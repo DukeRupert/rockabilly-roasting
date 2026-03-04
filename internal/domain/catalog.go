@@ -1,0 +1,97 @@
+package domain
+
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// ProductStatus represents the lifecycle state of a product.
+type ProductStatus string
+
+const (
+	ProductStatusDraft    ProductStatus = "draft"
+	ProductStatusActive   ProductStatus = "active"
+	ProductStatusArchived ProductStatus = "archived"
+)
+
+// MediaType represents the type of product media.
+type MediaType string
+
+const (
+	MediaTypeImage MediaType = "image"
+	MediaTypeVideo MediaType = "video"
+)
+
+// Product represents a catalog product.
+type Product struct {
+	ID            uuid.UUID
+	Slug          string
+	Title         string
+	Description   string
+	Status        ProductStatus
+	ProductTypeID *uuid.UUID
+	TaxonID       uuid.UUID
+	Metadata      map[string]any
+	AvailableOn   *time.Time
+	DiscontinueOn *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+// Variant represents a purchasable variant of a product.
+type Variant struct {
+	ID          uuid.UUID
+	ProductID   uuid.UUID
+	SKU         string
+	Barcode     *string
+	Position    int
+	IsDefault   bool
+	WeightGrams *int
+	Metadata    map[string]any
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// ProductOption represents a configurable option for a product (e.g., "Roast Level").
+type ProductOption struct {
+	ID        uuid.UUID
+	ProductID uuid.UUID
+	Name      string
+	Position  int
+}
+
+// ProductOptionValue represents a value for a product option (e.g., "Light").
+type ProductOptionValue struct {
+	ID              uuid.UUID
+	ProductOptionID uuid.UUID
+	Value           string
+	Position        int
+}
+
+// VariantOptionValue is a join table linking variants to option values.
+type VariantOptionValue struct {
+	VariantID            uuid.UUID
+	ProductOptionValueID uuid.UUID
+}
+
+// ProductMedia represents an image or video associated with a product.
+type ProductMedia struct {
+	ID        uuid.UUID
+	ProductID uuid.UUID
+	VariantID *uuid.UUID
+	URL       string
+	AltText   string
+	Position  int
+	MediaType MediaType
+}
+
+// Taxon represents a taxonomy node for product categorization.
+type Taxon struct {
+	ID       uuid.UUID
+	ParentID *uuid.UUID
+	Name     string
+	Slug     string
+	Position int
+	Depth    int
+}

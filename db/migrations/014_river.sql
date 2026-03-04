@@ -1,0 +1,14 @@
+-- +goose Up
+-- River (riverqueue/river) manages its own job tables via river.Migrate()
+-- called from cmd/server/main.go at startup. No custom SQL is needed here.
+--
+-- River creates the following tables automatically:
+--   river_job
+--   river_leader
+--   river_queue
+--
+-- See: https://riverqueue.com/docs/migrations
+
+-- +goose Down
+-- River tables are managed by river.Migrate() and are not dropped here.
+-- To fully remove River tables, use river.Migrate() with river.MigrateDown.

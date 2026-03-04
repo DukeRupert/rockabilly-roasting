@@ -11,33 +11,148 @@ import (
 )
 
 type Querier interface {
+	AdjustStockQuantity(ctx context.Context, arg AdjustStockQuantityParams) (StockLevel, error)
+	CancelSubscription(ctx context.Context, id uuid.UUID) error
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
+	CreateAdjustment(ctx context.Context, arg CreateAdjustmentParams) (Adjustment, error)
+	CreateAuditEntry(ctx context.Context, arg CreateAuditEntryParams) (AuditLog, error)
+	CreateCart(ctx context.Context, arg CreateCartParams) (Cart, error)
+	CreateCouponCode(ctx context.Context, arg CreateCouponCodeParams) (CouponCode, error)
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
+	CreateDiscount(ctx context.Context, arg CreateDiscountParams) (Discount, error)
 	CreateEmailVerification(ctx context.Context, arg CreateEmailVerificationParams) (EmailVerification, error)
+	CreateFulfillment(ctx context.Context, arg CreateFulfillmentParams) (Fulfillment, error)
+	CreateFulfillmentItem(ctx context.Context, arg CreateFulfillmentItemParams) (FulfillmentItem, error)
+	CreateInventoryItem(ctx context.Context, arg CreateInventoryItemParams) (InventoryItem, error)
+	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (LineItem, error)
+	CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error)
+	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
+	CreateProductMedia(ctx context.Context, arg CreateProductMediaParams) (ProductMedium, error)
+	CreateProductOption(ctx context.Context, arg CreateProductOptionParams) (ProductOption, error)
+	CreateProductOptionValue(ctx context.Context, arg CreateProductOptionValueParams) (ProductOptionValue, error)
 	CreateResetToken(ctx context.Context, arg CreateResetTokenParams) (ResetToken, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	CreateShipment(ctx context.Context, arg CreateShipmentParams) (Shipment, error)
+	CreateStockLevel(ctx context.Context, arg CreateStockLevelParams) (StockLevel, error)
+	CreateStockLocation(ctx context.Context, arg CreateStockLocationParams) (StockLocation, error)
+	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error)
+	CreateSubscriptionOrder(ctx context.Context, arg CreateSubscriptionOrderParams) error
+	CreateSubscriptionPlan(ctx context.Context, arg CreateSubscriptionPlanParams) (SubscriptionPlan, error)
+	CreateTaxon(ctx context.Context, arg CreateTaxonParams) (Taxon, error)
+	CreateVariant(ctx context.Context, arg CreateVariantParams) (Variant, error)
+	CreateVariantOptionValue(ctx context.Context, arg CreateVariantOptionValueParams) error
+	CreateWebhookEvent(ctx context.Context, arg CreateWebhookEventParams) (WebhookEvent, error)
 	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
+	DeleteAdjustment(ctx context.Context, id uuid.UUID) error
+	DeleteCart(ctx context.Context, id uuid.UUID) error
+	DeleteCouponCode(ctx context.Context, id uuid.UUID) error
 	DeleteCustomer(ctx context.Context, id uuid.UUID) error
+	DeleteDiscount(ctx context.Context, id uuid.UUID) error
+	DeleteLineItem(ctx context.Context, id uuid.UUID) error
+	DeleteLineItemsByOrder(ctx context.Context, orderID uuid.UUID) error
+	DeleteOrder(ctx context.Context, id uuid.UUID) error
+	DeleteProduct(ctx context.Context, id uuid.UUID) error
+	DeleteProductMedia(ctx context.Context, id uuid.UUID) error
+	DeleteProductOption(ctx context.Context, id uuid.UUID) error
+	DeleteProductOptionValue(ctx context.Context, id uuid.UUID) error
+	DeleteTaxon(ctx context.Context, id uuid.UUID) error
+	DeleteVariant(ctx context.Context, id uuid.UUID) error
+	DeleteVariantOptionValuesByVariant(ctx context.Context, variantID uuid.UUID) error
 	GetAddress(ctx context.Context, arg GetAddressParams) (Address, error)
 	GetAddressByID(ctx context.Context, id uuid.UUID) (Address, error)
+	GetCartByCustomerID(ctx context.Context, customerID *uuid.UUID) (Cart, error)
+	GetCartByID(ctx context.Context, id uuid.UUID) (Cart, error)
+	GetCouponCodeByCode(ctx context.Context, code string) (CouponCode, error)
+	GetCouponCodeByID(ctx context.Context, id uuid.UUID) (CouponCode, error)
 	GetCustomerByEmail(ctx context.Context, email string) (Customer, error)
 	GetCustomerByID(ctx context.Context, id uuid.UUID) (Customer, error)
+	GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, error)
 	GetEmailVerificationByTokenHash(ctx context.Context, tokenHash string) (EmailVerification, error)
+	GetFulfillmentByID(ctx context.Context, id uuid.UUID) (Fulfillment, error)
+	GetInventoryItemByID(ctx context.Context, id uuid.UUID) (InventoryItem, error)
+	GetInventoryItemByVariantID(ctx context.Context, variantID uuid.UUID) (InventoryItem, error)
+	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
+	GetOrderByNumber(ctx context.Context, number string) (Order, error)
+	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
+	GetProductBySlug(ctx context.Context, slug string) (Product, error)
 	GetResetTokenByTokenHash(ctx context.Context, tokenHash string) (ResetToken, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (Session, error)
+	GetShipmentByID(ctx context.Context, id uuid.UUID) (Shipment, error)
+	GetShippingConfig(ctx context.Context) (ShippingConfig, error)
+	GetStockLevelByInventoryAndLocation(ctx context.Context, arg GetStockLevelByInventoryAndLocationParams) (StockLevel, error)
+	GetStockLocationByID(ctx context.Context, id uuid.UUID) (StockLocation, error)
+	GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscription, error)
+	GetSubscriptionByIDAndCustomer(ctx context.Context, arg GetSubscriptionByIDAndCustomerParams) (Subscription, error)
+	GetSubscriptionPlanByID(ctx context.Context, id uuid.UUID) (SubscriptionPlan, error)
+	GetTaxonByID(ctx context.Context, id uuid.UUID) (Taxon, error)
+	GetTaxonBySlug(ctx context.Context, slug string) (Taxon, error)
+	GetVariantByID(ctx context.Context, id uuid.UUID) (Variant, error)
+	GetVariantBySKU(ctx context.Context, sku string) (Variant, error)
+	GetWebhookEventByProviderAndEventID(ctx context.Context, arg GetWebhookEventByProviderAndEventIDParams) (WebhookEvent, error)
 	ListAddresses(ctx context.Context, customerID *uuid.UUID) ([]Address, error)
+	ListAdjustmentsByLineItem(ctx context.Context, lineItemID *uuid.UUID) ([]Adjustment, error)
+	ListAdjustmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Adjustment, error)
+	ListAuditByAction(ctx context.Context, action string) ([]AuditLog, error)
+	ListAuditByActor(ctx context.Context, actorID *uuid.UUID) ([]AuditLog, error)
+	ListAuditByResource(ctx context.Context, arg ListAuditByResourceParams) ([]AuditLog, error)
+	ListCouponCodesByDiscount(ctx context.Context, discountID uuid.UUID) ([]CouponCode, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
+	ListFulfillmentItemsByFulfillment(ctx context.Context, fulfillmentID uuid.UUID) ([]FulfillmentItem, error)
+	ListFulfillmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Fulfillment, error)
+	ListLineItemsByOrder(ctx context.Context, orderID uuid.UUID) ([]LineItem, error)
+	ListProductMediaByProduct(ctx context.Context, productID uuid.UUID) ([]ProductMedium, error)
+	ListProductOptionValuesByOption(ctx context.Context, productOptionID uuid.UUID) ([]ProductOptionValue, error)
+	ListProductOptionsByProduct(ctx context.Context, productID uuid.UUID) ([]ProductOption, error)
+	ListRootTaxons(ctx context.Context) ([]Taxon, error)
+	ListShipmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Shipment, error)
+	ListStockLevelsByInventory(ctx context.Context, inventoryItemID uuid.UUID) ([]StockLevel, error)
+	ListStockLocations(ctx context.Context) ([]StockLocation, error)
+	ListSubscriptionOrdersBySubscription(ctx context.Context, subscriptionID uuid.UUID) ([]SubscriptionOrder, error)
+	ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlan, error)
+	ListSubscriptionsByCustomer(ctx context.Context, customerID uuid.UUID) ([]Subscription, error)
+	ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscription, error)
+	ListTaxonsByParent(ctx context.Context, parentID *uuid.UUID) ([]Taxon, error)
+	ListUnprocessedWebhookEvents(ctx context.Context) ([]WebhookEvent, error)
+	ListVariantOptionValuesByVariant(ctx context.Context, variantID uuid.UUID) ([]VariantOptionValue, error)
+	ListVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]Variant, error)
+	MarkCouponCodeRedeemed(ctx context.Context, arg MarkCouponCodeRedeemedParams) error
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
 	MarkResetTokenUsed(ctx context.Context, id uuid.UUID) error
+	MarkWebhookEventFailed(ctx context.Context, arg MarkWebhookEventFailedParams) error
+	MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error
 	PruneExpiredSessions(ctx context.Context) (int64, error)
+	ReleaseReservation(ctx context.Context, arg ReleaseReservationParams) (StockLevel, error)
+	ReserveStock(ctx context.Context, arg ReserveStockParams) (StockLevel, error)
 	RevokeAllSessionsForActor(ctx context.Context, arg RevokeAllSessionsForActorParams) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
+	UpdateCartAddresses(ctx context.Context, arg UpdateCartAddressesParams) (Cart, error)
+	UpdateCartDiscount(ctx context.Context, arg UpdateCartDiscountParams) (Cart, error)
 	UpdateCustomerEmail(ctx context.Context, arg UpdateCustomerEmailParams) (Customer, error)
 	UpdateCustomerEmailVerified(ctx context.Context, arg UpdateCustomerEmailVerifiedParams) error
 	UpdateCustomerGroup(ctx context.Context, arg UpdateCustomerGroupParams) error
 	UpdateCustomerPassword(ctx context.Context, arg UpdateCustomerPasswordParams) error
 	UpdateCustomerTaxExempt(ctx context.Context, arg UpdateCustomerTaxExemptParams) error
+	UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) (Discount, error)
+	UpdateFulfillmentStatus(ctx context.Context, arg UpdateFulfillmentStatusParams) (Fulfillment, error)
+	UpdateFulfillmentTracking(ctx context.Context, arg UpdateFulfillmentTrackingParams) (Fulfillment, error)
+	UpdateOrderFulfillmentStatus(ctx context.Context, arg UpdateOrderFulfillmentStatusParams) (Order, error)
+	UpdateOrderPaymentStatus(ctx context.Context, arg UpdateOrderPaymentStatusParams) (Order, error)
+	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
+	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
+	UpdateProductMediaPosition(ctx context.Context, arg UpdateProductMediaPositionParams) error
+	UpdateProductStatus(ctx context.Context, arg UpdateProductStatusParams) (Product, error)
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error
+	UpdateShipmentDelivered(ctx context.Context, id uuid.UUID) error
+	UpdateShipmentStatus(ctx context.Context, arg UpdateShipmentStatusParams) (Shipment, error)
+	UpdateShipmentTracking(ctx context.Context, arg UpdateShipmentTrackingParams) (Shipment, error)
+	UpdateShippingConfig(ctx context.Context, arg UpdateShippingConfigParams) error
+	UpdateStockLocationActive(ctx context.Context, arg UpdateStockLocationActiveParams) error
+	UpdateSubscriptionPauseUntil(ctx context.Context, arg UpdateSubscriptionPauseUntilParams) error
+	UpdateSubscriptionPeriod(ctx context.Context, arg UpdateSubscriptionPeriodParams) error
+	UpdateSubscriptionPlanActive(ctx context.Context, arg UpdateSubscriptionPlanActiveParams) error
+	UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscriptionStatusParams) (Subscription, error)
+	UpdateTaxon(ctx context.Context, arg UpdateTaxonParams) (Taxon, error)
+	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (Variant, error)
 }
 
 var _ Querier = (*Queries)(nil)

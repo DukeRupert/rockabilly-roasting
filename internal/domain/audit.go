@@ -1,6 +1,11 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // AuditActorType identifies the type of actor performing an audited action.
 type AuditActorType string
@@ -22,4 +27,21 @@ var SystemActor = StaffActor{
 	ID:   uuid.Nil,
 	Name: "system",
 	Type: AuditActorTypeSystem,
+}
+
+// AuditEntry represents a row in the audit_log table.
+type AuditEntry struct {
+	ID            uuid.UUID
+	ActorType     AuditActorType
+	ActorID       *uuid.UUID
+	ActorName     string
+	Action        string
+	ResourceType  string
+	ResourceID    uuid.UUID
+	AfterSnapshot json.RawMessage
+	RequestID     string
+	IPAddress     *string
+	Reason        *string
+	Metadata      map[string]any
+	CreatedAt     time.Time
 }

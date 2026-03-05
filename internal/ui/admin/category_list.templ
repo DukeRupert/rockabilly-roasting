@@ -1,0 +1,158 @@
+package admin
+
+import (
+	"fmt"
+	"strconv"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/components/button"
+	"github.com/dukerupert/hiri/internal/ui/components/card"
+	"github.com/dukerupert/hiri/internal/ui/components/input"
+	"github.com/dukerupert/hiri/internal/ui/components/label"
+	"github.com/dukerupert/hiri/internal/ui/components/table"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/dukerupert/hiri/internal/ui/components"
+)
+
+type CategoryListProps struct {
+	Taxons  []domain.Taxon
+	Flash   string
+	Editing *domain.Taxon
+}
+
+templ CategoryList(props CategoryListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Categories",
+		ActivePath: "/admin/catalog",
+		StaffName:  "Dev User",
+		StaffRole:  "admin",
+	}) {
+		@components.PageHeader(components.PageHeaderProps{
+			Title:       "Categories",
+			Description: "Organize products into categories",
+		}) {
+			@button.Button(button.Props{
+				Variant: button.VariantOutline,
+				Href:    "/admin/catalog",
+			}) {
+				Back to products
+			}
+		}
+		if props.Flash != "" {
+			<div class="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+				{ props.Flash }
+			</div>
+		}
+		<div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+			<!-- Category table -->
+			<div class="lg:col-span-2">
+				if len(props.Taxons) == 0 {
+					<div class="rounded-lg border border-dashed p-12 text-center">
+						<p class="text-sm text-muted-foreground">No categories yet. Create one to get started.</p>
+					</div>
+				} else {
+					@table.Table() {
+						@table.Header() {
+							@table.Row() {
+								@table.Head() { Name }
+								@table.Head() { Slug }
+								@table.Head() { Position }
+								@table.Head(table.HeadProps{Class: "text-right"}) { Actions }
+							}
+						}
+						@table.Body() {
+							for _, t := range props.Taxons {
+								@table.Row() {
+									@table.Cell() {
+										<span class="font-medium">{ t.Name }</span>
+									}
+									@table.Cell() {
+										<span class="font-mono text-sm text-muted-foreground">{ t.Slug }</span>
+									}
+									@table.Cell() {
+										{ strconv.Itoa(t.Position) }
+									}
+									@table.Cell(table.CellProps{Class: "text-right"}) {
+										<div class="flex items-center justify-end gap-1">
+											@button.Button(button.Props{
+												Variant: button.VariantGhost,
+												Size:    button.SizeSm,
+												Href:    fmt.Sprintf("/admin/categories?edit=%s", t.ID),
+											}) {
+												Edit
+											}
+											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/categories/%s/delete", t.ID)) } class="inline" onsubmit="return confirm('Delete this category? Products in this category will become uncategorized.')">
+												@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
+													Delete
+												}
+											</form>
+										</div>
+									}
+								}
+							}
+						}
+					}
+				}
+			</div>
+			<!-- Create/Edit form -->
+			<div>
+				@card.Card() {
+					@card.Header() {
+						@card.Title() {
+							if props.Editing != nil {
+								Edit category
+							} else {
+								New category
+							}
+						}
+					}
+					@card.Content() {
+						if props.Editing != nil {
+							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/categories/%s", props.Editing.ID)) } class="space-y-4">
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "cat_name"}) { Name }
+									@input.Input(input.Props{ID: "cat_name", Name: "name", Value: props.Editing.Name, Required: true})
+								</div>
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "cat_slug"}) { Slug }
+									@input.Input(input.Props{ID: "cat_slug", Name: "slug", Value: props.Editing.Slug, Required: true})
+								</div>
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "cat_position"}) { Position }
+									@input.Input(input.Props{ID: "cat_position", Name: "position", Type: input.TypeNumber, Value: strconv.Itoa(props.Editing.Position)})
+								</div>
+								<div class="flex gap-2">
+									@button.Button(button.Props{Type: button.TypeSubmit, FullWidth: true}) {
+										Save changes
+									}
+								</div>
+								<div>
+									@button.Button(button.Props{Variant: button.VariantOutline, FullWidth: true, Href: "/admin/categories"}) {
+										Cancel
+									}
+								</div>
+							</form>
+						} else {
+							<form method="post" action="/admin/categories" class="space-y-4">
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "cat_name"}) { Name }
+									@input.Input(input.Props{ID: "cat_name", Name: "name", Placeholder: "Category name", Required: true})
+								</div>
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "cat_slug"}) { Slug }
+									@input.Input(input.Props{ID: "cat_slug", Name: "slug", Placeholder: "category-slug", Required: true})
+								</div>
+								<div class="space-y-2">
+									@label.Label(label.Props{For: "cat_position"}) { Position }
+									@input.Input(input.Props{ID: "cat_position", Name: "position", Type: input.TypeNumber, Value: "0"})
+								</div>
+								@button.Button(button.Props{Type: button.TypeSubmit, FullWidth: true}) {
+									Create category
+								}
+							</form>
+						}
+					}
+				}
+			</div>
+		</div>
+	}
+}

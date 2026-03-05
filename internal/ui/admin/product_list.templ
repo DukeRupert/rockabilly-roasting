@@ -1,0 +1,150 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/google/uuid"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/components/button"
+	"github.com/dukerupert/hiri/internal/ui/components/table"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/dukerupert/hiri/internal/ui/components"
+)
+
+type ProductListProps struct {
+	Products      []domain.Product
+	Taxons        []domain.Taxon
+	TaxonMap      map[uuid.UUID]string
+	StatusFilter  string
+	TaxonFilter   string
+	Page          int
+	PerPage       int
+	HasMore       bool
+}
+
+templ ProductList(props ProductListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Products",
+		ActivePath: "/admin/catalog",
+		StaffName:  "Dev User",
+		StaffRole:  "admin",
+	}) {
+		@components.PageHeader(components.PageHeaderProps{
+			Title:       "Products",
+			Description: "Manage your product catalog",
+		}) {
+			@button.Button(button.Props{
+				Href: "/admin/catalog/new",
+			}) {
+				Add product
+			}
+		}
+		<div class="mt-6">
+			<!-- Filter bar -->
+			<form method="get" action="/admin/catalog" class="flex items-center gap-3 mb-4">
+				<select
+					name="status"
+					class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+					onchange="this.form.submit()"
+				>
+					<option value="">All statuses</option>
+					<option value="draft" selected?={ props.StatusFilter == "draft" }>Draft</option>
+					<option value="active" selected?={ props.StatusFilter == "active" }>Active</option>
+					<option value="archived" selected?={ props.StatusFilter == "archived" }>Archived</option>
+				</select>
+				<select
+					name="taxon"
+					class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+					onchange="this.form.submit()"
+				>
+					<option value="">All categories</option>
+					for _, t := range props.Taxons {
+						<option value={ t.ID.String() } selected?={ props.TaxonFilter == t.ID.String() }>{ t.Name }</option>
+					}
+				</select>
+			</form>
+			if len(props.Products) == 0 {
+				<div class="rounded-lg border border-dashed p-12 text-center">
+					<p class="text-sm text-muted-foreground">No products yet</p>
+					<div class="mt-4">
+						@button.Button(button.Props{
+							Href:    "/admin/catalog/new",
+							Variant: button.VariantOutline,
+						}) {
+							Add your first product
+						}
+					</div>
+				</div>
+			} else {
+				@table.Table() {
+					@table.Header() {
+						@table.Row() {
+							@table.Head() { Title }
+							@table.Head() { Status }
+							@table.Head() { Category }
+							@table.Head() { Created }
+							@table.Head(table.HeadProps{Class: "text-right"}) { Actions }
+						}
+					}
+					@table.Body() {
+						for _, p := range props.Products {
+							@table.Row() {
+								@table.Cell() {
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="font-medium hover:underline">
+										{ p.Title }
+									</a>
+								}
+								@table.Cell() {
+									@StatusBadge(p.Status)
+								}
+								@table.Cell() {
+									if name, ok := props.TaxonMap[p.TaxonID]; ok {
+										{ name }
+									} else {
+										<span class="text-muted-foreground">—</span>
+									}
+								}
+								@table.Cell() {
+									<span class="text-muted-foreground text-sm">{ p.CreatedAt.Format("Jan 2, 2006") }</span>
+								}
+								@table.Cell(table.CellProps{Class: "text-right"}) {
+									@button.Button(button.Props{
+										Variant: button.VariantGhost,
+										Size:    button.SizeSm,
+										Href:    fmt.Sprintf("/admin/catalog/%s", p.ID),
+									}) {
+										Edit
+									}
+								}
+							}
+						}
+					}
+				}
+				<!-- Pagination -->
+				<div class="flex items-center justify-between mt-4">
+					<div class="text-sm text-muted-foreground">
+						if props.Page > 1 {
+							@button.Button(button.Props{
+								Variant: button.VariantOutline,
+								Size:    button.SizeSm,
+								Href:    fmt.Sprintf("/admin/catalog?page=%d&status=%s&taxon=%s", props.Page-1, props.StatusFilter, props.TaxonFilter),
+							}) {
+								Previous
+							}
+						}
+					</div>
+					<div>
+						if props.HasMore {
+							@button.Button(button.Props{
+								Variant: button.VariantOutline,
+								Size:    button.SizeSm,
+								Href:    fmt.Sprintf("/admin/catalog?page=%d&status=%s&taxon=%s", props.Page+1, props.StatusFilter, props.TaxonFilter),
+							}) {
+								Next
+							}
+						}
+					</div>
+				</div>
+			}
+		</div>
+	}
+}

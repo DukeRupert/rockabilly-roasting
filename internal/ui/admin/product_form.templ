@@ -1,0 +1,195 @@
+package admin
+
+import (
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/components/button"
+	"github.com/dukerupert/hiri/internal/ui/components/card"
+	"github.com/dukerupert/hiri/internal/ui/components/input"
+	"github.com/dukerupert/hiri/internal/ui/components/label"
+	"github.com/dukerupert/hiri/internal/ui/components/textarea"
+)
+
+type ProductFormProps struct {
+	Product *domain.Product
+	Taxons  []domain.Taxon
+	IsNew   bool
+	Errors  map[string]string
+	Action  string
+}
+
+func productVal(p *domain.Product, field string) string {
+	if p == nil {
+		return ""
+	}
+	switch field {
+	case "title":
+		return p.Title
+	case "slug":
+		return p.Slug
+	case "description":
+		return p.Description
+	default:
+		return ""
+	}
+}
+
+func productDateVal(p *domain.Product, field string) string {
+	if p == nil {
+		return ""
+	}
+	switch field {
+	case "available_on":
+		if p.AvailableOn != nil {
+			return p.AvailableOn.Format("2006-01-02")
+		}
+	case "discontinue_on":
+		if p.DiscontinueOn != nil {
+			return p.DiscontinueOn.Format("2006-01-02")
+		}
+	}
+	return ""
+}
+
+func hasError(errors map[string]string, field string) bool {
+	if errors == nil {
+		return false
+	}
+	_, ok := errors[field]
+	return ok
+}
+
+func getError(errors map[string]string, field string) string {
+	if errors == nil {
+		return ""
+	}
+	return errors[field]
+}
+
+templ ProductForm(props ProductFormProps) {
+	<form method="post" action={ templ.SafeURL(props.Action) }>
+		@card.Card() {
+			@card.Header() {
+				@card.Title() {
+					General
+				}
+			}
+			@card.Content() {
+				<div class="space-y-4">
+					<div class="space-y-2">
+						@label.Label(label.Props{For: "title", Error: getError(props.Errors, "title")}) {
+							Title
+						}
+						@input.Input(input.Props{
+							ID:          "title",
+							Name:        "title",
+							Placeholder: "Product title",
+							Value:       productVal(props.Product, "title"),
+							Required:    true,
+							HasError:    hasError(props.Errors, "title"),
+						})
+						if msg := getError(props.Errors, "title"); msg != "" {
+							<p class="text-sm text-destructive">{ msg }</p>
+						}
+					</div>
+					<div class="space-y-2">
+						@label.Label(label.Props{For: "slug", Error: getError(props.Errors, "slug")}) {
+							Slug
+						}
+						@input.Input(input.Props{
+							ID:          "slug",
+							Name:        "slug",
+							Placeholder: "product-slug",
+							Value:       productVal(props.Product, "slug"),
+							Required:    true,
+							HasError:    hasError(props.Errors, "slug"),
+						})
+						if msg := getError(props.Errors, "slug"); msg != "" {
+							<p class="text-sm text-destructive">{ msg }</p>
+						}
+					</div>
+					<div class="space-y-2">
+						@label.Label(label.Props{For: "description"}) {
+							Description
+						}
+						@textarea.Textarea(textarea.Props{
+							ID:          "description",
+							Name:        "description",
+							Placeholder: "Product description",
+							Value:       productVal(props.Product, "description"),
+							Rows:        4,
+						})
+					</div>
+					<div class="space-y-2">
+						@label.Label(label.Props{For: "taxon_id"}) {
+							Category
+						}
+						<select
+							id="taxon_id"
+							name="taxon_id"
+							class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
+						>
+							<option value="">No category</option>
+							for _, t := range props.Taxons {
+								if props.Product != nil && props.Product.TaxonID == t.ID {
+									<option value={ t.ID.String() } selected>{ t.Name }</option>
+								} else {
+									<option value={ t.ID.String() }>{ t.Name }</option>
+								}
+							}
+						</select>
+					</div>
+				</div>
+			}
+		}
+		<div class="mt-6">
+			@card.Card() {
+				@card.Header() {
+					@card.Title() {
+						Availability
+					}
+				}
+				@card.Content() {
+					<div class="grid grid-cols-2 gap-4">
+						<div class="space-y-2">
+							@label.Label(label.Props{For: "available_on"}) {
+								Available on
+							}
+							@input.Input(input.Props{
+								ID:    "available_on",
+								Name:  "available_on",
+								Type:  input.TypeDate,
+								Value: productDateVal(props.Product, "available_on"),
+							})
+						</div>
+						<div class="space-y-2">
+							@label.Label(label.Props{For: "discontinue_on"}) {
+								Discontinue on
+							}
+							@input.Input(input.Props{
+								ID:    "discontinue_on",
+								Name:  "discontinue_on",
+								Type:  input.TypeDate,
+								Value: productDateVal(props.Product, "discontinue_on"),
+							})
+						</div>
+					</div>
+				}
+			}
+		</div>
+		@card.Footer(card.FooterProps{Class: "mt-6 justify-between"}) {
+			@button.Button(button.Props{
+				Variant: button.VariantOutline,
+				Href:    "/admin/catalog",
+			}) {
+				Cancel
+			}
+			@button.Button(button.Props{Type: button.TypeSubmit}) {
+				if props.IsNew {
+					Create product
+				} else {
+					Save changes
+				}
+			}
+		}
+	</form>
+}

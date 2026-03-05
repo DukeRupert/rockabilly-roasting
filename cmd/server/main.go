@@ -85,6 +85,7 @@ func run() error {
 
 	// Router
 	deps := &web.Deps{
+		Pool:                pool,
 		Logger:              logger,
 		Metrics:             metricsReg,
 		Sessions:            sessionMgr,

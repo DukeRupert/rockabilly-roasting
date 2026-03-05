@@ -1,0 +1,37 @@
+package admin
+
+import (
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/components/badge"
+)
+
+func statusBadgeVariant(status domain.ProductStatus) badge.Variant {
+	switch status {
+	case domain.ProductStatusActive:
+		return badge.VariantDefault
+	case domain.ProductStatusArchived:
+		return badge.VariantSecondary
+	default:
+		return badge.VariantOutline
+	}
+}
+
+func statusBadgeClass(status domain.ProductStatus) string {
+	switch status {
+	case domain.ProductStatusActive:
+		return "bg-emerald-100 text-emerald-800 border-emerald-200"
+	case domain.ProductStatusArchived:
+		return "bg-stone-100 text-stone-500 border-stone-200"
+	default:
+		return "bg-amber-100 text-amber-800 border-amber-200"
+	}
+}
+
+templ StatusBadge(status domain.ProductStatus) {
+	@badge.Badge(badge.Props{
+		Variant: badge.VariantOutline,
+		Class:   statusBadgeClass(status),
+	}) {
+		{ string(status) }
+	}
+}

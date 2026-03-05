@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
@@ -11,6 +13,7 @@ import (
 
 // Deps holds all dependencies needed by HTTP handlers.
 type Deps struct {
+	Pool          *pgxpool.Pool
 	Logger        *slog.Logger
 	Metrics       *metrics.Registry
 	Sessions      *sessions.Manager
@@ -41,6 +44,28 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin routes
 	mux.HandleFunc("GET /admin", deps.handleAdminDashboard)
+
+	// Admin catalog — categories (registered before product wildcard routes)
+	mux.HandleFunc("GET /admin/categories", deps.handleAdminCategoryList)
+	mux.HandleFunc("POST /admin/categories", deps.handleAdminCategoryCreate)
+	mux.HandleFunc("POST /admin/categories/{id}", deps.handleAdminCategoryUpdate)
+	mux.HandleFunc("POST /admin/categories/{id}/delete", deps.handleAdminCategoryDelete)
+
+	// Admin catalog — products
+	mux.HandleFunc("GET /admin/catalog", deps.handleAdminProductList)
+	mux.HandleFunc("GET /admin/catalog/new", deps.handleAdminProductNew)
+	mux.HandleFunc("POST /admin/catalog", deps.handleAdminProductCreate)
+	mux.HandleFunc("GET /admin/catalog/{id}", deps.handleAdminProductEdit)
+	mux.HandleFunc("POST /admin/catalog/{id}", deps.handleAdminProductUpdate)
+	mux.HandleFunc("POST /admin/catalog/{id}/status", deps.handleAdminProductStatusUpdate)
+	mux.HandleFunc("POST /admin/catalog/{id}/delete", deps.handleAdminProductDelete)
+	mux.HandleFunc("POST /admin/catalog/{id}/variants", deps.handleAdminVariantCreate)
+	mux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}", deps.handleAdminVariantUpdate)
+	mux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/delete", deps.handleAdminVariantDelete)
+	mux.HandleFunc("POST /admin/catalog/{id}/options", deps.handleAdminOptionCreate)
+	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/delete", deps.handleAdminOptionDelete)
+	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values", deps.handleAdminOptionValueCreate)
+	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values/{valueID}/delete", deps.handleAdminOptionValueDelete)
 
 	// API routes
 	// TODO: register API handlers

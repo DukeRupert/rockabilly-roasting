@@ -33,11 +33,14 @@ func NewRouter(deps *Deps) http.Handler {
 		w.Write([]byte("ok")) //nolint:errcheck
 	})
 
+	// Static assets
+	mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler("internal/ui/assets")))
+
 	// Storefront routes
 	// TODO: register storefront handlers
 
 	// Admin routes
-	// TODO: register admin handlers
+	mux.HandleFunc("GET /admin", deps.handleAdminDashboard)
 
 	// API routes
 	// TODO: register API handlers

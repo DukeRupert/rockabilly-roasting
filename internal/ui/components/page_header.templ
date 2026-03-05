@@ -1,0 +1,20 @@
+package components
+
+type PageHeaderProps struct {
+	Title       string
+	Description string
+}
+
+templ PageHeader(props PageHeaderProps) {
+	<div class="flex items-start justify-between gap-4">
+		<div>
+			<h1 class="text-2xl font-semibold text-stone-950">{ props.Title }</h1>
+			if props.Description != "" {
+				<p class="mt-1 text-sm text-stone-500">{ props.Description }</p>
+			}
+		</div>
+		<div class="flex items-center gap-2">
+			{ children... }
+		</div>
+	</div>
+}

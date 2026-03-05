@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@source "../../components/**/*.templ";
+@source "../../layouts/**/*.templ";
+
+@theme inline {
+	/* Hiri design system colors */
+	--color-hiri-teal: #2D7A7A;
+	--color-hiri-teal-dark: #1E5E5E;
+	--color-hiri-amber: #C4873A;
+	--color-hiri-red: #B85C4A;
+	--color-hiri-green: #3D8B6E;
+	--color-hiri-blue: #4A7FA8;
+	--color-hiri-bg: #FAF9F7;
+	--color-hiri-border: #E5E2DE;
+	--color-hiri-surface: #FFFFFF;
+	--color-hiri-text: #1C1917;
+	--color-hiri-text-secondary: #78716C;
+
+	/* Heritage tones */
+	--color-hiri-clay: #A66B4B;
+	--color-hiri-kina: #F5F0E6;
+	--color-hiri-lakatoi: #3D2E27;
+	--color-hiri-sail: #D4C4A8;
+}
+
+:root {
+	/* templui semantic tokens mapped to Hiri palette */
+	--background: var(--color-hiri-bg);
+	--foreground: var(--color-hiri-text);
+	--primary: var(--color-hiri-teal);
+	--primary-foreground: #FFFFFF;
+	--secondary: var(--color-hiri-kina);
+	--secondary-foreground: var(--color-hiri-text);
+	--accent: var(--color-stone-100);
+	--accent-foreground: var(--color-hiri-text);
+	--destructive: var(--color-hiri-red);
+	--destructive-foreground: #FFFFFF;
+	--muted: var(--color-stone-100);
+	--muted-foreground: var(--color-hiri-text-secondary);
+	--card: var(--color-hiri-surface);
+	--card-foreground: var(--color-hiri-text);
+	--border: var(--color-hiri-border);
+	--input: var(--color-hiri-border);
+	--ring: var(--color-hiri-teal);
+
+	/* Sidebar tokens */
+	--sidebar: var(--color-hiri-surface);
+	--sidebar-foreground: var(--color-hiri-text);
+	--sidebar-accent: var(--color-stone-100);
+	--sidebar-accent-foreground: var(--color-hiri-text);
+	--sidebar-border: var(--color-hiri-border);
+	--sidebar-ring: var(--color-hiri-teal);
+	--sidebar-primary: var(--color-hiri-teal);
+	--sidebar-primary-foreground: #FFFFFF;
+
+	/* Radius */
+	--radius: 0.375rem;
+}

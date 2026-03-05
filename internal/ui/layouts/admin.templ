@@ -1,0 +1,175 @@
+package layouts
+
+import (
+	"github.com/dukerupert/hiri/internal/ui/components/avatar"
+	"github.com/dukerupert/hiri/internal/ui/components/badge"
+	"github.com/dukerupert/hiri/internal/ui/components/dropdown"
+	"github.com/dukerupert/hiri/internal/ui/components/icon"
+	"github.com/dukerupert/hiri/internal/ui/components/sidebar"
+	"strings"
+)
+
+type AdminProps struct {
+	Title      string
+	ActivePath string
+	StaffName  string
+	StaffRole  string
+}
+
+type navItem struct {
+	Label   string
+	Href    string
+	IconFn  func(...icon.Props) templ.Component
+}
+
+func adminNavItems() []navItem {
+	return []navItem{
+		{Label: "Dashboard", Href: "/admin", IconFn: icon.LayoutDashboard},
+		{Label: "Orders", Href: "/admin/orders", IconFn: icon.ShoppingCart},
+		{Label: "Customers", Href: "/admin/customers", IconFn: icon.Users},
+		{Label: "Catalog", Href: "/admin/catalog", IconFn: icon.Package},
+		{Label: "Subscriptions", Href: "/admin/subscriptions", IconFn: icon.Repeat},
+		{Label: "Fulfillment", Href: "/admin/fulfillment", IconFn: icon.Truck},
+		{Label: "Discounts", Href: "/admin/discounts", IconFn: icon.Tag},
+	}
+}
+
+func staffInitials(name string) string {
+	parts := strings.Fields(name)
+	if len(parts) == 0 {
+		return "?"
+	}
+	if len(parts) == 1 {
+		return strings.ToUpper(string([]rune(parts[0])[0:1]))
+	}
+	return strings.ToUpper(string([]rune(parts[0])[0:1]) + string([]rune(parts[len(parts)-1])[0:1]))
+}
+
+templ Admin(props AdminProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ props.Title } - Hiri Admin</title>
+			<link rel="stylesheet" href="/static/css/output.css"/>
+		</head>
+		<body class="bg-[var(--background)] text-[var(--foreground)]">
+			@sidebar.Script()
+			@dropdown.Script()
+			@avatar.Script()
+			@sidebar.Layout() {
+				@sidebar.Sidebar(sidebar.Props{
+					Variant:     sidebar.VariantSidebar,
+					Collapsible: sidebar.CollapsibleIcon,
+					Side:        sidebar.SideLeft,
+				}) {
+					@sidebar.Header() {
+						@adminLogo()
+					}
+					@sidebar.Content() {
+						@sidebar.Group() {
+							@sidebar.GroupLabel() {
+								Navigation
+							}
+							@sidebar.Menu() {
+								for _, item := range adminNavItems() {
+									@sidebar.MenuItem() {
+										@sidebar.MenuButton(sidebar.MenuButtonProps{
+											Href:     item.Href,
+											IsActive: props.ActivePath == item.Href,
+											Tooltip:  item.Label,
+										}) {
+											@item.IconFn(icon.Props{Class: "size-4"})
+											<span>{ item.Label }</span>
+										}
+									}
+								}
+							}
+						}
+						@sidebar.Separator()
+						@sidebar.Group() {
+							@sidebar.Menu() {
+								@sidebar.MenuItem() {
+									@sidebar.MenuButton(sidebar.MenuButtonProps{
+										Href:     "/admin/settings",
+										IsActive: props.ActivePath == "/admin/settings",
+										Tooltip:  "Settings",
+									}) {
+										@icon.Settings(icon.Props{Class: "size-4"})
+										<span>Settings</span>
+									}
+								}
+							}
+						}
+					}
+					@sidebar.Footer() {
+						@adminUserMenu(props)
+					}
+				}
+				@sidebar.Inset() {
+					<header class="flex h-14 items-center gap-2 border-b border-[var(--border)] px-4">
+						@sidebar.Trigger()
+						<div class="flex-1"></div>
+					</header>
+					<div class="flex-1 p-6">
+						{ children... }
+					</div>
+				}
+			}
+		</body>
+	</html>
+}
+
+templ adminLogo() {
+	<a href="/admin" class="flex items-center gap-2 px-2 py-1">
+		<svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+			<path d="M32 8 L22 52 L32 44 L42 52 Z" fill="#2D7A7A" opacity="0.35"></path>
+			<path d="M36 6 L26 50 L36 42 L46 50 Z" fill="#2D7A7A"></path>
+		</svg>
+		<span class="text-lg font-semibold tracking-tight text-[var(--foreground)] group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:hidden">hiri</span>
+	</a>
+}
+
+templ adminUserMenu(props AdminProps) {
+	@dropdown.Dropdown() {
+		@dropdown.Trigger() {
+			@sidebar.MenuButton(sidebar.MenuButtonProps{
+				Size: sidebar.MenuButtonSizeLg,
+			}) {
+				@avatar.Avatar(avatar.Props{Class: "h-8 w-8"}) {
+					@avatar.Fallback(avatar.FallbackProps{Class: "bg-[var(--primary)] text-white text-xs"}) {
+						{ staffInitials(props.StaffName) }
+					}
+				}
+				<div class="flex flex-col gap-0.5 leading-none group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:hidden">
+					<span class="text-sm font-medium">{ props.StaffName }</span>
+					@badge.Badge(badge.Props{
+						Variant: badge.VariantSecondary,
+						Class:   "text-[10px] px-1.5 py-0 h-4 w-fit",
+					}) {
+						{ props.StaffRole }
+					}
+				</div>
+				@icon.ChevronsUpDown(icon.Props{Class: "ml-auto size-4 group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:hidden"})
+			}
+		}
+		@dropdown.Content(dropdown.ContentProps{
+			Placement: dropdown.PlacementTopStart,
+		}) {
+			@dropdown.Label() {
+				{ props.StaffName }
+			}
+			@dropdown.Separator()
+			@dropdown.Item(dropdown.ItemProps{Href: "/admin/settings"}) {
+				@icon.Settings(icon.Props{Class: "size-4"})
+				Settings
+			}
+			@dropdown.Separator()
+			@dropdown.Item(dropdown.ItemProps{Href: "/auth/logout"}) {
+				@icon.LogOut(icon.Props{Class: "size-4"})
+				Log out
+			}
+		}
+	}
+}

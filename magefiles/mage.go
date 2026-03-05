@@ -92,6 +92,24 @@ func (Dev) Templ() error {
 	return sh.RunV("templ", "generate")
 }
 
+// CSS compiles Tailwind CSS.
+func (Dev) CSS() error {
+	return sh.RunV("tailwindcss",
+		"-i", "internal/ui/assets/css/input.css",
+		"-o", "internal/ui/assets/css/output.css",
+		"--minify",
+	)
+}
+
+// Watch runs Tailwind CSS in watch mode.
+func (Dev) Watch() error {
+	return sh.RunV("tailwindcss",
+		"-i", "internal/ui/assets/css/input.css",
+		"-o", "internal/ui/assets/css/output.css",
+		"--watch",
+	)
+}
+
 // Checkout builds the Svelte checkout bundle.
 func (Dev) Checkout() error {
 	return sh.RunV("npm", "run", "build", "--prefix", "ui/checkout")

@@ -175,7 +175,7 @@ func CartContent(props CartPageProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</p></div><p class=\"mt-1 text-sm text-stone-500\">Shipping and taxes calculated at checkout.</p><div class=\"mt-6\"><button type=\"button\" class=\"w-full rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal\">Checkout</button></div><div class=\"mt-4 text-center\"><a href=\"/catalog\" class=\"text-sm text-hiri-teal hover:text-hiri-teal-dark font-medium\">Continue shopping</a></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</p></div><p class=\"mt-1 text-sm text-stone-500\">Shipping and taxes calculated at checkout.</p><div class=\"mt-6\"><a href=\"/checkout\" hx-boost=\"false\" class=\"block w-full rounded-md bg-hiri-teal px-6 py-3 text-center text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal\">Checkout</a></div><div class=\"mt-4 text-center\"><a href=\"/catalog\" class=\"text-sm text-hiri-teal hover:text-hiri-teal-dark font-medium\">Continue shopping</a></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -267,7 +267,7 @@ func CartBadge(count int) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/cart.templ`, Line: 140, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/cart.templ`, Line: 141, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {

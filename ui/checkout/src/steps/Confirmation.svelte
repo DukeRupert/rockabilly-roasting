@@ -1,0 +1,30 @@
+<script lang="ts">
+  interface Props {
+    orderNumber: string;
+  }
+
+  let { orderNumber }: Props = $props();
+</script>
+
+<div class="text-center py-12">
+  <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 mb-6">
+    <svg class="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+    </svg>
+  </div>
+
+  <h2 class="text-2xl font-bold text-stone-900 mb-2">Thank you for your order!</h2>
+  <p class="text-stone-600 mb-1">Your order has been confirmed.</p>
+  <p class="text-lg font-semibold text-hiri-teal mb-8">Order {orderNumber}</p>
+
+  <p class="text-sm text-stone-500 mb-6">
+    We'll send a confirmation email with your order details shortly.
+  </p>
+
+  <a
+    href="/catalog"
+    class="inline-block rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark"
+  >
+    Continue shopping
+  </a>
+</div>

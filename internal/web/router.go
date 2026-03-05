@@ -58,6 +58,13 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /cart/update", deps.handleCartUpdateQuantity)
 	mux.HandleFunc("POST /cart/remove", deps.handleCartRemoveItem)
 
+	// Checkout routes
+	mux.HandleFunc("GET /checkout", deps.handleCheckoutPage)
+	mux.HandleFunc("GET /api/checkout/cart", deps.handleCheckoutCart)
+	mux.HandleFunc("POST /api/checkout/address", deps.handleCheckoutAddress)
+	mux.HandleFunc("POST /api/checkout/payment-intent", deps.handleCheckoutPaymentIntent)
+	mux.HandleFunc("POST /api/checkout/confirm", deps.handleCheckoutConfirm)
+
 	// Admin routes
 	mux.HandleFunc("GET /admin", deps.handleAdminDashboard)
 

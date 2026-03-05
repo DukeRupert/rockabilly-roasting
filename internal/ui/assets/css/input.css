@@ -4,6 +4,7 @@
 @source "../../layouts/**/*.templ";
 @source "../../admin/**/*.templ";
 @source "../../storefront/**/*.templ";
+@source "../../../../../ui/checkout/src/**/*.svelte";
 
 @theme inline {
 	/* Hiri design system colors */

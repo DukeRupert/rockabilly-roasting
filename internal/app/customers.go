@@ -89,6 +89,32 @@ func (s *CustomerService) VerifyEmail(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return nil
 }
 
+// CreateGuest creates a guest customer with the given email and name.
+func (s *CustomerService) CreateGuest(ctx context.Context, tx pgx.Tx, email, firstName, lastName string) (*domain.Customer, error) {
+	c, err := s.customers.Create(ctx, tx, store.CreateCustomerParams{
+		Email:     email,
+		FirstName: firstName,
+		LastName:  lastName,
+		IsGuest:   true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create guest customer: %w", err)
+	}
+	return c, nil
+}
+
+// GetAddressByID returns an address by ID (no customer scoping).
+func (s *CustomerService) GetAddressByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Address, error) {
+	addr, err := s.customers.GetAddressByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrAddressNotFound
+		}
+		return nil, fmt.Errorf("get address by id: %w", err)
+	}
+	return addr, nil
+}
+
 // --- Staff-initiated methods (audited) ---
 
 // UpdateCustomerGroup updates a customer's group and records an audit entry.

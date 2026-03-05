@@ -96,6 +96,14 @@ func (s *CartService) ListItems(ctx context.Context, tx pgx.Tx, cartID uuid.UUID
 	return items, nil
 }
 
+// DeleteCart removes a cart and all its items.
+func (s *CartService) DeleteCart(ctx context.Context, tx pgx.Tx, cartID uuid.UUID) error {
+	if err := s.carts.DeleteCart(ctx, tx, cartID); err != nil {
+		return fmt.Errorf("delete cart: %w", err)
+	}
+	return nil
+}
+
 // GetItemCount returns total quantity of items in a cart.
 func (s *CartService) GetItemCount(ctx context.Context, tx pgx.Tx, cartID uuid.UUID) (int, error) {
 	count, err := s.carts.GetCartItemCount(ctx, tx, cartID)

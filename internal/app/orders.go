@@ -221,3 +221,15 @@ func (s *OrderService) UpdatePaymentStatus(ctx context.Context, tx pgx.Tx, id uu
 
 	return order, nil
 }
+
+// UpdateStripePaymentIntentID sets the Stripe PaymentIntent ID on an order.
+func (s *OrderService) UpdateStripePaymentIntentID(ctx context.Context, tx pgx.Tx, id uuid.UUID, intentID string) (*domain.Order, error) {
+	order, err := s.orders.UpdateOrderStripePaymentIntentID(ctx, tx, id, intentID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("update stripe payment intent id: %w", err)
+	}
+	return order, nil
+}

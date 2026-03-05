@@ -107,12 +107,13 @@ templ CartContent(props CartPageProps) {
 					</div>
 					<p class="mt-1 text-sm text-stone-500">Shipping and taxes calculated at checkout.</p>
 					<div class="mt-6">
-						<button
-							type="button"
-							class="w-full rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+						<a
+							href="/checkout"
+							hx-boost="false"
+							class="block w-full rounded-md bg-hiri-teal px-6 py-3 text-center text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
 						>
 							Checkout
-						</button>
+						</a>
 					</div>
 					<div class="mt-4 text-center">
 						<a href="/catalog" class="text-sm text-hiri-teal hover:text-hiri-teal-dark font-medium">

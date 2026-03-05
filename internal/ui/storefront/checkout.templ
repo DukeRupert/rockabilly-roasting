@@ -1,0 +1,23 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+type CheckoutPageProps struct {
+	CartID    string
+	StripeKey string
+	CartCount int
+}
+
+templ CheckoutContent(props CheckoutPageProps) {
+	<div id="checkout-app" data-cart-id={ props.CartID } data-stripe-key={ props.StripeKey }></div>
+	<script type="module" src="/static/checkout/checkout.js"></script>
+}
+
+templ CheckoutPage(props CheckoutPageProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:     "Checkout",
+		CartCount: props.CartCount,
+	}) {
+		@CheckoutContent(props)
+	}
+}

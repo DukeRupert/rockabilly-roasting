@@ -387,6 +387,65 @@ func (d *Deps) handleAdminProductDelete(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, "/admin/catalog?flash=Product+deleted", http.StatusSeeOther)
 }
 
+// --- Panel helpers ---
+
+// renderOptionsPanel re-fetches options for a product and renders the partial.
+func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, productID uuid.UUID) {
+	ctx := r.Context()
+	var product *domain.Product
+	var options []admin.OptionWithValues
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		product, txErr = d.CatalogService.GetProduct(ctx, tx, productID)
+		if txErr != nil {
+			return txErr
+		}
+		opts, txErr := d.CatalogService.ListProductOptions(ctx, tx, productID)
+		if txErr != nil {
+			return txErr
+		}
+		for _, opt := range opts {
+			vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
+			if vErr != nil {
+				return vErr
+			}
+			options = append(options, admin.OptionWithValues{
+				Option: opt,
+				Values: vals,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	admin.OptionsPanel(product, options).Render(ctx, w) //nolint:errcheck
+}
+
+// renderVariantsPanel re-fetches variants for a product and renders the partial.
+func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, productID uuid.UUID) {
+	ctx := r.Context()
+	var product *domain.Product
+	var variants []domain.Variant
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		product, txErr = d.CatalogService.GetProduct(ctx, tx, productID)
+		if txErr != nil {
+			return txErr
+		}
+		variants, txErr = d.CatalogService.ListVariants(ctx, tx, productID)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	admin.VariantsPanel(product, variants).Render(ctx, w) //nolint:errcheck
+}
+
 // --- Variants ---
 
 func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) {
@@ -412,8 +471,8 @@ func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) 
 	if barcode := r.FormValue("barcode"); barcode != "" {
 		params.Barcode = &barcode
 	}
-	if w, err := strconv.Atoi(r.FormValue("weight_grams")); err == nil && w > 0 {
-		params.WeightGrams = &w
+	if wt, err := strconv.Atoi(r.FormValue("weight_grams")); err == nil && wt > 0 {
+		params.WeightGrams = &wt
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -425,6 +484,10 @@ func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if IsHTMX(r) {
+		d.renderVariantsPanel(w, r, productID)
+		return
+	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+added", productID), http.StatusSeeOther)
 }
 
@@ -470,6 +533,10 @@ func (d *Deps) handleAdminVariantUpdate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if IsHTMX(r) {
+		d.renderVariantsPanel(w, r, productID)
+		return
+	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+updated", productID), http.StatusSeeOther)
 }
 
@@ -496,6 +563,10 @@ func (d *Deps) handleAdminVariantDelete(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if IsHTMX(r) {
+		d.renderVariantsPanel(w, r, productID)
+		return
+	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+deleted", productID), http.StatusSeeOther)
 }
 
@@ -530,6 +601,10 @@ func (d *Deps) handleAdminOptionCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if IsHTMX(r) {
+		d.renderOptionsPanel(w, r, productID)
+		return
+	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Option+added", productID), http.StatusSeeOther)
 }
 
@@ -556,6 +631,10 @@ func (d *Deps) handleAdminOptionDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if IsHTMX(r) {
+		d.renderOptionsPanel(w, r, productID)
+		return
+	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Option+deleted", productID), http.StatusSeeOther)
 }
 
@@ -596,6 +675,10 @@ func (d *Deps) handleAdminOptionValueCreate(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if IsHTMX(r) {
+		d.renderOptionsPanel(w, r, productID)
+		return
+	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Value+added", productID), http.StatusSeeOther)
 }
 
@@ -622,6 +705,10 @@ func (d *Deps) handleAdminOptionValueDelete(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	if IsHTMX(r) {
+		d.renderOptionsPanel(w, r, productID)
+		return
+	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Value+deleted", productID), http.StatusSeeOther)
 }
 

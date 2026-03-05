@@ -104,160 +104,215 @@ templ ProductEditContent(props ProductEditProps) {
 					</div>
 				</div>
 			</div>
+			<!-- Options panel (before variants — must define options before creating variants) -->
+			@OptionsPanel(props.Product, props.Options)
 			<!-- Variants panel -->
-			<div class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
-				<div class="px-4 py-5 sm:px-6">
-					<h3 class="text-base/7 font-semibold text-stone-900">Variants</h3>
-				</div>
-				<div class="border-t border-stone-200">
-					if len(props.Variants) > 0 {
-						<table class="min-w-full divide-y divide-stone-300">
-							<thead class="bg-stone-50">
-								<tr>
-									<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">SKU</th>
-									<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Barcode</th>
-									<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Default</th>
-									<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 lg:table-cell">Weight (g)</th>
-									<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-										<span class="sr-only">Actions</span>
-									</th>
-								</tr>
-							</thead>
-							<tbody class="divide-y divide-stone-200 bg-white">
-								for _, v := range props.Variants {
-									<tr>
-										<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-											<span class="font-mono font-medium text-stone-900">{ v.SKU }</span>
-										</td>
-										<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 sm:table-cell">
-											if v.Barcode != nil {
-												<span class="font-mono">{ *v.Barcode }</span>
-											} else {
-												<span class="text-stone-400">—</span>
-											}
-										</td>
-										<td class="whitespace-nowrap px-3 py-4 text-sm">
-											if v.IsDefault {
-												<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-													Default
-												</span>
-											}
-										</td>
-										<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 lg:table-cell">
-											if v.WeightGrams != nil {
-												{ strconv.Itoa(*v.WeightGrams) }
-											} else {
-												<span class="text-stone-400">—</span>
-											}
-										</td>
-										<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", props.Product.ID, v.ID)) } class="inline" onsubmit="return confirm('Delete this variant?')">
-												<button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
-											</form>
-										</td>
-									</tr>
-								}
-							</tbody>
-						</table>
-					} else {
+			@VariantsPanel(props.Product, props.Variants)
+		</div>
+}
+
+// OptionsPanel renders the options section as a standalone partial for htmx swaps.
+templ OptionsPanel(product *domain.Product, options []OptionWithValues) {
+	<div id="options-panel" class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+		<div class="px-4 py-5 sm:px-6">
+			<h3 class="text-base/7 font-semibold text-stone-900">Options</h3>
+			<p class="mt-1 text-sm text-stone-500">Define options (e.g. Size, Color) before creating variants.</p>
+		</div>
+		<div class="border-t border-stone-200">
+			if len(options) > 0 {
+				<div class="divide-y divide-stone-200">
+					for _, opt := range options {
 						<div class="px-4 py-5 sm:px-6">
-							<p class="text-sm text-stone-500">No variants yet.</p>
-						</div>
-					}
-					<!-- Add variant form -->
-					<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
-						<h4 class="text-sm font-medium text-stone-900 mb-4">Add variant</h4>
-						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants", props.Product.ID)) } class="flex items-end gap-3 flex-wrap">
-							<div class="flex-1 min-w-[120px]">
-								<label for="variant_sku" class="block text-sm/6 font-medium text-stone-900">SKU</label>
-								<div class="mt-2">
-									<input type="text" id="variant_sku" name="sku" placeholder="SKU-001" required class={ inputClasses(false) }/>
-								</div>
+							<div class="flex items-center justify-between mb-3">
+								<h4 class="text-sm font-medium text-stone-900">{ opt.Option.Name }</h4>
+								<form
+									method="post"
+									action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/options/%s/delete", product.ID, opt.Option.ID)) }
+									hx-post={ fmt.Sprintf("/admin/catalog/%s/options/%s/delete", product.ID, opt.Option.ID) }
+									hx-target="#options-panel"
+									hx-swap="outerHTML"
+									hx-confirm="Delete this option and all its values?"
+									class="inline"
+								>
+									<button type="submit" class="text-sm text-red-600 hover:text-red-900">Delete option</button>
+								</form>
 							</div>
-							<div class="flex-1 min-w-[120px]">
-								<label for="variant_barcode" class="block text-sm/6 font-medium text-stone-900">Barcode</label>
-								<div class="mt-2">
-									<input type="text" id="variant_barcode" name="barcode" placeholder="Optional" class={ inputClasses(false) }/>
-								</div>
-							</div>
-							<div class="w-24">
-								<label for="variant_weight" class="block text-sm/6 font-medium text-stone-900">Weight</label>
-								<div class="mt-2">
-									<input type="number" id="variant_weight" name="weight_grams" placeholder="0" class={ inputClasses(false) }/>
-								</div>
-							</div>
-							<div class="flex items-center gap-2 pb-1.5">
-								<input type="checkbox" id="variant_default" name="is_default" value="true" class="size-4 rounded border-stone-300 text-hiri-teal focus:ring-hiri-teal"/>
-								<label for="variant_default" class="text-sm font-medium text-stone-900">Default</label>
-							</div>
-							<button type="submit" class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
-								Add
-							</button>
-						</form>
-					</div>
-				</div>
-			</div>
-			<!-- Options panel -->
-			<div class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
-				<div class="px-4 py-5 sm:px-6">
-					<h3 class="text-base/7 font-semibold text-stone-900">Options</h3>
-				</div>
-				<div class="border-t border-stone-200">
-					if len(props.Options) > 0 {
-						<div class="divide-y divide-stone-200">
-							for _, opt := range props.Options {
-								<div class="px-4 py-5 sm:px-6">
-									<div class="flex items-center justify-between mb-3">
-										<h4 class="text-sm font-medium text-stone-900">{ opt.Option.Name }</h4>
-										<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/options/%s/delete", props.Product.ID, opt.Option.ID)) } class="inline" onsubmit="return confirm('Delete this option and all its values?')">
-											<button type="submit" class="text-sm text-red-600 hover:text-red-900">Delete option</button>
+							<div class="flex flex-wrap gap-2 mb-4">
+								for _, val := range opt.Values {
+									<span class="inline-flex items-center gap-x-1 rounded-md bg-stone-100 px-2 py-1 text-xs font-medium text-stone-600">
+										{ val.Value }
+										<form
+											method="post"
+											action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/options/%s/values/%s/delete", product.ID, opt.Option.ID, val.ID)) }
+											hx-post={ fmt.Sprintf("/admin/catalog/%s/options/%s/values/%s/delete", product.ID, opt.Option.ID, val.ID) }
+											hx-target="#options-panel"
+											hx-swap="outerHTML"
+											class="inline"
+										>
+											<button type="submit" class="text-stone-400 hover:text-red-500">&times;</button>
 										</form>
-									</div>
-									<div class="flex flex-wrap gap-2 mb-4">
-										for _, val := range opt.Values {
-											<span class="inline-flex items-center gap-x-1 rounded-md bg-stone-100 px-2 py-1 text-xs font-medium text-stone-600">
-												{ val.Value }
-												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/options/%s/values/%s/delete", props.Product.ID, opt.Option.ID, val.ID)) } class="inline">
-													<button type="submit" class="text-stone-400 hover:text-red-500">&times;</button>
-												</form>
-											</span>
-										}
-									</div>
-									<!-- Add value form -->
-									<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/options/%s/values", props.Product.ID, opt.Option.ID)) } class="flex items-end gap-2">
-										<div class="flex-1">
-											<input type="text" name="value" placeholder="New value" required class={ inputClasses(false) }/>
-										</div>
-										<button type="submit" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-stone-900 shadow-xs ring-1 ring-inset ring-stone-300 hover:bg-stone-50">
-											Add value
-										</button>
-									</form>
+									</span>
+								}
+							</div>
+							<!-- Add value form -->
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/options/%s/values", product.ID, opt.Option.ID)) }
+								hx-post={ fmt.Sprintf("/admin/catalog/%s/options/%s/values", product.ID, opt.Option.ID) }
+								hx-target="#options-panel"
+								hx-swap="outerHTML"
+								class="flex items-end gap-2"
+							>
+								<div class="flex-1">
+									<input type="text" name="value" placeholder="New value" required class={ inputClasses(false) }/>
 								</div>
-							}
-						</div>
-					} else {
-						<div class="px-4 py-5 sm:px-6">
-							<p class="text-sm text-stone-500 mb-4">No options defined.</p>
+								<button type="submit" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-stone-900 shadow-xs ring-1 ring-inset ring-stone-300 hover:bg-stone-50">
+									Add value
+								</button>
+							</form>
 						</div>
 					}
-					<!-- Add option form -->
-					<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
-						<h4 class="text-sm font-medium text-stone-900 mb-4">Add option</h4>
-						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/options", props.Product.ID)) } class="flex items-end gap-3">
-							<div class="flex-1">
-								<label for="option_name" class="block text-sm/6 font-medium text-stone-900">Name</label>
-								<div class="mt-2">
-									<input type="text" id="option_name" name="name" placeholder="e.g. Roast Level" required class={ inputClasses(false) }/>
-								</div>
-							</div>
-							<button type="submit" class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
-								Add option
-							</button>
-						</form>
-					</div>
 				</div>
+			} else {
+				<div class="px-4 py-5 sm:px-6">
+					<p class="text-sm text-stone-500 mb-4">No options defined.</p>
+				</div>
+			}
+			<!-- Add option form -->
+			<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
+				<h4 class="text-sm font-medium text-stone-900 mb-4">Add option</h4>
+				<form
+					method="post"
+					action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/options", product.ID)) }
+					hx-post={ fmt.Sprintf("/admin/catalog/%s/options", product.ID) }
+					hx-target="#options-panel"
+					hx-swap="outerHTML"
+					class="flex items-end gap-3"
+				>
+					<div class="flex-1">
+						<label for="option_name" class="block text-sm/6 font-medium text-stone-900">Name</label>
+						<div class="mt-2">
+							<input type="text" id="option_name" name="name" placeholder="e.g. Roast Level" required class={ inputClasses(false) }/>
+						</div>
+					</div>
+					<button type="submit" class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
+						Add option
+					</button>
+				</form>
 			</div>
 		</div>
+	</div>
+}
+
+// VariantsPanel renders the variants section as a standalone partial for htmx swaps.
+templ VariantsPanel(product *domain.Product, variants []domain.Variant) {
+	<div id="variants-panel" class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+		<div class="px-4 py-5 sm:px-6">
+			<h3 class="text-base/7 font-semibold text-stone-900">Variants</h3>
+		</div>
+		<div class="border-t border-stone-200">
+			if len(variants) > 0 {
+				<table class="min-w-full divide-y divide-stone-300">
+					<thead class="bg-stone-50">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">SKU</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Barcode</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Default</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 lg:table-cell">Weight (g)</th>
+							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+								<span class="sr-only">Actions</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-stone-200 bg-white">
+						for _, v := range variants {
+							<tr>
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+									<span class="font-mono font-medium text-stone-900">{ v.SKU }</span>
+								</td>
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 sm:table-cell">
+									if v.Barcode != nil {
+										<span class="font-mono">{ *v.Barcode }</span>
+									} else {
+										<span class="text-stone-400">—</span>
+									}
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									if v.IsDefault {
+										<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+											Default
+										</span>
+									}
+								</td>
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 lg:table-cell">
+									if v.WeightGrams != nil {
+										{ strconv.Itoa(*v.WeightGrams) }
+									} else {
+										<span class="text-stone-400">—</span>
+									}
+								</td>
+								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+									<form
+										method="post"
+										action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", product.ID, v.ID)) }
+										hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", product.ID, v.ID) }
+										hx-target="#variants-panel"
+										hx-swap="outerHTML"
+										hx-confirm="Delete this variant?"
+										class="inline"
+									>
+										<button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
+									</form>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			} else {
+				<div class="px-4 py-5 sm:px-6">
+					<p class="text-sm text-stone-500">No variants yet. Define options above first, then add variants.</p>
+				</div>
+			}
+			<!-- Add variant form -->
+			<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
+				<h4 class="text-sm font-medium text-stone-900 mb-4">Add variant</h4>
+				<form
+					method="post"
+					action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants", product.ID)) }
+					hx-post={ fmt.Sprintf("/admin/catalog/%s/variants", product.ID) }
+					hx-target="#variants-panel"
+					hx-swap="outerHTML"
+					class="flex items-end gap-3 flex-wrap"
+				>
+					<div class="flex-1 min-w-[120px]">
+						<label for="variant_sku" class="block text-sm/6 font-medium text-stone-900">SKU</label>
+						<div class="mt-2">
+							<input type="text" id="variant_sku" name="sku" placeholder="SKU-001" required class={ inputClasses(false) }/>
+						</div>
+					</div>
+					<div class="flex-1 min-w-[120px]">
+						<label for="variant_barcode" class="block text-sm/6 font-medium text-stone-900">Barcode</label>
+						<div class="mt-2">
+							<input type="text" id="variant_barcode" name="barcode" placeholder="Optional" class={ inputClasses(false) }/>
+						</div>
+					</div>
+					<div class="w-24">
+						<label for="variant_weight" class="block text-sm/6 font-medium text-stone-900">Weight</label>
+						<div class="mt-2">
+							<input type="number" id="variant_weight" name="weight_grams" placeholder="0" class={ inputClasses(false) }/>
+						</div>
+					</div>
+					<div class="flex items-center gap-2 pb-1.5">
+						<input type="checkbox" id="variant_default" name="is_default" value="true" class="size-4 rounded border-stone-300 text-hiri-teal focus:ring-hiri-teal"/>
+						<label for="variant_default" class="text-sm font-medium text-stone-900">Default</label>
+					</div>
+					<button type="submit" class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
+						Add
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
 }
 
 templ ProductEdit(props ProductEditProps) {

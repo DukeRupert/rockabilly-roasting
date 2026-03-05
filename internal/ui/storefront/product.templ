@@ -23,6 +23,7 @@ type ProductDetailProps struct {
 	Options      []OptionWithValues
 	DefaultPrice *int
 	CurrencyCode string
+	CartCount    int
 }
 
 templ ProductContent(props ProductDetailProps) {
@@ -151,6 +152,7 @@ templ ProductPage(props ProductDetailProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
 		Title:       props.Product.Title,
 		Description: props.Product.Description,
+		CartCount:   props.CartCount,
 	}) {
 		@ProductContent(props)
 	}

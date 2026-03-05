@@ -102,6 +102,7 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 		props := storefront.CartPageProps{}
 		if IsHTMX(r) {
 			storefront.CartContent(props).Render(ctx, w) //nolint:errcheck
+			storefront.CartBadge(0).Render(ctx, w)       //nolint:errcheck
 			return
 		}
 		storefront.CartPage(props).Render(ctx, w) //nolint:errcheck
@@ -150,12 +151,20 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cart count = sum of quantities across items
+	cartCount := 0
+	for _, item := range items {
+		cartCount += item.Quantity
+	}
+
 	props := storefront.CartPageProps{
-		Items:    items,
-		Subtotal: subtotal,
+		Items:     items,
+		Subtotal:  subtotal,
+		CartCount: cartCount,
 	}
 	if IsHTMX(r) {
 		storefront.CartContent(props).Render(ctx, w) //nolint:errcheck
+		storefront.CartBadge(cartCount).Render(ctx, w) //nolint:errcheck
 		return
 	}
 	storefront.CartPage(props).Render(ctx, w) //nolint:errcheck

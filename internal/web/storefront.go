@@ -119,6 +119,7 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 		Products:    cards,
 		Taxons:      taxons,
 		ActiveTaxon: categorySlug,
+		CartCount:   d.cartItemCountFromCookie(r),
 	}
 
 	if IsHTMX(r) {
@@ -213,6 +214,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		Options:      options,
 		DefaultPrice: defaultPrice,
 		CurrencyCode: "USD",
+		CartCount:    d.cartItemCountFromCookie(r),
 	}
 
 	if IsHTMX(r) {

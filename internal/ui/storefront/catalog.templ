@@ -16,6 +16,7 @@ type CatalogPageProps struct {
 	Products    []ProductCard
 	Taxons      []domain.Taxon
 	ActiveTaxon string
+	CartCount   int
 }
 
 func categoryPillClasses(active bool) string {
@@ -96,6 +97,7 @@ templ CatalogPage(props CatalogPageProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
 		Title:       "Shop",
 		Description: "Browse our collection of products",
+		CartCount:   props.CartCount,
 	}) {
 		@CatalogContent(props)
 	}

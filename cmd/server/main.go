@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/audit"
@@ -33,6 +34,9 @@ func main() {
 func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	// Load .env file if present
+	_ = godotenv.Load()
 
 	// Logger
 	logger := logging.New(slog.LevelInfo)

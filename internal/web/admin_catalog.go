@@ -237,7 +237,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 
 	var product *domain.Product
 	var taxons []domain.Taxon
-	var variants []domain.Variant
+	var variants []admin.VariantWithOptions
 	var options []admin.OptionWithValues
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -250,22 +250,47 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
-		variants, txErr = d.CatalogService.ListVariants(ctx, tx, id)
-		if txErr != nil {
-			return txErr
-		}
+
+		// Load options + values
 		opts, txErr := d.CatalogService.ListProductOptions(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
+		// Build a lookup from option value ID -> display value
+		optionValueNames := make(map[uuid.UUID]string)
 		for _, opt := range opts {
 			vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
 			if vErr != nil {
 				return vErr
 			}
+			for _, v := range vals {
+				optionValueNames[v.ID] = v.Value
+			}
 			options = append(options, admin.OptionWithValues{
 				Option: opt,
 				Values: vals,
+			})
+		}
+
+		// Load variants with their option value names
+		rawVariants, txErr := d.CatalogService.ListVariants(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		for _, v := range rawVariants {
+			vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
+			if vErr != nil {
+				return vErr
+			}
+			var names []string
+			for _, link := range vov {
+				if name, ok := optionValueNames[link.ProductOptionValueID]; ok {
+					names = append(names, name)
+				}
+			}
+			variants = append(variants, admin.VariantWithOptions{
+				Variant:      v,
+				OptionValues: names,
 			})
 		}
 		return nil
@@ -428,7 +453,8 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, productID uuid.UUID) {
 	ctx := r.Context()
 	var product *domain.Product
-	var variants []domain.Variant
+	var variants []admin.VariantWithOptions
+	var options []admin.OptionWithValues
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -436,14 +462,55 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 		if txErr != nil {
 			return txErr
 		}
-		variants, txErr = d.CatalogService.ListVariants(ctx, tx, productID)
-		return txErr
+
+		// Load options + values
+		opts, txErr := d.CatalogService.ListProductOptions(ctx, tx, productID)
+		if txErr != nil {
+			return txErr
+		}
+		optionValueNames := make(map[uuid.UUID]string)
+		for _, opt := range opts {
+			vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
+			if vErr != nil {
+				return vErr
+			}
+			for _, v := range vals {
+				optionValueNames[v.ID] = v.Value
+			}
+			options = append(options, admin.OptionWithValues{
+				Option: opt,
+				Values: vals,
+			})
+		}
+
+		// Load variants with option value names
+		rawVariants, txErr := d.CatalogService.ListVariants(ctx, tx, productID)
+		if txErr != nil {
+			return txErr
+		}
+		for _, v := range rawVariants {
+			vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
+			if vErr != nil {
+				return vErr
+			}
+			var names []string
+			for _, link := range vov {
+				if name, ok := optionValueNames[link.ProductOptionValueID]; ok {
+					names = append(names, name)
+				}
+			}
+			variants = append(variants, admin.VariantWithOptions{
+				Variant:      v,
+				OptionValues: names,
+			})
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
 		return
 	}
-	admin.VariantsPanel(product, variants).Render(ctx, w) //nolint:errcheck
+	admin.VariantsPanel(product, variants, options).Render(ctx, w) //nolint:errcheck
 }
 
 // --- Variants ---
@@ -475,9 +542,28 @@ func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) 
 		params.WeightGrams = &wt
 	}
 
+	// Collect option value selections from form (field names like "option_{optionID}")
+	var optionValueIDs []uuid.UUID
+	for key, values := range r.Form {
+		if !strings.HasPrefix(key, "option_") || len(values) == 0 || values[0] == "" {
+			continue
+		}
+		if valID, parseErr := uuid.Parse(values[0]); parseErr == nil {
+			optionValueIDs = append(optionValueIDs, valID)
+		}
+	}
+
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CatalogService.CreateVariant(ctx, tx, params)
-		return txErr
+		variant, txErr := d.CatalogService.CreateVariant(ctx, tx, params)
+		if txErr != nil {
+			return txErr
+		}
+		for _, valID := range optionValueIDs {
+			if txErr := d.CatalogService.CreateVariantOptionValue(ctx, tx, variant.ID, valID); txErr != nil {
+				return txErr
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)

@@ -15,7 +15,7 @@ type OptionWithValues struct {
 type ProductEditProps struct {
 	Product  *domain.Product
 	Taxons   []domain.Taxon
-	Variants []domain.Variant
+	Variants []VariantWithOptions
 	Options  []OptionWithValues
 	Errors   map[string]string
 	Flash    string
@@ -107,7 +107,7 @@ templ ProductEditContent(props ProductEditProps) {
 			<!-- Options panel (before variants — must define options before creating variants) -->
 			@OptionsPanel(props.Product, props.Options)
 			<!-- Variants panel -->
-			@VariantsPanel(props.Product, props.Variants)
+			@VariantsPanel(props.Product, props.Variants, props.Options)
 		</div>
 }
 
@@ -204,8 +204,14 @@ templ OptionsPanel(product *domain.Product, options []OptionWithValues) {
 	</div>
 }
 
+// VariantWithOptionValues pairs a variant with its selected option value names for display.
+type VariantWithOptions struct {
+	Variant     domain.Variant
+	OptionValues []string // e.g. ["Medium", "Dark Roast"]
+}
+
 // VariantsPanel renders the variants section as a standalone partial for htmx swaps.
-templ VariantsPanel(product *domain.Product, variants []domain.Variant) {
+templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues) {
 	<div id="variants-panel" class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
 		<div class="px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-stone-900">Variants</h3>
@@ -216,6 +222,7 @@ templ VariantsPanel(product *domain.Product, variants []domain.Variant) {
 					<thead class="bg-stone-50">
 						<tr>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">SKU</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Options</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Barcode</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Default</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 lg:table-cell">Weight (g)</th>
@@ -225,28 +232,41 @@ templ VariantsPanel(product *domain.Product, variants []domain.Variant) {
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-stone-200 bg-white">
-						for _, v := range variants {
+						for _, vwo := range variants {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<span class="font-mono font-medium text-stone-900">{ v.SKU }</span>
+									<span class="font-mono font-medium text-stone-900">{ vwo.Variant.SKU }</span>
+								</td>
+								<td class="px-3 py-4 text-sm text-stone-500">
+									if len(vwo.OptionValues) > 0 {
+										<div class="flex flex-wrap gap-1">
+											for _, ov := range vwo.OptionValues {
+												<span class="inline-flex items-center rounded-md bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
+													{ ov }
+												</span>
+											}
+										</div>
+									} else {
+										<span class="text-stone-400">—</span>
+									}
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 sm:table-cell">
-									if v.Barcode != nil {
-										<span class="font-mono">{ *v.Barcode }</span>
+									if vwo.Variant.Barcode != nil {
+										<span class="font-mono">{ *vwo.Variant.Barcode }</span>
 									} else {
 										<span class="text-stone-400">—</span>
 									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									if v.IsDefault {
+									if vwo.Variant.IsDefault {
 										<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
 											Default
 										</span>
 									}
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 lg:table-cell">
-									if v.WeightGrams != nil {
-										{ strconv.Itoa(*v.WeightGrams) }
+									if vwo.Variant.WeightGrams != nil {
+										{ strconv.Itoa(*vwo.Variant.WeightGrams) }
 									} else {
 										<span class="text-stone-400">—</span>
 									}
@@ -254,8 +274,8 @@ templ VariantsPanel(product *domain.Product, variants []domain.Variant) {
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 									<form
 										method="post"
-										action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", product.ID, v.ID)) }
-										hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", product.ID, v.ID) }
+										action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", product.ID, vwo.Variant.ID)) }
+										hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", product.ID, vwo.Variant.ID) }
 										hx-target="#variants-panel"
 										hx-swap="outerHTML"
 										hx-confirm="Delete this variant?"
@@ -284,6 +304,19 @@ templ VariantsPanel(product *domain.Product, variants []domain.Variant) {
 					hx-swap="outerHTML"
 					class="flex items-end gap-3 flex-wrap"
 				>
+					for _, opt := range options {
+						<div class="flex-1 min-w-[120px]">
+							<label class="block text-sm/6 font-medium text-stone-900">{ opt.Option.Name }</label>
+							<div class="mt-2">
+								<select name={ fmt.Sprintf("option_%s", opt.Option.ID) } required class={ inputClasses(false) }>
+									<option value="">Select { opt.Option.Name }</option>
+									for _, val := range opt.Values {
+										<option value={ val.ID.String() }>{ val.Value }</option>
+									}
+								</select>
+							</div>
+						</div>
+					}
 					<div class="flex-1 min-w-[120px]">
 						<label for="variant_sku" class="block text-sm/6 font-medium text-stone-900">SKU</label>
 						<div class="mt-2">

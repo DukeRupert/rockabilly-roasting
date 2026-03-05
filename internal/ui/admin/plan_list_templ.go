@@ -33,23 +33,18 @@ type PlanListProps struct {
 }
 
 func planIntervalLabel(interval domain.SubscriptionInterval, count int) string {
-	label := ""
 	switch interval {
-	case domain.SubscriptionIntervalWeekly:
-		label = "week"
-	case domain.SubscriptionIntervalBiweekly:
-		label = "2 weeks"
-	case domain.SubscriptionIntervalMonthly:
-		label = "month"
-	case domain.SubscriptionIntervalQuarterly:
-		label = "quarter"
+	case domain.SubscriptionIntervalEvery14Days:
+		return "Every 14 Days"
+	case domain.SubscriptionIntervalEvery21Days:
+		return "Every 21 Days"
+	case domain.SubscriptionIntervalEvery30Days:
+		return "Every 30 Days"
+	case domain.SubscriptionIntervalEvery60Days:
+		return "Every 60 Days"
 	default:
-		label = string(interval)
+		return string(interval)
 	}
-	if count > 1 {
-		return fmt.Sprintf("Every %d %ss", count, label)
-	}
-	return fmt.Sprintf("Every %s", label)
 }
 
 func PlanListContent(props PlanListProps) templ.Component {
@@ -135,7 +130,7 @@ func PlanListContent(props PlanListProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div></div><div><label for=\"plan-interval\" class=\"block text-sm font-medium text-stone-700\">Interval</label><div class=\"mt-1 grid grid-cols-1\"><select id=\"plan-interval\" name=\"interval\" required class=\"col-start-1 row-start-1 w-full appearance-none rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal focus:outline-none\"><option value=\"weekly\">Weekly</option> <option value=\"biweekly\">Biweekly</option> <option value=\"monthly\" selected>Monthly</option> <option value=\"quarterly\">Quarterly</option></select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div></div><div class=\"flex items-end\"><button type=\"submit\" class=\"inline-flex items-center rounded-md bg-hiri-teal px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal\">Create Plan</button></div></form></div><!-- Plan table --><div class=\"mt-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div></div><div><label for=\"plan-interval\" class=\"block text-sm font-medium text-stone-700\">Interval</label><div class=\"mt-1 grid grid-cols-1\"><select id=\"plan-interval\" name=\"interval\" required class=\"col-start-1 row-start-1 w-full appearance-none rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal focus:outline-none\"><option value=\"every_14_days\">Every 14 Days</option> <option value=\"every_21_days\">Every 21 Days</option> <option value=\"every_30_days\" selected>Every 30 Days</option> <option value=\"every_60_days\">Every 60 Days</option></select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div></div><div class=\"flex items-end\"><button type=\"submit\" class=\"inline-flex items-center rounded-md bg-hiri-teal px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal\">Create Plan</button></div></form></div><!-- Plan table --><div class=\"mt-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -10,10 +10,10 @@ import (
 type SubscriptionInterval string
 
 const (
-	SubscriptionIntervalWeekly    SubscriptionInterval = "weekly"
-	SubscriptionIntervalBiweekly  SubscriptionInterval = "biweekly"
-	SubscriptionIntervalMonthly   SubscriptionInterval = "monthly"
-	SubscriptionIntervalQuarterly SubscriptionInterval = "quarterly"
+	SubscriptionIntervalEvery14Days SubscriptionInterval = "every_14_days"
+	SubscriptionIntervalEvery21Days SubscriptionInterval = "every_21_days"
+	SubscriptionIntervalEvery30Days SubscriptionInterval = "every_30_days"
+	SubscriptionIntervalEvery60Days SubscriptionInterval = "every_60_days"
 )
 
 // SubscriptionStatus represents the lifecycle state of a subscription.

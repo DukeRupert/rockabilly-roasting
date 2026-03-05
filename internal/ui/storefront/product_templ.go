@@ -396,23 +396,18 @@ func optionPillClasses(selected bool) string {
 }
 
 func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) string {
-	label := ""
 	switch interval {
-	case domain.SubscriptionIntervalWeekly:
-		label = "week"
-	case domain.SubscriptionIntervalBiweekly:
-		label = "2 weeks"
-	case domain.SubscriptionIntervalMonthly:
-		label = "month"
-	case domain.SubscriptionIntervalQuarterly:
-		label = "quarter"
+	case domain.SubscriptionIntervalEvery14Days:
+		return "Every 14 Days"
+	case domain.SubscriptionIntervalEvery21Days:
+		return "Every 21 Days"
+	case domain.SubscriptionIntervalEvery30Days:
+		return "Every 30 Days"
+	case domain.SubscriptionIntervalEvery60Days:
+		return "Every 60 Days"
 	default:
-		label = string(interval)
+		return string(interval)
 	}
-	if count > 1 {
-		return fmt.Sprintf("Every %d %ss", count, label)
-	}
-	return fmt.Sprintf("Every %s", label)
 }
 
 func ProductPage(props ProductDetailProps) templ.Component {

@@ -362,7 +362,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\"></div></div><div class=\"sm:col-span-3\"><label for=\"discontinue_on\" class=\"block text-sm/6 font-medium text-stone-900\">Discontinue on</label><div class=\"mt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\"></div><p class=\"mt-2 text-sm text-stone-500\">Leave blank to make available immediately.</p></div><div class=\"sm:col-span-3\"><label for=\"discontinue_on\" class=\"block text-sm/6 font-medium text-stone-900\">Discontinue on</label><div class=\"mt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -378,7 +378,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(productDateVal(props.Product, "discontinue_on"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/product_form.templ`, Line: 176, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/product_form.templ`, Line: 177, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -397,7 +397,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\"></div></div></div></div></div><!-- Footer --><div class=\"mt-6 flex items-center justify-end gap-x-6\"><a href=\"/admin/catalog\" class=\"text-sm/6 font-semibold text-stone-900\">Cancel</a> <button type=\"submit\" class=\"rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\"></div><p class=\"mt-2 text-sm text-stone-500\">Leave blank to keep available indefinitely.</p></div></div></div></div><!-- Footer --><div class=\"mt-6 flex items-center justify-end gap-x-6\"><a href=\"/admin/catalog\" class=\"text-sm/6 font-semibold text-stone-900\">Cancel</a> <button type=\"submit\" class=\"rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

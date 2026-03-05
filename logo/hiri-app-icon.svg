@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Hiri App Icon - Canoe Version -->
+  
+  <!-- Background -->
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="#2D7A7A"/>
+  
+  <!-- Back sail -->
+  <path d="M 10 12 C 15 18, 13 26, 4 32 C 12 36, 24 38, 34 34 C 32 18, 10 12, 10 12 Z" fill="#FAF9F7" opacity="0.4"/>
+  
+  <!-- Front sail -->
+  <path d="M 21 12 C 26 18, 24 26, 15 32 C 23 36, 37 38, 49 34 C 47 18, 21 12, 21 12 Z" fill="#FAF9F7"/>
+  
+  <!-- Hull wordmark -->
+  <text x="32" y="50" text-anchor="middle" font-family="Outfit, sans-serif" font-size="12" font-weight="600" letter-spacing="0.25em" fill="#FAF9F7">hiri</text>
+</svg>

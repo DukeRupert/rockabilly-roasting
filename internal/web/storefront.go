@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/app"
@@ -140,6 +141,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	var options []storefront.OptionWithValues
 	var variantsWithPrices []storefront.VariantWithPrice
 	var defaultPrice *int
+	var plans []domain.SubscriptionPlan
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -163,7 +165,9 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		}
 
 		variantsWithPrices = make([]storefront.VariantWithPrice, len(variants))
+		variantIDs := make([]uuid.UUID, len(variants))
 		for i, v := range variants {
+			variantIDs[i] = v.ID
 			vwp := storefront.VariantWithPrice{
 				Variant:      v,
 				CurrencyCode: "USD",
@@ -180,6 +184,12 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			variantsWithPrices[i] = vwp
+		}
+
+		// Get subscription plans for this product's variants.
+		plans, txErr = d.SubscriptionService.ListActivePlansByVariantIDs(ctx, tx, variantIDs)
+		if txErr != nil {
+			return txErr
 		}
 
 		// Get options with values.
@@ -208,13 +218,14 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.ProductDetailProps{
-		Product:      product,
-		Media:        media,
-		Variants:     variantsWithPrices,
-		Options:      options,
-		DefaultPrice: defaultPrice,
-		CurrencyCode: "USD",
-		CartCount:    d.cartItemCountFromCookie(r),
+		Product:           product,
+		Media:             media,
+		Variants:          variantsWithPrices,
+		Options:           options,
+		DefaultPrice:      defaultPrice,
+		CurrencyCode:      "USD",
+		CartCount:         d.cartItemCountFromCookie(r),
+		SubscriptionPlans: plans,
 	}
 
 	if IsHTMX(r) {

@@ -1,6 +1,7 @@
 package storefront
 
 import (
+	"fmt"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -17,13 +18,14 @@ type VariantWithPrice struct {
 }
 
 type ProductDetailProps struct {
-	Product      *domain.Product
-	Media        []domain.ProductMedia
-	Variants     []VariantWithPrice
-	Options      []OptionWithValues
-	DefaultPrice *int
-	CurrencyCode string
-	CartCount    int
+	Product           *domain.Product
+	Media             []domain.ProductMedia
+	Variants          []VariantWithPrice
+	Options           []OptionWithValues
+	DefaultPrice      *int
+	CurrencyCode      string
+	CartCount         int
+	SubscriptionPlans []domain.SubscriptionPlan
 }
 
 templ ProductContent(props ProductDetailProps) {
@@ -124,6 +126,33 @@ templ ProductContent(props ProductDetailProps) {
 						</form>
 					</div>
 				}
+				<!-- Subscription options -->
+				if len(props.SubscriptionPlans) > 0 {
+					<div class="mt-8 border-t border-stone-200 pt-8">
+						<h3 class="text-sm font-semibold text-hiri-text">Subscribe &amp; Save</h3>
+						<p class="mt-1 text-sm text-hiri-text-secondary">Get this product delivered on a schedule.</p>
+						<div class="mt-4 space-y-3">
+							for _, plan := range props.SubscriptionPlans {
+								<div class="rounded-lg border border-stone-200 p-4 hover:border-hiri-teal transition-colors">
+									<div class="flex items-center justify-between">
+										<div>
+											<p class="text-sm font-medium text-hiri-text">{ plan.Name }</p>
+											<p class="text-xs text-hiri-text-secondary">
+												{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }
+											</p>
+										</div>
+										<a
+											href={ templ.SafeURL(fmt.Sprintf("/subscribe?plan_id=%s", plan.ID.String())) }
+											class="inline-flex items-center rounded-md bg-hiri-teal/10 px-3 py-1.5 text-sm font-semibold text-hiri-teal hover:bg-hiri-teal/20"
+										>
+											Subscribe
+										</a>
+									</div>
+								</div>
+							}
+						</div>
+					</div>
+				}
 			</div>
 		</div>
 	</div>
@@ -146,6 +175,26 @@ func optionPillClasses(selected bool) string {
 		return "rounded-full border-2 border-hiri-teal bg-hiri-teal/5 px-4 py-2 text-sm font-medium text-hiri-teal"
 	}
 	return "rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-hiri-teal hover:text-hiri-teal"
+}
+
+func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) string {
+	label := ""
+	switch interval {
+	case domain.SubscriptionIntervalWeekly:
+		label = "week"
+	case domain.SubscriptionIntervalBiweekly:
+		label = "2 weeks"
+	case domain.SubscriptionIntervalMonthly:
+		label = "month"
+	case domain.SubscriptionIntervalQuarterly:
+		label = "quarter"
+	default:
+		label = string(interval)
+	}
+	if count > 1 {
+		return fmt.Sprintf("Every %d %ss", count, label)
+	}
+	return fmt.Sprintf("Every %s", label)
 }
 
 templ ProductPage(props ProductDetailProps) {

@@ -7,10 +7,13 @@ export default defineConfig({
     outDir: '../../internal/ui/assets/checkout',
     emptyOutDir: true,
     rollupOptions: {
-      input: 'src/main.ts',
+      input: {
+        checkout: 'src/main.ts',
+        subscribe: 'src/subscribe-main.ts',
+      },
       output: {
-        entryFileNames: 'checkout.js',
-        assetFileNames: 'checkout[extname]',
+        entryFileNames: '[name].js',
+        assetFileNames: '[name][extname]',
       },
     },
   },

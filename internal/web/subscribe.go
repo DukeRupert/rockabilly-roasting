@@ -1,0 +1,322 @@
+package web
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"os"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+
+	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/logging"
+	"github.com/dukerupert/hiri/internal/platform/payments"
+	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/ui/storefront"
+)
+
+// --- Request/Response types ---
+
+type subscribeConfirmRequest struct {
+	PlanID          string `json:"plan_id"`
+	Email           string `json:"email"`
+	FirstName       string `json:"first_name"`
+	LastName        string `json:"last_name"`
+	Line1           string `json:"line1"`
+	Line2           string `json:"line2,omitempty"`
+	City            string `json:"city"`
+	State           string `json:"state"`
+	PostalCode      string `json:"postal_code"`
+	Country         string `json:"country"`
+	PaymentIntentID string `json:"payment_intent_id"`
+}
+
+type subscribeConfirmResponse struct {
+	SubscriptionID string `json:"subscription_id"`
+	OrderID        string `json:"order_id"`
+}
+
+// --- Handlers ---
+
+// handleSubscribePage renders the subscription signup page for a plan.
+func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	planIDStr := r.URL.Query().Get("plan_id")
+	planID, err := uuid.Parse(planIDStr)
+	if err != nil {
+		http.Error(w, "invalid plan_id", http.StatusBadRequest)
+		return
+	}
+
+	var plan *domain.SubscriptionPlan
+	var price int
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		plan, txErr = d.SubscriptionService.GetPlan(ctx, tx, planID)
+		if txErr != nil {
+			return txErr
+		}
+		if !plan.IsActive {
+			return app.ErrSubscriptionPlanInactive
+		}
+		p, txErr := d.PricingService.GetBasePrice(ctx, tx, plan.VariantID, "USD")
+		if txErr != nil {
+			return txErr
+		}
+		price = p.Amount
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, app.ErrSubscriptionPlanNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		Error(w, r, err)
+		return
+	}
+
+	props := storefront.SubscribePageProps{
+		Plan:      plan,
+		Price:     price,
+		StripeKey: os.Getenv("STRIPE_PUBLISHABLE_KEY"),
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+
+	if IsHTMX(r) {
+		storefront.SubscribeContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	storefront.SubscribePage(props).Render(ctx, w) //nolint:errcheck
+}
+
+// handleSubscribePaymentIntent creates a PaymentIntent for a subscription's first order.
+func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := logging.FromContext(ctx)
+
+	var req struct {
+		PlanID    string `json:"plan_id"`
+		Email     string `json:"email"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+		Line1     string `json:"line1"`
+		Line2     string `json:"line2,omitempty"`
+		City      string `json:"city"`
+		State     string `json:"state"`
+		PostalCode string `json:"postal_code"`
+		Country   string `json:"country"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	planID, err := uuid.Parse(req.PlanID)
+	if err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid plan_id"})
+		return
+	}
+
+	var plan *domain.SubscriptionPlan
+	var price int
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		plan, txErr = d.SubscriptionService.GetPlan(ctx, tx, planID)
+		if txErr != nil {
+			return txErr
+		}
+		p, txErr := d.PricingService.GetBasePrice(ctx, tx, plan.VariantID, "USD")
+		if txErr != nil {
+			return txErr
+		}
+		price = p.Amount
+		return nil
+	})
+	if err != nil {
+		logger.Error("subscribe payment-intent", "error", err)
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to load plan"})
+		return
+	}
+
+	pi, err := d.PaymentProvider.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
+		AmountCents: int64(price),
+		Currency:    "usd",
+		Metadata: map[string]string{
+			"plan_id":    planID.String(),
+			"email":      req.Email,
+			"first_name": req.FirstName,
+			"last_name":  req.LastName,
+		},
+		ShippingAddress: &payments.ShippingAddress{
+			Name:       req.FirstName + " " + req.LastName,
+			Line1:      req.Line1,
+			Line2:      req.Line2,
+			City:       req.City,
+			State:      req.State,
+			PostalCode: req.PostalCode,
+			Country:    req.Country,
+		},
+	})
+	if err != nil {
+		logger.Error("subscribe create PI", "error", err)
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create payment"})
+		return
+	}
+
+	JSON(w, http.StatusOK, checkoutPaymentIntentResponse{
+		ClientSecret: pi.ClientSecret,
+		Amount:       price,
+		Currency:     "usd",
+	})
+}
+
+// handleSubscribeConfirm creates the subscription and first order after payment succeeds.
+func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := logging.FromContext(ctx)
+
+	var req subscribeConfirmRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	planID, err := uuid.Parse(req.PlanID)
+	if err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid plan_id"})
+		return
+	}
+
+	// Verify payment succeeded
+	pi, err := d.PaymentProvider.GetPaymentIntent(ctx, req.PaymentIntentID)
+	if err != nil {
+		logger.Error("subscribe get PI", "error", err)
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to verify payment"})
+		return
+	}
+	if pi.Status != payments.PaymentIntentStatusSucceeded {
+		JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "payment has not succeeded"})
+		return
+	}
+
+	var resp subscribeConfirmResponse
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		// Get plan + price
+		plan, txErr := d.SubscriptionService.GetPlan(ctx, tx, planID)
+		if txErr != nil {
+			return fmt.Errorf("get plan: %w", txErr)
+		}
+
+		price, txErr := d.PricingService.GetBasePrice(ctx, tx, plan.VariantID, "USD")
+		if txErr != nil {
+			return fmt.Errorf("get price: %w", txErr)
+		}
+
+		// Find or create customer
+		if req.Country == "" {
+			req.Country = "US"
+		}
+		customer, txErr := d.CustomerService.GetCustomerByEmail(ctx, tx, req.Email)
+		if txErr != nil {
+			if !errors.Is(txErr, app.ErrCustomerNotFound) {
+				return fmt.Errorf("lookup customer: %w", txErr)
+			}
+			customer, txErr = d.CustomerService.CreateGuest(ctx, tx, req.Email, req.FirstName, req.LastName)
+			if txErr != nil {
+				return fmt.Errorf("create guest: %w", txErr)
+			}
+		}
+
+		// Create address
+		var line2 *string
+		if req.Line2 != "" {
+			line2 = &req.Line2
+		}
+		addr, txErr := d.CustomerService.CreateAddress(ctx, tx, store.CreateAddressParams{
+			CustomerID:  &customer.ID,
+			FirstName:   req.FirstName,
+			LastName:    req.LastName,
+			Line1:       req.Line1,
+			Line2:       line2,
+			City:        req.City,
+			State:       req.State,
+			PostalCode:  req.PostalCode,
+			CountryCode: req.Country,
+		})
+		if txErr != nil {
+			return fmt.Errorf("create address: %w", txErr)
+		}
+
+		// Create subscription
+		sub, txErr := d.SubscriptionService.CreateSubscription(ctx, tx, app.CreateSubscriptionParams{
+			CustomerID:        customer.ID,
+			PlanID:            planID,
+			ShippingAddressID: addr.ID,
+		}, app.Actor{
+			Type: "customer",
+			ID:   &customer.ID,
+			Name: "subscription checkout",
+		})
+		if txErr != nil {
+			return fmt.Errorf("create subscription: %w", txErr)
+		}
+		resp.SubscriptionID = sub.ID.String()
+
+		// Place first order
+		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
+			CustomerID:        customer.ID,
+			Items: []app.CartItem{{
+				VariantID: plan.VariantID,
+				Quantity:  1,
+				UnitPrice: price.Amount,
+			}},
+			ShippingAddressID: addr.ID,
+			BillingAddressID:  addr.ID,
+			CurrencyCode:      "USD",
+			SubscriptionID:    &sub.ID,
+		}, app.Actor{
+			Type: "customer",
+			ID:   &customer.ID,
+			Name: "subscription checkout",
+		})
+		if txErr != nil {
+			return fmt.Errorf("place order: %w", txErr)
+		}
+		resp.OrderID = order.ID.String()
+
+		// Store Stripe PI ID + mark payment captured
+		_, txErr = d.OrderService.UpdateStripePaymentIntentID(ctx, tx, order.ID, req.PaymentIntentID)
+		if txErr != nil {
+			return fmt.Errorf("set stripe PI: %w", txErr)
+		}
+		_, txErr = d.OrderService.UpdatePaymentStatus(ctx, tx, order.ID, domain.PaymentStatusCaptured, app.Actor{
+			Type: "system",
+			Name: "subscription_checkout",
+		})
+		if txErr != nil {
+			return fmt.Errorf("update payment status: %w", txErr)
+		}
+
+		// Link order to subscription
+		txErr = d.SubscriptionService.LinkOrder(ctx, tx, sub.ID, order.ID, sub.CurrentPeriodStart, sub.CurrentPeriodEnd)
+		if txErr != nil {
+			return fmt.Errorf("link order: %w", txErr)
+		}
+
+		return nil
+	})
+	if err != nil {
+		logger.Error("subscribe confirm", "error", err)
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create subscription"})
+		return
+	}
+
+	JSON(w, http.StatusOK, resp)
+}

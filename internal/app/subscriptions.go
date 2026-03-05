@@ -107,6 +107,15 @@ func (s *SubscriptionService) ListSubscriptionOrders(ctx context.Context, tx pgx
 	return orders, nil
 }
 
+// ListActivePlansByVariantIDs returns active plans for the given variant IDs.
+func (s *SubscriptionService) ListActivePlansByVariantIDs(ctx context.Context, tx pgx.Tx, variantIDs []uuid.UUID) ([]domain.SubscriptionPlan, error) {
+	plans, err := s.subscriptions.ListActivePlansByVariantIDs(ctx, tx, variantIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list active plans by variants: %w", err)
+	}
+	return plans, nil
+}
+
 // ListDueForRenewal returns active subscriptions due for renewal.
 func (s *SubscriptionService) ListDueForRenewal(ctx context.Context, tx pgx.Tx) ([]domain.Subscription, error) {
 	subs, err := s.subscriptions.ListDueForRenewal(ctx, tx)

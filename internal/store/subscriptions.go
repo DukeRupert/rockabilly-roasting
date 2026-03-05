@@ -86,6 +86,38 @@ func (s *SubscriptionStore) UpdatePlanActive(ctx context.Context, tx pgx.Tx, id 
 	return nil
 }
 
+// ListActivePlansByVariantIDs returns active subscription plans for the given variant IDs.
+func (s *SubscriptionStore) ListActivePlansByVariantIDs(ctx context.Context, tx pgx.Tx, variantIDs []uuid.UUID) ([]domain.SubscriptionPlan, error) {
+	if len(variantIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT id, name, interval, interval_count, variant_id, price_set_id, is_active, metadata
+		 FROM subscription_plans
+		 WHERE is_active = true AND variant_id = ANY($1)
+		 ORDER BY name`,
+		variantIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list active plans by variants: %w", err)
+	}
+	defer rows.Close()
+
+	var plans []domain.SubscriptionPlan
+	for rows.Next() {
+		var p domain.SubscriptionPlan
+		var interval string
+		var metadata []byte
+		if err := rows.Scan(&p.ID, &p.Name, &interval, &p.IntervalCount, &p.VariantID, &p.PriceSetID, &p.IsActive, &metadata); err != nil {
+			return nil, fmt.Errorf("scan plan: %w", err)
+		}
+		p.Interval = domain.SubscriptionInterval(interval)
+		p.Metadata = metadataFromJSON(metadata)
+		plans = append(plans, p)
+	}
+	return plans, rows.Err()
+}
+
 // --- Subscriptions ---
 
 // CreateSubscriptionParams holds the fields needed to create a subscription.

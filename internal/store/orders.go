@@ -144,12 +144,13 @@ func (s *OrderStore) DeleteOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID) e
 
 // OrderFilter holds optional filters for listing orders.
 type OrderFilter struct {
-	Status     *domain.OrderStatus
-	CustomerID *uuid.UUID
-	PlacedFrom *time.Time
-	PlacedTo   *time.Time
-	Limit      int
-	Offset     int
+	Status            *domain.OrderStatus
+	FulfillmentStatus *domain.FulfillmentStatus
+	CustomerID        *uuid.UUID
+	PlacedFrom        *time.Time
+	PlacedTo          *time.Time
+	Limit             int
+	Offset            int
 }
 
 // ListOrders returns orders matching the given filter (hand-written for dynamic WHERE).
@@ -166,6 +167,11 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	if f.Status != nil {
 		query += fmt.Sprintf(" AND status = $%d", argN)
 		args = append(args, string(*f.Status))
+		argN++
+	}
+	if f.FulfillmentStatus != nil {
+		query += fmt.Sprintf(" AND fulfillment_status = $%d", argN)
+		args = append(args, string(*f.FulfillmentStatus))
 		argN++
 	}
 	if f.CustomerID != nil {

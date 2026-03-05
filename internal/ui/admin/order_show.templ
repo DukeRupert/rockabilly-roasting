@@ -1,0 +1,157 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type OrderShowProps struct {
+	Order       *domain.Order
+	LineItems   []domain.LineItem
+	Adjustments []domain.Adjustment
+}
+
+templ OrderShowContent(props OrderShowProps) {
+	<!-- Header -->
+	<div class="sm:flex sm:items-center sm:justify-between">
+		<div>
+			<div class="flex items-center gap-3">
+				<h1 class="text-base/7 font-semibold text-stone-900">Order { props.Order.Number }</h1>
+				@OrderStatusBadge(props.Order.Status)
+			</div>
+			<p class="mt-1 text-sm text-stone-500">Placed { props.Order.PlacedAt.Format("January 2, 2006 at 3:04 PM") }</p>
+		</div>
+		<div class="mt-4 sm:mt-0">
+			<a href="/admin/orders" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Back to orders</a>
+		</div>
+	</div>
+	<!-- Status cards -->
+	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+			<dt class="text-sm font-medium text-stone-500">Payment</dt>
+			<dd class="mt-1">
+				@PaymentStatusBadge(props.Order.PaymentStatus)
+			</dd>
+		</div>
+		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+			<dt class="text-sm font-medium text-stone-500">Fulfillment</dt>
+			<dd class="mt-1">
+				@FulfillmentStatusBadge(props.Order.FulfillmentStatus)
+			</dd>
+		</div>
+		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+			<dt class="text-sm font-medium text-stone-500">Total</dt>
+			<dd class="mt-1 text-lg font-semibold text-stone-900 tabular-nums">{ formatCents(props.Order.Total) }</dd>
+		</div>
+	</div>
+	<!-- Line items -->
+	<div class="mt-8">
+		<h2 class="text-sm font-semibold text-stone-900">Line items</h2>
+		if len(props.LineItems) == 0 {
+			<p class="mt-2 text-sm text-stone-500">No line items.</p>
+		} else {
+			<div class="mt-2 overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+				<table class="min-w-full divide-y divide-stone-300">
+					<thead class="bg-stone-50">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Variant</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Qty</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Unit Price</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Total</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-stone-200 bg-white">
+						for _, li := range props.LineItems {
+							<tr>
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-stone-900 sm:pl-6">
+									{ li.VariantID.String()[:8] }...
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500 text-right tabular-nums">
+									{ fmt.Sprintf("%d", li.Quantity) }
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500 text-right tabular-nums">
+									{ formatCents(li.UnitPrice) }
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-900 text-right tabular-nums font-medium">
+									{ formatCents(li.Total) }
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+	<!-- Order totals -->
+	<div class="mt-6 rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+		<dl class="space-y-2">
+			<div class="flex justify-between text-sm">
+				<dt class="text-stone-500">Subtotal</dt>
+				<dd class="text-stone-900 tabular-nums">{ formatCents(props.Order.Subtotal) }</dd>
+			</div>
+			if props.Order.DiscountTotal > 0 {
+				<div class="flex justify-between text-sm">
+					<dt class="text-stone-500">Discounts</dt>
+					<dd class="text-stone-900 tabular-nums">-{ formatCents(props.Order.DiscountTotal) }</dd>
+				</div>
+			}
+			<div class="flex justify-between text-sm">
+				<dt class="text-stone-500">Shipping</dt>
+				<dd class="text-stone-900 tabular-nums">{ formatCents(props.Order.ShippingTotal) }</dd>
+			</div>
+			<div class="flex justify-between text-sm">
+				<dt class="text-stone-500">Tax</dt>
+				<dd class="text-stone-900 tabular-nums">{ formatCents(props.Order.TaxTotal) }</dd>
+			</div>
+			<div class="flex justify-between border-t border-stone-200 pt-2 text-sm font-semibold">
+				<dt class="text-stone-900">Total</dt>
+				<dd class="text-stone-900 tabular-nums">{ formatCents(props.Order.Total) }</dd>
+			</div>
+		</dl>
+	</div>
+	<!-- Adjustments -->
+	if len(props.Adjustments) > 0 {
+		<div class="mt-8">
+			<h2 class="text-sm font-semibold text-stone-900">Adjustments</h2>
+			<div class="mt-2 overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+				<table class="min-w-full divide-y divide-stone-300">
+					<thead class="bg-stone-50">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Label</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Type</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Amount</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-stone-200 bg-white">
+						for _, adj := range props.Adjustments {
+							<tr>
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-stone-900 sm:pl-6">{ adj.Label }</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500">{ adj.SourceType }</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-900 text-right tabular-nums">{ formatCents(adj.Amount) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	}
+	<!-- Notes -->
+	if props.Order.Notes != nil && *props.Order.Notes != "" {
+		<div class="mt-8">
+			<h2 class="text-sm font-semibold text-stone-900">Notes</h2>
+			<p class="mt-2 text-sm text-stone-600">{ *props.Order.Notes }</p>
+		</div>
+	}
+}
+
+templ OrderShow(props OrderShowProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      fmt.Sprintf("Order %s", props.Order.Number),
+		ActivePath: "/admin/orders",
+		StaffName:  "Dev User",
+		StaffRole:  "admin",
+	}) {
+		@OrderShowContent(props)
+	}
+}

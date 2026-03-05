@@ -18,13 +18,14 @@ type Deps struct {
 	Logger        *slog.Logger
 	Metrics       *metrics.Registry
 	Sessions      *sessions.Manager
-	OrderService  *app.OrderService
-	CustomerService *app.CustomerService
-	CatalogService  *app.CatalogService
-	CheckoutService *app.CheckoutService
-	FulfillmentService *app.FulfillmentService
+	OrderService        *app.OrderService
+	CustomerService     *app.CustomerService
+	CatalogService      *app.CatalogService
+	CheckoutService     *app.CheckoutService
+	FulfillmentService  *app.FulfillmentService
 	SubscriptionService *app.SubscriptionService
-	AuthService  *app.AuthService
+	DiscountService     *app.DiscountService
+	AuthService         *app.AuthService
 }
 
 // NewRouter creates a new HTTP router with all routes and middleware registered.
@@ -67,6 +68,23 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/delete", deps.handleAdminOptionDelete)
 	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values", deps.handleAdminOptionValueCreate)
 	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values/{valueID}/delete", deps.handleAdminOptionValueDelete)
+
+	// Admin orders
+	mux.HandleFunc("GET /admin/orders", deps.handleAdminOrderList)
+	mux.HandleFunc("GET /admin/orders/{id}", deps.handleAdminOrderShow)
+
+	// Admin customers
+	mux.HandleFunc("GET /admin/customers", deps.handleAdminCustomerList)
+	mux.HandleFunc("GET /admin/customers/{id}", deps.handleAdminCustomerShow)
+
+	// Admin subscriptions
+	mux.HandleFunc("GET /admin/subscriptions", deps.handleAdminSubscriptionList)
+
+	// Admin fulfillment
+	mux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)
+
+	// Admin discounts
+	mux.HandleFunc("GET /admin/discounts", deps.handleAdminDiscountList)
 
 	// Dev/test route — triggers a server error for toast testing
 	mux.HandleFunc("GET /admin/dev/error", func(w http.ResponseWriter, r *http.Request) {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store/sqlcgen"
@@ -209,6 +210,71 @@ func (s *SubscriptionStore) ListDueForRenewal(ctx context.Context, tx pgx.Tx) ([
 		subs[i] = *subscriptionFromRow(r)
 	}
 	return subs, nil
+}
+
+// SubscriptionFilter holds optional filters for listing subscriptions.
+type SubscriptionFilter struct {
+	Status *domain.SubscriptionStatus
+	Limit  int
+	Offset int
+}
+
+// List returns subscriptions matching the given filter (hand-written for dynamic WHERE).
+func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionFilter) ([]domain.Subscription, error) {
+	query := `SELECT id, customer_id, plan_id, status, shipping_address_id,
+	                 current_period_start, current_period_end, next_order_at,
+	                 cancelled_at, pause_until, metadata, created_at, updated_at
+	          FROM subscriptions WHERE true`
+	args := []any{}
+	argN := 1
+
+	if f.Status != nil {
+		query += fmt.Sprintf(" AND status = $%d", argN)
+		args = append(args, string(*f.Status))
+		argN++
+	}
+
+	query += " ORDER BY created_at DESC"
+
+	limit := f.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	query += fmt.Sprintf(" LIMIT $%d", argN)
+	args = append(args, limit)
+	argN++
+
+	if f.Offset > 0 {
+		query += fmt.Sprintf(" OFFSET $%d", argN)
+		args = append(args, f.Offset)
+	}
+
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list subscriptions: %w", err)
+	}
+	defer rows.Close()
+
+	var subs []domain.Subscription
+	for rows.Next() {
+		var sub domain.Subscription
+		var status string
+		var cancelledAt, pauseUntil pgtype.Timestamptz
+		var metadata []byte
+		if err := rows.Scan(
+			&sub.ID, &sub.CustomerID, &sub.PlanID, &status, &sub.ShippingAddressID,
+			&sub.CurrentPeriodStart, &sub.CurrentPeriodEnd, &sub.NextOrderAt,
+			&cancelledAt, &pauseUntil, &metadata, &sub.CreatedAt, &sub.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan subscription: %w", err)
+		}
+		sub.Status = domain.SubscriptionStatus(status)
+		sub.CancelledAt = timestampFromPG(cancelledAt)
+		sub.PauseUntil = timestampFromPG(pauseUntil)
+		sub.Metadata = metadataFromJSON(metadata)
+		subs = append(subs, sub)
+	}
+	return subs, rows.Err()
 }
 
 // --- Subscription Orders ---

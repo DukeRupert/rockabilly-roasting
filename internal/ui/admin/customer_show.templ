@@ -1,0 +1,121 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type CustomerShowProps struct {
+	Customer  *domain.Customer
+	Addresses []domain.Address
+}
+
+templ CustomerShowContent(props CustomerShowProps) {
+	<!-- Header -->
+	<div class="sm:flex sm:items-center sm:justify-between">
+		<div>
+			<h1 class="text-base/7 font-semibold text-stone-900">{ props.Customer.FirstName } { props.Customer.LastName }</h1>
+			<p class="mt-1 text-sm text-stone-500">{ props.Customer.Email }</p>
+		</div>
+		<div class="mt-4 sm:mt-0">
+			<a href="/admin/customers" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Back to customers</a>
+		</div>
+	</div>
+	<!-- Info cards -->
+	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+			<dt class="text-sm font-medium text-stone-500">Email verified</dt>
+			<dd class="mt-1">
+				if props.Customer.EmailVerified {
+					<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">yes</span>
+				} else {
+					<span class="inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20">no</span>
+				}
+			</dd>
+		</div>
+		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+			<dt class="text-sm font-medium text-stone-500">Account type</dt>
+			<dd class="mt-1 text-sm text-stone-900">
+				if props.Customer.IsGuest {
+					Guest
+				} else {
+					Registered
+				}
+			</dd>
+		</div>
+		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+			<dt class="text-sm font-medium text-stone-500">Tax exempt</dt>
+			<dd class="mt-1 text-sm text-stone-900">
+				if props.Customer.TaxExempt {
+					Yes
+					if props.Customer.TaxExemptReason != nil {
+						<span class="text-stone-500"> — { *props.Customer.TaxExemptReason }</span>
+					}
+				} else {
+					No
+				}
+			</dd>
+		</div>
+	</div>
+	<!-- Details -->
+	<div class="mt-8 rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+		<div class="px-4 py-5 sm:px-6">
+			<h2 class="text-sm font-semibold text-stone-900">Details</h2>
+		</div>
+		<div class="border-t border-stone-200">
+			<dl class="divide-y divide-stone-200">
+				if props.Customer.Phone != nil {
+					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+						<dt class="text-sm font-medium text-stone-500">Phone</dt>
+						<dd class="mt-1 text-sm text-stone-900 sm:col-span-2 sm:mt-0">{ *props.Customer.Phone }</dd>
+					</div>
+				}
+				<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+					<dt class="text-sm font-medium text-stone-500">Customer since</dt>
+					<dd class="mt-1 text-sm text-stone-900 sm:col-span-2 sm:mt-0">{ props.Customer.CreatedAt.Format("January 2, 2006") }</dd>
+				</div>
+			</dl>
+		</div>
+	</div>
+	<!-- Addresses -->
+	<div class="mt-8">
+		<h2 class="text-sm font-semibold text-stone-900">Addresses</h2>
+		if len(props.Addresses) == 0 {
+			<p class="mt-2 text-sm text-stone-500">No addresses on file.</p>
+		} else {
+			<div class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+				for _, addr := range props.Addresses {
+					<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+						<p class="text-sm font-medium text-stone-900">{ addr.FirstName } { addr.LastName }</p>
+						if addr.Company != nil {
+							<p class="text-sm text-stone-500">{ *addr.Company }</p>
+						}
+						<p class="text-sm text-stone-500">{ addr.Line1 }</p>
+						if addr.Line2 != nil {
+							<p class="text-sm text-stone-500">{ *addr.Line2 }</p>
+						}
+						<p class="text-sm text-stone-500">{ addr.City }, { addr.State } { addr.PostalCode }</p>
+						<p class="text-sm text-stone-500">{ addr.CountryCode }</p>
+						if addr.IsDefault {
+							<p class="mt-2">
+								<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">default</span>
+							</p>
+						}
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+templ CustomerShow(props CustomerShowProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      fmt.Sprintf("%s %s", props.Customer.FirstName, props.Customer.LastName),
+		ActivePath: "/admin/customers",
+		StaffName:  "Dev User",
+		StaffRole:  "admin",
+	}) {
+		@CustomerShowContent(props)
+	}
+}

@@ -71,7 +71,7 @@ func run() error {
 	fulfillmentStore := store.NewFulfillmentStore()
 	shippingStore := store.NewShippingStore()
 	_ = store.NewWebhookStore()
-	_ = store.NewDiscountStore()
+	discountStore := store.NewDiscountStore()
 	_ = store.NewAuditStore()
 
 	// Services
@@ -80,7 +80,8 @@ func run() error {
 	catalogSvc := app.NewCatalogService(catalogStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, nil, auditWriter, metricsReg) // TODO: wire label provider
-	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, store.NewDiscountStore(), auditWriter, metricsReg)
+	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
+	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, auditWriter, metricsReg)
 	authSvc := app.NewAuthService(customerStore, sessionMgr, limiter, auditWriter, metricsReg)
 
 	// Router
@@ -95,6 +96,7 @@ func run() error {
 		CheckoutService:     checkoutSvc,
 		FulfillmentService:  fulfillmentSvc,
 		SubscriptionService: subscriptionSvc,
+		DiscountService:     discountSvc,
 		AuthService:         authSvc,
 	}
 

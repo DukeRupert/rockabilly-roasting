@@ -58,4 +58,16 @@ var (
 
 	// Shipping errors
 	ErrShipmentNotFound = errors.New("shipment not found")
+
+	// Taxon errors
+	ErrTaxonNotFound = errors.New("taxon not found")
+
+	// Address errors
+	ErrAddressNotFound = errors.New("address not found")
+
+	// Status errors
+	ErrInvalidOrderStatus = errors.New("invalid order status transition")
+
+	// Slug errors
+	ErrSlugAlreadyExists = errors.New("slug already exists")
 )

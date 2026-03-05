@@ -63,6 +63,9 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, app.ErrPermissionDenied):
 		return http.StatusForbidden, "permission denied"
 
+	case errors.Is(err, app.ErrDuplicateVariantOptions):
+		return http.StatusConflict, err.Error()
+
 	case errors.Is(err, app.ErrEmailAlreadyExists),
 		errors.Is(err, app.ErrSKUAlreadyExists),
 		errors.Is(err, app.ErrCouponAlreadyUsed):

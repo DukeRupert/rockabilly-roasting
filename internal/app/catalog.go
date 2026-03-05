@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -373,6 +374,50 @@ func (s *CatalogService) ListVariantOptionValues(ctx context.Context, tx pgx.Tx,
 		return nil, fmt.Errorf("list variant option values: %w", err)
 	}
 	return vals, nil
+}
+
+// CheckDuplicateVariantOptions returns ErrDuplicateVariantOptions if any existing
+// variant for the product already has the exact same set of option values.
+func (s *CatalogService) CheckDuplicateVariantOptions(ctx context.Context, tx pgx.Tx, productID uuid.UUID, optionValueIDs []uuid.UUID) error {
+	variants, err := s.catalog.ListVariantsByProduct(ctx, tx, productID)
+	if err != nil {
+		return fmt.Errorf("list variants: %w", err)
+	}
+
+	// Build a canonical key for the incoming set
+	newKey := canonicalOptionKey(optionValueIDs)
+
+	for _, v := range variants {
+		existing, err := s.catalog.ListVariantOptionValues(ctx, tx, v.ID)
+		if err != nil {
+			return fmt.Errorf("list variant option values: %w", err)
+		}
+		ids := make([]uuid.UUID, len(existing))
+		for i, e := range existing {
+			ids[i] = e.ProductOptionValueID
+		}
+		if canonicalOptionKey(ids) == newKey {
+			return ErrDuplicateVariantOptions
+		}
+	}
+	return nil
+}
+
+// canonicalOptionKey sorts option value UUIDs and joins them into a comparable string.
+func canonicalOptionKey(ids []uuid.UUID) string {
+	strs := make([]string, len(ids))
+	for i, id := range ids {
+		strs[i] = id.String()
+	}
+	sort.Strings(strs)
+	key := ""
+	for i, s := range strs {
+		if i > 0 {
+			key += ","
+		}
+		key += s
+	}
+	return key
 }
 
 // DeleteVariantOptionValues removes all option values for a variant.

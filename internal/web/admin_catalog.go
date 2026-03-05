@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -15,6 +16,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
+	"github.com/dukerupert/hiri/internal/ui/components/toast"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -257,15 +259,10 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
-		// Build a lookup from option value ID -> display value
-		optionValueNames := make(map[uuid.UUID]string)
 		for _, opt := range opts {
 			vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
 			if vErr != nil {
 				return vErr
-			}
-			for _, v := range vals {
-				optionValueNames[v.ID] = v.Value
 			}
 			options = append(options, admin.OptionWithValues{
 				Option: opt,
@@ -283,15 +280,9 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 			if vErr != nil {
 				return vErr
 			}
-			var names []string
-			for _, link := range vov {
-				if name, ok := optionValueNames[link.ProductOptionValueID]; ok {
-					names = append(names, name)
-				}
-			}
 			variants = append(variants, admin.VariantWithOptions{
 				Variant:      v,
-				OptionValues: names,
+				OptionValues: sortedOptionValueNames(vov, options),
 			})
 		}
 		return nil
@@ -422,6 +413,26 @@ func (d *Deps) handleAdminProductDelete(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, "/admin/catalog?flash=Product+deleted", http.StatusSeeOther)
 }
 
+// sortedOptionValueNames returns option value display names for a variant,
+// ordered by the parent option's position (matching the options slice order).
+func sortedOptionValueNames(vov []domain.VariantOptionValue, options []admin.OptionWithValues) []string {
+	// Build a set of this variant's option value IDs
+	selected := make(map[uuid.UUID]struct{}, len(vov))
+	for _, link := range vov {
+		selected[link.ProductOptionValueID] = struct{}{}
+	}
+	// Walk options in definition order, pick matching values
+	var names []string
+	for _, opt := range options {
+		for _, val := range opt.Values {
+			if _, ok := selected[val.ID]; ok {
+				names = append(names, val.Value)
+			}
+		}
+	}
+	return names
+}
+
 // --- Panel helpers ---
 
 // renderOptionsPanel re-fetches options for a product and renders the partial.
@@ -450,14 +461,10 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 		if txErr != nil {
 			return txErr
 		}
-		optionValueNames := make(map[uuid.UUID]string)
 		for _, opt := range opts {
 			vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
 			if vErr != nil {
 				return vErr
-			}
-			for _, v := range vals {
-				optionValueNames[v.ID] = v.Value
 			}
 			options = append(options, admin.OptionWithValues{
 				Option: opt,
@@ -475,15 +482,9 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 			if vErr != nil {
 				return vErr
 			}
-			var names []string
-			for _, link := range vov {
-				if name, ok := optionValueNames[link.ProductOptionValueID]; ok {
-					names = append(names, name)
-				}
-			}
 			variants = append(variants, admin.VariantWithOptions{
 				Variant:      v,
-				OptionValues: names,
+				OptionValues: sortedOptionValueNames(vov, options),
 			})
 		}
 		return nil
@@ -525,14 +526,10 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 		if txErr != nil {
 			return txErr
 		}
-		optionValueNames := make(map[uuid.UUID]string)
 		for _, opt := range opts {
 			vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
 			if vErr != nil {
 				return vErr
-			}
-			for _, v := range vals {
-				optionValueNames[v.ID] = v.Value
 			}
 			options = append(options, admin.OptionWithValues{
 				Option: opt,
@@ -550,15 +547,9 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 			if vErr != nil {
 				return vErr
 			}
-			var names []string
-			for _, link := range vov {
-				if name, ok := optionValueNames[link.ProductOptionValueID]; ok {
-					names = append(names, name)
-				}
-			}
 			variants = append(variants, admin.VariantWithOptions{
 				Variant:      v,
-				OptionValues: names,
+				OptionValues: sortedOptionValueNames(vov, options),
 			})
 		}
 		return nil
@@ -595,8 +586,9 @@ func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) 
 	if barcode := r.FormValue("barcode"); barcode != "" {
 		params.Barcode = &barcode
 	}
-	if wt, err := strconv.Atoi(r.FormValue("weight_grams")); err == nil && wt > 0 {
-		params.WeightGrams = &wt
+	if oz, err := strconv.ParseFloat(r.FormValue("weight_oz"), 64); err == nil && oz > 0 {
+		grams := int(math.Round(oz * 28.3495))
+		params.WeightGrams = &grams
 	}
 
 	// Collect option value selections from form (field names like "option_{optionID}")
@@ -611,6 +603,11 @@ func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		if len(optionValueIDs) > 0 {
+			if txErr := d.CatalogService.CheckDuplicateVariantOptions(ctx, tx, productID, optionValueIDs); txErr != nil {
+				return txErr
+			}
+		}
 		variant, txErr := d.CatalogService.CreateVariant(ctx, tx, params)
 		if txErr != nil {
 			return txErr
@@ -623,6 +620,13 @@ func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) 
 		return nil
 	})
 	if err != nil {
+		if IsHTMX(r) {
+			// Re-render the panel so it stays visible, plus an OOB toast for the error
+			d.renderVariantsPanel(w, r, productID)
+			_, msg := mapError(err)
+			toast.Toast(toast.VariantError, msg).Render(r.Context(), w) //nolint:errcheck
+			return
+		}
 		Error(w, r, err)
 		return
 	}
@@ -663,8 +667,9 @@ func (d *Deps) handleAdminVariantUpdate(w http.ResponseWriter, r *http.Request) 
 	if barcode := r.FormValue("barcode"); barcode != "" {
 		params.Barcode = &barcode
 	}
-	if wt, err := strconv.Atoi(r.FormValue("weight_grams")); err == nil && wt > 0 {
-		params.WeightGrams = &wt
+	if oz, err := strconv.ParseFloat(r.FormValue("weight_oz"), 64); err == nil && oz > 0 {
+		grams := int(math.Round(oz * 28.3495))
+		params.WeightGrams = &grams
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {

@@ -24,7 +24,8 @@ var (
 	// Product errors
 	ErrProductNotFound  = errors.New("product not found")
 	ErrVariantNotFound  = errors.New("variant not found")
-	ErrSKUAlreadyExists = errors.New("sku already exists")
+	ErrSKUAlreadyExists              = errors.New("sku already exists")
+	ErrDuplicateVariantOptions       = errors.New("a variant with these options already exists")
 
 	// Inventory errors
 	ErrInsufficientStock = errors.New("insufficient stock")

@@ -2,10 +2,18 @@ package admin
 
 import (
 	"fmt"
-	"strconv"
+	"math"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
+
+// gramsToOz converts grams to ounces for display.
+func gramsToOz(g int) string {
+	oz := float64(g) / 28.3495
+	// Show one decimal place, trim trailing zero
+	s := fmt.Sprintf("%.1f", math.Round(oz*10)/10)
+	return s
+}
 
 type OptionWithValues struct {
 	Option domain.ProductOption
@@ -226,7 +234,7 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Options</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Barcode</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Default</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 lg:table-cell">Weight (g)</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 lg:table-cell">Weight (oz)</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
 							</th>
@@ -267,7 +275,7 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 lg:table-cell">
 									if vwo.Variant.WeightGrams != nil {
-										{ strconv.Itoa(*vwo.Variant.WeightGrams) }
+										{ gramsToOz(*vwo.Variant.WeightGrams) }
 									} else {
 										<span class="text-stone-400">—</span>
 									}
@@ -343,9 +351,9 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 					</div>
 					<div class="w-24">
 						<!-- TODO: unit should come from a global weight-unit setting in the admin settings panel -->
-						<label for="variant_weight" class="block text-sm/6 font-medium text-stone-900">Weight (g)</label>
+						<label for="variant_weight" class="block text-sm/6 font-medium text-stone-900">Weight (oz)</label>
 						<div class="mt-2">
-							<input type="number" id="variant_weight" name="weight_grams" placeholder="0" class={ inputClasses(false) }/>
+							<input type="number" id="variant_weight" name="weight_oz" step="0.1" placeholder="0" class={ inputClasses(false) }/>
 						</div>
 					</div>
 					<div class="flex items-center gap-2 pb-1.5">

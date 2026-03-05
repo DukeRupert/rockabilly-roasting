@@ -60,6 +60,7 @@ type PlaceOrderParams struct {
 	BillingAddressID  uuid.UUID
 	CurrencyCode      string
 	CouponCode        *string
+	SubscriptionID    *uuid.UUID
 	ShippingCents     int
 	TaxCents          int
 	Notes             *string
@@ -148,6 +149,7 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		Total:             total,
 		ShippingAddressID: p.ShippingAddressID,
 		BillingAddressID:  p.BillingAddressID,
+		SubscriptionID:    p.SubscriptionID,
 		Notes:             p.Notes,
 		Metadata:          p.Metadata,
 		PlacedAt:          time.Now(),

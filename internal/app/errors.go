@@ -31,9 +31,13 @@ var (
 	ErrInsufficientStock = errors.New("insufficient stock")
 
 	// Subscription errors
-	ErrSubscriptionNotFound    = errors.New("subscription not found")
-	ErrSubscriptionNotActive   = errors.New("subscription is not active")
-	ErrSubscriptionNotPausable = errors.New("subscription cannot be paused")
+	ErrSubscriptionNotFound      = errors.New("subscription not found")
+	ErrSubscriptionNotActive     = errors.New("subscription is not active")
+	ErrSubscriptionNotPausable   = errors.New("subscription cannot be paused")
+	ErrSubscriptionNotResumable  = errors.New("subscription cannot be resumed")
+	ErrSubscriptionNotCancellable = errors.New("subscription cannot be cancelled")
+	ErrSubscriptionPlanNotFound  = errors.New("subscription plan not found")
+	ErrSubscriptionPlanInactive  = errors.New("subscription plan is not active")
 
 	// Fulfillment errors
 	ErrFulfillmentNotFound = errors.New("fulfillment not found")

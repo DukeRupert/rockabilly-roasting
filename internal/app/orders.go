@@ -94,6 +94,27 @@ func (s *OrderService) ListAdjustments(ctx context.Context, tx pgx.Tx, orderID u
 	return adjs, nil
 }
 
+// GetOrderByStripePaymentIntentID returns an order by its Stripe PaymentIntent ID.
+func (s *OrderService) GetOrderByStripePaymentIntentID(ctx context.Context, tx pgx.Tx, intentID string) (*domain.Order, error) {
+	o, err := s.orders.GetOrderByStripePaymentIntentID(ctx, tx, intentID)
+	if err != nil {
+		return nil, fmt.Errorf("get order by stripe PI: %w", err)
+	}
+	return o, nil
+}
+
+// UpdateOrderStatus updates the order's status.
+func (s *OrderService) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
+	o, err := s.orders.UpdateOrderStatus(ctx, tx, id, status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("update order status: %w", err)
+	}
+	return o, nil
+}
+
 // --- Mutation methods ---
 
 // CancelOrder cancels an order if allowed by the state machine.

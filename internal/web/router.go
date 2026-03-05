@@ -113,6 +113,9 @@ func NewRouter(deps *Deps) http.Handler {
 		Error(w, r, errors.New("simulated server error for testing"))
 	})
 
+	// Webhooks
+	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)
+
 	// API routes
 	// TODO: register API handlers
 

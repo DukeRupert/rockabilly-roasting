@@ -21,6 +21,7 @@ const (
 	AuditSubscriptionPaused    = "subscription.paused"
 	AuditSubscriptionCancelled = "subscription.cancelled"
 	AuditSubscriptionRenewed   = "subscription.renewed"
+	AuditSubscriptionResumed   = "subscription.resumed"
 	AuditSubscriptionFailed    = "subscription.renewal_failed"
 
 	// Customer actions (staff-initiated)

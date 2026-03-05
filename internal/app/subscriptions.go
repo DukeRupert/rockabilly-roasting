@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -37,6 +38,24 @@ func NewSubscriptionService(
 	}
 }
 
+// --- State machine helpers ---
+
+func canPauseSubscription(status domain.SubscriptionStatus) bool {
+	return status == domain.SubscriptionStatusActive
+}
+
+func canResumeSubscription(status domain.SubscriptionStatus) bool {
+	return status == domain.SubscriptionStatusPaused
+}
+
+func canCancelSubscription(status domain.SubscriptionStatus) bool {
+	return status == domain.SubscriptionStatusActive ||
+		status == domain.SubscriptionStatusPaused ||
+		status == domain.SubscriptionStatusPastDue
+}
+
+// --- Query methods ---
+
 // GetSubscription returns a subscription by ID.
 func (s *SubscriptionService) GetSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
 	sub, err := s.subscriptions.GetByID(ctx, tx, id)
@@ -65,4 +84,298 @@ func (s *SubscriptionService) ListPlans(ctx context.Context, tx pgx.Tx) ([]domai
 		return nil, fmt.Errorf("list subscription plans: %w", err)
 	}
 	return plans, nil
+}
+
+// GetPlan returns a subscription plan by ID.
+func (s *SubscriptionService) GetPlan(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.SubscriptionPlan, error) {
+	plan, err := s.subscriptions.GetPlanByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionPlanNotFound
+		}
+		return nil, fmt.Errorf("get subscription plan: %w", err)
+	}
+	return plan, nil
+}
+
+// ListDueForRenewal returns active subscriptions due for renewal.
+func (s *SubscriptionService) ListDueForRenewal(ctx context.Context, tx pgx.Tx) ([]domain.Subscription, error) {
+	subs, err := s.subscriptions.ListDueForRenewal(ctx, tx)
+	if err != nil {
+		return nil, fmt.Errorf("list due for renewal: %w", err)
+	}
+	return subs, nil
+}
+
+// --- Mutation methods ---
+
+// CreateSubscriptionParams holds all input needed to create a subscription.
+type CreateSubscriptionParams struct {
+	CustomerID        uuid.UUID
+	PlanID            uuid.UUID
+	ShippingAddressID uuid.UUID
+	Metadata          map[string]any
+}
+
+// CreateSubscription creates a new active subscription for a customer.
+func (s *SubscriptionService) CreateSubscription(ctx context.Context, tx pgx.Tx, p CreateSubscriptionParams, actor Actor) (*domain.Subscription, error) {
+	plan, err := s.subscriptions.GetPlanByID(ctx, tx, p.PlanID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionPlanNotFound
+		}
+		return nil, fmt.Errorf("get plan for create: %w", err)
+	}
+	if !plan.IsActive {
+		return nil, ErrSubscriptionPlanInactive
+	}
+
+	now := time.Now()
+	periodEnd := nextPeriodEnd(now, plan.Interval, plan.IntervalCount)
+
+	sub, err := s.subscriptions.Create(ctx, tx, store.CreateSubscriptionParams{
+		CustomerID:         p.CustomerID,
+		PlanID:             p.PlanID,
+		Status:             domain.SubscriptionStatusActive,
+		ShippingAddressID:  p.ShippingAddressID,
+		CurrentPeriodStart: now,
+		CurrentPeriodEnd:   periodEnd,
+		NextOrderAt:        periodEnd,
+		Metadata:           p.Metadata,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create subscription: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditSubscriptionCreated,
+		ResourceType: "subscription",
+		ResourceID:   sub.ID,
+		After:        sub,
+	}); err != nil {
+		return nil, fmt.Errorf("audit subscription created: %w", err)
+	}
+
+	return sub, nil
+}
+
+// PauseSubscription pauses an active subscription. An optional pauseUntil date
+// can be provided for automatic resume scheduling.
+func (s *SubscriptionService) PauseSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, pauseUntil *time.Time, actor Actor) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for pause: %w", err)
+	}
+
+	if !canPauseSubscription(sub.Status) {
+		return nil, ErrSubscriptionNotPausable
+	}
+
+	sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusPaused)
+	if err != nil {
+		return nil, fmt.Errorf("pause subscription: %w", err)
+	}
+
+	if err := s.subscriptions.UpdatePauseUntil(ctx, tx, id, pauseUntil); err != nil {
+		return nil, fmt.Errorf("set pause_until: %w", err)
+	}
+	sub.PauseUntil = pauseUntil
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditSubscriptionPaused,
+		ResourceType: "subscription",
+		ResourceID:   id,
+		After:        sub,
+	}); err != nil {
+		return nil, fmt.Errorf("audit subscription paused: %w", err)
+	}
+
+	return sub, nil
+}
+
+// ResumeSubscription resumes a paused subscription and resets the billing period.
+func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for resume: %w", err)
+	}
+
+	if !canResumeSubscription(sub.Status) {
+		return nil, ErrSubscriptionNotResumable
+	}
+
+	plan, err := s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
+	if err != nil {
+		return nil, fmt.Errorf("get plan for resume: %w", err)
+	}
+
+	now := time.Now()
+	periodEnd := nextPeriodEnd(now, plan.Interval, plan.IntervalCount)
+
+	sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusActive)
+	if err != nil {
+		return nil, fmt.Errorf("resume subscription status: %w", err)
+	}
+
+	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, now, periodEnd, periodEnd); err != nil {
+		return nil, fmt.Errorf("reset billing period: %w", err)
+	}
+	sub.CurrentPeriodStart = now
+	sub.CurrentPeriodEnd = periodEnd
+	sub.NextOrderAt = periodEnd
+
+	if err := s.subscriptions.UpdatePauseUntil(ctx, tx, id, nil); err != nil {
+		return nil, fmt.Errorf("clear pause_until: %w", err)
+	}
+	sub.PauseUntil = nil
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditSubscriptionResumed,
+		ResourceType: "subscription",
+		ResourceID:   id,
+		After:        sub,
+	}); err != nil {
+		return nil, fmt.Errorf("audit subscription resumed: %w", err)
+	}
+
+	return sub, nil
+}
+
+// CancelSubscription cancels a subscription.
+func (s *SubscriptionService) CancelSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for cancel: %w", err)
+	}
+
+	if !canCancelSubscription(sub.Status) {
+		return nil, ErrSubscriptionNotCancellable
+	}
+
+	sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusCancelled)
+	if err != nil {
+		return nil, fmt.Errorf("cancel subscription status: %w", err)
+	}
+
+	if err := s.subscriptions.Cancel(ctx, tx, id); err != nil {
+		return nil, fmt.Errorf("set cancelled_at: %w", err)
+	}
+	now := time.Now()
+	sub.CancelledAt = &now
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditSubscriptionCancelled,
+		ResourceType: "subscription",
+		ResourceID:   id,
+		After:        sub,
+	}); err != nil {
+		return nil, fmt.Errorf("audit subscription cancelled: %w", err)
+	}
+
+	return sub, nil
+}
+
+// MarkPastDue transitions an active subscription to past_due after a payment failure.
+func (s *SubscriptionService) MarkPastDue(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for past_due: %w", err)
+	}
+
+	if sub.Status != domain.SubscriptionStatusActive {
+		return nil, ErrSubscriptionNotActive
+	}
+
+	sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusPastDue)
+	if err != nil {
+		return nil, fmt.Errorf("mark subscription past_due: %w", err)
+	}
+
+	return sub, nil
+}
+
+// AdvancePeriod advances the subscription's billing period after a successful renewal.
+func (s *SubscriptionService) AdvancePeriod(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for advance: %w", err)
+	}
+
+	plan, err := s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
+	if err != nil {
+		return nil, fmt.Errorf("get plan for advance: %w", err)
+	}
+
+	newStart := sub.CurrentPeriodEnd
+	newEnd := nextPeriodEnd(newStart, plan.Interval, plan.IntervalCount)
+
+	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, newStart, newEnd, newEnd); err != nil {
+		return nil, fmt.Errorf("advance period: %w", err)
+	}
+
+	// If subscription was past_due, restore to active on successful renewal
+	if sub.Status == domain.SubscriptionStatusPastDue {
+		sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusActive)
+		if err != nil {
+			return nil, fmt.Errorf("restore active status: %w", err)
+		}
+	}
+
+	sub.CurrentPeriodStart = newStart
+	sub.CurrentPeriodEnd = newEnd
+	sub.NextOrderAt = newEnd
+
+	return sub, nil
+}
+
+// LinkOrder associates an order with a subscription for a billing period.
+func (s *SubscriptionService) LinkOrder(ctx context.Context, tx pgx.Tx, subscriptionID, orderID uuid.UUID, periodStart, periodEnd time.Time) error {
+	if err := s.subscriptions.CreateSubscriptionOrder(ctx, tx, subscriptionID, orderID, periodStart, periodEnd); err != nil {
+		return fmt.Errorf("link order to subscription: %w", err)
+	}
+	return nil
+}
+
+// --- Period calculation ---
+
+func nextPeriodEnd(start time.Time, interval domain.SubscriptionInterval, count int) time.Time {
+	switch interval {
+	case domain.SubscriptionIntervalWeekly:
+		return start.AddDate(0, 0, 7*count)
+	case domain.SubscriptionIntervalBiweekly:
+		return start.AddDate(0, 0, 14*count)
+	case domain.SubscriptionIntervalMonthly:
+		return start.AddDate(0, count, 0)
+	case domain.SubscriptionIntervalQuarterly:
+		return start.AddDate(0, 3*count, 0)
+	default:
+		return start.AddDate(0, count, 0)
+	}
 }

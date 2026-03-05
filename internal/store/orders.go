@@ -134,6 +134,27 @@ func (s *OrderStore) UpdateOrderFulfillmentStatus(ctx context.Context, tx pgx.Tx
 	return orderFromRow(row), nil
 }
 
+// UpdateOrderStripePaymentIntentID sets the Stripe PaymentIntent ID on an order.
+func (s *OrderStore) UpdateOrderStripePaymentIntentID(ctx context.Context, tx pgx.Tx, id uuid.UUID, intentID string) (*domain.Order, error) {
+	row, err := sqlcgen.New(tx).UpdateOrderStripePaymentIntentID(ctx, sqlcgen.UpdateOrderStripePaymentIntentIDParams{
+		ID:                    id,
+		StripePaymentIntentID: &intentID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update order stripe payment intent id: %w", err)
+	}
+	return orderFromRow(row), nil
+}
+
+// GetOrderByStripePaymentIntentID returns an order by its Stripe PaymentIntent ID.
+func (s *OrderStore) GetOrderByStripePaymentIntentID(ctx context.Context, tx pgx.Tx, intentID string) (*domain.Order, error) {
+	row, err := sqlcgen.New(tx).GetOrderByStripePaymentIntentID(ctx, &intentID)
+	if err != nil {
+		return nil, fmt.Errorf("get order by stripe payment intent id: %w", err)
+	}
+	return orderFromRow(row), nil
+}
+
 // DeleteOrder removes an order by ID.
 func (s *OrderStore) DeleteOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if err := sqlcgen.New(tx).DeleteOrder(ctx, id); err != nil {
@@ -158,8 +179,8 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	query := `SELECT id, number, customer_id, status, payment_status, fulfillment_status,
 	                 currency_code, subtotal, discount_total, shipping_total, tax_total, total,
 	                 shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
-	                 tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata,
-	                 placed_at, created_at, updated_at
+	                 tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
+	                 notes, metadata, placed_at, created_at, updated_at
 	          FROM orders WHERE true`
 	args := []any{}
 	argN := 1
@@ -221,8 +242,8 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 			&o.ID, &o.Number, &o.CustomerID, &status, &paymentStatus, &fulfillmentStatus,
 			&o.CurrencyCode, &subtotal, &discountTotal, &shippingTotal, &taxTotal, &total,
 			&o.ShippingAddressID, &o.BillingAddressID, &o.SubscriptionID, &o.DraftByUserID,
-			&o.TaxExempt, &o.TaxExemptReason, &o.StripeTaxID, &o.Notes, &metadata,
-			&o.PlacedAt, &o.CreatedAt, &o.UpdatedAt,
+			&o.TaxExempt, &o.TaxExemptReason, &o.StripeTaxID, &o.StripePaymentIntentID,
+			&o.Notes, &metadata, &o.PlacedAt, &o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan order: %w", err)
 		}
@@ -470,8 +491,9 @@ func orderFromRow(r sqlcgen.Order) *domain.Order {
 		DraftByUserID:     r.DraftByUserID,
 		TaxExempt:         r.TaxExempt,
 		TaxExemptReason:   r.TaxExemptReason,
-		StripeTaxID:       r.StripeTaxID,
-		Notes:             r.Notes,
+		StripeTaxID:           r.StripeTaxID,
+		StripePaymentIntentID: r.StripePaymentIntentID,
+		Notes:                 r.Notes,
 		Metadata:          metadataFromJSON(r.Metadata),
 		PlacedAt:          r.PlacedAt,
 		CreatedAt:         r.CreatedAt,

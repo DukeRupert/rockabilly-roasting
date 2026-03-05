@@ -78,8 +78,8 @@ type CustomerFilter struct {
 // This method is hand-written because sqlc cannot generate dynamic WHERE clauses.
 func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) ([]domain.Customer, error) {
 	query := `SELECT id, email, email_verified, password_hash, first_name, last_name, phone,
-	                 is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata,
-	                 created_at, updated_at
+	                 is_guest, tax_exempt, tax_exempt_reason, stripe_customer_id,
+	                 customer_group_id, metadata, created_at, updated_at
 	          FROM customers WHERE true`
 	args := []any{}
 	argN := 1
@@ -121,8 +121,8 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 		var c domain.Customer
 		if err := rows.Scan(
 			&c.ID, &c.Email, &c.EmailVerified, &c.PasswordHash, &c.FirstName, &c.LastName, &c.Phone,
-			&c.IsGuest, &c.TaxExempt, &c.TaxExemptReason, &c.CustomerGroupID, &c.Metadata,
-			&c.CreatedAt, &c.UpdatedAt,
+			&c.IsGuest, &c.TaxExempt, &c.TaxExemptReason, &c.StripeCustomerID,
+			&c.CustomerGroupID, &c.Metadata, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
@@ -190,6 +190,27 @@ func (s *CustomerStore) UpdateCustomerGroup(ctx context.Context, tx pgx.Tx, id u
 		return fmt.Errorf("update customer group: %w", err)
 	}
 	return nil
+}
+
+// UpdateStripeCustomerID sets the Stripe customer ID on a customer.
+func (s *CustomerStore) UpdateStripeCustomerID(ctx context.Context, tx pgx.Tx, id uuid.UUID, stripeID string) (*domain.Customer, error) {
+	row, err := sqlcgen.New(tx).UpdateCustomerStripeCustomerID(ctx, sqlcgen.UpdateCustomerStripeCustomerIDParams{
+		ID:               id,
+		StripeCustomerID: &stripeID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update customer stripe customer id: %w", err)
+	}
+	return customerFromRow(row), nil
+}
+
+// GetByStripeCustomerID returns a customer by their Stripe customer ID.
+func (s *CustomerStore) GetByStripeCustomerID(ctx context.Context, tx pgx.Tx, stripeID string) (*domain.Customer, error) {
+	row, err := sqlcgen.New(tx).GetCustomerByStripeCustomerID(ctx, &stripeID)
+	if err != nil {
+		return nil, fmt.Errorf("get customer by stripe customer id: %w", err)
+	}
+	return customerFromRow(row), nil
 }
 
 // Delete hard-deletes a customer by ID.
@@ -299,8 +320,9 @@ func customerFromRow(r sqlcgen.Customer) *domain.Customer {
 		IsGuest:         r.IsGuest,
 		TaxExempt:       r.TaxExempt,
 		TaxExemptReason: r.TaxExemptReason,
-		CustomerGroupID: r.CustomerGroupID,
-		Metadata:        metadataFromJSON(r.Metadata),
+		StripeCustomerID: r.StripeCustomerID,
+		CustomerGroupID:  r.CustomerGroupID,
+		Metadata:         metadataFromJSON(r.Metadata),
 		CreatedAt:       r.CreatedAt,
 		UpdatedAt:       r.UpdatedAt,
 	}

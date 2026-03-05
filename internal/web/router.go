@@ -9,7 +9,9 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
+	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
+	"github.com/dukerupert/hiri/internal/store"
 )
 
 // Deps holds all dependencies needed by HTTP handlers.
@@ -25,7 +27,9 @@ type Deps struct {
 	FulfillmentService  *app.FulfillmentService
 	SubscriptionService *app.SubscriptionService
 	DiscountService     *app.DiscountService
-	AuthService         *app.AuthService
+	AuthService     *app.AuthService
+	PaymentProvider payments.Provider
+	WebhookStore    *store.WebhookStore
 }
 
 // NewRouter creates a new HTTP router with all routes and middleware registered.

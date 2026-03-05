@@ -30,6 +30,15 @@ SET fulfillment_status = $2, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateOrderStripePaymentIntentID :one
+UPDATE orders
+SET stripe_payment_intent_id = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: GetOrderByStripePaymentIntentID :one
+SELECT * FROM orders WHERE stripe_payment_intent_id = $1;
+
 -- name: DeleteOrder :exec
 DELETE FROM orders WHERE id = $1;
 

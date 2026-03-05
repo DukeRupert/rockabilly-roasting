@@ -16,6 +16,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
+	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/store"
@@ -62,6 +63,10 @@ func run() error {
 	sessionStore := store.NewSessionStore()
 	_ = sessionStore // will be used when session.Store interface is implemented
 	sessionMgr := sessions.NewManager(nil) // TODO: wire session store implementing sessions.Store
+	paymentProvider := payments.NewStripeProvider(
+		os.Getenv("STRIPE_SECRET_KEY"),
+		os.Getenv("STRIPE_WEBHOOK_SECRET"),
+	)
 
 	// Stores
 	orderStore := store.NewOrderStore()
@@ -70,7 +75,7 @@ func run() error {
 	subscriptionStore := store.NewSubscriptionStore()
 	fulfillmentStore := store.NewFulfillmentStore()
 	shippingStore := store.NewShippingStore()
-	_ = store.NewWebhookStore()
+	webhookStore := store.NewWebhookStore()
 	discountStore := store.NewDiscountStore()
 	_ = store.NewAuditStore()
 
@@ -81,7 +86,7 @@ func run() error {
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, nil, auditWriter, metricsReg) // TODO: wire label provider
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
-	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, auditWriter, metricsReg)
+	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, paymentProvider, auditWriter, metricsReg)
 	authSvc := app.NewAuthService(customerStore, sessionMgr, limiter, auditWriter, metricsReg)
 
 	// Router
@@ -97,7 +102,9 @@ func run() error {
 		FulfillmentService:  fulfillmentSvc,
 		SubscriptionService: subscriptionSvc,
 		DiscountService:     discountSvc,
-		AuthService:         authSvc,
+		AuthService:     authSvc,
+		PaymentProvider: paymentProvider,
+		WebhookStore:    webhookStore,
 	}
 
 	handler := web.NewRouter(deps)

@@ -77,20 +77,21 @@ type CouponCode struct {
 }
 
 type Customer struct {
-	ID              uuid.UUID       `json:"id"`
-	Email           string          `json:"email"`
-	EmailVerified   bool            `json:"email_verified"`
-	PasswordHash    *string         `json:"password_hash"`
-	FirstName       string          `json:"first_name"`
-	LastName        string          `json:"last_name"`
-	Phone           *string         `json:"phone"`
-	IsGuest         bool            `json:"is_guest"`
-	TaxExempt       bool            `json:"tax_exempt"`
-	TaxExemptReason *string         `json:"tax_exempt_reason"`
-	CustomerGroupID *uuid.UUID      `json:"customer_group_id"`
-	Metadata        json.RawMessage `json:"metadata"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	ID               uuid.UUID       `json:"id"`
+	Email            string          `json:"email"`
+	EmailVerified    bool            `json:"email_verified"`
+	PasswordHash     *string         `json:"password_hash"`
+	FirstName        string          `json:"first_name"`
+	LastName         string          `json:"last_name"`
+	Phone            *string         `json:"phone"`
+	IsGuest          bool            `json:"is_guest"`
+	TaxExempt        bool            `json:"tax_exempt"`
+	TaxExemptReason  *string         `json:"tax_exempt_reason"`
+	CustomerGroupID  *uuid.UUID      `json:"customer_group_id"`
+	Metadata         json.RawMessage `json:"metadata"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
+	StripeCustomerID *string         `json:"stripe_customer_id"`
 }
 
 type CustomerGroup struct {
@@ -169,30 +170,31 @@ type LineItem struct {
 }
 
 type Order struct {
-	ID                uuid.UUID       `json:"id"`
-	Number            string          `json:"number"`
-	CustomerID        *uuid.UUID      `json:"customer_id"`
-	Status            string          `json:"status"`
-	PaymentStatus     string          `json:"payment_status"`
-	FulfillmentStatus string          `json:"fulfillment_status"`
-	CurrencyCode      string          `json:"currency_code"`
-	Subtotal          int32           `json:"subtotal"`
-	DiscountTotal     int32           `json:"discount_total"`
-	ShippingTotal     int32           `json:"shipping_total"`
-	TaxTotal          int32           `json:"tax_total"`
-	Total             int32           `json:"total"`
-	ShippingAddressID uuid.UUID       `json:"shipping_address_id"`
-	BillingAddressID  uuid.UUID       `json:"billing_address_id"`
-	SubscriptionID    *uuid.UUID      `json:"subscription_id"`
-	DraftByUserID     *uuid.UUID      `json:"draft_by_user_id"`
-	TaxExempt         bool            `json:"tax_exempt"`
-	TaxExemptReason   *string         `json:"tax_exempt_reason"`
-	StripeTaxID       *string         `json:"stripe_tax_id"`
-	Notes             *string         `json:"notes"`
-	Metadata          json.RawMessage `json:"metadata"`
-	PlacedAt          time.Time       `json:"placed_at"`
-	CreatedAt         time.Time       `json:"created_at"`
-	UpdatedAt         time.Time       `json:"updated_at"`
+	ID                    uuid.UUID       `json:"id"`
+	Number                string          `json:"number"`
+	CustomerID            *uuid.UUID      `json:"customer_id"`
+	Status                string          `json:"status"`
+	PaymentStatus         string          `json:"payment_status"`
+	FulfillmentStatus     string          `json:"fulfillment_status"`
+	CurrencyCode          string          `json:"currency_code"`
+	Subtotal              int32           `json:"subtotal"`
+	DiscountTotal         int32           `json:"discount_total"`
+	ShippingTotal         int32           `json:"shipping_total"`
+	TaxTotal              int32           `json:"tax_total"`
+	Total                 int32           `json:"total"`
+	ShippingAddressID     uuid.UUID       `json:"shipping_address_id"`
+	BillingAddressID      uuid.UUID       `json:"billing_address_id"`
+	SubscriptionID        *uuid.UUID      `json:"subscription_id"`
+	DraftByUserID         *uuid.UUID      `json:"draft_by_user_id"`
+	TaxExempt             bool            `json:"tax_exempt"`
+	TaxExemptReason       *string         `json:"tax_exempt_reason"`
+	StripeTaxID           *string         `json:"stripe_tax_id"`
+	Notes                 *string         `json:"notes"`
+	Metadata              json.RawMessage `json:"metadata"`
+	PlacedAt              time.Time       `json:"placed_at"`
+	CreatedAt             time.Time       `json:"created_at"`
+	UpdatedAt             time.Time       `json:"updated_at"`
+	StripePaymentIntentID *string         `json:"stripe_payment_intent_id"`
 }
 
 type Price struct {

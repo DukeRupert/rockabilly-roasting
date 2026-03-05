@@ -18,8 +18,9 @@ type Customer struct {
 	IsGuest         bool
 	TaxExempt       bool
 	TaxExemptReason *string
-	CustomerGroupID *uuid.UUID
-	Metadata        map[string]any
+	StripeCustomerID *string
+	CustomerGroupID  *uuid.UUID
+	Metadata         map[string]any
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

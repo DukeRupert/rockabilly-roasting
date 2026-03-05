@@ -38,6 +38,15 @@ UPDATE customers
 SET customer_group_id = $2, updated_at = now()
 WHERE id = $1;
 
+-- name: UpdateCustomerStripeCustomerID :one
+UPDATE customers
+SET stripe_customer_id = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: GetCustomerByStripeCustomerID :one
+SELECT * FROM customers WHERE stripe_customer_id = $1;
+
 -- name: DeleteCustomer :exec
 DELETE FROM customers WHERE id = $1;
 

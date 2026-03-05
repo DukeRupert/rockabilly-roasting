@@ -66,6 +66,7 @@ type Querier interface {
 	GetCouponCodeByID(ctx context.Context, id uuid.UUID) (CouponCode, error)
 	GetCustomerByEmail(ctx context.Context, email string) (Customer, error)
 	GetCustomerByID(ctx context.Context, id uuid.UUID) (Customer, error)
+	GetCustomerByStripeCustomerID(ctx context.Context, stripeCustomerID *string) (Customer, error)
 	GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, error)
 	GetEmailVerificationByTokenHash(ctx context.Context, tokenHash string) (EmailVerification, error)
 	GetFulfillmentByID(ctx context.Context, id uuid.UUID) (Fulfillment, error)
@@ -73,6 +74,7 @@ type Querier interface {
 	GetInventoryItemByVariantID(ctx context.Context, variantID uuid.UUID) (InventoryItem, error)
 	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 	GetOrderByNumber(ctx context.Context, number string) (Order, error)
+	GetOrderByStripePaymentIntentID(ctx context.Context, stripePaymentIntentID *string) (Order, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySlug(ctx context.Context, slug string) (Product, error)
 	GetResetTokenByTokenHash(ctx context.Context, tokenHash string) (ResetToken, error)
@@ -131,6 +133,7 @@ type Querier interface {
 	UpdateCustomerEmailVerified(ctx context.Context, arg UpdateCustomerEmailVerifiedParams) error
 	UpdateCustomerGroup(ctx context.Context, arg UpdateCustomerGroupParams) error
 	UpdateCustomerPassword(ctx context.Context, arg UpdateCustomerPasswordParams) error
+	UpdateCustomerStripeCustomerID(ctx context.Context, arg UpdateCustomerStripeCustomerIDParams) (Customer, error)
 	UpdateCustomerTaxExempt(ctx context.Context, arg UpdateCustomerTaxExemptParams) error
 	UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) (Discount, error)
 	UpdateFulfillmentStatus(ctx context.Context, arg UpdateFulfillmentStatusParams) (Fulfillment, error)
@@ -138,6 +141,7 @@ type Querier interface {
 	UpdateOrderFulfillmentStatus(ctx context.Context, arg UpdateOrderFulfillmentStatusParams) (Order, error)
 	UpdateOrderPaymentStatus(ctx context.Context, arg UpdateOrderPaymentStatusParams) (Order, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
+	UpdateOrderStripePaymentIntentID(ctx context.Context, arg UpdateOrderStripePaymentIntentIDParams) (Order, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 	UpdateProductMediaPosition(ctx context.Context, arg UpdateProductMediaPositionParams) error
 	UpdateProductStatus(ctx context.Context, arg UpdateProductStatusParams) (Product, error)

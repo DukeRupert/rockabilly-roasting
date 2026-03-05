@@ -80,8 +80,9 @@ type Order struct {
 	DraftByUserID     *uuid.UUID
 	TaxExempt         bool
 	TaxExemptReason   *string
-	StripeTaxID       *string
-	Notes             *string
+	StripeTaxID            *string
+	StripePaymentIntentID  *string
+	Notes                  *string
 	Metadata          map[string]any
 	PlacedAt          time.Time
 	CreatedAt         time.Time

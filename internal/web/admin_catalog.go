@@ -301,12 +301,21 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var taxonName string
+	for _, t := range taxons {
+		if t.ID == product.TaxonID {
+			taxonName = t.Name
+			break
+		}
+	}
+
 	props := admin.ProductEditProps{
-		Product:  product,
-		Taxons:   taxons,
-		Variants: variants,
-		Options:  options,
-		Flash:    r.URL.Query().Get("flash"),
+		Product:   product,
+		Taxons:    taxons,
+		Variants:  variants,
+		Options:   options,
+		TaxonName: taxonName,
+		Flash:     r.URL.Query().Get("flash"),
 	}
 	if IsHTMX(r) {
 		admin.ProductEditContent(props).Render(ctx, w) //nolint:errcheck
@@ -421,12 +430,19 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 	var product *domain.Product
 	var options []admin.OptionWithValues
 	var variants []admin.VariantWithOptions
+	var taxonName string
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		product, txErr = d.CatalogService.GetProduct(ctx, tx, productID)
 		if txErr != nil {
 			return txErr
+		}
+
+		if product.TaxonID != uuid.Nil {
+			if taxon, tErr := d.CatalogService.GetTaxon(ctx, tx, product.TaxonID); tErr == nil {
+				taxonName = taxon.Name
+			}
 		}
 
 		// Load options + values
@@ -480,7 +496,7 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 	// Render options panel (primary swap target)
 	admin.OptionsPanel(product, options).Render(ctx, w) //nolint:errcheck
 	// Render variants panel as OOB swap so its option dropdowns stay in sync
-	admin.VariantsPanel(product, variants, options, templ.Attributes{"hx-swap-oob": "outerHTML"}).Render(ctx, w) //nolint:errcheck
+	admin.VariantsPanel(product, variants, options, taxonName, templ.Attributes{"hx-swap-oob": "outerHTML"}).Render(ctx, w) //nolint:errcheck
 }
 
 // renderVariantsPanel re-fetches variants for a product and renders the partial.
@@ -489,12 +505,19 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 	var product *domain.Product
 	var variants []admin.VariantWithOptions
 	var options []admin.OptionWithValues
+	var taxonName string
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		product, txErr = d.CatalogService.GetProduct(ctx, tx, productID)
 		if txErr != nil {
 			return txErr
+		}
+
+		if product.TaxonID != uuid.Nil {
+			if taxon, tErr := d.CatalogService.GetTaxon(ctx, tx, product.TaxonID); tErr == nil {
+				taxonName = taxon.Name
+			}
 		}
 
 		// Load options + values
@@ -544,7 +567,7 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 		Error(w, r, err)
 		return
 	}
-	admin.VariantsPanel(product, variants, options, nil).Render(ctx, w) //nolint:errcheck
+	admin.VariantsPanel(product, variants, options, taxonName, nil).Render(ctx, w) //nolint:errcheck
 }
 
 // --- Variants ---

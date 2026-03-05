@@ -13,12 +13,13 @@ type OptionWithValues struct {
 }
 
 type ProductEditProps struct {
-	Product  *domain.Product
-	Taxons   []domain.Taxon
-	Variants []VariantWithOptions
-	Options  []OptionWithValues
-	Errors   map[string]string
-	Flash    string
+	Product   *domain.Product
+	Taxons    []domain.Taxon
+	Variants  []VariantWithOptions
+	Options   []OptionWithValues
+	TaxonName string
+	Errors    map[string]string
+	Flash     string
 }
 
 templ ProductEditContent(props ProductEditProps) {
@@ -107,7 +108,7 @@ templ ProductEditContent(props ProductEditProps) {
 			<!-- Options panel (before variants — must define options before creating variants) -->
 			@OptionsPanel(props.Product, props.Options)
 			<!-- Variants panel -->
-			@VariantsPanel(props.Product, props.Variants, props.Options, nil)
+			@VariantsPanel(props.Product, props.Variants, props.Options, props.TaxonName, nil)
 		</div>
 }
 
@@ -211,7 +212,7 @@ type VariantWithOptions struct {
 }
 
 // VariantsPanel renders the variants section as a standalone partial for htmx swaps.
-templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues, attrs templ.Attributes) {
+templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues, taxonName string, attrs templ.Attributes) {
 	<div id="variants-panel" { attrs... } class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
 		<div class="px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-stone-900">Variants</h3>
@@ -297,18 +298,21 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 			<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
 				<h4 class="text-sm font-medium text-stone-900 mb-4">Add variant</h4>
 				<form
+					id="variant-form"
 					method="post"
 					action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants", product.ID)) }
 					hx-post={ fmt.Sprintf("/admin/catalog/%s/variants", product.ID) }
 					hx-target="#variants-panel"
 					hx-swap="outerHTML"
 					class="flex items-end gap-3 flex-wrap"
+					data-taxon-name={ taxonName }
+					data-product-title={ product.Title }
 				>
 					for _, opt := range options {
 						<div class="flex-1 min-w-[120px]">
 							<label class="block text-sm/6 font-medium text-stone-900">{ opt.Option.Name }</label>
 							<div class="mt-2">
-								<select name={ fmt.Sprintf("option_%s", opt.Option.ID) } required class={ inputClasses(false) }>
+								<select name={ fmt.Sprintf("option_%s", opt.Option.ID) } required class={ inputClasses(false) + " js-option-select" }>
 									<option value="">Select { opt.Option.Name }</option>
 									for _, val := range opt.Values {
 										<option value={ val.ID.String() }>{ val.Value }</option>
@@ -320,7 +324,15 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 					<div class="flex-1 min-w-[120px]">
 						<label for="variant_sku" class="block text-sm/6 font-medium text-stone-900">SKU</label>
 						<div class="mt-2">
-							<input type="text" id="variant_sku" name="sku" placeholder="SKU-001" required class={ inputClasses(false) }/>
+							<input
+								type="text"
+								id="variant_sku"
+								name="sku"
+								placeholder="AUTO-GEN"
+								required
+								oninput="this.dataset.edited='true'"
+								class={ inputClasses(false) }
+							/>
 						</div>
 					</div>
 					<div class="flex-1 min-w-[120px]">
@@ -343,6 +355,45 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 						Add
 					</button>
 				</form>
+				<script>
+					(function() {
+						function abbrev(s) {
+							s = s.trim().toUpperCase();
+							if (!s) return '';
+							var words = s.split(/\s+/);
+							if (words.length > 1) {
+								return words.map(function(w) { return w[0]; }).join('').slice(0, 4);
+							}
+							return s.replace(/[^A-Z0-9]/g, '').slice(0, 3);
+						}
+
+						function updateSKU(form) {
+							var sku = form.querySelector('#variant_sku');
+							if (sku.dataset.edited) return;
+							var parts = [];
+							var taxon = form.dataset.taxonName;
+							if (taxon) parts.push(abbrev(taxon));
+							parts.push(abbrev(form.dataset.productTitle));
+							form.querySelectorAll('.js-option-select').forEach(function(sel) {
+								if (sel.selectedIndex > 0) {
+									parts.push(abbrev(sel.options[sel.selectedIndex].text));
+								}
+							});
+							sku.value = parts.join('-');
+						}
+
+						function init() {
+							var form = document.getElementById('variant-form');
+							if (!form) return;
+							form.querySelectorAll('.js-option-select').forEach(function(sel) {
+								sel.addEventListener('change', function() { updateSKU(form); });
+							});
+						}
+
+						init();
+						document.addEventListener('htmx:afterSwap', init);
+					})();
+				</script>
 			</div>
 		</div>
 	</div>

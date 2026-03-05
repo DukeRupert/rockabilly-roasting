@@ -1,6 +1,6 @@
 -- name: CreateSubscriptionPlan :one
-INSERT INTO subscription_plans (id, name, interval, interval_count, variant_id, price_set_id, is_active, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO subscription_plans (id, name, interval, interval_count, discount_pct, is_active, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: GetSubscriptionPlanByID :one
@@ -13,9 +13,9 @@ SELECT * FROM subscription_plans ORDER BY name;
 UPDATE subscription_plans SET is_active = $2 WHERE id = $1;
 
 -- name: CreateSubscription :one
-INSERT INTO subscriptions (id, customer_id, plan_id, status, shipping_address_id,
+INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, status, shipping_address_id,
                            current_period_start, current_period_end, next_order_at, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: GetSubscriptionByID :one

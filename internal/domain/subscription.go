@@ -27,14 +27,13 @@ const (
 	SubscriptionStatusExpired   SubscriptionStatus = "expired"
 )
 
-// SubscriptionPlan defines a recurring delivery plan.
+// SubscriptionPlan defines a recurring delivery cadence (decoupled from products).
 type SubscriptionPlan struct {
 	ID            uuid.UUID
 	Name          string
 	Interval      SubscriptionInterval
 	IntervalCount int
-	VariantID     uuid.UUID
-	PriceSetID    uuid.UUID
+	DiscountPct   int
 	IsActive      bool
 	Metadata      map[string]any
 }
@@ -44,6 +43,7 @@ type Subscription struct {
 	ID                 uuid.UUID
 	CustomerID         uuid.UUID
 	PlanID             uuid.UUID
+	VariantID          uuid.UUID
 	Status             SubscriptionStatus
 	ShippingAddressID  uuid.UUID
 	CurrentPeriodStart time.Time

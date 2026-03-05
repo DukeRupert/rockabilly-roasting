@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/app"
@@ -165,9 +164,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		}
 
 		variantsWithPrices = make([]storefront.VariantWithPrice, len(variants))
-		variantIDs := make([]uuid.UUID, len(variants))
 		for i, v := range variants {
-			variantIDs[i] = v.ID
 			vwp := storefront.VariantWithPrice{
 				Variant:      v,
 				CurrencyCode: "USD",
@@ -186,10 +183,12 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 			variantsWithPrices[i] = vwp
 		}
 
-		// Get subscription plans for this product's variants.
-		plans, txErr = d.SubscriptionService.ListActivePlansByVariantIDs(ctx, tx, variantIDs)
-		if txErr != nil {
-			return txErr
+		// Only load subscription plans for subscribable products.
+		if product.Subscribable {
+			plans, txErr = d.SubscriptionService.ListActivePlans(ctx, tx)
+			if txErr != nil {
+				return txErr
+			}
 		}
 
 		// Get options with values.

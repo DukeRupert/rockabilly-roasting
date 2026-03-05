@@ -6,22 +6,8 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
-type PlanVariantInfo struct {
-	Plan         domain.SubscriptionPlan
-	ProductTitle string
-	VariantSKU   string
-}
-
-type ProductVariantOption struct {
-	VariantID    string
-	PriceSetID   string
-	ProductTitle string
-	VariantSKU   string
-}
-
 type PlanListProps struct {
-	Plans    []PlanVariantInfo
-	Variants []ProductVariantOption
+	Plans []domain.SubscriptionPlan
 }
 
 func planIntervalLabel(interval domain.SubscriptionInterval, count int) string {
@@ -44,7 +30,7 @@ templ PlanListContent(props PlanListProps) {
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
 			<h1 class="text-base/7 font-semibold text-stone-900">Subscription Plans</h1>
-			<p class="mt-1 text-sm text-stone-500">Define recurring delivery plans that customers can subscribe to.</p>
+			<p class="mt-1 text-sm text-stone-500">Define recurring delivery cadences. Plans are available on all subscribable products.</p>
 		</div>
 	</div>
 	<!-- Create form -->
@@ -58,32 +44,11 @@ templ PlanListContent(props PlanListProps) {
 					name="name"
 					type="text"
 					required
-					placeholder="e.g. Monthly Coffee Box"
+					placeholder="e.g. Every 30 Days"
 					class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal focus:outline-none"
 				/>
 			</div>
-			<div class="sm:col-span-2">
-				<label for="plan-variant" class="block text-sm font-medium text-stone-700">Product Variant</label>
-				<div class="mt-1 grid grid-cols-1">
-					<select
-						id="plan-variant"
-						name="variant_id"
-						required
-						class="col-start-1 row-start-1 w-full appearance-none rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal focus:outline-none"
-					>
-						<option value="">Select a variant...</option>
-						for _, v := range props.Variants {
-							<option value={ v.VariantID } data-price-set-id={ v.PriceSetID }>
-								{ v.ProductTitle } — { v.VariantSKU }
-							</option>
-						}
-					</select>
-					<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4" viewBox="0 0 16 16" fill="currentColor">
-						<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
-					</svg>
-				</div>
-			</div>
-			<div>
+			<div class="sm:col-span-1">
 				<label for="plan-interval" class="block text-sm font-medium text-stone-700">Interval</label>
 				<div class="mt-1 grid grid-cols-1">
 					<select
@@ -101,6 +66,18 @@ templ PlanListContent(props PlanListProps) {
 						<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
 					</svg>
 				</div>
+			</div>
+			<div class="sm:col-span-1">
+				<label for="plan-discount" class="block text-sm font-medium text-stone-700">Discount %</label>
+				<input
+					id="plan-discount"
+					name="discount_pct"
+					type="number"
+					min="0"
+					max="100"
+					value="0"
+					class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal focus:outline-none"
+				/>
 			</div>
 			<div class="flex items-end">
 				<button
@@ -128,8 +105,8 @@ templ PlanListContent(props PlanListProps) {
 					<thead class="bg-stone-50">
 						<tr>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Name</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Product / Variant</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Interval</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Discount</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Status</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
@@ -140,28 +117,32 @@ templ PlanListContent(props PlanListProps) {
 						for _, p := range props.Plans {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-stone-900 sm:pl-6">
-									{ p.Plan.Name }
+									{ p.Name }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500">
-									{ p.ProductTitle } — { p.VariantSKU }
+									{ planIntervalLabel(p.Interval, p.IntervalCount) }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500">
-									{ planIntervalLabel(p.Plan.Interval, p.Plan.IntervalCount) }
+									if p.DiscountPct > 0 {
+										{ fmt.Sprintf("%d%%", p.DiscountPct) }
+									} else {
+										—
+									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									if p.Plan.IsActive {
+									if p.IsActive {
 										<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">Active</span>
 									} else {
 										<span class="inline-flex items-center rounded-md bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600 ring-1 ring-inset ring-stone-500/10">Inactive</span>
 									}
 								</td>
 								<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-									if p.Plan.IsActive {
-										<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/plans/%s/deactivate", p.Plan.ID.String())) } class="inline">
+									if p.IsActive {
+										<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/plans/%s/deactivate", p.ID.String())) } class="inline">
 											<button type="submit" class="text-stone-600 hover:text-stone-900">Deactivate</button>
 										</form>
 									} else {
-										<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/plans/%s/activate", p.Plan.ID.String())) } class="inline">
+										<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/plans/%s/activate", p.ID.String())) } class="inline">
 											<button type="submit" class="text-hiri-teal hover:text-hiri-teal-dark">Activate</button>
 										</form>
 									}

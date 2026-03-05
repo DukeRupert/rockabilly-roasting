@@ -139,10 +139,15 @@ templ ProductContent(props ProductDetailProps) {
 											<p class="text-sm font-medium text-hiri-text">{ plan.Name }</p>
 											<p class="text-xs text-hiri-text-secondary">
 												{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }
+												if plan.DiscountPct > 0 {
+													<span class="ml-1 text-hiri-teal font-medium">
+														{ fmt.Sprintf("Save %d%%", plan.DiscountPct) }
+													</span>
+												}
 											</p>
 										</div>
 										<a
-											href={ templ.SafeURL(fmt.Sprintf("/subscribe?plan_id=%s", plan.ID.String())) }
+											href={ templ.SafeURL(fmt.Sprintf("/subscribe?plan_id=%s&variant_id=%s", plan.ID.String(), defaultVariantID(props.Variants))) }
 											class="inline-flex items-center rounded-md bg-hiri-teal/10 px-3 py-1.5 text-sm font-semibold text-hiri-teal hover:bg-hiri-teal/20"
 										>
 											Subscribe

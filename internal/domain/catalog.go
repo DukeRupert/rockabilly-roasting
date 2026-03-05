@@ -32,6 +32,7 @@ type Product struct {
 	Status        ProductStatus
 	ProductTypeID *uuid.UUID
 	TaxonID       uuid.UUID
+	Subscribable  bool
 	Metadata      map[string]any
 	AvailableOn   *time.Time
 	DiscontinueOn *time.Time

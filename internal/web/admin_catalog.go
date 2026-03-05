@@ -404,6 +404,41 @@ func (d *Deps) handleAdminProductStatusUpdate(w http.ResponseWriter, r *http.Req
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Status+updated", id), http.StatusSeeOther)
 }
 
+func (d *Deps) handleAdminProductSubscribableUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	// Checkbox sends "true" when checked, nothing when unchecked.
+	subscribable := r.FormValue("subscribable") == "true"
+
+	var product *domain.Product
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		product, txErr = d.CatalogService.UpdateProductSubscribable(ctx, tx, id, subscribable, devActor())
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	if IsHTMX(r) {
+		admin.SubscribablePanel(product).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Subscription+setting+updated", id), http.StatusSeeOther)
+}
+
 func (d *Deps) handleAdminProductDelete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

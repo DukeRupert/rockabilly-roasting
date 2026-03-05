@@ -22,6 +22,7 @@ import (
 
 type subscribeConfirmRequest struct {
 	PlanID          string `json:"plan_id"`
+	VariantID       string `json:"variant_id"`
 	Email           string `json:"email"`
 	FirstName       string `json:"first_name"`
 	LastName        string `json:"last_name"`
@@ -41,14 +42,21 @@ type subscribeConfirmResponse struct {
 
 // --- Handlers ---
 
-// handleSubscribePage renders the subscription signup page for a plan.
+// handleSubscribePage renders the subscription signup page for a plan + variant.
 func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	planIDStr := r.URL.Query().Get("plan_id")
+	variantIDStr := r.URL.Query().Get("variant_id")
+
 	planID, err := uuid.Parse(planIDStr)
 	if err != nil {
 		http.Error(w, "invalid plan_id", http.StatusBadRequest)
+		return
+	}
+	variantID, err := uuid.Parse(variantIDStr)
+	if err != nil {
+		http.Error(w, "invalid variant_id", http.StatusBadRequest)
 		return
 	}
 
@@ -64,11 +72,14 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 		if !plan.IsActive {
 			return app.ErrSubscriptionPlanInactive
 		}
-		p, txErr := d.PricingService.GetBasePrice(ctx, tx, plan.VariantID, "USD")
+		p, txErr := d.PricingService.GetBasePrice(ctx, tx, variantID, "USD")
 		if txErr != nil {
 			return txErr
 		}
 		price = p.Amount
+		if plan.DiscountPct > 0 {
+			price = price - (price * plan.DiscountPct / 100)
+		}
 		return nil
 	})
 	if err != nil {
@@ -82,6 +93,7 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 
 	props := storefront.SubscribePageProps{
 		Plan:      plan,
+		VariantID: variantID,
 		Price:     price,
 		StripeKey: os.Getenv("STRIPE_PUBLISHABLE_KEY"),
 		CartCount: d.cartItemCountFromCookie(r),
@@ -100,16 +112,17 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	logger := logging.FromContext(ctx)
 
 	var req struct {
-		PlanID    string `json:"plan_id"`
-		Email     string `json:"email"`
-		FirstName string `json:"first_name"`
-		LastName  string `json:"last_name"`
-		Line1     string `json:"line1"`
-		Line2     string `json:"line2,omitempty"`
-		City      string `json:"city"`
-		State     string `json:"state"`
+		PlanID     string `json:"plan_id"`
+		VariantID  string `json:"variant_id"`
+		Email      string `json:"email"`
+		FirstName  string `json:"first_name"`
+		LastName   string `json:"last_name"`
+		Line1      string `json:"line1"`
+		Line2      string `json:"line2,omitempty"`
+		City       string `json:"city"`
+		State      string `json:"state"`
 		PostalCode string `json:"postal_code"`
-		Country   string `json:"country"`
+		Country    string `json:"country"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
@@ -119,6 +132,11 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	planID, err := uuid.Parse(req.PlanID)
 	if err != nil {
 		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid plan_id"})
+		return
+	}
+	variantID, err := uuid.Parse(req.VariantID)
+	if err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid variant_id"})
 		return
 	}
 
@@ -131,11 +149,14 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		if txErr != nil {
 			return txErr
 		}
-		p, txErr := d.PricingService.GetBasePrice(ctx, tx, plan.VariantID, "USD")
+		p, txErr := d.PricingService.GetBasePrice(ctx, tx, variantID, "USD")
 		if txErr != nil {
 			return txErr
 		}
 		price = p.Amount
+		if plan.DiscountPct > 0 {
+			price = price - (price * plan.DiscountPct / 100)
+		}
 		return nil
 	})
 	if err != nil {
@@ -149,6 +170,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		Currency:    "usd",
 		Metadata: map[string]string{
 			"plan_id":    planID.String(),
+			"variant_id": variantID.String(),
 			"email":      req.Email,
 			"first_name": req.FirstName,
 			"last_name":  req.LastName,
@@ -192,6 +214,11 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid plan_id"})
 		return
 	}
+	variantID, err := uuid.Parse(req.VariantID)
+	if err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid variant_id"})
+		return
+	}
 
 	// Verify payment succeeded
 	pi, err := d.PaymentProvider.GetPaymentIntent(ctx, req.PaymentIntentID)
@@ -214,9 +241,14 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 			return fmt.Errorf("get plan: %w", txErr)
 		}
 
-		price, txErr := d.PricingService.GetBasePrice(ctx, tx, plan.VariantID, "USD")
+		price, txErr := d.PricingService.GetBasePrice(ctx, tx, variantID, "USD")
 		if txErr != nil {
 			return fmt.Errorf("get price: %w", txErr)
+		}
+
+		finalPrice := price.Amount
+		if plan.DiscountPct > 0 {
+			finalPrice = finalPrice - (finalPrice * plan.DiscountPct / 100)
 		}
 
 		// Find or create customer
@@ -258,6 +290,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 		sub, txErr := d.SubscriptionService.CreateSubscription(ctx, tx, app.CreateSubscriptionParams{
 			CustomerID:        customer.ID,
 			PlanID:            planID,
+			VariantID:         variantID,
 			ShippingAddressID: addr.ID,
 		}, app.Actor{
 			Type: "customer",
@@ -271,11 +304,11 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 
 		// Place first order
 		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:        customer.ID,
+			CustomerID: customer.ID,
 			Items: []app.CartItem{{
-				VariantID: plan.VariantID,
+				VariantID: variantID,
 				Quantity:  1,
-				UnitPrice: price.Amount,
+				UnitPrice: finalPrice,
 			}},
 			ShippingAddressID: addr.ID,
 			BillingAddressID:  addr.ID,

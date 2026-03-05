@@ -135,6 +135,31 @@ func (s *CatalogService) UpdateProductStatus(ctx context.Context, tx pgx.Tx, id 
 	return product, nil
 }
 
+// UpdateProductSubscribable sets whether a product is eligible for subscriptions.
+func (s *CatalogService) UpdateProductSubscribable(ctx context.Context, tx pgx.Tx, id uuid.UUID, subscribable bool, actor Actor) (*domain.Product, error) {
+	product, err := s.catalog.UpdateProductSubscribable(ctx, tx, id, subscribable)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrProductNotFound
+		}
+		return nil, fmt.Errorf("update product subscribable: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditProductUpdated,
+		ResourceType: "product",
+		ResourceID:   product.ID,
+		After:        product,
+	}); err != nil {
+		return nil, fmt.Errorf("audit product subscribable: %w", err)
+	}
+
+	return product, nil
+}
+
 // ListProducts returns products matching the given filter.
 func (s *CatalogService) ListProducts(ctx context.Context, tx pgx.Tx, f store.ProductFilter) ([]domain.Product, error) {
 	products, err := s.catalog.ListProducts(ctx, tx, f)

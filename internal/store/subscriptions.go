@@ -28,8 +28,7 @@ type CreatePlanParams struct {
 	Name          string
 	Interval      domain.SubscriptionInterval
 	IntervalCount int
-	VariantID     uuid.UUID
-	PriceSetID    uuid.UUID
+	DiscountPct   int
 	IsActive      bool
 	Metadata      map[string]any
 }
@@ -41,8 +40,7 @@ func (s *SubscriptionStore) CreatePlan(ctx context.Context, tx pgx.Tx, p CreateP
 		Name:          p.Name,
 		Interval:      string(p.Interval),
 		IntervalCount: int32(p.IntervalCount),
-		VariantID:     p.VariantID,
-		PriceSetID:    p.PriceSetID,
+		DiscountPct:   int32(p.DiscountPct),
 		IsActive:      p.IsActive,
 		Metadata:      metadataToJSON(p.Metadata),
 	})
@@ -86,20 +84,16 @@ func (s *SubscriptionStore) UpdatePlanActive(ctx context.Context, tx pgx.Tx, id 
 	return nil
 }
 
-// ListActivePlansByVariantIDs returns active subscription plans for the given variant IDs.
-func (s *SubscriptionStore) ListActivePlansByVariantIDs(ctx context.Context, tx pgx.Tx, variantIDs []uuid.UUID) ([]domain.SubscriptionPlan, error) {
-	if len(variantIDs) == 0 {
-		return nil, nil
-	}
+// ListActivePlans returns all active subscription plans.
+func (s *SubscriptionStore) ListActivePlans(ctx context.Context, tx pgx.Tx) ([]domain.SubscriptionPlan, error) {
 	rows, err := tx.Query(ctx,
-		`SELECT id, name, interval, interval_count, variant_id, price_set_id, is_active, metadata
+		`SELECT id, name, interval, interval_count, discount_pct, is_active, metadata
 		 FROM subscription_plans
-		 WHERE is_active = true AND variant_id = ANY($1)
-		 ORDER BY name`,
-		variantIDs,
+		 WHERE is_active = true
+		 ORDER BY interval_count, name`,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("list active plans by variants: %w", err)
+		return nil, fmt.Errorf("list active plans: %w", err)
 	}
 	defer rows.Close()
 
@@ -108,7 +102,7 @@ func (s *SubscriptionStore) ListActivePlansByVariantIDs(ctx context.Context, tx 
 		var p domain.SubscriptionPlan
 		var interval string
 		var metadata []byte
-		if err := rows.Scan(&p.ID, &p.Name, &interval, &p.IntervalCount, &p.VariantID, &p.PriceSetID, &p.IsActive, &metadata); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &interval, &p.IntervalCount, &p.DiscountPct, &p.IsActive, &metadata); err != nil {
 			return nil, fmt.Errorf("scan plan: %w", err)
 		}
 		p.Interval = domain.SubscriptionInterval(interval)
@@ -124,6 +118,7 @@ func (s *SubscriptionStore) ListActivePlansByVariantIDs(ctx context.Context, tx 
 type CreateSubscriptionParams struct {
 	CustomerID         uuid.UUID
 	PlanID             uuid.UUID
+	VariantID          uuid.UUID
 	Status             domain.SubscriptionStatus
 	ShippingAddressID  uuid.UUID
 	CurrentPeriodStart time.Time
@@ -138,6 +133,7 @@ func (s *SubscriptionStore) Create(ctx context.Context, tx pgx.Tx, p CreateSubsc
 		ID:                 uuid.New(),
 		CustomerID:         p.CustomerID,
 		PlanID:             p.PlanID,
+		VariantID:          p.VariantID,
 		Status:             string(p.Status),
 		ShippingAddressID:  p.ShippingAddressID,
 		CurrentPeriodStart: p.CurrentPeriodStart,
@@ -253,7 +249,7 @@ type SubscriptionFilter struct {
 
 // List returns subscriptions matching the given filter (hand-written for dynamic WHERE).
 func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionFilter) ([]domain.Subscription, error) {
-	query := `SELECT id, customer_id, plan_id, status, shipping_address_id,
+	query := `SELECT id, customer_id, plan_id, variant_id, status, shipping_address_id,
 	                 current_period_start, current_period_end, next_order_at,
 	                 cancelled_at, pause_until, metadata, created_at, updated_at
 	          FROM subscriptions WHERE true`
@@ -294,7 +290,7 @@ func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionF
 		var cancelledAt, pauseUntil pgtype.Timestamptz
 		var metadata []byte
 		if err := rows.Scan(
-			&sub.ID, &sub.CustomerID, &sub.PlanID, &status, &sub.ShippingAddressID,
+			&sub.ID, &sub.CustomerID, &sub.PlanID, &sub.VariantID, &status, &sub.ShippingAddressID,
 			&sub.CurrentPeriodStart, &sub.CurrentPeriodEnd, &sub.NextOrderAt,
 			&cancelledAt, &pauseUntil, &metadata, &sub.CreatedAt, &sub.UpdatedAt,
 		); err != nil {
@@ -351,8 +347,7 @@ func planFromRow(r sqlcgen.SubscriptionPlan) *domain.SubscriptionPlan {
 		Name:          r.Name,
 		Interval:      domain.SubscriptionInterval(r.Interval),
 		IntervalCount: int(r.IntervalCount),
-		VariantID:     r.VariantID,
-		PriceSetID:    r.PriceSetID,
+		DiscountPct:   int(r.DiscountPct),
 		IsActive:      r.IsActive,
 		Metadata:      metadataFromJSON(r.Metadata),
 	}
@@ -363,6 +358,7 @@ func subscriptionFromRow(r sqlcgen.Subscription) *domain.Subscription {
 		ID:                 r.ID,
 		CustomerID:         r.CustomerID,
 		PlanID:             r.PlanID,
+		VariantID:          r.VariantID,
 		Status:             domain.SubscriptionStatus(r.Status),
 		ShippingAddressID:  r.ShippingAddressID,
 		CurrentPeriodStart: r.CurrentPeriodStart,

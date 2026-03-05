@@ -89,7 +89,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			return fmt.Errorf("get address: %w", txErr)
 		}
 
-		price, txErr := s.pricing.GetBasePrice(ctx, tx, plan.VariantID, "USD")
+		price, txErr := s.pricing.GetBasePrice(ctx, tx, sub.VariantID, "USD")
 		if txErr != nil {
 			return fmt.Errorf("get variant price: %w", txErr)
 		}
@@ -170,7 +170,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		lineSubtotal := priceCents
 		_, txErr = s.orders.CreateLineItem(ctx, tx, store.CreateLineItemParams{
 			OrderID:   order.ID,
-			VariantID: plan.VariantID,
+			VariantID: sub.VariantID,
 			Quantity:  1,
 			UnitPrice: priceCents,
 			Subtotal:  lineSubtotal,

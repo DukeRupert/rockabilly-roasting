@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -17,82 +18,11 @@ func (d *Deps) handleAdminPlanList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var plans []domain.SubscriptionPlan
-	var products []domain.Product
-	var variantMap = make(map[uuid.UUID][]domain.Variant)
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		plans, txErr = d.SubscriptionService.ListPlans(ctx, tx)
-		if txErr != nil {
-			return txErr
-		}
-
-		// Load all active products with their variants for the create form.
-		activeStatus := domain.ProductStatusActive
-		products, txErr = d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{
-			Status: &activeStatus,
-			Limit:  200,
-		})
-		if txErr != nil {
-			return txErr
-		}
-
-		for _, p := range products {
-			variants, vErr := d.CatalogService.ListVariants(ctx, tx, p.ID)
-			if vErr != nil {
-				return vErr
-			}
-			variantMap[p.ID] = variants
-		}
-
-		return nil
-	})
-	if err != nil {
-		Error(w, r, err)
-		return
-	}
-
-	// Build plan info with product/variant names.
-	planInfos := make([]admin.PlanVariantInfo, len(plans))
-	// Build a quick lookup: variantID → (productTitle, sku).
-	type variantInfo struct {
-		productTitle string
-		sku          string
-	}
-	variantLookup := make(map[uuid.UUID]variantInfo)
-	for _, p := range products {
-		for _, v := range variantMap[p.ID] {
-			variantLookup[v.ID] = variantInfo{productTitle: p.Title, sku: v.SKU}
-		}
-	}
-
-	for i, plan := range plans {
-		info := variantLookup[plan.VariantID]
-		planInfos[i] = admin.PlanVariantInfo{
-			Plan:         plan,
-			ProductTitle: info.productTitle,
-			VariantSKU:   info.sku,
-		}
-	}
-
-	// Build variant options for the create form.
-	var variantOptions []admin.ProductVariantOption
-	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		for _, p := range products {
-			for _, v := range variantMap[p.ID] {
-				ps, psErr := d.PricingService.GetOrCreatePriceSet(ctx, tx, v.ID)
-				if psErr != nil {
-					return psErr
-				}
-				variantOptions = append(variantOptions, admin.ProductVariantOption{
-					VariantID:    v.ID.String(),
-					PriceSetID:   ps.ID.String(),
-					ProductTitle: p.Title,
-					VariantSKU:   v.SKU,
-				})
-			}
-		}
-		return nil
+		return txErr
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -100,8 +30,7 @@ func (d *Deps) handleAdminPlanList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := admin.PlanListProps{
-		Plans:    planInfos,
-		Variants: variantOptions,
+		Plans: plans,
 	}
 
 	if IsHTMX(r) {
@@ -120,44 +49,32 @@ func (d *Deps) handleAdminPlanCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name := r.FormValue("name")
-	variantIDStr := r.FormValue("variant_id")
 	intervalStr := r.FormValue("interval")
+	discountStr := r.FormValue("discount_pct")
 
-	if name == "" || variantIDStr == "" || intervalStr == "" {
-		renderPlanError(w, r, "Name, variant, and interval are required.")
-		return
-	}
-
-	variantID, err := uuid.Parse(variantIDStr)
-	if err != nil {
-		renderPlanError(w, r, "Invalid variant ID.")
+	if name == "" || intervalStr == "" {
+		renderPlanError(w, r, "Name and interval are required.")
 		return
 	}
 
 	interval := domain.SubscriptionInterval(intervalStr)
 
-	// Look up the price set for this variant.
-	var priceSetID uuid.UUID
-	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		ps, txErr := d.PricingService.GetOrCreatePriceSet(ctx, tx, variantID)
-		if txErr != nil {
-			return txErr
+	discountPct := 0
+	if discountStr != "" {
+		var err error
+		discountPct, err = strconv.Atoi(discountStr)
+		if err != nil || discountPct < 0 || discountPct > 100 {
+			renderPlanError(w, r, "Discount must be 0-100.")
+			return
 		}
-		priceSetID = ps.ID
-		return nil
-	})
-	if err != nil {
-		Error(w, r, err)
-		return
 	}
 
-	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		_, txErr := d.SubscriptionService.CreatePlan(ctx, tx, app.CreatePlanParams{
 			Name:          name,
 			Interval:      interval,
 			IntervalCount: 1,
-			VariantID:     variantID,
-			PriceSetID:    priceSetID,
+			DiscountPct:   discountPct,
 		}, devActor())
 		return txErr
 	})

@@ -22,6 +22,12 @@ SET status = $2, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateProductSubscribable :one
+UPDATE products
+SET subscribable = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: DeleteProduct :exec
 DELETE FROM products WHERE id = $1;
 

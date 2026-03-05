@@ -5,6 +5,7 @@ import (
 	"math"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
+	switchcomp "github.com/dukerupert/hiri/internal/ui/components/switch"
 )
 
 // gramsToOz converts grams to ounces for display.
@@ -113,7 +114,9 @@ templ ProductEditContent(props ProductEditProps) {
 					</div>
 				</div>
 			</div>
-			<!-- Options panel (before variants — must define options before creating variants) -->
+			<!-- Subscription eligibility panel -->
+		@SubscribablePanel(props.Product)
+		<!-- Options panel (before variants — must define options before creating variants) -->
 			@OptionsPanel(props.Product, props.Options)
 			<!-- Variants panel -->
 			@VariantsPanel(props.Product, props.Variants, props.Options, props.TaxonName, nil)
@@ -442,6 +445,37 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 					})();
 				</script>
 			</div>
+		</div>
+	</div>
+}
+
+// SubscribablePanel renders the subscription eligibility toggle as a standalone partial for htmx swaps.
+templ SubscribablePanel(product *domain.Product) {
+	<div id="subscribable-panel" class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+		<div class="px-4 py-5 sm:px-6">
+			<h3 class="text-base/7 font-semibold text-stone-900">Subscriptions</h3>
+			<p class="mt-1 text-sm text-stone-500">Control whether customers can subscribe to this product for recurring delivery.</p>
+		</div>
+		<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
+			<div class="flex items-center justify-between">
+				<div>
+					<p class="text-sm font-medium text-stone-900">Allow subscriptions</p>
+					<p class="text-sm text-stone-500">All active subscription plans will appear on this product's page.</p>
+				</div>
+				@switchcomp.Switch(switchcomp.Props{
+					ID:      fmt.Sprintf("subscribable-%s", product.ID),
+					Name:    "subscribable",
+					Value:   "true",
+					Checked: product.Subscribable,
+					Attributes: templ.Attributes{
+						"hx-post":    fmt.Sprintf("/admin/catalog/%s/subscribable", product.ID),
+						"hx-target":  "#subscribable-panel",
+						"hx-swap":    "outerHTML",
+						"hx-trigger": "change",
+					},
+				})
+			</div>
+			<div id="subscribable-error" class="hidden mt-2 text-sm text-red-600"></div>
 		</div>
 	</div>
 }

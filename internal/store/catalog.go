@@ -126,6 +126,18 @@ func (s *CatalogStore) UpdateProductStatus(ctx context.Context, tx pgx.Tx, id uu
 	return productFromRow(row), nil
 }
 
+// UpdateProductSubscribable updates whether a product is eligible for subscriptions.
+func (s *CatalogStore) UpdateProductSubscribable(ctx context.Context, tx pgx.Tx, id uuid.UUID, subscribable bool) (*domain.Product, error) {
+	row, err := sqlcgen.New(tx).UpdateProductSubscribable(ctx, sqlcgen.UpdateProductSubscribableParams{
+		ID:           id,
+		Subscribable: subscribable,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update product subscribable: %w", err)
+	}
+	return productFromRow(row), nil
+}
+
 // DeleteProduct removes a product by ID.
 func (s *CatalogStore) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if err := sqlcgen.New(tx).DeleteProduct(ctx, id); err != nil {
@@ -145,7 +157,7 @@ type ProductFilter struct {
 // ListProducts returns products matching the given filter (hand-written for dynamic WHERE).
 func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFilter) ([]domain.Product, error) {
 	query := `SELECT id, slug, title, description, status, product_type_id, taxon_id,
-	                 metadata, available_on, discontinue_on, created_at, updated_at
+	                 subscribable, metadata, available_on, discontinue_on, created_at, updated_at
 	          FROM products WHERE true`
 	args := []any{}
 	argN := 1
@@ -191,7 +203,7 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 		var availableOn, discontinueOn pgtype.Timestamptz
 		if err := rows.Scan(
 			&p.ID, &p.Slug, &p.Title, &p.Description, &status, &productTypeID, &taxonID,
-			&metadata, &availableOn, &discontinueOn, &p.CreatedAt, &p.UpdatedAt,
+			&p.Subscribable, &metadata, &availableOn, &discontinueOn, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan product: %w", err)
 		}
@@ -610,6 +622,7 @@ func productFromRow(r sqlcgen.Product) *domain.Product {
 		Status:        domain.ProductStatus(r.Status),
 		ProductTypeID: r.ProductTypeID,
 		TaxonID:       taxonID,
+		Subscribable:  r.Subscribable,
 		Metadata:      metadataFromJSON(r.Metadata),
 		AvailableOn:   timestampFromPG(r.AvailableOn),
 		DiscontinueOn: timestampFromPG(r.DiscontinueOn),

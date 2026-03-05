@@ -2,12 +2,14 @@ package storefront
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
 type SubscribePageProps struct {
 	Plan      *domain.SubscriptionPlan
+	VariantID uuid.UUID
 	Price     int
 	StripeKey string
 	CartCount int
@@ -33,6 +35,7 @@ templ SubscribeContent(props SubscribePageProps) {
 		<div
 			id="subscribe-app"
 			data-plan-id={ props.Plan.ID.String() }
+			data-variant-id={ props.VariantID.String() }
 			data-plan-name={ props.Plan.Name }
 			data-price={ fmt.Sprintf("%d", props.Price) }
 			data-interval={ string(props.Plan.Interval) }

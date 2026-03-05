@@ -107,11 +107,11 @@ func (s *SubscriptionService) ListSubscriptionOrders(ctx context.Context, tx pgx
 	return orders, nil
 }
 
-// ListActivePlansByVariantIDs returns active plans for the given variant IDs.
-func (s *SubscriptionService) ListActivePlansByVariantIDs(ctx context.Context, tx pgx.Tx, variantIDs []uuid.UUID) ([]domain.SubscriptionPlan, error) {
-	plans, err := s.subscriptions.ListActivePlansByVariantIDs(ctx, tx, variantIDs)
+// ListActivePlans returns all active subscription plans.
+func (s *SubscriptionService) ListActivePlans(ctx context.Context, tx pgx.Tx) ([]domain.SubscriptionPlan, error) {
+	plans, err := s.subscriptions.ListActivePlans(ctx, tx)
 	if err != nil {
-		return nil, fmt.Errorf("list active plans by variants: %w", err)
+		return nil, fmt.Errorf("list active plans: %w", err)
 	}
 	return plans, nil
 }
@@ -132,8 +132,7 @@ type CreatePlanParams struct {
 	Name          string
 	Interval      domain.SubscriptionInterval
 	IntervalCount int
-	VariantID     uuid.UUID
-	PriceSetID    uuid.UUID
+	DiscountPct   int
 }
 
 // CreatePlan creates a new subscription plan.
@@ -142,8 +141,7 @@ func (s *SubscriptionService) CreatePlan(ctx context.Context, tx pgx.Tx, p Creat
 		Name:          p.Name,
 		Interval:      p.Interval,
 		IntervalCount: p.IntervalCount,
-		VariantID:     p.VariantID,
-		PriceSetID:    p.PriceSetID,
+		DiscountPct:   p.DiscountPct,
 		IsActive:      true,
 	})
 	if err != nil {
@@ -196,6 +194,7 @@ func (s *SubscriptionService) UpdatePlanActive(ctx context.Context, tx pgx.Tx, i
 type CreateSubscriptionParams struct {
 	CustomerID        uuid.UUID
 	PlanID            uuid.UUID
+	VariantID         uuid.UUID
 	ShippingAddressID uuid.UUID
 	Metadata          map[string]any
 }
@@ -219,6 +218,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, tx pgx.Tx,
 	sub, err := s.subscriptions.Create(ctx, tx, store.CreateSubscriptionParams{
 		CustomerID:         p.CustomerID,
 		PlanID:             p.PlanID,
+		VariantID:          p.VariantID,
 		Status:             domain.SubscriptionStatusActive,
 		ShippingAddressID:  p.ShippingAddressID,
 		CurrentPeriodStart: now,

@@ -445,28 +445,30 @@ Subscriptions represent recurring purchase agreements. Rather than building a co
 
 ### 6.1 SubscriptionPlan
 
-A SubscriptionPlan is a merchant-configured recurring offer — e.g. "Weekly 12oz bag" or "Monthly Tasting Box". Plans define the interval and associated variant.
+A SubscriptionPlan is a merchant-configured recurring cadence — e.g. "Every 30 Days" or "Every 14 Days". Plans are decoupled from products; any product with `subscribable = true` can be subscribed to on any active plan. The customer chooses both the product/variant and the delivery frequency independently.
 
 | Field | Type | Description | Layer |
 |---|---|---|---|
 | id | uuid | Primary key | `core` |
-| name | text | e.g. "Weekly Single Origin" | `core` |
-| interval | enum | `weekly` \| `biweekly` \| `monthly` \| `quarterly` | `core` |
-| interval_count | int | e.g. interval=weekly, count=2 = every 2 weeks | `core` |
-| variant_id | uuid FK | The variant delivered on each renewal | `core` |
-| price_set_id | uuid FK | Prices for this plan (may differ from retail) | `core` |
+| name | text | e.g. "Every 30 Days" | `core` |
+| interval | enum | `every_14_days` \| `every_21_days` \| `every_30_days` \| `every_60_days` | `core` |
+| interval_count | int | Multiplier (default 1) | `core` |
+| discount_pct | int | Subscriber discount percentage (e.g. 15 = 15% off) | `core` |
 | is_active | bool | Inactive plans no longer accept new subscribers | `core` |
 | metadata | jsonb | Vertical-specific plan attributes | `ext` |
 
+Product eligibility is controlled by `products.subscribable` (boolean, default false). Admin toggles this per product — e.g. coffee = subscribable, t-shirts = not.
+
 ### 6.2 Subscription
 
-A Subscription is a customer's active recurring agreement to a Plan.
+A Subscription is a customer's active recurring agreement. It references both a Plan (cadence) and a Variant (what gets shipped), allowing customers to swap products without changing their delivery frequency.
 
 | Field | Type | Description | Layer |
 |---|---|---|---|
 | id | uuid | Primary key | `core` |
 | customer_id | uuid FK | | `core` |
-| plan_id | uuid FK | | `core` |
+| plan_id | uuid FK | Delivery cadence | `core` |
+| variant_id | uuid FK | What gets shipped each period | `core` |
 | status | enum | See Subscription States below | `core` |
 | shipping_address_id | uuid FK | | `core` |
 | current_period_start | timestamptz | Start of current billing/fulfillment period | `core` |
@@ -519,8 +521,8 @@ Key cross-domain relationships. Within-domain relationships are implied by the F
 | Fulfillment | has many | FulfillmentItem | |
 | InventoryItem | has many | StockLevel | One per StockLocation |
 | Subscription | has many | Order | Via SubscriptionOrder join table |
-| Subscription | belongs to | SubscriptionPlan | |
-| SubscriptionPlan | belongs to | Variant | What gets shipped each period |
+| Subscription | belongs to | SubscriptionPlan | Delivery cadence |
+| Subscription | belongs to | Variant | What gets shipped each period |
 
 ---
 

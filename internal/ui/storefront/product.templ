@@ -104,17 +104,40 @@ templ ProductContent(props ProductDetailProps) {
 					</div>
 				}
 				<!-- Add to Cart -->
-				<div class="mt-8">
-					<button
-						type="button"
-						class="w-full rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
-					>
-						Add to Cart
-					</button>
-				</div>
+				if len(props.Variants) > 0 {
+					<div class="mt-8">
+						<form
+							method="post"
+							action="/cart/add"
+							hx-post="/cart/add"
+							hx-swap="none"
+						>
+							<input type="hidden" name="variant_id" id="selected-variant-id" value={ defaultVariantID(props.Variants) }/>
+							<input type="hidden" name="quantity" value="1"/>
+							<button
+								type="submit"
+								class="w-full rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+							>
+								Add to Cart
+							</button>
+						</form>
+					</div>
+				}
 			</div>
 		</div>
 	</div>
+}
+
+func defaultVariantID(variants []VariantWithPrice) string {
+	for _, v := range variants {
+		if v.Variant.IsDefault {
+			return v.Variant.ID.String()
+		}
+	}
+	if len(variants) > 0 {
+		return variants[0].Variant.ID.String()
+	}
+	return ""
 }
 
 func optionPillClasses(selected bool) string {

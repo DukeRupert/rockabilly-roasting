@@ -82,6 +82,7 @@ func run() error {
 	webhookStore := store.NewWebhookStore()
 	discountStore := store.NewDiscountStore()
 	pricingStore := store.NewPricingStore()
+	cartStore := store.NewCartStore()
 	_ = store.NewAuditStore()
 
 	// Services
@@ -93,6 +94,7 @@ func run() error {
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, paymentProvider, auditWriter, metricsReg)
 	pricingSvc := app.NewPricingService(pricingStore)
+	cartSvc := app.NewCartService(cartStore, pricingStore)
 	authSvc := app.NewAuthService(customerStore, sessionMgr, limiter, auditWriter, metricsReg)
 
 	// Router
@@ -110,6 +112,7 @@ func run() error {
 		DiscountService:     discountSvc,
 		AuthService:     authSvc,
 		PricingService:  pricingSvc,
+		CartService:     cartSvc,
 		PaymentProvider: paymentProvider,
 		WebhookStore:    webhookStore,
 	}

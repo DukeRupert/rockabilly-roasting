@@ -66,6 +66,16 @@ type Cart struct {
 	CreatedAt           time.Time          `json:"created_at"`
 }
 
+type CartItem struct {
+	ID        uuid.UUID `json:"id"`
+	CartID    uuid.UUID `json:"cart_id"`
+	VariantID uuid.UUID `json:"variant_id"`
+	Quantity  int32     `json:"quantity"`
+	UnitPrice int32     `json:"unit_price"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type CouponCode struct {
 	ID         uuid.UUID          `json:"id"`
 	DiscountID uuid.UUID          `json:"discount_id"`

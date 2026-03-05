@@ -29,6 +29,7 @@ type Deps struct {
 	DiscountService     *app.DiscountService
 	AuthService     *app.AuthService
 	PricingService  *app.PricingService
+	CartService     *app.CartService
 	PaymentProvider payments.Provider
 	WebhookStore    *store.WebhookStore
 }
@@ -50,6 +51,12 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /{$}", deps.handleStorefrontHome)
 	mux.HandleFunc("GET /catalog", deps.handleStorefrontCatalog)
 	mux.HandleFunc("GET /catalog/{slug}", deps.handleStorefrontProduct)
+
+	// Cart routes
+	mux.HandleFunc("POST /cart/add", deps.handleCartAdd)
+	mux.HandleFunc("GET /cart", deps.handleCartView)
+	mux.HandleFunc("POST /cart/update", deps.handleCartUpdateQuantity)
+	mux.HandleFunc("POST /cart/remove", deps.handleCartRemoveItem)
 
 	// Admin routes
 	mux.HandleFunc("GET /admin", deps.handleAdminDashboard)

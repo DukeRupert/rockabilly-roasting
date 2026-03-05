@@ -17,6 +17,7 @@ type Querier interface {
 	CreateAdjustment(ctx context.Context, arg CreateAdjustmentParams) (Adjustment, error)
 	CreateAuditEntry(ctx context.Context, arg CreateAuditEntryParams) (AuditLog, error)
 	CreateCart(ctx context.Context, arg CreateCartParams) (Cart, error)
+	CreateCartForSession(ctx context.Context, arg CreateCartForSessionParams) (Cart, error)
 	CreateCouponCode(ctx context.Context, arg CreateCouponCodeParams) (CouponCode, error)
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
 	CreateDiscount(ctx context.Context, arg CreateDiscountParams) (Discount, error)
@@ -47,6 +48,8 @@ type Querier interface {
 	DeleteAdjustment(ctx context.Context, id uuid.UUID) error
 	DeleteBasePrice(ctx context.Context, arg DeleteBasePriceParams) error
 	DeleteCart(ctx context.Context, id uuid.UUID) error
+	DeleteCartItem(ctx context.Context, id uuid.UUID) error
+	DeleteCartItemByCartAndVariant(ctx context.Context, arg DeleteCartItemByCartAndVariantParams) error
 	DeleteCouponCode(ctx context.Context, id uuid.UUID) error
 	DeleteCustomer(ctx context.Context, id uuid.UUID) error
 	DeleteDiscount(ctx context.Context, id uuid.UUID) error
@@ -65,6 +68,7 @@ type Querier interface {
 	GetBasePrice(ctx context.Context, arg GetBasePriceParams) (Price, error)
 	GetCartByCustomerID(ctx context.Context, customerID *uuid.UUID) (Cart, error)
 	GetCartByID(ctx context.Context, id uuid.UUID) (Cart, error)
+	GetCartItemCount(ctx context.Context, cartID uuid.UUID) (int32, error)
 	GetCouponCodeByCode(ctx context.Context, code string) (CouponCode, error)
 	GetCouponCodeByID(ctx context.Context, id uuid.UUID) (CouponCode, error)
 	GetCustomerByEmail(ctx context.Context, email string) (Customer, error)
@@ -102,6 +106,7 @@ type Querier interface {
 	ListAuditByActor(ctx context.Context, actorID *uuid.UUID) ([]AuditLog, error)
 	ListAuditByResource(ctx context.Context, arg ListAuditByResourceParams) ([]AuditLog, error)
 	ListBasePricesByProduct(ctx context.Context, arg ListBasePricesByProductParams) ([]ListBasePricesByProductRow, error)
+	ListCartItems(ctx context.Context, cartID uuid.UUID) ([]CartItem, error)
 	ListCouponCodesByDiscount(ctx context.Context, discountID uuid.UUID) ([]CouponCode, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListFulfillmentItemsByFulfillment(ctx context.Context, fulfillmentID uuid.UUID) ([]FulfillmentItem, error)
@@ -132,6 +137,7 @@ type Querier interface {
 	ReserveStock(ctx context.Context, arg ReserveStockParams) (StockLevel, error)
 	RevokeAllSessionsForActor(ctx context.Context, arg RevokeAllSessionsForActorParams) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
+	SetCartItemQuantity(ctx context.Context, arg SetCartItemQuantityParams) (CartItem, error)
 	UpdateCartAddresses(ctx context.Context, arg UpdateCartAddressesParams) (Cart, error)
 	UpdateCartDiscount(ctx context.Context, arg UpdateCartDiscountParams) (Cart, error)
 	UpdateCustomerEmail(ctx context.Context, arg UpdateCustomerEmailParams) (Customer, error)
@@ -163,6 +169,7 @@ type Querier interface {
 	UpdateTaxon(ctx context.Context, arg UpdateTaxonParams) (Taxon, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (Variant, error)
 	UpsertBasePrice(ctx context.Context, arg UpsertBasePriceParams) (Price, error)
+	UpsertCartItem(ctx context.Context, arg UpsertCartItemParams) (CartItem, error)
 }
 
 var _ Querier = (*Queries)(nil)

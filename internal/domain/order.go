@@ -60,6 +60,17 @@ type Cart struct {
 	CreatedAt           time.Time
 }
 
+// CartItem represents a line item in a shopping cart.
+type CartItem struct {
+	ID        uuid.UUID
+	CartID    uuid.UUID
+	VariantID uuid.UUID
+	Quantity  int
+	UnitPrice int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // Order represents a placed order.
 type Order struct {
 	ID                uuid.UUID

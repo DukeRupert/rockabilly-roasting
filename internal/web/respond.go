@@ -88,7 +88,8 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrTokenAlreadyUsed),
 		errors.Is(err, app.ErrStaffInactive),
 		errors.Is(err, app.ErrPaymentFailed),
-		errors.Is(err, app.ErrInvalidPrice):
+		errors.Is(err, app.ErrInvalidPrice),
+		errors.Is(err, app.ErrInvalidQuantity):
 		return http.StatusUnprocessableEntity, err.Error()
 
 	default:

@@ -1,0 +1,143 @@
+package storefront
+
+import (
+	"fmt"
+	"github.com/google/uuid"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type CartItemDisplay struct {
+	ItemID       uuid.UUID
+	VariantID    uuid.UUID
+	ProductTitle string
+	SKU          string
+	Quantity     int
+	UnitPrice    int
+	LineTotal    int
+}
+
+type CartPageProps struct {
+	Items    []CartItemDisplay
+	Subtotal int
+}
+
+templ CartContent(props CartPageProps) {
+	<div>
+		<h1 class="text-3xl font-bold tracking-tight text-hiri-text mb-8">Your Cart</h1>
+		if len(props.Items) == 0 {
+			<div class="text-center py-12">
+				<p class="text-hiri-text-secondary mb-4">Your cart is empty.</p>
+				<a href="/catalog" class="text-hiri-teal hover:text-hiri-teal-dark font-medium">Continue shopping</a>
+			</div>
+		} else {
+			<div id="cart-items">
+				<table class="min-w-full divide-y divide-stone-200">
+					<thead>
+						<tr>
+							<th scope="col" class="py-3.5 pl-0 pr-3 text-left text-sm font-semibold text-stone-900">Product</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Price</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Quantity</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Total</th>
+							<th scope="col" class="relative py-3.5 pl-3 pr-0">
+								<span class="sr-only">Remove</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-stone-100">
+						for _, item := range props.Items {
+							<tr>
+								<td class="py-4 pl-0 pr-3">
+									<div>
+										<p class="text-sm font-medium text-stone-900">{ item.ProductTitle }</p>
+										<p class="text-sm text-stone-500 font-mono">{ item.SKU }</p>
+									</div>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-700">
+									{ formatCents(item.UnitPrice) }
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									<form
+										method="post"
+										action="/cart/update"
+										hx-post="/cart/update"
+										hx-target="#main-content"
+										hx-swap="innerHTML"
+										class="flex items-center gap-2"
+									>
+										<input type="hidden" name="item_id" value={ item.ItemID.String() }/>
+										<input
+											type="number"
+											name="quantity"
+											value={ fmt.Sprintf("%d", item.Quantity) }
+											min="1"
+											class="w-16 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
+										/>
+										<button type="submit" class="text-xs font-medium text-hiri-teal hover:text-hiri-teal-dark">
+											Update
+										</button>
+									</form>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-right font-medium text-stone-900">
+									{ formatCents(item.LineTotal) }
+								</td>
+								<td class="whitespace-nowrap py-4 pl-3 pr-0 text-right text-sm">
+									<form
+										method="post"
+										action="/cart/remove"
+										hx-post="/cart/remove"
+										hx-target="#main-content"
+										hx-swap="innerHTML"
+									>
+										<input type="hidden" name="item_id" value={ item.ItemID.String() }/>
+										<button type="submit" class="text-red-600 hover:text-red-900 text-sm font-medium">
+											Remove
+										</button>
+									</form>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+				<!-- Subtotal -->
+				<div class="mt-8 border-t border-stone-200 pt-6">
+					<div class="flex justify-between text-base font-medium text-stone-900">
+						<p>Subtotal</p>
+						<p>{ formatCents(props.Subtotal) }</p>
+					</div>
+					<p class="mt-1 text-sm text-stone-500">Shipping and taxes calculated at checkout.</p>
+					<div class="mt-6">
+						<button
+							type="button"
+							class="w-full rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+						>
+							Checkout
+						</button>
+					</div>
+					<div class="mt-4 text-center">
+						<a href="/catalog" class="text-sm text-hiri-teal hover:text-hiri-teal-dark font-medium">
+							Continue shopping
+						</a>
+					</div>
+				</div>
+			</div>
+		}
+	</div>
+}
+
+templ CartPage(props CartPageProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title: "Cart",
+	}) {
+		@CartContent(props)
+	}
+}
+
+templ CartBadge(count int) {
+	<span id="cart-badge" hx-swap-oob="true">
+		if count > 0 {
+			<span class="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-hiri-teal text-xs font-bold text-white">
+				{ fmt.Sprintf("%d", count) }
+			</span>
+		}
+	</span>
+}

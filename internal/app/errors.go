@@ -73,6 +73,9 @@ var (
 	ErrPriceNotFound = errors.New("price not found")
 	ErrInvalidPrice  = errors.New("price must not be negative")
 
+	// Cart errors (item-level)
+	ErrInvalidQuantity = errors.New("quantity must be greater than zero")
+
 	// Slug errors
 	ErrSlugAlreadyExists = errors.New("slug already exists")
 )

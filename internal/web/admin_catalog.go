@@ -428,6 +428,19 @@ func (d *Deps) handleAdminProductSubscribableUpdate(w http.ResponseWriter, r *ht
 		return txErr
 	})
 	if err != nil {
+		if IsHTMX(r) {
+			// Re-fetch product to render panel with unchanged state, plus error toast.
+			var current *domain.Product
+			_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+				current, _ = d.CatalogService.GetProduct(ctx, tx, id)
+				return nil
+			})
+			if current != nil {
+				admin.SubscribablePanel(current).Render(ctx, w) //nolint:errcheck
+			}
+			toast.Toast(toast.VariantError, "Failed to update subscription setting.").Render(ctx, w) //nolint:errcheck
+			return
+		}
 		Error(w, r, err)
 		return
 	}

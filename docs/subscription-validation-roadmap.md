@@ -2,26 +2,29 @@
 
 Goal: end-to-end subscription flow — create a product, check out with Stripe Payment Intents, process webhooks, create orders, and validate subscription lifecycle.
 
-## Current State (as of March 2025)
+> **See also:** `lean-commerce-subscriptions.md` for the full subscription design (data model, lifecycle, architecture decisions).
 
-**Already built:**
-- Product CRUD (store, service, admin handlers, admin UI)
-- Order domain types, store, service (status state machines, refund guards)
-- Subscription domain types, store, partial service (read-only — no mutations)
-- Webhook event deduplication (store + migration)
-- Checkout service (`PlaceOrder` — discount calc, line items, but no Stripe calls)
+## Current State (as of March 2026)
+
+**Built:**
+- Product CRUD with `subscribable` toggle (store, service, admin UI with htmx switch)
+- Subscription plans as decoupled cadence templates (day-based intervals, discount_pct)
+- Subscription domain types, store, service (create, pause, resume, cancel, advance period)
+- Renewal service (create payment, place order, advance period)
+- River job workers for subscription renewal
+- Stripe PaymentIntent integration (`platform/payments/`)
+- Webhook handler with signature verification and event dedup
+- Storefront subscribe page with Svelte checkout component
+- Admin plan management, subscription list/detail with lifecycle actions
+- Order domain with status state machines, refund guards
 - Audit infrastructure, metrics counters, sentinel errors
-- All database migrations (14 total)
+- 17 database migrations
 
 **Not built:**
-- Stripe SDK integration (not even in go.mod)
-- Payment provider interface (`platform/payments/`)
-- PaymentIntent creation flow
-- Webhook HTTP handler + signature verification
-- River job worker implementations
-- Storefront handlers + templates
-- Subscription mutations (create, pause, cancel, renew)
+- Customer self-service subscription management (change variant, change frequency, skip delivery)
+- Payment retry worker for failed renewals
 - Session/auth wiring (handlers use `devActor()` placeholder)
+- WooCommerce subscription migration tooling
 
 ## Implementation Phases
 
@@ -74,16 +77,21 @@ Complete the checkout → order → confirmation pipeline.
 
 **Depends on:** Phase 3
 
-### Phase 5: Subscription Lifecycle
+### Phase 5: Subscription Lifecycle ✅ (mostly complete)
 Implement subscription creation, renewal, and management.
 
-**Scope:**
-- `SubscriptionService` mutations: `Create`, `Pause`, `Resume`, `Cancel`
+**Done:**
+- `SubscriptionService` mutations: `Create`, `Pause`, `Resume`, `Cancel`, `AdvancePeriod`
 - `SubscriptionRenewal` River worker — generate renewal order + PI
-- `PaymentRetry` River worker — retry failed subscription payments
 - Subscription status state machine enforcement
-- Admin subscription management UI
-- Storefront subscription signup flow
+- Admin plan management UI (create plans with interval + discount)
+- Admin subscription detail with pause/resume/cancel actions
+- Product `subscribable` toggle with htmx switch component
+- Storefront subscribe page with Svelte checkout + Stripe Elements
+
+**Remaining:**
+- `PaymentRetry` River worker — retry failed subscription payments
+- Customer self-service portal (change variant, change frequency, skip)
 
 **Depends on:** Phase 4
 

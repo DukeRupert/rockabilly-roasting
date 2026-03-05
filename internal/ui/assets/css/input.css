@@ -25,6 +25,10 @@
 	--color-hiri-sail: #D4C4A8;
 }
 
+html {
+	scrollbar-gutter: stable;
+}
+
 :root {
 	/* templui semantic tokens mapped to Hiri palette */
 	--background: var(--color-hiri-bg);

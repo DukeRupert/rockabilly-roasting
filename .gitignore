@@ -1,2 +1,5 @@
 # Build artifacts
 server
+
+# Node
+node_modules/

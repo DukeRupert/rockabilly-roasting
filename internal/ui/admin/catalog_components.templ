@@ -1,37 +1,20 @@
 package admin
 
-import (
-	"github.com/dukerupert/hiri/internal/domain"
-	"github.com/dukerupert/hiri/internal/ui/components/badge"
-)
+import "github.com/dukerupert/hiri/internal/domain"
 
-func statusBadgeVariant(status domain.ProductStatus) badge.Variant {
+func statusBadgeClasses(status domain.ProductStatus) string {
 	switch status {
 	case domain.ProductStatusActive:
-		return badge.VariantDefault
+		return "inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
 	case domain.ProductStatusArchived:
-		return badge.VariantSecondary
+		return "inline-flex items-center rounded-md bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600 ring-1 ring-inset ring-stone-500/10"
 	default:
-		return badge.VariantOutline
-	}
-}
-
-func statusBadgeClass(status domain.ProductStatus) string {
-	switch status {
-	case domain.ProductStatusActive:
-		return "bg-emerald-100 text-emerald-800 border-emerald-200"
-	case domain.ProductStatusArchived:
-		return "bg-stone-100 text-stone-500 border-stone-200"
-	default:
-		return "bg-amber-100 text-amber-800 border-amber-200"
+		return "inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
 	}
 }
 
 templ StatusBadge(status domain.ProductStatus) {
-	@badge.Badge(badge.Props{
-		Variant: badge.VariantOutline,
-		Class:   statusBadgeClass(status),
-	}) {
+	<span class={ statusBadgeClasses(status) }>
 		{ string(status) }
-	}
+	</span>
 }

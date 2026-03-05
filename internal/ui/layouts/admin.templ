@@ -1,11 +1,7 @@
 package layouts
 
 import (
-	"github.com/dukerupert/hiri/internal/ui/components/avatar"
-	"github.com/dukerupert/hiri/internal/ui/components/badge"
-	"github.com/dukerupert/hiri/internal/ui/components/dropdown"
 	"github.com/dukerupert/hiri/internal/ui/components/icon"
-	"github.com/dukerupert/hiri/internal/ui/components/sidebar"
 	"strings"
 )
 
@@ -17,9 +13,9 @@ type AdminProps struct {
 }
 
 type navItem struct {
-	Label   string
-	Href    string
-	IconFn  func(...icon.Props) templ.Component
+	Label  string
+	Href   string
+	IconFn func(...icon.Props) templ.Component
 }
 
 func adminNavItems() []navItem {
@@ -45,131 +41,246 @@ func staffInitials(name string) string {
 	return strings.ToUpper(string([]rune(parts[0])[0:1]) + string([]rune(parts[len(parts)-1])[0:1]))
 }
 
+func navItemClasses(active bool) string {
+	if active {
+		return "group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-hiri-teal"
+	}
+	return "group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-hiri-teal"
+}
+
+func navIconColor(active bool) string {
+	if active {
+		return "size-6 shrink-0 text-hiri-teal"
+	}
+	return "size-6 shrink-0 text-stone-400 group-hover:text-hiri-teal"
+}
+
 templ Admin(props AdminProps) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang="en" class="h-full bg-hiri-bg">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ props.Title } - Hiri Admin</title>
 			<link rel="stylesheet" href="/static/css/output.css"/>
 		</head>
-		<body class="bg-[var(--background)] text-[var(--foreground)]">
-			@sidebar.Script()
-			@dropdown.Script()
-			@avatar.Script()
-			@sidebar.Layout() {
-				@sidebar.Sidebar(sidebar.Props{
-					Variant:     sidebar.VariantSidebar,
-					Collapsible: sidebar.CollapsibleIcon,
-					Side:        sidebar.SideLeft,
-				}) {
-					@sidebar.Header() {
+		<body class="h-full">
+			<!-- Mobile sidebar overlay -->
+			<div id="mobile-sidebar" class="relative z-50 lg:hidden hidden" role="dialog" aria-modal="true">
+				<!-- Backdrop -->
+				<div id="mobile-sidebar-backdrop" class="fixed inset-0 bg-stone-900/80 transition-opacity"></div>
+				<div class="fixed inset-0 flex">
+					<div id="mobile-sidebar-panel" class="relative mr-16 flex w-full max-w-xs flex-1">
+						<!-- Close button -->
+						<div class="absolute left-full top-0 flex w-16 justify-center pt-5">
+							<button type="button" id="mobile-sidebar-close" class="-m-2.5 p-2.5">
+								<span class="sr-only">Close sidebar</span>
+								<svg class="size-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+								</svg>
+							</button>
+						</div>
+						<!-- Mobile sidebar content -->
+						<div class="flex grow flex-col gap-y-5 overflow-y-auto bg-hiri-surface px-6 pb-4 border-r border-hiri-border">
+							<div class="flex h-16 shrink-0 items-center">
+								@adminLogo()
+							</div>
+							<nav class="flex flex-1 flex-col">
+								<ul role="list" class="flex flex-1 flex-col gap-y-7">
+									<li>
+										<ul role="list" class="-mx-2 space-y-1">
+											for _, item := range adminNavItems() {
+												<li>
+													<a href={ templ.SafeURL(item.Href) } class={ navItemClasses(props.ActivePath == item.Href) }>
+														@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
+														{ item.Label }
+													</a>
+												</li>
+											}
+										</ul>
+									</li>
+									<li>
+										<div class="text-xs/6 font-semibold text-stone-400">Settings</div>
+										<ul role="list" class="-mx-2 mt-2 space-y-1">
+											<li>
+												<a href="/admin/settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
+													@icon.Settings(icon.Props{Class: navIconColor(props.ActivePath == "/admin/settings")})
+													Settings
+												</a>
+											</li>
+										</ul>
+									</li>
+									<li class="mt-auto">
+										@adminUserFooter(props)
+									</li>
+								</ul>
+							</nav>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!-- Desktop sidebar -->
+			<div class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+				<div class="flex grow flex-col gap-y-5 overflow-y-auto bg-hiri-surface border-r border-hiri-border px-6 pb-4">
+					<div class="flex h-16 shrink-0 items-center">
 						@adminLogo()
-					}
-					@sidebar.Content() {
-						@sidebar.Group() {
-							@sidebar.GroupLabel() {
-								Navigation
-							}
-							@sidebar.Menu() {
-								for _, item := range adminNavItems() {
-									@sidebar.MenuItem() {
-										@sidebar.MenuButton(sidebar.MenuButtonProps{
-											Href:     item.Href,
-											IsActive: props.ActivePath == item.Href,
-											Tooltip:  item.Label,
-										}) {
-											@item.IconFn(icon.Props{Class: "size-4"})
-											<span>{ item.Label }</span>
-										}
+					</div>
+					<nav class="flex flex-1 flex-col">
+						<ul role="list" class="flex flex-1 flex-col gap-y-7">
+							<li>
+								<ul role="list" class="-mx-2 space-y-1">
+									for _, item := range adminNavItems() {
+										<li>
+											<a href={ templ.SafeURL(item.Href) } class={ navItemClasses(props.ActivePath == item.Href) }>
+												@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
+												{ item.Label }
+											</a>
+										</li>
 									}
-								}
-							}
-						}
-						@sidebar.Separator()
-						@sidebar.Group() {
-							@sidebar.Menu() {
-								@sidebar.MenuItem() {
-									@sidebar.MenuButton(sidebar.MenuButtonProps{
-										Href:     "/admin/settings",
-										IsActive: props.ActivePath == "/admin/settings",
-										Tooltip:  "Settings",
-									}) {
-										@icon.Settings(icon.Props{Class: "size-4"})
-										<span>Settings</span>
-									}
-								}
-							}
-						}
-					}
-					@sidebar.Footer() {
-						@adminUserMenu(props)
-					}
-				}
-				@sidebar.Inset() {
-					<header class="flex h-14 items-center gap-2 border-b border-[var(--border)] px-4">
-						@sidebar.Trigger()
+								</ul>
+							</li>
+							<li>
+								<div class="text-xs/6 font-semibold text-stone-400">Settings</div>
+								<ul role="list" class="-mx-2 mt-2 space-y-1">
+									<li>
+										<a href="/admin/settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
+											@icon.Settings(icon.Props{Class: navIconColor(props.ActivePath == "/admin/settings")})
+											Settings
+										</a>
+									</li>
+								</ul>
+							</li>
+							<li class="mt-auto">
+								@adminUserFooter(props)
+							</li>
+						</ul>
+					</nav>
+				</div>
+			</div>
+			<!-- Main content area -->
+			<div class="lg:pl-72">
+				<!-- Top bar -->
+				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-hiri-border bg-hiri-surface px-4 shadow-xs sm:gap-x-6 sm:px-6 lg:px-8">
+					<button type="button" id="mobile-menu-btn" class="-m-2.5 p-2.5 text-stone-700 lg:hidden">
+						<span class="sr-only">Open sidebar</span>
+						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
+						</svg>
+					</button>
+					<!-- Separator -->
+					<div class="h-6 w-px bg-stone-200 lg:hidden" aria-hidden="true"></div>
+					<div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
 						<div class="flex-1"></div>
-					</header>
-					<div class="flex-1 p-6">
+						<div class="flex items-center gap-x-4 lg:gap-x-6">
+							<!-- Desktop user dropdown -->
+							<div class="relative hidden lg:block" data-dropdown>
+								<button type="button" class="-m-1.5 flex items-center p-1.5" data-dropdown-trigger>
+									<span class="sr-only">Open user menu</span>
+									<span class="inline-flex size-8 items-center justify-center rounded-full bg-hiri-teal">
+										<span class="text-sm font-medium text-white">{ staffInitials(props.StaffName) }</span>
+									</span>
+									<span class="hidden lg:flex lg:items-center">
+										<span class="ml-4 text-sm/6 font-semibold text-stone-900">{ props.StaffName }</span>
+										<svg class="ml-2 size-5 text-stone-400" viewBox="0 0 20 20" fill="currentColor">
+											<path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+										</svg>
+									</span>
+								</button>
+								<div data-dropdown-menu class="hidden absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-stone-900/5">
+									<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Settings</a>
+									<a href="/auth/logout" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Sign out</a>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<main class="py-10">
+					<div class="px-4 sm:px-6 lg:px-8">
 						{ children... }
 					</div>
-				}
-			}
+				</main>
+			</div>
+			<script>
+				(function() {
+					// Mobile sidebar
+					var sidebar = document.getElementById('mobile-sidebar');
+					var openBtn = document.getElementById('mobile-menu-btn');
+					var closeBtn = document.getElementById('mobile-sidebar-close');
+					var backdrop = document.getElementById('mobile-sidebar-backdrop');
+
+					function openSidebar() {
+						sidebar.classList.remove('hidden');
+					}
+					function closeSidebar() {
+						sidebar.classList.add('hidden');
+					}
+
+					if (openBtn) openBtn.addEventListener('click', openSidebar);
+					if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+					if (backdrop) backdrop.addEventListener('click', closeSidebar);
+
+					document.addEventListener('keydown', function(e) {
+						if (e.key === 'Escape') closeSidebar();
+					});
+
+					// Dropdown menus
+					document.querySelectorAll('[data-dropdown]').forEach(function(dropdown) {
+						var trigger = dropdown.querySelector('[data-dropdown-trigger]');
+						var menu = dropdown.querySelector('[data-dropdown-menu]');
+
+						if (trigger && menu) {
+							trigger.addEventListener('click', function(e) {
+								e.stopPropagation();
+								var isOpen = !menu.classList.contains('hidden');
+								// Close all other dropdowns
+								document.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {
+									m.classList.add('hidden');
+								});
+								if (!isOpen) {
+									menu.classList.remove('hidden');
+								}
+							});
+						}
+					});
+
+					document.addEventListener('click', function() {
+						document.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {
+							m.classList.add('hidden');
+						});
+					});
+				})();
+			</script>
 		</body>
 	</html>
 }
 
 templ adminLogo() {
-	<a href="/admin" class="flex items-center gap-2 px-2 py-1">
-		<svg width="28" height="28" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+	<a href="/admin" class="flex items-center gap-2">
+		<svg width="32" height="32" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
 			<path d="M32 8 L22 52 L32 44 L42 52 Z" fill="#2D7A7A" opacity="0.35"></path>
 			<path d="M36 6 L26 50 L36 42 L46 50 Z" fill="#2D7A7A"></path>
 		</svg>
-		<span class="text-lg font-semibold tracking-tight text-[var(--foreground)] group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:hidden">hiri</span>
+		<span class="text-lg font-semibold tracking-tight text-stone-900">hiri</span>
 	</a>
 }
 
-templ adminUserMenu(props AdminProps) {
-	@dropdown.Dropdown() {
-		@dropdown.Trigger() {
-			@sidebar.MenuButton(sidebar.MenuButtonProps{
-				Size: sidebar.MenuButtonSizeLg,
-			}) {
-				@avatar.Avatar(avatar.Props{Class: "h-8 w-8"}) {
-					@avatar.Fallback(avatar.FallbackProps{Class: "bg-[var(--primary)] text-white text-xs"}) {
-						{ staffInitials(props.StaffName) }
-					}
-				}
-				<div class="flex flex-col gap-0.5 leading-none group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:hidden">
-					<span class="text-sm font-medium">{ props.StaffName }</span>
-					@badge.Badge(badge.Props{
-						Variant: badge.VariantSecondary,
-						Class:   "text-[10px] px-1.5 py-0 h-4 w-fit",
-					}) {
-						{ props.StaffRole }
-					}
-				</div>
-				@icon.ChevronsUpDown(icon.Props{Class: "ml-auto size-4 group-data-[tui-sidebar-state=collapsed]:group-data-[tui-sidebar-collapsible=icon]:hidden"})
-			}
-		}
-		@dropdown.Content(dropdown.ContentProps{
-			Placement: dropdown.PlacementTopStart,
-		}) {
-			@dropdown.Label() {
-				{ props.StaffName }
-			}
-			@dropdown.Separator()
-			@dropdown.Item(dropdown.ItemProps{Href: "/admin/settings"}) {
-				@icon.Settings(icon.Props{Class: "size-4"})
-				Settings
-			}
-			@dropdown.Separator()
-			@dropdown.Item(dropdown.ItemProps{Href: "/auth/logout"}) {
-				@icon.LogOut(icon.Props{Class: "size-4"})
-				Log out
-			}
-		}
-	}
+templ adminUserFooter(props AdminProps) {
+	<div class="relative" data-dropdown>
+		<button type="button" data-dropdown-trigger class="flex w-full items-center gap-x-4 rounded-md px-2 py-3 text-sm/6 font-semibold text-stone-900 hover:bg-stone-100">
+			<span class="inline-flex size-8 items-center justify-center rounded-full bg-hiri-teal">
+				<span class="text-sm font-medium text-white">{ staffInitials(props.StaffName) }</span>
+			</span>
+			<span class="flex-1 text-left">
+				<span class="block text-sm font-semibold text-stone-900">{ props.StaffName }</span>
+				<span class="block text-xs text-stone-500">{ props.StaffRole }</span>
+			</span>
+			<svg class="size-5 text-stone-400" viewBox="0 0 20 20" fill="currentColor">
+				<path fill-rule="evenodd" d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z" clip-rule="evenodd"></path>
+			</svg>
+		</button>
+		<div data-dropdown-menu class="hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-md bg-white py-2 shadow-lg ring-1 ring-stone-900/5">
+			<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Settings</a>
+			<a href="/auth/logout" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Sign out</a>
+		</div>
+	</div>
 }

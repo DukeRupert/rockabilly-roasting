@@ -4,21 +4,18 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/domain"
-	"github.com/dukerupert/hiri/internal/ui/components/button"
-	"github.com/dukerupert/hiri/internal/ui/components/table"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
-	"github.com/dukerupert/hiri/internal/ui/components"
 )
 
 type ProductListProps struct {
-	Products      []domain.Product
-	Taxons        []domain.Taxon
-	TaxonMap      map[uuid.UUID]string
-	StatusFilter  string
-	TaxonFilter   string
-	Page          int
-	PerPage       int
-	HasMore       bool
+	Products     []domain.Product
+	Taxons       []domain.Taxon
+	TaxonMap     map[uuid.UUID]string
+	StatusFilter string
+	TaxonFilter  string
+	Page         int
+	PerPage      int
+	HasMore      bool
 }
 
 templ ProductList(props ProductListProps) {
@@ -28,122 +25,137 @@ templ ProductList(props ProductListProps) {
 		StaffName:  "Dev User",
 		StaffRole:  "admin",
 	}) {
-		@components.PageHeader(components.PageHeaderProps{
-			Title:       "Products",
-			Description: "Manage your product catalog",
-		}) {
-			@button.Button(button.Props{
-				Href: "/admin/catalog/new",
-			}) {
-				Add product
-			}
-		}
-		<div class="mt-6">
-			<!-- Filter bar -->
-			<form method="get" action="/admin/catalog" class="flex items-center gap-3 mb-4">
+		<!-- Page header -->
+		<div class="sm:flex sm:items-center">
+			<div class="sm:flex-auto">
+				<h1 class="text-base/7 font-semibold text-stone-900">Products</h1>
+				<p class="mt-1 text-sm text-stone-500">Manage your product catalog</p>
+			</div>
+			<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+				<a
+					href="/admin/catalog/new"
+					class="block rounded-md bg-hiri-teal px-3 py-2 text-center text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+				>
+					Add product
+				</a>
+			</div>
+		</div>
+		<!-- Filters -->
+		<form method="get" action="/admin/catalog" class="mt-6 flex items-center gap-3">
+			<div class="grid grid-cols-1">
 				<select
 					name="status"
-					class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
 					onchange="this.form.submit()"
+					class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal"
 				>
 					<option value="">All statuses</option>
 					<option value="draft" selected?={ props.StatusFilter == "draft" }>Draft</option>
 					<option value="active" selected?={ props.StatusFilter == "active" }>Active</option>
 					<option value="archived" selected?={ props.StatusFilter == "archived" }>Archived</option>
 				</select>
+				<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+					<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+				</svg>
+			</div>
+			<div class="grid grid-cols-1">
 				<select
 					name="taxon"
-					class="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
 					onchange="this.form.submit()"
+					class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal"
 				>
 					<option value="">All categories</option>
 					for _, t := range props.Taxons {
 						<option value={ t.ID.String() } selected?={ props.TaxonFilter == t.ID.String() }>{ t.Name }</option>
 					}
 				</select>
-			</form>
+				<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+					<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+				</svg>
+			</div>
+		</form>
+		<!-- Product table -->
+		<div class="mt-6">
 			if len(props.Products) == 0 {
-				<div class="rounded-lg border border-dashed p-12 text-center">
-					<p class="text-sm text-muted-foreground">No products yet</p>
-					<div class="mt-4">
-						@button.Button(button.Props{
-							Href:    "/admin/catalog/new",
-							Variant: button.VariantOutline,
-						}) {
-							Add your first product
-						}
+				<div class="rounded-lg border-2 border-dashed border-stone-300 p-12 text-center">
+					<svg class="mx-auto size-12 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+						<path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"></path>
+					</svg>
+					<h3 class="mt-2 text-sm font-semibold text-stone-900">No products</h3>
+					<p class="mt-1 text-sm text-stone-500">Get started by creating a new product.</p>
+					<div class="mt-6">
+						<a href="/admin/catalog/new" class="inline-flex items-center rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
+							Add product
+						</a>
 					</div>
 				</div>
 			} else {
-				@table.Table() {
-					@table.Header() {
-						@table.Row() {
-							@table.Head() { Title }
-							@table.Head() { Status }
-							@table.Head() { Category }
-							@table.Head() { Created }
-							@table.Head(table.HeadProps{Class: "text-right"}) { Actions }
-						}
-					}
-					@table.Body() {
-						for _, p := range props.Products {
-							@table.Row() {
-								@table.Cell() {
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="font-medium hover:underline">
-										{ p.Title }
-									</a>
-								}
-								@table.Cell() {
-									@StatusBadge(p.Status)
-								}
-								@table.Cell() {
-									if name, ok := props.TaxonMap[p.TaxonID]; ok {
-										{ name }
-									} else {
-										<span class="text-muted-foreground">—</span>
-									}
-								}
-								@table.Cell() {
-									<span class="text-muted-foreground text-sm">{ p.CreatedAt.Format("Jan 2, 2006") }</span>
-								}
-								@table.Cell(table.CellProps{Class: "text-right"}) {
-									@button.Button(button.Props{
-										Variant: button.VariantGhost,
-										Size:    button.SizeSm,
-										Href:    fmt.Sprintf("/admin/catalog/%s", p.ID),
-									}) {
-										Edit
-									}
-								}
+				<div class="overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+					<table class="min-w-full divide-y divide-stone-300">
+						<thead class="bg-stone-50">
+							<tr>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Title</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Status</th>
+								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Category</th>
+								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 lg:table-cell">Created</th>
+								<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+									<span class="sr-only">Edit</span>
+								</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-stone-200 bg-white">
+							for _, p := range props.Products {
+								<tr>
+									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+										<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="font-medium text-stone-900 hover:text-hiri-teal">
+											{ p.Title }
+										</a>
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm">
+										@StatusBadge(p.Status)
+									</td>
+									<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 sm:table-cell">
+										if name, ok := props.TaxonMap[p.TaxonID]; ok {
+											{ name }
+										} else {
+											<span class="text-stone-400">—</span>
+										}
+									</td>
+									<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 lg:table-cell">
+										{ p.CreatedAt.Format("Jan 2, 2006") }
+									</td>
+									<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+										<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="text-hiri-teal hover:text-hiri-teal-dark">
+											Edit<span class="sr-only">, { p.Title }</span>
+										</a>
+									</td>
+								</tr>
 							}
-						}
-					}
-				}
-				<!-- Pagination -->
-				<div class="flex items-center justify-between mt-4">
-					<div class="text-sm text-muted-foreground">
-						if props.Page > 1 {
-							@button.Button(button.Props{
-								Variant: button.VariantOutline,
-								Size:    button.SizeSm,
-								Href:    fmt.Sprintf("/admin/catalog?page=%d&status=%s&taxon=%s", props.Page-1, props.StatusFilter, props.TaxonFilter),
-							}) {
-								Previous
-							}
-						}
-					</div>
-					<div>
-						if props.HasMore {
-							@button.Button(button.Props{
-								Variant: button.VariantOutline,
-								Size:    button.SizeSm,
-								Href:    fmt.Sprintf("/admin/catalog?page=%d&status=%s&taxon=%s", props.Page+1, props.StatusFilter, props.TaxonFilter),
-							}) {
-								Next
-							}
-						}
-					</div>
+						</tbody>
+					</table>
 				</div>
+				<!-- Pagination -->
+				<nav class="flex items-center justify-between border-t border-stone-200 px-4 pt-4 sm:px-0" aria-label="Pagination">
+					<div class="-mt-px flex w-0 flex-1">
+						if props.Page > 1 {
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/admin/catalog?page=%d&status=%s&taxon=%s", props.Page-1, props.StatusFilter, props.TaxonFilter)) }
+								class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+							>
+								Previous
+							</a>
+						}
+					</div>
+					<div class="-mt-px flex w-0 flex-1 justify-end">
+						if props.HasMore {
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/admin/catalog?page=%d&status=%s&taxon=%s", props.Page+1, props.StatusFilter, props.TaxonFilter)) }
+								class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+							>
+								Next
+							</a>
+						}
+					</div>
+				</nav>
 			}
 		</div>
 	}

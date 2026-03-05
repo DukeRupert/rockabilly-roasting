@@ -4,13 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"github.com/dukerupert/hiri/internal/domain"
-	"github.com/dukerupert/hiri/internal/ui/components/button"
-	"github.com/dukerupert/hiri/internal/ui/components/card"
-	"github.com/dukerupert/hiri/internal/ui/components/input"
-	"github.com/dukerupert/hiri/internal/ui/components/label"
-	"github.com/dukerupert/hiri/internal/ui/components/table"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
-	"github.com/dukerupert/hiri/internal/ui/components"
 )
 
 type CategoryListProps struct {
@@ -26,132 +20,151 @@ templ CategoryList(props CategoryListProps) {
 		StaffName:  "Dev User",
 		StaffRole:  "admin",
 	}) {
-		@components.PageHeader(components.PageHeaderProps{
-			Title:       "Categories",
-			Description: "Organize products into categories",
-		}) {
-			@button.Button(button.Props{
-				Variant: button.VariantOutline,
-				Href:    "/admin/catalog",
-			}) {
-				Back to products
-			}
-		}
+		<!-- Page header -->
+		<div class="sm:flex sm:items-center">
+			<div class="sm:flex-auto">
+				<h1 class="text-base/7 font-semibold text-stone-900">Categories</h1>
+				<p class="mt-1 text-sm text-stone-500">Organize products into categories</p>
+			</div>
+			<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+				<a
+					href="/admin/catalog"
+					class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+				>
+					Back to products
+				</a>
+			</div>
+		</div>
 		if props.Flash != "" {
-			<div class="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-				{ props.Flash }
+			<div class="mt-4 rounded-md bg-green-50 p-4">
+				<div class="flex">
+					<div class="flex-shrink-0">
+						<svg class="size-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path>
+						</svg>
+					</div>
+					<div class="ml-3">
+						<p class="text-sm font-medium text-green-800">{ props.Flash }</p>
+					</div>
+				</div>
 			</div>
 		}
 		<div class="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
 			<!-- Category table -->
 			<div class="lg:col-span-2">
 				if len(props.Taxons) == 0 {
-					<div class="rounded-lg border border-dashed p-12 text-center">
-						<p class="text-sm text-muted-foreground">No categories yet. Create one to get started.</p>
+					<div class="rounded-lg border-2 border-dashed border-stone-300 p-12 text-center">
+						<p class="text-sm text-stone-500">No categories yet. Create one to get started.</p>
 					</div>
 				} else {
-					@table.Table() {
-						@table.Header() {
-							@table.Row() {
-								@table.Head() { Name }
-								@table.Head() { Slug }
-								@table.Head() { Position }
-								@table.Head(table.HeadProps{Class: "text-right"}) { Actions }
-							}
-						}
-						@table.Body() {
-							for _, t := range props.Taxons {
-								@table.Row() {
-									@table.Cell() {
-										<span class="font-medium">{ t.Name }</span>
-									}
-									@table.Cell() {
-										<span class="font-mono text-sm text-muted-foreground">{ t.Slug }</span>
-									}
-									@table.Cell() {
-										{ strconv.Itoa(t.Position) }
-									}
-									@table.Cell(table.CellProps{Class: "text-right"}) {
-										<div class="flex items-center justify-end gap-1">
-											@button.Button(button.Props{
-												Variant: button.VariantGhost,
-												Size:    button.SizeSm,
-												Href:    fmt.Sprintf("/admin/categories?edit=%s", t.ID),
-											}) {
-												Edit
-											}
-											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/categories/%s/delete", t.ID)) } class="inline" onsubmit="return confirm('Delete this category? Products in this category will become uncategorized.')">
-												@button.Button(button.Props{Type: button.TypeSubmit, Variant: button.VariantGhost, Size: button.SizeSm}) {
-													Delete
-												}
-											</form>
-										</div>
-									}
+					<div class="overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+						<table class="min-w-full divide-y divide-stone-300">
+							<thead class="bg-stone-50">
+								<tr>
+									<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Name</th>
+									<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Slug</th>
+									<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Position</th>
+									<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+										<span class="sr-only">Actions</span>
+									</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-stone-200 bg-white">
+								for _, t := range props.Taxons {
+									<tr>
+										<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-stone-900 sm:pl-6">
+											{ t.Name }
+										</td>
+										<td class="hidden whitespace-nowrap px-3 py-4 text-sm sm:table-cell">
+											<span class="font-mono text-stone-500">{ t.Slug }</span>
+										</td>
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500">
+											{ strconv.Itoa(t.Position) }
+										</td>
+										<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+											<div class="flex items-center justify-end gap-3">
+												<a href={ templ.SafeURL(fmt.Sprintf("/admin/categories?edit=%s", t.ID)) } class="text-hiri-teal hover:text-hiri-teal-dark">Edit</a>
+												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/categories/%s/delete", t.ID)) } class="inline" onsubmit="return confirm('Delete this category? Products in this category will become uncategorized.')">
+													<button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
+												</form>
+											</div>
+										</td>
+									</tr>
 								}
-							}
-						}
-					}
+							</tbody>
+						</table>
+					</div>
 				}
 			</div>
 			<!-- Create/Edit form -->
 			<div>
-				@card.Card() {
-					@card.Header() {
-						@card.Title() {
+				<div class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+					<div class="px-4 py-5 sm:px-6">
+						<h3 class="text-base/7 font-semibold text-stone-900">
 							if props.Editing != nil {
 								Edit category
 							} else {
 								New category
 							}
-						}
-					}
-					@card.Content() {
+						</h3>
+					</div>
+					<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
 						if props.Editing != nil {
 							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/categories/%s", props.Editing.ID)) } class="space-y-4">
-								<div class="space-y-2">
-									@label.Label(label.Props{For: "cat_name"}) { Name }
-									@input.Input(input.Props{ID: "cat_name", Name: "name", Value: props.Editing.Name, Required: true})
-								</div>
-								<div class="space-y-2">
-									@label.Label(label.Props{For: "cat_slug"}) { Slug }
-									@input.Input(input.Props{ID: "cat_slug", Name: "slug", Value: props.Editing.Slug, Required: true})
-								</div>
-								<div class="space-y-2">
-									@label.Label(label.Props{For: "cat_position"}) { Position }
-									@input.Input(input.Props{ID: "cat_position", Name: "position", Type: input.TypeNumber, Value: strconv.Itoa(props.Editing.Position)})
-								</div>
-								<div class="flex gap-2">
-									@button.Button(button.Props{Type: button.TypeSubmit, FullWidth: true}) {
-										Save changes
-									}
+								<div>
+									<label for="cat_name" class="block text-sm/6 font-medium text-stone-900">Name</label>
+									<div class="mt-2">
+										<input type="text" id="cat_name" name="name" value={ props.Editing.Name } required class={ inputClasses(false) }/>
+									</div>
 								</div>
 								<div>
-									@button.Button(button.Props{Variant: button.VariantOutline, FullWidth: true, Href: "/admin/categories"}) {
+									<label for="cat_slug" class="block text-sm/6 font-medium text-stone-900">Slug</label>
+									<div class="mt-2">
+										<input type="text" id="cat_slug" name="slug" value={ props.Editing.Slug } required class={ inputClasses(false) }/>
+									</div>
+								</div>
+								<div>
+									<label for="cat_position" class="block text-sm/6 font-medium text-stone-900">Position</label>
+									<div class="mt-2">
+										<input type="number" id="cat_position" name="position" value={ strconv.Itoa(props.Editing.Position) } class={ inputClasses(false) }/>
+									</div>
+								</div>
+								<div class="flex flex-col gap-3 pt-2">
+									<button type="submit" class="w-full rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
+										Save changes
+									</button>
+									<a href="/admin/categories" class="w-full rounded-md bg-white px-3 py-2 text-center text-sm font-semibold text-stone-900 shadow-xs ring-1 ring-inset ring-stone-300 hover:bg-stone-50">
 										Cancel
-									}
+									</a>
 								</div>
 							</form>
 						} else {
 							<form method="post" action="/admin/categories" class="space-y-4">
-								<div class="space-y-2">
-									@label.Label(label.Props{For: "cat_name"}) { Name }
-									@input.Input(input.Props{ID: "cat_name", Name: "name", Placeholder: "Category name", Required: true})
+								<div>
+									<label for="cat_name" class="block text-sm/6 font-medium text-stone-900">Name</label>
+									<div class="mt-2">
+										<input type="text" id="cat_name" name="name" placeholder="Category name" required class={ inputClasses(false) }/>
+									</div>
 								</div>
-								<div class="space-y-2">
-									@label.Label(label.Props{For: "cat_slug"}) { Slug }
-									@input.Input(input.Props{ID: "cat_slug", Name: "slug", Placeholder: "category-slug", Required: true})
+								<div>
+									<label for="cat_slug" class="block text-sm/6 font-medium text-stone-900">Slug</label>
+									<div class="mt-2">
+										<input type="text" id="cat_slug" name="slug" placeholder="category-slug" required class={ inputClasses(false) }/>
+									</div>
 								</div>
-								<div class="space-y-2">
-									@label.Label(label.Props{For: "cat_position"}) { Position }
-									@input.Input(input.Props{ID: "cat_position", Name: "position", Type: input.TypeNumber, Value: "0"})
+								<div>
+									<label for="cat_position" class="block text-sm/6 font-medium text-stone-900">Position</label>
+									<div class="mt-2">
+										<input type="number" id="cat_position" name="position" value="0" class={ inputClasses(false) }/>
+									</div>
 								</div>
-								@button.Button(button.Props{Type: button.TypeSubmit, FullWidth: true}) {
+								<button type="submit" class="w-full rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
 									Create category
-								}
+								</button>
 							</form>
 						}
-					}
-				}
+					</div>
+				</div>
 			</div>
 		</div>
 	}

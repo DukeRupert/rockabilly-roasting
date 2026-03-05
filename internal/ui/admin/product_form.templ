@@ -1,13 +1,6 @@
 package admin
 
-import (
-	"github.com/dukerupert/hiri/internal/domain"
-	"github.com/dukerupert/hiri/internal/ui/components/button"
-	"github.com/dukerupert/hiri/internal/ui/components/card"
-	"github.com/dukerupert/hiri/internal/ui/components/input"
-	"github.com/dukerupert/hiri/internal/ui/components/label"
-	"github.com/dukerupert/hiri/internal/ui/components/textarea"
-)
+import "github.com/dukerupert/hiri/internal/domain"
 
 type ProductFormProps struct {
 	Product *domain.Product
@@ -65,131 +58,140 @@ func getError(errors map[string]string, field string) string {
 	return errors[field]
 }
 
+func inputClasses(hasErr bool) string {
+	if hasErr {
+		return "block w-full rounded-md bg-white px-3 py-1.5 text-base text-stone-900 outline-1 -outline-offset-1 outline-red-300 placeholder:text-stone-400 focus:outline-2 focus:-outline-offset-2 focus:outline-red-500 sm:text-sm/6"
+	}
+	return "block w-full rounded-md bg-white px-3 py-1.5 text-base text-stone-900 outline-1 -outline-offset-1 outline-stone-300 placeholder:text-stone-400 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal sm:text-sm/6"
+}
+
 templ ProductForm(props ProductFormProps) {
 	<form method="post" action={ templ.SafeURL(props.Action) }>
-		@card.Card() {
-			@card.Header() {
-				@card.Title() {
-					General
-				}
-			}
-			@card.Content() {
-				<div class="space-y-4">
-					<div class="space-y-2">
-						@label.Label(label.Props{For: "title", Error: getError(props.Errors, "title")}) {
-							Title
-						}
-						@input.Input(input.Props{
-							ID:          "title",
-							Name:        "title",
-							Placeholder: "Product title",
-							Value:       productVal(props.Product, "title"),
-							Required:    true,
-							HasError:    hasError(props.Errors, "title"),
-						})
+		<div class="space-y-12">
+			<!-- General section -->
+			<div class="border-b border-stone-900/10 pb-12">
+				<h2 class="text-base/7 font-semibold text-stone-900">General</h2>
+				<p class="mt-1 text-sm/6 text-stone-600">Basic product information.</p>
+				<div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+					<!-- Title -->
+					<div class="sm:col-span-4">
+						<label for="title" class="block text-sm/6 font-medium text-stone-900">Title</label>
+						<div class="mt-2">
+							<input
+								type="text"
+								id="title"
+								name="title"
+								value={ productVal(props.Product, "title") }
+								placeholder="Product title"
+								required
+								class={ inputClasses(hasError(props.Errors, "title")) }
+							/>
+						</div>
 						if msg := getError(props.Errors, "title"); msg != "" {
-							<p class="text-sm text-destructive">{ msg }</p>
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
 						}
 					</div>
-					<div class="space-y-2">
-						@label.Label(label.Props{For: "slug", Error: getError(props.Errors, "slug")}) {
-							Slug
-						}
-						@input.Input(input.Props{
-							ID:          "slug",
-							Name:        "slug",
-							Placeholder: "product-slug",
-							Value:       productVal(props.Product, "slug"),
-							Required:    true,
-							HasError:    hasError(props.Errors, "slug"),
-						})
+					<!-- Slug -->
+					<div class="sm:col-span-4">
+						<label for="slug" class="block text-sm/6 font-medium text-stone-900">Slug</label>
+						<div class="mt-2">
+							<input
+								type="text"
+								id="slug"
+								name="slug"
+								value={ productVal(props.Product, "slug") }
+								placeholder="product-slug"
+								required
+								class={ inputClasses(hasError(props.Errors, "slug")) }
+							/>
+						</div>
 						if msg := getError(props.Errors, "slug"); msg != "" {
-							<p class="text-sm text-destructive">{ msg }</p>
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
 						}
 					</div>
-					<div class="space-y-2">
-						@label.Label(label.Props{For: "description"}) {
-							Description
-						}
-						@textarea.Textarea(textarea.Props{
-							ID:          "description",
-							Name:        "description",
-							Placeholder: "Product description",
-							Value:       productVal(props.Product, "description"),
-							Rows:        4,
-						})
+					<!-- Description -->
+					<div class="col-span-full">
+						<label for="description" class="block text-sm/6 font-medium text-stone-900">Description</label>
+						<div class="mt-2">
+							<textarea
+								id="description"
+								name="description"
+								rows="4"
+								placeholder="Product description"
+								class={ inputClasses(false) }
+							>{ productVal(props.Product, "description") }</textarea>
+						</div>
 					</div>
-					<div class="space-y-2">
-						@label.Label(label.Props{For: "taxon_id"}) {
-							Category
-						}
-						<select
-							id="taxon_id"
-							name="taxon_id"
-							class="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs"
-						>
-							<option value="">No category</option>
-							for _, t := range props.Taxons {
-								if props.Product != nil && props.Product.TaxonID == t.ID {
-									<option value={ t.ID.String() } selected>{ t.Name }</option>
-								} else {
-									<option value={ t.ID.String() }>{ t.Name }</option>
+					<!-- Category -->
+					<div class="sm:col-span-3">
+						<label for="taxon_id" class="block text-sm/6 font-medium text-stone-900">Category</label>
+						<div class="mt-2 grid grid-cols-1">
+							<select
+								id="taxon_id"
+								name="taxon_id"
+								class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-base text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal sm:text-sm/6"
+							>
+								<option value="">No category</option>
+								for _, t := range props.Taxons {
+									if props.Product != nil && props.Product.TaxonID == t.ID {
+										<option value={ t.ID.String() } selected>{ t.Name }</option>
+									} else {
+										<option value={ t.ID.String() }>{ t.Name }</option>
+									}
 								}
-							}
-						</select>
+							</select>
+							<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+								<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+							</svg>
+						</div>
 					</div>
 				</div>
-			}
-		}
-		<div class="mt-6">
-			@card.Card() {
-				@card.Header() {
-					@card.Title() {
-						Availability
-					}
-				}
-				@card.Content() {
-					<div class="grid grid-cols-2 gap-4">
-						<div class="space-y-2">
-							@label.Label(label.Props{For: "available_on"}) {
-								Available on
-							}
-							@input.Input(input.Props{
-								ID:    "available_on",
-								Name:  "available_on",
-								Type:  input.TypeDate,
-								Value: productDateVal(props.Product, "available_on"),
-							})
-						</div>
-						<div class="space-y-2">
-							@label.Label(label.Props{For: "discontinue_on"}) {
-								Discontinue on
-							}
-							@input.Input(input.Props{
-								ID:    "discontinue_on",
-								Name:  "discontinue_on",
-								Type:  input.TypeDate,
-								Value: productDateVal(props.Product, "discontinue_on"),
-							})
+			</div>
+			<!-- Availability section -->
+			<div class="border-b border-stone-900/10 pb-12">
+				<h2 class="text-base/7 font-semibold text-stone-900">Availability</h2>
+				<p class="mt-1 text-sm/6 text-stone-600">Control when this product is available for purchase.</p>
+				<div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+					<div class="sm:col-span-3">
+						<label for="available_on" class="block text-sm/6 font-medium text-stone-900">Available on</label>
+						<div class="mt-2">
+							<input
+								type="date"
+								id="available_on"
+								name="available_on"
+								value={ productDateVal(props.Product, "available_on") }
+								class={ inputClasses(false) }
+							/>
 						</div>
 					</div>
-				}
-			}
+					<div class="sm:col-span-3">
+						<label for="discontinue_on" class="block text-sm/6 font-medium text-stone-900">Discontinue on</label>
+						<div class="mt-2">
+							<input
+								type="date"
+								id="discontinue_on"
+								name="discontinue_on"
+								value={ productDateVal(props.Product, "discontinue_on") }
+								class={ inputClasses(false) }
+							/>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
-		@card.Footer(card.FooterProps{Class: "mt-6 justify-between"}) {
-			@button.Button(button.Props{
-				Variant: button.VariantOutline,
-				Href:    "/admin/catalog",
-			}) {
-				Cancel
-			}
-			@button.Button(button.Props{Type: button.TypeSubmit}) {
+		<!-- Footer -->
+		<div class="mt-6 flex items-center justify-end gap-x-6">
+			<a href="/admin/catalog" class="text-sm/6 font-semibold text-stone-900">Cancel</a>
+			<button
+				type="submit"
+				class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+			>
 				if props.IsNew {
 					Create product
 				} else {
 					Save changes
 				}
-			}
-		}
+			</button>
+		</div>
 	</form>
 }

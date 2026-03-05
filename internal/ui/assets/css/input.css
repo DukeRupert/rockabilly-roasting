@@ -2,6 +2,7 @@
 
 @source "../../components/**/*.templ";
 @source "../../layouts/**/*.templ";
+@source "../../admin/**/*.templ";
 
 @theme inline {
 	/* Hiri design system colors */

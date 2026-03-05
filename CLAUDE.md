@@ -108,6 +108,13 @@ Customer-facing store methods require `customerID` as a parameter — this is ho
 - Must be idempotent — jobs may run more than once
 - Use `domain.SystemActor` for audit records, include `"river_job_id"` in metadata
 
+### htmx Partial Rendering (Admin Pages)
+Every admin HTML page uses htmx for in-page navigation. The pattern:
+- Split each page template into `<Name>Content` (content partial) and `<Name>` (wraps content in `@layouts.Admin`)
+- GET handlers check `IsHTMX(r)` and render the `Content` variant for htmx requests, full page for normal requests
+- POST handlers use `http.Redirect()` as-is — htmx follows redirects naturally
+- `hx-boost="true"` on `<body>` auto-upgrades links/forms; sidebar stays, content area swaps
+
 ## Naming Conventions
 
 - **Files:** `snake_case.go`, one domain area per file. No `utils.go` or `helpers.go`

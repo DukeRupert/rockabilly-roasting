@@ -249,6 +249,25 @@ templ Admin(props AdminProps) {
 							m.classList.add('hidden');
 						});
 					});
+				// Active nav highlighting after htmx navigation
+				var activeLink = 'group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-hiri-teal';
+				var inactiveLink = 'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-hiri-teal';
+				var activeIcon = 'size-6 shrink-0 text-hiri-teal';
+				var inactiveIcon = 'size-6 shrink-0 text-stone-400 group-hover:text-hiri-teal';
+
+				function updateActiveNav() {
+					var path = window.location.pathname;
+					document.querySelectorAll('nav a[href^="/admin"]').forEach(function(a) {
+						var href = a.getAttribute('href');
+						var isActive = (href === '/admin' && path === '/admin') ||
+							(href !== '/admin' && path.startsWith(href));
+						a.className = isActive ? activeLink : inactiveLink;
+						var icon = a.querySelector('svg');
+						if (icon) icon.className = isActive ? activeIcon : inactiveIcon;
+					});
+				}
+
+				document.addEventListener('htmx:afterSettle', updateActiveNav);
 				})();
 			</script>
 		</body>

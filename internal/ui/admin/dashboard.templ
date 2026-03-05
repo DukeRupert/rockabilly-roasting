@@ -1,0 +1,23 @@
+package admin
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+templ DashboardContent() {
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="text-base/7 font-semibold text-stone-900">Dashboard</h1>
+			<p class="mt-1 text-sm text-stone-500">Welcome to the Hiri admin panel</p>
+		</div>
+	</div>
+}
+
+templ Dashboard() {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Dashboard",
+		ActivePath: "/admin",
+		StaffName:  "Dev User",
+		StaffRole:  "admin",
+	}) {
+		@DashboardContent()
+	}
+}

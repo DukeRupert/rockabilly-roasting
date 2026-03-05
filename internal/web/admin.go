@@ -3,14 +3,14 @@ package web
 import (
 	"net/http"
 
-	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/dukerupert/hiri/internal/ui/admin"
 )
 
 func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
-	layouts.Admin(layouts.AdminProps{
-		Title:      "Dashboard",
-		ActivePath: "/admin",
-		StaffName:  "Dev User", // TODO: from session
-		StaffRole:  "admin",    // TODO: from session
-	}).Render(r.Context(), w) //nolint:errcheck
+	ctx := r.Context()
+	if IsHTMX(r) {
+		admin.DashboardContent().Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.Dashboard().Render(ctx, w) //nolint:errcheck
 }

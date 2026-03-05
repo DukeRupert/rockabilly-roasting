@@ -107,7 +107,7 @@ templ ProductEditContent(props ProductEditProps) {
 			<!-- Options panel (before variants — must define options before creating variants) -->
 			@OptionsPanel(props.Product, props.Options)
 			<!-- Variants panel -->
-			@VariantsPanel(props.Product, props.Variants, props.Options)
+			@VariantsPanel(props.Product, props.Variants, props.Options, nil)
 		</div>
 }
 
@@ -211,8 +211,8 @@ type VariantWithOptions struct {
 }
 
 // VariantsPanel renders the variants section as a standalone partial for htmx swaps.
-templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues) {
-	<div id="variants-panel" class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues, attrs templ.Attributes) {
+	<div id="variants-panel" { attrs... } class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
 		<div class="px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-stone-900">Variants</h3>
 		</div>

@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/a-h/templ"
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
@@ -419,6 +420,7 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 	ctx := r.Context()
 	var product *domain.Product
 	var options []admin.OptionWithValues
+	var variants []admin.VariantWithOptions
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -426,18 +428,46 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 		if txErr != nil {
 			return txErr
 		}
+
+		// Load options + values
 		opts, txErr := d.CatalogService.ListProductOptions(ctx, tx, productID)
 		if txErr != nil {
 			return txErr
 		}
+		optionValueNames := make(map[uuid.UUID]string)
 		for _, opt := range opts {
 			vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
 			if vErr != nil {
 				return vErr
 			}
+			for _, v := range vals {
+				optionValueNames[v.ID] = v.Value
+			}
 			options = append(options, admin.OptionWithValues{
 				Option: opt,
 				Values: vals,
+			})
+		}
+
+		// Load variants for OOB swap
+		rawVariants, txErr := d.CatalogService.ListVariants(ctx, tx, productID)
+		if txErr != nil {
+			return txErr
+		}
+		for _, v := range rawVariants {
+			vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
+			if vErr != nil {
+				return vErr
+			}
+			var names []string
+			for _, link := range vov {
+				if name, ok := optionValueNames[link.ProductOptionValueID]; ok {
+					names = append(names, name)
+				}
+			}
+			variants = append(variants, admin.VariantWithOptions{
+				Variant:      v,
+				OptionValues: names,
 			})
 		}
 		return nil
@@ -446,7 +476,11 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 		Error(w, r, err)
 		return
 	}
+
+	// Render options panel (primary swap target)
 	admin.OptionsPanel(product, options).Render(ctx, w) //nolint:errcheck
+	// Render variants panel as OOB swap so its option dropdowns stay in sync
+	admin.VariantsPanel(product, variants, options, templ.Attributes{"hx-swap-oob": "outerHTML"}).Render(ctx, w) //nolint:errcheck
 }
 
 // renderVariantsPanel re-fetches variants for a product and renders the partial.
@@ -510,7 +544,7 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 		Error(w, r, err)
 		return
 	}
-	admin.VariantsPanel(product, variants, options).Render(ctx, w) //nolint:errcheck
+	admin.VariantsPanel(product, variants, options, nil).Render(ctx, w) //nolint:errcheck
 }
 
 // --- Variants ---

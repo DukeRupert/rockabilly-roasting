@@ -71,6 +71,7 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /admin/catalog/{id}/variants", deps.handleAdminVariantCreate)
 	mux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}", deps.handleAdminVariantUpdate)
 	mux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/delete", deps.handleAdminVariantDelete)
+	mux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/price", deps.handleAdminVariantPriceUpdate)
 	mux.HandleFunc("POST /admin/catalog/{id}/options", deps.handleAdminOptionCreate)
 	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/delete", deps.handleAdminOptionDelete)
 	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values", deps.handleAdminOptionValueCreate)

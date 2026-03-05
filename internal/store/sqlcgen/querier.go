@@ -26,6 +26,7 @@ type Querier interface {
 	CreateInventoryItem(ctx context.Context, arg CreateInventoryItemParams) (InventoryItem, error)
 	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (LineItem, error)
 	CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error)
+	CreatePriceSet(ctx context.Context, arg CreatePriceSetParams) (PriceSet, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	CreateProductMedia(ctx context.Context, arg CreateProductMediaParams) (ProductMedium, error)
 	CreateProductOption(ctx context.Context, arg CreateProductOptionParams) (ProductOption, error)
@@ -44,6 +45,7 @@ type Querier interface {
 	CreateWebhookEvent(ctx context.Context, arg CreateWebhookEventParams) (WebhookEvent, error)
 	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
 	DeleteAdjustment(ctx context.Context, id uuid.UUID) error
+	DeleteBasePrice(ctx context.Context, arg DeleteBasePriceParams) error
 	DeleteCart(ctx context.Context, id uuid.UUID) error
 	DeleteCouponCode(ctx context.Context, id uuid.UUID) error
 	DeleteCustomer(ctx context.Context, id uuid.UUID) error
@@ -76,6 +78,7 @@ type Querier interface {
 	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 	GetOrderByNumber(ctx context.Context, number string) (Order, error)
 	GetOrderByStripePaymentIntentID(ctx context.Context, stripePaymentIntentID *string) (Order, error)
+	GetPriceSetByVariant(ctx context.Context, variantID uuid.UUID) (PriceSet, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySlug(ctx context.Context, slug string) (Product, error)
 	GetResetTokenByTokenHash(ctx context.Context, tokenHash string) (ResetToken, error)
@@ -98,6 +101,7 @@ type Querier interface {
 	ListAuditByAction(ctx context.Context, action string) ([]AuditLog, error)
 	ListAuditByActor(ctx context.Context, actorID *uuid.UUID) ([]AuditLog, error)
 	ListAuditByResource(ctx context.Context, arg ListAuditByResourceParams) ([]AuditLog, error)
+	ListBasePricesByProduct(ctx context.Context, arg ListBasePricesByProductParams) ([]ListBasePricesByProductRow, error)
 	ListCouponCodesByDiscount(ctx context.Context, discountID uuid.UUID) ([]CouponCode, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListFulfillmentItemsByFulfillment(ctx context.Context, fulfillmentID uuid.UUID) ([]FulfillmentItem, error)
@@ -158,6 +162,7 @@ type Querier interface {
 	UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscriptionStatusParams) (Subscription, error)
 	UpdateTaxon(ctx context.Context, arg UpdateTaxonParams) (Taxon, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (Variant, error)
+	UpsertBasePrice(ctx context.Context, arg UpsertBasePriceParams) (Price, error)
 }
 
 var _ Querier = (*Queries)(nil)

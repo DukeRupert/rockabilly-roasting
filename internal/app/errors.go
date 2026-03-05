@@ -71,6 +71,7 @@ var (
 
 	// Price errors
 	ErrPriceNotFound = errors.New("price not found")
+	ErrInvalidPrice  = errors.New("price must not be negative")
 
 	// Slug errors
 	ErrSlugAlreadyExists = errors.New("slug already exists")

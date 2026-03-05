@@ -9,7 +9,45 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const createPriceSet = `-- name: CreatePriceSet :one
+INSERT INTO price_sets (id, variant_id)
+VALUES ($1, $2)
+RETURNING id, variant_id
+`
+
+type CreatePriceSetParams struct {
+	ID        uuid.UUID `json:"id"`
+	VariantID uuid.UUID `json:"variant_id"`
+}
+
+func (q *Queries) CreatePriceSet(ctx context.Context, arg CreatePriceSetParams) (PriceSet, error) {
+	row := q.db.QueryRow(ctx, createPriceSet, arg.ID, arg.VariantID)
+	var i PriceSet
+	err := row.Scan(&i.ID, &i.VariantID)
+	return i, err
+}
+
+const deleteBasePrice = `-- name: DeleteBasePrice :exec
+DELETE FROM prices
+WHERE price_set_id = $1
+  AND currency_code = $2
+  AND price_list_id IS NULL
+  AND customer_group_id IS NULL
+  AND min_quantity IS NULL
+`
+
+type DeleteBasePriceParams struct {
+	PriceSetID   uuid.UUID `json:"price_set_id"`
+	CurrencyCode string    `json:"currency_code"`
+}
+
+func (q *Queries) DeleteBasePrice(ctx context.Context, arg DeleteBasePriceParams) error {
+	_, err := q.db.Exec(ctx, deleteBasePrice, arg.PriceSetID, arg.CurrencyCode)
+	return err
+}
 
 const getBasePrice = `-- name: GetBasePrice :one
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
@@ -32,6 +70,120 @@ type GetBasePriceParams struct {
 
 func (q *Queries) GetBasePrice(ctx context.Context, arg GetBasePriceParams) (Price, error) {
 	row := q.db.QueryRow(ctx, getBasePrice, arg.VariantID, arg.CurrencyCode)
+	var i Price
+	err := row.Scan(
+		&i.ID,
+		&i.PriceSetID,
+		&i.Amount,
+		&i.CurrencyCode,
+		&i.MinQuantity,
+		&i.MaxQuantity,
+		&i.CustomerGroupID,
+		&i.PriceListID,
+		&i.StartsAt,
+		&i.EndsAt,
+	)
+	return i, err
+}
+
+const getPriceSetByVariant = `-- name: GetPriceSetByVariant :one
+SELECT id, variant_id FROM price_sets WHERE variant_id = $1
+`
+
+func (q *Queries) GetPriceSetByVariant(ctx context.Context, variantID uuid.UUID) (PriceSet, error) {
+	row := q.db.QueryRow(ctx, getPriceSetByVariant, variantID)
+	var i PriceSet
+	err := row.Scan(&i.ID, &i.VariantID)
+	return i, err
+}
+
+const listBasePricesByProduct = `-- name: ListBasePricesByProduct :many
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.price_list_id, p.starts_at, p.ends_at,
+       ps.variant_id
+FROM variants v
+JOIN price_sets ps ON ps.variant_id = v.id
+JOIN prices p ON p.price_set_id = ps.id
+WHERE v.product_id = $1
+  AND p.currency_code = $2
+  AND p.price_list_id IS NULL
+  AND p.customer_group_id IS NULL
+  AND p.min_quantity IS NULL
+`
+
+type ListBasePricesByProductParams struct {
+	ProductID    uuid.UUID `json:"product_id"`
+	CurrencyCode string    `json:"currency_code"`
+}
+
+type ListBasePricesByProductRow struct {
+	ID              uuid.UUID          `json:"id"`
+	PriceSetID      uuid.UUID          `json:"price_set_id"`
+	Amount          int32              `json:"amount"`
+	CurrencyCode    string             `json:"currency_code"`
+	MinQuantity     *int32             `json:"min_quantity"`
+	MaxQuantity     *int32             `json:"max_quantity"`
+	CustomerGroupID *uuid.UUID         `json:"customer_group_id"`
+	PriceListID     *uuid.UUID         `json:"price_list_id"`
+	StartsAt        pgtype.Timestamptz `json:"starts_at"`
+	EndsAt          pgtype.Timestamptz `json:"ends_at"`
+	VariantID       uuid.UUID          `json:"variant_id"`
+}
+
+func (q *Queries) ListBasePricesByProduct(ctx context.Context, arg ListBasePricesByProductParams) ([]ListBasePricesByProductRow, error) {
+	rows, err := q.db.Query(ctx, listBasePricesByProduct, arg.ProductID, arg.CurrencyCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBasePricesByProductRow{}
+	for rows.Next() {
+		var i ListBasePricesByProductRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceSetID,
+			&i.Amount,
+			&i.CurrencyCode,
+			&i.MinQuantity,
+			&i.MaxQuantity,
+			&i.CustomerGroupID,
+			&i.PriceListID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.VariantID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const upsertBasePrice = `-- name: UpsertBasePrice :one
+INSERT INTO prices (id, price_set_id, amount, currency_code)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (id) DO UPDATE SET amount = EXCLUDED.amount
+RETURNING id, price_set_id, amount, currency_code, min_quantity, max_quantity, customer_group_id, price_list_id, starts_at, ends_at
+`
+
+type UpsertBasePriceParams struct {
+	ID           uuid.UUID `json:"id"`
+	PriceSetID   uuid.UUID `json:"price_set_id"`
+	Amount       int32     `json:"amount"`
+	CurrencyCode string    `json:"currency_code"`
+}
+
+func (q *Queries) UpsertBasePrice(ctx context.Context, arg UpsertBasePriceParams) (Price, error) {
+	row := q.db.QueryRow(ctx, upsertBasePrice,
+		arg.ID,
+		arg.PriceSetID,
+		arg.Amount,
+		arg.CurrencyCode,
+	)
 	var i Price
 	err := row.Scan(
 		&i.ID,

@@ -33,3 +33,31 @@ func (s *PricingService) GetBasePrice(ctx context.Context, tx pgx.Tx, variantID 
 	}
 	return price, nil
 }
+
+// SetBasePrice sets the base price (in cents) for a variant.
+// Creates a price set if one doesn't exist for the variant.
+func (s *PricingService) SetBasePrice(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, amountCents int, currencyCode string) (*domain.Price, error) {
+	if amountCents < 0 {
+		return nil, ErrInvalidPrice
+	}
+
+	ps, err := s.pricing.GetOrCreatePriceSet(ctx, tx, variantID)
+	if err != nil {
+		return nil, fmt.Errorf("get or create price set: %w", err)
+	}
+
+	price, err := s.pricing.SetBasePrice(ctx, tx, ps.ID, amountCents, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("set base price: %w", err)
+	}
+	return price, nil
+}
+
+// ListBasePricesByProduct returns base prices for all variants of a product, keyed by variant ID.
+func (s *PricingService) ListBasePricesByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID, currencyCode string) (map[uuid.UUID]int, error) {
+	prices, err := s.pricing.ListBasePricesByProduct(ctx, tx, productID, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("list base prices: %w", err)
+	}
+	return prices, nil
+}

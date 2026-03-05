@@ -275,15 +275,26 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
+
+		// Load prices for all variants at once
+		priceMap, txErr := d.PricingService.ListBasePricesByProduct(ctx, tx, id, "USD")
+		if txErr != nil {
+			return txErr
+		}
+
 		for _, v := range rawVariants {
 			vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
 			if vErr != nil {
 				return vErr
 			}
-			variants = append(variants, admin.VariantWithOptions{
+			vwo := admin.VariantWithOptions{
 				Variant:      v,
 				OptionValues: sortedOptionValueNames(vov, options),
-			})
+			}
+			if cents, ok := priceMap[v.ID]; ok {
+				vwo.PriceCents = &cents
+			}
+			variants = append(variants, vwo)
 		}
 		return nil
 	})
@@ -477,15 +488,26 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 		if txErr != nil {
 			return txErr
 		}
+
+		// Load prices for all variants at once
+		priceMap, txErr := d.PricingService.ListBasePricesByProduct(ctx, tx, productID, "USD")
+		if txErr != nil {
+			return txErr
+		}
+
 		for _, v := range rawVariants {
 			vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
 			if vErr != nil {
 				return vErr
 			}
-			variants = append(variants, admin.VariantWithOptions{
+			vwo := admin.VariantWithOptions{
 				Variant:      v,
 				OptionValues: sortedOptionValueNames(vov, options),
-			})
+			}
+			if cents, ok := priceMap[v.ID]; ok {
+				vwo.PriceCents = &cents
+			}
+			variants = append(variants, vwo)
 		}
 		return nil
 	})
@@ -542,15 +564,26 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 		if txErr != nil {
 			return txErr
 		}
+
+		// Load prices for all variants at once
+		priceMap, txErr := d.PricingService.ListBasePricesByProduct(ctx, tx, productID, "USD")
+		if txErr != nil {
+			return txErr
+		}
+
 		for _, v := range rawVariants {
 			vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
 			if vErr != nil {
 				return vErr
 			}
-			variants = append(variants, admin.VariantWithOptions{
+			vwo := admin.VariantWithOptions{
 				Variant:      v,
 				OptionValues: sortedOptionValueNames(vov, options),
-			})
+			}
+			if cents, ok := priceMap[v.ID]; ok {
+				vwo.PriceCents = &cents
+			}
+			variants = append(variants, vwo)
 		}
 		return nil
 	})
@@ -716,6 +749,65 @@ func (d *Deps) handleAdminVariantDelete(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+deleted", productID), http.StatusSeeOther)
+}
+
+// --- Variant Pricing ---
+
+func (d *Deps) handleAdminVariantPriceUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	productID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	variantID, err := uuid.Parse(r.PathValue("variantID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	dollars, err := strconv.ParseFloat(r.FormValue("price"), 64)
+	if err != nil || dollars < 0 {
+		if IsHTMX(r) {
+			d.renderVariantsPanel(w, r, productID)
+			_, msg := mapError(app.ErrInvalidPrice)
+			_ = msg
+			toast.Toast(toast.VariantError, "Please enter a valid price").Render(r.Context(), w) //nolint:errcheck
+			return
+		}
+		http.Error(w, "invalid price", http.StatusBadRequest)
+		return
+	}
+
+	cents := int(math.Round(dollars * 100))
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.PricingService.SetBasePrice(ctx, tx, variantID, cents, "USD")
+		return txErr
+	})
+	if err != nil {
+		if IsHTMX(r) {
+			d.renderVariantsPanel(w, r, productID)
+			_, msg := mapError(err)
+			toast.Toast(toast.VariantError, msg).Render(r.Context(), w) //nolint:errcheck
+			return
+		}
+		Error(w, r, err)
+		return
+	}
+
+	if IsHTMX(r) {
+		d.renderVariantsPanel(w, r, productID)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Price+updated", productID), http.StatusSeeOther)
 }
 
 // --- Options ---

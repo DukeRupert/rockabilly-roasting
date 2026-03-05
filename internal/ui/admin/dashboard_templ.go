@@ -31,7 +31,7 @@ func DashboardContent() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-base/7 font-semibold text-stone-900\">Dashboard</h1><p class=\"mt-1 text-sm text-stone-500\">Welcome to the Hiri admin panel</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-base/7 font-semibold text-stone-900\">Dashboard</h1><p class=\"mt-1 text-sm text-stone-500\">Welcome to the Hiri admin panel</p></div></div><!-- Dev testing --><div class=\"mt-8 rounded-lg border border-yellow-200 bg-yellow-50 p-4\"><h2 class=\"text-sm font-semibold text-yellow-800\">Dev Testing</h2><div class=\"mt-2 flex gap-3\"><a href=\"/admin/dev/error\" class=\"inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500\">Trigger Server Error</a></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

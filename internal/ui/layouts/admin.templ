@@ -200,6 +200,8 @@ templ Admin(props AdminProps) {
 						{ children... }
 					</div>
 				</main>
+				<!-- Toast live region -->
+				<div id="toast-container" aria-live="assertive"></div>
 			</div>
 			<script>
 				(function() {
@@ -268,6 +270,30 @@ templ Admin(props AdminProps) {
 				}
 
 				document.addEventListener('htmx:afterSettle', updateActiveNav);
+
+				// Toast slide-in/out and auto-dismiss
+				function dismissToast(el) {
+					if (!el || el.dataset.dismissing) return;
+					el.dataset.dismissing = 'true';
+					el.style.opacity = '0';
+					el.style.transform = 'translateX(100%)';
+					el.addEventListener('transitionend', function() { el.remove(); }, { once: true });
+				}
+
+				document.addEventListener('htmx:oobAfterSwap', function(evt) {
+					var toast = evt.detail.target.querySelector('[data-toast]');
+					if (!toast) return;
+					// Force initial off-screen state, then slide in on next frame
+					toast.style.transform = 'translateX(100%)';
+					toast.style.opacity = '0';
+					requestAnimationFrame(function() {
+						toast.style.transform = 'translateX(0)';
+						toast.style.opacity = '1';
+					});
+					setTimeout(function() { dismissToast(toast); }, 5000);
+					var btn = toast.querySelector('[data-toast-close]');
+					if (btn) btn.addEventListener('click', function() { dismissToast(toast); });
+				});
 				})();
 			</script>
 		</body>

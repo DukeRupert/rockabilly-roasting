@@ -178,11 +178,16 @@ func (d *Deps) handleAdminProductCreate(w http.ResponseWriter, r *http.Request) 
 			Description: params.Description,
 			TaxonID:     params.TaxonID,
 		}
-		admin.ProductNew(admin.ProductNewProps{
+		props := admin.ProductNewProps{
 			Product: &p,
 			Taxons:  taxons,
 			Errors:  errs,
-		}).Render(ctx, w) //nolint:errcheck
+		}
+		if IsHTMX(r) {
+			admin.ProductNewContent(props).Render(ctx, w) //nolint:errcheck
+			return
+		}
+		admin.ProductNew(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
 

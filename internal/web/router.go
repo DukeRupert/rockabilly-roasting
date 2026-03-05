@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -66,6 +67,11 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/delete", deps.handleAdminOptionDelete)
 	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values", deps.handleAdminOptionValueCreate)
 	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values/{valueID}/delete", deps.handleAdminOptionValueDelete)
+
+	// Dev/test route — triggers a server error for toast testing
+	mux.HandleFunc("GET /admin/dev/error", func(w http.ResponseWriter, r *http.Request) {
+		Error(w, r, errors.New("simulated server error for testing"))
+	})
 
 	// API routes
 	// TODO: register API handlers

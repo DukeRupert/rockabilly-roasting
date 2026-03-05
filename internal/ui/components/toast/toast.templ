@@ -1,0 +1,65 @@
+package toast
+
+type Variant string
+
+const (
+	VariantError   Variant = "error"
+	VariantSuccess Variant = "success"
+	VariantWarning Variant = "warning"
+)
+
+func variantClasses(v Variant) string {
+	switch v {
+	case VariantSuccess:
+		return "bg-green-50 text-green-800 ring-green-600/10"
+	case VariantWarning:
+		return "bg-yellow-50 text-yellow-800 ring-yellow-600/10"
+	default:
+		return "bg-red-50 text-red-800 ring-red-600/10"
+	}
+}
+
+func variantIcon(v Variant) string {
+	switch v {
+	case VariantSuccess:
+		return "M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+	case VariantWarning:
+		return "M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"
+	default:
+		return "M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"
+	}
+}
+
+// Toast renders an OOB-swapped toast notification that targets #toast-container.
+// Animation is handled by the htmx:oobAfterSwap listener in the admin layout.
+templ Toast(variant Variant, message string) {
+	<div id="toast-container" hx-swap-oob="innerHTML:#toast-container">
+		<div class="pointer-events-none fixed inset-0 z-50 flex items-end justify-end p-6">
+			<div
+				class={ "pointer-events-auto max-w-sm rounded-lg p-4 shadow-lg ring-1", variantClasses(variant) }
+				style="transition: transform 300ms ease-out, opacity 300ms ease-out; transform: translateX(100%); opacity: 0;"
+				role="alert"
+				data-toast
+			>
+			<div class="flex items-start">
+				<svg class="size-5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d={ variantIcon(variant) }></path>
+				</svg>
+				<p class="ml-3 flex-1 text-sm font-medium">{ message }</p>
+				<div class="ml-4 flex shrink-0">
+					<button
+						type="button"
+						data-toast-close
+						class="inline-flex rounded-md hover:opacity-70 focus:outline-2 focus:outline-offset-2"
+					>
+						<span class="sr-only">Close</span>
+						<svg class="size-5" viewBox="0 0 20 20" fill="currentColor">
+							<path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"></path>
+						</svg>
+					</button>
+				</div>
+			</div>
+			</div>
+		</div>
+	</div>
+}

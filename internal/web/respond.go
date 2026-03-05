@@ -7,6 +7,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/logging"
+	"github.com/dukerupert/hiri/internal/ui/components/toast"
 )
 
 // IsHTMX returns true if the request was made by htmx.
@@ -22,11 +23,18 @@ func JSON(w http.ResponseWriter, status int, v any) {
 }
 
 // Error maps application errors to HTTP responses.
+// For htmx requests, it renders an OOB toast so the current page stays intact.
+// For non-htmx requests, it returns JSON as before.
 func Error(w http.ResponseWriter, r *http.Request, err error) {
 	status, msg := mapError(err)
 	logger := logging.FromContext(r.Context())
 	if status >= 500 {
 		logger.Error("internal error", "error", err)
+	}
+	if IsHTMX(r) {
+		w.WriteHeader(http.StatusOK)
+		toast.Toast(toast.VariantError, msg).Render(r.Context(), w) //nolint:errcheck
+		return
 	}
 	JSON(w, status, map[string]string{"error": msg})
 }

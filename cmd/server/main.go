@@ -12,8 +12,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
@@ -97,7 +101,53 @@ func run() error {
 	cartSvc := app.NewCartService(cartStore, pricingStore)
 	authSvc := app.NewAuthService(customerStore, sessionMgr, limiter, auditWriter, metricsReg)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, paymentProvider, auditWriter, metricsReg)
-	_ = renewalSvc // TODO: wire into River job workers
+
+	// River job workers
+	workers := river.NewWorkers()
+	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool))
+
+	// River client — we create it first, then pass it to the scheduler worker
+	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
+		Queues: map[string]river.QueueConfig{
+			river.QueueDefault: {MaxWorkers: 10},
+		},
+		Workers: workers,
+		PeriodicJobs: []*river.PeriodicJob{
+			river.NewPeriodicJob(
+				river.PeriodicInterval(1*time.Hour),
+				func() (river.JobArgs, *river.InsertOpts) {
+					return jobs.RenewalSchedulerArgs{}, &river.InsertOpts{
+						UniqueOpts: river.UniqueOpts{
+							ByPeriod: 1 * time.Hour,
+						},
+					}
+				},
+				&river.PeriodicJobOpts{RunOnStart: true},
+			),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("create river client: %w", err)
+	}
+
+	// Register scheduler worker (needs the client for transactional inserts)
+	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient))
+
+	// Run River migrations
+	migrator, err := rivermigrate.New(riverpgxv5.New(pool), nil)
+	if err != nil {
+		return fmt.Errorf("create river migrator: %w", err)
+	}
+	if _, err := migrator.Migrate(ctx, rivermigrate.DirectionUp, nil); err != nil {
+		return fmt.Errorf("river migrate: %w", err)
+	}
+	logger.Info("river migrations complete")
+
+	// Start River client
+	if err := riverClient.Start(ctx); err != nil {
+		return fmt.Errorf("start river client: %w", err)
+	}
+	logger.Info("river workers started")
 
 	// Router
 	deps := &web.Deps{
@@ -120,9 +170,6 @@ func run() error {
 	}
 
 	handler := web.NewRouter(deps)
-
-	// TODO: Wire River job workers
-	// river.NewClient(...)
 
 	// HTTP server
 	addr := os.Getenv("ADDR")
@@ -157,6 +204,11 @@ func run() error {
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer shutdownCancel()
+
+	// Stop River gracefully
+	if err := riverClient.Stop(shutdownCtx); err != nil {
+		logger.Error("river stop", "error", err)
+	}
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("server shutdown: %w", err)

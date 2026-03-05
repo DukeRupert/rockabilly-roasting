@@ -53,7 +53,8 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrCartNotFound),
 		errors.Is(err, app.ErrStaffNotFound),
 		errors.Is(err, app.ErrShipmentNotFound),
-		errors.Is(err, app.ErrTaxonNotFound):
+		errors.Is(err, app.ErrTaxonNotFound),
+		errors.Is(err, app.ErrPriceNotFound):
 		return http.StatusNotFound, "not found"
 
 	case errors.Is(err, app.ErrInvalidCredentials):

@@ -68,6 +68,9 @@ var (
 	// Status errors
 	ErrInvalidOrderStatus = errors.New("invalid order status transition")
 
+	// Price errors
+	ErrPriceNotFound = errors.New("price not found")
+
 	// Slug errors
 	ErrSlugAlreadyExists = errors.New("slug already exists")
 )

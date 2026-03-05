@@ -28,6 +28,7 @@ type Deps struct {
 	SubscriptionService *app.SubscriptionService
 	DiscountService     *app.DiscountService
 	AuthService     *app.AuthService
+	PricingService  *app.PricingService
 	PaymentProvider payments.Provider
 	WebhookStore    *store.WebhookStore
 }
@@ -46,7 +47,9 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler("internal/ui/assets")))
 
 	// Storefront routes
-	// TODO: register storefront handlers
+	mux.HandleFunc("GET /{$}", deps.handleStorefrontHome)
+	mux.HandleFunc("GET /catalog", deps.handleStorefrontCatalog)
+	mux.HandleFunc("GET /catalog/{slug}", deps.handleStorefrontProduct)
 
 	// Admin routes
 	mux.HandleFunc("GET /admin", deps.handleAdminDashboard)

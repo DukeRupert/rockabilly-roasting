@@ -1,0 +1,134 @@
+package storefront
+
+import (
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type OptionWithValues struct {
+	Option domain.ProductOption
+	Values []domain.ProductOptionValue
+}
+
+type VariantWithPrice struct {
+	Variant      domain.Variant
+	BasePrice    *int
+	CurrencyCode string
+}
+
+type ProductDetailProps struct {
+	Product      *domain.Product
+	Media        []domain.ProductMedia
+	Variants     []VariantWithPrice
+	Options      []OptionWithValues
+	DefaultPrice *int
+	CurrencyCode string
+}
+
+templ ProductContent(props ProductDetailProps) {
+	<div>
+		<!-- Breadcrumb -->
+		<nav class="mb-8">
+			<ol class="flex items-center gap-2 text-sm text-hiri-text-secondary">
+				<li><a href="/catalog" class="hover:text-hiri-teal">Shop</a></li>
+				<li><span class="mx-1">/</span></li>
+				<li class="text-hiri-text">{ props.Product.Title }</li>
+			</ol>
+		</nav>
+		<!-- Product layout: 2 columns -->
+		<div class="lg:grid lg:grid-cols-2 lg:gap-x-8">
+			<!-- Image gallery -->
+			<div>
+				if len(props.Media) > 0 {
+					<!-- Main image -->
+					<div class="aspect-square w-full overflow-hidden rounded-lg bg-stone-100">
+						<img
+							src={ props.Media[0].URL }
+							alt={ props.Media[0].AltText }
+							class="h-full w-full object-cover object-center"
+						/>
+					</div>
+					<!-- Thumbnails -->
+					if len(props.Media) > 1 {
+						<div class="mt-4 grid grid-cols-4 gap-4">
+							for _, m := range props.Media {
+								<div class="aspect-square overflow-hidden rounded-lg bg-stone-100">
+									<img
+										src={ m.URL }
+										alt={ m.AltText }
+										class="h-full w-full object-cover object-center"
+									/>
+								</div>
+							}
+						</div>
+					}
+				} else {
+					<div class="aspect-square w-full overflow-hidden rounded-lg bg-stone-100 flex items-center justify-center">
+						<svg class="size-24 text-stone-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"></path>
+						</svg>
+					</div>
+				}
+			</div>
+			<!-- Product info -->
+			<div class="mt-8 lg:mt-0">
+				<h1 class="text-3xl font-bold tracking-tight text-hiri-text">{ props.Product.Title }</h1>
+				<!-- Price -->
+				if props.DefaultPrice != nil {
+					<p class="mt-3 text-2xl font-semibold text-hiri-teal">{ formatCents(*props.DefaultPrice) }</p>
+				}
+				<!-- Description -->
+				if props.Product.Description != "" {
+					<div class="mt-6">
+						<p class="text-base text-hiri-text-secondary">{ props.Product.Description }</p>
+					</div>
+				}
+				<!-- Options -->
+				if len(props.Options) > 0 {
+					<div class="mt-8 space-y-6">
+						for _, opt := range props.Options {
+							<div>
+								<h3 class="text-sm font-medium text-hiri-text">{ opt.Option.Name }</h3>
+								<div class="mt-2 flex flex-wrap gap-2">
+									for i, val := range opt.Values {
+										<button
+											type="button"
+											class={ optionPillClasses(i == 0) }
+										>
+											{ val.Value }
+										</button>
+									}
+								</div>
+							</div>
+						}
+					</div>
+				}
+				<!-- Add to Cart -->
+				<div class="mt-8">
+					<button
+						type="button"
+						class="w-full rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+					>
+						Add to Cart
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+func optionPillClasses(selected bool) string {
+	if selected {
+		return "rounded-full border-2 border-hiri-teal bg-hiri-teal/5 px-4 py-2 text-sm font-medium text-hiri-teal"
+	}
+	return "rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-hiri-teal hover:text-hiri-teal"
+}
+
+templ ProductPage(props ProductDetailProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       props.Product.Title,
+		Description: props.Product.Description,
+	}) {
+		@ProductContent(props)
+	}
+}

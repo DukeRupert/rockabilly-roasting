@@ -60,6 +60,7 @@ type Querier interface {
 	DeleteVariantOptionValuesByVariant(ctx context.Context, variantID uuid.UUID) error
 	GetAddress(ctx context.Context, arg GetAddressParams) (Address, error)
 	GetAddressByID(ctx context.Context, id uuid.UUID) (Address, error)
+	GetBasePrice(ctx context.Context, arg GetBasePriceParams) (Price, error)
 	GetCartByCustomerID(ctx context.Context, customerID *uuid.UUID) (Cart, error)
 	GetCartByID(ctx context.Context, id uuid.UUID) (Cart, error)
 	GetCouponCodeByCode(ctx context.Context, code string) (CouponCode, error)

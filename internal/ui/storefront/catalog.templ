@@ -1,0 +1,102 @@
+package storefront
+
+import (
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type ProductCard struct {
+	Product      domain.Product
+	ThumbnailURL string
+	BasePrice    *int
+	CurrencyCode string
+}
+
+type CatalogPageProps struct {
+	Products    []ProductCard
+	Taxons      []domain.Taxon
+	ActiveTaxon string
+}
+
+func categoryPillClasses(active bool) string {
+	if active {
+		return "inline-flex items-center rounded-full bg-hiri-teal px-4 py-2 text-sm font-medium text-white"
+	}
+	return "inline-flex items-center rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-200"
+}
+
+templ CatalogContent(props CatalogPageProps) {
+	<div>
+		<!-- Page heading -->
+		<div class="mb-8">
+			<h1 class="text-3xl font-bold tracking-tight text-hiri-text">Shop</h1>
+			<p class="mt-2 text-sm text-hiri-text-secondary">Browse our collection</p>
+		</div>
+		<!-- Category filter pills -->
+		if len(props.Taxons) > 0 {
+			<div class="mb-8 flex flex-wrap gap-2">
+				<a
+					href="/catalog"
+					class={ categoryPillClasses(props.ActiveTaxon == "") }
+				>
+					All
+				</a>
+				for _, taxon := range props.Taxons {
+					<a
+						href={ templ.SafeURL("/catalog?category=" + taxon.Slug) }
+						class={ categoryPillClasses(props.ActiveTaxon == taxon.Slug) }
+					>
+						{ taxon.Name }
+					</a>
+				}
+			</div>
+		}
+		<!-- Product grid -->
+		if len(props.Products) == 0 {
+			<div class="text-center py-12">
+				<p class="text-hiri-text-secondary">No products found.</p>
+			</div>
+		} else {
+			<div class="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+				for _, card := range props.Products {
+					@productCard(card)
+				}
+			</div>
+		}
+	</div>
+}
+
+templ productCard(card ProductCard) {
+	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug) } class="group">
+		<div class="aspect-square w-full overflow-hidden rounded-lg bg-stone-100">
+			if card.ThumbnailURL != "" {
+				<img
+					src={ card.ThumbnailURL }
+					alt={ card.Product.Title }
+					class="h-full w-full object-cover object-center group-hover:opacity-75 transition-opacity"
+				/>
+			} else {
+				<div class="flex h-full w-full items-center justify-center">
+					<svg class="size-12 text-stone-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"></path>
+					</svg>
+				</div>
+			}
+		</div>
+		<div class="mt-4">
+			<h3 class="text-sm font-medium text-hiri-text group-hover:text-hiri-teal">{ card.Product.Title }</h3>
+			if card.BasePrice != nil {
+				<p class="mt-1 text-sm font-semibold text-hiri-teal">{ formatCents(*card.BasePrice) }</p>
+			}
+		</div>
+	</a>
+}
+
+templ CatalogPage(props CatalogPageProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Shop",
+		Description: "Browse our collection of products",
+	}) {
+		@CatalogContent(props)
+	}
+}

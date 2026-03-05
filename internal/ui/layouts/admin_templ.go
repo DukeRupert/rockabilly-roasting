@@ -97,7 +97,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Hiri Admin</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"/static/js/htmx.min.js\"></script></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-stone-900/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-hiri-surface px-6 pb-4 border-r border-hiri-border\"><div class=\"flex h-16 shrink-0 items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Hiri Admin</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/hiri-favicon.svg\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"/static/js/htmx.min.js\"></script></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-stone-900/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-hiri-surface px-6 pb-4 border-r border-hiri-border\"><div class=\"flex h-16 shrink-0 items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -126,7 +126,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var4 templ.SafeURL
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 95, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 96, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -156,7 +156,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 97, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 98, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -234,7 +234,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var10 templ.SafeURL
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 130, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 131, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -268,7 +268,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 132, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 133, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -316,7 +316,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 168, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 169, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -329,7 +329,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 171, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 172, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -372,7 +372,7 @@ func adminLogo() templ.Component {
 			templ_7745c5c3_Var17 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<a href=\"/admin\" class=\"flex items-center gap-2\"><svg width=\"32\" height=\"32\" viewBox=\"0 0 64 64\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M32 8 L22 52 L32 44 L42 52 Z\" fill=\"#2D7A7A\" opacity=\"0.35\"></path> <path d=\"M36 6 L26 50 L36 42 L46 50 Z\" fill=\"#2D7A7A\"></path></svg> <span data-sidebar-label class=\"hidden opacity-0 text-lg font-semibold tracking-tight text-stone-900 transition-opacity duration-200\">hiri</span></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<a href=\"/admin\" class=\"flex items-center gap-2\"><svg width=\"32\" height=\"25\" viewBox=\"0 0 56 44\" fill=\"none\"><path d=\"M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z\" fill=\"#2D7A7A\" opacity=\"0.35\"></path> <path d=\"M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z\" fill=\"#2D7A7A\"></path></svg> <span class=\"text-lg font-semibold tracking-tight text-stone-900\">hiri</span></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -401,7 +401,7 @@ func adminSidebarToggle() templ.Component {
 			templ_7745c5c3_Var18 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<button type=\"button\" onclick=\"toggleSidebar()\" class=\"flex items-center gap-2 rounded-md p-1 -ml-1 text-stone-500 hover:text-stone-700 hover:bg-stone-100 transition-colors\"><!-- Menu icon: shown when collapsed --><svg id=\"sidebar-menu-icon\" class=\"size-8\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg><!-- Logo: shown when expanded --><svg id=\"sidebar-logo-icon\" class=\"hidden\" width=\"32\" height=\"32\" viewBox=\"0 0 64 64\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M32 8 L22 52 L32 44 L42 52 Z\" fill=\"#2D7A7A\" opacity=\"0.35\"></path> <path d=\"M36 6 L26 50 L36 42 L46 50 Z\" fill=\"#2D7A7A\"></path></svg> <span data-sidebar-label class=\"hidden opacity-0 text-lg font-semibold tracking-tight text-stone-900 transition-opacity duration-200\">hiri</span></button>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<button type=\"button\" onclick=\"toggleSidebar()\" class=\"group flex w-full gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-hiri-teal transition-colors\"><!-- Menu icon: shown when collapsed --><svg id=\"sidebar-menu-icon\" class=\"size-6 shrink-0 text-stone-400 group-hover:text-hiri-teal\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg><!-- Logo mark: shown when expanded --><svg id=\"sidebar-logo-icon\" class=\"hidden size-6 shrink-0\" viewBox=\"0 0 56 44\" fill=\"none\"><path d=\"M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z\" fill=\"#2D7A7A\" opacity=\"0.35\"></path> <path d=\"M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z\" fill=\"#2D7A7A\"></path></svg> <span data-sidebar-label class=\"hidden opacity-0 text-lg font-semibold tracking-tight text-stone-900 transition-opacity duration-200\">hiri</span></button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -437,7 +437,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 371, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 372, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -450,7 +450,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 374, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 375, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -463,7 +463,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 375, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 376, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {

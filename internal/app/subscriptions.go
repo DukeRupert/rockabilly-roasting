@@ -98,6 +98,15 @@ func (s *SubscriptionService) GetPlan(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return plan, nil
 }
 
+// ListSubscriptionOrders returns all orders for a subscription.
+func (s *SubscriptionService) ListSubscriptionOrders(ctx context.Context, tx pgx.Tx, subscriptionID uuid.UUID) ([]domain.SubscriptionOrder, error) {
+	orders, err := s.subscriptions.ListSubscriptionOrders(ctx, tx, subscriptionID)
+	if err != nil {
+		return nil, fmt.Errorf("list subscription orders: %w", err)
+	}
+	return orders, nil
+}
+
 // ListDueForRenewal returns active subscriptions due for renewal.
 func (s *SubscriptionService) ListDueForRenewal(ctx context.Context, tx pgx.Tx) ([]domain.Subscription, error) {
 	subs, err := s.subscriptions.ListDueForRenewal(ctx, tx)

@@ -96,6 +96,8 @@ func run() error {
 	pricingSvc := app.NewPricingService(pricingStore)
 	cartSvc := app.NewCartService(cartStore, pricingStore)
 	authSvc := app.NewAuthService(customerStore, sessionMgr, limiter, auditWriter, metricsReg)
+	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, paymentProvider, auditWriter, metricsReg)
+	_ = renewalSvc // TODO: wire into River job workers
 
 	// Router
 	deps := &web.Deps{

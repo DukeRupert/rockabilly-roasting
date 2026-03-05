@@ -84,6 +84,7 @@ templ ProductForm(props ProductFormProps) {
 								value={ productVal(props.Product, "title") }
 								placeholder="Product title"
 								required
+								oninput="var s=document.getElementById('slug');if(!s.dataset.edited){s.value=this.value.toLowerCase().trim().replace(/[^\w\s-]/g,'').replace(/[\s_]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'')}"
 								class={ inputClasses(hasError(props.Errors, "title")) }
 							/>
 						</div>
@@ -102,6 +103,7 @@ templ ProductForm(props ProductFormProps) {
 								value={ productVal(props.Product, "slug") }
 								placeholder="product-slug"
 								required
+								oninput="this.dataset.edited='true'"
 								class={ inputClasses(hasError(props.Errors, "slug")) }
 							/>
 						</div>

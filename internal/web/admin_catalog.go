@@ -3,7 +3,9 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +16,18 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/admin"
 	"github.com/jackc/pgx/v5"
 )
+
+var nonAlphanumDash = regexp.MustCompile(`[^\w-]+`)
+var multiDash = regexp.MustCompile(`-{2,}`)
+
+// slugify converts a string to a URL-friendly slug.
+func slugify(s string) string {
+	slug := strings.ToLower(strings.TrimSpace(s))
+	slug = nonAlphanumDash.ReplaceAllString(slug, "-")
+	slug = multiDash.ReplaceAllString(slug, "-")
+	slug = strings.Trim(slug, "-")
+	return slug
+}
 
 // devActor returns a placeholder actor until auth is wired.
 func devActor() app.Actor {
@@ -132,9 +146,14 @@ func (d *Deps) handleAdminProductCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	slug := r.FormValue("slug")
+	if slug == "" {
+		slug = slugify(r.FormValue("title"))
+	}
+
 	params := store.CreateProductParams{
 		Title:       r.FormValue("title"),
-		Slug:        r.FormValue("slug"),
+		Slug:        slug,
 		Description: r.FormValue("description"),
 		Status:      domain.ProductStatusDraft,
 	}

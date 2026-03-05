@@ -18,27 +18,32 @@ Hiri is a green-field single-merchant ecommerce platform written in Go. It deplo
 
 ## Build & Run Commands
 
+This project uses [Mage](https://magefile.org/) as a Go-native task runner. Install with `go install github.com/magefile/mage@latest`. Targets are defined in `magefiles/mage.go`.
+
 ```bash
-# Build the server
-go build ./cmd/server
+mage              # build server (default target)
+mage test         # run all tests
+mage testVerbose  # run tests with verbose output
+mage lint         # run static analysis (go vet)
+mage check        # lint + test (CI gate)
+mage generate     # run go generate ./...
+mage clean        # remove build artifacts
 
-# Run tests
-go test ./...
+# Database migrations (require DATABASE_URL)
+mage db:migrate   # run pending migrations
+mage db:rollback  # roll back last migration
+mage db:status    # show migration status
+mage db:create <name>  # create new migration file
 
-# Run a single test
+# Development tools
+mage dev:templ    # generate templ templates
+mage dev:checkout # build Svelte checkout bundle
+
+# Run a single test (use go test directly)
 go test ./internal/app/ -run TestOrderRefund
 
-# Generate templ templates
-templ generate
-
-# Build checkout Svelte bundle
-cd ui/checkout && npm run build
-
-# Run migrations
-goose -dir db/migrations postgres "$DATABASE_URL" up
-
-# Generate mocks
-go generate ./...
+# List all targets
+mage -l
 ```
 
 ## Architecture — Strict Layered Packages

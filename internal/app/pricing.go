@@ -53,6 +53,15 @@ func (s *PricingService) SetBasePrice(ctx context.Context, tx pgx.Tx, variantID 
 	return price, nil
 }
 
+// GetOrCreatePriceSet returns the price set for a variant, creating one if needed.
+func (s *PricingService) GetOrCreatePriceSet(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) (*domain.PriceSet, error) {
+	ps, err := s.pricing.GetOrCreatePriceSet(ctx, tx, variantID)
+	if err != nil {
+		return nil, fmt.Errorf("get or create price set: %w", err)
+	}
+	return ps, nil
+}
+
 // ListBasePricesByProduct returns base prices for all variants of a product, keyed by variant ID.
 func (s *PricingService) ListBasePricesByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID, currencyCode string) (map[uuid.UUID]int, error) {
 	prices, err := s.pricing.ListBasePricesByProduct(ctx, tx, productID, currencyCode)

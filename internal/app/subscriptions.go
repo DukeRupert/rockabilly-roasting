@@ -125,7 +125,72 @@ func (s *SubscriptionService) ListDueForRenewal(ctx context.Context, tx pgx.Tx) 
 	return subs, nil
 }
 
-// --- Mutation methods ---
+// --- Plan mutation methods ---
+
+// CreatePlanParams holds the input needed to create a subscription plan.
+type CreatePlanParams struct {
+	Name          string
+	Interval      domain.SubscriptionInterval
+	IntervalCount int
+	VariantID     uuid.UUID
+	PriceSetID    uuid.UUID
+}
+
+// CreatePlan creates a new subscription plan.
+func (s *SubscriptionService) CreatePlan(ctx context.Context, tx pgx.Tx, p CreatePlanParams, actor Actor) (*domain.SubscriptionPlan, error) {
+	plan, err := s.subscriptions.CreatePlan(ctx, tx, store.CreatePlanParams{
+		Name:          p.Name,
+		Interval:      p.Interval,
+		IntervalCount: p.IntervalCount,
+		VariantID:     p.VariantID,
+		PriceSetID:    p.PriceSetID,
+		IsActive:      true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create subscription plan: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditPlanCreated,
+		ResourceType: "subscription_plan",
+		ResourceID:   plan.ID,
+		After:        plan,
+	}); err != nil {
+		return nil, fmt.Errorf("audit plan created: %w", err)
+	}
+
+	return plan, nil
+}
+
+// UpdatePlanActive activates or deactivates a subscription plan.
+func (s *SubscriptionService) UpdatePlanActive(ctx context.Context, tx pgx.Tx, id uuid.UUID, isActive bool, actor Actor) error {
+	if err := s.subscriptions.UpdatePlanActive(ctx, tx, id, isActive); err != nil {
+		return fmt.Errorf("update plan active: %w", err)
+	}
+
+	action := audit.AuditPlanDeactivated
+	if isActive {
+		action = audit.AuditPlanActivated
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       action,
+		ResourceType: "subscription_plan",
+		ResourceID:   id,
+	}); err != nil {
+		return fmt.Errorf("audit plan active update: %w", err)
+	}
+
+	return nil
+}
+
+// --- Subscription mutation methods ---
 
 // CreateSubscriptionParams holds all input needed to create a subscription.
 type CreateSubscriptionParams struct {

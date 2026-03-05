@@ -342,7 +342,8 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 						</div>
 					</div>
 					<div class="w-24">
-						<label for="variant_weight" class="block text-sm/6 font-medium text-stone-900">Weight</label>
+						<!-- TODO: unit should come from a global weight-unit setting in the admin settings panel -->
+						<label for="variant_weight" class="block text-sm/6 font-medium text-stone-900">Weight (g)</label>
 						<div class="mt-2">
 							<input type="number" id="variant_weight" name="weight_grams" placeholder="0" class={ inputClasses(false) }/>
 						</div>

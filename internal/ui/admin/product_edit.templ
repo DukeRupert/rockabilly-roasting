@@ -21,13 +21,7 @@ type ProductEditProps struct {
 	Flash    string
 }
 
-templ ProductEdit(props ProductEditProps) {
-	@layouts.Admin(layouts.AdminProps{
-		Title:      props.Product.Title + " - Edit",
-		ActivePath: "/admin/catalog",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
-	}) {
+templ ProductEditContent(props ProductEditProps) {
 		<!-- Page header -->
 		<div class="sm:flex sm:items-center">
 			<div class="sm:flex-auto">
@@ -264,5 +258,15 @@ templ ProductEdit(props ProductEditProps) {
 				</div>
 			</div>
 		</div>
+}
+
+templ ProductEdit(props ProductEditProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      props.Product.Title + " - Edit",
+		ActivePath: "/admin/catalog",
+		StaffName:  "Dev User",
+		StaffRole:  "admin",
+	}) {
+		@ProductEditContent(props)
 	}
 }

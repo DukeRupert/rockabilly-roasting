@@ -1,0 +1,50 @@
+package admin
+
+import (
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type ProductNewProps struct {
+	Product *domain.Product
+	Taxons  []domain.Taxon
+	Errors  map[string]string
+}
+
+templ ProductNewContent(props ProductNewProps) {
+	<!-- Page header -->
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="text-base/7 font-semibold text-stone-900">New Product</h1>
+			<p class="mt-1 text-sm text-stone-500">Create a new product in your catalog</p>
+		</div>
+		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+			<a
+				href="/admin/catalog"
+				class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+			>
+				Back to products
+			</a>
+		</div>
+	</div>
+	<div class="mt-6">
+		@ProductForm(ProductFormProps{
+			Product: props.Product,
+			IsNew:   true,
+			Taxons:  props.Taxons,
+			Errors:  props.Errors,
+			Action:  "/admin/catalog",
+		})
+	</div>
+}
+
+templ ProductNew(props ProductNewProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "New Product",
+		ActivePath: "/admin/catalog",
+		StaffName:  "Dev User",
+		StaffRole:  "admin",
+	}) {
+		@ProductNewContent(props)
+	}
+}

@@ -81,7 +81,7 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 		taxonMap[t.ID] = t.Name
 	}
 
-	admin.ProductList(admin.ProductListProps{
+	props := admin.ProductListProps{
 		Products:     products,
 		Taxons:       taxons,
 		TaxonMap:     taxonMap,
@@ -90,7 +90,12 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 		Page:         page,
 		PerPage:      perPage,
 		HasMore:      hasMore,
-	}).Render(ctx, w) //nolint:errcheck
+	}
+	if IsHTMX(r) {
+		admin.ProductListContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.ProductList(props).Render(ctx, w) //nolint:errcheck
 }
 
 // --- Create Product ---
@@ -109,11 +114,14 @@ func (d *Deps) handleAdminProductNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	admin.ProductForm(admin.ProductFormProps{
-		IsNew:  true,
+	props := admin.ProductNewProps{
 		Taxons: taxons,
-		Action: "/admin/catalog",
-	}).Render(ctx, w) //nolint:errcheck
+	}
+	if IsHTMX(r) {
+		admin.ProductNewContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.ProductNew(props).Render(ctx, w) //nolint:errcheck
 }
 
 func (d *Deps) handleAdminProductCreate(w http.ResponseWriter, r *http.Request) {
@@ -170,12 +178,10 @@ func (d *Deps) handleAdminProductCreate(w http.ResponseWriter, r *http.Request) 
 			Description: params.Description,
 			TaxonID:     params.TaxonID,
 		}
-		admin.ProductForm(admin.ProductFormProps{
+		admin.ProductNew(admin.ProductNewProps{
 			Product: &p,
-			IsNew:   true,
 			Taxons:  taxons,
 			Errors:  errs,
-			Action:  "/admin/catalog",
 		}).Render(ctx, w) //nolint:errcheck
 		return
 	}
@@ -245,13 +251,18 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	admin.ProductEdit(admin.ProductEditProps{
+	props := admin.ProductEditProps{
 		Product:  product,
 		Taxons:   taxons,
 		Variants: variants,
 		Options:  options,
 		Flash:    r.URL.Query().Get("flash"),
-	}).Render(ctx, w) //nolint:errcheck
+	}
+	if IsHTMX(r) {
+		admin.ProductEditContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.ProductEdit(props).Render(ctx, w) //nolint:errcheck
 }
 
 func (d *Deps) handleAdminProductUpdate(w http.ResponseWriter, r *http.Request) {
@@ -621,11 +632,16 @@ func (d *Deps) handleAdminCategoryList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	admin.CategoryList(admin.CategoryListProps{
+	props := admin.CategoryListProps{
 		Taxons:  taxons,
 		Flash:   r.URL.Query().Get("flash"),
 		Editing: editing,
-	}).Render(ctx, w) //nolint:errcheck
+	}
+	if IsHTMX(r) {
+		admin.CategoryListContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.CategoryList(props).Render(ctx, w) //nolint:errcheck
 }
 
 func (d *Deps) handleAdminCategoryCreate(w http.ResponseWriter, r *http.Request) {

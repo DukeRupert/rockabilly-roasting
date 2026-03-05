@@ -13,13 +13,7 @@ type CategoryListProps struct {
 	Editing *domain.Taxon
 }
 
-templ CategoryList(props CategoryListProps) {
-	@layouts.Admin(layouts.AdminProps{
-		Title:      "Categories",
-		ActivePath: "/admin/catalog",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
-	}) {
+templ CategoryListContent(props CategoryListProps) {
 		<!-- Page header -->
 		<div class="sm:flex sm:items-center">
 			<div class="sm:flex-auto">
@@ -167,5 +161,15 @@ templ CategoryList(props CategoryListProps) {
 				</div>
 			</div>
 		</div>
+}
+
+templ CategoryList(props CategoryListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Categories",
+		ActivePath: "/admin/catalog",
+		StaffName:  "Dev User",
+		StaffRole:  "admin",
+	}) {
+		@CategoryListContent(props)
 	}
 }

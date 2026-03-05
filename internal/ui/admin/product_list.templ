@@ -18,13 +18,7 @@ type ProductListProps struct {
 	HasMore      bool
 }
 
-templ ProductList(props ProductListProps) {
-	@layouts.Admin(layouts.AdminProps{
-		Title:      "Products",
-		ActivePath: "/admin/catalog",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
-	}) {
+templ ProductListContent(props ProductListProps) {
 		<!-- Page header -->
 		<div class="sm:flex sm:items-center">
 			<div class="sm:flex-auto">
@@ -158,5 +152,15 @@ templ ProductList(props ProductListProps) {
 				</nav>
 			}
 		</div>
+}
+
+templ ProductList(props ProductListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Products",
+		ActivePath: "/admin/catalog",
+		StaffName:  "Dev User",
+		StaffRole:  "admin",
+	}) {
+		@ProductListContent(props)
 	}
 }

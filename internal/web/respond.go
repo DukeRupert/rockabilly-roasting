@@ -9,6 +9,11 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/logging"
 )
 
+// IsHTMX returns true if the request was made by htmx.
+func IsHTMX(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true"
+}
+
 // JSON writes a JSON response with the given status code.
 func JSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

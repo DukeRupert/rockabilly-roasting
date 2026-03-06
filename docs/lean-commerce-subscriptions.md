@@ -110,7 +110,7 @@ Customer          1 ←——— N  Subscription
 Subscription      1 ←——— N  Order         (via SubscriptionOrder)
 ```
 
-A customer can have multiple active subscriptions (e.g. two different coffees on different schedules). Each subscription generates independent renewal orders.
+A customer can have multiple active subscriptions (e.g. two different coffees on different schedules). When multiple subscriptions share the same customer and shipping address and come due on the same day, the renewal scheduler batches them into a single order with multiple line items and one Stripe charge. See `docs/batched-subscription-renewals.md` for the full design.
 
 ---
 
@@ -143,26 +143,36 @@ A customer can have multiple active subscriptions (e.g. two different coffees on
 - **cancelled** — terminal state
 - **expired** — terminal state (reserved for fixed-term subscriptions)
 
-### Renewal Flow
+### Renewal Flow (Batched)
 
-1. River worker polls `ListDueForRenewal()` — finds subscriptions where `next_order_at <= now()` and status is `active`
-2. For each subscription:
-   a. Look up the variant's current base price
-   b. Apply `plan.discount_pct` to compute the effective price
-   c. Create a Stripe PaymentIntent (off-session, using saved payment method)
-   d. Create an Order with line items
-   e. Link via SubscriptionOrder
-   f. Advance the subscription period (`current_period_start`, `current_period_end`, `next_order_at`)
-3. On payment failure: mark subscription `past_due`, enqueue retry job
-4. On retry success: restore to `active`
+When multiple subscriptions for the same customer and shipping address come due on the same day, they are batched into a single order with one Stripe charge.
+
+1. River periodic job (`RenewalScheduler`) polls `ListDueForRenewal()` — finds subscriptions where `next_order_at <= now()` and status is `active`
+2. Groups results by `(customer_id, shipping_address_id)` into batches
+3. Enqueues one `BatchRenewalArgs` job per group (containing all subscription IDs)
+4. `BatchRenewalWorker` calls `RenewalService.RenewBatch()`:
+   a. For each subscription: look up variant price, apply `plan.discount_pct`, compute line total (`unit_price * quantity`)
+   b. Sum all line totals for the order total
+   c. Create a single Stripe PaymentIntent (off-session) for the total amount
+   d. Create one Order with one LineItem per subscription
+   e. Link each subscription via `subscription_orders`
+   f. Advance each subscription's period independently (plans may differ)
+5. On payment failure: mark all subscriptions in the batch `past_due`
+6. On retry success: restore to `active`
+
+Single-subscription batches delegate to the existing `RenewSubscription` method for backwards compatibility.
+
+For the full batched renewal design, see `docs/batched-subscription-renewals.md`.
 
 ### Checkout Flow (New Subscription)
 
-1. Customer visits a subscribable product page, sees "Subscribe & Save" options
-2. Customer clicks a plan → routed to `/subscribe?plan_id=X&variant_id=Y`
-3. Subscribe page shows plan summary with discounted price
+1. Customer visits a subscribable product page, sees "Subscribe & Save" options with quantity selector
+2. Customer picks a plan and quantity → routed to `/subscribe?plan_id=X&variant_id=Y&quantity=N`
+3. Subscribe page shows plan summary with discounted price × quantity
 4. Svelte checkout component creates a PaymentIntent with setup for future use
 5. On payment confirmation: create Subscription + initial Order in one transaction
+
+Each subscription is single-product. Customers who want multiple products subscribe separately — the system batches them into one order at renewal time (see Renewal Flow above).
 
 ---
 
@@ -213,7 +223,7 @@ These are noted but not yet implemented:
 - **Product swaps:** Customer self-service to change the variant on an active subscription
 - **Frequency changes:** Customer self-service to switch plans on an active subscription
 - **Skip a delivery:** Pause for exactly one period, then auto-resume
-- **Quantity changes:** Subscribe to multiple units per delivery
+- **Customer self-service portal:** View all subscriptions, see next delivery date with all batched products
 - **Gift subscriptions:** Fixed-term subscriptions purchased for another person
 - **Win-back flows:** Re-engagement emails for cancelled subscriptions
 - **Migration tooling:** Import existing WooCommerce subscriptions with saved payment methods

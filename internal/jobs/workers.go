@@ -30,6 +30,15 @@ type SubscriptionRenewalArgs struct {
 // Kind returns the job kind identifier.
 func (SubscriptionRenewalArgs) Kind() string { return "subscription_renewal" }
 
+// BatchRenewalArgs triggers a batched renewal for multiple subscriptions
+// belonging to the same customer and shipping address.
+type BatchRenewalArgs struct {
+	SubscriptionIDs []uuid.UUID `json:"subscription_ids"`
+}
+
+// Kind returns the job kind identifier.
+func (BatchRenewalArgs) Kind() string { return "batch_renewal" }
+
 // PaymentRetryArgs retries a failed payment.
 type PaymentRetryArgs struct {
 	OrderID uuid.UUID `json:"order_id"`

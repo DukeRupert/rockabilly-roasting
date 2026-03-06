@@ -94,12 +94,15 @@ Implement subscription creation, renewal, and management.
 - Plan discount applied to renewal charges
 - Renewal jobs permanently cancelled for inactive/missing subscriptions (no retry spam)
 - Full lifecycle validated with Stripe test mode: subscribe → renew → pause → resume → renew → cancel
+- Subscription quantity support (1–10 units per subscription)
+- Batched renewals: multiple subscriptions for the same customer + address are consolidated into a single order with one Stripe charge (see `docs/batched-subscription-renewals.md`)
 
 **Remaining:**
 - `PaymentRetry` River worker — retry failed subscription payments
 - Customer self-service portal (change variant, change frequency, skip)
 - Revert scheduler interval from 1 minute back to 1 hour for production
 - Remove `every_2_minutes` dev-only interval before production
+- Validate batched renewals end-to-end with Stripe test mode
 
 **Depends on:** Phase 4
 

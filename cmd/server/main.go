@@ -105,6 +105,7 @@ func run() error {
 	// River job workers
 	workers := river.NewWorkers()
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool))
+	river.AddWorker(workers, jobs.NewBatchRenewalWorker(renewalSvc, pool))
 
 	// River client — we create it first, then pass it to the scheduler worker
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -19,7 +20,7 @@ type RenewalSchedulerArgs struct{}
 // Kind returns the job kind identifier.
 func (RenewalSchedulerArgs) Kind() string { return "renewal_scheduler" }
 
-// RenewalSchedulerWorker finds due subscriptions and enqueues individual renewal jobs.
+// RenewalSchedulerWorker finds due subscriptions and enqueues batched renewal jobs.
 type RenewalSchedulerWorker struct {
 	river.WorkerDefaults[RenewalSchedulerArgs]
 	subscriptionSvc *app.SubscriptionService
@@ -40,25 +41,44 @@ func NewRenewalSchedulerWorker(
 	}
 }
 
-// Work scans for due subscriptions and enqueues renewal jobs.
+// batchKey groups subscriptions by customer and shipping address so they
+// can be consolidated into a single renewal order.
+type batchKey struct {
+	CustomerID        uuid.UUID
+	ShippingAddressID uuid.UUID
+}
+
+// Work scans for due subscriptions, groups them by customer + address,
+// and enqueues one batch renewal job per group.
 func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalSchedulerArgs]) error {
 	logger := slog.Default()
 
-	var count int
+	var batchCount int
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		subs, txErr := w.subscriptionSvc.ListDueForRenewal(ctx, tx)
 		if txErr != nil {
 			return fmt.Errorf("list due subscriptions: %w", txErr)
 		}
 
+		// Group by (customer_id, shipping_address_id)
+		batches := make(map[batchKey][]uuid.UUID)
 		for _, sub := range subs {
-			_, txErr = w.client.InsertTx(ctx, tx, SubscriptionRenewalArgs{
-				SubscriptionID: sub.ID,
+			key := batchKey{
+				CustomerID:        sub.CustomerID,
+				ShippingAddressID: sub.ShippingAddressID,
+			}
+			batches[key] = append(batches[key], sub.ID)
+		}
+
+		// Enqueue one batch job per group
+		for _, subIDs := range batches {
+			_, txErr = w.client.InsertTx(ctx, tx, BatchRenewalArgs{
+				SubscriptionIDs: subIDs,
 			}, nil)
 			if txErr != nil {
-				return fmt.Errorf("enqueue renewal for %s: %w", sub.ID, txErr)
+				return fmt.Errorf("enqueue batch renewal: %w", txErr)
 			}
-			count++
+			batchCount++
 		}
 
 		return nil
@@ -67,8 +87,8 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 		return err
 	}
 
-	if count > 0 {
-		logger.Info("enqueued subscription renewals", "count", count)
+	if batchCount > 0 {
+		logger.Info("enqueued subscription renewal batches", "count", batchCount)
 	}
 	return nil
 }

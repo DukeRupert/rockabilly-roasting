@@ -129,6 +129,97 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 	storefront.CatalogPage(props).Render(ctx, w) //nolint:errcheck
 }
 
+// handleSubscriptionsPage renders the subscriptions landing page.
+func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	subscribable := true
+	activeStatus := domain.ProductStatusActive
+	filter := store.ProductFilter{
+		Status:       &activeStatus,
+		Subscribable: &subscribable,
+		Limit:        50,
+	}
+
+	var products []domain.Product
+	var plans []domain.SubscriptionPlan
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		products, txErr = d.CatalogService.ListProducts(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+		plans, txErr = d.SubscriptionService.ListActivePlans(ctx, tx)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	// Compute max discount across plans
+	maxDiscount := 0
+	for _, p := range plans {
+		if p.DiscountPct > maxDiscount {
+			maxDiscount = p.DiscountPct
+		}
+	}
+
+	cards := make([]storefront.SubscriptionProductCard, len(products))
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		for i, p := range products {
+			cards[i] = storefront.SubscriptionProductCard{
+				Product:     p,
+				MaxDiscount: maxDiscount,
+			}
+
+			media, mediaErr := d.CatalogService.ListProductMedia(ctx, tx, p.ID)
+			if mediaErr != nil {
+				return mediaErr
+			}
+			if len(media) > 0 {
+				cards[i].ThumbnailURL = media[0].URL
+			}
+
+			variants, varErr := d.CatalogService.ListVariants(ctx, tx, p.ID)
+			if varErr != nil {
+				return varErr
+			}
+			for _, v := range variants {
+				if v.IsDefault {
+					price, priceErr := d.PricingService.GetBasePrice(ctx, tx, v.ID, "USD")
+					if priceErr != nil {
+						if errors.Is(priceErr, app.ErrPriceNotFound) {
+							break
+						}
+						return priceErr
+					}
+					cards[i].BasePrice = &price.Amount
+					break
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	props := storefront.SubscriptionsPageProps{
+		Products:  cards,
+		Plans:     plans,
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+
+	if IsHTMX(r) {
+		storefront.SubscriptionsContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	storefront.SubscriptionsPage(props).Render(ctx, w) //nolint:errcheck
+}
+
 // handleStorefrontProduct renders a single product detail page.
 func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

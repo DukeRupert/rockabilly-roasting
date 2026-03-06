@@ -59,6 +59,9 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /cart/update", deps.handleCartUpdateQuantity)
 	mux.HandleFunc("POST /cart/remove", deps.handleCartRemoveItem)
 
+	// Subscriptions landing page
+	mux.HandleFunc("GET /subscriptions", deps.handleSubscriptionsPage)
+
 	// Subscribe routes
 	mux.HandleFunc("GET /subscribe", deps.handleSubscribePage)
 	mux.HandleFunc("POST /api/subscribe/payment-intent", deps.handleSubscribePaymentIntent)

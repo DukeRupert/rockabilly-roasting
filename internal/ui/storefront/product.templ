@@ -440,6 +440,13 @@ templ purchaseModeScript() {
 				return '$' + (cents / 100).toFixed(2);
 			}
 
+			// Auto-activate subscribe mode if ?mode=subscribe is present
+			var params = new URLSearchParams(window.location.search);
+			if (params.get('mode') === 'subscribe') {
+				var subscribeTab = document.querySelector('.purchase-mode-btn[data-mode="subscribe"]');
+				if (subscribeTab) subscribeTab.click();
+			}
+
 			// Initialize button states
 			updateQtyButtons();
 		})();

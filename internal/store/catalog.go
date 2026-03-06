@@ -148,10 +148,11 @@ func (s *CatalogStore) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUI
 
 // ProductFilter holds optional filters for listing products.
 type ProductFilter struct {
-	Status  *domain.ProductStatus
-	TaxonID *uuid.UUID
-	Limit   int
-	Offset  int
+	Status       *domain.ProductStatus
+	TaxonID      *uuid.UUID
+	Subscribable *bool
+	Limit        int
+	Offset       int
 }
 
 // ListProducts returns products matching the given filter (hand-written for dynamic WHERE).
@@ -170,6 +171,11 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 	if f.TaxonID != nil {
 		query += fmt.Sprintf(" AND taxon_id = $%d", argN)
 		args = append(args, *f.TaxonID)
+		argN++
+	}
+	if f.Subscribable != nil {
+		query += fmt.Sprintf(" AND subscribable = $%d", argN)
+		args = append(args, *f.Subscribable)
 		argN++
 	}
 

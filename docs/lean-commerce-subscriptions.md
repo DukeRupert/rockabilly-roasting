@@ -200,9 +200,10 @@ Each subscription is single-product. Customers who want multiple products subscr
 
 ## Storefront Behavior
 
-- **Product page:** If `product.subscribable == true`, a "Subscribe & Save" section appears below "Add to Cart" showing all active plans with their discounts
-- **Subscribe links** include both `plan_id` and `variant_id` so the subscription is tied to the specific variant the customer is viewing
-- **Price display:** Shows the discounted price (base price minus plan discount percentage)
+- **Subscriptions landing page** (`/subscriptions`): Shows all subscribable products with strikethrough original price and discounted price (using the max discount across plans). Product cards deep-link to the product detail page with `?mode=subscribe` to auto-activate the subscribe tab
+- **Product page:** If `product.subscribable == true`, a "Subscribe & Save" section appears below "Add to Cart" showing all active plans with their discounts. The subscribe tab auto-activates when `?mode=subscribe` is in the URL
+- **Subscribe links** include `plan_id`, `variant_id`, and `quantity` so the subscription is tied to the specific variant and quantity the customer selected
+- **Price display:** Shows the discounted price (base price minus plan discount percentage), with quantity multiplier when qty > 1
 
 ---
 

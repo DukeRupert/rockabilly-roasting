@@ -82,4 +82,16 @@ var (
 
 	// Slug errors
 	ErrSlugAlreadyExists = errors.New("slug already exists")
+
+	// Wholesale errors
+	ErrWholesaleNotApproved = errors.New("wholesale account is not approved")
+	ErrWholesaleNotPending  = errors.New("wholesale application is not pending")
+	ErrMOQViolation         = errors.New("minimum order quantity not met")
+
+	// Invoice errors
+	ErrInvoiceNotFound    = errors.New("invoice not found")
+	ErrOrderNotInvoiceable = errors.New("order cannot be invoiced")
+	ErrInvoiceNotPayable  = errors.New("invoice cannot accept payments")
+	ErrInvoiceNotSendable = errors.New("invoice is not in draft status")
+	ErrInvoiceNotVoidable = errors.New("invoice cannot be voided")
 )

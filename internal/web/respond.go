@@ -54,7 +54,8 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrStaffNotFound),
 		errors.Is(err, app.ErrShipmentNotFound),
 		errors.Is(err, app.ErrTaxonNotFound),
-		errors.Is(err, app.ErrPriceNotFound):
+		errors.Is(err, app.ErrPriceNotFound),
+		errors.Is(err, app.ErrInvoiceNotFound):
 		return http.StatusNotFound, "not found"
 
 	case errors.Is(err, app.ErrInvalidCredentials):
@@ -89,7 +90,14 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrStaffInactive),
 		errors.Is(err, app.ErrPaymentFailed),
 		errors.Is(err, app.ErrInvalidPrice),
-		errors.Is(err, app.ErrInvalidQuantity):
+		errors.Is(err, app.ErrInvalidQuantity),
+		errors.Is(err, app.ErrWholesaleNotApproved),
+		errors.Is(err, app.ErrWholesaleNotPending),
+		errors.Is(err, app.ErrMOQViolation),
+		errors.Is(err, app.ErrOrderNotInvoiceable),
+		errors.Is(err, app.ErrInvoiceNotPayable),
+		errors.Is(err, app.ErrInvoiceNotSendable),
+		errors.Is(err, app.ErrInvoiceNotVoidable):
 		return http.StatusUnprocessableEntity, err.Error()
 
 	default:

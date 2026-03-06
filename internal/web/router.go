@@ -30,6 +30,8 @@ type Deps struct {
 	AuthService         *app.AuthService
 	PricingService      *app.PricingService
 	CartService         *app.CartService
+	WholesaleService    *app.WholesaleService
+	InvoiceService      *app.InvoiceService
 	PaymentProvider     payments.Provider
 	WebhookStore        *store.WebhookStore
 	CustomerStore       *store.CustomerStore
@@ -73,6 +75,10 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /api/checkout/address", deps.handleCheckoutAddress)
 	mux.HandleFunc("POST /api/checkout/payment-intent", deps.handleCheckoutPaymentIntent)
 	mux.HandleFunc("POST /api/checkout/confirm", deps.handleCheckoutConfirm)
+
+	// Wholesale application (public)
+	mux.HandleFunc("GET /wholesale/apply", deps.handleWholesaleApplyPage)
+	mux.HandleFunc("POST /wholesale/apply", deps.handleWholesaleApply)
 
 	// Staff auth routes (no session required)
 	mux.HandleFunc("GET /auth/staff/login", deps.handleStaffLoginPage)
@@ -138,6 +144,19 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin discounts
 	adminMux.HandleFunc("GET /admin/discounts", deps.handleAdminDiscountList)
+
+	// Admin wholesale
+	adminMux.HandleFunc("GET /admin/wholesale", deps.handleAdminWholesaleList)
+	adminMux.HandleFunc("POST /admin/wholesale/{id}/approve", deps.handleAdminWholesaleApprove)
+	adminMux.HandleFunc("POST /admin/wholesale/{id}/decline", deps.handleAdminWholesaleDecline)
+	adminMux.HandleFunc("POST /admin/wholesale/{id}/suspend", deps.handleAdminWholesaleSuspend)
+
+	// Admin invoices
+	adminMux.HandleFunc("GET /admin/invoices/{id}", deps.handleAdminInvoiceShow)
+	adminMux.HandleFunc("POST /admin/invoices", deps.handleAdminInvoiceCreate)
+	adminMux.HandleFunc("POST /admin/invoices/{id}/send", deps.handleAdminInvoiceSend)
+	adminMux.HandleFunc("POST /admin/invoices/{id}/payment", deps.handleAdminInvoiceRecordPayment)
+	adminMux.HandleFunc("POST /admin/invoices/{id}/void", deps.handleAdminInvoiceVoid)
 
 	// Staff logout (requires session)
 	adminMux.HandleFunc("POST /auth/staff/logout", deps.handleStaffLogout)

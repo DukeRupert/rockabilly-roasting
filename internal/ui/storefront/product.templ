@@ -39,7 +39,7 @@ templ ProductContent(props ProductDetailProps) {
 			</ol>
 		</nav>
 		<!-- Product layout: 2 columns -->
-		<div class="lg:grid lg:grid-cols-2 lg:gap-x-12">
+		<div class="lg:grid lg:grid-cols-2 lg:gap-x-16">
 			<!-- Image gallery -->
 			<div>
 				if len(props.Media) > 0 {
@@ -135,7 +135,7 @@ templ ProductContent(props ProductDetailProps) {
 							<!-- Subscription frequency options (hidden by default) -->
 							<div id="subscribe-options" class="hidden mt-4">
 								<p class="text-sm font-medium text-hiri-text mb-3">Delivery every</p>
-								<div class="space-y-2">
+								<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
 									for i, plan := range props.SubscriptionPlans {
 										<label
 											class={ "subscribe-frequency-option flex items-center justify-between rounded-lg border p-3 cursor-pointer transition-colors",

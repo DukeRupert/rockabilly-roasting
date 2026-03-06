@@ -70,7 +70,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</li></ol></nav><!-- Product layout: 2 columns --><div class=\"lg:grid lg:grid-cols-2 lg:gap-x-12\"><!-- Image gallery --><div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</li></ol></nav><!-- Product layout: 2 columns --><div class=\"lg:grid lg:grid-cols-2 lg:gap-x-16\"><!-- Image gallery --><div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -318,7 +318,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</span></button></div><!-- Subscription frequency options (hidden by default) --> <div id=\"subscribe-options\" class=\"hidden mt-4\"><p class=\"text-sm font-medium text-hiri-text mb-3\">Delivery every</p><div class=\"space-y-2\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</span></button></div><!-- Subscription frequency options (hidden by default) --> <div id=\"subscribe-options\" class=\"hidden mt-4\"><p class=\"text-sm font-medium text-hiri-text mb-3\">Delivery every</p><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-2\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

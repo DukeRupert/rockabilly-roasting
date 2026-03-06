@@ -186,7 +186,9 @@ func (p *StripeProvider) ListPaymentMethods(_ context.Context, customerID string
 }
 
 func (p *StripeProvider) ConstructWebhookEvent(payload []byte, signature string) (*WebhookEvent, error) {
-	event, err := webhook.ConstructEvent(payload, signature, p.webhookSecret)
+	event, err := webhook.ConstructEventWithOptions(payload, signature, p.webhookSecret, webhook.ConstructEventOptions{
+		IgnoreAPIVersionMismatch: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("verify webhook signature: %w", err)
 	}

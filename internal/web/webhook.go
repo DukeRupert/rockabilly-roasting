@@ -224,31 +224,27 @@ func systemActor() app.Actor {
 // extractPaymentIntentID pulls the PaymentIntent ID from a payment_intent event's data.
 func extractPaymentIntentID(data []byte) (string, error) {
 	var obj struct {
-		Object struct {
-			ID string `json:"id"`
-		} `json:"object"`
+		ID string `json:"id"`
 	}
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return "", fmt.Errorf("unmarshal PI event: %w", err)
 	}
-	if obj.Object.ID == "" {
+	if obj.ID == "" {
 		return "", fmt.Errorf("missing payment_intent ID in event data")
 	}
-	return obj.Object.ID, nil
+	return obj.ID, nil
 }
 
 // extractChargePaymentIntentID pulls the PaymentIntent ID from a charge event's data.
 func extractChargePaymentIntentID(data []byte) (string, error) {
 	var obj struct {
-		Object struct {
-			PaymentIntent string `json:"payment_intent"`
-		} `json:"object"`
+		PaymentIntent string `json:"payment_intent"`
 	}
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return "", fmt.Errorf("unmarshal charge event: %w", err)
 	}
-	if obj.Object.PaymentIntent == "" {
+	if obj.PaymentIntent == "" {
 		return "", fmt.Errorf("missing payment_intent in charge event data")
 	}
-	return obj.Object.PaymentIntent, nil
+	return obj.PaymentIntent, nil
 }

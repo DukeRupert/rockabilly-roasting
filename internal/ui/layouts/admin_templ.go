@@ -36,6 +36,7 @@ func adminNavItems() []navItem {
 		{Label: "Subscriptions", Href: "/admin/subscriptions", IconFn: icon.Repeat},
 		{Label: "Fulfillment", Href: "/admin/fulfillment", IconFn: icon.Truck},
 		{Label: "Discounts", Href: "/admin/discounts", IconFn: icon.Tag},
+		{Label: "Wholesale", Href: "/admin/wholesale", IconFn: icon.Building},
 	}
 }
 
@@ -92,7 +93,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 65, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 66, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -127,7 +128,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var4 templ.SafeURL
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 97, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 98, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -157,7 +158,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 99, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 100, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -235,7 +236,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var10 templ.SafeURL
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 132, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 133, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -269,7 +270,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 134, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 135, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -317,7 +318,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 170, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 171, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -330,7 +331,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 173, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 174, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -438,7 +439,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 373, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 374, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -451,7 +452,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 376, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 377, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -464,7 +465,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 377, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 378, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {

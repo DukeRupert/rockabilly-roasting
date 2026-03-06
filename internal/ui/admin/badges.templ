@@ -120,3 +120,41 @@ func boolBadgeClasses(val bool, trueColor string) string {
 	}
 	return "inline-flex items-center rounded-md bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600 ring-1 ring-inset ring-stone-500/10"
 }
+
+func wholesaleStatusBadgeClasses(status domain.WholesaleStatus) string {
+	switch status {
+	case domain.WholesaleStatusApproved:
+		return "inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+	case domain.WholesaleStatusSuspended:
+		return "inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
+	default:
+		return "inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+	}
+}
+
+templ WholesaleStatusBadge(status domain.WholesaleStatus) {
+	<span class={ wholesaleStatusBadgeClasses(status) }>
+		{ string(status) }
+	</span>
+}
+
+func invoiceStatusBadgeClasses(status domain.InvoiceStatus) string {
+	switch status {
+	case domain.InvoiceStatusPaid:
+		return "inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+	case domain.InvoiceStatusVoid:
+		return "inline-flex items-center rounded-md bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600 ring-1 ring-inset ring-stone-500/10"
+	case domain.InvoiceStatusSent:
+		return "inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20"
+	case domain.InvoiceStatusPartiallyPaid:
+		return "inline-flex items-center rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+	default:
+		return "inline-flex items-center rounded-md bg-stone-100 px-2 py-1 text-xs font-medium text-stone-600 ring-1 ring-inset ring-stone-500/10"
+	}
+}
+
+templ InvoiceStatusBadge(status domain.InvoiceStatus) {
+	<span class={ invoiceStatusBadgeClasses(status) }>
+		{ string(status) }
+	</span>
+}

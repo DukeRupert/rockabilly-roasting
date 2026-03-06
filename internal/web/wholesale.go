@@ -7,14 +7,20 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
 
 // --- Wholesale application (public) ---
 
 func (d *Deps) handleWholesaleApplyPage(w http.ResponseWriter, r *http.Request) {
-	// TODO: Render wholesale application form template.
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte("<h1>Wholesale Application</h1><p>Coming soon.</p>")) //nolint:errcheck
+	props := storefront.WholesaleApplyProps{
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+	if IsHTMX(r) {
+		storefront.WholesaleApplyContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.WholesaleApplyPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
 func (d *Deps) handleWholesaleApply(w http.ResponseWriter, r *http.Request) {
@@ -48,9 +54,7 @@ func (d *Deps) handleWholesaleApply(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// TODO: Enqueue WholesaleApplicationNotifyArgs job.
-	// TODO: Render confirmation page.
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte("<h1>Application Received</h1><p>We'll be in touch within 2 business days.</p>")) //nolint:errcheck
+	storefront.WholesaleApplyConfirmation().Render(r.Context(), w) //nolint:errcheck
 }
 
 // --- Wholesale portal (authenticated, approved wholesale customers) ---

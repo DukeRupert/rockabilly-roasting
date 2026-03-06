@@ -9,6 +9,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/ui/admin"
 )
 
 func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) {
@@ -50,10 +51,21 @@ func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) 
 		customers = customers[:perPage]
 	}
 
-	// TODO: Render admin.WholesaleList / admin.WholesaleListContent template.
-	_ = hasMore
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte("<h1>Wholesale Applications</h1><p>Template pending.</p>")) //nolint:errcheck
+	name, role := staffNameRole(r)
+	props := admin.WholesaleListProps{
+		Customers:    customers,
+		StatusFilter: statusFilter,
+		Page:         page,
+		HasMore:      hasMore,
+		StaffName:    name,
+		StaffRole:    role,
+	}
+
+	if IsHTMX(r) {
+		admin.WholesaleListContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.WholesaleList(props).Render(ctx, w) //nolint:errcheck
 }
 
 func (d *Deps) handleAdminWholesaleApprove(w http.ResponseWriter, r *http.Request) {

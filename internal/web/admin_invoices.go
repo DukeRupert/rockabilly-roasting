@@ -9,6 +9,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/ui/admin"
 )
 
 func (d *Deps) handleAdminInvoiceShow(w http.ResponseWriter, r *http.Request) {
@@ -42,12 +43,20 @@ func (d *Deps) handleAdminInvoiceShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Render admin.InvoiceShow / admin.InvoiceShowContent template.
-	_ = invoice
-	_ = lines
-	_ = payments
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte("<h1>Invoice Detail</h1><p>Template pending.</p>")) //nolint:errcheck
+	name, role := staffNameRole(r)
+	props := admin.InvoiceShowProps{
+		Invoice:   invoice,
+		Lines:     lines,
+		Payments:  payments,
+		StaffName: name,
+		StaffRole: role,
+	}
+
+	if IsHTMX(r) {
+		admin.InvoiceShowContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.InvoiceShow(props).Render(ctx, w) //nolint:errcheck
 }
 
 func (d *Deps) handleAdminInvoiceCreate(w http.ResponseWriter, r *http.Request) {

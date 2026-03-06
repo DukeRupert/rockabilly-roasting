@@ -434,14 +434,44 @@ func CreateCouponCode(t *testing.T, tx pgx.Tx, discountID uuid.UUID, opts ...Cou
 	}
 }
 
+// --- Staff ---
+
+// CreateStaff inserts a staff row and returns its ID.
+func CreateStaff(t *testing.T, tx pgx.Tx) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	_, err := sqlcgen.New(tx).CreateStaff(context.Background(), sqlcgen.CreateStaffParams{
+		ID:           id,
+		Email:        fmt.Sprintf("staff-%s@example.com", uuid.New().String()[:8]),
+		Name:         "Test Staff",
+		PasswordHash: "$2a$10$abcdefghijklmnopqrstuuABCDEFGHIJKLMNOPQRSTUVWX", // dummy hash
+		Role:         "admin",
+	})
+	if err != nil {
+		t.Fatalf("create staff fixture: %v", err)
+	}
+	return id
+}
+
 // --- Test Actor ---
 
 // TestActor returns a staff actor suitable for audit-requiring service methods.
+// NOTE: The actor ID is a random UUID not in the DB. Use TestActorFromStaff when
+// a real staff FK reference is needed (e.g. wholesale approved_by).
 func TestActor() app.Actor {
 	id := uuid.New()
 	return app.Actor{
 		Type: domain.AuditActorTypeStaff,
 		ID:   &id,
+		Name: "Test Staff",
+	}
+}
+
+// TestActorFromStaff returns an actor with the given staff ID (must exist in DB).
+func TestActorFromStaff(staffID uuid.UUID) app.Actor {
+	return app.Actor{
+		Type: domain.AuditActorTypeStaff,
+		ID:   &staffID,
 		Name: "Test Staff",
 	}
 }

@@ -1,0 +1,130 @@
+package storefront
+
+import (
+	"fmt"
+	"github.com/google/uuid"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type WholesaleCheckoutItem struct {
+	VariantID   uuid.UUID
+	ProductName string
+	SKU         string
+	Quantity    int
+	UnitPrice   int
+	LineTotal   int
+}
+
+type WholesaleCheckoutProps struct {
+	CompanyName string
+	Items       []WholesaleCheckoutItem
+	Subtotal    int
+	Error       string
+}
+
+templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
+	<div class="mx-auto max-w-3xl space-y-6">
+		<div>
+			<h1 class="text-2xl font-bold text-hiri-text">Review Order</h1>
+			<p class="mt-1 text-sm text-hiri-text-secondary">
+				Review your wholesale order before submitting.
+			</p>
+		</div>
+		if props.Error != "" {
+			<div class="rounded-md bg-red-50 p-4">
+				<p class="text-sm text-red-700">{ props.Error }</p>
+			</div>
+		}
+		if len(props.Items) == 0 {
+			<div class="rounded-lg border border-hiri-border bg-white p-12 text-center">
+				<p class="text-sm text-hiri-text-secondary">Your order is empty.</p>
+				<a href="/wholesale/portal" class="mt-4 inline-block text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">
+					&larr; Back to Quick Order
+				</a>
+			</div>
+		} else {
+			<div class="rounded-lg border border-hiri-border bg-white overflow-hidden">
+				<table class="min-w-full divide-y divide-hiri-border">
+					<thead>
+						<tr class="bg-stone-50 text-left text-xs font-medium uppercase tracking-wider text-hiri-text-secondary">
+							<th class="px-4 py-3">Product</th>
+							<th class="px-4 py-3">SKU</th>
+							<th class="px-4 py-3 text-right">Unit Price</th>
+							<th class="px-4 py-3 text-center">Qty</th>
+							<th class="px-4 py-3 text-right">Total</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-hiri-border">
+						for _, item := range props.Items {
+							<tr>
+								<td class="px-4 py-3 text-sm text-hiri-text">{ item.ProductName }</td>
+								<td class="px-4 py-3 text-sm font-mono text-hiri-text-secondary">{ item.SKU }</td>
+								<td class="px-4 py-3 text-sm text-right text-hiri-text">{ formatCents(item.UnitPrice) }</td>
+								<td class="px-4 py-3 text-sm text-center text-hiri-text">{ fmt.Sprint(item.Quantity) }</td>
+								<td class="px-4 py-3 text-sm text-right font-medium text-hiri-text">{ formatCents(item.LineTotal) }</td>
+							</tr>
+						}
+					</tbody>
+					<tfoot>
+						<tr class="border-t-2 border-hiri-border bg-stone-50">
+							<td colspan="4" class="px-4 py-3 text-sm font-semibold text-hiri-text text-right">Subtotal</td>
+							<td class="px-4 py-3 text-sm font-bold text-hiri-text text-right">{ formatCents(props.Subtotal) }</td>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+			<form method="post" action="/wholesale/checkout/confirm" class="space-y-4">
+				<!-- Hidden line items -->
+				for _, item := range props.Items {
+					<input type="hidden" name="variant_id" value={ item.VariantID.String() }/>
+					<input type="hidden" name={ fmt.Sprintf("qty[%s]", item.VariantID.String()) } value={ fmt.Sprint(item.Quantity) }/>
+					<input type="hidden" name={ fmt.Sprintf("price[%s]", item.VariantID.String()) } value={ fmt.Sprint(item.UnitPrice) }/>
+				}
+				<div class="rounded-lg border border-hiri-border bg-white p-6 space-y-4">
+					<div>
+						<label for="po_number" class="block text-sm font-medium text-hiri-text">PO Number (optional)</label>
+						<input
+							type="text"
+							name="po_number"
+							id="po_number"
+							placeholder="Enter your purchase order number"
+							class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm"
+						/>
+					</div>
+					<div>
+						<label for="notes" class="block text-sm font-medium text-hiri-text">Order Notes (optional)</label>
+						<textarea
+							name="notes"
+							id="notes"
+							rows="3"
+							placeholder="Any special instructions for this order"
+							class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm"
+						></textarea>
+					</div>
+				</div>
+				<div class="flex items-center justify-between">
+					<a href="/wholesale/portal" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">
+						&larr; Back to Quick Order
+					</a>
+					<button
+						type="submit"
+						class="inline-flex items-center rounded-md bg-hiri-teal px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+					>
+						Place Order
+					</button>
+				</div>
+				<p class="text-xs text-hiri-text-secondary text-center">
+					An invoice will be sent after your order is confirmed. No payment is collected now.
+				</p>
+			</form>
+		}
+	</div>
+}
+
+templ WholesaleCheckoutPage(props WholesaleCheckoutProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title: "Review Order",
+	}) {
+		@WholesaleCheckoutContent(props)
+	}
+}

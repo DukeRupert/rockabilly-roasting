@@ -235,55 +235,131 @@ func (s *WholesaleService) SuspendAccount(ctx context.Context, tx pgx.Tx, custom
 
 // --- Quick order ---
 
-// QuickOrderRow represents a single row in the quick order form.
-type QuickOrderRow struct {
-	ProductID   uuid.UUID
-	ProductName string
-	VariantID   uuid.UUID
-	VariantName string
-	SKU         string
-	UnitPrice   int
-	MinQty      *int
-	Multiple    *int
-	InStock     bool
+// QuickOrderVariant represents a single variant row in the quick order table.
+type QuickOrderVariant struct {
+	ID           uuid.UUID
+	SKU          string
+	OptionValues []string // Values matching the product's option columns
+	UnitPrice    int      // Cents
+	MinQty       *int
+	Multiple     *int
+	InStock      bool
 }
 
-// QuickOrderRows returns all visible variants for a wholesale customer, with pricing applied.
-func (s *WholesaleService) QuickOrderRows(
+// QuickOrderProduct represents a product with all its variants for the quick order page.
+type QuickOrderProduct struct {
+	ID       uuid.UUID
+	Title    string
+	ImageURL string
+	Options  []string // Option column headers (e.g., "Size", "Grind")
+	Variants []QuickOrderVariant
+}
+
+// QuickOrderCatalog returns products grouped with their variants, options, and prices
+// for the wholesale quick order page.
+func (s *WholesaleService) QuickOrderCatalog(
 	ctx context.Context,
 	tx pgx.Tx,
-	visCtx store.VisibilityContext,
-) ([]QuickOrderRow, error) {
-	// Fetch visible products.
+	pricing *PricingService,
+	currencyCode string,
+) ([]QuickOrderProduct, error) {
 	products, err := s.catalog.ListProducts(ctx, tx, store.ProductFilter{
-		Status:     ptrTo(domain.ProductStatusActive),
-		Visibility: &visCtx,
+		Status: ptrTo(domain.ProductStatusActive),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list products: %w", err)
 	}
 
-	var rows []QuickOrderRow
+	result := make([]QuickOrderProduct, 0, len(products))
 	for _, p := range products {
 		variants, err := s.catalog.ListVariantsByProduct(ctx, tx, p.ID)
 		if err != nil {
-			return nil, fmt.Errorf("list variants for product %s: %w", p.ID, err)
+			return nil, fmt.Errorf("list variants for %s: %w", p.ID, err)
 		}
+		if len(variants) == 0 {
+			continue
+		}
+
+		// Load product options for column headers.
+		options, err := s.catalog.ListProductOptions(ctx, tx, p.ID)
+		if err != nil {
+			return nil, fmt.Errorf("list options for %s: %w", p.ID, err)
+		}
+
+		optionNames := make([]string, len(options))
+		// Build option ID -> values map for lookup.
+		optionValueMap := make(map[uuid.UUID]string) // productOptionValueID -> display value
+		for i, opt := range options {
+			optionNames[i] = opt.Name
+			vals, err := s.catalog.ListProductOptionValues(ctx, tx, opt.ID)
+			if err != nil {
+				return nil, fmt.Errorf("list option values for %s: %w", opt.ID, err)
+			}
+			for _, v := range vals {
+				optionValueMap[v.ID] = v.Value
+			}
+		}
+
+		// Load prices for all variants of this product.
+		priceMap, err := pricing.ListBasePricesByProduct(ctx, tx, p.ID, currencyCode)
+		if err != nil {
+			return nil, fmt.Errorf("list prices for %s: %w", p.ID, err)
+		}
+
+		// Load first product image.
+		var imageURL string
+		media, err := s.catalog.ListProductMedia(ctx, tx, p.ID)
+		if err == nil && len(media) > 0 {
+			imageURL = media[0].URL
+		}
+
+		qVariants := make([]QuickOrderVariant, 0, len(variants))
 		for _, v := range variants {
-			rows = append(rows, QuickOrderRow{
-				ProductID:   p.ID,
-				ProductName: p.Title,
-				VariantID:   v.ID,
-				VariantName: v.SKU,
-				SKU:         v.SKU,
-				MinQty:      v.WholesaleMinQty,
-				Multiple:    v.WholesaleMultiple,
-				InStock:     true, // TODO: wire up inventory when available
+			// Load variant option values and map them to display strings in option order.
+			vovs, err := s.catalog.ListVariantOptionValues(ctx, tx, v.ID)
+			if err != nil {
+				return nil, fmt.Errorf("list variant option values for %s: %w", v.ID, err)
+			}
+			vovMap := make(map[uuid.UUID]bool, len(vovs))
+			for _, vov := range vovs {
+				vovMap[vov.ProductOptionValueID] = true
+			}
+
+			// Build option values in the same order as option columns.
+			optValues := make([]string, len(options))
+			for i, opt := range options {
+				vals, _ := s.catalog.ListProductOptionValues(ctx, tx, opt.ID)
+				for _, val := range vals {
+					if vovMap[val.ID] {
+						optValues[i] = val.Value
+						break
+					}
+				}
+			}
+
+			unitPrice := priceMap[v.ID]
+
+			qVariants = append(qVariants, QuickOrderVariant{
+				ID:           v.ID,
+				SKU:          v.SKU,
+				OptionValues: optValues,
+				UnitPrice:    unitPrice,
+				MinQty:       v.WholesaleMinQty,
+				Multiple:     v.WholesaleMultiple,
+				InStock:      true, // TODO: wire up inventory
 			})
 		}
+
+		result = append(result, QuickOrderProduct{
+			ID:       p.ID,
+			Title:    p.Title,
+			ImageURL: imageURL,
+			Options:  optionNames,
+			Variants: qVariants,
+		})
 	}
 
-	return rows, nil
+	return result, nil
 }
 
 // --- Wholesale checkout ---

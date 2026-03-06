@@ -220,12 +220,17 @@ type CreateSubscriptionParams struct {
 	CustomerID        uuid.UUID
 	PlanID            uuid.UUID
 	VariantID         uuid.UUID
+	Quantity          int
 	ShippingAddressID uuid.UUID
 	Metadata          map[string]any
 }
 
 // CreateSubscription creates a new active subscription for a customer.
 func (s *SubscriptionService) CreateSubscription(ctx context.Context, tx pgx.Tx, p CreateSubscriptionParams, actor Actor) (*domain.Subscription, error) {
+	if p.Quantity < 1 || p.Quantity > 10 {
+		return nil, ErrInvalidQuantity
+	}
+
 	plan, err := s.subscriptions.GetPlanByID(ctx, tx, p.PlanID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -244,6 +249,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, tx pgx.Tx,
 		CustomerID:         p.CustomerID,
 		PlanID:             p.PlanID,
 		VariantID:          p.VariantID,
+		Quantity:           p.Quantity,
 		Status:             domain.SubscriptionStatusActive,
 		ShippingAddressID:  p.ShippingAddressID,
 		CurrentPeriodStart: now,

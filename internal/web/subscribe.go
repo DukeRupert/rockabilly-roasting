@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -23,6 +24,7 @@ import (
 type subscribeConfirmRequest struct {
 	PlanID          string `json:"plan_id"`
 	VariantID       string `json:"variant_id"`
+	Quantity        int    `json:"quantity"`
 	Email           string `json:"email"`
 	FirstName       string `json:"first_name"`
 	LastName        string `json:"last_name"`
@@ -48,6 +50,7 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 
 	planIDStr := r.URL.Query().Get("plan_id")
 	variantIDStr := r.URL.Query().Get("variant_id")
+	quantityStr := r.URL.Query().Get("quantity")
 
 	planID, err := uuid.Parse(planIDStr)
 	if err != nil {
@@ -58,6 +61,15 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "invalid variant_id", http.StatusBadRequest)
 		return
+	}
+
+	quantity := 1
+	if quantityStr != "" {
+		quantity, err = strconv.Atoi(quantityStr)
+		if err != nil || quantity < 1 || quantity > 10 {
+			http.Error(w, "invalid quantity", http.StatusBadRequest)
+			return
+		}
 	}
 
 	var plan *domain.SubscriptionPlan
@@ -102,7 +114,8 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.SubscribePageProps{
 		Plan:      plan,
 		VariantID: variantID,
-		Price:     price,
+		Quantity:  quantity,
+		Price:     price * quantity,
 		StripeKey: os.Getenv("STRIPE_PUBLISHABLE_KEY"),
 		CartCount: d.cartItemCountFromCookie(r),
 	}
@@ -122,6 +135,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	var req struct {
 		PlanID     string `json:"plan_id"`
 		VariantID  string `json:"variant_id"`
+		Quantity   int    `json:"quantity"`
 		Email      string `json:"email"`
 		FirstName  string `json:"first_name"`
 		LastName   string `json:"last_name"`
@@ -145,6 +159,12 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	variantID, err := uuid.Parse(req.VariantID)
 	if err != nil {
 		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid variant_id"})
+		return
+	}
+
+	quantity := req.Quantity
+	if quantity < 1 || quantity > 10 {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "quantity must be between 1 and 10"})
 		return
 	}
 
@@ -173,6 +193,8 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	totalPrice := price * quantity
+
 	// Create or find Stripe customer so the payment method is saved for future charges
 	var stripeCustomerID string
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -200,7 +222,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 	}
 
 	pi, err := d.PaymentProvider.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
-		AmountCents:      int64(price),
+		AmountCents:      int64(totalPrice),
 		Currency:         "usd",
 		CustomerID:       stripeCustomerID,
 		SetupFutureUsage: "off_session",
@@ -230,7 +252,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 
 	JSON(w, http.StatusOK, checkoutPaymentIntentResponse{
 		ClientSecret: pi.ClientSecret,
-		Amount:       price,
+		Amount:       totalPrice,
 		Currency:     "usd",
 	})
 }
@@ -254,6 +276,12 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 	variantID, err := uuid.Parse(req.VariantID)
 	if err != nil {
 		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid variant_id"})
+		return
+	}
+
+	quantity := req.Quantity
+	if quantity < 1 || quantity > 10 {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "quantity must be between 1 and 10"})
 		return
 	}
 
@@ -346,6 +374,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 			CustomerID:        customer.ID,
 			PlanID:            planID,
 			VariantID:         variantID,
+			Quantity:          quantity,
 			ShippingAddressID: addr.ID,
 		}, app.Actor{
 			Type: "customer",
@@ -362,7 +391,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 			CustomerID: customer.ID,
 			Items: []app.CartItem{{
 				VariantID: variantID,
-				Quantity:  1,
+				Quantity:  quantity,
 				UnitPrice: finalPrice,
 			}},
 			ShippingAddressID: addr.ID,

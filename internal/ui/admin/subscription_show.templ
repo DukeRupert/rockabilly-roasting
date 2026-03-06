@@ -83,6 +83,10 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			<dd class="text-xs text-stone-500">{ string(props.Plan.Interval) } (×{ fmt.Sprintf("%d", props.Plan.IntervalCount) })</dd>
 		</div>
 		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+			<dt class="text-sm font-medium text-stone-500">Quantity</dt>
+			<dd class="mt-1 text-sm font-semibold text-stone-900">{ fmt.Sprintf("%d", props.Subscription.Quantity) }</dd>
+		</div>
+		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
 			<dt class="text-sm font-medium text-stone-500">Customer</dt>
 			<dd class="mt-1 text-sm font-semibold text-stone-900">
 				<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())) } class="text-hiri-teal hover:text-hiri-teal-dark">

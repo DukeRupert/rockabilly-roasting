@@ -131,6 +131,7 @@ type CreateSubscriptionParams struct {
 	CustomerID         uuid.UUID
 	PlanID             uuid.UUID
 	VariantID          uuid.UUID
+	Quantity           int
 	Status             domain.SubscriptionStatus
 	ShippingAddressID  uuid.UUID
 	CurrentPeriodStart time.Time
@@ -146,6 +147,7 @@ func (s *SubscriptionStore) Create(ctx context.Context, tx pgx.Tx, p CreateSubsc
 		CustomerID:         p.CustomerID,
 		PlanID:             p.PlanID,
 		VariantID:          p.VariantID,
+		Quantity:           int32(p.Quantity),
 		Status:             string(p.Status),
 		ShippingAddressID:  p.ShippingAddressID,
 		CurrentPeriodStart: p.CurrentPeriodStart,
@@ -261,7 +263,7 @@ type SubscriptionFilter struct {
 
 // List returns subscriptions matching the given filter (hand-written for dynamic WHERE).
 func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionFilter) ([]domain.Subscription, error) {
-	query := `SELECT id, customer_id, plan_id, variant_id, status, shipping_address_id,
+	query := `SELECT id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
 	                 current_period_start, current_period_end, next_order_at,
 	                 cancelled_at, pause_until, metadata, created_at, updated_at
 	          FROM subscriptions WHERE true`
@@ -302,7 +304,7 @@ func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionF
 		var cancelledAt, pauseUntil pgtype.Timestamptz
 		var metadata []byte
 		if err := rows.Scan(
-			&sub.ID, &sub.CustomerID, &sub.PlanID, &sub.VariantID, &status, &sub.ShippingAddressID,
+			&sub.ID, &sub.CustomerID, &sub.PlanID, &sub.VariantID, &sub.Quantity, &status, &sub.ShippingAddressID,
 			&sub.CurrentPeriodStart, &sub.CurrentPeriodEnd, &sub.NextOrderAt,
 			&cancelledAt, &pauseUntil, &metadata, &sub.CreatedAt, &sub.UpdatedAt,
 		); err != nil {
@@ -371,6 +373,7 @@ func subscriptionFromRow(r sqlcgen.Subscription) *domain.Subscription {
 		CustomerID:         r.CustomerID,
 		PlanID:             r.PlanID,
 		VariantID:          r.VariantID,
+		Quantity:           int(r.Quantity),
 		Status:             domain.SubscriptionStatus(r.Status),
 		ShippingAddressID:  r.ShippingAddressID,
 		CurrentPeriodStart: r.CurrentPeriodStart,

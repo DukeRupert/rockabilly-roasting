@@ -45,6 +45,7 @@ type Subscription struct {
 	CustomerID         uuid.UUID
 	PlanID             uuid.UUID
 	VariantID          uuid.UUID
+	Quantity           int
 	Status             SubscriptionStatus
 	ShippingAddressID  uuid.UUID
 	CurrentPeriodStart time.Time

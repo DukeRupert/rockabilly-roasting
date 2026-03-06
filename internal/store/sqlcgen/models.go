@@ -366,6 +366,7 @@ type Subscription struct {
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`
 	VariantID          uuid.UUID          `json:"variant_id"`
+	Quantity           int32              `json:"quantity"`
 }
 
 type SubscriptionOrder struct {

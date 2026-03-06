@@ -104,6 +104,8 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		return nil, fmt.Errorf("renewal read phase: %w", err)
 	}
 
+	totalCents := priceCents * sub.Quantity
+
 	if customer.StripeCustomerID == nil {
 		return nil, fmt.Errorf("customer %s has no Stripe customer ID", customer.ID)
 	}
@@ -125,7 +127,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	}
 
 	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
-		AmountCents:     int64(priceCents),
+		AmountCents:     int64(totalCents),
 		Currency:        "usd",
 		CustomerID:      *customer.StripeCustomerID,
 		PaymentMethodID: methods[0].ID,
@@ -170,8 +172,8 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			PaymentStatus:     domain.PaymentStatusCaptured,
 			FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
 			CurrencyCode:      "USD",
-			Subtotal:          priceCents,
-			Total:             priceCents,
+			Subtotal:          totalCents,
+			Total:             totalCents,
 			ShippingAddressID: sub.ShippingAddressID,
 			BillingAddressID:  sub.ShippingAddressID,
 			SubscriptionID:    &subID,
@@ -186,14 +188,13 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		}
 
 		// Create line item
-		lineSubtotal := priceCents
 		_, txErr = s.orders.CreateLineItem(ctx, tx, store.CreateLineItemParams{
 			OrderID:   order.ID,
 			VariantID: sub.VariantID,
-			Quantity:  1,
+			Quantity:  sub.Quantity,
 			UnitPrice: priceCents,
-			Subtotal:  lineSubtotal,
-			Total:     lineSubtotal,
+			Subtotal:  totalCents,
+			Total:     totalCents,
 		})
 		if txErr != nil {
 			return fmt.Errorf("create renewal line item: %w", txErr)

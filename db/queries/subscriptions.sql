@@ -16,9 +16,9 @@ UPDATE subscription_plans SET is_active = $2 WHERE id = $1;
 UPDATE subscription_plans SET discount_pct = $2 WHERE id = $1;
 
 -- name: CreateSubscription :one
-INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, status, shipping_address_id,
+INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
                            current_period_start, current_period_end, next_order_at, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING *;
 
 -- name: GetSubscriptionByID :one

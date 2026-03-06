@@ -26,10 +26,10 @@ func (q *Queries) CancelSubscription(ctx context.Context, id uuid.UUID) error {
 }
 
 const createSubscription = `-- name: CreateSubscription :one
-INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, status, shipping_address_id,
+INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
                            current_period_start, current_period_end, next_order_at, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity
 `
 
 type CreateSubscriptionParams struct {
@@ -37,6 +37,7 @@ type CreateSubscriptionParams struct {
 	CustomerID         uuid.UUID       `json:"customer_id"`
 	PlanID             uuid.UUID       `json:"plan_id"`
 	VariantID          uuid.UUID       `json:"variant_id"`
+	Quantity           int32           `json:"quantity"`
 	Status             string          `json:"status"`
 	ShippingAddressID  uuid.UUID       `json:"shipping_address_id"`
 	CurrentPeriodStart time.Time       `json:"current_period_start"`
@@ -51,6 +52,7 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		arg.CustomerID,
 		arg.PlanID,
 		arg.VariantID,
+		arg.Quantity,
 		arg.Status,
 		arg.ShippingAddressID,
 		arg.CurrentPeriodStart,
@@ -74,6 +76,7 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.VariantID,
+		&i.Quantity,
 	)
 	return i, err
 }
@@ -140,7 +143,7 @@ func (q *Queries) CreateSubscriptionPlan(ctx context.Context, arg CreateSubscrip
 }
 
 const getSubscriptionByID = `-- name: GetSubscriptionByID :one
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id FROM subscriptions WHERE id = $1
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity FROM subscriptions WHERE id = $1
 `
 
 func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscription, error) {
@@ -161,12 +164,13 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscr
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.VariantID,
+		&i.Quantity,
 	)
 	return i, err
 }
 
 const getSubscriptionByIDAndCustomer = `-- name: GetSubscriptionByIDAndCustomer :one
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id FROM subscriptions WHERE id = $1 AND customer_id = $2
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity FROM subscriptions WHERE id = $1 AND customer_id = $2
 `
 
 type GetSubscriptionByIDAndCustomerParams struct {
@@ -192,6 +196,7 @@ func (q *Queries) GetSubscriptionByIDAndCustomer(ctx context.Context, arg GetSub
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.VariantID,
+		&i.Quantity,
 	)
 	return i, err
 }
@@ -279,7 +284,7 @@ func (q *Queries) ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlan
 }
 
 const listSubscriptionsByCustomer = `-- name: ListSubscriptionsByCustomer :many
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id FROM subscriptions
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity FROM subscriptions
 WHERE customer_id = $1
 ORDER BY created_at DESC
 `
@@ -308,6 +313,7 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.VariantID,
+			&i.Quantity,
 		); err != nil {
 			return nil, err
 		}
@@ -320,7 +326,7 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 }
 
 const listSubscriptionsDueForRenewal = `-- name: ListSubscriptionsDueForRenewal :many
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id FROM subscriptions
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity FROM subscriptions
 WHERE status = 'active' AND next_order_at <= now()
 ORDER BY next_order_at ASC
 `
@@ -349,6 +355,7 @@ func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscri
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.VariantID,
+			&i.Quantity,
 		); err != nil {
 			return nil, err
 		}
@@ -431,7 +438,7 @@ const updateSubscriptionStatus = `-- name: UpdateSubscriptionStatus :one
 UPDATE subscriptions
 SET status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity
 `
 
 type UpdateSubscriptionStatusParams struct {
@@ -457,6 +464,7 @@ func (q *Queries) UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscr
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.VariantID,
+		&i.Quantity,
 	)
 	return i, err
 }

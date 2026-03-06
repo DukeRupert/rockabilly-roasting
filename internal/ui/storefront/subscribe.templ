@@ -10,6 +10,7 @@ import (
 type SubscribePageProps struct {
 	Plan      *domain.SubscriptionPlan
 	VariantID uuid.UUID
+	Quantity  int
 	Price     int
 	StripeKey string
 	CartCount int
@@ -28,7 +29,12 @@ templ SubscribeContent(props SubscribePageProps) {
 						{ subscriptionIntervalLabel(props.Plan.Interval, props.Plan.IntervalCount) }
 					</p>
 				</div>
-				<p class="text-lg font-semibold text-hiri-teal">{ formatCents(props.Price) }</p>
+				<p class="text-lg font-semibold text-hiri-teal">
+				if props.Quantity > 1 {
+					{ fmt.Sprintf("%d × ", props.Quantity) }
+				}
+				{ formatCents(props.Price) }
+			</p>
 			</div>
 		</div>
 		<!-- Subscribe form (Stripe Elements) -->
@@ -36,6 +42,7 @@ templ SubscribeContent(props SubscribePageProps) {
 			id="subscribe-app"
 			data-plan-id={ props.Plan.ID.String() }
 			data-variant-id={ props.VariantID.String() }
+			data-quantity={ fmt.Sprintf("%d", props.Quantity) }
 			data-plan-name={ props.Plan.Name }
 			data-price={ fmt.Sprintf("%d", props.Price) }
 			data-interval={ string(props.Plan.Interval) }

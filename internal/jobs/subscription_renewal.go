@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,6 +30,10 @@ func NewSubscriptionRenewalWorker(renewalSvc *app.RenewalService, pool *pgxpool.
 func (w *SubscriptionRenewalWorker) Work(ctx context.Context, job *river.Job[SubscriptionRenewalArgs]) error {
 	_, err := w.renewalSvc.RenewSubscription(ctx, w.pool, job.Args.SubscriptionID)
 	if err != nil {
+		// Permanently discard jobs for subscriptions that are no longer renewable
+		if errors.Is(err, app.ErrSubscriptionNotActive) || errors.Is(err, app.ErrSubscriptionNotFound) {
+			return river.JobCancel(fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err))
+		}
 		return fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err)
 	}
 	return nil

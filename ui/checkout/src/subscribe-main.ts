@@ -6,6 +6,7 @@ function init() {
   if (!target) return;
 
   const planId = target.dataset.planId || '';
+  const variantId = target.dataset.variantId || '';
   const planName = target.dataset.planName || '';
   const price = parseInt(target.dataset.price || '0', 10);
   const interval = target.dataset.interval || '';
@@ -13,7 +14,7 @@ function init() {
 
   mount(SubscribeApp, {
     target,
-    props: { planId, planName, price, interval, stripeKey },
+    props: { planId, variantId, planName, price, interval, stripeKey },
   });
 }
 

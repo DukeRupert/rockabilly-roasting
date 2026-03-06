@@ -1,5 +1,6 @@
 export interface SubscribePaymentIntentRequest {
   plan_id: string;
+  variant_id: string;
   email: string;
   first_name: string;
   last_name: string;
@@ -19,6 +20,7 @@ export interface SubscribePaymentIntentResponse {
 
 export interface SubscribeConfirmRequest {
   plan_id: string;
+  variant_id: string;
   email: string;
   first_name: string;
   last_name: string;

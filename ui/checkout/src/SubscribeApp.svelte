@@ -10,13 +10,14 @@
 
   interface Props {
     planId: string;
+    variantId: string;
     planName: string;
     price: number;
     interval: string;
     stripeKey: string;
   }
 
-  let { planId, planName, price, interval, stripeKey }: Props = $props();
+  let { planId, variantId, planName, price, interval, stripeKey }: Props = $props();
 
   type Step = 'form' | 'confirmation';
 
@@ -80,6 +81,7 @@
 
       const piResponse = await createSubscribePaymentIntent({
         plan_id: planId,
+        variant_id: variantId,
         email,
         first_name: firstName,
         last_name: lastName,
@@ -140,6 +142,7 @@
 
       const result = await confirmSubscription({
         plan_id: planId,
+        variant_id: variantId,
         email,
         first_name: firstName,
         last_name: lastName,

@@ -29,7 +29,7 @@ const createSubscription = `-- name: CreateSubscription :one
 INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, status, shipping_address_id,
                            current_period_start, current_period_end, next_order_at, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, customer_id, plan_id, variant_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id
 `
 
 type CreateSubscriptionParams struct {
@@ -63,7 +63,6 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.ID,
 		&i.CustomerID,
 		&i.PlanID,
-		&i.VariantID,
 		&i.Status,
 		&i.ShippingAddressID,
 		&i.CurrentPeriodStart,
@@ -74,6 +73,7 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VariantID,
 	)
 	return i, err
 }
@@ -103,7 +103,7 @@ func (q *Queries) CreateSubscriptionOrder(ctx context.Context, arg CreateSubscri
 const createSubscriptionPlan = `-- name: CreateSubscriptionPlan :one
 INSERT INTO subscription_plans (id, name, interval, interval_count, discount_pct, is_active, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, name, interval, interval_count, discount_pct, is_active, metadata
+RETURNING id, name, interval, interval_count, is_active, metadata, discount_pct
 `
 
 type CreateSubscriptionPlanParams struct {
@@ -132,15 +132,15 @@ func (q *Queries) CreateSubscriptionPlan(ctx context.Context, arg CreateSubscrip
 		&i.Name,
 		&i.Interval,
 		&i.IntervalCount,
-		&i.DiscountPct,
 		&i.IsActive,
 		&i.Metadata,
+		&i.DiscountPct,
 	)
 	return i, err
 }
 
 const getSubscriptionByID = `-- name: GetSubscriptionByID :one
-SELECT id, customer_id, plan_id, variant_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at FROM subscriptions WHERE id = $1
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id FROM subscriptions WHERE id = $1
 `
 
 func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscription, error) {
@@ -150,7 +150,6 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscr
 		&i.ID,
 		&i.CustomerID,
 		&i.PlanID,
-		&i.VariantID,
 		&i.Status,
 		&i.ShippingAddressID,
 		&i.CurrentPeriodStart,
@@ -161,12 +160,13 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscr
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VariantID,
 	)
 	return i, err
 }
 
 const getSubscriptionByIDAndCustomer = `-- name: GetSubscriptionByIDAndCustomer :one
-SELECT id, customer_id, plan_id, variant_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at FROM subscriptions WHERE id = $1 AND customer_id = $2
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id FROM subscriptions WHERE id = $1 AND customer_id = $2
 `
 
 type GetSubscriptionByIDAndCustomerParams struct {
@@ -181,7 +181,6 @@ func (q *Queries) GetSubscriptionByIDAndCustomer(ctx context.Context, arg GetSub
 		&i.ID,
 		&i.CustomerID,
 		&i.PlanID,
-		&i.VariantID,
 		&i.Status,
 		&i.ShippingAddressID,
 		&i.CurrentPeriodStart,
@@ -192,12 +191,13 @@ func (q *Queries) GetSubscriptionByIDAndCustomer(ctx context.Context, arg GetSub
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VariantID,
 	)
 	return i, err
 }
 
 const getSubscriptionPlanByID = `-- name: GetSubscriptionPlanByID :one
-SELECT id, name, interval, interval_count, discount_pct, is_active, metadata FROM subscription_plans WHERE id = $1
+SELECT id, name, interval, interval_count, is_active, metadata, discount_pct FROM subscription_plans WHERE id = $1
 `
 
 func (q *Queries) GetSubscriptionPlanByID(ctx context.Context, id uuid.UUID) (SubscriptionPlan, error) {
@@ -208,9 +208,9 @@ func (q *Queries) GetSubscriptionPlanByID(ctx context.Context, id uuid.UUID) (Su
 		&i.Name,
 		&i.Interval,
 		&i.IntervalCount,
-		&i.DiscountPct,
 		&i.IsActive,
 		&i.Metadata,
+		&i.DiscountPct,
 	)
 	return i, err
 }
@@ -247,7 +247,7 @@ func (q *Queries) ListSubscriptionOrdersBySubscription(ctx context.Context, subs
 }
 
 const listSubscriptionPlans = `-- name: ListSubscriptionPlans :many
-SELECT id, name, interval, interval_count, discount_pct, is_active, metadata FROM subscription_plans ORDER BY name
+SELECT id, name, interval, interval_count, is_active, metadata, discount_pct FROM subscription_plans ORDER BY name
 `
 
 func (q *Queries) ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlan, error) {
@@ -264,9 +264,9 @@ func (q *Queries) ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlan
 			&i.Name,
 			&i.Interval,
 			&i.IntervalCount,
-			&i.DiscountPct,
 			&i.IsActive,
 			&i.Metadata,
+			&i.DiscountPct,
 		); err != nil {
 			return nil, err
 		}
@@ -279,7 +279,7 @@ func (q *Queries) ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlan
 }
 
 const listSubscriptionsByCustomer = `-- name: ListSubscriptionsByCustomer :many
-SELECT id, customer_id, plan_id, variant_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at FROM subscriptions
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id FROM subscriptions
 WHERE customer_id = $1
 ORDER BY created_at DESC
 `
@@ -297,7 +297,6 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 			&i.ID,
 			&i.CustomerID,
 			&i.PlanID,
-			&i.VariantID,
 			&i.Status,
 			&i.ShippingAddressID,
 			&i.CurrentPeriodStart,
@@ -308,6 +307,7 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.VariantID,
 		); err != nil {
 			return nil, err
 		}
@@ -320,7 +320,7 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 }
 
 const listSubscriptionsDueForRenewal = `-- name: ListSubscriptionsDueForRenewal :many
-SELECT id, customer_id, plan_id, variant_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at FROM subscriptions
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id FROM subscriptions
 WHERE status = 'active' AND next_order_at <= now()
 ORDER BY next_order_at ASC
 `
@@ -338,7 +338,6 @@ func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscri
 			&i.ID,
 			&i.CustomerID,
 			&i.PlanID,
-			&i.VariantID,
 			&i.Status,
 			&i.ShippingAddressID,
 			&i.CurrentPeriodStart,
@@ -349,6 +348,7 @@ func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscri
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.VariantID,
 		); err != nil {
 			return nil, err
 		}
@@ -413,11 +413,25 @@ func (q *Queries) UpdateSubscriptionPlanActive(ctx context.Context, arg UpdateSu
 	return err
 }
 
+const updateSubscriptionPlanDiscount = `-- name: UpdateSubscriptionPlanDiscount :exec
+UPDATE subscription_plans SET discount_pct = $2 WHERE id = $1
+`
+
+type UpdateSubscriptionPlanDiscountParams struct {
+	ID          uuid.UUID `json:"id"`
+	DiscountPct int32     `json:"discount_pct"`
+}
+
+func (q *Queries) UpdateSubscriptionPlanDiscount(ctx context.Context, arg UpdateSubscriptionPlanDiscountParams) error {
+	_, err := q.db.Exec(ctx, updateSubscriptionPlanDiscount, arg.ID, arg.DiscountPct)
+	return err
+}
+
 const updateSubscriptionStatus = `-- name: UpdateSubscriptionStatus :one
 UPDATE subscriptions
 SET status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, customer_id, plan_id, variant_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id
 `
 
 type UpdateSubscriptionStatusParams struct {
@@ -432,7 +446,6 @@ func (q *Queries) UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscr
 		&i.ID,
 		&i.CustomerID,
 		&i.PlanID,
-		&i.VariantID,
 		&i.Status,
 		&i.ShippingAddressID,
 		&i.CurrentPeriodStart,
@@ -443,6 +456,7 @@ func (q *Queries) UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscr
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.VariantID,
 	)
 	return i, err
 }

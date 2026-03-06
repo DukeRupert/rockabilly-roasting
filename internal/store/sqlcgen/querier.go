@@ -156,6 +156,7 @@ type Querier interface {
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 	UpdateProductMediaPosition(ctx context.Context, arg UpdateProductMediaPositionParams) error
 	UpdateProductStatus(ctx context.Context, arg UpdateProductStatusParams) (Product, error)
+	UpdateProductSubscribable(ctx context.Context, arg UpdateProductSubscribableParams) (Product, error)
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	UpdateShipmentDelivered(ctx context.Context, id uuid.UUID) error
 	UpdateShipmentStatus(ctx context.Context, arg UpdateShipmentStatusParams) (Shipment, error)
@@ -165,6 +166,7 @@ type Querier interface {
 	UpdateSubscriptionPauseUntil(ctx context.Context, arg UpdateSubscriptionPauseUntilParams) error
 	UpdateSubscriptionPeriod(ctx context.Context, arg UpdateSubscriptionPeriodParams) error
 	UpdateSubscriptionPlanActive(ctx context.Context, arg UpdateSubscriptionPlanActiveParams) error
+	UpdateSubscriptionPlanDiscount(ctx context.Context, arg UpdateSubscriptionPlanDiscountParams) error
 	UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscriptionStatusParams) (Subscription, error)
 	UpdateTaxon(ctx context.Context, arg UpdateTaxonParams) (Taxon, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (Variant, error)

@@ -242,12 +242,12 @@ type Product struct {
 	Status        string             `json:"status"`
 	ProductTypeID *uuid.UUID         `json:"product_type_id"`
 	TaxonID       *uuid.UUID         `json:"taxon_id"`
-	Subscribable  bool               `json:"subscribable"`
 	Metadata      json.RawMessage    `json:"metadata"`
 	AvailableOn   pgtype.Timestamptz `json:"available_on"`
 	DiscontinueOn pgtype.Timestamptz `json:"discontinue_on"`
 	CreatedAt     time.Time          `json:"created_at"`
 	UpdatedAt     time.Time          `json:"updated_at"`
+	Subscribable  bool               `json:"subscribable"`
 }
 
 type ProductMedium struct {
@@ -355,7 +355,6 @@ type Subscription struct {
 	ID                 uuid.UUID          `json:"id"`
 	CustomerID         uuid.UUID          `json:"customer_id"`
 	PlanID             uuid.UUID          `json:"plan_id"`
-	VariantID          uuid.UUID          `json:"variant_id"`
 	Status             string             `json:"status"`
 	ShippingAddressID  uuid.UUID          `json:"shipping_address_id"`
 	CurrentPeriodStart time.Time          `json:"current_period_start"`
@@ -366,6 +365,7 @@ type Subscription struct {
 	Metadata           json.RawMessage    `json:"metadata"`
 	CreatedAt          time.Time          `json:"created_at"`
 	UpdatedAt          time.Time          `json:"updated_at"`
+	VariantID          uuid.UUID          `json:"variant_id"`
 }
 
 type SubscriptionOrder struct {
@@ -380,9 +380,9 @@ type SubscriptionPlan struct {
 	Name          string          `json:"name"`
 	Interval      string          `json:"interval"`
 	IntervalCount int32           `json:"interval_count"`
-	DiscountPct   int32           `json:"discount_pct"`
 	IsActive      bool            `json:"is_active"`
 	Metadata      json.RawMessage `json:"metadata"`
+	DiscountPct   int32           `json:"discount_pct"`
 }
 
 type Taxon struct {

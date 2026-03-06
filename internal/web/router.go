@@ -110,6 +110,7 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /admin/plans", deps.handleAdminPlanCreate)
 	mux.HandleFunc("POST /admin/plans/{id}/deactivate", deps.handleAdminPlanDeactivate)
 	mux.HandleFunc("POST /admin/plans/{id}/activate", deps.handleAdminPlanActivate)
+	mux.HandleFunc("POST /admin/plans/{id}/discount", deps.handleAdminPlanUpdateDiscount)
 
 	// Admin subscriptions
 	mux.HandleFunc("GET /admin/subscriptions", deps.handleAdminSubscriptionList)

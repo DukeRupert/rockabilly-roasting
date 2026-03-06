@@ -126,6 +126,37 @@ func (d *Deps) handleAdminPlanActivate(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/plans", http.StatusSeeOther)
 }
 
+func (d *Deps) handleAdminPlanUpdateDiscount(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	discountPct, err := strconv.Atoi(r.FormValue("discount_pct"))
+	if err != nil || discountPct < 0 || discountPct > 100 {
+		renderPlanError(w, r, "Discount must be 0-100.")
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.SubscriptionService.UpdatePlanDiscount(ctx, tx, id, discountPct, devActor())
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/plans", http.StatusSeeOther)
+}
+
 func renderPlanError(w http.ResponseWriter, r *http.Request, msg string) {
 	if IsHTMX(r) {
 		w.WriteHeader(http.StatusOK)

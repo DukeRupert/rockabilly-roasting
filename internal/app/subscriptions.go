@@ -188,6 +188,31 @@ func (s *SubscriptionService) UpdatePlanActive(ctx context.Context, tx pgx.Tx, i
 	return nil
 }
 
+// UpdatePlanDiscount updates the discount percentage of a subscription plan.
+func (s *SubscriptionService) UpdatePlanDiscount(ctx context.Context, tx pgx.Tx, id uuid.UUID, discountPct int, actor Actor) error {
+	if discountPct < 0 || discountPct > 100 {
+		return fmt.Errorf("discount must be 0-100")
+	}
+
+	if err := s.subscriptions.UpdatePlanDiscount(ctx, tx, id, discountPct); err != nil {
+		return fmt.Errorf("update plan discount: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditPlanUpdated,
+		ResourceType: "subscription_plan",
+		ResourceID:   id,
+		Metadata:     map[string]any{"discount_pct": discountPct},
+	}); err != nil {
+		return fmt.Errorf("audit plan discount update: %w", err)
+	}
+
+	return nil
+}
+
 // --- Subscription mutation methods ---
 
 // CreateSubscriptionParams holds all input needed to create a subscription.

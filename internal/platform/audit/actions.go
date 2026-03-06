@@ -26,6 +26,7 @@ const (
 	AuditPlanCreated           = "subscription_plan.created"
 	AuditPlanDeactivated       = "subscription_plan.deactivated"
 	AuditPlanActivated         = "subscription_plan.activated"
+	AuditPlanUpdated           = "subscription_plan.updated"
 
 	// Customer actions (staff-initiated)
 	AuditCustomerGroupChanged        = "customer.group_changed"

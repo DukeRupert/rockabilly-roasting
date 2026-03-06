@@ -84,6 +84,18 @@ func (s *SubscriptionStore) UpdatePlanActive(ctx context.Context, tx pgx.Tx, id 
 	return nil
 }
 
+// UpdatePlanDiscount sets the discount percentage of a subscription plan.
+func (s *SubscriptionStore) UpdatePlanDiscount(ctx context.Context, tx pgx.Tx, id uuid.UUID, discountPct int) error {
+	err := sqlcgen.New(tx).UpdateSubscriptionPlanDiscount(ctx, sqlcgen.UpdateSubscriptionPlanDiscountParams{
+		ID:          id,
+		DiscountPct: int32(discountPct),
+	})
+	if err != nil {
+		return fmt.Errorf("update plan discount: %w", err)
+	}
+	return nil
+}
+
 // ListActivePlans returns all active subscription plans.
 func (s *SubscriptionStore) ListActivePlans(ctx context.Context, tx pgx.Tx) ([]domain.SubscriptionPlan, error) {
 	rows, err := tx.Query(ctx,

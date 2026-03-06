@@ -12,6 +12,9 @@ SELECT * FROM subscription_plans ORDER BY name;
 -- name: UpdateSubscriptionPlanActive :exec
 UPDATE subscription_plans SET is_active = $2 WHERE id = $1;
 
+-- name: UpdateSubscriptionPlanDiscount :exec
+UPDATE subscription_plans SET discount_pct = $2 WHERE id = $1;
+
 -- name: CreateSubscription :one
 INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, status, shipping_address_id,
                            current_period_start, current_period_end, next_order_at, metadata)

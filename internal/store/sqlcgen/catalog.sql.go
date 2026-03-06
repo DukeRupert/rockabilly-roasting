@@ -16,7 +16,7 @@ import (
 const createProduct = `-- name: CreateProduct :one
 INSERT INTO products (id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, subscribable, metadata, available_on, discontinue_on, created_at, updated_at
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable
 `
 
 type CreateProductParams struct {
@@ -54,12 +54,12 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		&i.Status,
 		&i.ProductTypeID,
 		&i.TaxonID,
-		&i.Subscribable,
 		&i.Metadata,
 		&i.AvailableOn,
 		&i.DiscontinueOn,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Subscribable,
 	)
 	return i, err
 }
@@ -322,7 +322,7 @@ func (q *Queries) DeleteVariantOptionValuesByVariant(ctx context.Context, varian
 }
 
 const getProductByID = `-- name: GetProductByID :one
-SELECT id, slug, title, description, status, product_type_id, taxon_id, subscribable, metadata, available_on, discontinue_on, created_at, updated_at FROM products WHERE id = $1
+SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable FROM products WHERE id = $1
 `
 
 func (q *Queries) GetProductByID(ctx context.Context, id uuid.UUID) (Product, error) {
@@ -336,18 +336,18 @@ func (q *Queries) GetProductByID(ctx context.Context, id uuid.UUID) (Product, er
 		&i.Status,
 		&i.ProductTypeID,
 		&i.TaxonID,
-		&i.Subscribable,
 		&i.Metadata,
 		&i.AvailableOn,
 		&i.DiscontinueOn,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Subscribable,
 	)
 	return i, err
 }
 
 const getProductBySlug = `-- name: GetProductBySlug :one
-SELECT id, slug, title, description, status, product_type_id, taxon_id, subscribable, metadata, available_on, discontinue_on, created_at, updated_at FROM products WHERE slug = $1
+SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable FROM products WHERE slug = $1
 `
 
 func (q *Queries) GetProductBySlug(ctx context.Context, slug string) (Product, error) {
@@ -361,12 +361,12 @@ func (q *Queries) GetProductBySlug(ctx context.Context, slug string) (Product, e
 		&i.Status,
 		&i.ProductTypeID,
 		&i.TaxonID,
-		&i.Subscribable,
 		&i.Metadata,
 		&i.AvailableOn,
 		&i.DiscontinueOn,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Subscribable,
 	)
 	return i, err
 }
@@ -680,7 +680,7 @@ UPDATE products
 SET slug = $2, title = $3, description = $4, product_type_id = $5, taxon_id = $6,
     metadata = $7, available_on = $8, discontinue_on = $9, updated_at = now()
 WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, subscribable, metadata, available_on, discontinue_on, created_at, updated_at
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable
 `
 
 type UpdateProductParams struct {
@@ -716,12 +716,12 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 		&i.Status,
 		&i.ProductTypeID,
 		&i.TaxonID,
-		&i.Subscribable,
 		&i.Metadata,
 		&i.AvailableOn,
 		&i.DiscontinueOn,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Subscribable,
 	)
 	return i, err
 }
@@ -740,44 +740,11 @@ func (q *Queries) UpdateProductMediaPosition(ctx context.Context, arg UpdateProd
 	return err
 }
 
-const updateProductSubscribable = `-- name: UpdateProductSubscribable :one
-UPDATE products
-SET subscribable = $2, updated_at = now()
-WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, subscribable, metadata, available_on, discontinue_on, created_at, updated_at
-`
-
-type UpdateProductSubscribableParams struct {
-	ID           uuid.UUID `json:"id"`
-	Subscribable bool      `json:"subscribable"`
-}
-
-func (q *Queries) UpdateProductSubscribable(ctx context.Context, arg UpdateProductSubscribableParams) (Product, error) {
-	row := q.db.QueryRow(ctx, updateProductSubscribable, arg.ID, arg.Subscribable)
-	var i Product
-	err := row.Scan(
-		&i.ID,
-		&i.Slug,
-		&i.Title,
-		&i.Description,
-		&i.Status,
-		&i.ProductTypeID,
-		&i.TaxonID,
-		&i.Subscribable,
-		&i.Metadata,
-		&i.AvailableOn,
-		&i.DiscontinueOn,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const updateProductStatus = `-- name: UpdateProductStatus :one
 UPDATE products
 SET status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, subscribable, metadata, available_on, discontinue_on, created_at, updated_at
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable
 `
 
 type UpdateProductStatusParams struct {
@@ -796,12 +763,45 @@ func (q *Queries) UpdateProductStatus(ctx context.Context, arg UpdateProductStat
 		&i.Status,
 		&i.ProductTypeID,
 		&i.TaxonID,
-		&i.Subscribable,
 		&i.Metadata,
 		&i.AvailableOn,
 		&i.DiscontinueOn,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Subscribable,
+	)
+	return i, err
+}
+
+const updateProductSubscribable = `-- name: UpdateProductSubscribable :one
+UPDATE products
+SET subscribable = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable
+`
+
+type UpdateProductSubscribableParams struct {
+	ID           uuid.UUID `json:"id"`
+	Subscribable bool      `json:"subscribable"`
+}
+
+func (q *Queries) UpdateProductSubscribable(ctx context.Context, arg UpdateProductSubscribableParams) (Product, error) {
+	row := q.db.QueryRow(ctx, updateProductSubscribable, arg.ID, arg.Subscribable)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.ProductTypeID,
+		&i.TaxonID,
+		&i.Metadata,
+		&i.AvailableOn,
+		&i.DiscontinueOn,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Subscribable,
 	)
 	return i, err
 }

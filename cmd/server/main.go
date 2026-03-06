@@ -99,8 +99,12 @@ func run() error {
 	pricingSvc := app.NewPricingService(pricingStore)
 	cartSvc := app.NewCartService(cartStore, pricingStore)
 	staffStore := store.NewStaffStore()
+	customerGroupStore := store.NewCustomerGroupStore()
+	invoiceStore := store.NewInvoiceStore()
 	authSvc := app.NewAuthService(staffStore, sessionMgr, auditWriter, metricsReg)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, paymentProvider, auditWriter, metricsReg)
+	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg)
+	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg)
 
 	// River job workers
 	workers := river.NewWorkers()
@@ -165,8 +169,10 @@ func run() error {
 		DiscountService:     discountSvc,
 		AuthService:     authSvc,
 		PricingService:  pricingSvc,
-		CartService:     cartSvc,
-		PaymentProvider: paymentProvider,
+		CartService:      cartSvc,
+		WholesaleService: wholesaleSvc,
+		InvoiceService:   invoiceSvc,
+		PaymentProvider:  paymentProvider,
 		WebhookStore:    webhookStore,
 		CustomerStore:   customerStore,
 	}

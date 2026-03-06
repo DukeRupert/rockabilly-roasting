@@ -57,6 +57,7 @@ var (
 	ErrStaffNotFound     = errors.New("staff not found")
 	ErrStaffInactive     = errors.New("staff account is inactive")
 	ErrPermissionDenied  = errors.New("permission denied")
+	ErrMagicLinkExpired  = errors.New("magic link expired or already used")
 
 	// Payment errors
 	ErrPaymentFailed = errors.New("payment failed")

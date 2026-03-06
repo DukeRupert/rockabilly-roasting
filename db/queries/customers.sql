@@ -1,6 +1,6 @@
 -- name: CreateCustomer :one
-INSERT INTO customers (id, email, password_hash, first_name, last_name, phone, is_guest)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO customers (id, email, password_hash, first_name, last_name, phone)
+VALUES ($1, $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: GetCustomerByID :one

@@ -220,7 +220,7 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 			if !errors.Is(txErr, app.ErrCustomerNotFound) {
 				return fmt.Errorf("lookup customer: %w", txErr)
 			}
-			customer, txErr = d.CustomerService.CreateGuest(ctx, tx, req.Email, req.FirstName, req.LastName)
+			customer, txErr = d.CustomerService.CreateRetail(ctx, tx, req.Email, req.FirstName, req.LastName)
 			if txErr != nil {
 				return fmt.Errorf("create guest customer: %w", txErr)
 			}

@@ -63,8 +63,8 @@ templ CustomerListContent(props CustomerListProps) {
 										if c.EmailVerified {
 											<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">verified</span>
 										}
-										if c.IsGuest {
-											<span class="inline-flex items-center rounded-md bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600 ring-1 ring-inset ring-stone-500/10">guest</span>
+										if c.AccountType == "wholesale" {
+											<span class="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">wholesale</span>
 										}
 									</div>
 								</td>

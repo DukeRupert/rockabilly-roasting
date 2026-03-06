@@ -24,10 +24,6 @@ func WithEmail(email string) CustomerOption {
 	return func(p *sqlcgen.CreateCustomerParams) { p.Email = email }
 }
 
-func WithGuest(isGuest bool) CustomerOption {
-	return func(p *sqlcgen.CreateCustomerParams) { p.IsGuest = isGuest }
-}
-
 func WithCustomerName(first, last string) CustomerOption {
 	return func(p *sqlcgen.CreateCustomerParams) {
 		p.FirstName = first
@@ -42,7 +38,6 @@ func CreateCustomer(t *testing.T, tx pgx.Tx, opts ...CustomerOption) *domain.Cus
 		Email:     fmt.Sprintf("test-%s@example.com", uuid.New().String()[:8]),
 		FirstName: "Test",
 		LastName:  "Customer",
-		IsGuest:   false,
 	}
 	for _, o := range opts {
 		o(&p)
@@ -59,7 +54,6 @@ func CreateCustomer(t *testing.T, tx pgx.Tx, opts ...CustomerOption) *domain.Cus
 		FirstName:     row.FirstName,
 		LastName:      row.LastName,
 		Phone:         row.Phone,
-		IsGuest:       row.IsGuest,
 		TaxExempt:     row.TaxExempt,
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,

@@ -1,7 +1,7 @@
 -- name: CreateWholesaleCustomer :one
-INSERT INTO customers (id, email, password_hash, first_name, last_name, phone, is_guest,
+INSERT INTO customers (id, email, password_hash, first_name, last_name, phone,
                        account_type, wholesale_status, company_name, website)
-VALUES ($1, $2, $3, $4, $5, $6, false, 'wholesale', 'pending', $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, 'wholesale', 'pending', $7, $8)
 RETURNING *;
 
 -- name: ApproveWholesaleCustomer :one

@@ -101,7 +101,8 @@ func run() error {
 	staffStore := store.NewStaffStore()
 	customerGroupStore := store.NewCustomerGroupStore()
 	invoiceStore := store.NewInvoiceStore()
-	authSvc := app.NewAuthService(staffStore, customerStore, sessionMgr, auditWriter, metricsReg)
+	magicLinkStore := store.NewMagicLinkStore()
+	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, paymentProvider, auditWriter, metricsReg)
 	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg)
 	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg)
@@ -110,6 +111,7 @@ func run() error {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool))
 	river.AddWorker(workers, jobs.NewBatchRenewalWorker(renewalSvc, pool))
+	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(customerStore, pool))
 
 	// River client — we create it first, then pass it to the scheduler worker
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
@@ -175,6 +177,8 @@ func run() error {
 		PaymentProvider:  paymentProvider,
 		WebhookStore:    webhookStore,
 		CustomerStore:   customerStore,
+		MagicLinkStore:  magicLinkStore,
+		RiverClient:     riverClient,
 	}
 
 	handler := web.NewRouter(deps)

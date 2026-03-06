@@ -2,17 +2,17 @@ package storefront
 
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
-type CustomerLoginProps struct {
+type WholesaleLoginProps struct {
 	Error string
 	Email string
 }
 
-templ CustomerLoginContent(props CustomerLoginProps) {
+templ WholesaleLoginContent(props WholesaleLoginProps) {
 	<div class="mx-auto max-w-sm">
 		<div class="text-center">
-			<h1 class="text-2xl font-bold text-hiri-text">Sign in</h1>
+			<h1 class="text-2xl font-bold text-hiri-text">Wholesale Sign In</h1>
 			<p class="mt-2 text-sm text-hiri-text-secondary">
-				Sign in to your account to manage orders and subscriptions.
+				Sign in to your wholesale account to place orders.
 			</p>
 		</div>
 		if props.Error != "" {
@@ -20,7 +20,7 @@ templ CustomerLoginContent(props CustomerLoginProps) {
 				<p class="text-sm text-red-700">{ props.Error }</p>
 			</div>
 		}
-		<form method="post" action="/auth/login" class="mt-8 space-y-5">
+		<form method="post" action="/wholesale/login" class="mt-8 space-y-5">
 			<div>
 				<label for="email" class="block text-sm font-medium text-hiri-text">Email</label>
 				<input
@@ -56,16 +56,16 @@ templ CustomerLoginContent(props CustomerLoginProps) {
 			</button>
 		</form>
 		<p class="mt-6 text-center text-sm text-hiri-text-secondary">
-			Wholesale customer?
-			<a href="/wholesale/apply" class="font-semibold text-hiri-teal hover:text-hiri-teal-dark">Apply for an account</a>
+			Don't have a wholesale account?
+			<a href="/wholesale/apply" class="font-semibold text-hiri-teal hover:text-hiri-teal-dark">Apply here</a>
 		</p>
 	</div>
 }
 
-templ CustomerLoginPage(props CustomerLoginProps) {
+templ WholesaleLoginPage(props WholesaleLoginProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title: "Sign In",
+		Title: "Wholesale Sign In",
 	}) {
-		@CustomerLoginContent(props)
+		@WholesaleLoginContent(props)
 	}
 }

@@ -94,7 +94,6 @@ type Customer struct {
 	FirstName        string             `json:"first_name"`
 	LastName         string             `json:"last_name"`
 	Phone            *string            `json:"phone"`
-	IsGuest          bool               `json:"is_guest"`
 	TaxExempt        bool               `json:"tax_exempt"`
 	TaxExemptReason  *string            `json:"tax_exempt_reason"`
 	CustomerGroupID  *uuid.UUID         `json:"customer_group_id"`
@@ -109,6 +108,8 @@ type Customer struct {
 	WholesaleNotes   *string            `json:"wholesale_notes"`
 	ApprovedAt       pgtype.Timestamptz `json:"approved_at"`
 	ApprovedBy       *uuid.UUID         `json:"approved_by"`
+	TwoFaEnabled     bool               `json:"two_fa_enabled"`
+	TwoFaMethod      *string            `json:"two_fa_method"`
 }
 
 type CustomerGroup struct {
@@ -227,6 +228,15 @@ type LineItem struct {
 	TaxTotal      int32           `json:"tax_total"`
 	Total         int32           `json:"total"`
 	Metadata      json.RawMessage `json:"metadata"`
+}
+
+type MagicLinkToken struct {
+	ID         uuid.UUID          `json:"id"`
+	CustomerID uuid.UUID          `json:"customer_id"`
+	TokenHash  string             `json:"token_hash"`
+	ExpiresAt  time.Time          `json:"expires_at"`
+	UsedAt     pgtype.Timestamptz `json:"used_at"`
+	CreatedAt  time.Time          `json:"created_at"`
 }
 
 type Order struct {

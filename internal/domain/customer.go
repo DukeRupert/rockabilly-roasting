@@ -32,7 +32,6 @@ type Customer struct {
 	FirstName       string
 	LastName        string
 	Phone           *string
-	IsGuest         bool
 	TaxExempt       bool
 	TaxExemptReason *string
 	StripeCustomerID *string
@@ -44,6 +43,8 @@ type Customer struct {
 	WholesaleNotes   *string
 	ApprovedAt       *time.Time
 	ApprovedBy       *uuid.UUID
+	TwoFAEnabled     bool
+	TwoFAMethod      *string
 	Metadata         map[string]any
 	CreatedAt        time.Time
 	UpdatedAt        time.Time

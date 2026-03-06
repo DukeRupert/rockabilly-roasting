@@ -29,7 +29,6 @@ type CreateCustomerParams struct {
 	FirstName    string
 	LastName     string
 	Phone        *string
-	IsGuest      bool
 }
 
 // Create inserts a new customer and returns it.
@@ -41,7 +40,6 @@ func (s *CustomerStore) Create(ctx context.Context, tx pgx.Tx, p CreateCustomerP
 		FirstName:    p.FirstName,
 		LastName:     p.LastName,
 		Phone:        p.Phone,
-		IsGuest:      p.IsGuest,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert customer: %w", err)
@@ -70,7 +68,6 @@ func (s *CustomerStore) GetByEmail(ctx context.Context, tx pgx.Tx, email string)
 // CustomerFilter holds optional filters for listing customers.
 type CustomerFilter struct {
 	CustomerGroupID *uuid.UUID
-	IsGuest         *bool
 	AccountType     *domain.AccountType
 	WholesaleStatus *domain.WholesaleStatus
 	Limit           int
@@ -81,9 +78,10 @@ type CustomerFilter struct {
 // This method is hand-written because sqlc cannot generate dynamic WHERE clauses.
 func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) ([]domain.Customer, error) {
 	query := `SELECT id, email, email_verified, password_hash, first_name, last_name, phone,
-	                 is_guest, tax_exempt, tax_exempt_reason, stripe_customer_id,
+	                 tax_exempt, tax_exempt_reason, stripe_customer_id,
 	                 customer_group_id, account_type, wholesale_status, company_name,
 	                 website, wholesale_notes, approved_at, approved_by,
+	                 two_fa_enabled, two_fa_method,
 	                 metadata, created_at, updated_at
 	          FROM customers WHERE true`
 	args := []any{}
@@ -92,11 +90,6 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	if f.CustomerGroupID != nil {
 		query += fmt.Sprintf(" AND customer_group_id = $%d", argN)
 		args = append(args, *f.CustomerGroupID)
-		argN++
-	}
-	if f.IsGuest != nil {
-		query += fmt.Sprintf(" AND is_guest = $%d", argN)
-		args = append(args, *f.IsGuest)
 		argN++
 	}
 	if f.AccountType != nil {
@@ -140,9 +133,10 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 		var approvedAt pgtype.Timestamptz
 		if err := rows.Scan(
 			&c.ID, &c.Email, &c.EmailVerified, &c.PasswordHash, &c.FirstName, &c.LastName, &c.Phone,
-			&c.IsGuest, &c.TaxExempt, &c.TaxExemptReason, &c.StripeCustomerID,
+			&c.TaxExempt, &c.TaxExemptReason, &c.StripeCustomerID,
 			&c.CustomerGroupID, &accountType, &wholesaleStatus, &c.CompanyName,
 			&c.Website, &c.WholesaleNotes, &approvedAt, &c.ApprovedBy,
+			&c.TwoFAEnabled, &c.TwoFAMethod,
 			&metadata, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
@@ -345,7 +339,6 @@ func customerFromRow(r sqlcgen.Customer) *domain.Customer {
 		FirstName:        r.FirstName,
 		LastName:         r.LastName,
 		Phone:            r.Phone,
-		IsGuest:          r.IsGuest,
 		TaxExempt:        r.TaxExempt,
 		TaxExemptReason:  r.TaxExemptReason,
 		StripeCustomerID: r.StripeCustomerID,
@@ -356,6 +349,8 @@ func customerFromRow(r sqlcgen.Customer) *domain.Customer {
 		WholesaleNotes:   r.WholesaleNotes,
 		ApprovedAt:       timestampFromPG(r.ApprovedAt),
 		ApprovedBy:       r.ApprovedBy,
+		TwoFAEnabled:     r.TwoFaEnabled,
+		TwoFAMethod:      r.TwoFaMethod,
 		Metadata:         metadataFromJSON(r.Metadata),
 		CreatedAt:        r.CreatedAt,
 		UpdatedAt:        r.UpdatedAt,

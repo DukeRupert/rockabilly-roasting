@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dukerupert/hiri/internal/app"
@@ -12,6 +13,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/store"
+	"github.com/riverqueue/river"
 )
 
 // Deps holds all dependencies needed by HTTP handlers.
@@ -35,6 +37,8 @@ type Deps struct {
 	PaymentProvider     payments.Provider
 	WebhookStore        *store.WebhookStore
 	CustomerStore       *store.CustomerStore
+	MagicLinkStore      *store.MagicLinkStore
+	RiverClient         *river.Client[pgx.Tx]
 }
 
 // NewRouter creates a new HTTP router with all routes and middleware registered.
@@ -80,12 +84,18 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /wholesale/apply", deps.handleWholesaleApplyPage)
 	mux.HandleFunc("POST /wholesale/apply", deps.handleWholesaleApply)
 
-	// Customer auth routes (no session required)
-	mux.HandleFunc("GET /auth/login", deps.handleCustomerLoginPage)
-	mux.HandleFunc("POST /auth/login", deps.handleCustomerLogin)
+	// Retail account auth routes (magic link, no session required)
+	mux.HandleFunc("GET /account/login", deps.handleAccountLoginPage)
+	mux.HandleFunc("POST /account/login", deps.handleAccountLoginRequest)
+	mux.HandleFunc("GET /account/magic", deps.handleAccountMagicRedeem)
+	mux.Handle("POST /account/logout", deps.requireCustomerSession(http.HandlerFunc(deps.handleAccountLogout)))
 
-	// Customer logout (requires session)
-	mux.Handle("POST /auth/logout", deps.requireCustomerSession(http.HandlerFunc(deps.handleCustomerLogout)))
+	// Wholesale auth routes (password, no session required)
+	mux.HandleFunc("GET /wholesale/login", deps.handleWholesaleLoginPage)
+	mux.HandleFunc("POST /wholesale/login", deps.handleWholesaleLogin)
+
+	// Wholesale logout (requires session)
+	mux.Handle("POST /wholesale/logout", deps.requireCustomerSession(http.HandlerFunc(deps.handleWholesaleLogout)))
 
 	// Wholesale portal — requires approved wholesale customer
 	wholesaleMux := http.NewServeMux()

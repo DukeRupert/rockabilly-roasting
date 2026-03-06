@@ -75,7 +75,6 @@ func (s *WholesaleService) SubmitApplication(ctx context.Context, tx pgx.Tx, p A
 		FirstName: p.FirstName,
 		LastName:  p.LastName,
 		Phone:     p.Phone,
-		IsGuest:   false,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create wholesale customer: %w", err)

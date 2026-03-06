@@ -67,7 +67,7 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 	ctx := r.Context()
 	customer, ok := auth.CustomerFromContext(ctx)
 	if !ok {
-		http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
 		return
 	}
 
@@ -191,7 +191,7 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 	customer, ok := auth.CustomerFromContext(ctx)
 	if !ok {
-		http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
 		return
 	}
 
@@ -262,7 +262,7 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 	ctx := r.Context()
 	customer, ok := auth.CustomerFromContext(ctx)
 	if !ok {
-		http.Redirect(w, r, "/auth/login", http.StatusSeeOther)
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
 		return
 	}
 

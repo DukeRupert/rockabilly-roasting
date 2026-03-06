@@ -102,3 +102,12 @@ type InvoiceSendArgs struct {
 
 // Kind returns the job kind identifier.
 func (InvoiceSendArgs) Kind() string { return "invoice_send" }
+
+// MagicLinkSendArgs sends a magic link email to a customer.
+type MagicLinkSendArgs struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+	RawToken   string    `json:"raw_token"`
+}
+
+// Kind returns the job kind identifier.
+func (MagicLinkSendArgs) Kind() string { return "magic_link_send" }

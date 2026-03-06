@@ -89,13 +89,12 @@ func (s *CustomerService) VerifyEmail(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return nil
 }
 
-// CreateGuest creates a guest customer with the given email and name.
-func (s *CustomerService) CreateGuest(ctx context.Context, tx pgx.Tx, email, firstName, lastName string) (*domain.Customer, error) {
+// CreateRetail creates a retail customer with the given email and name (no password).
+func (s *CustomerService) CreateRetail(ctx context.Context, tx pgx.Tx, email, firstName, lastName string) (*domain.Customer, error) {
 	c, err := s.customers.Create(ctx, tx, store.CreateCustomerParams{
 		Email:     email,
 		FirstName: firstName,
 		LastName:  lastName,
-		IsGuest:   true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create guest customer: %w", err)

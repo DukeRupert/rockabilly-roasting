@@ -33,6 +33,7 @@ type Querier interface {
 	CreateInvoiceLine(ctx context.Context, arg CreateInvoiceLineParams) (InvoiceLine, error)
 	CreateInvoicePayment(ctx context.Context, arg CreateInvoicePaymentParams) (InvoicePayment, error)
 	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (LineItem, error)
+	CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkTokenParams) (MagicLinkToken, error)
 	CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error)
 	CreatePriceSet(ctx context.Context, arg CreatePriceSetParams) (PriceSet, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
@@ -63,6 +64,7 @@ type Querier interface {
 	DeleteCustomer(ctx context.Context, id uuid.UUID) error
 	DeleteCustomerGroup(ctx context.Context, id uuid.UUID) error
 	DeleteDiscount(ctx context.Context, id uuid.UUID) error
+	DeleteExpiredMagicLinkTokens(ctx context.Context) error
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteLineItemsByOrder(ctx context.Context, orderID uuid.UUID) error
 	DeleteOrder(ctx context.Context, id uuid.UUID) error
@@ -156,6 +158,7 @@ type Querier interface {
 	MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error
 	NextInvoiceNumber(ctx context.Context) (int32, error)
 	PruneExpiredSessions(ctx context.Context) (int64, error)
+	RedeemMagicLinkToken(ctx context.Context, tokenHash string) (MagicLinkToken, error)
 	ReleaseReservation(ctx context.Context, arg ReleaseReservationParams) (StockLevel, error)
 	RemoveCustomerGroupMembership(ctx context.Context, arg RemoveCustomerGroupMembershipParams) error
 	RemoveProductGroupVisibility(ctx context.Context, arg RemoveProductGroupVisibilityParams) error

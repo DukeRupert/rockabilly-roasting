@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -17,29 +20,38 @@ import (
 	"github.com/dukerupert/hiri/internal/store"
 )
 
+// MagicLinkDuration is how long a magic link token is valid.
+const MagicLinkDuration = 15 * time.Minute
+
+// MagicLinkSessionDuration is the session lifetime for magic link logins.
+const MagicLinkSessionDuration = 30 * 24 * time.Hour
+
 // AuthService contains business logic for authentication and session management.
 type AuthService struct {
-	staff     *store.StaffStore
-	customers *store.CustomerStore
-	sessions  *sessions.Manager
-	audit     *audit.AuditWriter
-	metrics   *metrics.Registry
+	staff      *store.StaffStore
+	customers  *store.CustomerStore
+	magicLinks *store.MagicLinkStore
+	sessions   *sessions.Manager
+	audit      *audit.AuditWriter
+	metrics    *metrics.Registry
 }
 
 // NewAuthService creates a new AuthService.
 func NewAuthService(
 	staff *store.StaffStore,
 	customers *store.CustomerStore,
+	magicLinks *store.MagicLinkStore,
 	sessions *sessions.Manager,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
 ) *AuthService {
 	return &AuthService{
-		staff:     staff,
-		customers: customers,
-		sessions:  sessions,
-		audit:     audit,
-		metrics:   metrics,
+		staff:      staff,
+		customers:  customers,
+		magicLinks: magicLinks,
+		sessions:   sessions,
+		audit:      audit,
+		metrics:    metrics,
 	}
 }
 
@@ -183,4 +195,64 @@ func (s *AuthService) GetCustomerByID(ctx context.Context, tx pgx.Tx, id uuid.UU
 		return nil, fmt.Errorf("get customer: %w", err)
 	}
 	return customer, nil
+}
+
+// --- Magic link authentication ---
+
+// CreateMagicLinkToken generates a magic link token for a customer.
+// Returns the raw token (for the email link) and the stored record.
+// The raw token is NOT stored — only its SHA-256 hash is persisted.
+func (s *AuthService) CreateMagicLinkToken(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (rawToken string, err error) {
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("generate magic link token: %w", err)
+	}
+	rawToken = hex.EncodeToString(tokenBytes)
+
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	expiresAt := time.Now().Add(MagicLinkDuration)
+	_, err = s.magicLinks.Create(ctx, tx, customerID, tokenHash, expiresAt)
+	if err != nil {
+		return "", fmt.Errorf("store magic link token: %w", err)
+	}
+
+	return rawToken, nil
+}
+
+// RedeemMagicLink validates a magic link token and creates a session.
+// The token is single-use and expires after MagicLinkDuration.
+func (s *AuthService) RedeemMagicLink(ctx context.Context, tx pgx.Tx, rawToken string, ipAddress, userAgent *string) (*domain.Session, string, error) {
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	token, err := s.magicLinks.Redeem(ctx, tx, tokenHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, "", ErrMagicLinkExpired
+		}
+		return nil, "", fmt.Errorf("redeem magic link: %w", err)
+	}
+
+	// Create a long-lived session (30 days).
+	expiresAt := time.Now().Add(MagicLinkSessionDuration)
+	session, sessionToken, err := s.sessions.GetStore().Create(ctx, tx, domain.SessionActorTypeCustomer, token.CustomerID, expiresAt, ipAddress, userAgent)
+	if err != nil {
+		return nil, "", fmt.Errorf("create magic link session: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    domain.AuditActorTypeCustomer,
+		ActorID:      &token.CustomerID,
+		ActorName:    "",
+		Action:       audit.AuditCustomerLogin,
+		ResourceType: "session",
+		ResourceID:   session.ID,
+		Metadata:     map[string]any{"method": "magic_link"},
+	}); err != nil {
+		return nil, "", fmt.Errorf("audit magic link login: %w", err)
+	}
+
+	return session, sessionToken, nil
 }

@@ -38,12 +38,8 @@ templ CustomerShowContent(props CustomerShowProps) {
 		</div>
 		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
 			<dt class="text-sm font-medium text-stone-500">Account type</dt>
-			<dd class="mt-1 text-sm text-stone-900">
-				if props.Customer.IsGuest {
-					Guest
-				} else {
-					Registered
-				}
+			<dd class="mt-1 text-sm text-stone-900 capitalize">
+				{ string(props.Customer.AccountType) }
 			</dd>
 		</div>
 		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">

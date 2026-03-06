@@ -475,6 +475,8 @@ func (s *SubscriptionService) LinkOrder(ctx context.Context, tx pgx.Tx, subscrip
 
 func nextPeriodEnd(start time.Time, interval domain.SubscriptionInterval, count int) time.Time {
 	switch interval {
+	case domain.SubscriptionIntervalEvery2Minutes:
+		return start.Add(time.Duration(2*count) * time.Minute)
 	case domain.SubscriptionIntervalEvery14Days:
 		return start.AddDate(0, 0, 14*count)
 	case domain.SubscriptionIntervalEvery21Days:

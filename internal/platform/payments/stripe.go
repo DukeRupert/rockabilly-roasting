@@ -44,6 +44,10 @@ func (p *StripeProvider) CreatePaymentIntent(_ context.Context, req CreatePaymen
 		params.Confirm = stripe.Bool(true)
 	}
 
+	if req.SetupFutureUsage != "" {
+		params.SetupFutureUsage = stripe.String(req.SetupFutureUsage)
+	}
+
 	if req.ShippingAddress != nil {
 		params.Shipping = &stripe.ShippingDetailsParams{
 			Name: stripe.String(req.ShippingAddress.Name),

@@ -32,6 +32,7 @@ type Deps struct {
 	CartService     *app.CartService
 	PaymentProvider payments.Provider
 	WebhookStore    *store.WebhookStore
+	CustomerStore   *store.CustomerStore
 }
 
 // NewRouter creates a new HTTP router with all routes and middleware registered.

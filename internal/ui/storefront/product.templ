@@ -238,6 +238,8 @@ func optionPillClasses(selected bool) string {
 
 func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) string {
 	switch interval {
+	case domain.SubscriptionIntervalEvery2Minutes:
+		return "Every 2 Minutes"
 	case domain.SubscriptionIntervalEvery14Days:
 		return "Every 14 Days"
 	case domain.SubscriptionIntervalEvery21Days:

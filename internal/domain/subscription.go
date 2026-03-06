@@ -10,10 +10,11 @@ import (
 type SubscriptionInterval string
 
 const (
-	SubscriptionIntervalEvery14Days SubscriptionInterval = "every_14_days"
-	SubscriptionIntervalEvery21Days SubscriptionInterval = "every_21_days"
-	SubscriptionIntervalEvery30Days SubscriptionInterval = "every_30_days"
-	SubscriptionIntervalEvery60Days SubscriptionInterval = "every_60_days"
+	SubscriptionIntervalEvery2Minutes SubscriptionInterval = "every_2_minutes" // dev/testing only
+	SubscriptionIntervalEvery14Days   SubscriptionInterval = "every_14_days"
+	SubscriptionIntervalEvery21Days   SubscriptionInterval = "every_21_days"
+	SubscriptionIntervalEvery30Days   SubscriptionInterval = "every_30_days"
+	SubscriptionIntervalEvery60Days   SubscriptionInterval = "every_60_days"
 )
 
 // SubscriptionStatus represents the lifecycle state of a subscription.

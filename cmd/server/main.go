@@ -114,11 +114,11 @@ func run() error {
 		Workers: workers,
 		PeriodicJobs: []*river.PeriodicJob{
 			river.NewPeriodicJob(
-				river.PeriodicInterval(1*time.Hour),
+				river.PeriodicInterval(1*time.Minute),
 				func() (river.JobArgs, *river.InsertOpts) {
 					return jobs.RenewalSchedulerArgs{}, &river.InsertOpts{
 						UniqueOpts: river.UniqueOpts{
-							ByPeriod: 1 * time.Hour,
+							ByPeriod: 1 * time.Minute,
 						},
 					}
 				},
@@ -167,6 +167,7 @@ func run() error {
 		CartService:     cartSvc,
 		PaymentProvider: paymentProvider,
 		WebhookStore:    webhookStore,
+		CustomerStore:   customerStore,
 	}
 
 	handler := web.NewRouter(deps)

@@ -27,13 +27,14 @@ const (
 
 // CreatePaymentIntentRequest contains the data needed to create a payment intent.
 type CreatePaymentIntentRequest struct {
-	AmountCents     int64
-	Currency        string
-	CustomerID      string            // Stripe customer ID (cus_xxx)
-	PaymentMethodID string            // optional, for off-session payments
-	Metadata        map[string]string // order ID, subscription ID, etc.
-	OffSession      bool              // true for subscription renewals
-	ShippingAddress *ShippingAddress   // for automatic tax calculation
+	AmountCents      int64
+	Currency         string
+	CustomerID       string            // Stripe customer ID (cus_xxx)
+	PaymentMethodID  string            // optional, for off-session payments
+	Metadata         map[string]string // order ID, subscription ID, etc.
+	OffSession       bool              // true for subscription renewals
+	SetupFutureUsage string            // "off_session" to save PM for later charges
+	ShippingAddress  *ShippingAddress  // for automatic tax calculation
 }
 
 // ShippingAddress is the address passed to Stripe for tax calculation.

@@ -106,11 +106,27 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	}
 
 	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
+
+	// Look up saved payment methods for off-session charging
+	methods, err := s.payments.ListPaymentMethods(ctx, *customer.StripeCustomerID)
+	if err != nil {
+		return nil, fmt.Errorf("list payment methods: %w", err)
+	}
+	if len(methods) == 0 {
+		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
+			return nil
+		})
+		s.metrics.SubscriptionRenewalFailuresTotal.WithLabelValues("no_payment_method").Inc()
+		return nil, fmt.Errorf("customer %s has no saved payment methods", customer.ID)
+	}
+
 	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
-		AmountCents: int64(priceCents),
-		Currency:    "usd",
-		CustomerID:  *customer.StripeCustomerID,
-		OffSession:  true,
+		AmountCents:     int64(priceCents),
+		Currency:        "usd",
+		CustomerID:      *customer.StripeCustomerID,
+		PaymentMethodID: methods[0].ID,
+		OffSession:      true,
 		Metadata: map[string]string{
 			"subscription_id": sub.ID.String(),
 			"customer_id":     customer.ID.String(),

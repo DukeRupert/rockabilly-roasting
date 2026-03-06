@@ -84,7 +84,15 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, app.ErrSubscriptionPlanNotFound) {
-			http.NotFound(w, r)
+			http.Error(w, "subscription plan not found", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, app.ErrSubscriptionPlanInactive) {
+			http.Error(w, "subscription plan is not active", http.StatusNotFound)
+			return
+		}
+		if errors.Is(err, app.ErrPriceNotFound) {
+			http.Error(w, "price not found for this variant", http.StatusNotFound)
 			return
 		}
 		Error(w, r, err)
@@ -165,15 +173,44 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Create or find Stripe customer so the payment method is saved for future charges
+	var stripeCustomerID string
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		existing, txErr := d.CustomerService.GetCustomerByEmail(ctx, tx, req.Email)
+		if txErr == nil && existing.StripeCustomerID != nil {
+			stripeCustomerID = *existing.StripeCustomerID
+		}
+		return nil
+	})
+	if err != nil {
+		logger.Error("subscribe lookup customer", "error", err)
+	}
+
+	if stripeCustomerID == "" {
+		stripeCust, stripeErr := d.PaymentProvider.CreateCustomer(ctx, payments.CreateCustomerRequest{
+			Email: req.Email,
+			Name:  req.FirstName + " " + req.LastName,
+		})
+		if stripeErr != nil {
+			logger.Error("subscribe create stripe customer", "error", stripeErr)
+			JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create payment customer"})
+			return
+		}
+		stripeCustomerID = stripeCust.ID
+	}
+
 	pi, err := d.PaymentProvider.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
-		AmountCents: int64(price),
-		Currency:    "usd",
+		AmountCents:      int64(price),
+		Currency:         "usd",
+		CustomerID:       stripeCustomerID,
+		SetupFutureUsage: "off_session",
 		Metadata: map[string]string{
-			"plan_id":    planID.String(),
-			"variant_id": variantID.String(),
-			"email":      req.Email,
-			"first_name": req.FirstName,
-			"last_name":  req.LastName,
+			"plan_id":             planID.String(),
+			"variant_id":          variantID.String(),
+			"email":               req.Email,
+			"first_name":          req.FirstName,
+			"last_name":           req.LastName,
+			"stripe_customer_id":  stripeCustomerID,
 		},
 		ShippingAddress: &payments.ShippingAddress{
 			Name:       req.FirstName + " " + req.LastName,
@@ -232,6 +269,16 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Read Stripe customer ID from PI metadata (set during payment-intent creation)
+	stripeCustomerID := pi.Metadata["stripe_customer_id"]
+	if stripeCustomerID == "" {
+		logger.Error("subscribe confirm: missing stripe_customer_id in PI metadata")
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": "missing payment customer"})
+		return
+	}
+
+	// --- DB transaction: create everything ---
+
 	var resp subscribeConfirmResponse
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -263,6 +310,14 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 			customer, txErr = d.CustomerService.CreateGuest(ctx, tx, req.Email, req.FirstName, req.LastName)
 			if txErr != nil {
 				return fmt.Errorf("create guest: %w", txErr)
+			}
+		}
+
+		// Save Stripe customer ID
+		if customer.StripeCustomerID == nil {
+			_, txErr = d.CustomerStore.UpdateStripeCustomerID(ctx, tx, customer.ID, stripeCustomerID)
+			if txErr != nil {
+				return fmt.Errorf("save stripe customer id: %w", txErr)
 			}
 		}
 

@@ -16,6 +16,8 @@ type Deps struct {
 	FulfillmentService  *app.FulfillmentService
 	CheckoutService     *app.CheckoutService
 	AuthService         *app.AuthService
+	WholesaleService    *app.WholesaleService
+	InvoiceService      *app.InvoiceService
 	Audit               *audit.AuditWriter
 	Metrics             *metrics.Registry
 }
@@ -76,3 +78,27 @@ type SessionPruneArgs struct{}
 
 // Kind returns the job kind identifier.
 func (SessionPruneArgs) Kind() string { return "session_prune" }
+
+// WholesaleApplicationNotifyArgs notifies staff of a new wholesale application.
+type WholesaleApplicationNotifyArgs struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (WholesaleApplicationNotifyArgs) Kind() string { return "wholesale_application_notify" }
+
+// WholesaleApprovedArgs sends a welcome email to an approved wholesale customer.
+type WholesaleApprovedArgs struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (WholesaleApprovedArgs) Kind() string { return "wholesale_approved" }
+
+// InvoiceSendArgs sends an invoice to the customer via email.
+type InvoiceSendArgs struct {
+	InvoiceID uuid.UUID `json:"invoice_id"`
+}
+
+// Kind returns the job kind identifier.
+func (InvoiceSendArgs) Kind() string { return "invoice_send" }

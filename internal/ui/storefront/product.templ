@@ -39,7 +39,7 @@ templ ProductContent(props ProductDetailProps) {
 			</ol>
 		</nav>
 		<!-- Product layout: 2 columns -->
-		<div class="lg:grid lg:grid-cols-2 lg:gap-x-8">
+		<div class="lg:grid lg:grid-cols-2 lg:gap-x-12">
 			<!-- Image gallery -->
 			<div>
 				if len(props.Media) > 0 {
@@ -76,9 +76,11 @@ templ ProductContent(props ProductDetailProps) {
 			<!-- Product info -->
 			<div class="mt-8 lg:mt-0">
 				<h1 class="text-3xl font-bold tracking-tight text-hiri-text">{ props.Product.Title }</h1>
-				<!-- Price -->
+				<!-- Price display -->
 				if props.DefaultPrice != nil {
-					<p class="mt-3 text-2xl font-semibold text-hiri-teal">{ formatCents(*props.DefaultPrice) }</p>
+					<div class="mt-3" id="price-display">
+						<span class="text-2xl font-semibold text-hiri-text" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
+					</div>
 				}
 				<!-- Description -->
 				if props.Product.Description != "" {
@@ -106,61 +108,103 @@ templ ProductContent(props ProductDetailProps) {
 						}
 					</div>
 				}
-				<!-- Add to Cart -->
 				if len(props.Variants) > 0 {
-					<div class="mt-8">
-						<form
-							method="post"
-							action="/cart/add"
-							hx-post="/cart/add"
-							hx-swap="none"
-						>
-							<input type="hidden" name="variant_id" id="selected-variant-id" value={ defaultVariantID(props.Variants) }/>
-							<input type="hidden" name="quantity" value="1"/>
-							<button
-								type="submit"
-								class="w-full rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
-							>
-								Add to Cart
-							</button>
-						</form>
-					</div>
-				}
-				<!-- Subscription options -->
-				if len(props.SubscriptionPlans) > 0 {
-					<div class="mt-8 border-t border-stone-200 pt-8">
-						<h3 class="text-sm font-semibold text-hiri-text">Subscribe &amp; Save</h3>
-						<p class="mt-1 text-sm text-hiri-text-secondary">Get this product delivered on a schedule.</p>
-						<div class="mt-4 space-y-3">
-							for _, plan := range props.SubscriptionPlans {
-								<div class="rounded-lg border border-stone-200 p-4 hover:border-hiri-teal transition-colors">
-									<div class="flex items-center justify-between">
-										<div>
-											<p class="text-sm font-medium text-hiri-text">{ plan.Name }</p>
-											<p class="text-xs text-hiri-text-secondary">
-												{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }
-												if plan.DiscountPct > 0 {
-													<span class="ml-1 text-hiri-teal font-medium">
-														{ fmt.Sprintf("Save %d%%", plan.DiscountPct) }
-													</span>
-												}
-											</p>
-										</div>
-										<a
-											href={ templ.SafeURL(fmt.Sprintf("/subscribe?plan_id=%s&variant_id=%s", plan.ID.String(), defaultVariantID(props.Variants))) }
-											class="inline-flex items-center rounded-md bg-hiri-teal/10 px-3 py-1.5 text-sm font-semibold text-hiri-teal hover:bg-hiri-teal/20"
+					<!-- Purchase mode selector -->
+					<div class="mt-8" id="purchase-section">
+						if len(props.SubscriptionPlans) > 0 {
+							<!-- Mode toggle tabs -->
+							<div class="grid grid-cols-2 gap-3" id="purchase-mode-toggle">
+								<button
+									type="button"
+									data-mode="onetime"
+									class="purchase-mode-btn relative rounded-lg border-2 border-hiri-teal bg-hiri-teal/5 p-4 text-left transition-colors"
+								>
+									<span class="block text-sm font-semibold text-hiri-text">One-Time Purchase</span>
+								</button>
+								<button
+									type="button"
+									data-mode="subscribe"
+									class="purchase-mode-btn relative rounded-lg border-2 border-hiri-border bg-white p-4 text-left transition-colors"
+								>
+									<span class="block text-sm font-semibold text-hiri-text">Subscribe &amp; Save</span>
+									<span class="block text-xs text-hiri-teal font-medium mt-0.5">
+										{ fmt.Sprintf("Save up to %d%%", maxDiscount(props.SubscriptionPlans)) }
+									</span>
+								</button>
+							</div>
+							<!-- Subscription frequency options (hidden by default) -->
+							<div id="subscribe-options" class="hidden mt-4">
+								<p class="text-sm font-medium text-hiri-text mb-3">Delivery every</p>
+								<div class="space-y-2">
+									for i, plan := range props.SubscriptionPlans {
+										<label
+											class={ "subscribe-frequency-option flex items-center justify-between rounded-lg border p-3 cursor-pointer transition-colors",
+												templ.KV("border-hiri-teal bg-hiri-teal/5", i == 0),
+												templ.KV("border-hiri-border hover:border-stone-300", i != 0) }
+											data-plan-id={ plan.ID.String() }
+											data-discount={ fmt.Sprintf("%d", plan.DiscountPct) }
 										>
-											Subscribe
-										</a>
-									</div>
+											<div class="flex items-center gap-3">
+												<input
+													type="radio"
+													name="plan_id"
+													value={ plan.ID.String() }
+													if i == 0 {
+														checked
+													}
+													class="size-4 border-stone-300 text-hiri-teal focus:ring-hiri-teal"
+												/>
+												<span class="text-sm text-hiri-text">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
+											</div>
+											if plan.DiscountPct > 0 {
+												<span class="inline-flex items-center rounded-md bg-hiri-teal/10 px-2 py-0.5 text-xs font-medium text-hiri-teal">
+													{ fmt.Sprintf("Save %d%%", plan.DiscountPct) }
+												</span>
+											}
+										</label>
+									}
 								</div>
-							}
+							</div>
+						}
+						<!-- One-time purchase form -->
+						<div id="onetime-form" class="mt-4">
+							<form
+								method="post"
+								action="/cart/add"
+								hx-post="/cart/add"
+								hx-swap="none"
+							>
+								<input type="hidden" name="variant_id" id="selected-variant-id" value={ defaultVariantID(props.Variants) }/>
+								<input type="hidden" name="quantity" value="1"/>
+								<button
+									type="submit"
+									class="w-full rounded-md bg-hiri-teal px-6 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+								>
+									Add to Cart
+								</button>
+							</form>
 						</div>
+						<!-- Subscribe form (hidden by default) -->
+						if len(props.SubscriptionPlans) > 0 {
+							<div id="subscribe-form" class="hidden mt-4">
+								<a
+									id="subscribe-action"
+									href={ templ.SafeURL(fmt.Sprintf("/subscribe?plan_id=%s&variant_id=%s", props.SubscriptionPlans[0].ID.String(), defaultVariantID(props.Variants))) }
+									class="block w-full rounded-md bg-hiri-teal px-6 py-3.5 text-center text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+								>
+									Subscribe
+								</a>
+								<p class="mt-2 text-center text-xs text-hiri-text-secondary">Cancel or modify anytime from your account.</p>
+							</div>
+						}
 					</div>
 				}
 			</div>
 		</div>
 	</div>
+	if len(props.SubscriptionPlans) > 0 && len(props.Variants) > 0 {
+		@purchaseModeScript()
+	}
 }
 
 func defaultVariantID(variants []VariantWithPrice) string {
@@ -173,6 +217,16 @@ func defaultVariantID(variants []VariantWithPrice) string {
 		return variants[0].Variant.ID.String()
 	}
 	return ""
+}
+
+func maxDiscount(plans []domain.SubscriptionPlan) int {
+	max := 0
+	for _, p := range plans {
+		if p.DiscountPct > max {
+			max = p.DiscountPct
+		}
+	}
+	return max
 }
 
 func optionPillClasses(selected bool) string {
@@ -195,6 +249,99 @@ func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) 
 	default:
 		return string(interval)
 	}
+}
+
+templ purchaseModeScript() {
+	<script>
+		(function() {
+			var mode = 'onetime';
+			var variantID = document.getElementById('selected-variant-id');
+
+			// Mode toggle
+			document.querySelectorAll('.purchase-mode-btn').forEach(function(btn) {
+				btn.addEventListener('click', function() {
+					mode = btn.dataset.mode;
+					// Update tab styles
+					document.querySelectorAll('.purchase-mode-btn').forEach(function(b) {
+						if (b.dataset.mode === mode) {
+							b.className = 'purchase-mode-btn relative rounded-lg border-2 border-hiri-teal bg-hiri-teal/5 p-4 text-left transition-colors';
+						} else {
+							b.className = 'purchase-mode-btn relative rounded-lg border-2 border-hiri-border bg-white p-4 text-left transition-colors';
+						}
+					});
+					// Toggle form visibility
+					var onetimeForm = document.getElementById('onetime-form');
+					var subscribeForm = document.getElementById('subscribe-form');
+					var subscribeOptions = document.getElementById('subscribe-options');
+					if (mode === 'subscribe') {
+						onetimeForm.classList.add('hidden');
+						subscribeForm.classList.remove('hidden');
+						subscribeOptions.classList.remove('hidden');
+						updatePrice();
+					} else {
+						onetimeForm.classList.remove('hidden');
+						subscribeForm.classList.add('hidden');
+						subscribeOptions.classList.add('hidden');
+						resetPrice();
+					}
+				});
+			});
+
+			// Frequency selection
+			document.querySelectorAll('.subscribe-frequency-option').forEach(function(label) {
+				var radio = label.querySelector('input[type="radio"]');
+				radio.addEventListener('change', function() {
+					// Update selected styles
+					document.querySelectorAll('.subscribe-frequency-option').forEach(function(l) {
+						l.classList.remove('border-hiri-teal', 'bg-hiri-teal/5');
+						l.classList.add('border-hiri-border');
+					});
+					label.classList.remove('border-hiri-border');
+					label.classList.add('border-hiri-teal', 'bg-hiri-teal/5');
+					// Update subscribe link
+					updateSubscribeLink(label.dataset.planId);
+					updatePrice();
+				});
+			});
+
+			function updateSubscribeLink(planId) {
+				var link = document.getElementById('subscribe-action');
+				if (!link) return;
+				var vid = variantID ? variantID.value : '';
+				link.href = '/subscribe?plan_id=' + planId + '&variant_id=' + vid;
+			}
+
+			function updatePrice() {
+				var priceEl = document.querySelector('[data-base-price]');
+				if (!priceEl) return;
+				var baseCents = parseInt(priceEl.dataset.basePrice, 10);
+				var checked = document.querySelector('.subscribe-frequency-option input:checked');
+				if (!checked) return;
+				var label = checked.closest('.subscribe-frequency-option');
+				var discount = parseInt(label.dataset.discount, 10) || 0;
+				var discountedCents = Math.round(baseCents * (100 - discount) / 100);
+				var display = document.getElementById('price-display');
+				if (discount > 0) {
+					display.innerHTML = '<span class="text-lg text-hiri-text-secondary line-through">' + formatCents(baseCents) + '</span>' +
+						' <span class="text-2xl font-semibold text-hiri-teal">' + formatCents(discountedCents) + '</span>';
+				} else {
+					display.innerHTML = '<span class="text-2xl font-semibold text-hiri-text">' + formatCents(baseCents) + '</span>';
+				}
+			}
+
+			function resetPrice() {
+				var priceEl = document.querySelector('[data-base-price]');
+				if (!priceEl) return;
+				var baseCents = parseInt(priceEl.dataset.basePrice, 10);
+				var display = document.getElementById('price-display');
+				display.innerHTML = '<span class="text-2xl font-semibold text-hiri-text" data-base-price="' + baseCents + '">' + formatCents(baseCents) + '</span>';
+			}
+
+			function formatCents(cents) {
+				return '$' + (cents / 100).toFixed(2);
+			}
+		})();
+	</script>
 }
 
 templ ProductPage(props ProductDetailProps) {

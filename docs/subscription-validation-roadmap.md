@@ -101,7 +101,6 @@ Implement subscription creation, renewal, and management.
 **Remaining:**
 - `PaymentRetry` River worker — retry failed subscription payments
 - Customer self-service portal (change variant, change frequency, skip)
-- Admin order management UI (list, detail, status actions)
 - Revert scheduler interval from 1 minute back to 1 hour for production
 - Remove `every_2_minutes` dev-only interval before production
 - Validate batched renewals end-to-end with Stripe test mode

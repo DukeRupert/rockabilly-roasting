@@ -1,0 +1,156 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+type PackingSlipProps struct {
+	Order           *domain.Order
+	LineItems       []EnrichedLineItem
+	Customer        *domain.Customer
+	ShippingAddress *domain.Address
+}
+
+templ PackingSlip(props PackingSlipProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Packing Slip — { props.Order.Number }</title>
+			<style>
+				* { margin: 0; padding: 0; box-sizing: border-box; }
+				body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #1c1917; padding: 24px; }
+				.header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1c1917; padding-bottom: 16px; margin-bottom: 24px; }
+				.company { font-size: 18px; font-weight: 700; }
+				.order-info { text-align: right; }
+				.order-number { font-size: 14px; font-weight: 700; }
+				.order-date { color: #78716c; margin-top: 4px; }
+				.addresses { display: flex; gap: 48px; margin-bottom: 24px; }
+				.address-block h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #78716c; margin-bottom: 8px; }
+				.address-block p { line-height: 1.5; }
+				table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+				thead th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #78716c; padding: 8px 12px; border-bottom: 1px solid #d6d3d1; }
+				thead th.right { text-align: right; }
+				tbody td { padding: 10px 12px; border-bottom: 1px solid #e7e5e4; }
+				tbody td.right { text-align: right; }
+				.totals { margin-left: auto; width: 240px; }
+				.totals .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+				.totals .row.total { border-top: 1px solid #1c1917; padding-top: 8px; margin-top: 4px; font-weight: 700; font-size: 14px; }
+				.footer { margin-top: 48px; text-align: center; font-size: 11px; color: #a8a29e; }
+				@media print {
+					body { padding: 0; }
+					@page { margin: 0.5in; }
+				}
+			</style>
+		</head>
+		<body onload="window.print()">
+			<div class="header">
+				<div class="company">Hiri Coffee</div>
+				<div class="order-info">
+					<div class="order-number">{ props.Order.Number }</div>
+					<div class="order-date">{ props.Order.PlacedAt.Format("January 2, 2006") }</div>
+				</div>
+			</div>
+			<div class="addresses">
+				if props.ShippingAddress != nil {
+					<div class="address-block">
+						<h3>Ship To</h3>
+						<p>
+							{ props.ShippingAddress.FirstName } { props.ShippingAddress.LastName }
+							if props.ShippingAddress.Company != nil && *props.ShippingAddress.Company != "" {
+								<br/>
+								{ *props.ShippingAddress.Company }
+							}
+							<br/>
+							{ props.ShippingAddress.Line1 }
+							if props.ShippingAddress.Line2 != nil && *props.ShippingAddress.Line2 != "" {
+								<br/>
+								{ *props.ShippingAddress.Line2 }
+							}
+							<br/>
+							{ props.ShippingAddress.City }, { props.ShippingAddress.State } { props.ShippingAddress.PostalCode }
+						</p>
+					</div>
+				}
+				if props.Customer != nil {
+					<div class="address-block">
+						<h3>Customer</h3>
+						<p>
+							{ props.Customer.FirstName } { props.Customer.LastName }
+							<br/>
+							{ props.Customer.Email }
+						</p>
+					</div>
+				}
+			</div>
+			<table>
+				<thead>
+					<tr>
+						<th>Product</th>
+						<th>SKU</th>
+						<th class="right">Qty</th>
+						<th class="right">Unit Price</th>
+						<th class="right">Total</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, eli := range props.LineItems {
+						<tr>
+							<td>
+								if eli.ProductTitle != "" {
+									{ eli.ProductTitle }
+								} else {
+									{ eli.LineItem.VariantID.String()[:8] }...
+								}
+							</td>
+							<td>
+								if eli.VariantSKU != "" {
+									{ eli.VariantSKU }
+								} else {
+									—
+								}
+							</td>
+							<td class="right">{ fmt.Sprintf("%d", eli.LineItem.Quantity) }</td>
+							<td class="right">{ formatCents(eli.LineItem.UnitPrice) }</td>
+							<td class="right">{ formatCents(eli.LineItem.Total) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<div class="totals">
+				<div class="row">
+					<span>Subtotal</span>
+					<span>{ formatCents(props.Order.Subtotal) }</span>
+				</div>
+				if props.Order.DiscountTotal > 0 {
+					<div class="row">
+						<span>Discounts</span>
+						<span>-{ formatCents(props.Order.DiscountTotal) }</span>
+					</div>
+				}
+				<div class="row">
+					<span>Shipping</span>
+					<span>{ formatCents(props.Order.ShippingTotal) }</span>
+				</div>
+				<div class="row">
+					<span>Tax</span>
+					<span>{ formatCents(props.Order.TaxTotal) }</span>
+				</div>
+				<div class="row total">
+					<span>Total</span>
+					<span>{ formatCents(props.Order.Total) }</span>
+				</div>
+			</div>
+			if props.Order.Notes != nil && *props.Order.Notes != "" {
+				<div style="margin-top: 24px; padding: 12px; background: #fafaf9; border: 1px solid #e7e5e4;">
+					<strong>Notes:</strong> { *props.Order.Notes }
+				</div>
+			}
+			<div class="footer">
+				Thank you for your order!
+			</div>
+		</body>
+	</html>
+}

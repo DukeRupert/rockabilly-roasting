@@ -81,6 +81,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var lineItems []domain.LineItem
 	var adjustments []domain.Adjustment
 	var customer *domain.Customer
+	var shippingAddress *domain.Address
 	var enrichedItems []admin.EnrichedLineItem
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -104,6 +105,12 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			if txErr != nil && !errors.Is(txErr, app.ErrCustomerNotFound) {
 				return txErr
 			}
+		}
+
+		// Resolve shipping address.
+		shippingAddress, txErr = d.CustomerService.GetAddressByID(ctx, tx, order.ShippingAddressID)
+		if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
+			return txErr
 		}
 
 		// Resolve variant + product names for each line item.
@@ -143,10 +150,11 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := admin.OrderShowProps{
-		Order:       order,
-		LineItems:   enrichedItems,
-		Adjustments: adjustments,
-		Customer:    customer,
+		Order:           order,
+		LineItems:       enrichedItems,
+		Adjustments:     adjustments,
+		Customer:        customer,
+		ShippingAddress: shippingAddress,
 	}
 
 	if IsHTMX(r) {
@@ -198,7 +206,7 @@ func (d *Deps) handleAdminOrderRefund(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
 }
 
-func (d *Deps) handleAdminOrderUpdateFulfillment(w http.ResponseWriter, r *http.Request) {
+func (d *Deps) handleAdminOrderFulfill(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	id, err := uuid.Parse(r.PathValue("id"))
@@ -207,10 +215,8 @@ func (d *Deps) handleAdminOrderUpdateFulfillment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	status := domain.FulfillmentStatus(r.FormValue("fulfillment_status"))
-
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.OrderService.UpdateFulfillmentStatus(ctx, tx, id, status, devActor())
+		_, txErr := d.OrderService.FulfillOrder(ctx, tx, id, devActor())
 		return txErr
 	})
 	if err != nil {
@@ -219,4 +225,107 @@ func (d *Deps) handleAdminOrderUpdateFulfillment(w http.ResponseWriter, r *http.
 	}
 
 	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminOrderShip(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.ShipOrder(ctx, tx, id, devActor())
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var order *domain.Order
+	var lineItems []domain.LineItem
+	var customer *domain.Customer
+	var shippingAddress *domain.Address
+	var enrichedItems []admin.EnrichedLineItem
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		order, txErr = d.OrderService.GetOrder(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		lineItems, txErr = d.OrderService.ListLineItems(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+
+		if order.CustomerID != nil {
+			customer, txErr = d.CustomerService.GetCustomer(ctx, tx, *order.CustomerID)
+			if txErr != nil && !errors.Is(txErr, app.ErrCustomerNotFound) {
+				return txErr
+			}
+		}
+
+		shippingAddress, txErr = d.CustomerService.GetAddressByID(ctx, tx, order.ShippingAddressID)
+		if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
+			return txErr
+		}
+
+		enrichedItems = make([]admin.EnrichedLineItem, len(lineItems))
+		for i, li := range lineItems {
+			enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
+
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
+			if vErr != nil {
+				if errors.Is(vErr, app.ErrVariantNotFound) {
+					continue
+				}
+				return vErr
+			}
+			enrichedItems[i].VariantSKU = variant.SKU
+
+			product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+			if pErr != nil {
+				if errors.Is(pErr, app.ErrProductNotFound) {
+					continue
+				}
+				return pErr
+			}
+			enrichedItems[i].ProductTitle = product.Title
+		}
+
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, app.ErrOrderNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		Error(w, r, err)
+		return
+	}
+
+	props := admin.PackingSlipProps{
+		Order:           order,
+		LineItems:       enrichedItems,
+		Customer:        customer,
+		ShippingAddress: shippingAddress,
+	}
+
+	admin.PackingSlip(props).Render(ctx, w) //nolint:errcheck
 }

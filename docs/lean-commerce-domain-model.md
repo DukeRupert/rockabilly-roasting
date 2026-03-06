@@ -337,7 +337,29 @@ Discount, tax, and shipping details beyond the totals stored on the order are re
 | `delivered` | All items confirmed delivered | **Yes** |
 | `returned` | Items returned by customer | **Yes** |
 
-### 4.6 LineItem
+### 4.6 Admin Order Pipeline
+
+The admin UI presents a simplified **three-step progress bar** rather than exposing the raw order/payment/fulfillment statuses independently. This avoids confusing combinations (e.g., "pending" order status alongside "captured" payment).
+
+```
+  Paid  ────  Fulfilled  ────  Shipped
+   ✓             ✓              ○
+```
+
+**Pipeline mapping:**
+| Step | Condition | Order Status set to | Fulfillment Status set to |
+|------|-----------|---------------------|---------------------------|
+| Paid | Payment captured (via Stripe webhook) | `confirmed` | — |
+| Fulfilled | Admin clicks "Fulfill Order" | `processing` | `fulfilled` |
+| Shipped | Admin clicks "Mark Shipped" | `complete` | `shipped` |
+
+**Guided actions:** Only the logical next step is shown as a primary button. Cancel and refund appear as secondary actions when valid. Cancelled/refunded orders skip the progress bar and show a badge instead.
+
+**Order list:** Each row shows compact progress dots (●●○) with a label ("Paid", "Fulfilled", "Shipped") instead of separate status columns.
+
+**Packing slip:** Available from order detail, opens in a new tab with `window.print()` auto-trigger. Shows ship-to address, customer info, line items with product names/SKUs, and order totals.
+
+### 4.7 LineItem
 
 A LineItem records one variant and quantity on an order. Prices are denormalized at the time of order placement to preserve historical accuracy.
 
@@ -354,7 +376,7 @@ A LineItem records one variant and quantity on an order. Prices are denormalized
 | total | int | Final line total | `core` |
 | metadata | jsonb | Vertical-specific line attributes | `ext` |
 
-### 4.7 Adjustment
+### 4.8 Adjustment
 
 Adjustments modify an order total. They can be positive (surcharges, fees) or negative (discounts, promotions). Every change to order totals is traceable through adjustments.
 

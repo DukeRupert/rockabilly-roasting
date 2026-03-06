@@ -191,6 +191,86 @@ func (s *OrderService) RefundOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID,
 	return order, nil
 }
 
+// FulfillOrder marks an order as fulfilled and moves it to processing.
+func (s *OrderService) FulfillOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for fulfill: %w", err)
+	}
+
+	if order.FulfillmentStatus == domain.FulfillmentStatusFulfilled ||
+		order.FulfillmentStatus == domain.FulfillmentStatusShipped ||
+		order.FulfillmentStatus == domain.FulfillmentStatusDelivered {
+		return nil, ErrOrderAlreadyFulfilled
+	}
+
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusFulfilled)
+	if err != nil {
+		return nil, fmt.Errorf("fulfill order: %w", err)
+	}
+
+	order, err = s.orders.UpdateOrderStatus(ctx, tx, id, domain.OrderStatusProcessing)
+	if err != nil {
+		return nil, fmt.Errorf("fulfill order status: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderFulfilled,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+	}); err != nil {
+		return nil, fmt.Errorf("audit order fulfilled: %w", err)
+	}
+
+	return order, nil
+}
+
+// ShipOrder marks an order as shipped and moves it to complete.
+func (s *OrderService) ShipOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for ship: %w", err)
+	}
+
+	if order.FulfillmentStatus != domain.FulfillmentStatusFulfilled {
+		return nil, fmt.Errorf("order must be fulfilled before shipping: %w", ErrInvalidOrderStatus)
+	}
+
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusShipped)
+	if err != nil {
+		return nil, fmt.Errorf("ship order: %w", err)
+	}
+
+	order, err = s.orders.UpdateOrderStatus(ctx, tx, id, domain.OrderStatusComplete)
+	if err != nil {
+		return nil, fmt.Errorf("ship order status: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderShipped,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+	}); err != nil {
+		return nil, fmt.Errorf("audit order shipped: %w", err)
+	}
+
+	return order, nil
+}
+
 // UpdateFulfillmentStatus updates an order's fulfillment status.
 func (s *OrderService) UpdateFulfillmentStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.FulfillmentStatus, actor Actor) (*domain.Order, error) {
 	order, err := s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, status)

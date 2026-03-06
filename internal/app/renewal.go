@@ -94,6 +94,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			return fmt.Errorf("get variant price: %w", txErr)
 		}
 		priceCents = price.Amount
+		if plan.DiscountPct > 0 {
+			priceCents = priceCents - (priceCents * plan.DiscountPct / 100)
+		}
 
 		return nil
 	})

@@ -54,15 +54,16 @@ Wire Stripe into checkout to create and manage Payment Intents.
 
 **Depends on:** Phase 1
 
-### Phase 3: Webhook Processing
+### Phase 3: Webhook Processing ✅
 Receive and process Stripe events to drive order/payment state.
 
-**Scope:**
-- `POST /webhooks/stripe` handler — verify signature, dedup, enqueue River job
-- `ProcessWebhookEvent` River worker — route by event type
+**Done:**
+- `POST /webhooks/stripe` handler — verify signature, dedup, persist event
+- Synchronous event processing (route by event type, no separate River job)
 - Handle: `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
 - Wire `OrderService.UpdatePaymentStatus` from webhook events
-- `FinalizeFromPayment` — confirm order when payment succeeds
+- Graceful handling of unmatched payment intents (test events, etc.)
+- API version mismatch tolerance via `ConstructEventWithOptions`
 
 **Depends on:** Phase 1, Phase 2
 
@@ -77,7 +78,7 @@ Complete the checkout → order → confirmation pipeline.
 
 **Depends on:** Phase 3
 
-### Phase 5: Subscription Lifecycle ✅ (mostly complete)
+### Phase 5: Subscription Lifecycle ✅ (validated end-to-end)
 Implement subscription creation, renewal, and management.
 
 **Done:**
@@ -88,10 +89,17 @@ Implement subscription creation, renewal, and management.
 - Admin subscription detail with pause/resume/cancel actions
 - Product `subscribable` toggle with htmx switch component
 - Storefront subscribe page with Svelte checkout + Stripe Elements
+- Stripe customer creation + payment method saving during subscribe checkout (`setup_future_usage: off_session`)
+- Off-session renewal charges with saved payment methods
+- Plan discount applied to renewal charges
+- Renewal jobs permanently cancelled for inactive/missing subscriptions (no retry spam)
+- Full lifecycle validated with Stripe test mode: subscribe → renew → pause → resume → renew → cancel
 
 **Remaining:**
 - `PaymentRetry` River worker — retry failed subscription payments
 - Customer self-service portal (change variant, change frequency, skip)
+- Revert scheduler interval from 1 minute back to 1 hour for production
+- Remove `every_2_minutes` dev-only interval before production
 
 **Depends on:** Phase 4
 
@@ -109,3 +117,14 @@ This project will migrate existing WooCommerce subscriptions that use Payment In
 - Integration tests against Stripe test mode for `StripeProvider`
 - Stripe CLI (`stripe listen --forward-to`) for local webhook testing
 - End-to-end: create product → checkout → webhook → order confirmed → subscription renewal
+
+### Validated (March 6, 2026)
+Using Stripe CLI + local Postgres (docker-compose) + 2-minute test plan:
+- Webhook signature verification and event deduplication
+- `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded` handlers
+- Unhandled event types silently skipped
+- Subscribe checkout → Stripe customer created → payment method saved
+- Automatic renewal after interval expires (off-session charge with saved PM)
+- Pause stops renewals, resume resets billing period and renewals continue
+- Cancel stops renewals, stale renewal jobs permanently cancelled
+- Plan discount correctly applied to renewal charges

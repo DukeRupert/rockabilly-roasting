@@ -215,13 +215,13 @@ templ ProductContent(props ProductDetailProps) {
 										</button>
 									</div>
 								</div>
-								<a
+								<button
+									type="button"
 									id="subscribe-action"
-									href={ templ.SafeURL(fmt.Sprintf("/subscribe?plan_id=%s&variant_id=%s&quantity=1", props.SubscriptionPlans[0].ID.String(), defaultVariantID(props.Variants))) }
 									class="block w-full rounded-md bg-hiri-teal px-6 py-3.5 text-center text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
 								>
 									Subscribe
-								</a>
+								</button>
 								<p class="mt-2 text-center text-xs text-hiri-text-secondary">Cancel or modify anytime from your account.</p>
 							</div>
 						}
@@ -342,6 +342,12 @@ templ purchaseModeScript() {
 					else if (val > 10) qtyInput.value = 10;
 					onQuantityChange();
 				});
+				qtyInput.addEventListener('input', function() {
+					var val = parseInt(qtyInput.value, 10);
+					if (!isNaN(val) && val >= 1 && val <= 10) {
+						onQuantityChange();
+					}
+				});
 			}
 
 			function onQuantityChange() {
@@ -381,12 +387,24 @@ templ purchaseModeScript() {
 				return parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
 			}
 
+			var selectedPlanId = '';
 			function updateSubscribeLink(planId) {
-				var link = document.getElementById('subscribe-action');
-				if (!link) return;
-				var vid = variantID ? variantID.value : '';
-				var qty = getQuantity();
-				link.href = '/subscribe?plan_id=' + planId + '&variant_id=' + vid + '&quantity=' + qty;
+				selectedPlanId = planId;
+			}
+
+			// Navigate on subscribe button click
+			var subscribeBtn = document.getElementById('subscribe-action');
+			if (subscribeBtn) {
+				subscribeBtn.addEventListener('click', function() {
+					var vid = variantID ? variantID.value : '';
+					var qty = getQuantity();
+					var pid = selectedPlanId;
+					if (!pid) {
+						var checked = document.querySelector('.subscribe-frequency-option input:checked');
+						if (checked) pid = checked.closest('.subscribe-frequency-option').dataset.planId;
+					}
+					if (pid) window.location.href = '/subscribe?plan_id=' + pid + '&variant_id=' + vid + '&quantity=' + qty;
+				});
 			}
 
 			function updatePrice() {

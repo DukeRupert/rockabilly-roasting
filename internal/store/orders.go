@@ -180,6 +180,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	                 currency_code, subtotal, discount_total, shipping_total, tax_total, total,
 	                 shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
 	                 tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
+	                 customer_po_number, internal_note,
 	                 notes, metadata, placed_at, created_at, updated_at
 	          FROM orders WHERE true`
 	args := []any{}
@@ -243,6 +244,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 			&o.CurrencyCode, &subtotal, &discountTotal, &shippingTotal, &taxTotal, &total,
 			&o.ShippingAddressID, &o.BillingAddressID, &o.SubscriptionID, &o.DraftByUserID,
 			&o.TaxExempt, &o.TaxExemptReason, &o.StripeTaxID, &o.StripePaymentIntentID,
+			&o.CustomerPONumber, &o.InternalNote,
 			&o.Notes, &metadata, &o.PlacedAt, &o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan order: %w", err)
@@ -493,8 +495,10 @@ func orderFromRow(r sqlcgen.Order) *domain.Order {
 		TaxExemptReason:   r.TaxExemptReason,
 		StripeTaxID:           r.StripeTaxID,
 		StripePaymentIntentID: r.StripePaymentIntentID,
+		CustomerPONumber:      r.CustomerPoNumber,
+		InternalNote:          r.InternalNote,
 		Notes:                 r.Notes,
-		Metadata:          metadataFromJSON(r.Metadata),
+		Metadata:              metadataFromJSON(r.Metadata),
 		PlacedAt:          r.PlacedAt,
 		CreatedAt:         r.CreatedAt,
 		UpdatedAt:         r.UpdatedAt,

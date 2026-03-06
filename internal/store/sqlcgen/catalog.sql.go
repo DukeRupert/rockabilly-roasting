@@ -16,7 +16,7 @@ import (
 const createProduct = `-- name: CreateProduct :one
 INSERT INTO products (id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility
 `
 
 type CreateProductParams struct {
@@ -60,6 +60,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Subscribable,
+		&i.Visibility,
 	)
 	return i, err
 }
@@ -202,7 +203,7 @@ func (q *Queries) CreateTaxon(ctx context.Context, arg CreateTaxonParams) (Taxon
 const createVariant = `-- name: CreateVariant :one
 INSERT INTO variants (id, product_id, sku, barcode, position, is_default, weight_grams, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at
+RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple
 `
 
 type CreateVariantParams struct {
@@ -239,6 +240,8 @@ func (q *Queries) CreateVariant(ctx context.Context, arg CreateVariantParams) (V
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.WholesaleMinQty,
+		&i.WholesaleMultiple,
 	)
 	return i, err
 }
@@ -322,7 +325,7 @@ func (q *Queries) DeleteVariantOptionValuesByVariant(ctx context.Context, varian
 }
 
 const getProductByID = `-- name: GetProductByID :one
-SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable FROM products WHERE id = $1
+SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility FROM products WHERE id = $1
 `
 
 func (q *Queries) GetProductByID(ctx context.Context, id uuid.UUID) (Product, error) {
@@ -342,12 +345,13 @@ func (q *Queries) GetProductByID(ctx context.Context, id uuid.UUID) (Product, er
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Subscribable,
+		&i.Visibility,
 	)
 	return i, err
 }
 
 const getProductBySlug = `-- name: GetProductBySlug :one
-SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable FROM products WHERE slug = $1
+SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility FROM products WHERE slug = $1
 `
 
 func (q *Queries) GetProductBySlug(ctx context.Context, slug string) (Product, error) {
@@ -367,6 +371,7 @@ func (q *Queries) GetProductBySlug(ctx context.Context, slug string) (Product, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Subscribable,
+		&i.Visibility,
 	)
 	return i, err
 }
@@ -408,7 +413,7 @@ func (q *Queries) GetTaxonBySlug(ctx context.Context, slug string) (Taxon, error
 }
 
 const getVariantByID = `-- name: GetVariantByID :one
-SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at FROM variants WHERE id = $1
+SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple FROM variants WHERE id = $1
 `
 
 func (q *Queries) GetVariantByID(ctx context.Context, id uuid.UUID) (Variant, error) {
@@ -425,12 +430,14 @@ func (q *Queries) GetVariantByID(ctx context.Context, id uuid.UUID) (Variant, er
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.WholesaleMinQty,
+		&i.WholesaleMultiple,
 	)
 	return i, err
 }
 
 const getVariantBySKU = `-- name: GetVariantBySKU :one
-SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at FROM variants WHERE sku = $1
+SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple FROM variants WHERE sku = $1
 `
 
 func (q *Queries) GetVariantBySKU(ctx context.Context, sku string) (Variant, error) {
@@ -447,6 +454,8 @@ func (q *Queries) GetVariantBySKU(ctx context.Context, sku string) (Variant, err
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.WholesaleMinQty,
+		&i.WholesaleMultiple,
 	)
 	return i, err
 }
@@ -639,7 +648,7 @@ func (q *Queries) ListVariantOptionValuesByVariant(ctx context.Context, variantI
 }
 
 const listVariantsByProduct = `-- name: ListVariantsByProduct :many
-SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at FROM variants
+SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple FROM variants
 WHERE product_id = $1
 ORDER BY position
 `
@@ -664,6 +673,8 @@ func (q *Queries) ListVariantsByProduct(ctx context.Context, productID uuid.UUID
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.WholesaleMinQty,
+			&i.WholesaleMultiple,
 		); err != nil {
 			return nil, err
 		}
@@ -680,7 +691,7 @@ UPDATE products
 SET slug = $2, title = $3, description = $4, product_type_id = $5, taxon_id = $6,
     metadata = $7, available_on = $8, discontinue_on = $9, updated_at = now()
 WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility
 `
 
 type UpdateProductParams struct {
@@ -722,6 +733,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Subscribable,
+		&i.Visibility,
 	)
 	return i, err
 }
@@ -744,7 +756,7 @@ const updateProductStatus = `-- name: UpdateProductStatus :one
 UPDATE products
 SET status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility
 `
 
 type UpdateProductStatusParams struct {
@@ -769,6 +781,7 @@ func (q *Queries) UpdateProductStatus(ctx context.Context, arg UpdateProductStat
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Subscribable,
+		&i.Visibility,
 	)
 	return i, err
 }
@@ -777,7 +790,7 @@ const updateProductSubscribable = `-- name: UpdateProductSubscribable :one
 UPDATE products
 SET subscribable = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility
 `
 
 type UpdateProductSubscribableParams struct {
@@ -802,6 +815,7 @@ func (q *Queries) UpdateProductSubscribable(ctx context.Context, arg UpdateProdu
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Subscribable,
+		&i.Visibility,
 	)
 	return i, err
 }
@@ -848,7 +862,7 @@ UPDATE variants
 SET sku = $2, barcode = $3, position = $4, is_default = $5, weight_grams = $6,
     metadata = $7, updated_at = now()
 WHERE id = $1
-RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at
+RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple
 `
 
 type UpdateVariantParams struct {
@@ -883,6 +897,8 @@ func (q *Queries) UpdateVariant(ctx context.Context, arg UpdateVariantParams) (V
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.WholesaleMinQty,
+		&i.WholesaleMultiple,
 	)
 	return i, err
 }

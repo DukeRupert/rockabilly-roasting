@@ -87,21 +87,28 @@ type CouponCode struct {
 }
 
 type Customer struct {
-	ID               uuid.UUID       `json:"id"`
-	Email            string          `json:"email"`
-	EmailVerified    bool            `json:"email_verified"`
-	PasswordHash     *string         `json:"password_hash"`
-	FirstName        string          `json:"first_name"`
-	LastName         string          `json:"last_name"`
-	Phone            *string         `json:"phone"`
-	IsGuest          bool            `json:"is_guest"`
-	TaxExempt        bool            `json:"tax_exempt"`
-	TaxExemptReason  *string         `json:"tax_exempt_reason"`
-	CustomerGroupID  *uuid.UUID      `json:"customer_group_id"`
-	Metadata         json.RawMessage `json:"metadata"`
-	CreatedAt        time.Time       `json:"created_at"`
-	UpdatedAt        time.Time       `json:"updated_at"`
-	StripeCustomerID *string         `json:"stripe_customer_id"`
+	ID               uuid.UUID          `json:"id"`
+	Email            string             `json:"email"`
+	EmailVerified    bool               `json:"email_verified"`
+	PasswordHash     *string            `json:"password_hash"`
+	FirstName        string             `json:"first_name"`
+	LastName         string             `json:"last_name"`
+	Phone            *string            `json:"phone"`
+	IsGuest          bool               `json:"is_guest"`
+	TaxExempt        bool               `json:"tax_exempt"`
+	TaxExemptReason  *string            `json:"tax_exempt_reason"`
+	CustomerGroupID  *uuid.UUID         `json:"customer_group_id"`
+	Metadata         json.RawMessage    `json:"metadata"`
+	CreatedAt        time.Time          `json:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at"`
+	StripeCustomerID *string            `json:"stripe_customer_id"`
+	AccountType      string             `json:"account_type"`
+	WholesaleStatus  *string            `json:"wholesale_status"`
+	CompanyName      *string            `json:"company_name"`
+	Website          *string            `json:"website"`
+	WholesaleNotes   *string            `json:"wholesale_notes"`
+	ApprovedAt       pgtype.Timestamptz `json:"approved_at"`
+	ApprovedBy       *uuid.UUID         `json:"approved_by"`
 }
 
 type CustomerGroup struct {
@@ -166,6 +173,49 @@ type InventoryItem struct {
 	RequiresShipping bool      `json:"requires_shipping"`
 }
 
+type Invoice struct {
+	ID           uuid.UUID          `json:"id"`
+	OrderID      uuid.UUID          `json:"order_id"`
+	Number       string             `json:"number"`
+	Status       string             `json:"status"`
+	Subtotal     int32              `json:"subtotal"`
+	Shipping     int32              `json:"shipping"`
+	TaxTotal     int32              `json:"tax_total"`
+	Total        int32              `json:"total"`
+	AmountPaid   int32              `json:"amount_paid"`
+	AmountDue    *int32             `json:"amount_due"`
+	DueDate      pgtype.Date        `json:"due_date"`
+	Notes        *string            `json:"notes"`
+	InternalNote *string            `json:"internal_note"`
+	SentAt       pgtype.Timestamptz `json:"sent_at"`
+	PaidAt       pgtype.Timestamptz `json:"paid_at"`
+	VoidedAt     pgtype.Timestamptz `json:"voided_at"`
+	CreatedBy    *uuid.UUID         `json:"created_by"`
+	CreatedAt    time.Time          `json:"created_at"`
+	UpdatedAt    time.Time          `json:"updated_at"`
+}
+
+type InvoiceLine struct {
+	ID          uuid.UUID  `json:"id"`
+	InvoiceID   uuid.UUID  `json:"invoice_id"`
+	VariantID   *uuid.UUID `json:"variant_id"`
+	Description string     `json:"description"`
+	Quantity    int32      `json:"quantity"`
+	UnitPrice   int32      `json:"unit_price"`
+	Total       int32      `json:"total"`
+}
+
+type InvoicePayment struct {
+	ID         uuid.UUID  `json:"id"`
+	InvoiceID  uuid.UUID  `json:"invoice_id"`
+	Amount     int32      `json:"amount"`
+	Method     string     `json:"method"`
+	Reference  *string    `json:"reference"`
+	Note       *string    `json:"note"`
+	RecordedBy *uuid.UUID `json:"recorded_by"`
+	PaidAt     time.Time  `json:"paid_at"`
+}
+
 type LineItem struct {
 	ID            uuid.UUID       `json:"id"`
 	OrderID       uuid.UUID       `json:"order_id"`
@@ -205,6 +255,8 @@ type Order struct {
 	CreatedAt             time.Time       `json:"created_at"`
 	UpdatedAt             time.Time       `json:"updated_at"`
 	StripePaymentIntentID *string         `json:"stripe_payment_intent_id"`
+	CustomerPoNumber      *string         `json:"customer_po_number"`
+	InternalNote          *string         `json:"internal_note"`
 }
 
 type Price struct {
@@ -248,6 +300,12 @@ type Product struct {
 	CreatedAt     time.Time          `json:"created_at"`
 	UpdatedAt     time.Time          `json:"updated_at"`
 	Subscribable  bool               `json:"subscribable"`
+	Visibility    string             `json:"visibility"`
+}
+
+type ProductGroupVisibility struct {
+	ProductID       uuid.UUID `json:"product_id"`
+	CustomerGroupID uuid.UUID `json:"customer_group_id"`
 }
 
 type ProductMedium struct {
@@ -396,16 +454,18 @@ type Taxon struct {
 }
 
 type Variant struct {
-	ID          uuid.UUID       `json:"id"`
-	ProductID   uuid.UUID       `json:"product_id"`
-	Sku         string          `json:"sku"`
-	Barcode     *string         `json:"barcode"`
-	Position    int32           `json:"position"`
-	IsDefault   bool            `json:"is_default"`
-	WeightGrams *int32          `json:"weight_grams"`
-	Metadata    json.RawMessage `json:"metadata"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	ID                uuid.UUID       `json:"id"`
+	ProductID         uuid.UUID       `json:"product_id"`
+	Sku               string          `json:"sku"`
+	Barcode           *string         `json:"barcode"`
+	Position          int32           `json:"position"`
+	IsDefault         bool            `json:"is_default"`
+	WeightGrams       *int32          `json:"weight_grams"`
+	Metadata          json.RawMessage `json:"metadata"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
+	WholesaleMinQty   *int32          `json:"wholesale_min_qty"`
+	WholesaleMultiple *int32          `json:"wholesale_multiple"`
 }
 
 type VariantOptionValue struct {

@@ -6,6 +6,15 @@ import (
 	"github.com/google/uuid"
 )
 
+// ProductVisibility controls who can see a product.
+type ProductVisibility string
+
+const (
+	ProductVisibilityPublic     ProductVisibility = "public"
+	ProductVisibilityWholesale  ProductVisibility = "wholesale"
+	ProductVisibilityRestricted ProductVisibility = "restricted"
+)
+
 // ProductStatus represents the lifecycle state of a product.
 type ProductStatus string
 
@@ -33,6 +42,7 @@ type Product struct {
 	ProductTypeID *uuid.UUID
 	TaxonID       uuid.UUID
 	Subscribable  bool
+	Visibility    ProductVisibility
 	Metadata      map[string]any
 	AvailableOn   *time.Time
 	DiscontinueOn *time.Time
@@ -48,8 +58,10 @@ type Variant struct {
 	Barcode     *string
 	Position    int
 	IsDefault   bool
-	WeightGrams *int
-	Metadata    map[string]any
+	WeightGrams        *int
+	WholesaleMinQty    *int
+	WholesaleMultiple  *int
+	Metadata           map[string]any
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

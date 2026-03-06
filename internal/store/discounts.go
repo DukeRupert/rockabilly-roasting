@@ -271,12 +271,3 @@ func couponCodeFromRow(r sqlcgen.CouponCode) *domain.CouponCode {
 		CreatedAt:  r.CreatedAt,
 	}
 }
-
-// int32PtrToIntPtr converts *int32 to *int.
-func int32PtrToIntPtr(p *int32) *int {
-	if p == nil {
-		return nil
-	}
-	v := int(*p)
-	return &v
-}

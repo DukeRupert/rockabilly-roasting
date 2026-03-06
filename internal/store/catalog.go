@@ -138,6 +138,49 @@ func (s *CatalogStore) UpdateProductSubscribable(ctx context.Context, tx pgx.Tx,
 	return productFromRow(row), nil
 }
 
+// UpdateProductVisibility updates a product's visibility and returns it.
+func (s *CatalogStore) UpdateProductVisibility(ctx context.Context, tx pgx.Tx, id uuid.UUID, visibility domain.ProductVisibility) (*domain.Product, error) {
+	row, err := sqlcgen.New(tx).UpdateProductVisibility(ctx, sqlcgen.UpdateProductVisibilityParams{
+		ID:         id,
+		Visibility: string(visibility),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update product visibility: %w", err)
+	}
+	return productFromRow(row), nil
+}
+
+// SetProductGroupVisibility adds a customer group to a product's restricted visibility list.
+func (s *CatalogStore) SetProductGroupVisibility(ctx context.Context, tx pgx.Tx, productID, groupID uuid.UUID) error {
+	if err := sqlcgen.New(tx).SetProductGroupVisibility(ctx, sqlcgen.SetProductGroupVisibilityParams{
+		ProductID:       productID,
+		CustomerGroupID: groupID,
+	}); err != nil {
+		return fmt.Errorf("set product group visibility: %w", err)
+	}
+	return nil
+}
+
+// RemoveProductGroupVisibility removes a customer group from a product's restricted visibility list.
+func (s *CatalogStore) RemoveProductGroupVisibility(ctx context.Context, tx pgx.Tx, productID, groupID uuid.UUID) error {
+	if err := sqlcgen.New(tx).RemoveProductGroupVisibility(ctx, sqlcgen.RemoveProductGroupVisibilityParams{
+		ProductID:       productID,
+		CustomerGroupID: groupID,
+	}); err != nil {
+		return fmt.Errorf("remove product group visibility: %w", err)
+	}
+	return nil
+}
+
+// ListProductGroupVisibility returns the group IDs assigned to a restricted product.
+func (s *CatalogStore) ListProductGroupVisibility(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]uuid.UUID, error) {
+	ids, err := sqlcgen.New(tx).ListProductGroupVisibility(ctx, productID)
+	if err != nil {
+		return nil, fmt.Errorf("list product group visibility: %w", err)
+	}
+	return ids, nil
+}
+
 // DeleteProduct removes a product by ID.
 func (s *CatalogStore) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if err := sqlcgen.New(tx).DeleteProduct(ctx, id); err != nil {
@@ -146,11 +189,18 @@ func (s *CatalogStore) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUI
 	return nil
 }
 
+// VisibilityContext holds the viewer's context for product visibility filtering.
+type VisibilityContext struct {
+	IsWholesale bool
+	GroupIDs    []uuid.UUID
+}
+
 // ProductFilter holds optional filters for listing products.
 type ProductFilter struct {
 	Status       *domain.ProductStatus
 	TaxonID      *uuid.UUID
 	Subscribable *bool
+	Visibility   *VisibilityContext
 	Limit        int
 	Offset       int
 }
@@ -158,7 +208,8 @@ type ProductFilter struct {
 // ListProducts returns products matching the given filter (hand-written for dynamic WHERE).
 func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFilter) ([]domain.Product, error) {
 	query := `SELECT id, slug, title, description, status, product_type_id, taxon_id,
-	                 subscribable, metadata, available_on, discontinue_on, created_at, updated_at
+	                 subscribable, visibility, metadata, available_on, discontinue_on,
+	                 created_at, updated_at
 	          FROM products WHERE true`
 	args := []any{}
 	argN := 1
@@ -177,6 +228,25 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 		query += fmt.Sprintf(" AND subscribable = $%d", argN)
 		args = append(args, *f.Subscribable)
 		argN++
+	}
+	if f.Visibility != nil {
+		vis := f.Visibility
+		if !vis.IsWholesale {
+			query += " AND visibility = 'public'"
+		} else if len(vis.GroupIDs) == 0 {
+			query += " AND visibility IN ('public', 'wholesale')"
+		} else {
+			query += fmt.Sprintf(` AND (
+				visibility IN ('public', 'wholesale')
+				OR (visibility = 'restricted' AND EXISTS (
+					SELECT 1 FROM product_group_visibility pgv
+					WHERE pgv.product_id = products.id
+					AND pgv.customer_group_id = ANY($%d)
+				))
+			)`, argN)
+			args = append(args, vis.GroupIDs)
+			argN++
+		}
 	}
 
 	query += " ORDER BY created_at DESC"
@@ -203,17 +273,18 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 	var products []domain.Product
 	for rows.Next() {
 		var p domain.Product
-		var status string
+		var status, visibility string
 		var productTypeID, taxonID *uuid.UUID
 		var metadata []byte
 		var availableOn, discontinueOn pgtype.Timestamptz
 		if err := rows.Scan(
 			&p.ID, &p.Slug, &p.Title, &p.Description, &status, &productTypeID, &taxonID,
-			&p.Subscribable, &metadata, &availableOn, &discontinueOn, &p.CreatedAt, &p.UpdatedAt,
+			&p.Subscribable, &visibility, &metadata, &availableOn, &discontinueOn, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan product: %w", err)
 		}
 		p.Status = domain.ProductStatus(status)
+		p.Visibility = domain.ProductVisibility(visibility)
 		p.ProductTypeID = productTypeID
 		if taxonID != nil {
 			p.TaxonID = *taxonID
@@ -312,6 +383,19 @@ func (s *CatalogStore) UpdateVariant(ctx context.Context, tx pgx.Tx, p UpdateVar
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update variant: %w", err)
+	}
+	return variantFromRow(row), nil
+}
+
+// UpdateVariantWholesale updates a variant's wholesale MOQ settings.
+func (s *CatalogStore) UpdateVariantWholesale(ctx context.Context, tx pgx.Tx, id uuid.UUID, minQty, multiple *int) (*domain.Variant, error) {
+	row, err := sqlcgen.New(tx).UpdateVariantWholesale(ctx, sqlcgen.UpdateVariantWholesaleParams{
+		ID:                id,
+		WholesaleMinQty:   intPtrToInt32Ptr(minQty),
+		WholesaleMultiple: intPtrToInt32Ptr(multiple),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update variant wholesale: %w", err)
 	}
 	return variantFromRow(row), nil
 }
@@ -629,6 +713,7 @@ func productFromRow(r sqlcgen.Product) *domain.Product {
 		ProductTypeID: r.ProductTypeID,
 		TaxonID:       taxonID,
 		Subscribable:  r.Subscribable,
+		Visibility:    domain.ProductVisibility(r.Visibility),
 		Metadata:      metadataFromJSON(r.Metadata),
 		AvailableOn:   timestampFromPG(r.AvailableOn),
 		DiscontinueOn: timestampFromPG(r.DiscontinueOn),
@@ -639,16 +724,18 @@ func productFromRow(r sqlcgen.Product) *domain.Product {
 
 func variantFromRow(r sqlcgen.Variant) *domain.Variant {
 	return &domain.Variant{
-		ID:          r.ID,
-		ProductID:   r.ProductID,
-		SKU:         r.Sku,
-		Barcode:     r.Barcode,
-		Position:    int(r.Position),
-		IsDefault:   r.IsDefault,
-		WeightGrams: int32PtrToIntPtr(r.WeightGrams),
-		Metadata:    metadataFromJSON(r.Metadata),
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
+		ID:                r.ID,
+		ProductID:         r.ProductID,
+		SKU:               r.Sku,
+		Barcode:           r.Barcode,
+		Position:          int(r.Position),
+		IsDefault:         r.IsDefault,
+		WeightGrams:       int32PtrToIntPtr(r.WeightGrams),
+		WholesaleMinQty:   int32PtrToIntPtr(r.WholesaleMinQty),
+		WholesaleMultiple: int32PtrToIntPtr(r.WholesaleMultiple),
+		Metadata:          metadataFromJSON(r.Metadata),
+		CreatedAt:         r.CreatedAt,
+		UpdatedAt:         r.UpdatedAt,
 	}
 }
 

@@ -69,7 +69,7 @@ func (q *Queries) CreateAddress(ctx context.Context, arg CreateAddressParams) (A
 const createCustomer = `-- name: CreateCustomer :one
 INSERT INTO customers (id, email, password_hash, first_name, last_name, phone, is_guest)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id
+RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by
 `
 
 type CreateCustomerParams struct {
@@ -109,6 +109,13 @@ func (q *Queries) CreateCustomer(ctx context.Context, arg CreateCustomerParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.StripeCustomerID,
+		&i.AccountType,
+		&i.WholesaleStatus,
+		&i.CompanyName,
+		&i.Website,
+		&i.WholesaleNotes,
+		&i.ApprovedAt,
+		&i.ApprovedBy,
 	)
 	return i, err
 }
@@ -190,7 +197,7 @@ func (q *Queries) GetAddressByID(ctx context.Context, id uuid.UUID) (Address, er
 }
 
 const getCustomerByEmail = `-- name: GetCustomerByEmail :one
-SELECT id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id FROM customers WHERE email = $1
+SELECT id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by FROM customers WHERE email = $1
 `
 
 func (q *Queries) GetCustomerByEmail(ctx context.Context, email string) (Customer, error) {
@@ -212,12 +219,19 @@ func (q *Queries) GetCustomerByEmail(ctx context.Context, email string) (Custome
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.StripeCustomerID,
+		&i.AccountType,
+		&i.WholesaleStatus,
+		&i.CompanyName,
+		&i.Website,
+		&i.WholesaleNotes,
+		&i.ApprovedAt,
+		&i.ApprovedBy,
 	)
 	return i, err
 }
 
 const getCustomerByID = `-- name: GetCustomerByID :one
-SELECT id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id FROM customers WHERE id = $1
+SELECT id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by FROM customers WHERE id = $1
 `
 
 func (q *Queries) GetCustomerByID(ctx context.Context, id uuid.UUID) (Customer, error) {
@@ -239,12 +253,19 @@ func (q *Queries) GetCustomerByID(ctx context.Context, id uuid.UUID) (Customer, 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.StripeCustomerID,
+		&i.AccountType,
+		&i.WholesaleStatus,
+		&i.CompanyName,
+		&i.Website,
+		&i.WholesaleNotes,
+		&i.ApprovedAt,
+		&i.ApprovedBy,
 	)
 	return i, err
 }
 
 const getCustomerByStripeCustomerID = `-- name: GetCustomerByStripeCustomerID :one
-SELECT id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id FROM customers WHERE stripe_customer_id = $1
+SELECT id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by FROM customers WHERE stripe_customer_id = $1
 `
 
 func (q *Queries) GetCustomerByStripeCustomerID(ctx context.Context, stripeCustomerID *string) (Customer, error) {
@@ -266,6 +287,13 @@ func (q *Queries) GetCustomerByStripeCustomerID(ctx context.Context, stripeCusto
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.StripeCustomerID,
+		&i.AccountType,
+		&i.WholesaleStatus,
+		&i.CompanyName,
+		&i.Website,
+		&i.WholesaleNotes,
+		&i.ApprovedAt,
+		&i.ApprovedBy,
 	)
 	return i, err
 }
@@ -308,7 +336,7 @@ func (q *Queries) ListAddresses(ctx context.Context, customerID *uuid.UUID) ([]A
 }
 
 const listCustomers = `-- name: ListCustomers :many
-SELECT id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id FROM customers ORDER BY created_at DESC
+SELECT id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by FROM customers ORDER BY created_at DESC
 `
 
 func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
@@ -336,6 +364,13 @@ func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.StripeCustomerID,
+			&i.AccountType,
+			&i.WholesaleStatus,
+			&i.CompanyName,
+			&i.Website,
+			&i.WholesaleNotes,
+			&i.ApprovedAt,
+			&i.ApprovedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -351,7 +386,7 @@ const updateCustomerEmail = `-- name: UpdateCustomerEmail :one
 UPDATE customers
 SET email = $2, email_verified = false, updated_at = now()
 WHERE id = $1
-RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id
+RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by
 `
 
 type UpdateCustomerEmailParams struct {
@@ -378,6 +413,13 @@ func (q *Queries) UpdateCustomerEmail(ctx context.Context, arg UpdateCustomerEma
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.StripeCustomerID,
+		&i.AccountType,
+		&i.WholesaleStatus,
+		&i.CompanyName,
+		&i.Website,
+		&i.WholesaleNotes,
+		&i.ApprovedAt,
+		&i.ApprovedBy,
 	)
 	return i, err
 }
@@ -434,7 +476,7 @@ const updateCustomerStripeCustomerID = `-- name: UpdateCustomerStripeCustomerID 
 UPDATE customers
 SET stripe_customer_id = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id
+RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, is_guest, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by
 `
 
 type UpdateCustomerStripeCustomerIDParams struct {
@@ -461,6 +503,13 @@ func (q *Queries) UpdateCustomerStripeCustomerID(ctx context.Context, arg Update
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.StripeCustomerID,
+		&i.AccountType,
+		&i.WholesaleStatus,
+		&i.CompanyName,
+		&i.Website,
+		&i.WholesaleNotes,
+		&i.ApprovedAt,
+		&i.ApprovedBy,
 	)
 	return i, err
 }

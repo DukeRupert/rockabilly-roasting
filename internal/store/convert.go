@@ -75,6 +75,36 @@ func float64ToNumeric(f float64) pgtype.Numeric {
 	}
 }
 
+// dateFromPG converts a pgtype.Date to *time.Time. Returns nil if not valid.
+func dateFromPG(d pgtype.Date) *time.Time {
+	if !d.Valid {
+		return nil
+	}
+	t := d.Time
+	return &t
+}
+
+// dateToPG converts a date string ("2024-01-15") to pgtype.Date.
+func dateToPG(s *string) pgtype.Date {
+	if s == nil || *s == "" {
+		return pgtype.Date{Valid: false}
+	}
+	t, err := time.Parse("2006-01-02", *s)
+	if err != nil {
+		return pgtype.Date{Valid: false}
+	}
+	return pgtype.Date{Time: t, Valid: true}
+}
+
+// int32PtrToIntPtr converts *int32 to *int.
+func int32PtrToIntPtr(p *int32) *int {
+	if p == nil {
+		return nil
+	}
+	v := int(*p)
+	return &v
+}
+
 // int32ToInt converts an *int32 to int. Returns 0 if nil.
 func int32ToInt(p *int32) int {
 	if p == nil {

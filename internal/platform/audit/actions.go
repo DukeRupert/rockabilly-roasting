@@ -49,4 +49,18 @@ const (
 	AuditDiscountCreated     = "discount.created"
 	AuditDiscountUpdated     = "discount.updated"
 	AuditDiscountDeactivated = "discount.deactivated"
+
+	// Wholesale customer actions
+	AuditWholesaleApplicationApproved = "wholesale.application_approved"
+	AuditWholesaleApplicationDeclined = "wholesale.application_declined"
+	AuditWholesaleAccountSuspended    = "wholesale.account_suspended"
+
+	// Product visibility actions
+	AuditProductVisibilityUpdated = "product.visibility_updated"
+
+	// Invoice actions
+	AuditInvoiceCreated         = "invoice.created"
+	AuditInvoiceSent            = "invoice.sent"
+	AuditInvoiceVoided          = "invoice.voided"
+	AuditInvoicePaymentRecorded = "invoice.payment_recorded"
 )

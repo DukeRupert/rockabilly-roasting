@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store/sqlcgen"
@@ -70,6 +71,8 @@ func (s *CustomerStore) GetByEmail(ctx context.Context, tx pgx.Tx, email string)
 type CustomerFilter struct {
 	CustomerGroupID *uuid.UUID
 	IsGuest         *bool
+	AccountType     *domain.AccountType
+	WholesaleStatus *domain.WholesaleStatus
 	Limit           int
 	Offset          int
 }
@@ -79,7 +82,9 @@ type CustomerFilter struct {
 func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) ([]domain.Customer, error) {
 	query := `SELECT id, email, email_verified, password_hash, first_name, last_name, phone,
 	                 is_guest, tax_exempt, tax_exempt_reason, stripe_customer_id,
-	                 customer_group_id, metadata, created_at, updated_at
+	                 customer_group_id, account_type, wholesale_status, company_name,
+	                 website, wholesale_notes, approved_at, approved_by,
+	                 metadata, created_at, updated_at
 	          FROM customers WHERE true`
 	args := []any{}
 	argN := 1
@@ -92,6 +97,16 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	if f.IsGuest != nil {
 		query += fmt.Sprintf(" AND is_guest = $%d", argN)
 		args = append(args, *f.IsGuest)
+		argN++
+	}
+	if f.AccountType != nil {
+		query += fmt.Sprintf(" AND account_type = $%d", argN)
+		args = append(args, string(*f.AccountType))
+		argN++
+	}
+	if f.WholesaleStatus != nil {
+		query += fmt.Sprintf(" AND wholesale_status = $%d", argN)
+		args = append(args, string(*f.WholesaleStatus))
 		argN++
 	}
 
@@ -119,13 +134,26 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	var customers []domain.Customer
 	for rows.Next() {
 		var c domain.Customer
+		var accountType string
+		var wholesaleStatus *string
+		var metadata []byte
+		var approvedAt pgtype.Timestamptz
 		if err := rows.Scan(
 			&c.ID, &c.Email, &c.EmailVerified, &c.PasswordHash, &c.FirstName, &c.LastName, &c.Phone,
 			&c.IsGuest, &c.TaxExempt, &c.TaxExemptReason, &c.StripeCustomerID,
-			&c.CustomerGroupID, &c.Metadata, &c.CreatedAt, &c.UpdatedAt,
+			&c.CustomerGroupID, &accountType, &wholesaleStatus, &c.CompanyName,
+			&c.Website, &c.WholesaleNotes, &approvedAt, &c.ApprovedBy,
+			&metadata, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
+		c.AccountType = domain.AccountType(accountType)
+		if wholesaleStatus != nil {
+			ws := domain.WholesaleStatus(*wholesaleStatus)
+			c.WholesaleStatus = &ws
+		}
+		c.ApprovedAt = timestampFromPG(approvedAt)
+		c.Metadata = metadataFromJSON(metadata)
 		customers = append(customers, c)
 	}
 	return customers, rows.Err()
@@ -309,23 +337,34 @@ func (s *CustomerStore) DeleteAddress(ctx context.Context, tx pgx.Tx, id, custom
 // --- Row converters ---
 
 func customerFromRow(r sqlcgen.Customer) *domain.Customer {
-	return &domain.Customer{
-		ID:              r.ID,
-		Email:           r.Email,
-		EmailVerified:   r.EmailVerified,
-		PasswordHash:    r.PasswordHash,
-		FirstName:       r.FirstName,
-		LastName:        r.LastName,
-		Phone:           r.Phone,
-		IsGuest:         r.IsGuest,
-		TaxExempt:       r.TaxExempt,
-		TaxExemptReason: r.TaxExemptReason,
+	c := &domain.Customer{
+		ID:               r.ID,
+		Email:            r.Email,
+		EmailVerified:    r.EmailVerified,
+		PasswordHash:     r.PasswordHash,
+		FirstName:        r.FirstName,
+		LastName:         r.LastName,
+		Phone:            r.Phone,
+		IsGuest:          r.IsGuest,
+		TaxExempt:        r.TaxExempt,
+		TaxExemptReason:  r.TaxExemptReason,
 		StripeCustomerID: r.StripeCustomerID,
 		CustomerGroupID:  r.CustomerGroupID,
+		AccountType:      domain.AccountType(r.AccountType),
+		CompanyName:      r.CompanyName,
+		Website:          r.Website,
+		WholesaleNotes:   r.WholesaleNotes,
+		ApprovedAt:       timestampFromPG(r.ApprovedAt),
+		ApprovedBy:       r.ApprovedBy,
 		Metadata:         metadataFromJSON(r.Metadata),
-		CreatedAt:       r.CreatedAt,
-		UpdatedAt:       r.UpdatedAt,
+		CreatedAt:        r.CreatedAt,
+		UpdatedAt:        r.UpdatedAt,
 	}
+	if r.WholesaleStatus != nil {
+		ws := domain.WholesaleStatus(*r.WholesaleStatus)
+		c.WholesaleStatus = &ws
+	}
+	return c
 }
 
 func addressFromRow(r sqlcgen.Address) *domain.Address {

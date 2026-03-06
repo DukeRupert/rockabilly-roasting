@@ -28,8 +28,12 @@ const (
 	PaymentStatusCaptured   PaymentStatus = "captured"
 	PaymentStatusPartial    PaymentStatus = "partial"
 	PaymentStatusRefunded   PaymentStatus = "refunded"
-	PaymentStatusFailed     PaymentStatus = "failed"
-	PaymentStatusVoided     PaymentStatus = "voided"
+	PaymentStatusFailed         PaymentStatus = "failed"
+	PaymentStatusVoided         PaymentStatus = "voided"
+	PaymentStatusPendingInvoice PaymentStatus = "pending_invoice"
+	PaymentStatusInvoiced       PaymentStatus = "invoiced"
+	PaymentStatusPartiallyPaid  PaymentStatus = "partially_paid"
+	PaymentStatusOverdue        PaymentStatus = "overdue"
 )
 
 // FulfillmentStatus represents the fulfillment state of an order.
@@ -93,8 +97,10 @@ type Order struct {
 	TaxExemptReason   *string
 	StripeTaxID            *string
 	StripePaymentIntentID  *string
+	CustomerPONumber       *string
+	InternalNote           *string
 	Notes                  *string
-	Metadata          map[string]any
+	Metadata               map[string]any
 	PlacedAt          time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time

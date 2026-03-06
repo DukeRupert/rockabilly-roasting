@@ -6,6 +6,23 @@ import (
 	"github.com/google/uuid"
 )
 
+// AccountType distinguishes retail from wholesale customers.
+type AccountType string
+
+const (
+	AccountTypeRetail    AccountType = "retail"
+	AccountTypeWholesale AccountType = "wholesale"
+)
+
+// WholesaleStatus represents the approval state of a wholesale account.
+type WholesaleStatus string
+
+const (
+	WholesaleStatusPending   WholesaleStatus = "pending"
+	WholesaleStatusApproved  WholesaleStatus = "approved"
+	WholesaleStatusSuspended WholesaleStatus = "suspended"
+)
+
 // Customer represents a registered or guest customer.
 type Customer struct {
 	ID              uuid.UUID
@@ -20,9 +37,16 @@ type Customer struct {
 	TaxExemptReason *string
 	StripeCustomerID *string
 	CustomerGroupID  *uuid.UUID
+	AccountType      AccountType
+	WholesaleStatus  *WholesaleStatus
+	CompanyName      *string
+	Website          *string
+	WholesaleNotes   *string
+	ApprovedAt       *time.Time
+	ApprovedBy       *uuid.UUID
 	Metadata         map[string]any
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // Address represents a shipping or billing address.

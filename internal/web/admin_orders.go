@@ -53,12 +53,15 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 		orders = orders[:perPage]
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.OrderListProps{
 		Orders:       orders,
 		StatusFilter: statusFilter,
 		Page:         page,
 		PerPage:      perPage,
 		HasMore:      hasMore,
+		StaffName:    name,
+		StaffRole:    role,
 	}
 
 	if IsHTMX(r) {
@@ -149,12 +152,15 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.OrderShowProps{
 		Order:           order,
 		LineItems:       enrichedItems,
 		Adjustments:     adjustments,
 		Customer:        customer,
 		ShippingAddress: shippingAddress,
+		StaffName:       name,
+		StaffRole:       role,
 	}
 
 	if IsHTMX(r) {
@@ -174,7 +180,7 @@ func (d *Deps) handleAdminOrderCancel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.OrderService.CancelOrder(ctx, tx, id, devActor())
+		_, txErr := d.OrderService.CancelOrder(ctx, tx, id, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -195,7 +201,7 @@ func (d *Deps) handleAdminOrderRefund(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.OrderService.RefundOrder(ctx, tx, id, devActor())
+		_, txErr := d.OrderService.RefundOrder(ctx, tx, id, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -216,7 +222,7 @@ func (d *Deps) handleAdminOrderFulfill(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.OrderService.FulfillOrder(ctx, tx, id, devActor())
+		_, txErr := d.OrderService.FulfillOrder(ctx, tx, id, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -237,7 +243,7 @@ func (d *Deps) handleAdminOrderShip(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.OrderService.ShipOrder(ctx, tx, id, devActor())
+		_, txErr := d.OrderService.ShipOrder(ctx, tx, id, staffActor(r))
 		return txErr
 	})
 	if err != nil {

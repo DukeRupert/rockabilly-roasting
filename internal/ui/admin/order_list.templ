@@ -12,6 +12,8 @@ type OrderListProps struct {
 	Page         int
 	PerPage      int
 	HasMore      bool
+	StaffName    string
+	StaffRole    string
 }
 
 func formatCents(cents int) string {
@@ -185,8 +187,8 @@ templ OrderList(props OrderListProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Orders",
 		ActivePath: "/admin/orders",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@OrderListContent(props)
 	}

@@ -45,11 +45,14 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 		customers = customers[:perPage]
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.CustomerListProps{
 		Customers: customers,
 		Page:      page,
 		PerPage:   perPage,
 		HasMore:   hasMore,
+		StaffName: name,
+		StaffRole: role,
 	}
 
 	if IsHTMX(r) {
@@ -85,9 +88,12 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.CustomerShowProps{
 		Customer:  customer,
 		Addresses: addresses,
+		StaffName: name,
+		StaffRole: role,
 	}
 
 	if IsHTMX(r) {

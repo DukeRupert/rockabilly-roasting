@@ -20,12 +20,12 @@ templ DashboardContent() {
 	</div>
 }
 
-templ Dashboard() {
+templ Dashboard(staffName, staffRole string) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Dashboard",
 		ActivePath: "/admin",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  staffName,
+		StaffRole:  staffRole,
 	}) {
 		@DashboardContent()
 	}

@@ -114,3 +114,8 @@ func (Dev) Watch() error {
 func (Dev) Checkout() error {
 	return sh.RunV("npm", "run", "build", "--prefix", "ui/checkout")
 }
+
+// Seed creates an admin staff user. Set SEED_EMAIL, SEED_PASSWORD, and optionally SEED_NAME.
+func (Dev) Seed() error {
+	return sh.RunV("go", "run", "./cmd/seed")
+}

@@ -39,7 +39,7 @@ func DashboardContent() templ.Component {
 	})
 }
 
-func Dashboard() templ.Component {
+func Dashboard(staffName, staffRole string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -81,8 +81,8 @@ func Dashboard() templ.Component {
 		templ_7745c5c3_Err = layouts.Admin(layouts.AdminProps{
 			Title:      "Dashboard",
 			ActivePath: "/admin",
-			StaffName:  "Dev User",
-			StaffRole:  "admin",
+			StaffName:  staffName,
+			StaffRole:  staffRole,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

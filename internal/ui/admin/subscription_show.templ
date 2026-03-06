@@ -11,6 +11,8 @@ type SubscriptionShowProps struct {
 	Plan         *domain.SubscriptionPlan
 	Customer     *domain.Customer
 	Orders       []domain.SubscriptionOrder
+	StaffName    string
+	StaffRole    string
 }
 
 func canPause(status domain.SubscriptionStatus) bool {
@@ -166,8 +168,8 @@ templ SubscriptionShow(props SubscriptionShowProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      fmt.Sprintf("Subscription %s", props.Subscription.ID.String()[:8]),
 		ActivePath: "/admin/subscriptions",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@SubscriptionShowContent(props)
 	}

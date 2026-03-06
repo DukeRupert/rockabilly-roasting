@@ -38,6 +38,7 @@ mage db:create <name>  # create new migration file
 # Development tools
 mage dev:templ    # generate templ templates
 mage dev:checkout # build Svelte checkout bundle
+mage dev:seed     # create admin staff user (set SEED_EMAIL, SEED_PASSWORD, SEED_NAME)
 
 # Run a single test (use go test directly)
 go test ./internal/app/ -run TestOrderRefund

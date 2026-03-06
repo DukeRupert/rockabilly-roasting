@@ -12,6 +12,8 @@ type SubscriptionListProps struct {
 	Page          int
 	PerPage       int
 	HasMore       bool
+	StaffName     string
+	StaffRole     string
 }
 
 templ SubscriptionListContent(props SubscriptionListProps) {
@@ -116,8 +118,8 @@ templ SubscriptionList(props SubscriptionListProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Subscriptions",
 		ActivePath: "/admin/subscriptions",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@SubscriptionListContent(props)
 	}

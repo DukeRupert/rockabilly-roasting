@@ -8,9 +8,11 @@ import (
 )
 
 type CategoryListProps struct {
-	Taxons  []domain.Taxon
-	Flash   string
-	Editing *domain.Taxon
+	Taxons    []domain.Taxon
+	Flash     string
+	Editing   *domain.Taxon
+	StaffName string
+	StaffRole string
 }
 
 templ CategoryListContent(props CategoryListProps) {
@@ -167,8 +169,8 @@ templ CategoryList(props CategoryListProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Categories",
 		ActivePath: "/admin/catalog",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@CategoryListContent(props)
 	}

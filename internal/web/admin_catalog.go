@@ -32,15 +32,6 @@ func slugify(s string) string {
 	return slug
 }
 
-// devActor returns a placeholder actor until auth is wired.
-func devActor() app.Actor {
-	return app.Actor{
-		Type: domain.AuditActorTypeStaff,
-		ID:   nil,
-		Name: "Dev User",
-	}
-}
-
 // --- Product List ---
 
 func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +89,7 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 		taxonMap[t.ID] = t.Name
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.ProductListProps{
 		Products:     products,
 		Taxons:       taxons,
@@ -107,6 +99,8 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 		Page:         page,
 		PerPage:      perPage,
 		HasMore:      hasMore,
+		StaffName:    name,
+		StaffRole:    role,
 	}
 	if IsHTMX(r) {
 		admin.ProductListContent(props).Render(ctx, w) //nolint:errcheck
@@ -131,8 +125,11 @@ func (d *Deps) handleAdminProductNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.ProductNewProps{
-		Taxons: taxons,
+		Taxons:    taxons,
+		StaffName: name,
+		StaffRole: role,
 	}
 	if IsHTMX(r) {
 		admin.ProductNewContent(props).Render(ctx, w) //nolint:errcheck
@@ -200,10 +197,13 @@ func (d *Deps) handleAdminProductCreate(w http.ResponseWriter, r *http.Request) 
 			Description: params.Description,
 			TaxonID:     params.TaxonID,
 		}
+		n, ro := staffNameRole(r)
 		props := admin.ProductNewProps{
-			Product: &p,
-			Taxons:  taxons,
-			Errors:  errs,
+			Product:   &p,
+			Taxons:    taxons,
+			Errors:    errs,
+			StaffName: n,
+			StaffRole: ro,
 		}
 		if IsHTMX(r) {
 			admin.ProductNewContent(props).Render(ctx, w) //nolint:errcheck
@@ -216,7 +216,7 @@ func (d *Deps) handleAdminProductCreate(w http.ResponseWriter, r *http.Request) 
 	var product *domain.Product
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		product, txErr = d.CatalogService.CreateProduct(ctx, tx, params, devActor())
+		product, txErr = d.CatalogService.CreateProduct(ctx, tx, params, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -311,6 +311,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.ProductEditProps{
 		Product:   product,
 		Taxons:    taxons,
@@ -318,6 +319,8 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		Options:   options,
 		TaxonName: taxonName,
 		Flash:     r.URL.Query().Get("flash"),
+		StaffName: name,
+		StaffRole: role,
 	}
 	if IsHTMX(r) {
 		admin.ProductEditContent(props).Render(ctx, w) //nolint:errcheck
@@ -365,7 +368,7 @@ func (d *Deps) handleAdminProductUpdate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CatalogService.UpdateProduct(ctx, tx, id, params, devActor())
+		_, txErr := d.CatalogService.UpdateProduct(ctx, tx, id, params, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -399,7 +402,7 @@ func (d *Deps) handleAdminProductStatusUpdate(w http.ResponseWriter, r *http.Req
 	var product *domain.Product
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		product, txErr = d.CatalogService.UpdateProductStatus(ctx, tx, id, status, devActor())
+		product, txErr = d.CatalogService.UpdateProductStatus(ctx, tx, id, status, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -446,7 +449,7 @@ func (d *Deps) handleAdminProductSubscribableUpdate(w http.ResponseWriter, r *ht
 	var product *domain.Product
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		product, txErr = d.CatalogService.UpdateProductSubscribable(ctx, tx, id, subscribable, devActor())
+		product, txErr = d.CatalogService.UpdateProductSubscribable(ctx, tx, id, subscribable, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -1053,10 +1056,13 @@ func (d *Deps) handleAdminCategoryList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.CategoryListProps{
-		Taxons:  taxons,
-		Flash:   r.URL.Query().Get("flash"),
-		Editing: editing,
+		Taxons:    taxons,
+		Flash:     r.URL.Query().Get("flash"),
+		Editing:   editing,
+		StaffName: name,
+		StaffRole: role,
 	}
 	if IsHTMX(r) {
 		admin.CategoryListContent(props).Render(ctx, w) //nolint:errcheck

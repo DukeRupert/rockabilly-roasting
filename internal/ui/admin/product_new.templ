@@ -6,9 +6,11 @@ import (
 )
 
 type ProductNewProps struct {
-	Product *domain.Product
-	Taxons  []domain.Taxon
-	Errors  map[string]string
+	Product   *domain.Product
+	Taxons    []domain.Taxon
+	Errors    map[string]string
+	StaffName string
+	StaffRole string
 }
 
 templ ProductNewContent(props ProductNewProps) {
@@ -42,8 +44,8 @@ templ ProductNew(props ProductNewProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "New Product",
 		ActivePath: "/admin/catalog",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@ProductNewContent(props)
 	}

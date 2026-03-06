@@ -12,6 +12,8 @@ type FulfillmentListProps struct {
 	Page         int
 	PerPage      int
 	HasMore      bool
+	StaffName    string
+	StaffRole    string
 }
 
 templ FulfillmentListContent(props FulfillmentListProps) {
@@ -128,8 +130,8 @@ templ FulfillmentList(props FulfillmentListProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Fulfillment",
 		ActivePath: "/admin/fulfillment",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@FulfillmentListContent(props)
 	}

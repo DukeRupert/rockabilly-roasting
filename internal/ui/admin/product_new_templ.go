@@ -14,9 +14,11 @@ import (
 )
 
 type ProductNewProps struct {
-	Product *domain.Product
-	Taxons  []domain.Taxon
-	Errors  map[string]string
+	Product   *domain.Product
+	Taxons    []domain.Taxon
+	Errors    map[string]string
+	StaffName string
+	StaffRole string
 }
 
 func ProductNewContent(props ProductNewProps) templ.Component {
@@ -104,8 +106,8 @@ func ProductNew(props ProductNewProps) templ.Component {
 		templ_7745c5c3_Err = layouts.Admin(layouts.AdminProps{
 			Title:      "New Product",
 			ActivePath: "/admin/catalog",
-			StaffName:  "Dev User",
-			StaffRole:  "admin",
+			StaffName:  props.StaffName,
+			StaffRole:  props.StaffRole,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

@@ -50,12 +50,15 @@ func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request
 		orders = orders[:perPage]
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.FulfillmentListProps{
 		Orders:       orders,
 		StatusFilter: statusFilter,
 		Page:         page,
 		PerPage:      perPage,
 		HasMore:      hasMore,
+		StaffName:    name,
+		StaffRole:    role,
 	}
 
 	if IsHTMX(r) {

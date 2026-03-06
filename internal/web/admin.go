@@ -12,5 +12,6 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		admin.DashboardContent().Render(ctx, w) //nolint:errcheck
 		return
 	}
-	admin.Dashboard().Render(ctx, w) //nolint:errcheck
+	name, role := staffNameRole(r)
+	admin.Dashboard(name, role).Render(ctx, w) //nolint:errcheck
 }

@@ -29,8 +29,11 @@ func (d *Deps) handleAdminPlanList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.PlanListProps{
-		Plans: plans,
+		Plans:     plans,
+		StaffName: name,
+		StaffRole: role,
 	}
 
 	if IsHTMX(r) {
@@ -75,7 +78,7 @@ func (d *Deps) handleAdminPlanCreate(w http.ResponseWriter, r *http.Request) {
 			Interval:      interval,
 			IntervalCount: 1,
 			DiscountPct:   discountPct,
-		}, devActor())
+		}, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -96,7 +99,7 @@ func (d *Deps) handleAdminPlanDeactivate(w http.ResponseWriter, r *http.Request)
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.SubscriptionService.UpdatePlanActive(ctx, tx, id, false, devActor())
+		return d.SubscriptionService.UpdatePlanActive(ctx, tx, id, false, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -116,7 +119,7 @@ func (d *Deps) handleAdminPlanActivate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.SubscriptionService.UpdatePlanActive(ctx, tx, id, true, devActor())
+		return d.SubscriptionService.UpdatePlanActive(ctx, tx, id, true, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -147,7 +150,7 @@ func (d *Deps) handleAdminPlanUpdateDiscount(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.SubscriptionService.UpdatePlanDiscount(ctx, tx, id, discountPct, devActor())
+		return d.SubscriptionService.UpdatePlanDiscount(ctx, tx, id, discountPct, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)

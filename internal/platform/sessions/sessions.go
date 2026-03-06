@@ -25,15 +25,20 @@ type Manager struct {
 
 // Store defines the interface for session persistence.
 type Store interface {
-	Create(ctx context.Context, tx pgx.Tx, actorType domain.SessionActorType, actorID uuid.UUID, expiresAt time.Time) (*domain.Session, string, error)
-	GetByToken(ctx context.Context, token string) (*domain.Session, error)
+	Create(ctx context.Context, tx pgx.Tx, actorType domain.SessionActorType, actorID uuid.UUID, expiresAt time.Time, ipAddress *string, userAgent *string) (*domain.Session, string, error)
+	GetByToken(ctx context.Context, tx pgx.Tx, rawToken string) (*domain.Session, error)
 	Revoke(ctx context.Context, tx pgx.Tx, sessionID uuid.UUID) error
 	RevokeAllForActor(ctx context.Context, tx pgx.Tx, actorType domain.SessionActorType, actorID uuid.UUID) error
-	UpdateLastSeen(ctx context.Context, sessionID uuid.UUID) error
-	PruneExpired(ctx context.Context) error
+	UpdateLastSeen(ctx context.Context, tx pgx.Tx, sessionID uuid.UUID) error
+	PruneExpired(ctx context.Context, tx pgx.Tx) (int64, error)
 }
 
 // NewManager creates a new session manager.
 func NewManager(store Store) *Manager {
 	return &Manager{store: store}
+}
+
+// GetStore returns the underlying store for direct access.
+func (m *Manager) GetStore() Store {
+	return m.store
 }

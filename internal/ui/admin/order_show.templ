@@ -19,6 +19,8 @@ type OrderShowProps struct {
 	Adjustments     []domain.Adjustment
 	Customer        *domain.Customer
 	ShippingAddress *domain.Address
+	StaffName       string
+	StaffRole       string
 }
 
 func canCancelOrder(status domain.OrderStatus) bool {
@@ -374,8 +376,8 @@ templ OrderShow(props OrderShowProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      fmt.Sprintf("Order %s", props.Order.Number),
 		ActivePath: "/admin/orders",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@OrderShowContent(props)
 	}

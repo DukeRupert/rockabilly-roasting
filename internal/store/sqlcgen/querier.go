@@ -35,6 +35,7 @@ type Querier interface {
 	CreateResetToken(ctx context.Context, arg CreateResetTokenParams) (ResetToken, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateShipment(ctx context.Context, arg CreateShipmentParams) (Shipment, error)
+	CreateStaff(ctx context.Context, arg CreateStaffParams) (Staff, error)
 	CreateStockLevel(ctx context.Context, arg CreateStockLevelParams) (StockLevel, error)
 	CreateStockLocation(ctx context.Context, arg CreateStockLocationParams) (StockLocation, error)
 	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error)
@@ -89,6 +90,8 @@ type Querier interface {
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (Session, error)
 	GetShipmentByID(ctx context.Context, id uuid.UUID) (Shipment, error)
 	GetShippingConfig(ctx context.Context) (ShippingConfig, error)
+	GetStaffByEmail(ctx context.Context, email string) (Staff, error)
+	GetStaffByID(ctx context.Context, id uuid.UUID) (Staff, error)
 	GetStockLevelByInventoryAndLocation(ctx context.Context, arg GetStockLevelByInventoryAndLocationParams) (StockLevel, error)
 	GetStockLocationByID(ctx context.Context, id uuid.UUID) (StockLocation, error)
 	GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscription, error)
@@ -117,6 +120,7 @@ type Querier interface {
 	ListProductOptionsByProduct(ctx context.Context, productID uuid.UUID) ([]ProductOption, error)
 	ListRootTaxons(ctx context.Context) ([]Taxon, error)
 	ListShipmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Shipment, error)
+	ListStaff(ctx context.Context, arg ListStaffParams) ([]Staff, error)
 	ListStockLevelsByInventory(ctx context.Context, inventoryItemID uuid.UUID) ([]StockLevel, error)
 	ListStockLocations(ctx context.Context) ([]StockLocation, error)
 	ListSubscriptionOrdersBySubscription(ctx context.Context, subscriptionID uuid.UUID) ([]SubscriptionOrder, error)
@@ -162,6 +166,9 @@ type Querier interface {
 	UpdateShipmentStatus(ctx context.Context, arg UpdateShipmentStatusParams) (Shipment, error)
 	UpdateShipmentTracking(ctx context.Context, arg UpdateShipmentTrackingParams) (Shipment, error)
 	UpdateShippingConfig(ctx context.Context, arg UpdateShippingConfigParams) error
+	UpdateStaffActive(ctx context.Context, arg UpdateStaffActiveParams) error
+	UpdateStaffPassword(ctx context.Context, arg UpdateStaffPasswordParams) error
+	UpdateStaffRole(ctx context.Context, arg UpdateStaffRoleParams) error
 	UpdateStockLocationActive(ctx context.Context, arg UpdateStockLocationActiveParams) error
 	UpdateSubscriptionPauseUntil(ctx context.Context, arg UpdateSubscriptionPauseUntilParams) error
 	UpdateSubscriptionPeriod(ctx context.Context, arg UpdateSubscriptionPeriodParams) error

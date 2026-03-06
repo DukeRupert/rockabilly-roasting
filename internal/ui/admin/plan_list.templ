@@ -7,7 +7,9 @@ import (
 )
 
 type PlanListProps struct {
-	Plans []domain.SubscriptionPlan
+	Plans     []domain.SubscriptionPlan
+	StaffName string
+	StaffRole string
 }
 
 func planIntervalLabel(interval domain.SubscriptionInterval, count int) string {
@@ -173,8 +175,8 @@ templ PlanList(props PlanListProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Subscription Plans",
 		ActivePath: "/admin/plans",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@PlanListContent(props)
 	}

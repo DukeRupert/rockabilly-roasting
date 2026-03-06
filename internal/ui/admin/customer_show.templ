@@ -9,6 +9,8 @@ import (
 type CustomerShowProps struct {
 	Customer  *domain.Customer
 	Addresses []domain.Address
+	StaffName string
+	StaffRole string
 }
 
 templ CustomerShowContent(props CustomerShowProps) {
@@ -113,8 +115,8 @@ templ CustomerShow(props CustomerShowProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      fmt.Sprintf("%s %s", props.Customer.FirstName, props.Customer.LastName),
 		ActivePath: "/admin/customers",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@CustomerShowContent(props)
 	}

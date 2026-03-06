@@ -67,10 +67,9 @@ func run() error {
 	auditWriter := audit.NewAuditWriter()
 	metricsReg := metrics.NewRegistry()
 	rateLimitStore := ratelimit.NewInMemoryStore()
-	limiter := ratelimit.NewLimiter(rateLimitStore)
+	_ = rateLimitStore // will be used for rate limiting login endpoints
 	sessionStore := store.NewSessionStore()
-	_ = sessionStore // will be used when session.Store interface is implemented
-	sessionMgr := sessions.NewManager(nil) // TODO: wire session store implementing sessions.Store
+	sessionMgr := sessions.NewManager(sessionStore)
 	paymentProvider := payments.NewStripeProvider(
 		os.Getenv("STRIPE_SECRET_KEY"),
 		os.Getenv("STRIPE_WEBHOOK_SECRET"),
@@ -99,7 +98,8 @@ func run() error {
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, paymentProvider, auditWriter, metricsReg)
 	pricingSvc := app.NewPricingService(pricingStore)
 	cartSvc := app.NewCartService(cartStore, pricingStore)
-	authSvc := app.NewAuthService(customerStore, sessionMgr, limiter, auditWriter, metricsReg)
+	staffStore := store.NewStaffStore()
+	authSvc := app.NewAuthService(staffStore, sessionMgr, auditWriter, metricsReg)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, paymentProvider, auditWriter, metricsReg)
 
 	// River job workers

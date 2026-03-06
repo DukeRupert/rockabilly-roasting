@@ -178,7 +178,7 @@ templ Admin(props AdminProps) {
 								</button>
 								<div data-dropdown-menu class="hidden absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-stone-900/5">
 									<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Settings</a>
-									<a href="/auth/logout" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Sign out</a>
+									<form method="post" action="/auth/staff/logout"><button type="submit" class="block w-full text-left px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Sign out</button></form>
 								</div>
 							</div>
 						</div>
@@ -382,7 +382,7 @@ templ adminUserFooter(props AdminProps) {
 		</button>
 		<div data-dropdown-menu class="hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-md bg-white py-2 shadow-lg ring-1 ring-stone-900/5">
 			<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Settings</a>
-			<a href="/auth/logout" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Sign out</a>
+			<form method="post" action="/auth/staff/logout"><button type="submit" class="block w-full text-left px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Sign out</button></form>
 		</div>
 	</div>
 }

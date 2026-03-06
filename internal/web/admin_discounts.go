@@ -50,12 +50,15 @@ func (d *Deps) handleAdminDiscountList(w http.ResponseWriter, r *http.Request) {
 		discounts = discounts[:perPage]
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.DiscountListProps{
 		Discounts:    discounts,
 		ActiveFilter: activeFilter,
 		Page:         page,
 		PerPage:      perPage,
 		HasMore:      hasMore,
+		StaffName:    name,
+		StaffRole:    role,
 	}
 
 	if IsHTMX(r) {

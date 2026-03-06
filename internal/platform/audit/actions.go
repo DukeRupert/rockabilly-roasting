@@ -38,6 +38,8 @@ const (
 	AuditStaffCreated     = "staff.created"
 	AuditStaffRoleChanged = "staff.role_changed"
 	AuditStaffDeactivated = "staff.deactivated"
+	AuditStaffLogin       = "staff.login"
+	AuditStaffLogout      = "staff.logout"
 
 	// Shipping actions
 	AuditShipmentLabelCreated  = "shipment.label_created"

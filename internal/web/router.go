@@ -16,10 +16,10 @@ import (
 
 // Deps holds all dependencies needed by HTTP handlers.
 type Deps struct {
-	Pool          *pgxpool.Pool
-	Logger        *slog.Logger
-	Metrics       *metrics.Registry
-	Sessions      *sessions.Manager
+	Pool                *pgxpool.Pool
+	Logger              *slog.Logger
+	Metrics             *metrics.Registry
+	Sessions            *sessions.Manager
 	OrderService        *app.OrderService
 	CustomerService     *app.CustomerService
 	CatalogService      *app.CatalogService
@@ -27,12 +27,12 @@ type Deps struct {
 	FulfillmentService  *app.FulfillmentService
 	SubscriptionService *app.SubscriptionService
 	DiscountService     *app.DiscountService
-	AuthService     *app.AuthService
-	PricingService  *app.PricingService
-	CartService     *app.CartService
-	PaymentProvider payments.Provider
-	WebhookStore    *store.WebhookStore
-	CustomerStore   *store.CustomerStore
+	AuthService         *app.AuthService
+	PricingService      *app.PricingService
+	CartService         *app.CartService
+	PaymentProvider     payments.Provider
+	WebhookStore        *store.WebhookStore
+	CustomerStore       *store.CustomerStore
 }
 
 // NewRouter creates a new HTTP router with all routes and middleware registered.
@@ -74,76 +74,85 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /api/checkout/payment-intent", deps.handleCheckoutPaymentIntent)
 	mux.HandleFunc("POST /api/checkout/confirm", deps.handleCheckoutConfirm)
 
-	// Admin routes
-	mux.HandleFunc("GET /admin", deps.handleAdminDashboard)
+	// Staff auth routes (no session required)
+	mux.HandleFunc("GET /auth/staff/login", deps.handleStaffLoginPage)
+	mux.HandleFunc("POST /auth/staff/login", deps.handleStaffLogin)
 
-	// Admin catalog — categories (registered before product wildcard routes)
-	mux.HandleFunc("GET /admin/categories", deps.handleAdminCategoryList)
-	mux.HandleFunc("POST /admin/categories", deps.handleAdminCategoryCreate)
-	mux.HandleFunc("POST /admin/categories/{id}", deps.handleAdminCategoryUpdate)
-	mux.HandleFunc("POST /admin/categories/{id}/delete", deps.handleAdminCategoryDelete)
+	// Admin routes — all require staff session
+	adminMux := http.NewServeMux()
+	adminMux.HandleFunc("GET /admin", deps.handleAdminDashboard)
+
+	// Admin catalog — categories
+	adminMux.HandleFunc("GET /admin/categories", deps.handleAdminCategoryList)
+	adminMux.HandleFunc("POST /admin/categories", deps.handleAdminCategoryCreate)
+	adminMux.HandleFunc("POST /admin/categories/{id}", deps.handleAdminCategoryUpdate)
+	adminMux.HandleFunc("POST /admin/categories/{id}/delete", deps.handleAdminCategoryDelete)
 
 	// Admin catalog — products
-	mux.HandleFunc("GET /admin/catalog", deps.handleAdminProductList)
-	mux.HandleFunc("GET /admin/catalog/new", deps.handleAdminProductNew)
-	mux.HandleFunc("POST /admin/catalog", deps.handleAdminProductCreate)
-	mux.HandleFunc("GET /admin/catalog/{id}", deps.handleAdminProductEdit)
-	mux.HandleFunc("POST /admin/catalog/{id}", deps.handleAdminProductUpdate)
-	mux.HandleFunc("POST /admin/catalog/{id}/status", deps.handleAdminProductStatusUpdate)
-	mux.HandleFunc("POST /admin/catalog/{id}/subscribable", deps.handleAdminProductSubscribableUpdate)
-	mux.HandleFunc("POST /admin/catalog/{id}/delete", deps.handleAdminProductDelete)
-	mux.HandleFunc("POST /admin/catalog/{id}/variants", deps.handleAdminVariantCreate)
-	mux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}", deps.handleAdminVariantUpdate)
-	mux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/delete", deps.handleAdminVariantDelete)
-	mux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/price", deps.handleAdminVariantPriceUpdate)
-	mux.HandleFunc("POST /admin/catalog/{id}/options", deps.handleAdminOptionCreate)
-	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/delete", deps.handleAdminOptionDelete)
-	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values", deps.handleAdminOptionValueCreate)
-	mux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values/{valueID}/delete", deps.handleAdminOptionValueDelete)
+	adminMux.HandleFunc("GET /admin/catalog", deps.handleAdminProductList)
+	adminMux.HandleFunc("GET /admin/catalog/new", deps.handleAdminProductNew)
+	adminMux.HandleFunc("POST /admin/catalog", deps.handleAdminProductCreate)
+	adminMux.HandleFunc("GET /admin/catalog/{id}", deps.handleAdminProductEdit)
+	adminMux.HandleFunc("POST /admin/catalog/{id}", deps.handleAdminProductUpdate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/status", deps.handleAdminProductStatusUpdate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/subscribable", deps.handleAdminProductSubscribableUpdate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/delete", deps.handleAdminProductDelete)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/variants", deps.handleAdminVariantCreate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}", deps.handleAdminVariantUpdate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/delete", deps.handleAdminVariantDelete)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/price", deps.handleAdminVariantPriceUpdate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/options", deps.handleAdminOptionCreate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/delete", deps.handleAdminOptionDelete)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values", deps.handleAdminOptionValueCreate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values/{valueID}/delete", deps.handleAdminOptionValueDelete)
 
 	// Admin orders
-	mux.HandleFunc("GET /admin/orders", deps.handleAdminOrderList)
-	mux.HandleFunc("GET /admin/orders/{id}", deps.handleAdminOrderShow)
-	mux.HandleFunc("POST /admin/orders/{id}/cancel", deps.handleAdminOrderCancel)
-	mux.HandleFunc("POST /admin/orders/{id}/refund", deps.handleAdminOrderRefund)
-	mux.HandleFunc("POST /admin/orders/{id}/fulfill", deps.handleAdminOrderFulfill)
-	mux.HandleFunc("POST /admin/orders/{id}/ship", deps.handleAdminOrderShip)
-	mux.HandleFunc("GET /admin/orders/{id}/packing-slip", deps.handleAdminOrderPackingSlip)
+	adminMux.HandleFunc("GET /admin/orders", deps.handleAdminOrderList)
+	adminMux.HandleFunc("GET /admin/orders/{id}", deps.handleAdminOrderShow)
+	adminMux.HandleFunc("POST /admin/orders/{id}/cancel", deps.handleAdminOrderCancel)
+	adminMux.HandleFunc("POST /admin/orders/{id}/refund", deps.handleAdminOrderRefund)
+	adminMux.HandleFunc("POST /admin/orders/{id}/fulfill", deps.handleAdminOrderFulfill)
+	adminMux.HandleFunc("POST /admin/orders/{id}/ship", deps.handleAdminOrderShip)
+	adminMux.HandleFunc("GET /admin/orders/{id}/packing-slip", deps.handleAdminOrderPackingSlip)
 
 	// Admin customers
-	mux.HandleFunc("GET /admin/customers", deps.handleAdminCustomerList)
-	mux.HandleFunc("GET /admin/customers/{id}", deps.handleAdminCustomerShow)
+	adminMux.HandleFunc("GET /admin/customers", deps.handleAdminCustomerList)
+	adminMux.HandleFunc("GET /admin/customers/{id}", deps.handleAdminCustomerShow)
 
 	// Admin subscription plans
-	mux.HandleFunc("GET /admin/plans", deps.handleAdminPlanList)
-	mux.HandleFunc("POST /admin/plans", deps.handleAdminPlanCreate)
-	mux.HandleFunc("POST /admin/plans/{id}/deactivate", deps.handleAdminPlanDeactivate)
-	mux.HandleFunc("POST /admin/plans/{id}/activate", deps.handleAdminPlanActivate)
-	mux.HandleFunc("POST /admin/plans/{id}/discount", deps.handleAdminPlanUpdateDiscount)
+	adminMux.HandleFunc("GET /admin/plans", deps.handleAdminPlanList)
+	adminMux.HandleFunc("POST /admin/plans", deps.handleAdminPlanCreate)
+	adminMux.HandleFunc("POST /admin/plans/{id}/deactivate", deps.handleAdminPlanDeactivate)
+	adminMux.HandleFunc("POST /admin/plans/{id}/activate", deps.handleAdminPlanActivate)
+	adminMux.HandleFunc("POST /admin/plans/{id}/discount", deps.handleAdminPlanUpdateDiscount)
 
 	// Admin subscriptions
-	mux.HandleFunc("GET /admin/subscriptions", deps.handleAdminSubscriptionList)
-	mux.HandleFunc("GET /admin/subscriptions/{id}", deps.handleAdminSubscriptionShow)
-	mux.HandleFunc("POST /admin/subscriptions/{id}/pause", deps.handleAdminSubscriptionPause)
-	mux.HandleFunc("POST /admin/subscriptions/{id}/resume", deps.handleAdminSubscriptionResume)
-	mux.HandleFunc("POST /admin/subscriptions/{id}/cancel", deps.handleAdminSubscriptionCancel)
+	adminMux.HandleFunc("GET /admin/subscriptions", deps.handleAdminSubscriptionList)
+	adminMux.HandleFunc("GET /admin/subscriptions/{id}", deps.handleAdminSubscriptionShow)
+	adminMux.HandleFunc("POST /admin/subscriptions/{id}/pause", deps.handleAdminSubscriptionPause)
+	adminMux.HandleFunc("POST /admin/subscriptions/{id}/resume", deps.handleAdminSubscriptionResume)
+	adminMux.HandleFunc("POST /admin/subscriptions/{id}/cancel", deps.handleAdminSubscriptionCancel)
 
 	// Admin fulfillment
-	mux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)
+	adminMux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)
 
 	// Admin discounts
-	mux.HandleFunc("GET /admin/discounts", deps.handleAdminDiscountList)
+	adminMux.HandleFunc("GET /admin/discounts", deps.handleAdminDiscountList)
 
-	// Dev/test route — triggers a server error for toast testing
-	mux.HandleFunc("GET /admin/dev/error", func(w http.ResponseWriter, r *http.Request) {
+	// Staff logout (requires session)
+	adminMux.HandleFunc("POST /auth/staff/logout", deps.handleStaffLogout)
+
+	// Dev/test route
+	adminMux.HandleFunc("GET /admin/dev/error", func(w http.ResponseWriter, r *http.Request) {
 		Error(w, r, errors.New("simulated server error for testing"))
 	})
 
+	// Mount admin mux behind session middleware
+	mux.Handle("/admin/", deps.requireStaffSession(adminMux))
+	mux.Handle("/auth/staff/logout", deps.requireStaffSession(adminMux))
+
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)
-
-	// API routes
-	// TODO: register API handlers
 
 	// Apply middleware stack
 	var handler http.Handler = mux

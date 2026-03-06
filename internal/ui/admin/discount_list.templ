@@ -12,6 +12,8 @@ type DiscountListProps struct {
 	Page         int
 	PerPage      int
 	HasMore      bool
+	StaffName    string
+	StaffRole    string
 }
 
 func discountTypeLabel(t domain.DiscountType) string {
@@ -160,8 +162,8 @@ templ DiscountList(props DiscountListProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Discounts",
 		ActivePath: "/admin/discounts",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@DiscountListContent(props)
 	}

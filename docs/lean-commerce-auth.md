@@ -6,6 +6,38 @@ Session strategy: **database-backed opaque tokens** throughout. Instant revocati
 
 ---
 
+## Implementation Status
+
+### Staff Auth (Phase 1) — ✅ Complete
+
+Staff login, logout, and session-based route protection are fully implemented:
+
+- **Login flow:** `POST /auth/staff/login` validates email/password via bcrypt, creates a database-backed session, sets an `HttpOnly` cookie (`hiri_session`)
+- **Session middleware:** `requireStaffSession` protects all `/admin/` routes — validates cookie, looks up session + staff, redirects to `/auth/staff/login` if invalid
+- **Logout:** `POST /auth/staff/logout` revokes the session and clears the cookie
+- **Context propagation:** `auth.WithStaff(ctx, staff)` / `auth.StaffFromContext(ctx)` — all admin handlers read the real staff identity for audit trails and UI display
+- **Audit:** `staffActor(r)` replaces the former `devActor()` placeholder — all admin actions (order cancel, refund, fulfill, ship, product create/update, plan management, subscription management) now record the real staff actor
+- **UI:** Admin layout displays the authenticated staff member's name and role (initials avatar, sidebar footer, top-bar dropdown)
+- **Seed tool:** `cmd/seed/main.go` creates an initial admin user — run via `mage dev:seed` with `SEED_EMAIL`, `SEED_PASSWORD`, and optional `SEED_NAME`
+
+**Key files:**
+- `internal/web/auth.go` — middleware, login/logout handlers, `staffActor()`, `staffNameRole()`
+- `internal/app/auth.go` — `AuthService` (StaffLogin, Logout, ValidateSession, GetStaffByID)
+- `internal/store/staff.go` — `StaffStore` (GetByID, GetByEmail, Create, UpdatePassword)
+- `internal/platform/sessions/sessions.go` — `Manager` + `Store` interface
+- `internal/ui/admin/staff_login.templ` — standalone login page
+- `internal/web/router.go` — separate `adminMux` behind `requireStaffSession` middleware
+
+### Customer Auth (Phase 2) — 🔲 Not Started
+
+Customer login, registration, email verification, guest checkout, and password reset are designed (see below) but not yet implemented.
+
+### Permission Middleware (Phase 3) — 🔲 Not Started
+
+`RequirePermission` middleware for role-based route protection is designed but not yet applied to individual admin routes. Currently all authenticated staff can access all admin routes.
+
+---
+
 ## Part 1: Authentication
 
 ### The two flows are separate by design

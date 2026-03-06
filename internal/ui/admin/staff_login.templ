@@ -1,0 +1,64 @@
+package admin
+
+templ StaffLoginPage(errMsg string) {
+	<!DOCTYPE html>
+	<html lang="en" class="h-full bg-stone-50">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Staff Login — Hiri</title>
+			<link rel="stylesheet" href="/static/css/output.css"/>
+		</head>
+		<body class="h-full">
+			<div class="flex min-h-full flex-col justify-center px-6 py-12 lg:px-8">
+				<div class="sm:mx-auto sm:w-full sm:max-w-sm">
+					<h1 class="text-center text-2xl font-bold tracking-tight text-stone-900">Hiri</h1>
+					<h2 class="mt-2 text-center text-base text-stone-600">Sign in to your account</h2>
+				</div>
+				<div class="mt-8 sm:mx-auto sm:w-full sm:max-w-sm">
+					if errMsg != "" {
+						<div class="mb-4 rounded-md bg-red-50 p-3 ring-1 ring-inset ring-red-600/20">
+							<p class="text-sm text-red-700">{ errMsg }</p>
+						</div>
+					}
+					<form method="post" action="/auth/staff/login" class="space-y-5">
+						<div>
+							<label for="email" class="block text-sm font-medium text-stone-900">Email address</label>
+							<div class="mt-1">
+								<input
+									id="email"
+									name="email"
+									type="email"
+									autocomplete="email"
+									required
+									class="block w-full rounded-md bg-white px-3 py-2 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 placeholder:text-stone-400 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal"
+								/>
+							</div>
+						</div>
+						<div>
+							<label for="password" class="block text-sm font-medium text-stone-900">Password</label>
+							<div class="mt-1">
+								<input
+									id="password"
+									name="password"
+									type="password"
+									autocomplete="current-password"
+									required
+									class="block w-full rounded-md bg-white px-3 py-2 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 placeholder:text-stone-400 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal"
+								/>
+							</div>
+						</div>
+						<div>
+							<button
+								type="submit"
+								class="flex w-full justify-center rounded-md bg-hiri-teal px-3 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+							>
+								Sign in
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</body>
+	</html>
+}

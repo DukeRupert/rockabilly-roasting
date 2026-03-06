@@ -53,12 +53,15 @@ func (d *Deps) handleAdminSubscriptionList(w http.ResponseWriter, r *http.Reques
 		subscriptions = subscriptions[:perPage]
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.SubscriptionListProps{
 		Subscriptions: subscriptions,
 		StatusFilter:  statusFilter,
 		Page:          page,
 		PerPage:       perPage,
 		HasMore:       hasMore,
+		StaffName:     name,
+		StaffRole:     role,
 	}
 
 	if IsHTMX(r) {
@@ -108,11 +111,14 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	name, role := staffNameRole(r)
 	props := admin.SubscriptionShowProps{
 		Subscription: sub,
 		Plan:         plan,
 		Customer:     customer,
 		Orders:       orders,
+		StaffName:    name,
+		StaffRole:    role,
 	}
 
 	if IsHTMX(r) {
@@ -132,7 +138,7 @@ func (d *Deps) handleAdminSubscriptionPause(w http.ResponseWriter, r *http.Reque
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.SubscriptionService.PauseSubscription(ctx, tx, id, nil, devActor())
+		_, txErr := d.SubscriptionService.PauseSubscription(ctx, tx, id, nil, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -153,7 +159,7 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.SubscriptionService.ResumeSubscription(ctx, tx, id, devActor())
+		_, txErr := d.SubscriptionService.ResumeSubscription(ctx, tx, id, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -174,7 +180,7 @@ func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.SubscriptionService.CancelSubscription(ctx, tx, id, devActor())
+		_, txErr := d.SubscriptionService.CancelSubscription(ctx, tx, id, staffActor(r))
 		return txErr
 	})
 	if err != nil {

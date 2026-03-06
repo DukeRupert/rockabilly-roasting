@@ -11,6 +11,8 @@ type CustomerListProps struct {
 	Page      int
 	PerPage   int
 	HasMore   bool
+	StaffName string
+	StaffRole string
 }
 
 templ CustomerListContent(props CustomerListProps) {
@@ -110,8 +112,8 @@ templ CustomerList(props CustomerListProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Customers",
 		ActivePath: "/admin/customers",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@CustomerListContent(props)
 	}

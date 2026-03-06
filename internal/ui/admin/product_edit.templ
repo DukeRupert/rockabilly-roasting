@@ -29,6 +29,8 @@ type ProductEditProps struct {
 	TaxonName string
 	Errors    map[string]string
 	Flash     string
+	StaffName string
+	StaffRole string
 }
 
 templ ProductEditContent(props ProductEditProps) {
@@ -522,8 +524,8 @@ templ ProductEdit(props ProductEditProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      props.Product.Title + " - Edit",
 		ActivePath: "/admin/catalog",
-		StaffName:  "Dev User",
-		StaffRole:  "admin",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
 		@ProductEditContent(props)
 	}

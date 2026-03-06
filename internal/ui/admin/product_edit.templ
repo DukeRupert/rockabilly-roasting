@@ -69,39 +69,47 @@ templ ProductEditContent(props ProductEditProps) {
 				Errors:  props.Errors,
 				Action:  fmt.Sprintf("/admin/catalog/%s", props.Product.ID),
 			})
-			<!-- Status panel -->
+			<!-- Settings panel: status + subscription toggle -->
 			<div class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
 				<div class="px-4 py-5 sm:px-6">
-					<h3 class="text-base/7 font-semibold text-stone-900">Status</h3>
+					<h3 class="text-base/7 font-semibold text-stone-900">Settings</h3>
 				</div>
-				<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-3">
-							<span class="text-sm text-stone-500">Current status:</span>
-							@StatusBadge(props.Product.Status)
+				<div class="border-t border-stone-200 px-4 py-5 sm:px-6 space-y-6">
+					<!-- Status toggle -->
+					@StatusToggle(props.Product)
+					<!-- Subscription eligibility -->
+					@SubscribableToggle(props.Product)
+					<!-- Destructive actions -->
+					<div class="flex items-center justify-between border-t border-stone-200 pt-6">
+						<div>
+							<p class="text-sm font-medium text-stone-900">
+								if props.Product.Status == domain.ProductStatusArchived {
+									Archived
+								} else {
+									Archive or delete
+								}
+							</p>
+							<p class="text-sm text-stone-500">
+								if props.Product.Status == domain.ProductStatusArchived {
+									This product is archived and hidden from the storefront.
+								} else {
+									Remove this product from the storefront.
+								}
+							</p>
 						</div>
 						<div class="flex items-center gap-2">
-							if props.Product.Status == domain.ProductStatusDraft {
-								<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/status", props.Product.ID)) }>
-									<input type="hidden" name="status" value="active"/>
-									<button type="submit" class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
-										Activate
-									</button>
-								</form>
-							}
-							if props.Product.Status == domain.ProductStatusActive {
-								<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/status", props.Product.ID)) }>
-									<input type="hidden" name="status" value="archived"/>
-									<button type="submit" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-stone-900 shadow-xs ring-1 ring-inset ring-stone-300 hover:bg-stone-50">
-										Archive
-									</button>
-								</form>
-							}
 							if props.Product.Status == domain.ProductStatusArchived {
 								<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/status", props.Product.ID)) }>
 									<input type="hidden" name="status" value="draft"/>
 									<button type="submit" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-stone-900 shadow-xs ring-1 ring-inset ring-stone-300 hover:bg-stone-50">
-										Move to draft
+										Unarchive
+									</button>
+								</form>
+							} else {
+								<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/status", props.Product.ID)) }>
+									<input type="hidden" name="status" value="archived"/>
+									<button type="submit" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-stone-900 shadow-xs ring-1 ring-inset ring-stone-300 hover:bg-stone-50">
+										Archive
 									</button>
 								</form>
 							}
@@ -114,8 +122,6 @@ templ ProductEditContent(props ProductEditProps) {
 					</div>
 				</div>
 			</div>
-			<!-- Subscription eligibility panel -->
-		@SubscribablePanel(props.Product)
 		<!-- Options panel (before variants — must define options before creating variants) -->
 			@OptionsPanel(props.Product, props.Options)
 			<!-- Variants panel -->
@@ -449,35 +455,67 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 	</div>
 }
 
-// SubscribablePanel renders the subscription eligibility toggle as a standalone partial for htmx swaps.
-templ SubscribablePanel(product *domain.Product) {
-	<div id="subscribable-panel" class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
-		<div class="px-4 py-5 sm:px-6">
-			<h3 class="text-base/7 font-semibold text-stone-900">Subscriptions</h3>
-			<p class="mt-1 text-sm text-stone-500">Control whether customers can subscribe to this product for recurring delivery.</p>
-		</div>
-		<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
-			<div class="flex items-center justify-between">
-				<div>
-					<p class="text-sm font-medium text-stone-900">Allow subscriptions</p>
-					<p class="text-sm text-stone-500">All active subscription plans will appear on this product's page.</p>
-				</div>
+// StatusToggle renders the active/inactive toggle as a standalone partial for htmx swaps.
+templ StatusToggle(product *domain.Product) {
+	<div id="status-panel">
+		<div class="flex items-center justify-between">
+			<div>
+				<p class="text-sm font-medium text-stone-900">Active</p>
+				<p class="text-sm text-stone-500">Product is visible on the storefront.</p>
+			</div>
+			if product.Status == domain.ProductStatusArchived {
 				@switchcomp.Switch(switchcomp.Props{
-					ID:      fmt.Sprintf("subscribable-%s", product.ID),
-					Name:    "subscribable",
-					Value:   "true",
-					Checked: product.Subscribable,
+					ID:       fmt.Sprintf("status-%s", product.ID),
+					Name:     "status",
+					Value:    "active",
+					Checked:  false,
+					Disabled: true,
+				})
+			} else {
+				@switchcomp.Switch(switchcomp.Props{
+					ID:      fmt.Sprintf("status-%s", product.ID),
+					Name:    "status",
+					Value:   "active",
+					Checked: product.Status == domain.ProductStatusActive,
 					Attributes: templ.Attributes{
-						"hx-post":    fmt.Sprintf("/admin/catalog/%s/subscribable", product.ID),
-						"hx-target":  "#subscribable-panel",
+						"hx-post":    fmt.Sprintf("/admin/catalog/%s/status", product.ID),
+						"hx-target":  "#status-panel",
 						"hx-swap":    "outerHTML",
 						"hx-trigger": "change",
 					},
 				})
-			</div>
-			<div id="subscribable-error" class="hidden mt-2 text-sm text-red-600"></div>
+			}
 		</div>
 	</div>
+}
+
+// SubscribableToggle renders the subscription toggle row for embedding inside another panel.
+templ SubscribableToggle(product *domain.Product) {
+	<div id="subscribable-panel">
+		<div class="flex items-center justify-between">
+			<div>
+				<p class="text-sm font-medium text-stone-900">Allow subscriptions</p>
+				<p class="text-sm text-stone-500">Customers can subscribe for recurring delivery.</p>
+			</div>
+			@switchcomp.Switch(switchcomp.Props{
+				ID:      fmt.Sprintf("subscribable-%s", product.ID),
+				Name:    "subscribable",
+				Value:   "true",
+				Checked: product.Subscribable,
+				Attributes: templ.Attributes{
+					"hx-post":    fmt.Sprintf("/admin/catalog/%s/subscribable", product.ID),
+					"hx-target":  "#subscribable-panel",
+					"hx-swap":    "outerHTML",
+					"hx-trigger": "change",
+				},
+			})
+		</div>
+	</div>
+}
+
+// SubscribablePanel renders the subscription toggle as a standalone partial for htmx swaps.
+templ SubscribablePanel(product *domain.Product) {
+	@SubscribableToggle(product)
 }
 
 templ ProductEdit(props ProductEditProps) {

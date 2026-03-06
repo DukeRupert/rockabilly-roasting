@@ -391,16 +391,38 @@ func (d *Deps) handleAdminProductStatusUpdate(w http.ResponseWriter, r *http.Req
 	}
 
 	status := domain.ProductStatus(r.FormValue("status"))
+	// Toggle switch sends no value when unchecked — default to draft.
+	if status == "" {
+		status = domain.ProductStatusDraft
+	}
 
+	var product *domain.Product
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CatalogService.UpdateProductStatus(ctx, tx, id, status, devActor())
+		var txErr error
+		product, txErr = d.CatalogService.UpdateProductStatus(ctx, tx, id, status, devActor())
 		return txErr
 	})
 	if err != nil {
+		if IsHTMX(r) {
+			var current *domain.Product
+			_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+				current, _ = d.CatalogService.GetProduct(ctx, tx, id)
+				return nil
+			})
+			if current != nil {
+				admin.StatusToggle(current).Render(ctx, w) //nolint:errcheck
+			}
+			toast.Toast(toast.VariantError, "Failed to update product status.").Render(ctx, w) //nolint:errcheck
+			return
+		}
 		Error(w, r, err)
 		return
 	}
 
+	if IsHTMX(r) {
+		admin.StatusToggle(product).Render(ctx, w) //nolint:errcheck
+		return
+	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Status+updated", id), http.StatusSeeOther)
 }
 

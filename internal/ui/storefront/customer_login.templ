@@ -1,0 +1,71 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+type CustomerLoginProps struct {
+	Error string
+	Email string
+}
+
+templ CustomerLoginContent(props CustomerLoginProps) {
+	<div class="mx-auto max-w-sm">
+		<div class="text-center">
+			<h1 class="text-2xl font-bold text-hiri-text">Sign in</h1>
+			<p class="mt-2 text-sm text-hiri-text-secondary">
+				Sign in to your account to manage orders and subscriptions.
+			</p>
+		</div>
+		if props.Error != "" {
+			<div class="mt-4 rounded-md bg-red-50 p-3">
+				<p class="text-sm text-red-700">{ props.Error }</p>
+			</div>
+		}
+		<form method="post" action="/auth/login" class="mt-8 space-y-5">
+			<div>
+				<label for="email" class="block text-sm font-medium text-hiri-text">Email</label>
+				<input
+					type="email"
+					name="email"
+					id="email"
+					required
+					value={ props.Email }
+					class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm"
+				/>
+			</div>
+			<div>
+				<label for="password" class="block text-sm font-medium text-hiri-text">Password</label>
+				<input
+					type="password"
+					name="password"
+					id="password"
+					required
+					class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm"
+				/>
+			</div>
+			<div class="flex items-center justify-between">
+				<div class="flex items-center">
+					<input type="checkbox" name="remember_me" id="remember_me" class="size-4 rounded border-stone-300 text-hiri-teal focus:ring-hiri-teal"/>
+					<label for="remember_me" class="ml-2 text-sm text-hiri-text-secondary">Remember me</label>
+				</div>
+			</div>
+			<button
+				type="submit"
+				class="flex w-full justify-center rounded-md bg-hiri-teal px-3 py-3 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+			>
+				Sign in
+			</button>
+		</form>
+		<p class="mt-6 text-center text-sm text-hiri-text-secondary">
+			Wholesale customer?
+			<a href="/wholesale/apply" class="font-semibold text-hiri-teal hover:text-hiri-teal-dark">Apply for an account</a>
+		</p>
+	</div>
+}
+
+templ CustomerLoginPage(props CustomerLoginProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title: "Sign In",
+	}) {
+		@CustomerLoginContent(props)
+	}
+}

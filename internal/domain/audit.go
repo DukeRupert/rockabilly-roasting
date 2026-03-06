@@ -11,8 +11,9 @@ import (
 type AuditActorType string
 
 const (
-	AuditActorTypeStaff  AuditActorType = "staff"
-	AuditActorTypeSystem AuditActorType = "system"
+	AuditActorTypeStaff    AuditActorType = "staff"
+	AuditActorTypeCustomer AuditActorType = "customer"
+	AuditActorTypeSystem   AuditActorType = "system"
 )
 
 // StaffActor represents the staff member performing an action (for audit).

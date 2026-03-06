@@ -80,6 +80,24 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /wholesale/apply", deps.handleWholesaleApplyPage)
 	mux.HandleFunc("POST /wholesale/apply", deps.handleWholesaleApply)
 
+	// Customer auth routes (no session required)
+	mux.HandleFunc("GET /auth/login", deps.handleCustomerLoginPage)
+	mux.HandleFunc("POST /auth/login", deps.handleCustomerLogin)
+
+	// Customer logout (requires session)
+	mux.Handle("POST /auth/logout", deps.requireCustomerSession(http.HandlerFunc(deps.handleCustomerLogout)))
+
+	// Wholesale portal — requires approved wholesale customer
+	wholesaleMux := http.NewServeMux()
+	wholesaleMux.HandleFunc("GET /wholesale/portal", deps.handleWholesaleQuickOrder)
+	wholesaleMux.HandleFunc("POST /wholesale/portal/bulk-add", deps.handleWholesaleBulkAdd)
+	wholesaleMux.HandleFunc("GET /wholesale/checkout", deps.handleWholesaleCheckoutPage)
+	wholesaleMux.HandleFunc("POST /wholesale/checkout/confirm", deps.handleWholesaleCheckoutConfirm)
+	mux.Handle("/wholesale/portal", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("/wholesale/portal/", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("/wholesale/checkout", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("/wholesale/checkout/", deps.requireApprovedWholesale(wholesaleMux))
+
 	// Staff auth routes (no session required)
 	mux.HandleFunc("GET /auth/staff/login", deps.handleStaffLoginPage)
 	mux.HandleFunc("POST /auth/staff/login", deps.handleStaffLogin)

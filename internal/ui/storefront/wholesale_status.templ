@@ -1,0 +1,33 @@
+package storefront
+
+// WholesalePending is shown to wholesale customers whose application is still pending.
+templ WholesalePending() {
+	<div class="mx-auto max-w-lg text-center py-12">
+		<svg class="mx-auto size-16 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+		</svg>
+		<h1 class="mt-4 text-2xl font-bold text-hiri-text">Application Under Review</h1>
+		<p class="mt-2 text-sm text-hiri-text-secondary">
+			Your wholesale application is currently being reviewed. We'll notify you by email once a decision has been made, typically within 2 business days.
+		</p>
+		<div class="mt-8">
+			<a href="/catalog" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Continue shopping</a>
+		</div>
+	</div>
+}
+
+// WholesaleSuspended is shown to wholesale customers whose account has been suspended.
+templ WholesaleSuspended() {
+	<div class="mx-auto max-w-lg text-center py-12">
+		<svg class="mx-auto size-16 text-red-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"></path>
+		</svg>
+		<h1 class="mt-4 text-2xl font-bold text-hiri-text">Account Suspended</h1>
+		<p class="mt-2 text-sm text-hiri-text-secondary">
+			Your wholesale account has been suspended. Please contact us for more information.
+		</p>
+		<div class="mt-8">
+			<a href="/catalog" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Continue shopping</a>
+		</div>
+	</div>
+}

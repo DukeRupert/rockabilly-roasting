@@ -19,24 +19,27 @@ import (
 
 // AuthService contains business logic for authentication and session management.
 type AuthService struct {
-	staff    *store.StaffStore
-	sessions *sessions.Manager
-	audit    *audit.AuditWriter
-	metrics  *metrics.Registry
+	staff     *store.StaffStore
+	customers *store.CustomerStore
+	sessions  *sessions.Manager
+	audit     *audit.AuditWriter
+	metrics   *metrics.Registry
 }
 
 // NewAuthService creates a new AuthService.
 func NewAuthService(
 	staff *store.StaffStore,
+	customers *store.CustomerStore,
 	sessions *sessions.Manager,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
 ) *AuthService {
 	return &AuthService{
-		staff:    staff,
-		sessions: sessions,
-		audit:    audit,
-		metrics:  metrics,
+		staff:     staff,
+		customers: customers,
+		sessions:  sessions,
+		audit:     audit,
+		metrics:   metrics,
 	}
 }
 
@@ -125,4 +128,59 @@ func (s *AuthService) ValidateSession(ctx context.Context, tx pgx.Tx, rawToken s
 	}
 
 	return session, nil
+}
+
+// CustomerLogin authenticates a customer and creates a session.
+func (s *AuthService) CustomerLogin(ctx context.Context, tx pgx.Tx, email, password string, rememberMe bool, ipAddress, userAgent *string) (*domain.Session, string, error) {
+	customer, err := s.customers.GetByEmail(ctx, tx, email)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, "", ErrInvalidCredentials
+		}
+		return nil, "", fmt.Errorf("customer login lookup: %w", err)
+	}
+
+	if customer.PasswordHash == nil {
+		return nil, "", ErrInvalidCredentials
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*customer.PasswordHash), []byte(password)); err != nil {
+		return nil, "", ErrInvalidCredentials
+	}
+
+	duration := sessions.CustomerSessionDuration
+	if rememberMe {
+		duration = sessions.CustomerRememberMeDuration
+	}
+
+	expiresAt := time.Now().Add(duration)
+	session, rawToken, err := s.sessions.GetStore().Create(ctx, tx, domain.SessionActorTypeCustomer, customer.ID, expiresAt, ipAddress, userAgent)
+	if err != nil {
+		return nil, "", fmt.Errorf("create customer session: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    domain.AuditActorTypeCustomer,
+		ActorID:      &customer.ID,
+		ActorName:    customer.Email,
+		Action:       audit.AuditCustomerLogin,
+		ResourceType: "session",
+		ResourceID:   session.ID,
+	}); err != nil {
+		return nil, "", fmt.Errorf("audit customer login: %w", err)
+	}
+
+	return session, rawToken, nil
+}
+
+// GetCustomerByID returns a customer by ID.
+func (s *AuthService) GetCustomerByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Customer, error) {
+	customer, err := s.customers.GetByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCustomerNotFound
+		}
+		return nil, fmt.Errorf("get customer: %w", err)
+	}
+	return customer, nil
 }

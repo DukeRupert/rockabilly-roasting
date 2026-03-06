@@ -34,6 +34,10 @@ const (
 	AuditCustomerTaxExemptionRevoked = "customer.tax_exemption_revoked"
 	AuditCustomerDeactivated         = "customer.deactivated"
 
+	// Customer auth actions
+	AuditCustomerLogin  = "customer.login"
+	AuditCustomerLogout = "customer.logout"
+
 	// Staff actions
 	AuditStaffCreated     = "staff.created"
 	AuditStaffRoleChanged = "staff.role_changed"

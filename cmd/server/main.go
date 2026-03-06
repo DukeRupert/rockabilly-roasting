@@ -101,7 +101,7 @@ func run() error {
 	staffStore := store.NewStaffStore()
 	customerGroupStore := store.NewCustomerGroupStore()
 	invoiceStore := store.NewInvoiceStore()
-	authSvc := app.NewAuthService(staffStore, sessionMgr, auditWriter, metricsReg)
+	authSvc := app.NewAuthService(staffStore, customerStore, sessionMgr, auditWriter, metricsReg)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, paymentProvider, auditWriter, metricsReg)
 	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg)
 	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg)

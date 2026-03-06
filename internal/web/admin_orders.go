@@ -1,12 +1,14 @@
 package web
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
@@ -78,6 +80,8 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var order *domain.Order
 	var lineItems []domain.LineItem
 	var adjustments []domain.Adjustment
+	var customer *domain.Customer
+	var enrichedItems []admin.EnrichedLineItem
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -90,17 +94,59 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		adjustments, txErr = d.OrderService.ListAdjustments(ctx, tx, id)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+
+		// Resolve customer.
+		if order.CustomerID != nil {
+			customer, txErr = d.CustomerService.GetCustomer(ctx, tx, *order.CustomerID)
+			if txErr != nil && !errors.Is(txErr, app.ErrCustomerNotFound) {
+				return txErr
+			}
+		}
+
+		// Resolve variant + product names for each line item.
+		enrichedItems = make([]admin.EnrichedLineItem, len(lineItems))
+		for i, li := range lineItems {
+			enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
+
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
+			if vErr != nil {
+				if errors.Is(vErr, app.ErrVariantNotFound) {
+					continue
+				}
+				return vErr
+			}
+			enrichedItems[i].VariantSKU = variant.SKU
+
+			product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+			if pErr != nil {
+				if errors.Is(pErr, app.ErrProductNotFound) {
+					continue
+				}
+				return pErr
+			}
+			enrichedItems[i].ProductTitle = product.Title
+			enrichedItems[i].ProductSlug = product.Slug
+		}
+
+		return nil
 	})
 	if err != nil {
+		if errors.Is(err, app.ErrOrderNotFound) {
+			http.NotFound(w, r)
+			return
+		}
 		Error(w, r, err)
 		return
 	}
 
 	props := admin.OrderShowProps{
 		Order:       order,
-		LineItems:   lineItems,
+		LineItems:   enrichedItems,
 		Adjustments: adjustments,
+		Customer:    customer,
 	}
 
 	if IsHTMX(r) {
@@ -108,4 +154,69 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.OrderShow(props).Render(ctx, w) //nolint:errcheck
+}
+
+func (d *Deps) handleAdminOrderCancel(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.CancelOrder(ctx, tx, id, devActor())
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminOrderRefund(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.RefundOrder(ctx, tx, id, devActor())
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminOrderUpdateFulfillment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	status := domain.FulfillmentStatus(r.FormValue("fulfillment_status"))
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.UpdateFulfillmentStatus(ctx, tx, id, status, devActor())
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
 }

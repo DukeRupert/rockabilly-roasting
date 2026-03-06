@@ -6,10 +6,27 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
+type EnrichedLineItem struct {
+	LineItem     domain.LineItem
+	ProductTitle string
+	ProductSlug  string
+	VariantSKU   string
+}
+
 type OrderShowProps struct {
 	Order       *domain.Order
-	LineItems   []domain.LineItem
+	LineItems   []EnrichedLineItem
 	Adjustments []domain.Adjustment
+	Customer    *domain.Customer
+}
+
+func canCancelOrder(status domain.OrderStatus) bool {
+	return status == domain.OrderStatusPending || status == domain.OrderStatusConfirmed
+}
+
+func canRefundOrder(status domain.OrderStatus, paymentStatus domain.PaymentStatus) bool {
+	return (status == domain.OrderStatusComplete || status == domain.OrderStatusConfirmed) &&
+		paymentStatus == domain.PaymentStatusCaptured
 }
 
 templ OrderShowContent(props OrderShowProps) {
@@ -26,8 +43,60 @@ templ OrderShowContent(props OrderShowProps) {
 			<a href="/admin/orders" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Back to orders</a>
 		</div>
 	</div>
+	<!-- Actions -->
+	<div class="mt-6 flex flex-wrap gap-3">
+		if canCancelOrder(props.Order.Status) {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/cancel", props.Order.ID.String())) }>
+				<button
+					type="submit"
+					class="inline-flex items-center rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-inset ring-red-600/20 hover:bg-red-100"
+					onclick="return confirm('Are you sure you want to cancel this order?')"
+				>
+					Cancel Order
+				</button>
+			</form>
+		}
+		if canRefundOrder(props.Order.Status, props.Order.PaymentStatus) {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/refund", props.Order.ID.String())) }>
+				<button
+					type="submit"
+					class="inline-flex items-center rounded-md bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 ring-1 ring-inset ring-amber-600/20 hover:bg-amber-100"
+					onclick="return confirm('Are you sure you want to refund this order?')"
+				>
+					Refund Order
+				</button>
+			</form>
+		}
+		<!-- Fulfillment status update -->
+		if props.Order.Status != domain.OrderStatusCancelled && props.Order.Status != domain.OrderStatusRefunded {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/fulfillment", props.Order.ID.String())) } class="flex items-center gap-2">
+				<div class="grid grid-cols-1">
+					<select
+						name="fulfillment_status"
+						class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal"
+					>
+						<option value="unfulfilled" selected?={ props.Order.FulfillmentStatus == domain.FulfillmentStatusUnfulfilled }>Unfulfilled</option>
+						<option value="fulfilled" selected?={ props.Order.FulfillmentStatus == domain.FulfillmentStatusFulfilled }>Fulfilled</option>
+						<option value="partially_fulfilled" selected?={ props.Order.FulfillmentStatus == domain.FulfillmentStatusPartiallyFulfilled }>Partially Fulfilled</option>
+						<option value="shipped" selected?={ props.Order.FulfillmentStatus == domain.FulfillmentStatusShipped }>Shipped</option>
+						<option value="delivered" selected?={ props.Order.FulfillmentStatus == domain.FulfillmentStatusDelivered }>Delivered</option>
+						<option value="returned" selected?={ props.Order.FulfillmentStatus == domain.FulfillmentStatusReturned }>Returned</option>
+					</select>
+					<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+						<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+				<button
+					type="submit"
+					class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+				>
+					Update
+				</button>
+			</form>
+		}
+	</div>
 	<!-- Status cards -->
-	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
 			<dt class="text-sm font-medium text-stone-500">Payment</dt>
 			<dd class="mt-1">
@@ -44,7 +113,27 @@ templ OrderShowContent(props OrderShowProps) {
 			<dt class="text-sm font-medium text-stone-500">Total</dt>
 			<dd class="mt-1 text-lg font-semibold text-stone-900 tabular-nums">{ formatCents(props.Order.Total) }</dd>
 		</div>
+		if props.Customer != nil {
+			<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+				<dt class="text-sm font-medium text-stone-500">Customer</dt>
+				<dd class="mt-1 text-sm font-semibold text-stone-900">
+					<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())) } class="text-hiri-teal hover:text-hiri-teal-dark">
+						{ props.Customer.FirstName } { props.Customer.LastName }
+					</a>
+				</dd>
+				<dd class="text-xs text-stone-500">{ props.Customer.Email }</dd>
+			</div>
+		}
 	</div>
+	<!-- Stripe info -->
+	if props.Order.StripePaymentIntentID != nil && *props.Order.StripePaymentIntentID != "" {
+		<div class="mt-4 rounded-lg bg-stone-50 p-4 ring-1 ring-stone-900/5">
+			<p class="text-sm text-stone-600">
+				<span class="font-medium">Stripe Payment Intent:</span>
+				<code class="ml-1 text-xs">{ *props.Order.StripePaymentIntentID }</code>
+			</p>
+		</div>
+	}
 	<!-- Line items -->
 	<div class="mt-8">
 		<h2 class="text-sm font-semibold text-stone-900">Line items</h2>
@@ -55,26 +144,40 @@ templ OrderShowContent(props OrderShowProps) {
 				<table class="min-w-full divide-y divide-stone-300">
 					<thead class="bg-stone-50">
 						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Variant</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Product</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">SKU</th>
 							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Qty</th>
 							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Unit Price</th>
 							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Total</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-stone-200 bg-white">
-						for _, li := range props.LineItems {
+						for _, eli := range props.LineItems {
 							<tr>
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-stone-900 sm:pl-6">
-									{ li.VariantID.String()[:8] }...
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+									if eli.ProductTitle != "" {
+										<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", eli.LineItem.VariantID.String())) } class="font-medium text-stone-900 hover:text-hiri-teal">
+											{ eli.ProductTitle }
+										</a>
+									} else {
+										<span class="font-medium text-stone-900">{ eli.LineItem.VariantID.String()[:8] }...</span>
+									}
+								</td>
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 sm:table-cell">
+									if eli.VariantSKU != "" {
+										{ eli.VariantSKU }
+									} else {
+										<span class="text-stone-400">—</span>
+									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500 text-right tabular-nums">
-									{ fmt.Sprintf("%d", li.Quantity) }
+									{ fmt.Sprintf("%d", eli.LineItem.Quantity) }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500 text-right tabular-nums">
-									{ formatCents(li.UnitPrice) }
+									{ formatCents(eli.LineItem.UnitPrice) }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-900 text-right tabular-nums font-medium">
-									{ formatCents(li.Total) }
+									{ formatCents(eli.LineItem.Total) }
 								</td>
 							</tr>
 						}

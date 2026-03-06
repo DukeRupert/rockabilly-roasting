@@ -104,6 +104,9 @@ func NewRouter(deps *Deps) http.Handler {
 	// Admin orders
 	mux.HandleFunc("GET /admin/orders", deps.handleAdminOrderList)
 	mux.HandleFunc("GET /admin/orders/{id}", deps.handleAdminOrderShow)
+	mux.HandleFunc("POST /admin/orders/{id}/cancel", deps.handleAdminOrderCancel)
+	mux.HandleFunc("POST /admin/orders/{id}/refund", deps.handleAdminOrderRefund)
+	mux.HandleFunc("POST /admin/orders/{id}/fulfillment", deps.handleAdminOrderUpdateFulfillment)
 
 	// Admin customers
 	mux.HandleFunc("GET /admin/customers", deps.handleAdminCustomerList)

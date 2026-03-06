@@ -2,12 +2,14 @@
 
 -- Safety check: ensure no meaningful guest rows exist before dropping.
 -- If this fails, handle guest records before re-running.
+-- +goose StatementBegin
 DO $$
 BEGIN
     IF (SELECT count(*) FROM customers WHERE is_guest = true) > 0 THEN
         RAISE EXCEPTION 'Found rows with is_guest = true. Handle these before dropping the column.';
     END IF;
 END $$;
+-- +goose StatementEnd
 
 ALTER TABLE customers
     DROP COLUMN is_guest;

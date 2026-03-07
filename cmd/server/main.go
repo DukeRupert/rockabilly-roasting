@@ -22,6 +22,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/logging"
+	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
@@ -88,6 +89,15 @@ func run() error {
 	storeName := os.Getenv("STORE_NAME")
 	staffEmail := os.Getenv("STAFF_NOTIFICATION_EMAIL")
 
+	// Media (Cloudflare Images + R2)
+	cfImagesClient := media.NewCFImagesClient(
+		os.Getenv("CF_IMAGES_ACCOUNT_ID"),
+		os.Getenv("CF_IMAGES_API_TOKEN"),
+	)
+	mediaConfig := &media.Config{
+		CFImagesBaseURL: os.Getenv("CF_IMAGES_BASE_URL"),
+	}
+
 	// Stores
 	orderStore := store.NewOrderStore()
 	customerStore := store.NewCustomerStore()
@@ -130,6 +140,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewWholesaleApprovedWorker(customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
 	river.AddWorker(workers, jobs.NewOrderConfirmEmailWorker(orderStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
 	river.AddWorker(workers, jobs.NewSubscriptionConfirmEmailWorker(subscriptionStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
+	river.AddWorker(workers, jobs.NewCFImageDeleteWorker(cfImagesClient))
 
 	// River client — we create it first, then pass it to the scheduler worker
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
@@ -198,6 +209,8 @@ func run() error {
 		MagicLinkStore:     magicLinkStore,
 		CustomerGroupStore: customerGroupStore,
 		RiverClient:        riverClient,
+		CFImagesClient:     cfImagesClient,
+		MediaConfig:        mediaConfig,
 	}
 
 	handler := web.NewRouter(deps)

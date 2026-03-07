@@ -1,0 +1,199 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/google/uuid"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/media"
+)
+
+type MediaGalleryProps struct {
+	ProductID   uuid.UUID
+	Media       []domain.ProductMedia
+	MediaConfig *media.Config
+}
+
+// mediaURL resolves a product media item to a renderable URL.
+func mediaURL(m domain.ProductMedia, cfg *media.Config) string {
+	if cfg != nil && m.CFImageID != "" {
+		return cfg.ProductImageURL(m.CFImageID, media.VariantCard)
+	}
+	if cfg != nil {
+		return cfg.PlaceholderURL()
+	}
+	return "/static/placeholder-product.png"
+}
+
+// MediaGallery renders the product image gallery with upload and delete controls.
+// This is the htmx-swappable partial — used by both the initial page render and
+// after image add/delete operations.
+templ MediaGallery(props MediaGalleryProps) {
+	<div id="media-gallery" class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+		<div class="px-4 py-5 sm:px-6">
+			<h3 class="text-base/7 font-semibold text-stone-900">Images</h3>
+			<p class="mt-1 text-sm text-stone-500">Product photos displayed on the storefront. First image is the primary.</p>
+		</div>
+		<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
+			if len(props.Media) > 0 {
+				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+					for i, m := range props.Media {
+						<div class="group relative">
+							<div class="aspect-square overflow-hidden rounded-lg bg-stone-100">
+								<img
+									src={ mediaURL(m, props.MediaConfig) }
+									alt={ m.AltText }
+									class="h-full w-full object-cover object-center"
+								/>
+							</div>
+							if i == 0 {
+								<span class="absolute top-2 left-2 inline-flex items-center rounded-md bg-hiri-teal px-1.5 py-0.5 text-xs font-medium text-white">
+									Primary
+								</span>
+							}
+							<!-- Delete button overlay -->
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/images/%s/delete", props.ProductID, m.ID)) }
+								hx-post={ fmt.Sprintf("/admin/catalog/%s/images/%s/delete", props.ProductID, m.ID) }
+								hx-target="#media-gallery"
+								hx-swap="outerHTML"
+								hx-confirm="Delete this image?"
+								class="absolute top-2 right-2 hidden group-hover:block"
+							>
+								<button
+									type="submit"
+									class="rounded-full bg-red-600 p-1 text-white shadow-sm hover:bg-red-500"
+								>
+									<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>
+									</svg>
+								</button>
+							</form>
+						</div>
+					}
+				</div>
+			} else {
+				<div class="rounded-lg border-2 border-dashed border-stone-300 p-8 text-center">
+					<svg class="mx-auto size-12 text-stone-400" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"></path>
+					</svg>
+					<p class="mt-2 text-sm text-stone-500">No images yet.</p>
+				</div>
+			}
+			<!-- Upload button -->
+			<div class="mt-4">
+				<div
+					x-data={ fmt.Sprintf("imageUploader('%s')", props.ProductID) }
+					class="relative"
+				>
+					<input
+						type="file"
+						accept="image/*"
+						multiple
+						x-ref="fileInput"
+						@change="handleFiles($event)"
+						class="hidden"
+					/>
+					<button
+						type="button"
+						@click="$refs.fileInput.click()"
+						:disabled="uploading"
+						class="inline-flex items-center gap-x-1.5 rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark disabled:opacity-50"
+					>
+						<svg class="-ml-0.5 size-5" viewBox="0 0 20 20" fill="currentColor">
+							<path d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"></path>
+						</svg>
+						<span x-text="uploading ? 'Uploading...' : 'Add photos'"></span>
+					</button>
+					<!-- Progress indicator -->
+					<template x-if="uploading">
+						<div class="mt-2 text-sm text-stone-500">
+							Uploading <span x-text="progress"></span>...
+						</div>
+					</template>
+					<!-- Error display -->
+					<template x-if="error">
+						<div class="mt-2 text-sm text-red-600" x-text="error"></div>
+					</template>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+// imageUploaderScript outputs the Alpine.js component for direct-to-CF upload.
+templ ImageUploaderScript() {
+	<script>
+		document.addEventListener('alpine:init', () => {
+			Alpine.data('imageUploader', (productId) => ({
+				uploading: false,
+				progress: '',
+				error: '',
+
+				async handleFiles(event) {
+					const files = event.target.files;
+					if (!files.length) return;
+
+					this.uploading = true;
+					this.error = '';
+
+					for (let i = 0; i < files.length; i++) {
+						this.progress = (i + 1) + ' of ' + files.length;
+						try {
+							await this.uploadFile(files[i], i);
+						} catch (err) {
+							this.error = 'Upload failed: ' + err.message;
+							break;
+						}
+					}
+
+					this.uploading = false;
+					this.progress = '';
+					event.target.value = '';
+				},
+
+				async uploadFile(file, position) {
+					// Step 1: Get presigned upload URL from our server.
+					const urlResp = await fetch('/admin/images/upload-url', {
+						method: 'POST',
+						headers: { 'X-Requested-With': 'XMLHttpRequest' },
+					});
+					if (!urlResp.ok) throw new Error('Failed to get upload URL');
+					const { upload_url, image_id } = await urlResp.json();
+
+					// Step 2: Upload directly to Cloudflare Images.
+					const formData = new FormData();
+					formData.append('file', file);
+					const cfResp = await fetch(upload_url, {
+						method: 'POST',
+						body: formData,
+					});
+					if (!cfResp.ok) throw new Error('Failed to upload to Cloudflare');
+
+					// Step 3: Persist the image ID in our database.
+					const persistForm = new FormData();
+					persistForm.append('cf_image_id', image_id);
+					persistForm.append('alt_text', file.name.replace(/\.[^.]+$/, ''));
+					persistForm.append('position', position.toString());
+
+					const persistResp = await fetch('/admin/catalog/' + productId + '/images', {
+						method: 'POST',
+						headers: {
+							'HX-Request': 'true',
+						},
+						body: persistForm,
+					});
+					if (!persistResp.ok) throw new Error('Failed to save image');
+
+					// Step 4: Swap in the updated gallery.
+					const html = await persistResp.text();
+					const gallery = document.getElementById('media-gallery');
+					if (gallery) {
+						gallery.outerHTML = html;
+						htmx.process(document.getElementById('media-gallery'));
+					}
+				},
+			}));
+		});
+	</script>
+}

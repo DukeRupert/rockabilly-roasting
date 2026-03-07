@@ -242,6 +242,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var variants []admin.VariantWithOptions
 	var options []admin.OptionWithValues
 	var groups []domain.CustomerGroup
+	var mediaList []domain.ProductMedia
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -250,6 +251,10 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		taxons, txErr = d.CatalogService.ListRootTaxons(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		mediaList, txErr = d.CatalogService.ListProductMedia(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
@@ -323,15 +328,17 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.ProductEditProps{
-		Product:   product,
-		Taxons:    taxons,
-		Variants:  variants,
-		Options:   options,
-		Groups:    groups,
-		TaxonName: taxonName,
-		Flash:     r.URL.Query().Get("flash"),
-		StaffName: name,
-		StaffRole: role,
+		Product:     product,
+		Taxons:      taxons,
+		Variants:    variants,
+		Options:     options,
+		Groups:      groups,
+		Media:       mediaList,
+		MediaConfig: d.MediaConfig,
+		TaxonName:   taxonName,
+		Flash:       r.URL.Query().Get("flash"),
+		StaffName:   name,
+		StaffRole:   role,
 	}
 	if IsHTMX(r) {
 		admin.ProductEditContent(props).Render(ctx, w) //nolint:errcheck

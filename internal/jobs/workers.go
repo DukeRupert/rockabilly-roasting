@@ -121,3 +121,12 @@ type MagicLinkSendArgs struct {
 
 // Kind returns the job kind identifier.
 func (MagicLinkSendArgs) Kind() string { return "magic_link_send" }
+
+// CFImageDeleteArgs deletes an image from Cloudflare Images.
+// Enqueued when a product media record is removed from the DB.
+type CFImageDeleteArgs struct {
+	CFImageID string `json:"cf_image_id"`
+}
+
+// Kind returns the job kind identifier.
+func (CFImageDeleteArgs) Kind() string { return "cf_image_delete" }

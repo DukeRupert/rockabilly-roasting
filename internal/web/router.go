@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
@@ -40,6 +41,8 @@ type Deps struct {
 	MagicLinkStore      *store.MagicLinkStore
 	CustomerGroupStore  *store.CustomerGroupStore
 	RiverClient         *river.Client[pgx.Tx]
+	CFImagesClient      *media.CFImagesClient
+	MediaConfig         *media.Config
 }
 
 // NewRouter creates a new HTTP router with all routes and middleware registered.
@@ -165,6 +168,12 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/delete", deps.handleAdminOptionDelete)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values", deps.handleAdminOptionValueCreate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values/{valueID}/delete", deps.handleAdminOptionValueDelete)
+
+	// Admin catalog — media
+	adminMux.HandleFunc("POST /admin/images/upload-url", deps.handleAdminImageUploadURL)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/images", deps.handleAdminProductImageCreate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/images/{imageID}/delete", deps.handleAdminProductImageDelete)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/images/reorder", deps.handleAdminProductImageReorder)
 
 	// Admin orders
 	adminMux.HandleFunc("GET /admin/orders", deps.handleAdminOrderList)

@@ -62,6 +62,10 @@ const (
 	// Product visibility actions
 	AuditProductVisibilityUpdated = "product.visibility_updated"
 
+	// Product media actions
+	AuditProductMediaAdded   = "product_media.added"
+	AuditProductMediaDeleted = "product_media.deleted"
+
 	// Invoice actions
 	AuditInvoiceCreated         = "invoice.created"
 	AuditInvoiceSent            = "invoice.sent"

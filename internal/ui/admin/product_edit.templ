@@ -5,6 +5,7 @@ import (
 	"math"
 	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 	switchcomp "github.com/dukerupert/hiri/internal/ui/components/switch"
 )
@@ -23,16 +24,18 @@ type OptionWithValues struct {
 }
 
 type ProductEditProps struct {
-	Product   *domain.Product
-	Taxons    []domain.Taxon
-	Variants  []VariantWithOptions
-	Options   []OptionWithValues
-	Groups    []domain.CustomerGroup
-	TaxonName string
-	Errors    map[string]string
-	Flash     string
-	StaffName string
-	StaffRole string
+	Product     *domain.Product
+	Taxons      []domain.Taxon
+	Variants    []VariantWithOptions
+	Options     []OptionWithValues
+	Groups      []domain.CustomerGroup
+	Media       []domain.ProductMedia
+	MediaConfig *media.Config
+	TaxonName   string
+	Errors      map[string]string
+	Flash       string
+	StaffName   string
+	StaffRole   string
 }
 
 templ ProductEditContent(props ProductEditProps) {
@@ -70,6 +73,7 @@ templ ProductEditContent(props ProductEditProps) {
 		<div class="grid grid-cols-1 sm:hidden">
 			<select aria-label="Select a tab" data-tab-select class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-2 pr-8 pl-3 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal">
 				<option value="details" selected>Details</option>
+				<option value="media">Media</option>
 				<option value="variants">Variants</option>
 				<option value="pricing">Pricing</option>
 			</select>
@@ -82,6 +86,7 @@ templ ProductEditContent(props ProductEditProps) {
 			<div class="border-b border-stone-200">
 				<nav aria-label="Tabs" class="-mb-px flex space-x-8">
 					<button type="button" data-tab="details" class="border-b-2 border-hiri-teal px-1 py-4 text-sm font-medium whitespace-nowrap text-hiri-teal">Details</button>
+					<button type="button" data-tab="media" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-stone-500 hover:border-stone-300 hover:text-stone-700">Media</button>
 					<button type="button" data-tab="variants" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-stone-500 hover:border-stone-300 hover:text-stone-700">Variants</button>
 					<button type="button" data-tab="pricing" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-stone-500 hover:border-stone-300 hover:text-stone-700">Pricing</button>
 				</nav>
@@ -92,6 +97,9 @@ templ ProductEditContent(props ProductEditProps) {
 	<div class="mt-6">
 		<div data-tab-panel="details">
 			@productDetailsTab(props)
+		</div>
+		<div data-tab-panel="media" class="hidden">
+			@productMediaTab(props)
 		</div>
 		<div data-tab-panel="variants" class="hidden">
 			@productVariantsTab(props)
@@ -124,6 +132,7 @@ templ ProductEditContent(props ProductEditProps) {
 			if (sel) sel.addEventListener('change', function() { switchTab(this.value); });
 		})();
 	</script>
+	@ImageUploaderScript()
 }
 
 // --- Details Tab ---
@@ -189,6 +198,16 @@ templ productDetailsTab(props ProductEditProps) {
 			</div>
 		</div>
 	</div>
+}
+
+// --- Media Tab ---
+
+templ productMediaTab(props ProductEditProps) {
+	@MediaGallery(MediaGalleryProps{
+		ProductID:   props.Product.ID,
+		Media:       props.Media,
+		MediaConfig: props.MediaConfig,
+	})
 }
 
 // --- Variants Tab ---

@@ -455,12 +455,25 @@ func (s *CatalogService) DeleteVariantOptionValues(ctx context.Context, tx pgx.T
 
 // --- Product Media ---
 
-// CreateProductMedia creates a new product media item.
-func (s *CatalogService) CreateProductMedia(ctx context.Context, tx pgx.Tx, p store.CreateProductMediaParams) (*domain.ProductMedia, error) {
+// CreateProductMedia creates a new product media item and records an audit entry.
+func (s *CatalogService) CreateProductMedia(ctx context.Context, tx pgx.Tx, p store.CreateProductMediaParams, actor Actor) (*domain.ProductMedia, error) {
 	m, err := s.catalog.CreateProductMedia(ctx, tx, p)
 	if err != nil {
 		return nil, fmt.Errorf("create product media: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditProductMediaAdded,
+		ResourceType: "product_media",
+		ResourceID:   m.ID,
+		After:        m,
+	}); err != nil {
+		return nil, fmt.Errorf("audit product media added: %w", err)
+	}
+
 	return m, nil
 }
 
@@ -483,10 +496,23 @@ func (s *CatalogService) UpdateProductMediaPosition(ctx context.Context, tx pgx.
 
 // DeleteProductMedia removes a product media item by ID and returns the
 // CF image ID for cleanup (e.g. enqueue a River job to delete from CF).
-func (s *CatalogService) DeleteProductMedia(ctx context.Context, tx pgx.Tx, id uuid.UUID) (string, error) {
+func (s *CatalogService) DeleteProductMedia(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (string, error) {
 	cfImageID, err := s.catalog.DeleteProductMedia(ctx, tx, id)
 	if err != nil {
 		return "", fmt.Errorf("delete product media: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditProductMediaDeleted,
+		ResourceType: "product_media",
+		ResourceID:   id,
+		Metadata:     map[string]any{"cf_image_id": cfImageID},
+	}); err != nil {
+		return "", fmt.Errorf("audit product media deleted: %w", err)
+	}
+
 	return cfImageID, nil
 }

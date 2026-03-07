@@ -25,6 +25,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
+	"github.com/dukerupert/hiri/internal/platform/shipping"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/web"
 )
@@ -75,6 +76,7 @@ func run() error {
 		os.Getenv("STRIPE_SECRET_KEY"),
 		os.Getenv("STRIPE_WEBHOOK_SECRET"),
 	)
+	labelProvider := shipping.NewEasyPostProvider(os.Getenv("EASYPOST_API_KEY"))
 	mailer := email.NewPostmarkSender(os.Getenv("POSTMARK_SERVER_TOKEN"))
 	fromAddr := os.Getenv("EMAIL_FROM")
 	baseURL := os.Getenv("BASE_URL")
@@ -98,7 +100,7 @@ func run() error {
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	catalogSvc := app.NewCatalogService(catalogStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg)
-	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, nil, auditWriter, metricsReg) // TODO: wire label provider
+	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, labelProvider, auditWriter, metricsReg)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, paymentProvider, auditWriter, metricsReg)
 	pricingSvc := app.NewPricingService(pricingStore)

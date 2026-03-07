@@ -213,6 +213,7 @@ type ProductFilter struct {
 	TaxonID      *uuid.UUID
 	Subscribable *bool
 	Visibility   *VisibilityContext
+	Search       string // ILIKE search on title and description
 	Limit        int
 	Offset       int
 }
@@ -239,6 +240,11 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 	if f.Subscribable != nil {
 		query += fmt.Sprintf(" AND subscribable = $%d", argN)
 		args = append(args, *f.Subscribable)
+		argN++
+	}
+	if f.Search != "" {
+		query += fmt.Sprintf(" AND (title ILIKE $%d OR description ILIKE $%d)", argN, argN)
+		args = append(args, "%"+f.Search+"%")
 		argN++
 	}
 	if f.Visibility != nil {
@@ -307,6 +313,59 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 		products = append(products, p)
 	}
 	return products, rows.Err()
+}
+
+// CountProducts returns the total number of products matching the filter (for pagination).
+func (s *CatalogStore) CountProducts(ctx context.Context, tx pgx.Tx, f ProductFilter) (int, error) {
+	query := `SELECT COUNT(*) FROM products WHERE true`
+	args := []any{}
+	argN := 1
+
+	if f.Status != nil {
+		query += fmt.Sprintf(" AND status = $%d", argN)
+		args = append(args, string(*f.Status))
+		argN++
+	}
+	if f.TaxonID != nil {
+		query += fmt.Sprintf(" AND taxon_id = $%d", argN)
+		args = append(args, *f.TaxonID)
+		argN++
+	}
+	if f.Subscribable != nil {
+		query += fmt.Sprintf(" AND subscribable = $%d", argN)
+		args = append(args, *f.Subscribable)
+		argN++
+	}
+	if f.Search != "" {
+		query += fmt.Sprintf(" AND (title ILIKE $%d OR description ILIKE $%d)", argN, argN)
+		args = append(args, "%"+f.Search+"%")
+		argN++
+	}
+	if f.Visibility != nil {
+		vis := f.Visibility
+		if !vis.IsWholesale {
+			query += " AND visibility = 'public'"
+		} else if len(vis.GroupIDs) == 0 {
+			query += " AND visibility IN ('public', 'wholesale')"
+		} else {
+			query += fmt.Sprintf(` AND (
+				visibility IN ('public', 'wholesale')
+				OR (visibility = 'restricted' AND EXISTS (
+					SELECT 1 FROM product_group_visibility pgv
+					WHERE pgv.product_id = products.id
+					AND pgv.customer_group_id = ANY($%d)
+				))
+			)`, argN)
+			args = append(args, vis.GroupIDs)
+			argN++
+		}
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count products: %w", err)
+	}
+	return count, nil
 }
 
 // --- Variants ---

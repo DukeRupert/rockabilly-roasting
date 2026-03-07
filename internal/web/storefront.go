@@ -3,6 +3,8 @@ package web
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -18,14 +20,23 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/catalog", http.StatusFound)
 }
 
+const catalogPageSize = 12
+
 // handleStorefrontCatalog renders the product catalog page.
 func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	categorySlug := r.URL.Query().Get("category")
+	search := strings.TrimSpace(r.URL.Query().Get("q"))
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
 
 	filter := store.ProductFilter{
-		Limit: 50,
+		Limit:  catalogPageSize,
+		Offset: (page - 1) * catalogPageSize,
+		Search: search,
 	}
 	// Only show active products on the storefront.
 	activeStatus := domain.ProductStatusActive
@@ -54,10 +65,15 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 
 	var products []domain.Product
 	var taxons []domain.Taxon
+	var totalCount int
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		products, txErr = d.CatalogService.ListProducts(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+		totalCount, txErr = d.CatalogService.CountProducts(ctx, tx, filter)
 		if txErr != nil {
 			return txErr
 		}
@@ -70,6 +86,11 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		Error(w, r, err)
 		return
+	}
+
+	totalPages := (totalCount + catalogPageSize - 1) / catalogPageSize
+	if totalPages < 1 {
+		totalPages = 1
 	}
 
 	// Build product cards with thumbnails and prices.
@@ -120,6 +141,9 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 		Products:    cards,
 		Taxons:      taxons,
 		ActiveTaxon: categorySlug,
+		Search:      search,
+		Page:        page,
+		TotalPages:  totalPages,
 		CartCount:   d.cartItemCountFromCookie(r),
 	}
 

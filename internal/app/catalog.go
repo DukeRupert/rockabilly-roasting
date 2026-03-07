@@ -169,6 +169,15 @@ func (s *CatalogService) ListProducts(ctx context.Context, tx pgx.Tx, f store.Pr
 	return products, nil
 }
 
+// CountProducts returns the total number of products matching the filter.
+func (s *CatalogService) CountProducts(ctx context.Context, tx pgx.Tx, f store.ProductFilter) (int, error) {
+	count, err := s.catalog.CountProducts(ctx, tx, f)
+	if err != nil {
+		return 0, fmt.Errorf("count products: %w", err)
+	}
+	return count, nil
+}
+
 // DeleteProduct removes a product by ID.
 func (s *CatalogService) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if err := s.catalog.DeleteProduct(ctx, tx, id); err != nil {

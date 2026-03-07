@@ -1,6 +1,9 @@
 package storefront
 
 import (
+	"fmt"
+	"net/url"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -16,6 +19,9 @@ type CatalogPageProps struct {
 	Products    []ProductCard
 	Taxons      []domain.Taxon
 	ActiveTaxon string
+	Search      string
+	Page        int
+	TotalPages  int
 	CartCount   int
 }
 
@@ -26,6 +32,25 @@ func categoryPillClasses(active bool) string {
 	return "inline-flex items-center rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-200"
 }
 
+// catalogURL builds a /catalog URL preserving the given query params.
+func catalogURL(category, search string, page int) string {
+	v := url.Values{}
+	if category != "" {
+		v.Set("category", category)
+	}
+	if search != "" {
+		v.Set("q", search)
+	}
+	if page > 1 {
+		v.Set("page", fmt.Sprintf("%d", page))
+	}
+	q := v.Encode()
+	if q != "" {
+		return "/catalog?" + q
+	}
+	return "/catalog"
+}
+
 templ CatalogContent(props CatalogPageProps) {
 	<div>
 		<!-- Page heading -->
@@ -33,18 +58,38 @@ templ CatalogContent(props CatalogPageProps) {
 			<h1 class="text-3xl font-bold tracking-tight text-hiri-text">Shop</h1>
 			<p class="mt-2 text-sm text-hiri-text-secondary">Browse our collection</p>
 		</div>
+		<!-- Search -->
+		<form class="mb-6" action="/catalog" method="get">
+			if props.ActiveTaxon != "" {
+				<input type="hidden" name="category" value={ props.ActiveTaxon }/>
+			}
+			<div class="relative max-w-md">
+				<input
+					type="search"
+					name="q"
+					value={ props.Search }
+					placeholder="Search products..."
+					class="w-full rounded-lg border border-stone-300 bg-white py-2 pl-10 pr-4 text-sm text-hiri-text placeholder:text-stone-400 focus:border-hiri-teal focus:outline-none focus:ring-1 focus:ring-hiri-teal"
+				/>
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+					<svg class="size-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path>
+					</svg>
+				</div>
+			</div>
+		</form>
 		<!-- Category filter pills -->
 		if len(props.Taxons) > 0 {
 			<div class="mb-8 flex flex-wrap gap-2">
 				<a
-					href="/catalog"
+					href={ templ.SafeURL(catalogURL("", props.Search, 1)) }
 					class={ categoryPillClasses(props.ActiveTaxon == "") }
 				>
 					All
 				</a>
 				for _, taxon := range props.Taxons {
 					<a
-						href={ templ.SafeURL("/catalog?category=" + taxon.Slug) }
+						href={ templ.SafeURL(catalogURL(taxon.Slug, props.Search, 1)) }
 						class={ categoryPillClasses(props.ActiveTaxon == taxon.Slug) }
 					>
 						{ taxon.Name }
@@ -63,6 +108,41 @@ templ CatalogContent(props CatalogPageProps) {
 					@productCard(card)
 				}
 			</div>
+		}
+		<!-- Pagination -->
+		if props.TotalPages > 1 {
+			<nav class="mt-12 flex items-center justify-center gap-2" aria-label="Pagination">
+				if props.Page > 1 {
+					<a
+						href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, props.Page-1)) }
+						class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+					>
+						Previous
+					</a>
+				}
+				for _, p := range pageRange(props.Page, props.TotalPages) {
+					if p == props.Page {
+						<span class="inline-flex items-center rounded-lg bg-hiri-teal px-4 py-2 text-sm font-medium text-white">
+							{ fmt.Sprintf("%d", p) }
+						</span>
+					} else {
+						<a
+							href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, p)) }
+							class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+						>
+							{ fmt.Sprintf("%d", p) }
+						</a>
+					}
+				}
+				if props.Page < props.TotalPages {
+					<a
+						href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, props.Page+1)) }
+						class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+					>
+						Next
+					</a>
+				}
+			</nav>
 		}
 	</div>
 }

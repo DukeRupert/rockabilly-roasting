@@ -70,3 +70,44 @@ func (s *PricingService) ListBasePricesByProduct(ctx context.Context, tx pgx.Tx,
 	}
 	return prices, nil
 }
+
+// SetGroupPrice sets the group price (in cents) for a variant + customer group.
+func (s *PricingService) SetGroupPrice(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, customerGroupID uuid.UUID, amountCents int, currencyCode string) (*domain.Price, error) {
+	if amountCents < 0 {
+		return nil, ErrInvalidPrice
+	}
+
+	ps, err := s.pricing.GetOrCreatePriceSet(ctx, tx, variantID)
+	if err != nil {
+		return nil, fmt.Errorf("get or create price set: %w", err)
+	}
+
+	price, err := s.pricing.SetGroupPrice(ctx, tx, ps.ID, customerGroupID, amountCents, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("set group price: %w", err)
+	}
+	return price, nil
+}
+
+// DeleteGroupPrice removes the group price for a variant + customer group.
+func (s *PricingService) DeleteGroupPrice(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, customerGroupID uuid.UUID, currencyCode string) error {
+	ps, err := s.pricing.GetOrCreatePriceSet(ctx, tx, variantID)
+	if err != nil {
+		return fmt.Errorf("get price set: %w", err)
+	}
+
+	if err := s.pricing.DeleteGroupPrice(ctx, tx, ps.ID, customerGroupID, currencyCode); err != nil {
+		return fmt.Errorf("delete group price: %w", err)
+	}
+	return nil
+}
+
+// ListGroupPricesByProduct returns group prices for all variants of a product,
+// keyed by variant ID then customer group ID.
+func (s *PricingService) ListGroupPricesByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID, currencyCode string) (map[uuid.UUID]map[uuid.UUID]int, error) {
+	prices, err := s.pricing.ListGroupPricesByProduct(ctx, tx, productID, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("list group prices: %w", err)
+	}
+	return prices, nil
+}

@@ -19,6 +19,7 @@ import (
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
@@ -74,6 +75,10 @@ func run() error {
 		os.Getenv("STRIPE_SECRET_KEY"),
 		os.Getenv("STRIPE_WEBHOOK_SECRET"),
 	)
+	mailer := email.NewPostmarkSender(os.Getenv("POSTMARK_SERVER_TOKEN"))
+	fromAddr := os.Getenv("EMAIL_FROM")
+	baseURL := os.Getenv("BASE_URL")
+	staffEmail := os.Getenv("STAFF_NOTIFICATION_EMAIL")
 
 	// Stores
 	orderStore := store.NewOrderStore()
@@ -111,7 +116,10 @@ func run() error {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool))
 	river.AddWorker(workers, jobs.NewBatchRenewalWorker(renewalSvc, pool))
-	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(customerStore, pool))
+	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(customerStore, pool, mailer, fromAddr, baseURL))
+	river.AddWorker(workers, jobs.NewInvoiceSendWorker(invoiceStore, orderStore, customerStore, pool, mailer, fromAddr, baseURL))
+	river.AddWorker(workers, jobs.NewWholesaleApplicationNotifyWorker(customerStore, pool, mailer, fromAddr, staffEmail, baseURL))
+	river.AddWorker(workers, jobs.NewWholesaleApprovedWorker(customerStore, pool, mailer, fromAddr, baseURL))
 
 	// River client — we create it first, then pass it to the scheduler worker
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{

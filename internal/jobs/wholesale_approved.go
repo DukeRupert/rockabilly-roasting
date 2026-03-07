@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/store"
 )
 
@@ -16,13 +17,19 @@ type WholesaleApprovedWorker struct {
 	river.WorkerDefaults[WholesaleApprovedArgs]
 	customers *store.CustomerStore
 	pool      *pgxpool.Pool
+	mailer    email.Sender
+	fromAddr  string
+	baseURL   string
 }
 
 // NewWholesaleApprovedWorker creates a new WholesaleApprovedWorker.
-func NewWholesaleApprovedWorker(customers *store.CustomerStore, pool *pgxpool.Pool) *WholesaleApprovedWorker {
+func NewWholesaleApprovedWorker(customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, fromAddr, baseURL string) *WholesaleApprovedWorker {
 	return &WholesaleApprovedWorker{
 		customers: customers,
 		pool:      pool,
+		mailer:    mailer,
+		fromAddr:  fromAddr,
+		baseURL:   baseURL,
 	}
 }
 
@@ -43,11 +50,29 @@ func (w *WholesaleApprovedWorker) Work(ctx context.Context, job *river.Job[Whole
 		return fmt.Errorf("commit tx: %w", err)
 	}
 
-	// TODO: Send welcome email with login credentials and wholesale portal link.
-	slog.Info("wholesale application approved — welcome email pending",
+	companyName := "there"
+	if customer.CompanyName != nil {
+		companyName = *customer.CompanyName
+	}
+
+	portalURL := fmt.Sprintf("%s/wholesale/login", w.baseURL)
+	result, err := w.mailer.Send(ctx, email.Message{
+		From:    w.fromAddr,
+		To:      customer.Email,
+		Subject: "Your wholesale account has been approved",
+		HTML:    fmt.Sprintf(`<p>Welcome, <strong>%s</strong>! Your wholesale account has been approved.</p><p><a href="%s">Log in to the wholesale portal</a> to start ordering.</p>`, companyName, portalURL),
+		Text:    fmt.Sprintf("Welcome, %s! Your wholesale account has been approved.\n\nLog in to the wholesale portal: %s", companyName, portalURL),
+		Tag:     "wholesale-approved",
+	})
+	if err != nil {
+		return fmt.Errorf("send wholesale approved email: %w", err)
+	}
+
+	slog.Info("wholesale approved email sent",
 		"customer_id", customer.ID,
 		"email", customer.Email,
 		"company", customer.CompanyName,
+		"message_id", result.MessageID,
 		"river_job_id", job.ID,
 	)
 

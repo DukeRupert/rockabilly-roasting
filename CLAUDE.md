@@ -36,6 +36,7 @@ mage db:status    # show migration status
 mage db:create <name>  # create new migration file
 
 # Development tools
+mage dev:run      # generate templ + CSS, build, and run server
 mage dev:templ    # generate templ templates
 mage dev:css      # compile Tailwind CSS (minified)
 mage dev:watch    # run Tailwind CSS in watch mode

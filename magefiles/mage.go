@@ -115,6 +115,21 @@ func (Dev) Checkout() error {
 	return sh.RunV("npm", "run", "build", "--prefix", "ui/checkout")
 }
 
+// Run generates templates and CSS, builds the server, and runs it.
+func (Dev) Run() error {
+	d := Dev{}
+	if err := d.Templ(); err != nil {
+		return err
+	}
+	if err := d.CSS(); err != nil {
+		return err
+	}
+	if err := Build(); err != nil {
+		return err
+	}
+	return sh.RunV("./server")
+}
+
 // Seed creates an admin staff user. Set SEED_EMAIL, SEED_PASSWORD, and optionally SEED_NAME.
 func (Dev) Seed() error {
 	return sh.RunV("go", "run", "./cmd/seed")

@@ -478,4 +478,69 @@ Email Notification (River worker)
     ├─▶ Renderer.Render(name, data) — produces HTML + text bodies
     └─▶ Sender.Send(ctx, message) — external call, no tx
 
+---
+
+## 9. Media & Object Storage
+
+**Decision: two storage backends — Cloudflare Images for public product photos, Cloudflare R2 for private binary assets.**
+
+### Cloudflare Images (product media)
+
+Product photos upload directly from the browser to Cloudflare Images — no file data passes through the application server.
+
+**Upload flow:**
+1. Admin UI requests a one-time direct upload URL → `POST /admin/images/upload-url`
+2. Server calls CF API (`/v2/direct_upload`) → returns `{ upload_url, image_id }`
+3. Browser uploads the file directly to CF using the upload URL
+4. Browser sends the `cf_image_id` back to the server → `POST /admin/catalog/{id}/images`
+5. Server persists the `cf_image_id` in `product_media` — no URL, no bytes stored locally
+
+**URL construction at render time:**
+```
+{CF_IMAGES_BASE_URL}/{cf_image_id}/{variant}
+```
+
+Named variants are configured in the CF dashboard:
+| Variant | Size | Usage |
+|---|---|---|
+| `thumbnail` | 200×200 | Gallery thumbnails |
+| `card` | 400×400 | Catalog grid cards |
+| `hero` | 800×800 | Product detail main image |
+| `public` | Original | Full resolution |
+
+The `media.Config.ProductImageURL(cfImageID, variant)` helper constructs URLs. Templates never hardcode base URLs.
+
+**Deletion:** When a product media record is deleted, a `cf_image_delete` River job is enqueued in the same transaction. The job calls the CF API to remove the image. Decoupling deletion prevents external API failures from blocking the admin UI.
+
+### Cloudflare R2 (shipping labels)
+
+Shipping labels are private binary assets (PDF/PNG) stored in R2 via the S3-compatible API.
+
+**Storage flow:**
+1. Admin creates a shipping label → handler calls EasyPost API (outside tx), persists shipment record
+2. `store_label_to_r2` River job is enqueued in the same transaction
+3. Worker fetches label bytes from the EasyPost URL, uploads to R2 at `labels/{shipment_id}.{format}`
+4. Worker updates the shipment's `label_r2_key` and `label_format` columns
+
+**Download flow:**
+Staff clicks a label link → `GET /admin/shipments/{id}/label` → server generates a 5-minute presigned R2 URL → 307 redirect.
+
+**Why two backends:**
+- Product images are public, served at scale via CF's CDN with automatic resizing — CF Images handles this natively
+- Shipping labels are private, accessed rarely by staff only — R2 provides cheap durable storage with presigned access
+
+### Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `CF_IMAGES_ACCOUNT_ID` | Cloudflare account ID for Images API |
+| `CF_IMAGES_API_TOKEN` | API token with Images write permission |
+| `CF_IMAGES_BASE_URL` | Base URL for image delivery (e.g. `https://imagedelivery.net/{hash}`) |
+| `R2_ACCOUNT_ID` | Cloudflare account ID for R2 endpoint |
+| `R2_ACCESS_KEY_ID` | R2 API token access key |
+| `R2_SECRET_ACCESS_KEY` | R2 API token secret key |
+| `R2_BUCKET` | R2 bucket name |
+
+---
+
 **The invariant that holds throughout:** domain logic sits in the middle of every stack, unaware of what wraps it. Services receive explicit parameters — `tx`, `actor`, `customerID` — and operate on them. No service reaches into a context for authorization state, no repository omits a `customer_id` scope, no handler contains a rate limit check. Each concern is independently testable, independently replaceable, and auditable by reading a single layer.

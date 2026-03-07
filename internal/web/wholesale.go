@@ -14,6 +14,48 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
 
+const wholesaleCartCookieName = "wholesale_cart_id"
+
+// getWholesaleCartID reads the wholesale cart ID from its dedicated cookie.
+func getWholesaleCartID(r *http.Request) *uuid.UUID {
+	c, err := r.Cookie(wholesaleCartCookieName)
+	if err != nil {
+		return nil
+	}
+	id, err := uuid.Parse(c.Value)
+	if err != nil {
+		return nil
+	}
+	return &id
+}
+
+// setWholesaleCartCookie writes the wholesale cart ID cookie.
+func setWholesaleCartCookie(w http.ResponseWriter, cartID uuid.UUID) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     wholesaleCartCookieName,
+		Value:    cartID.String(),
+		Path:     "/",
+		MaxAge:   30 * 24 * 60 * 60, // 30 days
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// wholesaleCartItemCount returns the cart item count for the wholesale cart cookie.
+func (d *Deps) wholesaleCartItemCount(r *http.Request) int {
+	cartID := getWholesaleCartID(r)
+	if cartID == nil {
+		return 0
+	}
+	var count int
+	_ = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
+		var err error
+		count, err = d.CartService.GetItemCount(r.Context(), tx, *cartID)
+		return err
+	})
+	return count
+}
+
 // --- Wholesale application (public) ---
 
 func (d *Deps) handleWholesaleApplyPage(w http.ResponseWriter, r *http.Request) {
@@ -185,7 +227,7 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 	props := storefront.WholesalePortalProps{
 		CompanyName: companyName,
 		Products:    templateProducts,
-		CartCount:   d.cartItemCountFromCookie(r),
+		CartCount:   d.wholesaleCartItemCount(r),
 	}
 
 	if IsHTMX(r) {
@@ -233,8 +275,7 @@ func (d *Deps) handleWholesaleBulkAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Use the cookie-based cart (same as retail).
-	cartID := getCartID(r)
+	cartID := getWholesaleCartID(r)
 	var resultCartID uuid.UUID
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -255,7 +296,7 @@ func (d *Deps) handleWholesaleBulkAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	setCartCookie(w, resultCartID)
+	setWholesaleCartCookie(w, resultCartID)
 	http.Redirect(w, r, "/wholesale/checkout", http.StatusSeeOther)
 }
 
@@ -272,7 +313,7 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 		companyName = *customer.CompanyName
 	}
 
-	cartID := getCartID(r)
+	cartID := getWholesaleCartID(r)
 	var checkoutItems []storefront.WholesaleCheckoutItem
 	subtotal := 0
 
@@ -322,7 +363,7 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 		CompanyName: companyName,
 		Items:       checkoutItems,
 		Subtotal:    subtotal,
-		CartCount:   d.cartItemCountFromCookie(r),
+		CartCount:   d.wholesaleCartItemCount(r),
 	}
 
 	if IsHTMX(r) {
@@ -344,7 +385,7 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 
 	poNumber := r.FormValue("po_number")
 	notes := r.FormValue("notes")
-	cartID := getCartID(r)
+	cartID := getWholesaleCartID(r)
 
 	if cartID == nil {
 		http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
@@ -403,9 +444,9 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 
 	d.Metrics.CheckoutCompleted.WithLabelValues("wholesale").Inc()
 
-	// Clear cart cookie.
+	// Clear wholesale cart cookie.
 	http.SetCookie(w, &http.Cookie{
-		Name:   cartCookieName,
+		Name:   wholesaleCartCookieName,
 		Value:  "",
 		Path:   "/",
 		MaxAge: -1,

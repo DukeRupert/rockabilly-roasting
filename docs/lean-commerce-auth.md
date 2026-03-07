@@ -6,56 +6,28 @@ Session strategy: **database-backed opaque tokens** throughout. Instant revocati
 
 ---
 
-## Implementation Status
-
-### Staff Auth (Phase 1) — ✅ Complete
-
-Staff login, logout, and session-based route protection are fully implemented:
-
-- **Login flow:** `POST /auth/staff/login` validates email/password via bcrypt, creates a database-backed session, sets an `HttpOnly` cookie (`hiri_session`)
-- **Session middleware:** `requireStaffSession` protects all `/admin/` routes — validates cookie, looks up session + staff, redirects to `/auth/staff/login` if invalid
-- **Logout:** `POST /auth/staff/logout` revokes the session and clears the cookie
-- **Context propagation:** `auth.WithStaff(ctx, staff)` / `auth.StaffFromContext(ctx)` — all admin handlers read the real staff identity for audit trails and UI display
-- **Audit:** `staffActor(r)` replaces the former `devActor()` placeholder — all admin actions (order cancel, refund, fulfill, ship, product create/update, plan management, subscription management) now record the real staff actor
-- **UI:** Admin layout displays the authenticated staff member's name and role (initials avatar, sidebar footer, top-bar dropdown)
-- **Seed tool:** `cmd/seed/main.go` creates an initial admin user — run via `mage dev:seed` with `SEED_EMAIL`, `SEED_PASSWORD`, and optional `SEED_NAME`
-
-**Key files:**
-- `internal/web/auth.go` — middleware, login/logout handlers, `staffActor()`, `staffNameRole()`
-- `internal/app/auth.go` — `AuthService` (StaffLogin, Logout, ValidateSession, GetStaffByID)
-- `internal/store/staff.go` — `StaffStore` (GetByID, GetByEmail, Create, UpdatePassword)
-- `internal/platform/sessions/sessions.go` — `Manager` + `Store` interface
-- `internal/ui/admin/staff_login.templ` — standalone login page
-- `internal/web/router.go` — separate `adminMux` behind `requireStaffSession` middleware
-
-### Customer Auth (Phase 2) — 🔲 Not Started
-
-Customer login, registration, email verification, guest checkout, and password reset are designed (see below) but not yet implemented.
-
-### Permission Middleware (Phase 3) — 🔲 Not Started
-
-`RequirePermission` middleware for role-based route protection is designed but not yet applied to individual admin routes. Currently all authenticated staff can access all admin routes.
-
----
-
 ## Part 1: Authentication
 
-### The two flows are separate by design
+### Three actor flows, all separate by design
 
 Customers and staff authenticate through different endpoints, produce different session types, and are stored in separate session rows. A customer token cannot be presented to a staff endpoint and vice versa — the session lookup always scopes by `actor_type`. This means a compromised customer account cannot escalate to staff access even if the token somehow crossed surfaces.
 
-```
-/auth/customer/login     → issues customer session
-/auth/customer/logout
-/auth/customer/register
-/auth/customer/verify-email
-/auth/customer/reset-password
+Retail and wholesale customers also have separate login routes — they use different auth mechanisms (magic link vs. password) and land in different portals after login.
 
-/auth/staff/login        → issues staff session
+```
+/account/login           → retail customer magic link request
+/account/magic           → retail customer magic link redemption (?token=...)
+/account/logout
+
+/wholesale/apply         → wholesale account application (public)
+/wholesale/login         → wholesale customer password login
+/wholesale/logout
+
+/auth/staff/login        → staff password login
 /auth/staff/logout
 ```
 
-There is no shared `/auth/login` endpoint. The split is intentional — it makes the routing unambiguous and allows different rate limits, lockout policies, and audit rules per actor type.
+There is no shared `/auth/login` endpoint. The split is intentional — it makes the routing unambiguous and allows different auth mechanisms, rate limits, lockout policies, and audit rules per actor type.
 
 ---
 
@@ -65,14 +37,18 @@ There is no shared `/auth/login` endpoint. The split is intentional — it makes
 
 ```sql
 CREATE TABLE customers (
-    id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    email            text NOT NULL,
-    email_verified   bool NOT NULL DEFAULT false,
-    password_hash    text,                    -- null for OAuth-only accounts
-    is_guest         bool NOT NULL DEFAULT false,
+    id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    email             text NOT NULL,
+    email_verified    bool NOT NULL DEFAULT false,
+    account_type      text NOT NULL DEFAULT 'retail'
+                          CHECK (account_type IN ('retail', 'wholesale')),
+    password_hash     text,            -- null for retail (magic link only);
+                                       -- required for wholesale
+    two_fa_enabled    bool NOT NULL DEFAULT false,
+    two_fa_method     text CHECK (two_fa_method IN ('magic_link', 'totp')),
     customer_group_id uuid REFERENCES customer_groups(id),
-    created_at       timestamptz NOT NULL DEFAULT now(),
-    updated_at       timestamptz NOT NULL DEFAULT now(),
+    created_at        timestamptz NOT NULL DEFAULT now(),
+    updated_at        timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT uq_customer_email UNIQUE (email)
 );
@@ -80,9 +56,13 @@ CREATE TABLE customers (
 
 A few design notes on this table:
 
-`password_hash` is nullable to allow for passwordless or OAuth flows in future without a schema change. For now it will always be set for non-guest accounts.
+`account_type` distinguishes retail from wholesale customers. Retail customers authenticate via magic link and have no password. Wholesale customers authenticate with a password and are subject to the wholesale approval flow. This is the primary discriminator used by auth middleware and the session system.
 
-`is_guest` flags temporary accounts created during guest checkout. When a guest later registers, their data is merged into a permanent account and `is_guest` flips to false — no new row is created.
+`password_hash` is nullable by design — it is always null for retail customers and always set for wholesale customers. The login handler checks `account_type` before attempting password verification, so a retail customer cannot accidentally authenticate via password even if somehow presented with a password field.
+
+`two_fa_enabled` and `two_fa_method` support wholesale 2FA via magic link as a future addition. When `two_fa_enabled = true` on a wholesale customer, the login handler sends a magic link after password verification and waits for token redemption before creating a session. No schema changes are needed to enable this — the `magic_link_tokens` table serves both retail passwordless auth and wholesale 2FA.
+
+There is no `is_guest` column. Retail customers are persistent records created at checkout with no password — they are not "guests" in the disposable sense. A customer's record survives indefinitely and is accessible via magic link if they want to view order history or manage subscriptions.
 
 `customer_group_id` is the pricing gate. Retail vs. wholesale vs. VIP is determined here, and pricing queries filter against it. A customer belongs to exactly one group at a time (simpler than a join table for this use case — promote/demote is a single update).
 
@@ -146,44 +126,107 @@ The raw token is a cryptographically random string (32 bytes → 64 hex characte
 
 **Expiry:**
 
-| Actor type | Session lifetime | Rationale |
+| Actor | Session lifetime | Rationale |
 |---|---|---|
-| Customer (remember me) | 30 days | Matches user expectation for e-commerce |
-| Customer (no remember me) | 24 hours | Short enough to limit exposure |
-| Guest customer | 72 hours | Cart should survive a few days |
+| Retail customer (magic link session) | 30 days | Infrequent logins; long session reduces friction |
+| Wholesale customer (remember me) | 30 days | Matches user expectation |
+| Wholesale customer (no remember me) | 24 hours | Short enough to limit exposure |
 | Staff | 8 hours | Workday-scoped; re-auth each morning |
+| Magic link token | 15 minutes | Single use; separate from session lifetime |
 
 A background job (River, scheduled) prunes expired sessions nightly. The index on `expires_at` makes this efficient.
 
 ---
 
-### Authentication flow (customer login)
+### Authentication flow — retail customer (magic link)
+
+Retail customers have no password. Authentication is initiated by requesting a magic link.
 
 ```
-1. POST /auth/customer/login  { email, password, remember_me }
+1. POST /account/login  { email }
 
 2. Look up customer by email
-   → 404-equivalent: return generic "invalid credentials" (never reveal whether email exists)
+   → Whether found or not: respond with "if you have an account, check your email"
+     Never reveal whether the email exists in the system.
 
-3. Check customer.is_guest = false and email_verified = true
-   → Unverified: return specific error prompting verification
+3. If customer found and account_type = 'retail':
+   Generate raw token: crypto/rand, 32 bytes, hex-encoded
+   Compute token_hash: sha256(raw_token)
+   INSERT INTO magic_link_tokens (customer_id, token_hash, expires_at = now() + 15min)
+   Send email with link: https://example.com/account/magic?token=<raw_token>
+
+4. GET /account/magic?token=<raw_token>
+   Compute token_hash = sha256(raw_token)
+   UPDATE magic_link_tokens
+       SET used_at = now()
+       WHERE token_hash = $1
+         AND used_at IS NULL
+         AND expires_at > now()
+       RETURNING *
+   → No row returned: render "this link has expired or has already been used"
+   → Row returned: create session for customer_id, redirect to /account
+```
+
+The atomic `UPDATE ... WHERE used_at IS NULL RETURNING *` prevents double-use under concurrent requests — only one request can set `used_at`.
+
+**Magic link tokens schema:**
+
+```sql
+CREATE TABLE magic_link_tokens (
+    id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    token_hash  text NOT NULL UNIQUE,  -- SHA-256 of raw token; raw token never stored
+    expires_at  timestamptz NOT NULL,
+    used_at     timestamptz,           -- null = unused; set atomically on first use
+    created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_magic_link_tokens_customer ON magic_link_tokens (customer_id);
+```
+
+The nightly session cleanup job also prunes expired magic link tokens:
+`DELETE FROM magic_link_tokens WHERE expires_at < now()`.
+
+---
+
+### Authentication flow — wholesale customer (password)
+
+```
+1. POST /wholesale/login  { email, password, remember_me }
+
+2. Look up customer by email WHERE account_type = 'wholesale'
+   → Not found or wrong account_type: return generic "invalid credentials"
+
+3. Check customer.wholesale_status = 'approved'
+   → 'pending':   render pending approval message
+   → 'suspended': render suspended account message
 
 4. bcrypt.CompareHashAndPassword(customer.password_hash, password)
-   → Mismatch: increment failed attempt counter (rate limiting concern, see §6)
-   → return generic "invalid credentials"
+   → Mismatch: increment failed attempt counter; return generic "invalid credentials"
 
-5. Generate raw token: crypto/rand, 32 bytes, hex-encoded
+5. If customer.two_fa_enabled:
+   Generate magic link token (same flow as retail, 15min expiry)
+   Send to customer email
+   Render 2FA prompt: "Check your email for a verification link"
+   → Customer clicks link → GET /wholesale/magic?token=...
+   → Redeem token (same atomic UPDATE pattern)
+   → Create session, redirect to /wholesale/portal
+
+6. Generate raw session token: crypto/rand, 32 bytes, hex-encoded
    Compute token_hash: sha256(raw_token)
    Set expires_at based on remember_me flag
 
-6. INSERT INTO sessions (actor_type='customer', actor_id=customer.id, token_hash, ...)
+7. INSERT INTO sessions (actor_type='customer', actor_id=customer.id, token_hash, ...)
 
-7. Return raw token to client
-   → API clients: in response body  { token: "..." }
-   → Browser clients: Set-Cookie: session=<raw_token>; HttpOnly; Secure; SameSite=Lax
+8. Set-Cookie: session=<raw_token>; HttpOnly; Secure; SameSite=Lax
+   Redirect to /wholesale/portal
 ```
 
-**Why `SameSite=Lax` and not `Strict`?** Strict breaks navigation from external links (e.g. a customer clicking through from an email). Lax blocks cross-site POST requests (CSRF attack vector) while allowing GET navigation. For a commerce site this is the right balance.
+Note that `magic_link_tokens` serves double duty: retail passwordless auth now, wholesale 2FA later. No schema changes are needed to enable wholesale 2FA — just set `two_fa_enabled = true` on the customer record.
+
+---
+
+### Authentication flow (staff login — unchanged)
 
 ---
 
@@ -452,9 +495,83 @@ func StaffFromContext(ctx context.Context) *Staff {
 
 Handlers check for nil explicitly when the route can be reached by both authenticated and unauthenticated actors (e.g. product browsing). For routes that require authentication, the session middleware has already returned 401 before the handler runs — the handler can assume a non-nil actor.
 
+**Why `SameSite=Lax` and not `Strict`?** Strict breaks navigation from external links (e.g. a customer clicking through from an email). Lax blocks cross-site POST requests (CSRF attack vector) while allowing GET navigation. For a commerce site this is the right balance.
+
 ---
 
-### Edge cases worth calling out
+### WooCommerce customer migration
+
+Existing Rockabilly Roasting customers are imported from WooCommerce. Magic link auth means no password hashes are needed — import the customer record with email only. Customers who want account access visit `/account/login`, enter their WooCommerce email, receive a magic link, and are in. Customers who never log in are unaffected.
+
+**Per customer, import:**
+
+- Email → `customers.email`
+- Name → name fields
+- Default shipping address → `addresses` table
+- Order history → `orders` table (status = fulfilled, payment_status = captured)
+- Active subscriptions → `subscriptions` table
+
+All imported customers get `account_type = 'retail'`, `password_hash = null`. No forced re-registration, no password reset emails, no migration friction.
+
+---
+
+## Part 3: Customer Account Portal
+
+Retail customers who have authenticated via magic link have access to a self-service account portal. The portal is gated by the `requireRetailCustomer` middleware and served under `/account/*`.
+
+### Middleware: `requireRetailCustomer`
+
+This middleware runs on all `/account/*` routes (except login/magic/logout which are public). It enforces three checks:
+
+1. **Session exists** — validates the session cookie, looks up the session + customer. Redirects to `/account/login?next=<current_path>` if unauthenticated.
+2. **Customer is retail** — wholesale customers are redirected to `/wholesale/portal`. The two account types have separate portals by design.
+3. **Customer attached to context** — on success, the customer is attached via `auth.WithCustomer(ctx, customer)` so handlers can read it with `auth.CustomerFromContext(ctx)`.
+
+This is separate from `requireCustomerSession` (which is used for wholesale routes and account logout) because it adds the retail-vs-wholesale routing logic.
+
+### Account routes
+
+All routes are registered on an `accountMux` sub-mux, mounted behind `requireRetailCustomer`:
+
+```
+GET  /account/{$}                          → redirect to /account/settings
+GET  /account/settings                     → profile form (name, email)
+POST /account/settings                     → update profile
+
+GET  /account/orders                       → order history list
+GET  /account/orders/{id}                  → order detail (line items, shipping, tracking)
+
+GET  /account/subscriptions                → subscription list with plan details
+POST /account/subscriptions/{id}/pause     → pause subscription
+POST /account/subscriptions/{id}/resume    → resume subscription
+POST /account/subscriptions/{id}/cancel    → cancel subscription
+
+GET  /account/addresses                    → address book
+POST /account/addresses                    → create address
+POST /account/addresses/{id}               → update address
+POST /account/addresses/{id}/delete        → delete address (blocked if last address)
+POST /account/addresses/{id}/default       → set default address
+```
+
+### Ownership enforcement
+
+All account handlers read the authenticated customer from context and pass `customer.ID` to every service/store call. This enforces ownership at the query level per the project's authorization model:
+
+- **Orders:** `GetOrder` fetches the order, then the handler checks `order.CustomerID == customer.ID`. Returns 404 (not 403) if the order belongs to another customer.
+- **Subscriptions:** `GetSubscriptionByCustomer(ctx, tx, id, customerID)` scopes the query to the customer. Pause/resume/cancel verify ownership before acting.
+- **Addresses:** All address operations pass `customerID` to the store, which includes it in the WHERE clause.
+
+### Template structure
+
+Account pages live in `internal/ui/storefront/account.templ` (single file, not split by section). Each page has a `Content` variant (partial) and a `Page` variant (full page with layout), following the htmx partial rendering pattern. Handlers check `IsHTMX(r)` and render the appropriate variant.
+
+The account layout provides:
+- **Desktop:** sidebar navigation (settings, orders, subscriptions, addresses) + content area
+- **Mobile:** horizontal scrolling tab bar above the content area
+
+Interactive elements (inline pause/cancel confirmation on subscriptions, show/hide address edit forms) use Alpine.js with `x-data`/`x-show`/`x-cloak`. Alpine.js is loaded via CDN in the storefront layout.
+
+---
 
 **"Log out all devices"** — `DELETE FROM sessions WHERE actor_id = $1 AND actor_type = $2`. One query, all sessions gone. This is the main reason for database-backed sessions over JWTs.
 

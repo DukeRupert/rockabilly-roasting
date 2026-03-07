@@ -557,12 +557,13 @@ internal/ui/
     product.templ
     cart.templ
     checkout.templ        ← Svelte mount point
-    auth.templ
-  account/
-    orders.templ
-    order_detail.templ
-    subscriptions.templ
-    addresses.templ
+    subscribe.templ       ← subscription signup flow
+    subscriptions.templ   ← subscriptions landing page
+    account_login.templ   ← retail customer magic link login
+    account.templ         ← all account pages (settings, orders, order detail,
+                             subscriptions, addresses) — single file with shared
+                             account layout, nav, and per-section Content/Page pairs
+    format.go             ← shared formatCents/discountedPrice helpers
   wholesale/
     quick_order.templ
     orders.templ
@@ -597,8 +598,8 @@ Order within admin: Dashboard → Orders → Customers → Catalog → Fulfillme
 **Phase 3 — Storefront (B2C)**
 Catalog → Product detail → Cart → Checkout (Svelte) → Auth (login/register). This is the revenue path — get it right before the account panel.
 
-**Phase 4 — Customer account panel**
-Order history → Subscriptions → Addresses. Subscription management is the most complex — build order history first for simpler wins.
+**Phase 4 — Customer account panel** ✅
+Order history → Subscriptions → Addresses. All implemented in `storefront/account.templ` with handlers in `web/account.go`. Includes settings (name/email edit), order history + detail, subscription management (pause/resume/cancel with inline confirmation), and address book (CRUD + set-default). Gated by `requireRetailCustomer` middleware.
 
 **Phase 5 — Wholesale portal**
 Quick order → Order history → Account. B2B portal is last because it serves a smaller audience and the foundation (products, orders, customers) must already exist.

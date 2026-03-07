@@ -121,11 +121,13 @@ func TestCatalogService_CreateVariant(t *testing.T) {
 
 	product := testutil.CreateProduct(t, tx)
 
+	actor := testutil.TestActor()
+
 	v, err := svc.CreateVariant(ctx, tx, store.CreateVariantParams{
 		ProductID: product.ID,
 		SKU:       "UNIQUE-SKU-1",
 		IsDefault: true,
-	})
+	}, actor)
 	require.NoError(t, err)
 	assert.Equal(t, "UNIQUE-SKU-1", v.SKU)
 
@@ -133,7 +135,7 @@ func TestCatalogService_CreateVariant(t *testing.T) {
 	_, err = svc.CreateVariant(ctx, tx, store.CreateVariantParams{
 		ProductID: product.ID,
 		SKU:       "UNIQUE-SKU-1",
-	})
+	}, actor)
 	assert.ErrorIs(t, err, app.ErrSKUAlreadyExists)
 }
 
@@ -147,18 +149,20 @@ func TestCatalogService_UpdateVariant(t *testing.T) {
 	v1 := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("SKU-A"))
 	testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("SKU-B"))
 
+	actor := testutil.TestActor()
+
 	// Same SKU unchanged is OK.
 	updated, err := svc.UpdateVariant(ctx, tx, v1.ID, store.UpdateVariantParams{
 		SKU:       "SKU-A",
 		IsDefault: true,
-	})
+	}, actor)
 	require.NoError(t, err)
 	assert.Equal(t, "SKU-A", updated.SKU)
 
 	// Changing to taken SKU errors.
 	_, err = svc.UpdateVariant(ctx, tx, v1.ID, store.UpdateVariantParams{
 		SKU: "SKU-B",
-	})
+	}, actor)
 	assert.ErrorIs(t, err, app.ErrSKUAlreadyExists)
 }
 

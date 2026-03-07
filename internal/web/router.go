@@ -40,6 +40,7 @@ type Deps struct {
 	PaymentProvider     payments.Provider
 	WebhookStore        *store.WebhookStore
 	CustomerStore       *store.CustomerStore
+	AuditStore          *store.AuditStore
 	MagicLinkStore      *store.MagicLinkStore
 	CustomerGroupStore  *store.CustomerGroupStore
 	SettingsStore       *store.SettingsStore
@@ -254,6 +255,9 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/invoices/{id}/send", deps.handleAdminInvoiceSend)
 	adminMux.HandleFunc("POST /admin/invoices/{id}/payment", deps.handleAdminInvoiceRecordPayment)
 	adminMux.HandleFunc("POST /admin/invoices/{id}/void", deps.handleAdminInvoiceVoid)
+
+	// Admin audit log
+	adminMux.HandleFunc("GET /admin/audit", deps.handleAdminAuditList)
 
 	// Staff logout (requires session)
 	adminMux.HandleFunc("POST /auth/staff/logout", deps.handleStaffLogout)

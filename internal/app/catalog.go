@@ -178,18 +178,30 @@ func (s *CatalogService) CountProducts(ctx context.Context, tx pgx.Tx, f store.P
 	return count, nil
 }
 
-// DeleteProduct removes a product by ID.
-func (s *CatalogService) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+// DeleteProduct removes a product by ID and records an audit entry.
+func (s *CatalogService) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
 	if err := s.catalog.DeleteProduct(ctx, tx, id); err != nil {
 		return fmt.Errorf("delete product: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditProductDeleted,
+		ResourceType: "product",
+		ResourceID:   id,
+	}); err != nil {
+		return fmt.Errorf("audit product deleted: %w", err)
+	}
+
 	return nil
 }
 
 // --- Variants ---
 
-// CreateVariant creates a new variant after checking SKU uniqueness.
-func (s *CatalogService) CreateVariant(ctx context.Context, tx pgx.Tx, p store.CreateVariantParams) (*domain.Variant, error) {
+// CreateVariant creates a new variant after checking SKU uniqueness and records an audit entry.
+func (s *CatalogService) CreateVariant(ctx context.Context, tx pgx.Tx, p store.CreateVariantParams, actor Actor) (*domain.Variant, error) {
 	_, err := s.catalog.GetVariantBySKU(ctx, tx, p.SKU)
 	if err == nil {
 		return nil, ErrSKUAlreadyExists
@@ -202,6 +214,19 @@ func (s *CatalogService) CreateVariant(ctx context.Context, tx pgx.Tx, p store.C
 	if err != nil {
 		return nil, fmt.Errorf("create variant: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditVariantCreated,
+		ResourceType: "variant",
+		ResourceID:   variant.ID,
+		After:        variant,
+	}); err != nil {
+		return nil, fmt.Errorf("audit variant created: %w", err)
+	}
+
 	return variant, nil
 }
 
@@ -226,8 +251,8 @@ func (s *CatalogService) ListVariants(ctx context.Context, tx pgx.Tx, productID 
 	return variants, nil
 }
 
-// UpdateVariant updates a variant after checking SKU uniqueness if changed.
-func (s *CatalogService) UpdateVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID, p store.UpdateVariantParams) (*domain.Variant, error) {
+// UpdateVariant updates a variant after checking SKU uniqueness if changed and records an audit entry.
+func (s *CatalogService) UpdateVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID, p store.UpdateVariantParams, actor Actor) (*domain.Variant, error) {
 	existing, err := s.catalog.GetVariantByID(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -251,14 +276,39 @@ func (s *CatalogService) UpdateVariant(ctx context.Context, tx pgx.Tx, id uuid.U
 	if err != nil {
 		return nil, fmt.Errorf("update variant: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditVariantUpdated,
+		ResourceType: "variant",
+		ResourceID:   id,
+		After:        variant,
+	}); err != nil {
+		return nil, fmt.Errorf("audit variant updated: %w", err)
+	}
+
 	return variant, nil
 }
 
-// DeleteVariant removes a variant by ID.
-func (s *CatalogService) DeleteVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+// DeleteVariant removes a variant by ID and records an audit entry.
+func (s *CatalogService) DeleteVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
 	if err := s.catalog.DeleteVariant(ctx, tx, id); err != nil {
 		return fmt.Errorf("delete variant: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditVariantDeleted,
+		ResourceType: "variant",
+		ResourceID:   id,
+	}); err != nil {
+		return fmt.Errorf("audit variant deleted: %w", err)
+	}
+
 	return nil
 }
 

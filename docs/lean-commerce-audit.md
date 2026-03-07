@@ -1,6 +1,6 @@
 # Lean Commerce — Audit Logging
 
-Actors logged: **staff** and **system/background jobs**. Customer actions are recoverable from domain data; staff and system actions need an explicit explanation attached.
+Actors logged: **staff**, **system/background jobs**, and **customers** (for self-service mutations with support or dispute value). Customer actions on their own data are audited when the action is irreversible or commonly disputed.
 
 Capture: **action + resource reference + after snapshot**.
 
@@ -11,7 +11,7 @@ Write strategy: **same transaction as the domain change**. A change without an a
 ## Schema
 
 ```sql
-CREATE TYPE audit_actor_type AS ENUM ('staff', 'system');
+CREATE TYPE audit_actor_type AS ENUM ('staff', 'system', 'customer');
 
 CREATE TABLE audit_log (
     id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -19,9 +19,9 @@ CREATE TABLE audit_log (
 
     -- Who did it
     actor_type    audit_actor_type NOT NULL,
-    actor_id      uuid,             -- staff.id, or null for anonymous system events
-    actor_name    text,             -- denormalized: staff name at time of action
-                                    -- (staff may be deactivated/renamed later)
+    actor_id      uuid,             -- staff.id, customers.id, or null for system events
+    actor_name    text,             -- denormalized: name/email at time of action
+                                    -- (accounts may be deactivated/renamed later)
 
     -- What they did
     action        text NOT NULL,    -- namespaced verb: 'order.refunded',
@@ -93,23 +93,60 @@ const (
 // Subscription actions
 const (
     AuditSubscriptionCreated  = "subscription.created"
-    AuditSubscriptionPaused   = "subscription.paused"
-    AuditSubscriptionCancelled= "subscription.cancelled"
-    AuditSubscriptionRenewed  = "subscription.renewed"   -- system actor
-    AuditSubscriptionFailed   = "subscription.renewal_failed" -- system actor
+    AuditSubscriptionPaused   = "subscription.paused"   // staff or customer actor
+    AuditSubscriptionResumed  = "subscription.resumed"  // staff or customer actor
+    AuditSubscriptionCancelled= "subscription.cancelled" // staff or customer actor
+    AuditSubscriptionRenewed  = "subscription.renewed"          // system actor
+    AuditSubscriptionRenewalFailed = "subscription.renewal_failed" // system actor
 )
 
-// Customer actions (staff-initiated only — not customer self-service)
+// Customer actions — staff-initiated mutations on customer accounts
 const (
-    AuditCustomerGroupChanged = "customer.group_changed"
-    AuditCustomerDeactivated  = "customer.deactivated"
+    AuditCustomerGroupChanged    = "customer.group_changed"
+    AuditCustomerDeactivated     = "customer.deactivated"
+    AuditCustomerAddressAdded    = "customer.address_added"    // customer actor
+    AuditCustomerAddressUpdated  = "customer.address_updated"  // customer actor
+    AuditCustomerAddressDeleted  = "customer.address_deleted"  // customer actor
 )
 
-// Staff actions
+// Wholesale actions — staff-initiated
 const (
-    AuditStaffCreated         = "staff.created"
-    AuditStaffRoleChanged     = "staff.role_changed"
-    AuditStaffDeactivated     = "staff.deactivated"
+    AuditWholesaleApplicationApproved = "wholesale.application_approved"
+    AuditWholesaleApplicationRejected = "wholesale.application_rejected"
+    AuditWholesalePriceListUpdated    = "wholesale.price_list_updated"
+)
+
+// Invoice actions — staff-initiated
+const (
+    AuditInvoiceSent            = "invoice.sent"
+    AuditInvoicePaymentRecorded = "invoice.payment_recorded"
+    AuditInvoiceVoided          = "invoice.voided"
+)
+
+// Coupon actions — staff-initiated
+const (
+    AuditCouponCreated          = "coupon.created"
+    AuditCouponDeactivated      = "coupon.deactivated"
+)
+
+// Shipment actions — system actor (River job)
+const (
+    AuditShipmentLabelCreated   = "shipment.label_created"
+)
+
+// Auth events — security-relevant, always audited
+const (
+    AuditAuthStaffLogin         = "auth.staff_login"          // staff actor
+    AuditAuthStaffLoginFailed   = "auth.staff_login_failed"   // system actor (no valid staff yet)
+    AuditAuthMagicLinkRequested = "auth.magic_link_requested" // system actor
+    AuditAuthStaffLogout        = "auth.staff_logout"         // staff actor
+)
+
+// Staff management actions
+const (
+    AuditStaffCreated           = "staff.created"
+    AuditStaffRoleChanged       = "staff.role_changed"
+    AuditStaffDeactivated       = "staff.deactivated"
 )
 ```
 
@@ -120,10 +157,18 @@ const (
 The audit writer is a thin struct with a single method. It takes an open transaction and appends a row. It never opens or commits its own transaction — the caller controls transaction scope.
 
 ```go
+type AuditActorType string
+
+const (
+    AuditActorStaff    AuditActorType = "staff"
+    AuditActorSystem   AuditActorType = "system"
+    AuditActorCustomer AuditActorType = "customer"
+)
+
 type AuditEntry struct {
     ActorType    AuditActorType
     ActorID      *uuid.UUID   // pointer — nil for pure system events
-    ActorName    string
+    ActorName    string       // staff name, customer email, or "system"
     Action       string
     ResourceType string
     ResourceID   uuid.UUID
@@ -226,10 +271,10 @@ func handleIssueRefund(deps *Deps) http.HandlerFunc {
 Background jobs (River workers) don't have a session or an IP address. They use a sentinel system actor:
 
 ```go
-var SystemActor = StaffActor{
-    ID:   uuid.Nil,   // zero UUID — no real staff row
-    Name: "system",
-    Type: AuditActorSystem,
+var SystemActor = AuditEntry{
+    ActorType: AuditActorSystem,
+    ActorID:   nil,
+    ActorName: "system",
 }
 ```
 
@@ -265,6 +310,7 @@ Including `river_job_id` in metadata means you can correlate an audit entry to t
 Three query patterns cover almost all operational needs:
 
 **"What happened to this order?"**
+
 ```sql
 SELECT actor_name, action, after, occurred_at, reason
 FROM audit_log
@@ -273,6 +319,7 @@ ORDER BY occurred_at ASC;
 ```
 
 **"What did this staff member do today?"**
+
 ```sql
 SELECT action, resource_type, resource_id, occurred_at, metadata
 FROM audit_log
@@ -282,6 +329,7 @@ ORDER BY occurred_at DESC;
 ```
 
 **"All refunds in the last 30 days"**
+
 ```sql
 SELECT actor_name, resource_id, metadata->>'refund_amount' AS amount,
        occurred_at, reason
@@ -290,6 +338,181 @@ WHERE action = 'order.refunded'
   AND occurred_at >= now() - interval '30 days'
 ORDER BY occurred_at DESC;
 ```
+
+---
+
+## Customer actor pattern
+
+Customer self-service actions use `AuditActorCustomer`. The handler resolves the customer from the session, same as staff actors are resolved. `actor_name` stores the customer's email — it's the most useful identifier for support queries and is already denormalized for the same reason as staff names.
+
+```go
+// web/middleware.go — retail session middleware sets this in context
+type CustomerActor struct {
+    ID        uuid.UUID
+    Email     string
+    IPAddress string
+}
+
+// In a customer-initiated service call:
+func (s *SubscriptionService) Cancel(
+    ctx        context.Context,
+    tx         pgx.Tx,
+    subID      uuid.UUID,
+    actor      CustomerActor,
+    reason     string,
+) error {
+    sub, err := s.subscriptions.Cancel(ctx, tx, subID, actor.ID) // ownership enforced in store
+    if err != nil {
+        return err
+    }
+    return s.audit.Record(ctx, tx, AuditEntry{
+        ActorType:    AuditActorCustomer,
+        ActorID:      &actor.ID,
+        ActorName:    actor.Email,
+        Action:       AuditSubscriptionCancelled,
+        ResourceType: "subscription",
+        ResourceID:   subID,
+        After:        sub,
+        RequestID:    RequestIDFromContext(ctx),
+        IPAddress:    actor.IPAddress,
+        Reason:       reason,
+    })
+}
+```
+
+The store query for customer-initiated mutations always includes a `customer_id` ownership check — a customer cannot cancel another customer's subscription. The audit record is only written after that check passes.
+
+---
+
+## Schema migration note
+
+The `customer` actor type requires a migration to extend the enum before any customer actor call sites are wired:
+
+```sql
+-- migration: add_customer_audit_actor
+ALTER TYPE audit_actor_type ADD VALUE 'customer';
+```
+
+PostgreSQL `ADD VALUE` on an enum does not require a table rewrite and is safe on a live database. It does require its own migration — it cannot be run inside a transaction that also modifies tables using that enum.
+
+---
+
+## Coverage map
+
+Full inventory of audited mutations, actors, and wiring status. Update this as call sites are added.
+
+### Orders
+
+| Mutation | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Order placed (retail) | `order.created` | system | `app/checkout.go: PlaceOrder` | ✅ |
+| Order placed (wholesale) | `order.created` | staff or customer | `app/wholesale.go: PlaceWholesaleOrder` | ✅ |
+| Status changed | `order.status_changed` | staff or system | `app/orders.go: UpdateOrderStatus` | ✅ |
+| Refund issued | `order.refunded` | staff | `app/orders.go: RefundOrder` | ✅ |
+| Order cancelled | `order.cancelled` | staff | `app/orders.go: CancelOrder` | ✅ |
+| Fulfilled | `order.fulfilled` | staff | `app/orders.go: FulfillOrder` | ✅ |
+| Shipped | `order.shipped` | staff | `app/orders.go: ShipOrder` | ✅ |
+| Payment status changed | `order.status_changed` | staff or system | `app/orders.go: UpdatePaymentStatus` | ✅ |
+| Fulfillment status changed | `order.fulfilled` | staff | `app/orders.go: UpdateFulfillmentStatus` | ✅ |
+
+### Products
+
+| Mutation | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Product created | `product.created` | staff | `app/catalog.go: CreateProduct` | ✅ |
+| Product updated | `product.updated` | staff | `app/catalog.go: UpdateProduct` | ✅ |
+| Product archived | `product.archived` | staff | `app/catalog.go: UpdateProductStatus` | ✅ |
+| Product deleted | `product.deleted` | staff | `app/catalog.go: DeleteProduct` | ✅ |
+| Variant created | `variant.created` | staff | `app/catalog.go: CreateVariant` | ✅ |
+| Variant updated | `variant.updated` | staff | `app/catalog.go: UpdateVariant` | ✅ |
+| Variant deleted | `variant.deleted` | staff | `app/catalog.go: DeleteVariant` | ✅ |
+| Variant price updated | `variant.price_updated` | staff | `app/catalog.go: UpdateVariantPrice` | ⬜ wire |
+| Product media added | `product_media.added` | staff | `app/catalog.go: CreateProductMedia` | ✅ |
+| Product media deleted | `product_media.deleted` | staff | `app/catalog.go: DeleteProductMedia` | ✅ |
+
+### Subscriptions
+
+| Mutation | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Created | `subscription.created` | system or staff | `app/subscriptions.go: CreateSubscription` | ✅ |
+| Plan created | `subscription_plan.created` | staff | `app/subscriptions.go: CreatePlan` | ✅ |
+| Plan activated/deactivated | `subscription_plan.deactivated` | staff | `app/subscriptions.go: UpdatePlanActive` | ✅ |
+| Plan discount updated | `subscription_plan.updated` | staff | `app/subscriptions.go: UpdatePlanDiscount` | ✅ |
+| Paused | `subscription.paused` | customer or staff | `app/subscriptions.go: PauseSubscription` | ✅ |
+| Resumed | `subscription.resumed` | customer or staff | `app/subscriptions.go: ResumeSubscription` | ✅ |
+| Cancelled | `subscription.cancelled` | customer or staff | `app/subscriptions.go: CancelSubscription` | ✅ |
+| Renewal succeeded | `subscription.renewed` | system | `app/renewal.go: processRenewal` | ✅ |
+| Renewal failed | `subscription.renewal_failed` | system | `app/renewal.go: processRenewal` | ✅ |
+
+### Customers
+
+| Mutation | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Group changed | `customer.group_changed` | staff | `app/customers.go: UpdateCustomerGroup` | ✅ |
+| Tax exemption granted | `customer.tax_exemption_granted` | staff | `app/customers.go: GrantTaxExemption` | ✅ |
+| Tax exemption revoked | `customer.tax_exemption_revoked` | staff | `app/customers.go: RevokeTaxExemption` | ✅ |
+| Address added | `customer.address_added` | customer | `app/customers.go: CreateAddress` | ✅ |
+| Address updated | `customer.address_updated` | customer | `app/customers.go: UpdateAddress` | ✅ |
+| Address deleted | `customer.address_deleted` | customer | `app/customers.go: DeleteAddress` | ✅ |
+
+### Wholesale
+
+| Mutation | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Application approved | `wholesale.application_approved` | staff | `app/wholesale.go: ApproveApplication` | ✅ |
+| Application declined | `wholesale.application_declined` | staff | `app/wholesale.go: DeclineApplication` | ✅ |
+| Account suspended | `wholesale.account_suspended` | staff | `app/wholesale.go: SuspendAccount` | ✅ |
+| Wholesale order placed | `order.created` | customer | `app/wholesale.go: PlaceWholesaleOrder` | ✅ |
+
+### Invoices
+
+| Mutation | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Invoice created | `invoice.created` | staff | `app/invoices.go: CreateFromOrder` | ✅ |
+| Invoice sent | `invoice.sent` | staff | `app/invoices.go: SendInvoice` | ✅ |
+| Payment recorded | `invoice.payment_recorded` | staff | `app/invoices.go: RecordPayment` | ✅ |
+| Invoice voided | `invoice.voided` | staff | `app/invoices.go: VoidInvoice` | ✅ |
+
+### Discounts
+
+| Mutation | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Discount created | `discount.created` | staff | `app/discounts.go` | ⬜ wire when mutations added |
+| Discount deactivated | `discount.deactivated` | staff | `app/discounts.go` | ⬜ wire when mutations added |
+
+### Shipments
+
+| Mutation | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Label created | `shipment.label_created` | staff | `app/fulfillment.go: CreateShipmentLabel` | ✅ |
+
+### Auth
+
+| Event | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Staff login success | `staff.login` | staff | `app/auth.go: StaffLogin` | ✅ |
+| Staff logout | `staff.logout` | staff | `app/auth.go: StaffLogout` | ✅ |
+| Customer login | `customer.login` | customer | `app/auth.go: CustomerLogin` | ✅ |
+| Customer magic link | `customer.login` | system | `app/auth.go: CreateMagicLinkToken` | ✅ |
+
+### Staff management
+
+| Mutation | Action | Actor | Call site | Status |
+|---|---|---|---|---|
+| Staff created | `staff.created` | staff | `app/staff.go: Create` | ⬜ wire when feature built |
+| Role changed | `staff.role_changed` | staff | `app/staff.go: ChangeRole` | ⬜ wire when feature built |
+| Deactivated | `staff.deactivated` | staff | `app/staff.go: Deactivate` | ⬜ wire when feature built |
+
+**Status key:** ✅ wired · ⬜ wire when feature is built · 🚫 explicitly not audited
+
+---
+
+## Implementation status
+
+Infrastructure is complete. The audit writer, store, domain types, action constants, and admin UI viewer
+are all in place. Most call sites are wired. Remaining ⬜ items will be wired when those features are built.
+
+Auth events (step 5) are the only ones worth wiring before the feature is otherwise built — everything else can be wired at the same time the feature is implemented.
 
 ---
 

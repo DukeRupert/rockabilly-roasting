@@ -119,7 +119,7 @@ func run() error {
 	pricingStore := store.NewPricingStore()
 	cartStore := store.NewCartStore()
 	settingsStore := store.NewSettingsStore()
-	_ = store.NewAuditStore()
+	auditStore := store.NewAuditStore()
 
 	// Services
 	orderSvc := app.NewOrderService(orderStore, auditWriter, metricsReg)
@@ -220,6 +220,7 @@ func run() error {
 		WholesaleService: wholesaleSvc,
 		InvoiceService:   invoiceSvc,
 		PaymentProvider:  paymentProvider,
+		AuditStore:      auditStore,
 		WebhookStore:    webhookStore,
 		CustomerStore:   customerStore,
 		MagicLinkStore:     magicLinkStore,

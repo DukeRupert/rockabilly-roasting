@@ -14,6 +14,10 @@ const (
 	AuditProductCreated      = "product.created"
 	AuditProductUpdated      = "product.updated"
 	AuditProductArchived     = "product.archived"
+	AuditProductDeleted      = "product.deleted"
+	AuditVariantCreated      = "variant.created"
+	AuditVariantUpdated      = "variant.updated"
+	AuditVariantDeleted      = "variant.deleted"
 	AuditVariantPriceUpdated = "variant.price_updated"
 
 	// Subscription actions
@@ -33,6 +37,9 @@ const (
 	AuditCustomerTaxExemptionGranted = "customer.tax_exemption_granted"
 	AuditCustomerTaxExemptionRevoked = "customer.tax_exemption_revoked"
 	AuditCustomerDeactivated         = "customer.deactivated"
+	AuditCustomerAddressAdded        = "customer.address_added"
+	AuditCustomerAddressUpdated      = "customer.address_updated"
+	AuditCustomerAddressDeleted      = "customer.address_deleted"
 
 	// Customer auth actions
 	AuditCustomerLogin  = "customer.login"

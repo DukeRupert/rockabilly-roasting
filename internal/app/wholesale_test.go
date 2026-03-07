@@ -132,7 +132,7 @@ func TestWholesaleService_SuspendAccount(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, domain.WholesaleStatusSuspended, *suspended.WholesaleStatus)
 
-		entry := testutil.LastAuditEntry(t, tx, "customer", customer.ID)
+		entry := testutil.LastAuditEntryWithAction(t, tx, "customer", customer.ID, audit.AuditWholesaleAccountSuspended)
 		assert.Equal(t, audit.AuditWholesaleAccountSuspended, entry.Action)
 	})
 

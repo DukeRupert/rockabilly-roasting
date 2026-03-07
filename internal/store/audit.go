@@ -87,6 +87,81 @@ func (s *AuditStore) ListByAction(ctx context.Context, tx pgx.Tx, action string)
 	return auditEntriesFromRows(rows), nil
 }
 
+// AuditFilter holds optional filters for listing audit entries.
+type AuditFilter struct {
+	ActorType    *string
+	Action       *string
+	ResourceType *string
+	Limit        int
+	Offset       int
+}
+
+// List returns audit entries matching the given filter, paginated.
+func (s *AuditStore) List(ctx context.Context, tx pgx.Tx, f AuditFilter) ([]domain.AuditEntry, error) {
+	query := `SELECT id, actor_type, actor_id, actor_name, action, resource_type, resource_id,
+	                  after_snapshot, request_id, ip_address, reason, metadata, created_at
+	           FROM audit_log WHERE 1=1`
+	args := []any{}
+	argN := 1
+
+	if f.ActorType != nil {
+		query += fmt.Sprintf(" AND actor_type = $%d", argN)
+		args = append(args, *f.ActorType)
+		argN++
+	}
+	if f.Action != nil {
+		query += fmt.Sprintf(" AND action = $%d", argN)
+		args = append(args, *f.Action)
+		argN++
+	}
+	if f.ResourceType != nil {
+		query += fmt.Sprintf(" AND resource_type = $%d", argN)
+		args = append(args, *f.ResourceType)
+		argN++
+	}
+
+	query += " ORDER BY created_at DESC"
+
+	if f.Limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d", argN)
+		args = append(args, f.Limit)
+		argN++
+	}
+	if f.Offset > 0 {
+		query += fmt.Sprintf(" OFFSET $%d", argN)
+		args = append(args, f.Offset)
+		argN++
+	}
+
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list audit entries: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []domain.AuditEntry
+	for rows.Next() {
+		var e domain.AuditEntry
+		var actorType string
+		var metadataJSON json.RawMessage
+		if err := rows.Scan(
+			&e.ID, &actorType, &e.ActorID, &e.ActorName,
+			&e.Action, &e.ResourceType, &e.ResourceID,
+			&e.AfterSnapshot, &e.RequestID, &e.IPAddress,
+			&e.Reason, &metadataJSON, &e.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan audit entry: %w", err)
+		}
+		e.ActorType = domain.AuditActorType(actorType)
+		e.Metadata = metadataFromJSON(metadataJSON)
+		entries = append(entries, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate audit entries: %w", err)
+	}
+	return entries, nil
+}
+
 // --- Row converters ---
 
 func auditEntryFromRow(r sqlcgen.AuditLog) *domain.AuditEntry {

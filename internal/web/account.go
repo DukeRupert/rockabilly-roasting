@@ -358,7 +358,7 @@ func (d *Deps) handleAccountAddressCreate(w http.ResponseWriter, r *http.Request
 	}
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CustomerService.CreateAddress(ctx, tx, p)
+		_, txErr := d.CustomerService.CreateAddress(ctx, tx, p, customerActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -399,7 +399,7 @@ func (d *Deps) handleAccountAddressUpdate(w http.ResponseWriter, r *http.Request
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CustomerService.UpdateAddress(ctx, tx, id, customer.ID, p)
+		_, txErr := d.CustomerService.UpdateAddress(ctx, tx, id, customer.ID, p, customerActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -429,7 +429,7 @@ func (d *Deps) handleAccountAddressDelete(w http.ResponseWriter, r *http.Request
 		if count <= 1 {
 			return app.ErrLastAddress
 		}
-		return d.CustomerService.DeleteAddress(ctx, tx, id, customer.ID)
+		return d.CustomerService.DeleteAddress(ctx, tx, id, customer.ID, customerActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)

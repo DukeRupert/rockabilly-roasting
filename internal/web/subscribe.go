@@ -355,6 +355,11 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 		if req.Line2 != "" {
 			line2 = &req.Line2
 		}
+		actor := app.Actor{
+			Type: domain.AuditActorTypeCustomer,
+			ID:   &customer.ID,
+			Name: customer.Email,
+		}
 		addr, txErr := d.CustomerService.CreateAddress(ctx, tx, store.CreateAddressParams{
 			CustomerID:  &customer.ID,
 			FirstName:   req.FirstName,
@@ -365,7 +370,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 			State:       req.State,
 			PostalCode:  req.PostalCode,
 			CountryCode: req.Country,
-		})
+		}, actor)
 		if txErr != nil {
 			return fmt.Errorf("create address: %w", txErr)
 		}

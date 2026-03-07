@@ -199,12 +199,25 @@ func (s *CustomerService) ListCustomers(ctx context.Context, tx pgx.Tx, f store.
 
 // --- Address methods ---
 
-// CreateAddress creates a new address.
-func (s *CustomerService) CreateAddress(ctx context.Context, tx pgx.Tx, p store.CreateAddressParams) (*domain.Address, error) {
+// CreateAddress creates a new address and records an audit entry.
+func (s *CustomerService) CreateAddress(ctx context.Context, tx pgx.Tx, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
 	addr, err := s.customers.CreateAddress(ctx, tx, p)
 	if err != nil {
 		return nil, fmt.Errorf("create address: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerAddressAdded,
+		ResourceType: "address",
+		ResourceID:   addr.ID,
+		After:        addr,
+	}); err != nil {
+		return nil, fmt.Errorf("audit address created: %w", err)
+	}
+
 	return addr, nil
 }
 
@@ -229,8 +242,8 @@ func (s *CustomerService) ListAddresses(ctx context.Context, tx pgx.Tx, customer
 	return addrs, nil
 }
 
-// UpdateAddress updates an address's fields, scoped to a customer.
-func (s *CustomerService) UpdateAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID, p store.CreateAddressParams) (*domain.Address, error) {
+// UpdateAddress updates an address's fields, scoped to a customer, and records an audit entry.
+func (s *CustomerService) UpdateAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID, p store.CreateAddressParams, actor Actor) (*domain.Address, error) {
 	addr, err := s.customers.UpdateAddress(ctx, tx, id, customerID, p)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -238,6 +251,19 @@ func (s *CustomerService) UpdateAddress(ctx context.Context, tx pgx.Tx, id, cust
 		}
 		return nil, fmt.Errorf("update address: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerAddressUpdated,
+		ResourceType: "address",
+		ResourceID:   id,
+		After:        addr,
+	}); err != nil {
+		return nil, fmt.Errorf("audit address updated: %w", err)
+	}
+
 	return addr, nil
 }
 
@@ -249,10 +275,22 @@ func (s *CustomerService) SetDefaultAddress(ctx context.Context, tx pgx.Tx, id, 
 	return nil
 }
 
-// DeleteAddress removes an address, scoped to a customer.
-func (s *CustomerService) DeleteAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID) error {
+// DeleteAddress removes an address, scoped to a customer, and records an audit entry.
+func (s *CustomerService) DeleteAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID, actor Actor) error {
 	if err := s.customers.DeleteAddress(ctx, tx, id, customerID); err != nil {
 		return fmt.Errorf("delete address: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerAddressDeleted,
+		ResourceType: "address",
+		ResourceID:   id,
+	}); err != nil {
+		return fmt.Errorf("audit address deleted: %w", err)
+	}
+
 	return nil
 }

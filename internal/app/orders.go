@@ -103,8 +103,8 @@ func (s *OrderService) GetOrderByStripePaymentIntentID(ctx context.Context, tx p
 	return o, nil
 }
 
-// UpdateOrderStatus updates the order's status.
-func (s *OrderService) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
+// UpdateOrderStatus updates the order's status and records an audit entry.
+func (s *OrderService) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.OrderStatus, actor Actor) (*domain.Order, error) {
 	o, err := s.orders.UpdateOrderStatus(ctx, tx, id, status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -112,6 +112,20 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid
 		}
 		return nil, fmt.Errorf("update order status: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderStatusChanged,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        o,
+		Metadata:     map[string]any{"new_status": string(status)},
+	}); err != nil {
+		return nil, fmt.Errorf("audit order status changed: %w", err)
+	}
+
 	return o, nil
 }
 

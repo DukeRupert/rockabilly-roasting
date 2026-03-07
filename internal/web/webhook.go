@@ -141,7 +141,7 @@ func (d *Deps) handlePaymentIntentSucceeded(ctx context.Context, event *payments
 
 		// Confirm order if still pending
 		if order.Status == domain.OrderStatusPending {
-			_, err = d.OrderService.UpdateOrderStatus(ctx, tx, order.ID, domain.OrderStatusConfirmed)
+			_, err = d.OrderService.UpdateOrderStatus(ctx, tx, order.ID, domain.OrderStatusConfirmed, systemActor())
 			if err != nil {
 				return fmt.Errorf("confirm order: %w", err)
 			}

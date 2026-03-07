@@ -505,7 +505,7 @@ func (d *Deps) handleAdminProductDelete(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CatalogService.DeleteProduct(ctx, tx, id)
+		return d.CatalogService.DeleteProduct(ctx, tx, id, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -754,7 +754,7 @@ func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) 
 				return txErr
 			}
 		}
-		variant, txErr := d.CatalogService.CreateVariant(ctx, tx, params)
+		variant, txErr := d.CatalogService.CreateVariant(ctx, tx, params, staffActor(r))
 		if txErr != nil {
 			return txErr
 		}
@@ -819,7 +819,7 @@ func (d *Deps) handleAdminVariantUpdate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CatalogService.UpdateVariant(ctx, tx, variantID, params)
+		_, txErr := d.CatalogService.UpdateVariant(ctx, tx, variantID, params, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -850,7 +850,7 @@ func (d *Deps) handleAdminVariantDelete(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CatalogService.DeleteVariant(ctx, tx, variantID)
+		return d.CatalogService.DeleteVariant(ctx, tx, variantID, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)

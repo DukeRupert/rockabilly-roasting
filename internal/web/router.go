@@ -153,10 +153,13 @@ func NewRouter(deps *Deps) http.Handler {
 	wholesaleMux.HandleFunc("POST /wholesale/portal/bulk-add", deps.handleWholesaleBulkAdd)
 	wholesaleMux.HandleFunc("GET /wholesale/checkout", deps.handleWholesaleCheckoutPage)
 	wholesaleMux.HandleFunc("POST /wholesale/checkout/confirm", deps.handleWholesaleCheckoutConfirm)
+	wholesaleMux.HandleFunc("POST /wholesale/cart/update", deps.handleWholesaleCartUpdate)
+	wholesaleMux.HandleFunc("POST /wholesale/cart/remove", deps.handleWholesaleCartRemove)
 	mux.Handle("/wholesale/portal", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("/wholesale/portal/", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("/wholesale/checkout", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("/wholesale/checkout/", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("/wholesale/cart/", deps.requireApprovedWholesale(wholesaleMux))
 
 	// Staff auth routes (no session required)
 	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {

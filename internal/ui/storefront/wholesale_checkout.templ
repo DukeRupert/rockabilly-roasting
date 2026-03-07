@@ -7,6 +7,7 @@ import (
 )
 
 type WholesaleCheckoutItem struct {
+	ItemID      uuid.UUID
 	VariantID   uuid.UUID
 	ProductName string
 	SKU         string
@@ -24,7 +25,7 @@ type WholesaleCheckoutProps struct {
 }
 
 templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
-	<div class="mx-auto max-w-3xl space-y-6">
+	<div id="wholesale-checkout" class="mx-auto max-w-3xl space-y-6">
 		<div>
 			<h1 class="text-2xl font-bold text-hiri-text">Review Order</h1>
 			<p class="mt-1 text-sm text-hiri-text-secondary">
@@ -53,6 +54,7 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 							<th class="px-4 py-3 text-right">Unit Price</th>
 							<th class="px-4 py-3 text-center">Qty</th>
 							<th class="px-4 py-3 text-right">Total</th>
+							<th class="px-4 py-3 w-10"></th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-hiri-border">
@@ -61,8 +63,34 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 								<td class="px-4 py-3 text-sm text-hiri-text">{ item.ProductName }</td>
 								<td class="px-4 py-3 text-sm font-mono text-hiri-text-secondary">{ item.SKU }</td>
 								<td class="px-4 py-3 text-sm text-right text-hiri-text">{ formatCents(item.UnitPrice) }</td>
-								<td class="px-4 py-3 text-sm text-center text-hiri-text">{ fmt.Sprint(item.Quantity) }</td>
+								<td class="px-4 py-3 text-center">
+									<input
+										type="number"
+										name="quantity"
+										value={ fmt.Sprint(item.Quantity) }
+										min="1"
+										class="w-16 rounded-md border-stone-300 px-2 py-1 text-center text-sm shadow-sm focus:border-hiri-teal focus:ring-hiri-teal"
+										hx-post={ fmt.Sprintf("/wholesale/cart/update?item_id=%s", item.ItemID.String()) }
+										hx-trigger="change"
+										hx-target="#wholesale-checkout"
+										hx-swap="outerHTML"
+										hx-include="this"
+									/>
+								</td>
 								<td class="px-4 py-3 text-sm text-right font-medium text-hiri-text">{ formatCents(item.LineTotal) }</td>
+								<td class="px-4 py-3 text-center">
+									<button
+										type="button"
+										class="text-stone-400 hover:text-red-600"
+										hx-post={ fmt.Sprintf("/wholesale/cart/remove?item_id=%s", item.ItemID.String()) }
+										hx-target="#wholesale-checkout"
+										hx-swap="outerHTML"
+									>
+										<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+										</svg>
+									</button>
+								</td>
 							</tr>
 						}
 					</tbody>
@@ -70,17 +98,12 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 						<tr class="border-t-2 border-hiri-border bg-stone-50">
 							<td colspan="4" class="px-4 py-3 text-sm font-semibold text-hiri-text text-right">Subtotal</td>
 							<td class="px-4 py-3 text-sm font-bold text-hiri-text text-right">{ formatCents(props.Subtotal) }</td>
+							<td></td>
 						</tr>
 					</tfoot>
 				</table>
 			</div>
 			<form method="post" action="/wholesale/checkout/confirm" class="space-y-4">
-				<!-- Hidden line items -->
-				for _, item := range props.Items {
-					<input type="hidden" name="variant_id" value={ item.VariantID.String() }/>
-					<input type="hidden" name={ fmt.Sprintf("qty[%s]", item.VariantID.String()) } value={ fmt.Sprint(item.Quantity) }/>
-					<input type="hidden" name={ fmt.Sprintf("price[%s]", item.VariantID.String()) } value={ fmt.Sprint(item.UnitPrice) }/>
-				}
 				<div class="rounded-lg border border-hiri-border bg-white p-6 space-y-4">
 					<div>
 						<label for="po_number" class="block text-sm font-medium text-hiri-text">PO Number (optional)</label>

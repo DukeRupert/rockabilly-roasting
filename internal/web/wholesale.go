@@ -301,6 +301,7 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 				subtotal += lineTotal
 
 				checkoutItems = append(checkoutItems, storefront.WholesaleCheckoutItem{
+					ItemID:      ci.ID,
 					VariantID:   ci.VariantID,
 					ProductName: product.Title,
 					SKU:         variant.SKU,
@@ -411,4 +412,53 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 	})
 
 	http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
+}
+
+// handleWholesaleCartUpdate updates the quantity of a cart item inline.
+func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	itemID, err := uuid.Parse(r.URL.Query().Get("item_id"))
+	if err != nil {
+		http.Error(w, "invalid item", http.StatusBadRequest)
+		return
+	}
+
+	quantity, err := strconv.Atoi(r.FormValue("quantity"))
+	if err != nil || quantity < 1 {
+		http.Error(w, "invalid quantity", http.StatusBadRequest)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.CartService.UpdateItemQuantity(ctx, tx, itemID, quantity)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	d.handleWholesaleCheckoutPage(w, r)
+}
+
+// handleWholesaleCartRemove removes a cart item inline.
+func (d *Deps) handleWholesaleCartRemove(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	itemID, err := uuid.Parse(r.URL.Query().Get("item_id"))
+	if err != nil {
+		http.Error(w, "invalid item", http.StatusBadRequest)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.CartService.RemoveItem(ctx, tx, itemID)
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	d.handleWholesaleCheckoutPage(w, r)
 }

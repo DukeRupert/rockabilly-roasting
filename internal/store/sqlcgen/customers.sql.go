@@ -11,6 +11,26 @@ import (
 	"github.com/google/uuid"
 )
 
+const clearDefaultAddresses = `-- name: ClearDefaultAddresses :exec
+UPDATE addresses SET is_default = false WHERE customer_id = $1 AND is_default = true
+`
+
+func (q *Queries) ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearDefaultAddresses, customerID)
+	return err
+}
+
+const countAddresses = `-- name: CountAddresses :one
+SELECT count(*) FROM addresses WHERE customer_id = $1
+`
+
+func (q *Queries) CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countAddresses, customerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAddress = `-- name: CreateAddress :one
 INSERT INTO addresses (id, customer_id, first_name, last_name, company, line1, line2,
                        city, state, postal_code, country_code, is_default)
@@ -385,6 +405,74 @@ func (q *Queries) ListCustomers(ctx context.Context) ([]Customer, error) {
 	return items, nil
 }
 
+const setDefaultAddress = `-- name: SetDefaultAddress :exec
+UPDATE addresses SET is_default = true WHERE id = $1 AND customer_id = $2
+`
+
+type SetDefaultAddressParams struct {
+	ID         uuid.UUID  `json:"id"`
+	CustomerID *uuid.UUID `json:"customer_id"`
+}
+
+func (q *Queries) SetDefaultAddress(ctx context.Context, arg SetDefaultAddressParams) error {
+	_, err := q.db.Exec(ctx, setDefaultAddress, arg.ID, arg.CustomerID)
+	return err
+}
+
+const updateAddress = `-- name: UpdateAddress :one
+UPDATE addresses
+SET first_name = $3, last_name = $4, company = $5, line1 = $6, line2 = $7,
+    city = $8, state = $9, postal_code = $10, country_code = $11
+WHERE id = $1 AND customer_id = $2
+RETURNING id, customer_id, first_name, last_name, company, line1, line2, city, state, postal_code, country_code, is_default
+`
+
+type UpdateAddressParams struct {
+	ID          uuid.UUID  `json:"id"`
+	CustomerID  *uuid.UUID `json:"customer_id"`
+	FirstName   string     `json:"first_name"`
+	LastName    string     `json:"last_name"`
+	Company     *string    `json:"company"`
+	Line1       string     `json:"line1"`
+	Line2       *string    `json:"line2"`
+	City        string     `json:"city"`
+	State       string     `json:"state"`
+	PostalCode  string     `json:"postal_code"`
+	CountryCode string     `json:"country_code"`
+}
+
+func (q *Queries) UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error) {
+	row := q.db.QueryRow(ctx, updateAddress,
+		arg.ID,
+		arg.CustomerID,
+		arg.FirstName,
+		arg.LastName,
+		arg.Company,
+		arg.Line1,
+		arg.Line2,
+		arg.City,
+		arg.State,
+		arg.PostalCode,
+		arg.CountryCode,
+	)
+	var i Address
+	err := row.Scan(
+		&i.ID,
+		&i.CustomerID,
+		&i.FirstName,
+		&i.LastName,
+		&i.Company,
+		&i.Line1,
+		&i.Line2,
+		&i.City,
+		&i.State,
+		&i.PostalCode,
+		&i.CountryCode,
+		&i.IsDefault,
+	)
+	return i, err
+}
+
 const updateCustomerEmail = `-- name: UpdateCustomerEmail :one
 UPDATE customers
 SET email = $2, email_verified = false, updated_at = now()
@@ -458,6 +546,50 @@ type UpdateCustomerGroupParams struct {
 func (q *Queries) UpdateCustomerGroup(ctx context.Context, arg UpdateCustomerGroupParams) error {
 	_, err := q.db.Exec(ctx, updateCustomerGroup, arg.ID, arg.CustomerGroupID)
 	return err
+}
+
+const updateCustomerName = `-- name: UpdateCustomerName :one
+UPDATE customers
+SET first_name = $2, last_name = $3, updated_at = now()
+WHERE id = $1
+RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method
+`
+
+type UpdateCustomerNameParams struct {
+	ID        uuid.UUID `json:"id"`
+	FirstName string    `json:"first_name"`
+	LastName  string    `json:"last_name"`
+}
+
+func (q *Queries) UpdateCustomerName(ctx context.Context, arg UpdateCustomerNameParams) (Customer, error) {
+	row := q.db.QueryRow(ctx, updateCustomerName, arg.ID, arg.FirstName, arg.LastName)
+	var i Customer
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.EmailVerified,
+		&i.PasswordHash,
+		&i.FirstName,
+		&i.LastName,
+		&i.Phone,
+		&i.TaxExempt,
+		&i.TaxExemptReason,
+		&i.CustomerGroupID,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.StripeCustomerID,
+		&i.AccountType,
+		&i.WholesaleStatus,
+		&i.CompanyName,
+		&i.Website,
+		&i.WholesaleNotes,
+		&i.ApprovedAt,
+		&i.ApprovedBy,
+		&i.TwoFaEnabled,
+		&i.TwoFaMethod,
+	)
+	return i, err
 }
 
 const updateCustomerPassword = `-- name: UpdateCustomerPassword :exec

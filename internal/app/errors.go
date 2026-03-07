@@ -70,6 +70,7 @@ var (
 
 	// Address errors
 	ErrAddressNotFound = errors.New("address not found")
+	ErrLastAddress     = errors.New("cannot delete the only address")
 
 	// Status errors
 	ErrInvalidOrderStatus = errors.New("invalid order status transition")

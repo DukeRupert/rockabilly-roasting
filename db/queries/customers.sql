@@ -12,6 +12,12 @@ SELECT * FROM customers WHERE email = $1;
 -- name: ListCustomers :many
 SELECT * FROM customers ORDER BY created_at DESC;
 
+-- name: UpdateCustomerName :one
+UPDATE customers
+SET first_name = $2, last_name = $3, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: UpdateCustomerEmail :one
 UPDATE customers
 SET email = $2, email_verified = false, updated_at = now()
@@ -64,6 +70,22 @@ SELECT * FROM addresses WHERE id = $1;
 
 -- name: ListAddresses :many
 SELECT * FROM addresses WHERE customer_id = $1 ORDER BY is_default DESC, id;
+
+-- name: UpdateAddress :one
+UPDATE addresses
+SET first_name = $3, last_name = $4, company = $5, line1 = $6, line2 = $7,
+    city = $8, state = $9, postal_code = $10, country_code = $11
+WHERE id = $1 AND customer_id = $2
+RETURNING *;
+
+-- name: ClearDefaultAddresses :exec
+UPDATE addresses SET is_default = false WHERE customer_id = $1 AND is_default = true;
+
+-- name: SetDefaultAddress :exec
+UPDATE addresses SET is_default = true WHERE id = $1 AND customer_id = $2;
+
+-- name: CountAddresses :one
+SELECT count(*) FROM addresses WHERE customer_id = $1;
 
 -- name: DeleteAddress :exec
 DELETE FROM addresses WHERE id = $1 AND customer_id = $2;

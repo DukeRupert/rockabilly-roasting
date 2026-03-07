@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"net/http"
+	"net/url"
 
 	"github.com/jackc/pgx/v5"
 
@@ -52,6 +53,57 @@ func (d *Deps) requireCustomerSession(next http.Handler) http.Handler {
 				HttpOnly: true,
 			})
 			http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+			return
+		}
+
+		ctx := auth.WithCustomer(r.Context(), customer)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// requireRetailCustomer validates that the request has an authenticated retail customer.
+// Unauthenticated requests redirect to /account/login with a ?next= return URL.
+// Wholesale customers are redirected to /wholesale/portal.
+func (d *Deps) requireRetailCustomer(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(customerCookieName)
+		if err != nil || cookie.Value == "" {
+			returnTo := url.QueryEscape(r.URL.Path)
+			http.Redirect(w, r, "/account/login?next="+returnTo, http.StatusSeeOther)
+			return
+		}
+
+		var sess *domain.Session
+		var customer *domain.Customer
+
+		err = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
+			var txErr error
+			sess, txErr = d.AuthService.ValidateSession(r.Context(), tx, cookie.Value)
+			if txErr != nil {
+				return txErr
+			}
+			if sess.ActorType != domain.SessionActorTypeCustomer {
+				return nil
+			}
+			customer, txErr = d.AuthService.GetCustomerByID(r.Context(), tx, sess.ActorID)
+			return txErr
+		})
+
+		if err != nil || sess == nil || customer == nil {
+			http.SetCookie(w, &http.Cookie{
+				Name:     customerCookieName,
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HttpOnly: true,
+			})
+			returnTo := url.QueryEscape(r.URL.Path)
+			http.Redirect(w, r, "/account/login?next="+returnTo, http.StatusSeeOther)
+			return
+		}
+
+		if customer.AccountType == domain.AccountTypeWholesale {
+			http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
 			return
 		}
 

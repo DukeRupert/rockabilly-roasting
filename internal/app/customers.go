@@ -56,6 +56,15 @@ func (s *CustomerService) GetCustomerByEmail(ctx context.Context, tx pgx.Tx, ema
 	return c, nil
 }
 
+// UpdateName updates a customer's first and last name.
+func (s *CustomerService) UpdateName(ctx context.Context, tx pgx.Tx, id uuid.UUID, firstName, lastName string) (*domain.Customer, error) {
+	c, err := s.customers.UpdateName(ctx, tx, id, firstName, lastName)
+	if err != nil {
+		return nil, fmt.Errorf("update name: %w", err)
+	}
+	return c, nil
+}
+
 // UpdateEmail updates a customer's email after checking uniqueness.
 func (s *CustomerService) UpdateEmail(ctx context.Context, tx pgx.Tx, id uuid.UUID, email string) (*domain.Customer, error) {
 	existing, err := s.customers.GetByEmail(ctx, tx, email)
@@ -218,6 +227,26 @@ func (s *CustomerService) ListAddresses(ctx context.Context, tx pgx.Tx, customer
 		return nil, fmt.Errorf("list addresses: %w", err)
 	}
 	return addrs, nil
+}
+
+// UpdateAddress updates an address's fields, scoped to a customer.
+func (s *CustomerService) UpdateAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID, p store.CreateAddressParams) (*domain.Address, error) {
+	addr, err := s.customers.UpdateAddress(ctx, tx, id, customerID, p)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrAddressNotFound
+		}
+		return nil, fmt.Errorf("update address: %w", err)
+	}
+	return addr, nil
+}
+
+// SetDefaultAddress sets an address as the default for a customer.
+func (s *CustomerService) SetDefaultAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID) error {
+	if err := s.customers.SetDefaultAddress(ctx, tx, id, customerID); err != nil {
+		return fmt.Errorf("set default address: %w", err)
+	}
+	return nil
 }
 
 // DeleteAddress removes an address, scoped to a customer.

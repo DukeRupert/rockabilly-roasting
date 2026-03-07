@@ -153,6 +153,19 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	return customers, rows.Err()
 }
 
+// UpdateName sets a customer's first and last name.
+func (s *CustomerStore) UpdateName(ctx context.Context, tx pgx.Tx, id uuid.UUID, firstName, lastName string) (*domain.Customer, error) {
+	row, err := sqlcgen.New(tx).UpdateCustomerName(ctx, sqlcgen.UpdateCustomerNameParams{
+		ID:        id,
+		FirstName: firstName,
+		LastName:  lastName,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update customer name: %w", err)
+	}
+	return customerFromRow(row), nil
+}
+
 // UpdateEmail sets a customer's email and resets email_verified to false.
 func (s *CustomerStore) UpdateEmail(ctx context.Context, tx pgx.Tx, id uuid.UUID, email string) (*domain.Customer, error) {
 	row, err := sqlcgen.New(tx).UpdateCustomerEmail(ctx, sqlcgen.UpdateCustomerEmailParams{
@@ -314,6 +327,51 @@ func (s *CustomerStore) ListAddresses(ctx context.Context, tx pgx.Tx, customerID
 		addresses[i] = *addressFromRow(r)
 	}
 	return addresses, nil
+}
+
+// UpdateAddress updates an address's fields, scoped to a customer.
+func (s *CustomerStore) UpdateAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID, p CreateAddressParams) (*domain.Address, error) {
+	row, err := sqlcgen.New(tx).UpdateAddress(ctx, sqlcgen.UpdateAddressParams{
+		ID:          id,
+		CustomerID:  &customerID,
+		FirstName:   p.FirstName,
+		LastName:    p.LastName,
+		Company:     p.Company,
+		Line1:       p.Line1,
+		Line2:       p.Line2,
+		City:        p.City,
+		State:       p.State,
+		PostalCode:  p.PostalCode,
+		CountryCode: p.CountryCode,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update address: %w", err)
+	}
+	return addressFromRow(row), nil
+}
+
+// SetDefaultAddress sets an address as the default, clearing others.
+func (s *CustomerStore) SetDefaultAddress(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID) error {
+	q := sqlcgen.New(tx)
+	if err := q.ClearDefaultAddresses(ctx, &customerID); err != nil {
+		return fmt.Errorf("clear default addresses: %w", err)
+	}
+	if err := q.SetDefaultAddress(ctx, sqlcgen.SetDefaultAddressParams{
+		ID:         id,
+		CustomerID: &customerID,
+	}); err != nil {
+		return fmt.Errorf("set default address: %w", err)
+	}
+	return nil
+}
+
+// CountAddresses returns the number of addresses for a customer.
+func (s *CustomerStore) CountAddresses(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (int, error) {
+	count, err := sqlcgen.New(tx).CountAddresses(ctx, &customerID)
+	if err != nil {
+		return 0, fmt.Errorf("count addresses: %w", err)
+	}
+	return int(count), nil
 }
 
 // DeleteAddress removes an address, scoped to a customer.

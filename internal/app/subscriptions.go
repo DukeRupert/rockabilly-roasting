@@ -116,6 +116,27 @@ func (s *SubscriptionService) ListActivePlans(ctx context.Context, tx pgx.Tx) ([
 	return plans, nil
 }
 
+// ListSubscriptionsByCustomer returns all subscriptions for a customer.
+func (s *SubscriptionService) ListSubscriptionsByCustomer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) ([]domain.Subscription, error) {
+	subs, err := s.subscriptions.ListByCustomer(ctx, tx, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("list subscriptions by customer: %w", err)
+	}
+	return subs, nil
+}
+
+// GetSubscriptionByCustomer returns a subscription scoped to a customer.
+func (s *SubscriptionService) GetSubscriptionByCustomer(ctx context.Context, tx pgx.Tx, id, customerID uuid.UUID) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.Get(ctx, tx, id, customerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription by customer: %w", err)
+	}
+	return sub, nil
+}
+
 // ListDueForRenewal returns active subscriptions due for renewal.
 func (s *SubscriptionService) ListDueForRenewal(ctx context.Context, tx pgx.Tx) ([]domain.Subscription, error) {
 	subs, err := s.subscriptions.ListDueForRenewal(ctx, tx)

@@ -243,7 +243,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"rounded-lg border border-hiri-border bg-white p-6 space-y-4\"><div><label for=\"po_number\" class=\"block text-sm font-medium text-hiri-text\">PO Number (optional)</label> <input type=\"text\" name=\"po_number\" id=\"po_number\" placeholder=\"Enter your purchase order number\" class=\"mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm\"></div><div><label for=\"notes\" class=\"block text-sm font-medium text-hiri-text\">Order Notes (optional)</label> <textarea name=\"notes\" id=\"notes\" rows=\"3\" placeholder=\"Any special instructions for this order\" class=\"mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm\"></textarea></div></div><div class=\"flex items-center justify-between\"><a href=\"/wholesale/portal\" class=\"text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark\">&larr; Back to Quick Order</a> <button type=\"submit\" class=\"inline-flex items-center rounded-md bg-hiri-teal px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal\">Place Order</button></div><p class=\"text-xs text-hiri-text-secondary text-center\">An invoice will be sent after your order is confirmed. No payment is collected now.</p></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"rounded-lg border border-hiri-border bg-white p-6 space-y-4\"><div><label for=\"po_number\" class=\"block text-sm font-medium text-hiri-text\">PO Number (optional)</label> <input type=\"text\" name=\"po_number\" id=\"po_number\" placeholder=\"Enter your purchase order number\" class=\"mt-1 block w-full rounded-md border-stone-300 px-3 py-2 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm\"></div><div><label for=\"notes\" class=\"block text-sm font-medium text-hiri-text\">Order Notes (optional)</label> <textarea name=\"notes\" id=\"notes\" rows=\"3\" placeholder=\"Any special instructions for this order\" class=\"mt-1 block w-full rounded-md border-stone-300 px-3 py-2 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm\"></textarea></div></div><div class=\"flex items-center justify-between\"><a href=\"/wholesale/portal\" class=\"text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark\">&larr; Back to Quick Order</a> <button type=\"submit\" class=\"inline-flex items-center rounded-md bg-hiri-teal px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal\">Place Order</button></div><p class=\"text-xs text-hiri-text-secondary text-center\">An invoice will be sent after your order is confirmed. No payment is collected now.</p></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -296,7 +296,8 @@ func WholesaleCheckoutPage(props WholesaleCheckoutProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title: "Review Order",
+			Title:   "Review Order",
+			CartURL: "/wholesale/checkout",
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var15), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

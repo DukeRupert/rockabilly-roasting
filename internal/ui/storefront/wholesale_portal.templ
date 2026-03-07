@@ -122,7 +122,7 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 													}()
 												}
 												placeholder="0"
-												class="w-20 rounded-md border-stone-300 text-center text-sm shadow-sm focus:border-hiri-teal focus:ring-hiri-teal"
+												class="w-20 rounded-md border-stone-300 px-2 py-1.5 text-center text-sm shadow-sm focus:border-hiri-teal focus:ring-hiri-teal"
 											/>
 										</td>
 										<td class="whitespace-nowrap px-4 py-2">
@@ -160,7 +160,8 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 
 templ WholesalePortalPage(props WholesalePortalProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title: "Quick Order",
+		Title:   "Quick Order",
+		CartURL: "/wholesale/checkout",
 	}) {
 		@WholesalePortalContent(props)
 	}

@@ -267,7 +267,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" placeholder=\"0\" class=\"w-20 rounded-md border-stone-300 text-center text-sm shadow-sm focus:border-hiri-teal focus:ring-hiri-teal\"></td><td class=\"whitespace-nowrap px-4 py-2\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" placeholder=\"0\" class=\"w-20 rounded-md border-stone-300 px-2 py-1.5 text-center text-sm shadow-sm focus:border-hiri-teal focus:ring-hiri-teal\"></td><td class=\"whitespace-nowrap px-4 py-2\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -346,7 +346,8 @@ func WholesalePortalPage(props WholesalePortalProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title: "Quick Order",
+			Title:   "Quick Order",
+			CartURL: "/wholesale/checkout",
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var14), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

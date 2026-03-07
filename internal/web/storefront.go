@@ -8,6 +8,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
@@ -86,7 +87,7 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 				return mediaErr
 			}
 			if len(media) > 0 {
-				cards[i].ThumbnailURL = media[0].CFImageID
+				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].CFImageID, mediapkg.VariantCard)
 			}
 
 			// Get price from default variant.
@@ -179,7 +180,7 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 				return mediaErr
 			}
 			if len(media) > 0 {
-				cards[i].ThumbnailURL = media[0].CFImageID
+				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].CFImageID, mediapkg.VariantCard)
 			}
 
 			variants, varErr := d.CatalogService.ListVariants(ctx, tx, p.ID)
@@ -310,6 +311,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	props := storefront.ProductDetailProps{
 		Product:           product,
 		Media:             media,
+		MediaConfig:       d.MediaConfig,
 		Variants:          variantsWithPrices,
 		Options:           options,
 		DefaultPrice:      defaultPrice,

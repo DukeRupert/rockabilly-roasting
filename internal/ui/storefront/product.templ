@@ -3,6 +3,7 @@ package storefront
 import (
 	"fmt"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
@@ -20,6 +21,7 @@ type VariantWithPrice struct {
 type ProductDetailProps struct {
 	Product           *domain.Product
 	Media             []domain.ProductMedia
+	MediaConfig       *media.Config
 	Variants          []VariantWithPrice
 	Options           []OptionWithValues
 	DefaultPrice      *int
@@ -46,7 +48,7 @@ templ ProductContent(props ProductDetailProps) {
 					<!-- Main image -->
 					<div class="aspect-square w-full overflow-hidden rounded-lg bg-stone-100">
 						<img
-							src={ props.Media[0].CFImageID }
+							src={ props.MediaConfig.ProductImageURL(props.Media[0].CFImageID, media.VariantHero) }
 							alt={ props.Media[0].AltText }
 							class="h-full w-full object-cover object-center"
 						/>
@@ -57,7 +59,7 @@ templ ProductContent(props ProductDetailProps) {
 							for _, m := range props.Media {
 								<div class="aspect-square overflow-hidden rounded-lg bg-stone-100">
 									<img
-										src={ m.CFImageID }
+										src={ props.MediaConfig.ProductImageURL(m.CFImageID, media.VariantThumbnail) }
 										alt={ m.AltText }
 										class="h-full w-full object-cover object-center"
 									/>

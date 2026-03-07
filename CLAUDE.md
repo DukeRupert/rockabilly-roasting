@@ -37,6 +37,8 @@ mage db:create <name>  # create new migration file
 
 # Development tools
 mage dev:templ    # generate templ templates
+mage dev:css      # compile Tailwind CSS (minified)
+mage dev:watch    # run Tailwind CSS in watch mode
 mage dev:checkout # build Svelte checkout bundle
 mage dev:seed     # create admin staff user (set SEED_EMAIL, SEED_PASSWORD, SEED_NAME)
 
@@ -68,9 +70,11 @@ platform/ → domain/ only (audit sub-package)
 - `web/` — thin HTTP handlers: parse request → call service → render response. Route registration + middleware in `router.go`
 - `ui/` — templ templates organized as `layouts/`, `storefront/`, `admin/`, `components/`
 - `jobs/` — River workers, one file per job type. Workers are thin: open tx, call service, return
-- `platform/` — infrastructure sub-packages: `audit/`, `metrics/`, `sessions/`, `auth/`, `ratelimit/`, `shipping/`, `logging/`
+- `platform/` — infrastructure sub-packages: `audit/`, `auth/`, `email/`, `logging/`, `media/`, `metrics/`, `payments/`, `ratelimit/`, `sessions/`, `shipping/`, `tax/`
+- `emailtemplates/` — templ-based email templates
+- `testutil/` — shared test helpers
 
-Entry point: `cmd/server/main.go` wires all dependencies.
+Entry point: `cmd/server/main.go` wires all dependencies. Uses `godotenv` to load `.env` if present.
 
 ## Critical Patterns
 

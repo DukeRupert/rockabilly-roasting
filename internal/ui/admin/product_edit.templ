@@ -3,6 +3,7 @@ package admin
 import (
 	"fmt"
 	"math"
+	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 	switchcomp "github.com/dukerupert/hiri/internal/ui/components/switch"
@@ -26,6 +27,7 @@ type ProductEditProps struct {
 	Taxons    []domain.Taxon
 	Variants  []VariantWithOptions
 	Options   []OptionWithValues
+	Groups    []domain.CustomerGroup
 	TaxonName string
 	Errors    map[string]string
 	Flash     string
@@ -127,7 +129,7 @@ templ ProductEditContent(props ProductEditProps) {
 		<!-- Options panel (before variants — must define options before creating variants) -->
 			@OptionsPanel(props.Product, props.Options)
 			<!-- Variants panel -->
-			@VariantsPanel(props.Product, props.Variants, props.Options, props.TaxonName, nil)
+			@VariantsPanel(props.Product, props.Variants, props.Options, props.TaxonName, props.Groups, nil)
 		</div>
 }
 
@@ -227,8 +229,9 @@ templ OptionsPanel(product *domain.Product, options []OptionWithValues) {
 // VariantWithOptionValues pairs a variant with its selected option value names for display.
 type VariantWithOptions struct {
 	Variant      domain.Variant
-	OptionValues []string // e.g. ["Medium", "Dark Roast"]
-	PriceCents   *int     // base price in cents, nil = not set
+	OptionValues []string          // e.g. ["Medium", "Dark Roast"]
+	PriceCents   *int              // base price in cents, nil = not set
+	GroupPrices  map[uuid.UUID]int // customerGroupID -> cents
 }
 
 // formatPrice formats cents as dollars (e.g. 1299 -> "$12.99").
@@ -242,7 +245,7 @@ func priceToDollars(cents int) string {
 }
 
 // VariantsPanel renders the variants section as a standalone partial for htmx swaps.
-templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues, taxonName string, attrs templ.Attributes) {
+templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues, taxonName string, groups []domain.CustomerGroup, attrs templ.Attributes) {
 	<div id="variants-panel" { attrs... } class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
 		<div class="px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-stone-900">Variants</h3>
@@ -255,8 +258,6 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">SKU</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Options</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Price</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Barcode</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Default</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 lg:table-cell">Weight (oz)</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
@@ -267,7 +268,16 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 						for _, vwo := range variants {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<span class="font-mono font-medium text-stone-900">{ vwo.Variant.SKU }</span>
+									<div>
+										<span class="font-mono font-medium text-stone-900">{ vwo.Variant.SKU }</span>
+										if vwo.Variant.IsDefault {
+											<div class="mt-0.5">
+												<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+													Default
+												</span>
+											</div>
+										}
+									</div>
 								</td>
 								<td class="px-3 py-4 text-sm text-stone-500">
 									if len(vwo.OptionValues) > 0 {
@@ -282,45 +292,64 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 										<span class="text-stone-400">—</span>
 									}
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									<form
-										method="post"
-										action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/price", product.ID, vwo.Variant.ID)) }
-										hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/price", product.ID, vwo.Variant.ID) }
-										hx-target="#variants-panel"
-										hx-swap="outerHTML"
-										class="flex items-center gap-1"
-									>
-										<span class="text-stone-400">$</span>
-										<input
-											type="number"
-											name="price"
-											step="0.01"
-											min="0"
-											placeholder="0.00"
-											if vwo.PriceCents != nil {
-												value={ priceToDollars(*vwo.PriceCents) }
-											}
-											class="w-20 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
-										/>
-										<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-hiri-teal hover:text-hiri-teal-dark">
-											Save
-										</button>
-									</form>
-								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 sm:table-cell">
-									if vwo.Variant.Barcode != nil {
-										<span class="font-mono">{ *vwo.Variant.Barcode }</span>
-									} else {
-										<span class="text-stone-400">—</span>
-									}
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									if vwo.Variant.IsDefault {
-										<span class="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-											Default
-										</span>
-									}
+								<td class="px-3 py-4 text-sm">
+									<div class="space-y-1.5">
+										<!-- Base price -->
+										<form
+											method="post"
+											action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/price", product.ID, vwo.Variant.ID)) }
+											hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/price", product.ID, vwo.Variant.ID) }
+											hx-target="#variants-panel"
+											hx-swap="outerHTML"
+											class="flex items-center gap-1"
+										>
+											<span class="w-16 text-xs text-stone-400 truncate" title="Base">Base</span>
+											<span class="text-stone-400">$</span>
+											<input
+												type="number"
+												name="price"
+												step="0.01"
+												min="0"
+												placeholder="0.00"
+												if vwo.PriceCents != nil {
+													value={ priceToDollars(*vwo.PriceCents) }
+												}
+												class="w-20 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
+											/>
+											<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-hiri-teal hover:text-hiri-teal-dark">
+												Save
+											</button>
+										</form>
+										<!-- Group prices -->
+										for _, g := range groups {
+											<form
+												method="post"
+												action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/group-price", product.ID, vwo.Variant.ID)) }
+												hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/group-price", product.ID, vwo.Variant.ID) }
+												hx-target="#variants-panel"
+												hx-swap="outerHTML"
+												class="flex items-center gap-1"
+											>
+												<input type="hidden" name="group_id" value={ g.ID.String() }/>
+												<span class="w-16 text-xs text-indigo-600 truncate" title={ g.Name }>{ g.Name }</span>
+												<span class="text-stone-400">$</span>
+												<input
+													type="number"
+													name="price"
+													step="0.01"
+													min="0"
+													placeholder="0.00"
+													if cents, ok := vwo.GroupPrices[g.ID]; ok {
+														value={ priceToDollars(cents) }
+													}
+													class="w-20 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
+												/>
+												<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-hiri-teal hover:text-hiri-teal-dark">
+													Save
+												</button>
+											</form>
+										}
+									</div>
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 lg:table-cell">
 									if vwo.Variant.WeightGrams != nil {

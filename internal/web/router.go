@@ -136,6 +136,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}", deps.handleAdminVariantUpdate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/delete", deps.handleAdminVariantDelete)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/price", deps.handleAdminVariantPriceUpdate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/group-price", deps.handleAdminVariantGroupPriceUpdate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/options", deps.handleAdminOptionCreate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/delete", deps.handleAdminOptionDelete)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values", deps.handleAdminOptionValueCreate)
@@ -160,6 +161,9 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("GET /admin/groups", deps.handleAdminGroupList)
 	adminMux.HandleFunc("POST /admin/groups", deps.handleAdminGroupCreate)
 	adminMux.HandleFunc("POST /admin/groups/{id}/delete", deps.handleAdminGroupDelete)
+	adminMux.HandleFunc("GET /admin/groups/prices", deps.handleAdminGroupPrices)
+	adminMux.HandleFunc("POST /admin/groups/prices/base", deps.handleAdminGroupPriceBaseUpdate)
+	adminMux.HandleFunc("POST /admin/groups/prices/group", deps.handleAdminGroupPriceGroupUpdate)
 
 	// Admin subscription plans
 	adminMux.HandleFunc("GET /admin/plans", deps.handleAdminPlanList)

@@ -46,7 +46,7 @@ templ ProductContent(props ProductDetailProps) {
 					<!-- Main image -->
 					<div class="aspect-square w-full overflow-hidden rounded-lg bg-stone-100">
 						<img
-							src={ props.Media[0].URL }
+							src={ props.Media[0].CFImageID }
 							alt={ props.Media[0].AltText }
 							class="h-full w-full object-cover object-center"
 						/>
@@ -57,7 +57,7 @@ templ ProductContent(props ProductDetailProps) {
 							for _, m := range props.Media {
 								<div class="aspect-square overflow-hidden rounded-lg bg-stone-100">
 									<img
-										src={ m.URL }
+										src={ m.CFImageID }
 										alt={ m.AltText }
 										class="h-full w-full object-cover object-center"
 									/>

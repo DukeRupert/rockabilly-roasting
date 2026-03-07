@@ -36,3 +36,11 @@ RETURNING *;
 UPDATE shipments
 SET status = 'delivered', delivered_at = now()
 WHERE id = $1;
+
+-- name: UpdateShipmentLabel :exec
+UPDATE shipments
+SET label_r2_key = $2, label_format = $3
+WHERE id = $1;
+
+-- name: GetShipmentLabelKey :one
+SELECT label_r2_key FROM shipments WHERE id = $1;

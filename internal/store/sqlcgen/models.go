@@ -322,7 +322,7 @@ type ProductMedium struct {
 	ID        uuid.UUID  `json:"id"`
 	ProductID uuid.UUID  `json:"product_id"`
 	VariantID *uuid.UUID `json:"variant_id"`
-	Url       string     `json:"url"`
+	CfImageID string     `json:"cf_image_id"`
 	AltText   string     `json:"alt_text"`
 	Position  int32      `json:"position"`
 	MediaType string     `json:"media_type"`
@@ -384,6 +384,8 @@ type Shipment struct {
 	LabelCreatedAt pgtype.Timestamptz `json:"label_created_at"`
 	ShippedAt      pgtype.Timestamptz `json:"shipped_at"`
 	DeliveredAt    pgtype.Timestamptz `json:"delivered_at"`
+	LabelR2Key     *string            `json:"label_r2_key"`
+	LabelFormat    *string            `json:"label_format"`
 }
 
 type ShippingConfig struct {

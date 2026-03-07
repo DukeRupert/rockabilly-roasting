@@ -89,11 +89,13 @@ type VariantOptionValue struct {
 }
 
 // ProductMedia represents an image or video associated with a product.
+// CFImageID is a Cloudflare Images image ID — URLs are constructed at
+// render time from a base delivery domain + variant name.
 type ProductMedia struct {
 	ID        uuid.UUID
 	ProductID uuid.UUID
 	VariantID *uuid.UUID
-	URL       string
+	CFImageID string
 	AltText   string
 	Position  int
 	MediaType MediaType

@@ -66,16 +66,16 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 }
 
 const createProductMedia = `-- name: CreateProductMedia :one
-INSERT INTO product_media (id, product_id, variant_id, url, alt_text, position, media_type)
+INSERT INTO product_media (id, product_id, variant_id, cf_image_id, alt_text, position, media_type)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, product_id, variant_id, url, alt_text, position, media_type
+RETURNING id, product_id, variant_id, cf_image_id, alt_text, position, media_type
 `
 
 type CreateProductMediaParams struct {
 	ID        uuid.UUID  `json:"id"`
 	ProductID uuid.UUID  `json:"product_id"`
 	VariantID *uuid.UUID `json:"variant_id"`
-	Url       string     `json:"url"`
+	CfImageID string     `json:"cf_image_id"`
 	AltText   string     `json:"alt_text"`
 	Position  int32      `json:"position"`
 	MediaType string     `json:"media_type"`
@@ -86,7 +86,7 @@ func (q *Queries) CreateProductMedia(ctx context.Context, arg CreateProductMedia
 		arg.ID,
 		arg.ProductID,
 		arg.VariantID,
-		arg.Url,
+		arg.CfImageID,
 		arg.AltText,
 		arg.Position,
 		arg.MediaType,
@@ -96,7 +96,7 @@ func (q *Queries) CreateProductMedia(ctx context.Context, arg CreateProductMedia
 		&i.ID,
 		&i.ProductID,
 		&i.VariantID,
-		&i.Url,
+		&i.CfImageID,
 		&i.AltText,
 		&i.Position,
 		&i.MediaType,
@@ -376,6 +376,25 @@ func (q *Queries) GetProductBySlug(ctx context.Context, slug string) (Product, e
 	return i, err
 }
 
+const getProductMediaByID = `-- name: GetProductMediaByID :one
+SELECT id, product_id, variant_id, cf_image_id, alt_text, position, media_type FROM product_media WHERE id = $1
+`
+
+func (q *Queries) GetProductMediaByID(ctx context.Context, id uuid.UUID) (ProductMedium, error) {
+	row := q.db.QueryRow(ctx, getProductMediaByID, id)
+	var i ProductMedium
+	err := row.Scan(
+		&i.ID,
+		&i.ProductID,
+		&i.VariantID,
+		&i.CfImageID,
+		&i.AltText,
+		&i.Position,
+		&i.MediaType,
+	)
+	return i, err
+}
+
 const getTaxonByID = `-- name: GetTaxonByID :one
 SELECT id, parent_id, name, slug, position, depth FROM taxons WHERE id = $1
 `
@@ -461,7 +480,7 @@ func (q *Queries) GetVariantBySKU(ctx context.Context, sku string) (Variant, err
 }
 
 const listProductMediaByProduct = `-- name: ListProductMediaByProduct :many
-SELECT id, product_id, variant_id, url, alt_text, position, media_type FROM product_media
+SELECT id, product_id, variant_id, cf_image_id, alt_text, position, media_type FROM product_media
 WHERE product_id = $1
 ORDER BY position
 `
@@ -479,7 +498,7 @@ func (q *Queries) ListProductMediaByProduct(ctx context.Context, productID uuid.
 			&i.ID,
 			&i.ProductID,
 			&i.VariantID,
-			&i.Url,
+			&i.CfImageID,
 			&i.AltText,
 			&i.Position,
 			&i.MediaType,

@@ -103,9 +103,11 @@ type Querier interface {
 	GetPriceSetByVariant(ctx context.Context, variantID uuid.UUID) (PriceSet, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySlug(ctx context.Context, slug string) (Product, error)
+	GetProductMediaByID(ctx context.Context, id uuid.UUID) (ProductMedium, error)
 	GetResetTokenByTokenHash(ctx context.Context, tokenHash string) (ResetToken, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (Session, error)
 	GetShipmentByID(ctx context.Context, id uuid.UUID) (Shipment, error)
+	GetShipmentLabelKey(ctx context.Context, id uuid.UUID) (*string, error)
 	GetShippingConfig(ctx context.Context) (ShippingConfig, error)
 	GetStaffByEmail(ctx context.Context, email string) (Staff, error)
 	GetStaffByID(ctx context.Context, id uuid.UUID) (Staff, error)
@@ -204,6 +206,7 @@ type Querier interface {
 	UpdateProductVisibility(ctx context.Context, arg UpdateProductVisibilityParams) (Product, error)
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	UpdateShipmentDelivered(ctx context.Context, id uuid.UUID) error
+	UpdateShipmentLabel(ctx context.Context, arg UpdateShipmentLabelParams) error
 	UpdateShipmentStatus(ctx context.Context, arg UpdateShipmentStatusParams) (Shipment, error)
 	UpdateShipmentTracking(ctx context.Context, arg UpdateShipmentTrackingParams) (Shipment, error)
 	UpdateShippingConfig(ctx context.Context, arg UpdateShippingConfigParams) error

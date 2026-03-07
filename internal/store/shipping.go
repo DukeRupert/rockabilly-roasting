@@ -147,6 +147,28 @@ func (s *ShippingStore) UpdateShipmentDelivered(ctx context.Context, tx pgx.Tx, 
 	return nil
 }
 
+// UpdateShipmentLabel sets the R2 key and format for a shipment's label.
+func (s *ShippingStore) UpdateShipmentLabel(ctx context.Context, tx pgx.Tx, id uuid.UUID, r2Key, format string) error {
+	err := sqlcgen.New(tx).UpdateShipmentLabel(ctx, sqlcgen.UpdateShipmentLabelParams{
+		ID:          id,
+		LabelR2Key:  &r2Key,
+		LabelFormat: &format,
+	})
+	if err != nil {
+		return fmt.Errorf("update shipment label: %w", err)
+	}
+	return nil
+}
+
+// GetShipmentLabelKey returns the R2 object key for a shipment's label.
+func (s *ShippingStore) GetShipmentLabelKey(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*string, error) {
+	key, err := sqlcgen.New(tx).GetShipmentLabelKey(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get shipment label key: %w", err)
+	}
+	return key, nil
+}
+
 // --- Row converters ---
 
 func shipmentFromRow(r sqlcgen.Shipment) *domain.Shipment {
@@ -170,5 +192,7 @@ func shipmentFromRow(r sqlcgen.Shipment) *domain.Shipment {
 		LabelCreatedAt: timestampFromPG(r.LabelCreatedAt),
 		ShippedAt:      timestampFromPG(r.ShippedAt),
 		DeliveredAt:    timestampFromPG(r.DeliveredAt),
+		LabelR2Key:     r.LabelR2Key,
+		LabelFormat:    r.LabelFormat,
 	}
 }

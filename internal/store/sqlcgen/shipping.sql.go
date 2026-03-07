@@ -17,7 +17,7 @@ INSERT INTO shipments (id, order_id, status, provider, tracking_number, label_ur
                        carrier_name, service_name, label_cost_cents, label_currency,
                        weight_oz, length_in, width_in, height_in, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-RETURNING id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at
+RETURNING id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at, label_r2_key, label_format
 `
 
 type CreateShipmentParams struct {
@@ -77,12 +77,14 @@ func (q *Queries) CreateShipment(ctx context.Context, arg CreateShipmentParams) 
 		&i.LabelCreatedAt,
 		&i.ShippedAt,
 		&i.DeliveredAt,
+		&i.LabelR2Key,
+		&i.LabelFormat,
 	)
 	return i, err
 }
 
 const getShipmentByID = `-- name: GetShipmentByID :one
-SELECT id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at FROM shipments WHERE id = $1
+SELECT id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at, label_r2_key, label_format FROM shipments WHERE id = $1
 `
 
 func (q *Queries) GetShipmentByID(ctx context.Context, id uuid.UUID) (Shipment, error) {
@@ -108,8 +110,21 @@ func (q *Queries) GetShipmentByID(ctx context.Context, id uuid.UUID) (Shipment, 
 		&i.LabelCreatedAt,
 		&i.ShippedAt,
 		&i.DeliveredAt,
+		&i.LabelR2Key,
+		&i.LabelFormat,
 	)
 	return i, err
+}
+
+const getShipmentLabelKey = `-- name: GetShipmentLabelKey :one
+SELECT label_r2_key FROM shipments WHERE id = $1
+`
+
+func (q *Queries) GetShipmentLabelKey(ctx context.Context, id uuid.UUID) (*string, error) {
+	row := q.db.QueryRow(ctx, getShipmentLabelKey, id)
+	var label_r2_key *string
+	err := row.Scan(&label_r2_key)
+	return label_r2_key, err
 }
 
 const getShippingConfig = `-- name: GetShippingConfig :one
@@ -124,7 +139,7 @@ func (q *Queries) GetShippingConfig(ctx context.Context) (ShippingConfig, error)
 }
 
 const listShipmentsByOrder = `-- name: ListShipmentsByOrder :many
-SELECT id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at FROM shipments
+SELECT id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at, label_r2_key, label_format FROM shipments
 WHERE order_id = $1
 ORDER BY created_at ASC
 `
@@ -158,6 +173,8 @@ func (q *Queries) ListShipmentsByOrder(ctx context.Context, orderID uuid.UUID) (
 			&i.LabelCreatedAt,
 			&i.ShippedAt,
 			&i.DeliveredAt,
+			&i.LabelR2Key,
+			&i.LabelFormat,
 		); err != nil {
 			return nil, err
 		}
@@ -180,11 +197,28 @@ func (q *Queries) UpdateShipmentDelivered(ctx context.Context, id uuid.UUID) err
 	return err
 }
 
+const updateShipmentLabel = `-- name: UpdateShipmentLabel :exec
+UPDATE shipments
+SET label_r2_key = $2, label_format = $3
+WHERE id = $1
+`
+
+type UpdateShipmentLabelParams struct {
+	ID          uuid.UUID `json:"id"`
+	LabelR2Key  *string   `json:"label_r2_key"`
+	LabelFormat *string   `json:"label_format"`
+}
+
+func (q *Queries) UpdateShipmentLabel(ctx context.Context, arg UpdateShipmentLabelParams) error {
+	_, err := q.db.Exec(ctx, updateShipmentLabel, arg.ID, arg.LabelR2Key, arg.LabelFormat)
+	return err
+}
+
 const updateShipmentStatus = `-- name: UpdateShipmentStatus :one
 UPDATE shipments
 SET status = $2
 WHERE id = $1
-RETURNING id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at
+RETURNING id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at, label_r2_key, label_format
 `
 
 type UpdateShipmentStatusParams struct {
@@ -215,6 +249,8 @@ func (q *Queries) UpdateShipmentStatus(ctx context.Context, arg UpdateShipmentSt
 		&i.LabelCreatedAt,
 		&i.ShippedAt,
 		&i.DeliveredAt,
+		&i.LabelR2Key,
+		&i.LabelFormat,
 	)
 	return i, err
 }
@@ -223,7 +259,7 @@ const updateShipmentTracking = `-- name: UpdateShipmentTracking :one
 UPDATE shipments
 SET tracking_number = $2, label_url = $3, label_created_at = now()
 WHERE id = $1
-RETURNING id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at
+RETURNING id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at, label_r2_key, label_format
 `
 
 type UpdateShipmentTrackingParams struct {
@@ -255,6 +291,8 @@ func (q *Queries) UpdateShipmentTracking(ctx context.Context, arg UpdateShipment
 		&i.LabelCreatedAt,
 		&i.ShippedAt,
 		&i.DeliveredAt,
+		&i.LabelR2Key,
+		&i.LabelFormat,
 	)
 	return i, err
 }

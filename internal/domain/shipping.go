@@ -53,4 +53,6 @@ type Shipment struct {
 	LabelCreatedAt *time.Time
 	ShippedAt      *time.Time
 	DeliveredAt    *time.Time
+	LabelR2Key     *string
+	LabelFormat    *string
 }

@@ -481,10 +481,12 @@ func (s *CatalogService) UpdateProductMediaPosition(ctx context.Context, tx pgx.
 	return nil
 }
 
-// DeleteProductMedia removes a product media item by ID.
-func (s *CatalogService) DeleteProductMedia(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
-	if err := s.catalog.DeleteProductMedia(ctx, tx, id); err != nil {
-		return fmt.Errorf("delete product media: %w", err)
+// DeleteProductMedia removes a product media item by ID and returns the
+// CF image ID for cleanup (e.g. enqueue a River job to delete from CF).
+func (s *CatalogService) DeleteProductMedia(ctx context.Context, tx pgx.Tx, id uuid.UUID) (string, error) {
+	cfImageID, err := s.catalog.DeleteProductMedia(ctx, tx, id)
+	if err != nil {
+		return "", fmt.Errorf("delete product media: %w", err)
 	}
-	return nil
+	return cfImageID, nil
 }

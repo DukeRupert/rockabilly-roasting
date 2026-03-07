@@ -97,6 +97,15 @@ func run() error {
 	mediaConfig := &media.Config{
 		CFImagesBaseURL: os.Getenv("CF_IMAGES_BASE_URL"),
 	}
+	r2Client, err := media.NewR2Client(ctx, media.R2Config{
+		AccountID:      os.Getenv("R2_ACCOUNT_ID"),
+		AccessKeyID:    os.Getenv("R2_ACCESS_KEY_ID"),
+		SecretAccessKey: os.Getenv("R2_SECRET_ACCESS_KEY"),
+		Bucket:         os.Getenv("R2_BUCKET"),
+	})
+	if err != nil {
+		return fmt.Errorf("create r2 client: %w", err)
+	}
 
 	// Stores
 	orderStore := store.NewOrderStore()
@@ -141,6 +150,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewOrderConfirmEmailWorker(orderStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
 	river.AddWorker(workers, jobs.NewSubscriptionConfirmEmailWorker(subscriptionStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
 	river.AddWorker(workers, jobs.NewCFImageDeleteWorker(cfImagesClient))
+	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
 
 	// River client — we create it first, then pass it to the scheduler worker
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
@@ -210,6 +220,7 @@ func run() error {
 		CustomerGroupStore: customerGroupStore,
 		RiverClient:        riverClient,
 		CFImagesClient:     cfImagesClient,
+		R2Client:           r2Client,
 		MediaConfig:        mediaConfig,
 	}
 

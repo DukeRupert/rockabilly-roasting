@@ -130,3 +130,13 @@ type CFImageDeleteArgs struct {
 
 // Kind returns the job kind identifier.
 func (CFImageDeleteArgs) Kind() string { return "cf_image_delete" }
+
+// StoreLabelToR2Args fetches a shipping label from the provider URL
+// and uploads it to R2 for permanent storage.
+type StoreLabelToR2Args struct {
+	ShipmentID uuid.UUID `json:"shipment_id"`
+	LabelURL   string    `json:"label_url"`
+}
+
+// Kind returns the job kind identifier.
+func (StoreLabelToR2Args) Kind() string { return "store_label_to_r2" }

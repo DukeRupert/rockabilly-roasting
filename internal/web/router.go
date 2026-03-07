@@ -42,6 +42,7 @@ type Deps struct {
 	CustomerGroupStore  *store.CustomerGroupStore
 	RiverClient         *river.Client[pgx.Tx]
 	CFImagesClient      *media.CFImagesClient
+	R2Client            *media.R2Client
 	MediaConfig         *media.Config
 }
 
@@ -212,8 +213,10 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/resume", deps.handleAdminSubscriptionResume)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/cancel", deps.handleAdminSubscriptionCancel)
 
-	// Admin fulfillment
+	// Admin fulfillment & shipping
 	adminMux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)
+	adminMux.HandleFunc("POST /admin/orders/{id}/label", deps.handleAdminShipmentLabelCreate)
+	adminMux.HandleFunc("GET /admin/shipments/{id}/label", deps.handleAdminShipmentLabelDownload)
 
 	// Admin discounts
 	adminMux.HandleFunc("GET /admin/discounts", deps.handleAdminDiscountList)

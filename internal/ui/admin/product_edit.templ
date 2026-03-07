@@ -280,6 +280,7 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 									hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID) }
 									hx-target="#variants-panel"
 									hx-swap="outerHTML"
+									hx-trigger="change from:find input"
 									class="flex items-center gap-1"
 								>
 									<span class="text-stone-400">$</span>
@@ -294,9 +295,6 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 										}
 										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
 									/>
-									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-hiri-teal hover:text-hiri-teal-dark">
-										Save
-									</button>
 								</form>
 							} else {
 								<form
@@ -305,6 +303,7 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 									hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/group-price", props.Product.ID, vwo.Variant.ID) }
 									hx-target="#variants-panel"
 									hx-swap="outerHTML"
+									hx-trigger="change from:find input[name=price]"
 									class="flex items-center gap-1"
 								>
 									<input type="hidden" name="group_id" value={ group.ID.String() }/>
@@ -320,9 +319,6 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 										}
 										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
 									/>
-									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-hiri-teal hover:text-hiri-teal-dark">
-										Save
-									</button>
 								</form>
 							}
 						</td>

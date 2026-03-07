@@ -20,6 +20,7 @@ type WholesaleCheckoutProps struct {
 	Items       []WholesaleCheckoutItem
 	Subtotal    int
 	Error       string
+	CartCount   int
 }
 
 templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
@@ -123,8 +124,9 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 
 templ WholesaleCheckoutPage(props WholesaleCheckoutProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:   "Review Order",
-		CartURL: "/wholesale/checkout",
+		Title:     "Review Order",
+		CartURL:   "/wholesale/checkout",
+		CartCount: props.CartCount,
 	}) {
 		@WholesaleCheckoutContent(props)
 	}

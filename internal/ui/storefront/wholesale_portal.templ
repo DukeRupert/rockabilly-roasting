@@ -27,6 +27,7 @@ type QuickOrderProduct struct {
 type WholesalePortalProps struct {
 	CompanyName string
 	Products    []QuickOrderProduct
+	CartCount   int
 }
 
 templ WholesalePortalContent(props WholesalePortalProps) {
@@ -160,8 +161,9 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 
 templ WholesalePortalPage(props WholesalePortalProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:   "Quick Order",
-		CartURL: "/wholesale/checkout",
+		Title:     "Quick Order",
+		CartURL:   "/wholesale/checkout",
+		CartCount: props.CartCount,
 	}) {
 		@WholesalePortalContent(props)
 	}

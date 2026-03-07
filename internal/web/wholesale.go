@@ -185,6 +185,7 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 	props := storefront.WholesalePortalProps{
 		CompanyName: companyName,
 		Products:    templateProducts,
+		CartCount:   d.cartItemCountFromCookie(r),
 	}
 
 	if IsHTMX(r) {
@@ -320,6 +321,7 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 		CompanyName: companyName,
 		Items:       checkoutItems,
 		Subtotal:    subtotal,
+		CartCount:   d.cartItemCountFromCookie(r),
 	}
 
 	if IsHTMX(r) {

@@ -43,6 +43,7 @@ type Product struct {
 	TaxonID       uuid.UUID
 	Subscribable  bool
 	Visibility    ProductVisibility
+	TaxExempt     bool
 	Metadata      map[string]any
 	AvailableOn   *time.Time
 	DiscontinueOn *time.Time

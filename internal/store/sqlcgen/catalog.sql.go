@@ -16,7 +16,7 @@ import (
 const createProduct = `-- name: CreateProduct :one
 INSERT INTO products (id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility, tax_exempt
 `
 
 type CreateProductParams struct {
@@ -61,6 +61,7 @@ func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (P
 		&i.UpdatedAt,
 		&i.Subscribable,
 		&i.Visibility,
+		&i.TaxExempt,
 	)
 	return i, err
 }
@@ -325,7 +326,7 @@ func (q *Queries) DeleteVariantOptionValuesByVariant(ctx context.Context, varian
 }
 
 const getProductByID = `-- name: GetProductByID :one
-SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility FROM products WHERE id = $1
+SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility, tax_exempt FROM products WHERE id = $1
 `
 
 func (q *Queries) GetProductByID(ctx context.Context, id uuid.UUID) (Product, error) {
@@ -346,12 +347,13 @@ func (q *Queries) GetProductByID(ctx context.Context, id uuid.UUID) (Product, er
 		&i.UpdatedAt,
 		&i.Subscribable,
 		&i.Visibility,
+		&i.TaxExempt,
 	)
 	return i, err
 }
 
 const getProductBySlug = `-- name: GetProductBySlug :one
-SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility FROM products WHERE slug = $1
+SELECT id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility, tax_exempt FROM products WHERE slug = $1
 `
 
 func (q *Queries) GetProductBySlug(ctx context.Context, slug string) (Product, error) {
@@ -372,6 +374,7 @@ func (q *Queries) GetProductBySlug(ctx context.Context, slug string) (Product, e
 		&i.UpdatedAt,
 		&i.Subscribable,
 		&i.Visibility,
+		&i.TaxExempt,
 	)
 	return i, err
 }
@@ -710,7 +713,7 @@ UPDATE products
 SET slug = $2, title = $3, description = $4, product_type_id = $5, taxon_id = $6,
     metadata = $7, available_on = $8, discontinue_on = $9, updated_at = now()
 WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility, tax_exempt
 `
 
 type UpdateProductParams struct {
@@ -753,6 +756,7 @@ func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (P
 		&i.UpdatedAt,
 		&i.Subscribable,
 		&i.Visibility,
+		&i.TaxExempt,
 	)
 	return i, err
 }
@@ -775,7 +779,7 @@ const updateProductStatus = `-- name: UpdateProductStatus :one
 UPDATE products
 SET status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility, tax_exempt
 `
 
 type UpdateProductStatusParams struct {
@@ -801,6 +805,7 @@ func (q *Queries) UpdateProductStatus(ctx context.Context, arg UpdateProductStat
 		&i.UpdatedAt,
 		&i.Subscribable,
 		&i.Visibility,
+		&i.TaxExempt,
 	)
 	return i, err
 }
@@ -809,7 +814,7 @@ const updateProductSubscribable = `-- name: UpdateProductSubscribable :one
 UPDATE products
 SET subscribable = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility, tax_exempt
 `
 
 type UpdateProductSubscribableParams struct {
@@ -835,6 +840,42 @@ func (q *Queries) UpdateProductSubscribable(ctx context.Context, arg UpdateProdu
 		&i.UpdatedAt,
 		&i.Subscribable,
 		&i.Visibility,
+		&i.TaxExempt,
+	)
+	return i, err
+}
+
+const updateProductTaxExempt = `-- name: UpdateProductTaxExempt :one
+UPDATE products
+SET tax_exempt = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility, tax_exempt
+`
+
+type UpdateProductTaxExemptParams struct {
+	ID        uuid.UUID `json:"id"`
+	TaxExempt bool      `json:"tax_exempt"`
+}
+
+func (q *Queries) UpdateProductTaxExempt(ctx context.Context, arg UpdateProductTaxExemptParams) (Product, error) {
+	row := q.db.QueryRow(ctx, updateProductTaxExempt, arg.ID, arg.TaxExempt)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.ProductTypeID,
+		&i.TaxonID,
+		&i.Metadata,
+		&i.AvailableOn,
+		&i.DiscontinueOn,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Subscribable,
+		&i.Visibility,
+		&i.TaxExempt,
 	)
 	return i, err
 }

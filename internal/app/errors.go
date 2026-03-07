@@ -62,6 +62,10 @@ var (
 	// Payment errors
 	ErrPaymentFailed = errors.New("payment failed")
 
+	// Tax errors
+	ErrTaxCalculationFailed = errors.New("tax calculation failed")
+	ErrInvalidTaxConfig     = errors.New("invalid tax configuration")
+
 	// Shipping errors
 	ErrShipmentNotFound = errors.New("shipment not found")
 

@@ -118,6 +118,7 @@ func run() error {
 	discountStore := store.NewDiscountStore()
 	pricingStore := store.NewPricingStore()
 	cartStore := store.NewCartStore()
+	settingsStore := store.NewSettingsStore()
 	_ = store.NewAuditStore()
 
 	// Services
@@ -127,7 +128,7 @@ func run() error {
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, labelProvider, auditWriter, metricsReg)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
-	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, paymentProvider, auditWriter, metricsReg)
+	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, paymentProvider, auditWriter, metricsReg)
 	pricingSvc := app.NewPricingService(pricingStore)
 	cartSvc := app.NewCartService(cartStore, pricingStore)
 	staffStore := store.NewStaffStore()
@@ -218,6 +219,7 @@ func run() error {
 		CustomerStore:   customerStore,
 		MagicLinkStore:     magicLinkStore,
 		CustomerGroupStore: customerGroupStore,
+		SettingsStore:      settingsStore,
 		RiverClient:        riverClient,
 		CFImagesClient:     cfImagesClient,
 		R2Client:           r2Client,

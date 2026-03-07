@@ -65,6 +65,8 @@ type checkoutPaymentIntentResponse struct {
 	ClientSecret string `json:"client_secret"`
 	Amount       int    `json:"amount"`
 	Currency     string `json:"currency"`
+	TaxTotal     int    `json:"tax_total"`
+	TaxLabel     string `json:"tax_label,omitempty"`
 }
 
 type checkoutConfirmRequest struct {
@@ -287,6 +289,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	}
 
 	var subtotal int
+	var taxTotal int
+	var taxLabel string
 	var shippingAddr *domain.Address
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -298,9 +302,42 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return app.ErrCartEmpty
 		}
 
-		for _, ci := range items {
-			subtotal += ci.UnitPrice * ci.Quantity
+		// Build subtotal and tax line items.
+		taxLineItems := make([]domain.TaxLineItem, len(items))
+		for i, ci := range items {
+			lineTotal := ci.UnitPrice * ci.Quantity
+			subtotal += lineTotal
+
+			// Look up product to check tax_exempt.
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
+			if vErr != nil {
+				return fmt.Errorf("get variant for tax: %w", vErr)
+			}
+			product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+			if pErr != nil {
+				return fmt.Errorf("get product for tax: %w", pErr)
+			}
+
+			taxLineItems[i] = domain.TaxLineItem{
+				LineIndex: i,
+				Subtotal:  lineTotal,
+				TaxExempt: product.TaxExempt,
+			}
 		}
+
+		// Resolve customer for tax exemption status.
+		customer, txErr := d.CustomerService.GetCustomer(ctx, tx, customerID)
+		if txErr != nil {
+			return fmt.Errorf("get customer for tax: %w", txErr)
+		}
+
+		isWholesale := customer.AccountType == domain.AccountTypeWholesale
+		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, isWholesale)
+		if txErr != nil {
+			return fmt.Errorf("calculate tax: %w", txErr)
+		}
+		taxTotal = taxResult.TaxTotal
+		taxLabel = taxResult.Label
 
 		shippingAddr, txErr = d.CustomerService.GetAddressByID(ctx, tx, addressID)
 		if txErr != nil {
@@ -320,7 +357,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Shipping: $0 for now
-	totalCents := subtotal
+	totalCents := subtotal + taxTotal
 
 	// Create Stripe PaymentIntent (external call — outside transaction)
 	pi, err := d.PaymentProvider.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
@@ -351,6 +388,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		ClientSecret: pi.ClientSecret,
 		Amount:       totalCents,
 		Currency:     "usd",
+		TaxTotal:     taxTotal,
+		TaxLabel:     taxLabel,
 	})
 }
 
@@ -405,12 +444,40 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 		}
 
 		orderItems := make([]app.CartItem, len(items))
+		taxLineItems := make([]domain.TaxLineItem, len(items))
 		for i, ci := range items {
 			orderItems[i] = app.CartItem{
 				VariantID: ci.VariantID,
 				Quantity:  ci.Quantity,
 				UnitPrice: ci.UnitPrice,
 			}
+			lineTotal := ci.UnitPrice * ci.Quantity
+
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
+			if vErr != nil {
+				return fmt.Errorf("get variant for tax: %w", vErr)
+			}
+			product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+			if pErr != nil {
+				return fmt.Errorf("get product for tax: %w", pErr)
+			}
+
+			taxLineItems[i] = domain.TaxLineItem{
+				LineIndex: i,
+				Subtotal:  lineTotal,
+				TaxExempt: product.TaxExempt,
+			}
+		}
+
+		customer, txErr := d.CustomerService.GetCustomer(ctx, tx, customerID)
+		if txErr != nil {
+			return fmt.Errorf("get customer for tax: %w", txErr)
+		}
+		isWholesale := customer.AccountType == domain.AccountTypeWholesale
+
+		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, isWholesale)
+		if txErr != nil {
+			return fmt.Errorf("calculate tax: %w", txErr)
 		}
 
 		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
@@ -420,7 +487,7 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 			BillingAddressID:  addressID,
 			CurrencyCode:      "USD",
 			ShippingCents:     0,
-			TaxCents:          0, // TODO: pull from Stripe automatic tax
+			TaxCents:          taxResult.TaxTotal,
 		}, app.Actor{
 			Type: "customer",
 			ID:   &customerID,

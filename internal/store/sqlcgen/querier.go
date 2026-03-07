@@ -113,6 +113,7 @@ type Querier interface {
 	GetStaffByID(ctx context.Context, id uuid.UUID) (Staff, error)
 	GetStockLevelByInventoryAndLocation(ctx context.Context, arg GetStockLevelByInventoryAndLocationParams) (StockLevel, error)
 	GetStockLocationByID(ctx context.Context, id uuid.UUID) (StockLocation, error)
+	GetStoreSettings(ctx context.Context) (StoreSetting, error)
 	GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscription, error)
 	GetSubscriptionByIDAndCustomer(ctx context.Context, arg GetSubscriptionByIDAndCustomerParams) (Subscription, error)
 	GetSubscriptionPlanByID(ctx context.Context, id uuid.UUID) (SubscriptionPlan, error)
@@ -203,6 +204,7 @@ type Querier interface {
 	UpdateProductMediaPosition(ctx context.Context, arg UpdateProductMediaPositionParams) error
 	UpdateProductStatus(ctx context.Context, arg UpdateProductStatusParams) (Product, error)
 	UpdateProductSubscribable(ctx context.Context, arg UpdateProductSubscribableParams) (Product, error)
+	UpdateProductTaxExempt(ctx context.Context, arg UpdateProductTaxExemptParams) (Product, error)
 	UpdateProductVisibility(ctx context.Context, arg UpdateProductVisibilityParams) (Product, error)
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	UpdateShipmentDelivered(ctx context.Context, id uuid.UUID) error
@@ -219,6 +221,7 @@ type Querier interface {
 	UpdateSubscriptionPlanActive(ctx context.Context, arg UpdateSubscriptionPlanActiveParams) error
 	UpdateSubscriptionPlanDiscount(ctx context.Context, arg UpdateSubscriptionPlanDiscountParams) error
 	UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscriptionStatusParams) (Subscription, error)
+	UpdateTaxConfig(ctx context.Context, arg UpdateTaxConfigParams) (StoreSetting, error)
 	UpdateTaxon(ctx context.Context, arg UpdateTaxonParams) (Taxon, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (Variant, error)
 	UpdateVariantWholesale(ctx context.Context, arg UpdateVariantWholesaleParams) (Variant, error)

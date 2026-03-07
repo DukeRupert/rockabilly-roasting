@@ -40,6 +40,7 @@ type Deps struct {
 	CustomerStore       *store.CustomerStore
 	MagicLinkStore      *store.MagicLinkStore
 	CustomerGroupStore  *store.CustomerGroupStore
+	SettingsStore       *store.SettingsStore
 	RiverClient         *river.Client[pgx.Tx]
 	CFImagesClient      *media.CFImagesClient
 	R2Client            *media.R2Client

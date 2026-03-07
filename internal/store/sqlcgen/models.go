@@ -311,6 +311,7 @@ type Product struct {
 	UpdatedAt     time.Time          `json:"updated_at"`
 	Subscribable  bool               `json:"subscribable"`
 	Visibility    string             `json:"visibility"`
+	TaxExempt     bool               `json:"tax_exempt"`
 }
 
 type ProductGroupVisibility struct {
@@ -419,6 +420,15 @@ type StockLocation struct {
 	Name      string     `json:"name"`
 	AddressID *uuid.UUID `json:"address_id"`
 	IsActive  bool       `json:"is_active"`
+}
+
+type StoreSetting struct {
+	ID        bool           `json:"id"`
+	TaxMode   string         `json:"tax_mode"`
+	TaxRate   pgtype.Numeric `json:"tax_rate"`
+	TaxLabel  *string        `json:"tax_label"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 }
 
 type Subscription struct {

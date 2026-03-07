@@ -13,14 +13,16 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
+	"github.com/dukerupert/hiri/internal/platform/tax"
 	"github.com/dukerupert/hiri/internal/store"
 )
 
 // CheckoutService orchestrates the checkout flow: cart validation, payment, and order creation.
 type CheckoutService struct {
-	orders   *store.OrderStore
+	orders    *store.OrderStore
 	customers *store.CustomerStore
 	discounts *store.DiscountStore
+	settings  *store.SettingsStore
 	payments  payments.Provider
 	audit     *audit.AuditWriter
 	metrics   *metrics.Registry
@@ -31,6 +33,7 @@ func NewCheckoutService(
 	orders *store.OrderStore,
 	customers *store.CustomerStore,
 	discounts *store.DiscountStore,
+	settings *store.SettingsStore,
 	payments payments.Provider,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
@@ -39,10 +42,47 @@ func NewCheckoutService(
 		orders:    orders,
 		customers: customers,
 		discounts: discounts,
+		settings:  settings,
 		payments:  payments,
 		audit:     audit,
 		metrics:   metrics,
 	}
+}
+
+// taxCalculatorForConfig returns the appropriate TaxCalculator for the given config and customer type.
+// B2B (wholesale) always gets NoneCalculator regardless of store config.
+func taxCalculatorForConfig(cfg *domain.TaxConfig, isWholesale bool) tax.TaxCalculator {
+	if isWholesale {
+		return &tax.NoneCalculator{}
+	}
+	switch cfg.Mode {
+	case domain.TaxModeFlatRate:
+		return &tax.FlatRateCalculator{Rate: cfg.Rate, Label: cfg.Label}
+	case domain.TaxModeStripeTax:
+		// Stripe Tax not yet implemented — fall back to none.
+		return &tax.NoneCalculator{}
+	default:
+		return &tax.NoneCalculator{}
+	}
+}
+
+// CalculateTax computes tax for the given line items using the store's tax configuration.
+func (s *CheckoutService) CalculateTax(ctx context.Context, tx pgx.Tx, items []domain.TaxLineItem, customerExempt, isWholesale bool) (*domain.TaxResult, error) {
+	cfg, err := s.settings.GetTaxConfig(ctx, tx)
+	if err != nil {
+		return nil, fmt.Errorf("get tax config: %w", err)
+	}
+
+	calculator := taxCalculatorForConfig(cfg, isWholesale)
+	result, err := calculator.Calculate(ctx, tax.TaxOrder{
+		CustomerExempt: customerExempt,
+		LineItems:      items,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("calculate tax: %w", err)
+	}
+
+	return &result, nil
 }
 
 // CartItem represents an item in the checkout cart with pre-resolved pricing.

@@ -1,267 +1,202 @@
 # Lean Commerce — Tax
 
-Tax calculation is handled by Stripe Tax for standard customers. Tax-exempt customers (B2B resellers, nonprofits, government entities) are marked exempt by staff after offline verification — no certificate workflow, no customer-facing exemption process.
+Tax calculation supports three modes configured at the store level: flat rate, Stripe Tax, or no tax. The mode is set once in `store_settings` and applies to all B2C orders. B2B (wholesale) orders always skip tax regardless of the store's tax mode.
 
 ---
 
-## Scope
+## Tax modes
 
-**In scope:**
-- Tax calculation at checkout via Stripe Tax
-- Tax-exempt customers (admin-controlled, all-or-nothing)
-- Tax display on invoices and order history
-- Audit trail for exemption grant and revocation
+| Mode | Description | Use case |
+|------|-------------|----------|
+| `flat_rate` | Fixed percentage applied to taxable line items | Single-jurisdiction merchants (e.g., WA-only) |
+| `stripe_tax` | Stripe calculates based on buyer address + product codes | Multi-state / nexus-tracking merchants |
+| `none` | No tax calculated | B2B-only merchants, tax-exempt businesses |
 
-**Out of scope:**
-- Exemption certificate storage
-- Certificate expiry tracking
-- Per-state exemption rules
-- Customer-facing exemption workflow
-- Tax reporting and remittance (handled in Stripe dashboard)
-
-Geographic scope: US only.
-
----
-
-## The two paths through checkout
-
-Every order takes exactly one tax path, determined before the Stripe PaymentIntent is created:
-
-```
-Is the customer tax exempt?
-    │
-    ├── Yes → disable Stripe Tax on PaymentIntent
-    │          tax_total = 0
-    │          copy tax_exempt_reason onto order
-    │
-    └── No  → enable Stripe Tax on PaymentIntent
-               Stripe calculates tax based on buyer address + product codes
-               tax_total = amount returned by Stripe on payment confirmation
-               stripe_tax_id stored for reconciliation
-```
-
-The decision is made once and frozen on the order. A subsequent change to the customer's exemption status does not alter past orders.
+**Rockabilly Roasting:** `flat_rate` at 8.75% (WA Sales Tax) for B2C, no tax on B2B.
 
 ---
 
 ## Schema
 
-### Customer additions
+### Store-level configuration
 
 ```sql
-ALTER TABLE customers
-    ADD COLUMN tax_exempt        bool NOT NULL DEFAULT false,
-    ADD COLUMN tax_exempt_reason text;
+CREATE TABLE store_settings (
+    id         bool PRIMARY KEY DEFAULT true CHECK (id = true),  -- singleton
+    tax_mode   text NOT NULL DEFAULT 'none'
+                   CHECK (tax_mode IN ('stripe_tax', 'flat_rate', 'none')),
+    tax_rate   numeric(6,4),    -- e.g. 0.0875 for 8.75%; null unless flat_rate
+    tax_label  text,            -- e.g. "WA Sales Tax"; shown at checkout
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
 ```
 
-`tax_exempt_reason` is freeform text set by the admin at the time of granting exemption. Examples: "Reseller certificate on file", "501(c)(3) nonprofit", "Government entity". Not an enum — the admin records whatever is accurate for the relationship.
+`tax_rate` is stored as a decimal fraction (0.0875, not 8.75). Arithmetic is cleaner and unambiguous.
 
-### Order additions
+### Product-level tax exemption
 
 ```sql
-ALTER TABLE orders
-    ADD COLUMN tax_total         int  NOT NULL DEFAULT 0,  -- cents
-    ADD COLUMN tax_exempt        bool NOT NULL DEFAULT false,
-    ADD COLUMN tax_exempt_reason text,
-    ADD COLUMN stripe_tax_id     text;
+ALTER TABLE products ADD COLUMN tax_exempt bool NOT NULL DEFAULT false;
 ```
 
-| Column | Exempt order | Non-exempt order |
-|---|---|---|
-| `tax_total` | `0` | Stripe-calculated amount in cents |
-| `tax_exempt` | `true` | `false` |
-| `tax_exempt_reason` | Copied from customer at order time | `null` |
-| `stripe_tax_id` | `null` | Stripe tax calculation ID |
+Some products are non-taxable (e.g., food items for home consumption in WA). The `tax_exempt` flag on products is checked during tax calculation — exempt products contribute $0 tax regardless of the rate.
 
-`tax_exempt_reason` is copied from the customer record onto the order at the time of purchase. This makes the order self-contained — if the exemption reason is later updated or revoked, the order still reflects why it was exempt when placed.
+### Customer additions (pre-existing)
+
+```sql
+-- Already on customers table
+tax_exempt        bool NOT NULL DEFAULT false
+tax_exempt_reason text
+```
+
+### Order additions (pre-existing)
+
+```sql
+-- Already on orders table
+tax_total         int  NOT NULL DEFAULT 0   -- cents
+tax_exempt        bool NOT NULL DEFAULT false
+tax_exempt_reason text
+stripe_tax_id     text
+```
 
 ---
 
 ## Domain types
 
 ```go
-// domain/customer.go — additions
-type Customer struct {
-    // ... existing fields ...
-    TaxExempt       bool
-    TaxExemptReason *string  // nil if not exempt
+// domain/tax.go
+
+type TaxMode string
+const (
+    TaxModeStripeTax TaxMode = "stripe_tax"
+    TaxModeFlatRate  TaxMode = "flat_rate"
+    TaxModeNone      TaxMode = "none"
+)
+
+type TaxConfig struct {
+    Mode  TaxMode
+    Rate  float64  // decimal fraction, e.g. 0.0875
+    Label string   // e.g. "WA Sales Tax"
 }
 
-// domain/order.go — additions
-type Order struct {
-    // ... existing fields ...
-    TaxTotal        int      // cents; 0 for exempt orders
-    TaxExempt       bool
-    TaxExemptReason *string  // copied from customer at order time; nil if not exempt
-    StripeTaxID     *string  // nil for exempt orders; Stripe reference for reconciliation
+type TaxLineItem struct {
+    LineIndex int
+    Subtotal  int   // cents
+    TaxExempt bool  // from product.tax_exempt
+}
+
+type TaxResult struct {
+    TaxTotal  int
+    Label     string
+    Breakdown []TaxLineBreakdown
 }
 ```
 
+`CalculateFlatRateTax` is a pure function in the domain package — no DB, no external calls. Takes line items, rate, customer exemption status, and label. Returns a deterministic `TaxResult`. Fully unit tested.
+
 ---
 
-## Stripe Tax integration
+## TaxCalculator interface
 
-Stripe Tax is configured in the Stripe dashboard — merchant address, automatic tax enabled, product tax codes assigned to catalog items. No tax rate management lives in the application codebase.
+```go
+// platform/tax/tax.go
 
-### PaymentIntent creation
+type TaxCalculator interface {
+    Calculate(ctx context.Context, order TaxOrder) (domain.TaxResult, error)
+}
+```
 
-The Go backend creates the PaymentIntent with `automatic_tax` enabled or disabled based on the customer's exemption status:
+Three implementations:
+- `FlatRateCalculator` — delegates to `domain.CalculateFlatRateTax`
+- `NoneCalculator` — returns zero tax
+- `StripeTaxCalculator` — stub (returns `NoneCalculator` behavior until implemented)
+
+### Calculator selection
 
 ```go
 // app/checkout.go
 
-func (s *CheckoutService) CreatePaymentIntent(
-    ctx     context.Context,
-    tx      pgx.Tx,
-    cart    *domain.Cart,
-    customer *domain.Customer,
-) (*stripe.PaymentIntent, error) {
-
-    params := &stripe.PaymentIntentParams{
-        Amount:   stripe.Int64(int64(cart.Subtotal + cart.ShippingTotal)),
-        Currency: stripe.String(cart.Currency),
+func taxCalculatorForConfig(cfg *domain.TaxConfig, isWholesale bool) tax.TaxCalculator {
+    if isWholesale {
+        return &tax.NoneCalculator{}
     }
-
-    if customer.TaxExempt {
-        params.AutomaticTaxParams = &stripe.PaymentIntentAutomaticTaxParams{
-            Enabled: stripe.Bool(false),
-        }
-    } else {
-        params.AutomaticTaxParams = &stripe.PaymentIntentAutomaticTaxParams{
-            Enabled: stripe.Bool(true),
-        }
+    switch cfg.Mode {
+    case domain.TaxModeFlatRate:
+        return &tax.FlatRateCalculator{Rate: cfg.Rate, Label: cfg.Label}
+    case domain.TaxModeStripeTax:
+        return &tax.NoneCalculator{} // stub
+    default:
+        return &tax.NoneCalculator{}
     }
-
-    return paymentintent.New(params)
 }
 ```
 
-### Order finalization
+**Key rule:** wholesale always gets `NoneCalculator` regardless of store config.
 
-The `payment_intent.succeeded` webhook triggers order finalization. The PaymentIntent returned by Stripe includes the final tax amount when Stripe Tax is enabled. The order is created with that amount frozen:
+---
 
-```go
-// app/orders.go — called from the webhook River worker
+## Checkout flow
 
-func (s *OrderService) FinalizeFromPayment(
-    ctx      context.Context,
-    tx       pgx.Tx,
-    cart     *domain.Cart,
-    customer *domain.Customer,
-    pi       *stripe.PaymentIntent,
-) (*domain.Order, error) {
+Tax is calculated at two points:
 
-    taxTotal := 0
-    var stripeTaxID *string
+1. **Payment intent creation** — tax total is included in the Stripe charge amount and returned to the frontend for display
+2. **Order confirmation** — tax is recalculated and stored on the order record
 
-    if !customer.TaxExempt && pi.AutomaticTax != nil {
-        taxTotal = int(pi.AutomaticTax.Amount)
-        stripeTaxID = &pi.AutomaticTax.TaxCalculation
-    }
+Tax is calculated after discounts — the taxable amount is the discounted subtotal per line item, not the original price.
 
-    return s.orders.Create(ctx, tx, store.CreateOrderParams{
-        CustomerID:      customer.ID,
-        Subtotal:        cart.Subtotal,
-        ShippingTotal:   cart.ShippingTotal,
-        TaxTotal:        taxTotal,
-        Total:           cart.Subtotal + cart.ShippingTotal + taxTotal,
-        TaxExempt:       customer.TaxExempt,
-        TaxExemptReason: customer.TaxExemptReason,
-        StripeTaxID:     stripeTaxID,
-    })
+### Payment intent response
+
+```json
+{
+    "client_secret": "pi_..._secret_...",
+    "amount": 4459,
+    "currency": "usd",
+    "tax_total": 324,
+    "tax_label": "WA Sales Tax"
 }
 ```
 
-The `Total` on the order is always `Subtotal + ShippingTotal + TaxTotal`. For exempt customers this simplifies to `Subtotal + ShippingTotal` since `TaxTotal = 0`.
+The frontend displays the tax line only when `tax_total > 0`.
+
+### Tax display at checkout
+
+```
+Subtotal          $36.00
+Discount          -$3.60    (if applicable)
+Shipping           $8.95
+WA Sales Tax       $3.24    (only when tax_total > 0)
+─────────────────────────
+Total             $44.59
+```
+
+B2B checkout shows no tax line — wholesale buyers expect this.
 
 ---
 
 ## Tax exemption management
 
-### Granting exemption
+### Customer-level exemption
 
-Staff navigates to a customer record in the admin and sets `tax_exempt = true` with a reason. This is a direct admin action — no customer request flow, no certificate upload.
+Staff navigates to a customer record in the admin and sets `tax_exempt = true` with a reason. This is a direct admin action — no customer request flow, no certificate upload. When a tax-exempt customer checks out, the tax calculator returns $0 regardless of line items.
 
-The service method:
+### Product-level exemption
 
-```go
-// app/customers.go
+Staff sets `tax_exempt = true` on individual products via the admin product form. Tax-exempt products contribute $0 tax in any cart, even for non-exempt customers.
 
-func (s *CustomerService) GrantTaxExemption(
-    ctx    context.Context,
-    tx     pgx.Tx,
-    id     uuid.UUID,
-    reason string,
-    actor  domain.StaffActor,
-) (*domain.Customer, error) {
+### Exemption priority
 
-    updated, err := s.customers.SetTaxExempt(ctx, tx, id, true, reason)
-    if err != nil { return nil, err }
-
-    s.audit.Record(ctx, tx, audit.AuditEntry{
-        ActorType:    audit.ActorStaff,
-        ActorID:      &actor.ID,
-        ActorName:    actor.Name,
-        Action:       audit.AuditCustomerTaxExemptionGranted,
-        ResourceType: "customer",
-        ResourceID:   id,
-        After:        updated,
-        Reason:       reason,
-    })
-
-    return updated, nil
-}
-```
-
-### Revoking exemption
-
-```go
-func (s *CustomerService) RevokeTaxExemption(
-    ctx   context.Context,
-    tx    pgx.Tx,
-    id    uuid.UUID,
-    reason string,
-    actor domain.StaffActor,
-) (*domain.Customer, error) {
-
-    updated, err := s.customers.SetTaxExempt(ctx, tx, id, false, "")
-    if err != nil { return nil, err }
-
-    s.audit.Record(ctx, tx, audit.AuditEntry{
-        ActorType:    audit.ActorStaff,
-        ActorID:      &actor.ID,
-        ActorName:    actor.Name,
-        Action:       audit.AuditCustomerTaxExemptionRevoked,
-        ResourceType: "customer",
-        ResourceID:   id,
-        After:        updated,
-        Reason:       reason,
-    })
-
-    return updated, nil
-}
-```
-
-The `reason` parameter on revocation records the staff member's explanation — "certificate expired", "customer relationship ended", etc. This goes into the audit entry `reason` field, not into `tax_exempt_reason` (which is cleared on revocation).
-
-### Audit actions
-
-Add to `platform/audit/actions.go`:
-
-```go
-AuditCustomerTaxExemptionGranted = "customer.tax_exemption_granted"
-AuditCustomerTaxExemptionRevoked = "customer.tax_exemption_revoked"
-```
-
-Both are audited staff actions — `GrantTaxExemption` and `RevokeTaxExemption` each write an audit record inside the same transaction as the customer update.
+1. **Customer exempt** → all items $0 tax (short-circuits entirely)
+2. **Product exempt** → that line item $0 tax, other items taxed normally
+3. **B2B (wholesale)** → all items $0 tax (enforced at calculator selection)
 
 ---
 
 ## Invoice display
 
-Every order displays a tax line. The line is never omitted — its presence or absence is not determined by whether tax is zero.
+The `tax_label` is stored on the order as a snapshot — it's what appears on receipts and invoices. If the store later changes their tax label, historical orders still show the correct label at time of purchase.
 
-**Exempt customer:**
+**Tax-exempt customer:**
 ```
 Subtotal         $450.00
 Shipping           $12.00
@@ -270,29 +205,20 @@ Tax                 $0.00   Tax exempt — Reseller certificate on file
 Total            $462.00
 ```
 
-**Standard customer:**
+**Standard customer (flat rate):**
 ```
 Subtotal         $450.00
 Shipping           $12.00
-Tax                $36.00
+WA Sales Tax       $39.38
 ────────────────────────────────────────
-Total            $498.00
+Total            $501.38
 ```
-
-The parenthetical text on exempt orders comes from `order.tax_exempt_reason`. If `tax_exempt_reason` is null on an exempt order (edge case: reason was not recorded at time of grant), display "Tax exempt" without further detail.
-
-Non-exempt orders display the tax amount only — no jurisdiction breakdown on the invoice. The full breakdown is available in the Stripe dashboard via `stripe_tax_id` for merchants who need it.
 
 ---
 
 ## What this design defers
 
-These are deliberate exclusions, all addable later without breaking changes to the current schema:
-
-**Per-state exemption** — the current design is all-or-nothing. Per-state exemption would add a `customer_tax_exemptions` table with `(customer_id, state_code, exempt_reason)` and change the checkout path to look up exemption by the buyer's shipping state. The `tax_exempt` boolean on `customers` would be retired or repurposed as a global override.
-
-**Certificate storage** — add a `tax_exempt_certificate_url` column to `customers` pointing to a file in object storage. The upload workflow is an admin action. No changes to checkout logic.
-
-**Certificate expiry** — add `tax_exempt_expires_at` to `customers`. A scheduled River job checks for upcoming expirations and notifies staff. Expired exemptions are not automatically revoked — staff confirms and revokes manually.
-
-**Customer-facing exemption request** — add a customer-submitted request flow: customer submits certificate, River job notifies staff, staff reviews and grants or denies. The grant path is the same `GrantTaxExemption` service method.
+- **Stripe Tax implementation** — the `StripeTaxCalculator` is a stub. When a merchant needs address-based calculation, implement `Calculate()` to call the Stripe Tax API. Nothing else in checkout changes.
+- **Per-line tax display** — `TaxResult.Breakdown` captures per-line tax amounts but the UI currently shows only the total. Line-level display can be added without backend changes.
+- **Tax on shipping** — currently only line item subtotals are taxed. If shipping needs to be taxed, add a shipping line item to the tax calculation input.
+- **Certificate storage / expiry** — addable without schema changes to tax calculation.

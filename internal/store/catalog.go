@@ -181,6 +181,18 @@ func (s *CatalogStore) ListProductGroupVisibility(ctx context.Context, tx pgx.Tx
 	return ids, nil
 }
 
+// UpdateProductTaxExempt updates whether a product is tax exempt.
+func (s *CatalogStore) UpdateProductTaxExempt(ctx context.Context, tx pgx.Tx, id uuid.UUID, taxExempt bool) (*domain.Product, error) {
+	row, err := sqlcgen.New(tx).UpdateProductTaxExempt(ctx, sqlcgen.UpdateProductTaxExemptParams{
+		ID:        id,
+		TaxExempt: taxExempt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update product tax exempt: %w", err)
+	}
+	return productFromRow(row), nil
+}
+
 // DeleteProduct removes a product by ID.
 func (s *CatalogStore) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if err := sqlcgen.New(tx).DeleteProduct(ctx, id); err != nil {
@@ -208,7 +220,7 @@ type ProductFilter struct {
 // ListProducts returns products matching the given filter (hand-written for dynamic WHERE).
 func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFilter) ([]domain.Product, error) {
 	query := `SELECT id, slug, title, description, status, product_type_id, taxon_id,
-	                 subscribable, visibility, metadata, available_on, discontinue_on,
+	                 subscribable, visibility, tax_exempt, metadata, available_on, discontinue_on,
 	                 created_at, updated_at
 	          FROM products WHERE true`
 	args := []any{}
@@ -279,7 +291,7 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 		var availableOn, discontinueOn pgtype.Timestamptz
 		if err := rows.Scan(
 			&p.ID, &p.Slug, &p.Title, &p.Description, &status, &productTypeID, &taxonID,
-			&p.Subscribable, &visibility, &metadata, &availableOn, &discontinueOn, &p.CreatedAt, &p.UpdatedAt,
+			&p.Subscribable, &visibility, &p.TaxExempt, &metadata, &availableOn, &discontinueOn, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan product: %w", err)
 		}
@@ -728,6 +740,7 @@ func productFromRow(r sqlcgen.Product) *domain.Product {
 		TaxonID:       taxonID,
 		Subscribable:  r.Subscribable,
 		Visibility:    domain.ProductVisibility(r.Visibility),
+		TaxExempt:     r.TaxExempt,
 		Metadata:      metadataFromJSON(r.Metadata),
 		AvailableOn:   timestampFromPG(r.AvailableOn),
 		DiscontinueOn: timestampFromPG(r.DiscontinueOn),

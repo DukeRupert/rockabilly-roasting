@@ -28,6 +28,12 @@ SET subscribable = $2, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateProductTaxExempt :one
+UPDATE products
+SET tax_exempt = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: DeleteProduct :exec
 DELETE FROM products WHERE id = $1;
 

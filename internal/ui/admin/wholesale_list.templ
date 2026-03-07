@@ -98,18 +98,20 @@ templ WholesaleListContent(props WholesaleListProps) {
 									}
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-									<div class="flex items-center justify-end gap-2">
+									<div class="flex items-center justify-end gap-3">
 										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
-											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)) }>
-												<button type="submit" class="text-green-600 hover:text-green-900">Approve</button>
-											</form>
-											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
-												<button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Decline this application?')">Decline</button>
-											</form>
+											<span class="isolate inline-flex rounded-md shadow-xs">
+												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)) }>
+													<button type="submit" class="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-green-700 inset-ring-1 inset-ring-gray-300 hover:bg-green-50 focus:z-10">Approve</button>
+												</form>
+												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
+													<button type="submit" class="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-red-700 inset-ring-1 inset-ring-gray-300 hover:bg-red-50 focus:z-10" onclick="return confirm('Decline this application?')">Decline</button>
+												</form>
+											</span>
 										}
 										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
 											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
-												<button type="submit" class="text-red-600 hover:text-red-900" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
+												<button type="submit" class="relative inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 inset-ring-1 inset-ring-gray-300 hover:bg-red-50 focus:z-10" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
 											</form>
 										}
 										<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-hiri-teal hover:text-hiri-teal-dark">

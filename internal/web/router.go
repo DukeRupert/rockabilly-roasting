@@ -114,7 +114,7 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin routes — all require staff session
 	adminMux := http.NewServeMux()
-	adminMux.HandleFunc("GET /admin", deps.handleAdminDashboard)
+	adminMux.HandleFunc("GET /admin/", deps.handleAdminDashboard)
 
 	// Admin catalog — categories
 	adminMux.HandleFunc("GET /admin/categories", deps.handleAdminCategoryList)
@@ -196,6 +196,9 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Mount admin mux behind session middleware
 	mux.Handle("/admin/", deps.requireStaffSession(adminMux))
+	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
+	})
 	mux.Handle("/auth/staff/logout", deps.requireStaffSession(adminMux))
 
 	// Webhooks

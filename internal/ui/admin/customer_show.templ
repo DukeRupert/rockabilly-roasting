@@ -17,13 +17,51 @@ templ CustomerShowContent(props CustomerShowProps) {
 	<!-- Header -->
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
-			<h1 class="text-base/7 font-semibold text-stone-900">{ props.Customer.FirstName } { props.Customer.LastName }</h1>
+			<div class="flex items-center gap-3">
+				<h1 class="text-base/7 font-semibold text-stone-900">{ props.Customer.FirstName } { props.Customer.LastName }</h1>
+				if props.Customer.AccountType == domain.AccountTypeWholesale {
+					<span class="inline-flex items-center rounded-md bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20">B2B</span>
+				} else {
+					<span class="inline-flex items-center rounded-md bg-stone-50 px-2 py-1 text-xs font-medium text-stone-600 ring-1 ring-inset ring-stone-500/10">B2C</span>
+				}
+			</div>
 			<p class="mt-1 text-sm text-stone-500">{ props.Customer.Email }</p>
+			if props.Customer.CompanyName != nil && *props.Customer.CompanyName != "" {
+				<p class="text-sm text-stone-500">{ *props.Customer.CompanyName }</p>
+			}
 		</div>
 		<div class="mt-4 sm:mt-0">
 			<a href="/admin/customers" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Back to customers</a>
 		</div>
 	</div>
+	<!-- Wholesale status banner -->
+	if props.Customer.AccountType == domain.AccountTypeWholesale && props.Customer.WholesaleStatus != nil {
+		<div class="mt-4 rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
+			<div class="sm:flex sm:items-center sm:justify-between">
+				<div class="flex items-center gap-3">
+					<h3 class="text-sm font-medium text-stone-900">Wholesale application</h3>
+					@WholesaleStatusBadge(*props.Customer.WholesaleStatus)
+				</div>
+				<div class="mt-3 sm:mt-0">
+					if *props.Customer.WholesaleStatus == domain.WholesaleStatusPending {
+						<span class="isolate inline-flex rounded-md shadow-xs">
+							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", props.Customer.ID)) }>
+								<button type="submit" class="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-green-700 inset-ring-1 inset-ring-gray-300 hover:bg-green-50 focus:z-10">Approve</button>
+							</form>
+							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", props.Customer.ID)) }>
+								<button type="submit" class="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-red-700 inset-ring-1 inset-ring-gray-300 hover:bg-red-50 focus:z-10" onclick="return confirm('Decline this application?')">Decline</button>
+							</form>
+						</span>
+					}
+					if *props.Customer.WholesaleStatus == domain.WholesaleStatusApproved {
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", props.Customer.ID)) }>
+							<button type="submit" class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 inset-ring-1 inset-ring-gray-300 hover:bg-red-50 focus:z-10" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
+						</form>
+					}
+				</div>
+			</div>
+		</div>
+	}
 	<!-- Info cards -->
 	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
 		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">

@@ -2,7 +2,6 @@
   import { getCart, type CartResponse } from './lib/api';
   import Information from './steps/Information.svelte';
   import Payment from './steps/Payment.svelte';
-  import Confirmation from './steps/Confirmation.svelte';
   import { formatCents } from './lib/format';
 
   interface Props {
@@ -12,7 +11,7 @@
 
   let { cartId, stripeKey }: Props = $props();
 
-  type Step = 'information' | 'payment' | 'confirmation';
+  type Step = 'information' | 'payment';
 
   let step = $state<Step>('information');
   let cart = $state<CartResponse | null>(null);
@@ -22,13 +21,10 @@
   // Checkout state carried between steps
   let customerId = $state('');
   let addressId = $state('');
-  let orderNumber = $state('');
-  let orderId = $state('');
 
   const steps: { key: Step; label: string }[] = [
     { key: 'information', label: 'Information' },
     { key: 'payment', label: 'Payment' },
-    { key: 'confirmation', label: 'Confirmation' },
   ];
 
   let currentStepIndex = $derived(steps.findIndex((s) => s.key === step));
@@ -58,11 +54,6 @@
     step = 'payment';
   }
 
-  function handlePaymentComplete(e: { orderNumber: string; orderId: string }) {
-    orderNumber = e.orderNumber;
-    orderId = e.orderId;
-    step = 'confirmation';
-  }
 </script>
 
 <div class="max-w-2xl mx-auto">
@@ -108,16 +99,12 @@
             {stripeKey}
             {customerId}
             {addressId}
-            onComplete={handlePaymentComplete}
             onBack={() => (step = 'information')}
           />
-        {:else if step === 'confirmation'}
-          <Confirmation {orderNumber} />
         {/if}
       </div>
 
       <!-- Order summary sidebar -->
-      {#if step !== 'confirmation'}
         <div class="mt-8 lg:mt-0 lg:col-span-2">
           <div class="rounded-lg bg-stone-50 p-6">
             <h2 class="text-lg font-semibold text-stone-900 mb-4">Order summary</h2>
@@ -150,7 +137,6 @@
             </div>
           </div>
         </div>
-      {/if}
     </div>
   {/if}
 </div>

@@ -101,6 +101,7 @@ type checkoutConfirmRequest struct {
 type checkoutConfirmResponse struct {
 	OrderID     string `json:"order_id"`
 	OrderNumber string `json:"order_number"`
+	Redirect    string `json:"redirect"`
 }
 
 // --- Handlers ---
@@ -729,6 +730,7 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 
 		resp.OrderID = order.ID.String()
 		resp.OrderNumber = order.Number
+		resp.Redirect = "/order/confirmed?number=" + order.Number
 
 		return nil
 	})
@@ -753,6 +755,27 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 	})
 
 	JSON(w, http.StatusOK, resp)
+}
+
+// handleOrderConfirmed renders a server-side order confirmation page.
+// This is the redirect target after the Svelte checkout completes, so the
+// confirmation survives a page refresh.
+func (d *Deps) handleOrderConfirmed(w http.ResponseWriter, r *http.Request) {
+	orderNumber := r.URL.Query().Get("number")
+	if orderNumber == "" {
+		http.Redirect(w, r, "/catalog", http.StatusSeeOther)
+		return
+	}
+
+	props := storefront.OrderConfirmedProps{
+		OrderNumber: orderNumber,
+		CartCount:   0, // Cart was just cleared
+	}
+	if IsHTMX(r) {
+		storefront.OrderConfirmedContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.OrderConfirmedPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
 // calculateDiscountAmount computes the discount amount in cents.

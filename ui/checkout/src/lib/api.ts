@@ -53,6 +53,7 @@ export interface ConfirmRequest {
 export interface ConfirmResponse {
   order_id: string;
   order_number: string;
+  redirect: string;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {

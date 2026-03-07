@@ -10,11 +10,10 @@
     stripeKey: string;
     customerId: string;
     addressId: string;
-    onComplete: (result: { orderNumber: string; orderId: string }) => void;
     onBack: () => void;
   }
 
-  let { cart, stripeKey, customerId, addressId, onComplete, onBack }: Props = $props();
+  let { cart, stripeKey, customerId, addressId, onBack }: Props = $props();
 
   let stripe = $state<Stripe | null>(null);
   let elements = $state<StripeElements | null>(null);
@@ -90,10 +89,8 @@
         payment_intent_id: paymentIntent.id,
       });
 
-      onComplete({
-        orderNumber: result.order_number,
-        orderId: result.order_id,
-      });
+      // Navigate to server-rendered confirmation page so it survives refresh.
+      window.location.href = result.redirect;
     } catch (e: any) {
       error = e.message || 'Failed to complete order';
     } finally {

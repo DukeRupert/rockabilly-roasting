@@ -125,6 +125,7 @@ func (InvoiceSendArgs) Kind() string { return "invoice_send" }
 type MagicLinkSendArgs struct {
 	CustomerID uuid.UUID `json:"customer_id"`
 	RawToken   string    `json:"raw_token"`
+	Next       string    `json:"next,omitempty"`
 }
 
 // Kind returns the job kind identifier.

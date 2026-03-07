@@ -6,6 +6,7 @@ type AccountLoginProps struct {
 	Error   string
 	Success string
 	Email   string
+	Next    string
 }
 
 templ AccountLoginContent(props AccountLoginProps) {
@@ -34,6 +35,9 @@ templ AccountLoginContent(props AccountLoginProps) {
 					</div>
 				} else {
 					<form method="post" action="/account/login" class="space-y-6">
+						if props.Next != "" {
+							<input type="hidden" name="next" value={ props.Next }/>
+						}
 						<div>
 							<label for="email" class="block text-sm/6 font-medium text-gray-900">Email address</label>
 							<div class="mt-2">

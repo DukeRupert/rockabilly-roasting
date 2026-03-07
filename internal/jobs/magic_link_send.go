@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -56,6 +57,9 @@ func (w *MagicLinkSendWorker) Work(ctx context.Context, job *river.Job[MagicLink
 	}
 
 	magicURL := fmt.Sprintf("%s/account/magic?token=%s", w.baseURL, job.Args.RawToken)
+	if job.Args.Next != "" {
+		magicURL += "&next=" + url.QueryEscape(job.Args.Next)
+	}
 	html, text, err := w.renderer.Render("magic_link", emailtemplates.MagicLinkData{
 		CustomerName: customer.FirstName,
 		MagicLinkURL: magicURL,

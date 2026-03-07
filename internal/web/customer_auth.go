@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
@@ -164,15 +165,19 @@ func (d *Deps) handleAccountLoginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/account", http.StatusSeeOther)
 		return
 	}
-	storefront.AccountLoginPage(storefront.AccountLoginProps{}).Render(r.Context(), w) //nolint:errcheck
+	props := storefront.AccountLoginProps{
+		Next: r.URL.Query().Get("next"),
+	}
+	storefront.AccountLoginPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
 func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	email := r.FormValue("email")
+	next := r.FormValue("next")
 
 	if email == "" {
-		props := storefront.AccountLoginProps{Error: "Please enter your email address."}
+		props := storefront.AccountLoginProps{Error: "Please enter your email address.", Next: next}
 		storefront.AccountLoginPage(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
@@ -198,6 +203,7 @@ func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request)
 		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.MagicLinkSendArgs{
 			CustomerID: customer.ID,
 			RawToken:   rawToken,
+			Next:       next,
 		}, nil)
 		return txErr
 	})
@@ -247,7 +253,15 @@ func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) 
 		Secure:   r.TLS != nil,
 	})
 
-	http.Redirect(w, r, "/account", http.StatusSeeOther)
+	redirectTo := "/account"
+	if next := r.URL.Query().Get("next"); next != "" {
+		// Only allow local paths to prevent open redirect.
+		if strings.HasPrefix(next, "/") && !strings.HasPrefix(next, "//") {
+			redirectTo = next
+		}
+	}
+
+	http.Redirect(w, r, redirectTo, http.StatusSeeOther)
 }
 
 func (d *Deps) handleAccountLogout(w http.ResponseWriter, r *http.Request) {

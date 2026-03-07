@@ -350,7 +350,7 @@ Loading state is important — any button that triggers an HTTP request should s
 
 *Cart* — line items with quantity controls. Order summary (subtotal, shipping, tax, discount). Coupon code field. Prominent "Checkout" CTA. Guest users see a "Continue as guest" option alongside login — don't gate checkout behind account creation.
 
-*Checkout* — Svelte component. Progress indicator: Cart → Shipping → Payment → Confirmation. Each step is completable before proceeding — no hidden validation that only fires at the end.
+*Checkout* — Svelte component. Progress indicator: Information → Payment. Each step is completable before proceeding — no hidden validation that only fires at the end. After payment succeeds, the confirm API returns a `redirect` URL and the Svelte component navigates to a server-rendered `/order/confirmed` page that survives page refresh.
 
 *Account — Order history* — reverse chronological list. Each order: date, order number, total, status badge, "View details" link. Order detail: full line items, address, invoice-style totals including tax/discount.
 

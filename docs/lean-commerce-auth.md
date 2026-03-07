@@ -164,7 +164,7 @@ Retail customers have no password. Authentication is initiated by requesting a m
          AND expires_at > now()
        RETURNING *
    → No row returned: render "this link has expired or has already been used"
-   → Row returned: create session for customer_id, redirect to /account
+   → Row returned: create session for customer_id, redirect to ?next param (validated as local path) or /account
 ```
 
 The atomic `UPDATE ... WHERE used_at IS NULL RETURNING *` prevents double-use under concurrent requests — only one request can set `used_at`.
@@ -523,7 +523,7 @@ Retail customers who have authenticated via magic link have access to a self-ser
 
 This middleware runs on all `/account/*` routes (except login/magic/logout which are public). It enforces three checks:
 
-1. **Session exists** — validates the session cookie, looks up the session + customer. Redirects to `/account/login?next=<current_path>` if unauthenticated.
+1. **Session exists** — validates the session cookie, looks up the session + customer. Redirects to `/account/login?next=<current_path>` if unauthenticated. The `next` parameter is preserved through the magic link email round-trip: login form passes it as a hidden field → `MagicLinkSendArgs` carries it → email worker appends it to the magic link URL → redemption handler reads it back and validates it's a local path (starts with `/`, not `//`) before redirecting.
 2. **Customer is retail** — wholesale customers are redirected to `/wholesale/portal`. The two account types have separate portals by design.
 3. **Customer attached to context** — on success, the customer is attached via `auth.WithCustomer(ctx, customer)` so handlers can read it with `auth.CustomerFromContext(ctx)`.
 

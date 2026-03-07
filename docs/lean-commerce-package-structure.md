@@ -147,12 +147,10 @@ lean-commerce/
 │       ├── src/
 │       │   ├── App.svelte       ← root component, owns checkout state machine
 │       │   ├── steps/
-│       │   │   ├── Cart.svelte
-│       │   │   ├── Address.svelte
-│       │   │   ├── Payment.svelte   ← mounts Stripe Elements
-│       │   │   └── Confirmation.svelte
+│       │   │   ├── Information.svelte  ← email + shipping address
+│       │   │   └── Payment.svelte    ← mounts Stripe Elements
 │       │   └── lib/
-│       │       ├── api.ts       ← typed fetch wrappers for the 4 Go JSON endpoints
+│       │       ├── api.ts       ← typed fetch wrappers for the checkout JSON endpoints
 │       │       └── stripe.ts    ← Stripe Elements initialisation
 │       ├── package.json
 │       ├── vite.config.ts       ← outputs to static/checkout/

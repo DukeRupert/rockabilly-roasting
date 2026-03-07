@@ -425,10 +425,12 @@ ALTER TABLE orders
 
 The wholesale checkout is a simplified two-step flow (no Stripe at order time):
 
-1. **Review** — line items, quantities, subtotals, shipping address, PO number field
+1. **Review** — line items with inline quantity editing and remove buttons (htmx), subtotals, PO number field, order notes. Customers can adjust quantities or remove items directly on the review page without navigating back to the quick order form via `POST /wholesale/cart/update` and `POST /wholesale/cart/remove`.
 2. **Confirm** — order is placed with `payment_status = 'pending_invoice'`
 
 No payment is collected at this step. The order enters the fulfillment queue immediately.
+
+Wholesale uses a dedicated `wholesale_cart_id` cookie, separate from the retail `cart_id` cookie, to prevent cart collision when a customer visits both the retail catalog and the wholesale portal.
 
 ---
 

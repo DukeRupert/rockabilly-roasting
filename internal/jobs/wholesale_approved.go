@@ -2,8 +2,12 @@ package jobs
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -14,27 +18,32 @@ import (
 )
 
 // WholesaleApprovedWorker sends a welcome email to an approved wholesale customer.
+// setupTokenDuration is how long a wholesale password setup link is valid.
+const setupTokenDuration = 72 * time.Hour
+
 type WholesaleApprovedWorker struct {
 	river.WorkerDefaults[WholesaleApprovedArgs]
-	customers *store.CustomerStore
-	pool      *pgxpool.Pool
-	mailer    email.Sender
-	renderer  *emailtemplates.Renderer
-	fromAddr  string
-	baseURL   string
-	storeName string
+	customers  *store.CustomerStore
+	magicLinks *store.MagicLinkStore
+	pool       *pgxpool.Pool
+	mailer     email.Sender
+	renderer   *emailtemplates.Renderer
+	fromAddr   string
+	baseURL    string
+	storeName  string
 }
 
 // NewWholesaleApprovedWorker creates a new WholesaleApprovedWorker.
-func NewWholesaleApprovedWorker(customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, renderer *emailtemplates.Renderer, fromAddr, baseURL, storeName string) *WholesaleApprovedWorker {
+func NewWholesaleApprovedWorker(customers *store.CustomerStore, magicLinks *store.MagicLinkStore, pool *pgxpool.Pool, mailer email.Sender, renderer *emailtemplates.Renderer, fromAddr, baseURL, storeName string) *WholesaleApprovedWorker {
 	return &WholesaleApprovedWorker{
-		customers: customers,
-		pool:      pool,
-		mailer:    mailer,
-		renderer:  renderer,
-		fromAddr:  fromAddr,
-		baseURL:   baseURL,
-		storeName: storeName,
+		customers:  customers,
+		magicLinks: magicLinks,
+		pool:       pool,
+		mailer:     mailer,
+		renderer:   renderer,
+		fromAddr:   fromAddr,
+		baseURL:    baseURL,
+		storeName:  storeName,
 	}
 }
 
@@ -51,6 +60,20 @@ func (w *WholesaleApprovedWorker) Work(ctx context.Context, job *river.Job[Whole
 		return fmt.Errorf("get customer %s: %w", job.Args.CustomerID, err)
 	}
 
+	// Generate a password-setup token.
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return fmt.Errorf("generate setup token: %w", err)
+	}
+	rawToken := hex.EncodeToString(tokenBytes)
+	tokenHash := sha256.Sum256([]byte(rawToken))
+	tokenHashHex := hex.EncodeToString(tokenHash[:])
+
+	expiresAt := time.Now().Add(setupTokenDuration)
+	if _, err := w.magicLinks.Create(ctx, tx, customer.ID, tokenHashHex, expiresAt); err != nil {
+		return fmt.Errorf("store setup token: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit tx: %w", err)
 	}
@@ -60,10 +83,10 @@ func (w *WholesaleApprovedWorker) Work(ctx context.Context, job *river.Job[Whole
 		companyName = *customer.CompanyName
 	}
 
-	portalURL := fmt.Sprintf("%s/wholesale/login", w.baseURL)
+	setupURL := fmt.Sprintf("%s/wholesale/setup?token=%s", w.baseURL, rawToken)
 	html, text, err := w.renderer.Render("wholesale_approved", emailtemplates.WholesaleApprovedData{
 		CompanyName: companyName,
-		PortalURL:   portalURL,
+		SetupURL:    setupURL,
 		StoreName:   w.storeName,
 		StoreURL:    w.baseURL,
 	})

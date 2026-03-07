@@ -122,7 +122,14 @@ type SubscriptionConfirmData struct {
 // WholesaleApprovedData holds data for the wholesale approved welcome email.
 type WholesaleApprovedData struct {
 	CompanyName string
-	PortalURL   string
+	SetupURL    string
+	StoreName   string
+	StoreURL    string
+}
+
+// WholesaleSuspendedData holds data for the wholesale suspended notification email.
+type WholesaleSuspendedData struct {
+	CompanyName string
 	StoreName   string
 	StoreURL    string
 }

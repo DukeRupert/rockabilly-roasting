@@ -1,0 +1,91 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+type WholesaleSetupProps struct {
+	Token   string
+	Error   string
+	Success bool
+}
+
+templ WholesaleSetupContent(props WholesaleSetupProps) {
+	<div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
+		<div class="sm:mx-auto sm:w-full sm:max-w-md">
+			if props.Success {
+				<div class="text-center">
+					<svg class="mx-auto size-16 text-hiri-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+					</svg>
+					<h2 class="mt-4 text-2xl/9 font-bold tracking-tight text-gray-900">Password Set</h2>
+					<p class="mt-2 text-sm/6 text-gray-500">Your password has been set. You can now sign in to your wholesale account.</p>
+					<div class="mt-8">
+						<a href="/wholesale/login" class="rounded-md bg-hiri-teal px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
+							Sign in
+						</a>
+					</div>
+				</div>
+			} else {
+				<h2 class="text-center text-2xl/9 font-bold tracking-tight text-gray-900">Set Your Password</h2>
+				<p class="mt-2 text-center text-sm/6 text-gray-500">
+					Create a password for your wholesale account.
+				</p>
+				<div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
+					<div class="bg-white px-6 py-12 shadow-sm sm:rounded-lg sm:px-12">
+						if props.Error != "" {
+							<div class="mb-6 rounded-md bg-red-50 p-3">
+								<p class="text-sm/6 text-red-700">{ props.Error }</p>
+							</div>
+						}
+						<form method="post" action="/wholesale/setup" class="space-y-6">
+							<input type="hidden" name="token" value={ props.Token }/>
+							<div>
+								<label for="password" class="block text-sm/6 font-medium text-gray-900">Password</label>
+								<div class="mt-2">
+									<input
+										type="password"
+										name="password"
+										id="password"
+										required
+										minlength="8"
+										autocomplete="new-password"
+										class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal sm:text-sm/6"
+									/>
+								</div>
+							</div>
+							<div>
+								<label for="password_confirm" class="block text-sm/6 font-medium text-gray-900">Confirm password</label>
+								<div class="mt-2">
+									<input
+										type="password"
+										name="password_confirm"
+										id="password_confirm"
+										required
+										minlength="8"
+										autocomplete="new-password"
+										class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal sm:text-sm/6"
+									/>
+								</div>
+							</div>
+							<div>
+								<button
+									type="submit"
+									class="flex w-full justify-center rounded-md bg-hiri-teal px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+								>
+									Set Password
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ WholesaleSetupPage(props WholesaleSetupProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title: "Set Your Password",
+	}) {
+		@WholesaleSetupContent(props)
+	}
+}

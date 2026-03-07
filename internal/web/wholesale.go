@@ -61,6 +61,77 @@ func (d *Deps) handleWholesaleApply(w http.ResponseWriter, r *http.Request) {
 	storefront.WholesaleApplyConfirmation().Render(r.Context(), w) //nolint:errcheck
 }
 
+// --- Wholesale password setup (token from welcome email) ---
+
+func (d *Deps) handleWholesaleSetupPage(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+		return
+	}
+	props := storefront.WholesaleSetupProps{Token: token}
+	if IsHTMX(r) {
+		storefront.WholesaleSetupContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.WholesaleSetupPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+func (d *Deps) handleWholesaleSetup(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	token := r.FormValue("token")
+	password := r.FormValue("password")
+	passwordConfirm := r.FormValue("password_confirm")
+
+	renderErr := func(msg string) {
+		props := storefront.WholesaleSetupProps{Token: token, Error: msg}
+		if IsHTMX(r) {
+			storefront.WholesaleSetupContent(props).Render(ctx, w) //nolint:errcheck
+			return
+		}
+		storefront.WholesaleSetupPage(props).Render(ctx, w) //nolint:errcheck
+	}
+
+	if token == "" {
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+		return
+	}
+
+	if password != passwordConfirm {
+		renderErr("Passwords do not match.")
+		return
+	}
+
+	if len(password) < 8 {
+		renderErr("Password must be at least 8 characters.")
+		return
+	}
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.AuthService.SetPasswordWithToken(ctx, tx, token, password)
+		return txErr
+	})
+	if err != nil {
+		if err == app.ErrSetupTokenExpired {
+			renderErr("This setup link has expired or has already been used.")
+			return
+		}
+		if err == app.ErrPasswordTooShort {
+			renderErr("Password must be at least 8 characters.")
+			return
+		}
+		Error(w, r, err)
+		return
+	}
+
+	props := storefront.WholesaleSetupProps{Success: true}
+	if IsHTMX(r) {
+		storefront.WholesaleSetupContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	storefront.WholesaleSetupPage(props).Render(ctx, w) //nolint:errcheck
+}
+
 // --- Wholesale portal (authenticated, approved wholesale customers) ---
 
 func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request) {

@@ -124,7 +124,7 @@ func TestRender_WholesaleApproved(t *testing.T) {
 
 	data := WholesaleApprovedData{
 		CompanyName: "Bean Co",
-		PortalURL:   "https://example.com/wholesale/login",
+		SetupURL:    "https://example.com/wholesale/setup?token=abc123",
 		StoreName:   "Test Store",
 		StoreURL:    "https://example.com",
 	}
@@ -133,8 +133,9 @@ func TestRender_WholesaleApproved(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Contains(t, html, "Bean Co")
-	assert.Contains(t, html, "/wholesale/login")
+	assert.Contains(t, html, "/wholesale/setup?token=abc123")
 	assert.Contains(t, text, "Bean Co")
+	assert.Contains(t, text, "/wholesale/setup?token=abc123")
 }
 
 func TestRender_WholesaleApplication(t *testing.T) {

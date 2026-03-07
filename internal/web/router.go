@@ -97,9 +97,11 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /api/checkout/payment-intent", deps.handleCheckoutPaymentIntent)
 	mux.HandleFunc("POST /api/checkout/confirm", deps.handleCheckoutConfirm)
 
-	// Wholesale application (public)
+	// Wholesale application and password setup (public)
 	mux.HandleFunc("GET /wholesale/apply", deps.handleWholesaleApplyPage)
 	mux.HandleFunc("POST /wholesale/apply", deps.handleWholesaleApply)
+	mux.HandleFunc("GET /wholesale/setup", deps.handleWholesaleSetupPage)
+	mux.HandleFunc("POST /wholesale/setup", deps.handleWholesaleSetup)
 
 	// Retail account auth routes (magic link, no session required)
 	magicLinkLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
@@ -247,6 +249,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/approve", deps.handleAdminWholesaleApprove)
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/decline", deps.handleAdminWholesaleDecline)
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/suspend", deps.handleAdminWholesaleSuspend)
+	adminMux.HandleFunc("POST /admin/wholesale/{id}/reactivate", deps.handleAdminWholesaleReactivate)
 
 	// Admin invoices
 	adminMux.HandleFunc("GET /admin/invoices/{id}", deps.handleAdminInvoiceShow)

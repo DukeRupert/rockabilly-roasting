@@ -59,6 +59,8 @@ var (
 	ErrStaffInactive     = errors.New("staff account is inactive")
 	ErrPermissionDenied  = errors.New("permission denied")
 	ErrMagicLinkExpired  = errors.New("magic link expired or already used")
+	ErrSetupTokenExpired = errors.New("setup link expired or already used")
+	ErrPasswordTooShort  = errors.New("password must be at least 8 characters")
 
 	// Payment errors
 	ErrPaymentFailed = errors.New("payment failed")

@@ -23,6 +23,9 @@ import (
 // MagicLinkDuration is how long a magic link token is valid.
 const MagicLinkDuration = 15 * time.Minute
 
+// SetupTokenDuration is how long a wholesale password setup link is valid.
+const SetupTokenDuration = 72 * time.Hour
+
 // MagicLinkSessionDuration is the session lifetime for magic link logins.
 const MagicLinkSessionDuration = 30 * 24 * time.Hour
 
@@ -255,4 +258,60 @@ func (s *AuthService) RedeemMagicLink(ctx context.Context, tx pgx.Tx, rawToken s
 	}
 
 	return session, sessionToken, nil
+}
+
+// CreateSetupToken generates a password-setup token for a wholesale customer.
+// Uses the same magic_link_tokens table with a longer expiry.
+func (s *AuthService) CreateSetupToken(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (rawToken string, err error) {
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("generate setup token: %w", err)
+	}
+	rawToken = hex.EncodeToString(tokenBytes)
+
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	expiresAt := time.Now().Add(SetupTokenDuration)
+	_, err = s.magicLinks.Create(ctx, tx, customerID, tokenHash, expiresAt)
+	if err != nil {
+		return "", fmt.Errorf("store setup token: %w", err)
+	}
+
+	return rawToken, nil
+}
+
+// SetPasswordWithToken validates a setup token and sets the customer's password.
+// The token is single-use.
+func (s *AuthService) SetPasswordWithToken(ctx context.Context, tx pgx.Tx, rawToken, password string) (*domain.Customer, error) {
+	if len(password) < 8 {
+		return nil, ErrPasswordTooShort
+	}
+
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	token, err := s.magicLinks.Redeem(ctx, tx, tokenHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSetupTokenExpired
+		}
+		return nil, fmt.Errorf("redeem setup token: %w", err)
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	if err := s.customers.UpdatePassword(ctx, tx, token.CustomerID, string(passwordHash)); err != nil {
+		return nil, fmt.Errorf("update password: %w", err)
+	}
+
+	customer, err := s.customers.GetByID(ctx, tx, token.CustomerID)
+	if err != nil {
+		return nil, fmt.Errorf("get customer: %w", err)
+	}
+
+	return customer, nil
 }

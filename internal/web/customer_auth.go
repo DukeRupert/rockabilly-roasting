@@ -285,7 +285,12 @@ func (d *Deps) handleWholesaleLoginPage(w http.ResponseWriter, r *http.Request) 
 		http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
 		return
 	}
-	storefront.WholesaleLoginPage(storefront.WholesaleLoginProps{}).Render(r.Context(), w) //nolint:errcheck
+	props := storefront.WholesaleLoginProps{}
+	if IsHTMX(r) {
+		storefront.WholesaleLoginContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.WholesaleLoginPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
 func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
@@ -294,7 +299,11 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 	rememberMe := r.FormValue("remember_me") == "on"
 
 	if email == "" || password == "" {
-		props := storefront.WholesaleLoginProps{Error: "Email and password are required."}
+		props := storefront.WholesaleLoginProps{Error: "Email and password are required.", Email: email}
+		if IsHTMX(r) {
+			storefront.WholesaleLoginContent(props).Render(r.Context(), w) //nolint:errcheck
+			return
+		}
 		storefront.WholesaleLoginPage(props).Render(r.Context(), w) //nolint:errcheck
 		return
 	}
@@ -313,6 +322,10 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 		props := storefront.WholesaleLoginProps{
 			Error: "Invalid email or password.",
 			Email: email,
+		}
+		if IsHTMX(r) {
+			storefront.WholesaleLoginContent(props).Render(r.Context(), w) //nolint:errcheck
+			return
 		}
 		storefront.WholesaleLoginPage(props).Render(r.Context(), w) //nolint:errcheck
 		return

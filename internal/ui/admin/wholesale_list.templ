@@ -114,6 +114,11 @@ templ WholesaleListContent(props WholesaleListProps) {
 												<button type="submit" class="relative inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 inset-ring-1 inset-ring-gray-300 hover:bg-red-50 focus:z-10" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
 											</form>
 										}
+										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
+											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
+												<button type="submit" class="relative inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-hiri-teal inset-ring-1 inset-ring-gray-300 hover:bg-green-50 focus:z-10" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
+											</form>
+										}
 										<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-hiri-teal hover:text-hiri-teal-dark">
 											View
 										</a>

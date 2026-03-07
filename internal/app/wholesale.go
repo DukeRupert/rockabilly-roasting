@@ -232,6 +232,52 @@ func (s *WholesaleService) SuspendAccount(ctx context.Context, tx pgx.Tx, custom
 	return updated, nil
 }
 
+// ReactivateAccount reactivates a suspended wholesale account.
+func (s *WholesaleService) ReactivateAccount(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, actor Actor) (*domain.Customer, error) {
+	customer, err := s.customers.GetByID(ctx, tx, customerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCustomerNotFound
+		}
+		return nil, fmt.Errorf("get customer: %w", err)
+	}
+
+	if customer.AccountType != domain.AccountTypeWholesale {
+		return nil, ErrWholesaleNotApproved
+	}
+	if customer.WholesaleStatus == nil || *customer.WholesaleStatus != domain.WholesaleStatusSuspended {
+		return nil, ErrWholesaleNotApproved
+	}
+
+	_, err = tx.Exec(ctx,
+		`UPDATE customers SET wholesale_status = 'approved', wholesale_notes = NULL,
+		 updated_at = now() WHERE id = $1`,
+		customerID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("reactivate wholesale: %w", err)
+	}
+
+	updated, err := s.customers.GetByID(ctx, tx, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("refetch customer: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditWholesaleAccountReactivated,
+		ResourceType: "customer",
+		ResourceID:   customerID,
+		After:        updated,
+	}); err != nil {
+		return nil, fmt.Errorf("audit wholesale reactivated: %w", err)
+	}
+
+	return updated, nil
+}
+
 // --- Quick order ---
 
 // QuickOrderVariant represents a single variant row in the quick order table.

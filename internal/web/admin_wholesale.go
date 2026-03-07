@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
@@ -81,6 +82,10 @@ func (d *Deps) handleAdminWholesaleApprove(w http.ResponseWriter, r *http.Reques
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		_, txErr := d.WholesaleService.ApproveApplication(ctx, tx, id, actor)
+		if txErr != nil {
+			return txErr
+		}
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.WholesaleApprovedArgs{CustomerID: id}, nil)
 		return txErr
 	})
 	if err != nil {
@@ -88,7 +93,6 @@ func (d *Deps) handleAdminWholesaleApprove(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// TODO: Enqueue WholesaleApprovedArgs job for welcome email.
 	http.Redirect(w, r, "/admin/wholesale", http.StatusSeeOther)
 }
 
@@ -129,6 +133,38 @@ func (d *Deps) handleAdminWholesaleSuspend(w http.ResponseWriter, r *http.Reques
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		_, txErr := d.WholesaleService.SuspendAccount(ctx, tx, id, notes, actor)
+		if txErr != nil {
+			return txErr
+		}
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.WholesaleSuspendedArgs{CustomerID: id}, nil)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/wholesale", http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminWholesaleReactivate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	actor := staffActor(r)
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.WholesaleService.ReactivateAccount(ctx, tx, id, actor)
+		if txErr != nil {
+			return txErr
+		}
+		// Send the welcome/setup email so they can set a new password.
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.WholesaleApprovedArgs{CustomerID: id}, nil)
 		return txErr
 	})
 	if err != nil {

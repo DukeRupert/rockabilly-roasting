@@ -65,6 +65,7 @@ const (
 	AuditWholesaleApplicationApproved = "wholesale.application_approved"
 	AuditWholesaleApplicationDeclined = "wholesale.application_declined"
 	AuditWholesaleAccountSuspended    = "wholesale.account_suspended"
+	AuditWholesaleAccountReactivated  = "wholesale.account_reactivated"
 
 	// Product visibility actions
 	AuditProductVisibilityUpdated = "product.visibility_updated"

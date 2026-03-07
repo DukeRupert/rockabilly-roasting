@@ -105,6 +105,14 @@ type WholesaleApprovedArgs struct {
 // Kind returns the job kind identifier.
 func (WholesaleApprovedArgs) Kind() string { return "wholesale_approved" }
 
+// WholesaleSuspendedArgs sends a suspension notification email to a wholesale customer.
+type WholesaleSuspendedArgs struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (WholesaleSuspendedArgs) Kind() string { return "wholesale_suspended" }
+
 // InvoiceSendArgs sends an invoice to the customer via email.
 type InvoiceSendArgs struct {
 	InvoiceID uuid.UUID `json:"invoice_id"`

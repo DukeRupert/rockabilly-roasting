@@ -1,54 +1,108 @@
 package ratelimit
 
 import (
+	"context"
 	"sync"
 	"time"
 )
 
-type bucket struct {
-	tokens   float64
-	lastSeen time.Time
+type entry struct {
+	mu       sync.Mutex
+	attempts []time.Time
 }
 
-// InMemoryStore is an in-process token bucket rate limit store.
-type InMemoryStore struct {
-	mu      sync.Mutex
-	buckets map[string]*bucket
+// MemoryStore is an in-process sliding window rate limit store.
+// State is ephemeral — counters reset on process restart, which is acceptable
+// for a single-server deployment.
+type MemoryStore struct {
+	mu      sync.RWMutex
+	entries map[string]*entry
+	stop    chan struct{}
 }
 
-// NewInMemoryStore creates a new in-memory rate limit store.
-func NewInMemoryStore() *InMemoryStore {
-	return &InMemoryStore{
-		buckets: make(map[string]*bucket),
+// NewMemoryStore creates a new in-memory store and starts a background
+// goroutine that evicts expired entries every cleanupInterval.
+func NewMemoryStore(cleanupInterval time.Duration) *MemoryStore {
+	s := &MemoryStore{
+		entries: make(map[string]*entry),
+		stop:    make(chan struct{}),
 	}
+	go s.cleanup(cleanupInterval)
+	return s
 }
 
-// Allow checks whether key has available tokens using the token bucket algorithm.
-func (s *InMemoryStore) Allow(key string, cfg LimitConfig) (bool, float64, time.Duration) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+// Allow implements Store using a sliding window algorithm.
+func (s *MemoryStore) Allow(_ context.Context, key string, limit int, window time.Duration) (bool, int, time.Time, error) {
 	now := time.Now()
-	b, ok := s.buckets[key]
+	cutoff := now.Add(-window)
+	resetAt := now.Add(window)
+
+	s.mu.Lock()
+	e, ok := s.entries[key]
 	if !ok {
-		b = &bucket{tokens: cfg.Capacity, lastSeen: now}
-		s.buckets[key] = b
+		e = &entry{}
+		s.entries[key] = e
+	}
+	s.mu.Unlock()
+
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	// Evict attempts outside the window.
+	valid := e.attempts[:0]
+	for _, t := range e.attempts {
+		if t.After(cutoff) {
+			valid = append(valid, t)
+		}
+	}
+	e.attempts = valid
+
+	if len(e.attempts) >= limit {
+		// Calculate when the oldest attempt expires.
+		if len(e.attempts) > 0 {
+			resetAt = e.attempts[0].Add(window)
+		}
+		return false, 0, resetAt, nil
 	}
 
-	// Refill tokens based on elapsed time
-	elapsed := now.Sub(b.lastSeen).Seconds()
-	b.tokens += elapsed * cfg.Rate
-	if b.tokens > cfg.Capacity {
-		b.tokens = cfg.Capacity
-	}
-	b.lastSeen = now
+	e.attempts = append(e.attempts, now)
+	remaining := limit - len(e.attempts)
+	return true, remaining, resetAt, nil
+}
 
-	if b.tokens >= 1 {
-		b.tokens--
-		return true, b.tokens, 0
-	}
+// Reset clears the counter for key.
+func (s *MemoryStore) Reset(_ context.Context, key string) error {
+	s.mu.Lock()
+	delete(s.entries, key)
+	s.mu.Unlock()
+	return nil
+}
 
-	// Calculate time until next token
-	wait := time.Duration((1 - b.tokens) / cfg.Rate * float64(time.Second))
-	return false, b.tokens, wait
+// Stop signals the cleanup goroutine to exit.
+func (s *MemoryStore) Stop() {
+	close(s.stop)
+}
+
+// cleanup periodically removes entries whose newest attempt is older than
+// a generous threshold (10 minutes). This prevents unbounded memory growth.
+func (s *MemoryStore) cleanup(interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-s.stop:
+			return
+		case now := <-ticker.C:
+			threshold := now.Add(-10 * time.Minute)
+			s.mu.Lock()
+			for key, e := range s.entries {
+				e.mu.Lock()
+				if len(e.attempts) == 0 || e.attempts[len(e.attempts)-1].Before(threshold) {
+					delete(s.entries, key)
+				}
+				e.mu.Unlock()
+			}
+			s.mu.Unlock()
+		}
+	}
 }

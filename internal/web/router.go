@@ -13,6 +13,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
+	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/riverqueue/river"
@@ -46,6 +47,7 @@ type Deps struct {
 	CFImagesClient      *media.CFImagesClient
 	R2Client            *media.R2Client
 	MediaConfig         *media.Config
+	RateLimiter         *ratelimit.Limiter
 }
 
 // NewRouter creates a new HTTP router with all routes and middleware registered.
@@ -87,7 +89,10 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /checkout", deps.handleCheckoutPage)
 	mux.HandleFunc("GET /api/checkout/cart", deps.handleCheckoutCart)
 	mux.HandleFunc("POST /api/checkout/address", deps.handleCheckoutAddress)
-	mux.HandleFunc("POST /api/checkout/coupon", deps.handleCheckoutApplyCoupon)
+	couponIPLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.CouponIPLimit, ratelimit.CouponWindow, func(r *http.Request) string {
+		return ratelimit.CouponIPKey(ratelimit.ClientIP(r))
+	})
+	mux.Handle("POST /api/checkout/coupon", couponIPLimit(http.HandlerFunc(deps.handleCheckoutApplyCoupon)))
 	mux.HandleFunc("DELETE /api/checkout/coupon", deps.handleCheckoutRemoveCoupon)
 	mux.HandleFunc("POST /api/checkout/payment-intent", deps.handleCheckoutPaymentIntent)
 	mux.HandleFunc("POST /api/checkout/confirm", deps.handleCheckoutConfirm)
@@ -97,8 +102,11 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /wholesale/apply", deps.handleWholesaleApply)
 
 	// Retail account auth routes (magic link, no session required)
+	magicLinkLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
+		return r.FormValue("email")
+	})
 	mux.HandleFunc("GET /account/login", deps.handleAccountLoginPage)
-	mux.HandleFunc("POST /account/login", deps.handleAccountLoginRequest)
+	mux.Handle("POST /account/login", magicLinkLimit(http.HandlerFunc(deps.handleAccountLoginRequest)))
 	mux.HandleFunc("GET /account/magic", deps.handleAccountMagicRedeem)
 	mux.Handle("POST /account/logout", deps.requireCustomerSession(http.HandlerFunc(deps.handleAccountLogout)))
 
@@ -127,8 +135,11 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("/account/addresses", deps.requireRetailCustomer(accountMux))
 
 	// Wholesale auth routes (password, no session required)
+	wholesaleAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.AuthWindow, func(r *http.Request) string {
+		return r.FormValue("email")
+	})
 	mux.HandleFunc("GET /wholesale/login", deps.handleWholesaleLoginPage)
-	mux.HandleFunc("POST /wholesale/login", deps.handleWholesaleLogin)
+	mux.Handle("POST /wholesale/login", wholesaleAuthLimit(http.HandlerFunc(deps.handleWholesaleLogin)))
 
 	// Wholesale logout (requires session)
 	mux.Handle("POST /wholesale/logout", deps.requireCustomerSession(http.HandlerFunc(deps.handleWholesaleLogout)))
@@ -145,8 +156,11 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("/wholesale/checkout/", deps.requireApprovedWholesale(wholesaleMux))
 
 	// Staff auth routes (no session required)
+	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {
+		return r.FormValue("email")
+	})
 	mux.HandleFunc("GET /auth/staff/login", deps.handleStaffLoginPage)
-	mux.HandleFunc("POST /auth/staff/login", deps.handleStaffLogin)
+	mux.Handle("POST /auth/staff/login", staffAuthLimit(http.HandlerFunc(deps.handleStaffLogin)))
 
 	// Admin routes — all require staff session
 	adminMux := http.NewServeMux()
@@ -263,6 +277,7 @@ func NewRouter(deps *Deps) http.Handler {
 	var handler http.Handler = mux
 	handler = requestIDMiddleware(handler)
 	handler = loggingMiddleware(handler, deps.Logger, deps.Metrics)
+	handler = ratelimit.GlobalLimit(deps.RateLimiter, ratelimit.GlobalIPLimit, ratelimit.GlobalWindow)(handler)
 	handler = metrics.HTTPMiddleware(deps.Metrics)(handler)
 
 	return handler

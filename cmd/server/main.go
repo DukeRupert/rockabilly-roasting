@@ -70,8 +70,8 @@ func run() error {
 	// Infrastructure
 	auditWriter := audit.NewAuditWriter()
 	metricsReg := metrics.NewRegistry()
-	rateLimitStore := ratelimit.NewInMemoryStore()
-	_ = rateLimitStore // will be used for rate limiting login endpoints
+	rateLimitStore := ratelimit.NewMemoryStore(5 * time.Minute)
+	rateLimiter := ratelimit.NewLimiter(rateLimitStore)
 	sessionStore := store.NewSessionStore()
 	sessionMgr := sessions.NewManager(sessionStore)
 	paymentProvider := payments.NewStripeProvider(
@@ -229,6 +229,7 @@ func run() error {
 		CFImagesClient:     cfImagesClient,
 		R2Client:           r2Client,
 		MediaConfig:        mediaConfig,
+		RateLimiter:        rateLimiter,
 	}
 
 	handler := web.NewRouter(deps)
@@ -266,6 +267,9 @@ func run() error {
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer shutdownCancel()
+
+	// Stop rate limit cleanup goroutine
+	rateLimitStore.Stop()
 
 	// Stop River gracefully
 	if err := riverClient.Stop(shutdownCtx); err != nil {

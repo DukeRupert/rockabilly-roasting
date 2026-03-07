@@ -8,6 +8,7 @@ import (
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/auth"
+	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
@@ -117,6 +118,10 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 		admin.StaffLoginPage("Invalid email or password.").Render(r.Context(), w) //nolint:errcheck
 		return
 	}
+
+	// Reset rate limit counters on successful login.
+	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIPKey(ratelimit.ClientIP(r)))
+	_ = d.RateLimiter.Reset(r.Context(), ratelimit.AuthIdentifierKey(ratelimit.HashIdentifier(email)))
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,

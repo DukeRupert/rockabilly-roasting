@@ -221,49 +221,60 @@ A 404 is not an error. A 422 is not an error. `ERROR` means a human should look 
 
 ## 6. Rate Limiting & Abuse Prevention
 
-**Decision: token bucket; auth endpoints only; in-memory now, Redis migration path designed.**
+**Decision: sliding window; auth + checkout + global; in-memory, single-server.**
 
-**Scope:** authentication endpoints only — login (customer and staff), register, password reset. General API browsing is not rate limited at this stage.
+**Scope:** five threat surfaces covered with targeted limits.
 
-**Algorithm: token bucket.** Each actor gets a bucket with a capacity (burst allowance) that replenishes at a fixed rate. Sustained hammering drains the bucket; legitimate sporadic use is absorbed by burst capacity.
+| Threat | Surface | Strategy |
+|---|---|---|
+| Brute force / credential stuffing | Login endpoints | Per-IP + per-identifier sliding window |
+| Magic link abuse | `POST /account/login` | Per-IP sliding window |
+| Coupon enumeration | `POST /api/checkout/coupon` | Per-IP sliding window |
+| General scraping | All routes | Global per-IP sliding window |
 
-**Keys:** per IP address and/or per hashed email. Email is SHA-256 hashed before use as a map key (cache key — no salt needed).
+**Algorithm: sliding window.** "No more than N attempts in the last M minutes." Accurate, no burst allowance at window boundaries. Appropriate for auth protection where token bucket boundary bursts are undesirable.
+
+**Keys:** per IP address and/or per hashed identifier. Email is SHA-256 hashed (128-bit prefix) before use as a key — the rate limit store never holds plaintext emails.
 
 **Configurations:**
 
-| Endpoint | Key | Capacity | Rate |
+| Endpoint | Key | Limit | Window |
 |---|---|---|---|
-| Customer login | per IP | 5 | 0.1 req/s |
-| Customer login | per email | 5 | 0.1 req/s |
-| Staff login | per IP | 3 | 0.05 req/s |
-| Staff login | per email | 3 | 0.05 req/s |
-| Customer register | per IP | 10 | 0.003 req/s |
-| Password reset | per email | 3 | 0.001 req/s |
-| Password reset | per IP | 10 | 0.003 req/s |
+| Staff login | per IP | 5 | 15 min |
+| Staff login | per identifier | 3 | 15 min |
+| Wholesale login | per IP | 10 | 15 min |
+| Wholesale login | per identifier | 5 | 15 min |
+| Magic link request | per IP | 5 | 15 min |
+| Coupon apply | per IP | 30 | 1 hour |
+| All routes (global) | per IP | 300 | 1 min |
+
+Staff login gets the tightest identifier limit (3 attempts) — staff accounts have admin access, highest value target. Global limit of 300/min per IP is generous enough that no legitimate browser session will hit it.
 
 **The `Store` interface is the migration seam:**
 
 ```go
 type Store interface {
-    Allow(key string, cfg LimitConfig) (allowed bool, remaining float64, retryAfter time.Duration)
+    Allow(ctx context.Context, key string, limit int, window time.Duration) (allowed bool, remaining int, resetAt time.Time, err error)
+    Reset(ctx context.Context, key string) error
 }
 ```
 
-`InMemoryStore` implements this today. `RedisStore` (Lua script, atomic bucket operations) implements the same interface when multiple instances require shared state. Swapping is a one-line change at startup.
+`MemoryStore` implements this with a `map[string]*entry` where each entry holds a `[]time.Time` of attempts within the window. A background goroutine evicts expired entries every 5 minutes to prevent unbounded memory growth. `Stop()` signals the goroutine on shutdown. State is ephemeral — counters reset on process restart, which is acceptable for a single-server deployment.
 
-**Middleware ordering on auth endpoints:**
-1. IP rate limit — runs first, no body parsing needed
-2. Body parsing — parse JSON once, store in context
-3. Email rate limit — reads email from context
-4. Handler
+**Reset on successful login.** Auth rate limit counters are cleared when a user successfully authenticates. This prevents false positives for legitimate users who took several attempts, and allows admin unblocking via `Reset()`.
 
-**IP extraction** trusts `X-Forwarded-For` / `X-Real-IP` only when the connection originates from a trusted proxy. Blind trust of these headers allows clients to spoof their IP and bypass IP-based limits.
+**Three middleware constructors:**
+- `GlobalLimit(limiter, limit, window)` — per-IP for all routes
+- `AuthLimit(limiter, ipLimit, idLimit, window, identifierFn)` — per-IP + optional per-identifier for auth endpoints
+- `EndpointLimit(limiter, limit, window, keyFn)` — generic key-based for coupon/checkout
 
-**Fail-open on store unavailability.** If the rate limit store fails, requests are allowed through rather than blocking all users. The error is logged and alerted on separately.
+**Middleware applied at route registration** in `router.go`, not inside handlers. Auth limit middleware wraps individual POST handlers; global limit wraps the entire mux in the outer middleware stack.
 
-**Rate limit hits are tracked in Prometheus** (`rate_limit_hits_total`, labels: config, key_type). Alert configured on elevated login hits — the signal for active credential stuffing.
+**IP extraction** via `ClientIP(r)` checks `X-Forwarded-For` (first IP), `X-Real-IP`, then falls back to `RemoteAddr`.
 
-*Full detail: `lean-commerce-rate-limiting.md`*
+**Fail-open on store error.** If the rate limit store returns an error, requests are allowed through rather than blocking all users.
+
+**429 responses** include a `Retry-After` header. For htmx requests, `HX-Retarget` and `HX-Reswap` headers are set so the error renders inline.
 
 ---
 

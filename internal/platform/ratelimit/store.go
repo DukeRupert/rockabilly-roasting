@@ -1,10 +1,19 @@
 package ratelimit
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
-// Store is the interface for rate limit token bucket storage.
+// Store is the interface for rate limit storage.
+// Implementations use a sliding window algorithm: "no more than limit
+// attempts in the last window duration."
 type Store interface {
-	// Allow checks whether key has available tokens.
-	// Returns (allowed, remaining tokens, time until next token).
-	Allow(key string, cfg LimitConfig) (bool, float64, time.Duration)
+	// Allow checks and increments the counter for key.
+	// Returns whether the request is allowed, remaining attempts, and when
+	// the oldest tracked attempt expires (reset time).
+	Allow(ctx context.Context, key string, limit int, window time.Duration) (allowed bool, remaining int, resetAt time.Time, err error)
+
+	// Reset clears the counter for key — used after successful login.
+	Reset(ctx context.Context, key string) error
 }

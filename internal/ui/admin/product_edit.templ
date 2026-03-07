@@ -31,16 +31,8 @@ type ProductEditProps struct {
 	TaxonName string
 	Errors    map[string]string
 	Flash     string
-	Tab       string
 	StaffName string
 	StaffRole string
-}
-
-func (p ProductEditProps) ActiveTab() string {
-	if p.Tab == "variants" || p.Tab == "pricing" {
-		return p.Tab
-	}
-	return "details"
 }
 
 templ ProductEditContent(props ProductEditProps) {
@@ -73,73 +65,65 @@ templ ProductEditContent(props ProductEditProps) {
 		</div>
 	}
 	<!-- Tabs -->
-	@productTabs(props)
-	<!-- Tab content -->
-	<div class="mt-6">
-		switch props.ActiveTab() {
-			case "variants":
-				@productVariantsTab(props)
-			case "pricing":
-				@productPricingTab(props)
-			default:
-				@productDetailsTab(props)
-		}
-	</div>
-}
-
-templ productTabs(props ProductEditProps) {
-	<div class="mt-6">
+	<div class="mt-6" id="product-tabs">
 		<!-- Mobile dropdown -->
 		<div class="grid grid-cols-1 sm:hidden">
-			<select
-				aria-label="Select a tab"
-				id="product-tab-select"
-				data-base-url={ fmt.Sprintf("/admin/catalog/%s", props.Product.ID) }
-				class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-2 pr-8 pl-3 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal"
-			>
-				<option value="details" selected?={ props.ActiveTab() == "details" }>Details</option>
-				<option value="variants" selected?={ props.ActiveTab() == "variants" }>Variants</option>
-				<option value="pricing" selected?={ props.ActiveTab() == "pricing" }>Pricing</option>
+			<select aria-label="Select a tab" data-tab-select class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-2 pr-8 pl-3 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal">
+				<option value="details" selected>Details</option>
+				<option value="variants">Variants</option>
+				<option value="pricing">Pricing</option>
 			</select>
 			<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end fill-gray-500">
 				<path d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd"></path>
 			</svg>
-			<script>
-				document.getElementById("product-tab-select").addEventListener("change", function() {
-					window.location.href = this.dataset.baseUrl + "?tab=" + this.value;
-				});
-			</script>
 		</div>
 		<!-- Desktop tabs -->
 		<div class="hidden sm:block">
 			<div class="border-b border-stone-200">
 				<nav aria-label="Tabs" class="-mb-px flex space-x-8">
-					@productTabLink("Details", "details", props)
-					@productTabLink("Variants", "variants", props)
-					@productTabLink("Pricing", "pricing", props)
+					<button type="button" data-tab="details" class="border-b-2 border-hiri-teal px-1 py-4 text-sm font-medium whitespace-nowrap text-hiri-teal">Details</button>
+					<button type="button" data-tab="variants" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-stone-500 hover:border-stone-300 hover:text-stone-700">Variants</button>
+					<button type="button" data-tab="pricing" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-stone-500 hover:border-stone-300 hover:text-stone-700">Pricing</button>
 				</nav>
 			</div>
 		</div>
 	</div>
-}
+	<!-- Tab panels -->
+	<div class="mt-6">
+		<div data-tab-panel="details">
+			@productDetailsTab(props)
+		</div>
+		<div data-tab-panel="variants" class="hidden">
+			@productVariantsTab(props)
+		</div>
+		<div data-tab-panel="pricing" class="hidden">
+			@productPricingTab(props)
+		</div>
+	</div>
+	<script>
+		(function() {
+			var activeClass = 'border-hiri-teal text-hiri-teal';
+			var inactiveClass = 'border-transparent text-stone-500 hover:border-stone-300 hover:text-stone-700';
 
-templ productTabLink(label string, tab string, props ProductEditProps) {
-	if props.ActiveTab() == tab {
-		<a
-			href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s?tab=%s", props.Product.ID, tab)) }
-			aria-current="page"
-			class="border-b-2 border-hiri-teal px-1 py-4 text-sm font-medium whitespace-nowrap text-hiri-teal"
-		>
-			{ label }
-		</a>
-	} else {
-		<a
-			href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s?tab=%s", props.Product.ID, tab)) }
-			class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-stone-500 hover:border-stone-300 hover:text-stone-700"
-		>
-			{ label }
-		</a>
-	}
+			function switchTab(name) {
+				document.querySelectorAll('[data-tab-panel]').forEach(function(p) {
+					p.classList.toggle('hidden', p.dataset.tabPanel !== name);
+				});
+				document.querySelectorAll('[data-tab]').forEach(function(b) {
+					var active = b.dataset.tab === name;
+					b.className = 'border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap ' + (active ? activeClass : inactiveClass);
+				});
+				var sel = document.querySelector('[data-tab-select]');
+				if (sel) sel.value = name;
+			}
+
+			document.querySelectorAll('[data-tab]').forEach(function(b) {
+				b.addEventListener('click', function() { switchTab(this.dataset.tab); });
+			});
+			var sel = document.querySelector('[data-tab-select]');
+			if (sel) sel.addEventListener('change', function() { switchTab(this.value); });
+		})();
+	</script>
 }
 
 // --- Details Tab ---
@@ -219,7 +203,7 @@ templ productVariantsTab(props ProductEditProps) {
 // --- Pricing Tab ---
 
 templ productPricingTab(props ProductEditProps) {
-	<div id="pricing-tab-content" class="space-y-4">
+	<div class="space-y-4">
 		<p class="text-sm text-stone-500">
 			Set base and group-specific prices for this product's variants.
 			if len(props.Groups) == 0 {
@@ -229,11 +213,7 @@ templ productPricingTab(props ProductEditProps) {
 		if len(props.Variants) == 0 {
 			<div class="rounded-lg border-2 border-dashed border-stone-300 p-12 text-center">
 				<h3 class="mt-2 text-sm font-semibold text-stone-900">No variants</h3>
-				<p class="mt-1 text-sm text-stone-500">
-					Add variants on the
-					<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s?tab=variants", props.Product.ID)) } class="text-hiri-teal hover:text-hiri-teal-dark">Variants tab</a>
-					first.
-				</p>
+				<p class="mt-1 text-sm text-stone-500">Add variants on the Variants tab first.</p>
 			</div>
 		} else {
 			<!-- Base Prices -->
@@ -244,11 +224,6 @@ templ productPricingTab(props ProductEditProps) {
 			}
 		}
 	</div>
-}
-
-// ProductPricingTabContent renders the pricing tab inner content for htmx swaps.
-templ ProductPricingTabContent(props ProductEditProps) {
-	@productPricingTab(props)
 }
 
 templ productPricingCard(title string, group *domain.CustomerGroup, props ProductEditProps) {
@@ -284,11 +259,10 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 									method="post"
 									action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID)) }
 									hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID) }
-									hx-target="#pricing-tab-content"
-									hx-swap="innerHTML"
+									hx-target="#variants-panel"
+									hx-swap="outerHTML"
 									class="flex items-center gap-1"
 								>
-									<input type="hidden" name="return_tab" value="pricing"/>
 									<span class="text-stone-400">$</span>
 									<input
 										type="number"
@@ -310,11 +284,10 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 									method="post"
 									action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/group-price", props.Product.ID, vwo.Variant.ID)) }
 									hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/group-price", props.Product.ID, vwo.Variant.ID) }
-									hx-target="#pricing-tab-content"
-									hx-swap="innerHTML"
+									hx-target="#variants-panel"
+									hx-swap="outerHTML"
 									class="flex items-center gap-1"
 								>
-									<input type="hidden" name="return_tab" value="pricing"/>
 									<input type="hidden" name="group_id" value={ group.ID.String() }/>
 									<span class="text-stone-400">$</span>
 									<input

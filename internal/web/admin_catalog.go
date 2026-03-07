@@ -330,7 +330,6 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		Groups:    groups,
 		TaxonName: taxonName,
 		Flash:     r.URL.Query().Get("flash"),
-		Tab:       r.URL.Query().Get("tab"),
 		StaffName: name,
 		StaffRole: role,
 	}
@@ -701,85 +700,6 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 	admin.VariantsPanel(product, variants, options, taxonName, groups, nil).Render(ctx, w) //nolint:errcheck
 }
 
-// renderPricingTab re-fetches pricing data for a product and renders the pricing tab partial.
-func (d *Deps) renderPricingTab(w http.ResponseWriter, r *http.Request, productID uuid.UUID) {
-	ctx := r.Context()
-	var product *domain.Product
-	var variants []admin.VariantWithOptions
-	var options []admin.OptionWithValues
-	var groups []domain.CustomerGroup
-
-	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		var txErr error
-		product, txErr = d.CatalogService.GetProduct(ctx, tx, productID)
-		if txErr != nil {
-			return txErr
-		}
-
-		// Load options + values (needed for sorted option value names)
-		opts, txErr := d.CatalogService.ListProductOptions(ctx, tx, productID)
-		if txErr != nil {
-			return txErr
-		}
-		for _, opt := range opts {
-			vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
-			if vErr != nil {
-				return vErr
-			}
-			options = append(options, admin.OptionWithValues{
-				Option: opt,
-				Values: vals,
-			})
-		}
-
-		rawVariants, txErr := d.CatalogService.ListVariants(ctx, tx, productID)
-		if txErr != nil {
-			return txErr
-		}
-
-		priceMap, txErr := d.PricingService.ListBasePricesByProduct(ctx, tx, productID, "USD")
-		if txErr != nil {
-			return txErr
-		}
-
-		groupPriceMap, txErr := d.PricingService.ListGroupPricesByProduct(ctx, tx, productID, "USD")
-		if txErr != nil {
-			return txErr
-		}
-
-		for _, v := range rawVariants {
-			vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
-			if vErr != nil {
-				return vErr
-			}
-			vwo := admin.VariantWithOptions{
-				Variant:      v,
-				OptionValues: sortedOptionValueNames(vov, options),
-				GroupPrices:  groupPriceMap[v.ID],
-			}
-			if cents, ok := priceMap[v.ID]; ok {
-				vwo.PriceCents = &cents
-			}
-			variants = append(variants, vwo)
-		}
-
-		groups, txErr = d.CustomerGroupStore.List(ctx, tx)
-		return txErr
-	})
-	if err != nil {
-		Error(w, r, err)
-		return
-	}
-
-	props := admin.ProductEditProps{
-		Product:  product,
-		Variants: variants,
-		Groups:   groups,
-		Tab:      "pricing",
-	}
-	admin.ProductPricingTabContent(props).Render(ctx, w) //nolint:errcheck
-}
-
 // --- Variants ---
 
 func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) {
@@ -959,12 +879,10 @@ func (d *Deps) handleAdminVariantPriceUpdate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	returnTab := r.FormValue("return_tab")
-
 	dollars, err := strconv.ParseFloat(r.FormValue("price"), 64)
 	if err != nil || dollars < 0 {
 		if IsHTMX(r) {
-			d.renderPricePanel(w, r, productID, returnTab)
+			d.renderVariantsPanel(w, r, productID)
 			toast.Toast(toast.VariantError, "Please enter a valid price").Render(r.Context(), w) //nolint:errcheck
 			return
 		}
@@ -980,7 +898,7 @@ func (d *Deps) handleAdminVariantPriceUpdate(w http.ResponseWriter, r *http.Requ
 	})
 	if err != nil {
 		if IsHTMX(r) {
-			d.renderPricePanel(w, r, productID, returnTab)
+			d.renderVariantsPanel(w, r, productID)
 			_, msg := mapError(err)
 			toast.Toast(toast.VariantError, msg).Render(r.Context(), w) //nolint:errcheck
 			return
@@ -990,10 +908,10 @@ func (d *Deps) handleAdminVariantPriceUpdate(w http.ResponseWriter, r *http.Requ
 	}
 
 	if IsHTMX(r) {
-		d.renderPricePanel(w, r, productID, returnTab)
+		d.renderVariantsPanel(w, r, productID)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?tab=pricing&flash=Price+updated", productID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Price+updated", productID), http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminVariantGroupPriceUpdate(w http.ResponseWriter, r *http.Request) {
@@ -1017,7 +935,6 @@ func (d *Deps) handleAdminVariantGroupPriceUpdate(w http.ResponseWriter, r *http
 		return
 	}
 
-	returnTab := r.FormValue("return_tab")
 	priceStr := r.FormValue("price")
 
 	// Empty price = delete group price
@@ -1030,17 +947,17 @@ func (d *Deps) handleAdminVariantGroupPriceUpdate(w http.ResponseWriter, r *http
 			return
 		}
 		if IsHTMX(r) {
-			d.renderPricePanel(w, r, productID, returnTab)
+			d.renderVariantsPanel(w, r, productID)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?tab=pricing&flash=Group+price+removed", productID), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Group+price+removed", productID), http.StatusSeeOther)
 		return
 	}
 
 	dollars, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil || dollars < 0 {
 		if IsHTMX(r) {
-			d.renderPricePanel(w, r, productID, returnTab)
+			d.renderVariantsPanel(w, r, productID)
 			toast.Toast(toast.VariantError, "Please enter a valid price").Render(r.Context(), w) //nolint:errcheck
 			return
 		}
@@ -1056,7 +973,7 @@ func (d *Deps) handleAdminVariantGroupPriceUpdate(w http.ResponseWriter, r *http
 	})
 	if err != nil {
 		if IsHTMX(r) {
-			d.renderPricePanel(w, r, productID, returnTab)
+			d.renderVariantsPanel(w, r, productID)
 			_, msg := mapError(err)
 			toast.Toast(toast.VariantError, msg).Render(r.Context(), w) //nolint:errcheck
 			return
@@ -1066,19 +983,10 @@ func (d *Deps) handleAdminVariantGroupPriceUpdate(w http.ResponseWriter, r *http
 	}
 
 	if IsHTMX(r) {
-		d.renderPricePanel(w, r, productID, returnTab)
+		d.renderVariantsPanel(w, r, productID)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?tab=pricing&flash=Group+price+updated", productID), http.StatusSeeOther)
-}
-
-// renderPricePanel renders either the pricing tab or variants panel based on returnTab.
-func (d *Deps) renderPricePanel(w http.ResponseWriter, r *http.Request, productID uuid.UUID, returnTab string) {
-	if returnTab == "pricing" {
-		d.renderPricingTab(w, r, productID)
-	} else {
-		d.renderVariantsPanel(w, r, productID)
-	}
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Group+price+updated", productID), http.StatusSeeOther)
 }
 
 // --- Options ---

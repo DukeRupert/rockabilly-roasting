@@ -324,7 +324,7 @@ type ProductMedium struct {
 	ID        uuid.UUID  `json:"id"`
 	ProductID uuid.UUID  `json:"product_id"`
 	VariantID *uuid.UUID `json:"variant_id"`
-	CfImageID string     `json:"cf_image_id"`
+	R2Key     string     `json:"r2_key"`
 	AltText   string     `json:"alt_text"`
 	Position  int32      `json:"position"`
 	MediaType string     `json:"media_type"`

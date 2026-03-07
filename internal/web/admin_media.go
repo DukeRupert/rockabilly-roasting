@@ -3,8 +3,10 @@ package web
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -15,29 +17,36 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
 
-// handleAdminImageUploadURL generates a one-time direct upload URL from
-// Cloudflare Images. The browser uploads directly to CF — no file data
-// passes through this server.
+// handleAdminImageUploadURL generates a presigned R2 PUT URL for browser-direct
+// upload. No file data passes through this server.
 //
 // POST /admin/images/upload-url
-// Response: { "upload_url": "...", "image_id": "..." }
+// Form: content_type (e.g. "image/jpeg")
+// Response: { "upload_url": "...", "r2_key": "..." }
 func (d *Deps) handleAdminImageUploadURL(w http.ResponseWriter, r *http.Request) {
-	result, err := d.CFImagesClient.UploadURL(r.Context())
+	contentType := r.FormValue("content_type")
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+
+	r2Key := fmt.Sprintf("products/%s", uuid.New().String())
+
+	uploadURL, err := d.R2Client.PresignPutURL(r.Context(), r2Key, contentType, 15*time.Minute)
 	if err != nil {
 		Error(w, r, err)
 		return
 	}
 	JSON(w, http.StatusOK, map[string]string{
-		"upload_url": result.UploadURL,
-		"image_id":   result.ImageID,
+		"upload_url": uploadURL,
+		"r2_key":     r2Key,
 	})
 }
 
 // handleAdminProductImageCreate persists a product media record after the
-// browser has uploaded the image to Cloudflare Images.
+// browser has uploaded the image to R2.
 //
 // POST /admin/catalog/{id}/images
-// Form: cf_image_id, alt_text, position
+// Form: r2_key, alt_text, position
 func (d *Deps) handleAdminProductImageCreate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -47,14 +56,14 @@ func (d *Deps) handleAdminProductImageCreate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := r.ParseForm(); err != nil {
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		Error(w, r, err)
 		return
 	}
 
-	cfImageID := r.FormValue("cf_image_id")
-	if cfImageID == "" {
-		Error(w, r, errors.New("cf_image_id is required"))
+	r2Key := r.FormValue("r2_key")
+	if r2Key == "" {
+		Error(w, r, errors.New("r2_key is required"))
 		return
 	}
 
@@ -65,7 +74,7 @@ func (d *Deps) handleAdminProductImageCreate(w http.ResponseWriter, r *http.Requ
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		_, txErr := d.CatalogService.CreateProductMedia(ctx, tx, store.CreateProductMediaParams{
 			ProductID: productID,
-			CFImageID: cfImageID,
+			R2Key:     r2Key,
 			AltText:   altText,
 			Position:  position,
 			MediaType: domain.MediaTypeImage,
@@ -81,7 +90,7 @@ func (d *Deps) handleAdminProductImageCreate(w http.ResponseWriter, r *http.Requ
 }
 
 // handleAdminProductImageDelete removes a product media record and enqueues
-// a River job to delete the image from Cloudflare Images.
+// a River job to delete the image from R2.
 //
 // POST /admin/catalog/{id}/images/{imageID}/delete
 func (d *Deps) handleAdminProductImageDelete(w http.ResponseWriter, r *http.Request) {
@@ -101,17 +110,17 @@ func (d *Deps) handleAdminProductImageDelete(w http.ResponseWriter, r *http.Requ
 
 	actor := staffActor(r)
 
-	var cfImageID string
+	var r2Key string
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		cfImageID, txErr = d.CatalogService.DeleteProductMedia(ctx, tx, imageID, actor)
+		r2Key, txErr = d.CatalogService.DeleteProductMedia(ctx, tx, imageID, actor)
 		if txErr != nil {
 			return txErr
 		}
 
-		// Enqueue CF image deletion in the same transaction.
-		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.CFImageDeleteArgs{
-			CFImageID: cfImageID,
+		// Enqueue R2 image deletion in the same transaction.
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.R2ImageDeleteArgs{
+			R2Key: r2Key,
 		}, nil)
 		return txErr
 	})

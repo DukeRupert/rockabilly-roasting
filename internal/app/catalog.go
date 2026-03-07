@@ -554,9 +554,9 @@ func (s *CatalogService) UpdateProductMediaPosition(ctx context.Context, tx pgx.
 }
 
 // DeleteProductMedia removes a product media item by ID and returns the
-// CF image ID for cleanup (e.g. enqueue a River job to delete from CF).
+// R2 key for cleanup (e.g. enqueue a River job to delete from R2).
 func (s *CatalogService) DeleteProductMedia(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (string, error) {
-	cfImageID, err := s.catalog.DeleteProductMedia(ctx, tx, id)
+	r2Key, err := s.catalog.DeleteProductMedia(ctx, tx, id)
 	if err != nil {
 		return "", fmt.Errorf("delete product media: %w", err)
 	}
@@ -568,10 +568,10 @@ func (s *CatalogService) DeleteProductMedia(ctx context.Context, tx pgx.Tx, id u
 		Action:       audit.AuditProductMediaDeleted,
 		ResourceType: "product_media",
 		ResourceID:   id,
-		Metadata:     map[string]any{"cf_image_id": cfImageID},
+		Metadata:     map[string]any{"r2_key": r2Key},
 	}); err != nil {
 		return "", fmt.Errorf("audit product media deleted: %w", err)
 	}
 
-	return cfImageID, nil
+	return r2Key, nil
 }

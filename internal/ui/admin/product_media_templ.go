@@ -23,8 +23,8 @@ type MediaGalleryProps struct {
 
 // mediaURL resolves a product media item to a renderable URL.
 func mediaURL(m domain.ProductMedia, cfg *media.Config) string {
-	if cfg != nil && m.CFImageID != "" {
-		return cfg.ProductImageURL(m.CFImageID, media.VariantCard)
+	if cfg != nil && m.R2Key != "" {
+		return cfg.ProductImageURL(m.R2Key, media.VariantCard)
 	}
 	if cfg != nil {
 		return cfg.PlaceholderURL()
@@ -137,26 +137,43 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"rounded-lg border-2 border-dashed border-stone-300 p-8 text-center\"><svg class=\"mx-auto size-12 text-stone-400\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z\"></path></svg><p class=\"mt-2 text-sm text-stone-500\">No images yet.</p></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<!-- Upload button --><div class=\"mt-4\"><div x-data=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<!-- Upload drop zone -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("imageUploader('%s')", props.ProductID))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/product_media.templ`, Line: 86, Col: 65}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		var templ_7745c5c3_Var6 = []any{templ.KV("mt-4", len(props.Media) > 0)}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" class=\"relative\"><input type=\"file\" accept=\"image/*\" multiple x-ref=\"fileInput\" @change=\"handleFiles($event)\" class=\"hidden\"> <button type=\"button\" @click=\"$refs.fileInput.click()\" :disabled=\"uploading\" class=\"inline-flex items-center gap-x-1.5 rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark disabled:opacity-50\"><svg class=\"-ml-0.5 size-5\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path d=\"M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z\"></path></svg> <span x-text=\"uploading ? 'Uploading...' : 'Add photos'\"></span></button><!-- Progress indicator --><template x-if=\"uploading\"><div class=\"mt-2 text-sm text-stone-500\">Uploading <span x-text=\"progress\"></span>...</div></template><!-- Error display --><template x-if=\"error\"><div class=\"mt-2 text-sm text-red-600\" x-text=\"error\"></div></template></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div x-data=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("imageUploader('%s')", props.ProductID))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/product_media.templ`, Line: 78, Col: 64}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" class=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var8 string
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var6).String())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/product_media.templ`, Line: 1, Col: 0}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><div @click=\"$refs.fileInput.click()\" @dragover.prevent=\"dragging = true\" @dragleave.prevent=\"dragging = false\" @drop.prevent=\"dragging = false; handleDrop($event)\" :class=\"dragging ? 'border-hiri-teal bg-hiri-teal/5' : 'border-stone-900/25'\" class=\"flex cursor-pointer justify-center rounded-lg border border-dashed px-6 py-10 transition-colors\"><div class=\"text-center\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\" class=\"mx-auto size-12 text-stone-300\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M1.5 6a2.25 2.25 0 0 1 2.25-2.25h16.5A2.25 2.25 0 0 1 22.5 6v12a2.25 2.25 0 0 1-2.25 2.25H3.75A2.25 2.25 0 0 1 1.5 18V6ZM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0 0 21 18v-1.94l-2.69-2.689a1.5 1.5 0 0 0-2.12 0l-.88.879.97.97a.75.75 0 1 1-1.06 1.06l-5.16-5.159a1.5 1.5 0 0 0-2.12 0L3 16.061Zm10.125-7.81a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Z\"></path></svg><div class=\"mt-4 flex text-sm/6 text-stone-600\"><span class=\"font-semibold text-hiri-teal hover:text-hiri-teal-dark\" x-show=\"!uploading\">Upload a file</span> <span class=\"font-semibold text-stone-500\" x-show=\"uploading\" x-cloak>Uploading <span x-text=\"progress\"></span>...</span><p class=\"pl-1\" x-show=\"!uploading\">or drag and drop</p></div><p class=\"text-xs/5 text-stone-600\">PNG, JPG, GIF up to 10MB</p><!-- Error display --><template x-if=\"error\"><p class=\"mt-2 text-sm text-red-600\" x-text=\"error\"></p></template></div></div><input type=\"file\" accept=\"image/png,image/jpeg,image/gif\" multiple x-ref=\"fileInput\" @change=\"handleFiles($event)\" class=\"sr-only\"></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -164,7 +181,7 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 	})
 }
 
-// imageUploaderScript outputs the Alpine.js component for direct-to-CF upload.
+// imageUploaderScript outputs the Alpine.js component for direct-to-R2 upload.
 func ImageUploaderScript() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -181,12 +198,12 @@ func ImageUploaderScript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var7 == nil {
-			templ_7745c5c3_Var7 = templ.NopComponent
+		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var9 == nil {
+			templ_7745c5c3_Var9 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<script>\n\t\tdocument.addEventListener('alpine:init', () => {\n\t\t\tAlpine.data('imageUploader', (productId) => ({\n\t\t\t\tuploading: false,\n\t\t\t\tprogress: '',\n\t\t\t\terror: '',\n\n\t\t\t\tasync handleFiles(event) {\n\t\t\t\t\tconst files = event.target.files;\n\t\t\t\t\tif (!files.length) return;\n\n\t\t\t\t\tthis.uploading = true;\n\t\t\t\t\tthis.error = '';\n\n\t\t\t\t\tfor (let i = 0; i < files.length; i++) {\n\t\t\t\t\t\tthis.progress = (i + 1) + ' of ' + files.length;\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tawait this.uploadFile(files[i], i);\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\tthis.error = 'Upload failed: ' + err.message;\n\t\t\t\t\t\t\tbreak;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tthis.uploading = false;\n\t\t\t\t\tthis.progress = '';\n\t\t\t\t\tevent.target.value = '';\n\t\t\t\t},\n\n\t\t\t\tasync uploadFile(file, position) {\n\t\t\t\t\t// Step 1: Get presigned upload URL from our server.\n\t\t\t\t\tconst urlResp = await fetch('/admin/images/upload-url', {\n\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\theaders: { 'X-Requested-With': 'XMLHttpRequest' },\n\t\t\t\t\t});\n\t\t\t\t\tif (!urlResp.ok) throw new Error('Failed to get upload URL');\n\t\t\t\t\tconst { upload_url, image_id } = await urlResp.json();\n\n\t\t\t\t\t// Step 2: Upload directly to Cloudflare Images.\n\t\t\t\t\tconst formData = new FormData();\n\t\t\t\t\tformData.append('file', file);\n\t\t\t\t\tconst cfResp = await fetch(upload_url, {\n\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\tbody: formData,\n\t\t\t\t\t});\n\t\t\t\t\tif (!cfResp.ok) throw new Error('Failed to upload to Cloudflare');\n\n\t\t\t\t\t// Step 3: Persist the image ID in our database.\n\t\t\t\t\tconst persistForm = new FormData();\n\t\t\t\t\tpersistForm.append('cf_image_id', image_id);\n\t\t\t\t\tpersistForm.append('alt_text', file.name.replace(/\\.[^.]+$/, ''));\n\t\t\t\t\tpersistForm.append('position', position.toString());\n\n\t\t\t\t\tconst persistResp = await fetch('/admin/catalog/' + productId + '/images', {\n\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\theaders: {\n\t\t\t\t\t\t\t'HX-Request': 'true',\n\t\t\t\t\t\t},\n\t\t\t\t\t\tbody: persistForm,\n\t\t\t\t\t});\n\t\t\t\t\tif (!persistResp.ok) throw new Error('Failed to save image');\n\n\t\t\t\t\t// Step 4: Swap in the updated gallery.\n\t\t\t\t\tconst html = await persistResp.text();\n\t\t\t\t\tconst gallery = document.getElementById('media-gallery');\n\t\t\t\t\tif (gallery) {\n\t\t\t\t\t\tgallery.outerHTML = html;\n\t\t\t\t\t\thtmx.process(document.getElementById('media-gallery'));\n\t\t\t\t\t}\n\t\t\t\t},\n\t\t\t}));\n\t\t});\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<script>\n\t\tdocument.addEventListener('alpine:init', () => {\n\t\t\tAlpine.data('imageUploader', (productId) => ({\n\t\t\t\tuploading: false,\n\t\t\t\tdragging: false,\n\t\t\t\tprogress: '',\n\t\t\t\terror: '',\n\n\t\t\t\thandleDrop(event) {\n\t\t\t\t\tconst files = event.dataTransfer.files;\n\t\t\t\t\tif (files.length) {\n\t\t\t\t\t\tthis.$refs.fileInput.files = files;\n\t\t\t\t\t\tthis.handleFiles({ target: { files, value: '' } });\n\t\t\t\t\t}\n\t\t\t\t},\n\n\t\t\t\tasync handleFiles(event) {\n\t\t\t\t\tconst files = event.target.files;\n\t\t\t\t\tif (!files.length) return;\n\n\t\t\t\t\tthis.uploading = true;\n\t\t\t\t\tthis.error = '';\n\n\t\t\t\t\tfor (let i = 0; i < files.length; i++) {\n\t\t\t\t\t\tthis.progress = (i + 1) + ' of ' + files.length;\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tawait this.uploadFile(files[i], i);\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\tthis.error = 'Upload failed: ' + err.message;\n\t\t\t\t\t\t\tbreak;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tthis.uploading = false;\n\t\t\t\t\tthis.progress = '';\n\t\t\t\t\tif (event.target.value !== undefined) {\n\t\t\t\t\t\tevent.target.value = '';\n\t\t\t\t\t}\n\t\t\t\t},\n\n\t\t\t\tasync uploadFile(file, position) {\n\t\t\t\t\t// Step 1: Get presigned R2 upload URL from our server.\n\t\t\t\t\tconst urlForm = new FormData();\n\t\t\t\t\turlForm.append('content_type', file.type || 'image/jpeg');\n\t\t\t\t\tconst urlResp = await fetch('/admin/images/upload-url', {\n\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\theaders: { 'X-Requested-With': 'XMLHttpRequest' },\n\t\t\t\t\t\tbody: urlForm,\n\t\t\t\t\t});\n\t\t\t\t\tif (!urlResp.ok) throw new Error('Failed to get upload URL');\n\t\t\t\t\tconst { upload_url, r2_key } = await urlResp.json();\n\n\t\t\t\t\t// Step 2: Upload directly to R2 via presigned PUT.\n\t\t\t\t\tconst r2Resp = await fetch(upload_url, {\n\t\t\t\t\t\tmethod: 'PUT',\n\t\t\t\t\t\theaders: { 'Content-Type': file.type || 'image/jpeg' },\n\t\t\t\t\t\tbody: file,\n\t\t\t\t\t});\n\t\t\t\t\tif (!r2Resp.ok) throw new Error('Failed to upload to R2');\n\n\t\t\t\t\t// Step 3: Persist the R2 key in our database.\n\t\t\t\t\tconst persistForm = new FormData();\n\t\t\t\t\tpersistForm.append('r2_key', r2_key);\n\t\t\t\t\tpersistForm.append('alt_text', file.name.replace(/\\.[^.]+$/, ''));\n\t\t\t\t\tpersistForm.append('position', position.toString());\n\n\t\t\t\t\tconst persistResp = await fetch('/admin/catalog/' + productId + '/images', {\n\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\theaders: {\n\t\t\t\t\t\t\t'HX-Request': 'true',\n\t\t\t\t\t\t},\n\t\t\t\t\t\tbody: persistForm,\n\t\t\t\t\t});\n\t\t\t\t\tif (!persistResp.ok) throw new Error('Failed to save image');\n\n\t\t\t\t\t// Step 4: Swap in the updated gallery.\n\t\t\t\t\tconst html = await persistResp.text();\n\t\t\t\t\tconst gallery = document.getElementById('media-gallery');\n\t\t\t\t\tif (gallery) {\n\t\t\t\t\t\tgallery.outerHTML = html;\n\t\t\t\t\t\thtmx.process(document.getElementById('media-gallery'));\n\t\t\t\t\t}\n\t\t\t\t},\n\t\t\t}));\n\t\t});\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

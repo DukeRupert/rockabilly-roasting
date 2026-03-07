@@ -101,7 +101,7 @@ WHERE variant_id = $1;
 DELETE FROM variant_option_values WHERE variant_id = $1;
 
 -- name: CreateProductMedia :one
-INSERT INTO product_media (id, product_id, variant_id, cf_image_id, alt_text, position, media_type)
+INSERT INTO product_media (id, product_id, variant_id, r2_key, alt_text, position, media_type)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 

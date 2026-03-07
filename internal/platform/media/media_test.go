@@ -8,44 +8,44 @@ import (
 
 func TestProductImageURL(t *testing.T) {
 	cfg := &Config{
-		CFImagesBaseURL: "https://imagedelivery.net/abc123hash",
+		MediaBaseURL: "https://media.hiri.com",
 	}
 
 	tests := []struct {
 		name     string
-		imageID  string
+		r2Key    string
 		variant  ImageVariant
 		expected string
 	}{
 		{
 			name:     "thumbnail variant",
-			imageID:  "img-uuid-001",
+			r2Key:    "products/img-001.jpg",
 			variant:  VariantThumbnail,
-			expected: "https://imagedelivery.net/abc123hash/img-uuid-001/thumbnail",
+			expected: "https://media.hiri.com/cdn-cgi/image/width=200,height=200,fit=crop/products/img-001.jpg",
 		},
 		{
 			name:     "card variant",
-			imageID:  "img-uuid-002",
+			r2Key:    "products/img-002.jpg",
 			variant:  VariantCard,
-			expected: "https://imagedelivery.net/abc123hash/img-uuid-002/card",
+			expected: "https://media.hiri.com/cdn-cgi/image/width=400,height=400,fit=crop/products/img-002.jpg",
 		},
 		{
 			name:     "hero variant",
-			imageID:  "img-uuid-003",
+			r2Key:    "products/img-003.jpg",
 			variant:  VariantHero,
-			expected: "https://imagedelivery.net/abc123hash/img-uuid-003/hero",
+			expected: "https://media.hiri.com/cdn-cgi/image/width=800,height=800,fit=contain/products/img-003.jpg",
 		},
 		{
 			name:     "public (original) variant",
-			imageID:  "img-uuid-004",
+			r2Key:    "products/img-004.jpg",
 			variant:  VariantPublic,
-			expected: "https://imagedelivery.net/abc123hash/img-uuid-004/public",
+			expected: "https://media.hiri.com/cdn-cgi/image/width=1200,fit=scale-down/products/img-004.jpg",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := cfg.ProductImageURL(tt.imageID, tt.variant)
+			got := cfg.ProductImageURL(tt.r2Key, tt.variant)
 			assert.Equal(t, tt.expected, got)
 		})
 	}

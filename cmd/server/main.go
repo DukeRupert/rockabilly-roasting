@@ -89,13 +89,9 @@ func run() error {
 	storeName := os.Getenv("STORE_NAME")
 	staffEmail := os.Getenv("STAFF_NOTIFICATION_EMAIL")
 
-	// Media (Cloudflare Images + R2)
-	cfImagesClient := media.NewCFImagesClient(
-		os.Getenv("CF_IMAGES_ACCOUNT_ID"),
-		os.Getenv("CF_IMAGES_API_TOKEN"),
-	)
+	// Media (R2 storage + Cloudflare Image Transformations)
 	mediaConfig := &media.Config{
-		CFImagesBaseURL: os.Getenv("CF_IMAGES_BASE_URL"),
+		MediaBaseURL: os.Getenv("MEDIA_BASE_URL"),
 	}
 	r2Client, err := media.NewR2Client(ctx, media.R2Config{
 		AccountID:      os.Getenv("R2_ACCOUNT_ID"),
@@ -150,7 +146,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewWholesaleApprovedWorker(customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
 	river.AddWorker(workers, jobs.NewOrderConfirmEmailWorker(orderStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
 	river.AddWorker(workers, jobs.NewSubscriptionConfirmEmailWorker(subscriptionStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
-	river.AddWorker(workers, jobs.NewCFImageDeleteWorker(cfImagesClient))
+	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
 
 	// River client — we create it first, then pass it to the scheduler worker
@@ -227,7 +223,6 @@ func run() error {
 		CustomerGroupStore: customerGroupStore,
 		SettingsStore:      settingsStore,
 		RiverClient:        riverClient,
-		CFImagesClient:     cfImagesClient,
 		R2Client:           r2Client,
 		MediaConfig:        mediaConfig,
 		RateLimiter:        rateLimiter,

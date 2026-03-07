@@ -79,3 +79,28 @@ func (c *R2Client) PresignGetURL(ctx context.Context, key string, ttl time.Durat
 	}
 	return req.URL, nil
 }
+
+// PresignPutURL returns a time-limited upload URL for browser-direct uploads.
+func (c *R2Client) PresignPutURL(ctx context.Context, key, contentType string, ttl time.Duration) (string, error) {
+	req, err := c.presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(c.bucket),
+		Key:         aws.String(key),
+		ContentType: aws.String(contentType),
+	}, s3.WithPresignExpires(ttl))
+	if err != nil {
+		return "", fmt.Errorf("r2 presign put %s: %w", key, err)
+	}
+	return req.URL, nil
+}
+
+// DeleteObject removes an object from R2 by key.
+func (c *R2Client) DeleteObject(ctx context.Context, key string) error {
+	_, err := c.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("r2 delete %s: %w", key, err)
+	}
+	return nil
+}

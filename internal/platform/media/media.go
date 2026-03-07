@@ -2,9 +2,8 @@ package media
 
 import "fmt"
 
-// ImageVariant identifies a named transform preset configured in the
-// Cloudflare Images dashboard. Appended to the delivery URL as the
-// final path segment.
+// ImageVariant identifies a named transform preset. Each variant maps to
+// Cloudflare Image Transformation parameters appended via /cdn-cgi/image/.
 type ImageVariant string
 
 const (
@@ -14,22 +13,34 @@ const (
 	VariantPublic    ImageVariant = "public"     // original size
 )
 
-// Config holds Cloudflare Images and R2 configuration.
+// variantParams maps each variant to its Cloudflare Image Transformation params.
+var variantParams = map[ImageVariant]string{
+	VariantThumbnail: "width=200,height=200,fit=crop",
+	VariantCard:      "width=400,height=400,fit=crop",
+	VariantHero:      "width=800,height=800,fit=contain",
+	VariantPublic:    "width=1200,fit=scale-down",
+}
+
+// Config holds media delivery configuration.
 type Config struct {
-	// CFImagesBaseURL is the delivery base URL, e.g.
-	// "https://imagedelivery.net/<account_hash>".
-	CFImagesBaseURL string
+	// MediaBaseURL is the public domain serving R2 content with Cloudflare
+	// Image Transformations enabled, e.g. "https://media.hiri.com".
+	MediaBaseURL string
 
 	// PlaceholderPath is the local static path for missing images.
 	PlaceholderPath string
 }
 
-// ProductImageURL constructs a Cloudflare Images delivery URL from a
-// CF image ID and a named variant.
+// ProductImageURL constructs a Cloudflare Image Transformations URL for an
+// R2 object key and a named variant.
 //
-//	https://imagedelivery.net/<account_hash>/<image_id>/<variant>
-func (c *Config) ProductImageURL(cfImageID string, variant ImageVariant) string {
-	return fmt.Sprintf("%s/%s/%s", c.CFImagesBaseURL, cfImageID, variant)
+//	https://<domain>/cdn-cgi/image/<params>/<r2_key>
+func (c *Config) ProductImageURL(r2Key string, variant ImageVariant) string {
+	params, ok := variantParams[variant]
+	if !ok {
+		params = variantParams[VariantPublic]
+	}
+	return fmt.Sprintf("%s/cdn-cgi/image/%s/%s", c.MediaBaseURL, params, r2Key)
 }
 
 // PlaceholderURL returns the local fallback path when no image exists.

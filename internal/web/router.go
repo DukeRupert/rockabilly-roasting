@@ -45,7 +45,6 @@ type Deps struct {
 	CustomerGroupStore  *store.CustomerGroupStore
 	SettingsStore       *store.SettingsStore
 	RiverClient         *river.Client[pgx.Tx]
-	CFImagesClient      *media.CFImagesClient
 	R2Client            *media.R2Client
 	MediaConfig         *media.Config
 	RateLimiter         *ratelimit.Limiter

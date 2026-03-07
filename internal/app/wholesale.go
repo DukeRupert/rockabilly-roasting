@@ -309,7 +309,7 @@ func (s *WholesaleService) QuickOrderCatalog(
 		var imageURL string
 		media, err := s.catalog.ListProductMedia(ctx, tx, p.ID)
 		if err == nil && len(media) > 0 {
-			imageURL = media[0].CFImageID
+			imageURL = media[0].R2Key
 		}
 
 		qVariants := make([]QuickOrderVariant, 0, len(variants))

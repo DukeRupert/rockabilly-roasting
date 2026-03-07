@@ -607,7 +607,7 @@ func (s *CatalogStore) DeleteVariantOptionValues(ctx context.Context, tx pgx.Tx,
 type CreateProductMediaParams struct {
 	ProductID uuid.UUID
 	VariantID *uuid.UUID
-	CFImageID string
+	R2Key     string
 	AltText   string
 	Position  int
 	MediaType domain.MediaType
@@ -619,7 +619,7 @@ func (s *CatalogStore) CreateProductMedia(ctx context.Context, tx pgx.Tx, p Crea
 		ID:        uuid.New(),
 		ProductID: p.ProductID,
 		VariantID: p.VariantID,
-		CfImageID: p.CFImageID,
+		R2Key:     p.R2Key,
 		AltText:   p.AltText,
 		Position:  int32(p.Position),
 		MediaType: string(p.MediaType),
@@ -665,7 +665,7 @@ func (s *CatalogStore) GetProductMediaByID(ctx context.Context, tx pgx.Tx, id uu
 }
 
 // DeleteProductMedia removes a product media item by ID and returns the
-// CF image ID so the caller can enqueue a cleanup job.
+// R2 key so the caller can enqueue a cleanup job.
 func (s *CatalogStore) DeleteProductMedia(ctx context.Context, tx pgx.Tx, id uuid.UUID) (string, error) {
 	media, err := sqlcgen.New(tx).GetProductMediaByID(ctx, id)
 	if err != nil {
@@ -674,7 +674,7 @@ func (s *CatalogStore) DeleteProductMedia(ctx context.Context, tx pgx.Tx, id uui
 	if err := sqlcgen.New(tx).DeleteProductMedia(ctx, id); err != nil {
 		return "", fmt.Errorf("delete product media: %w", err)
 	}
-	return media.CfImageID, nil
+	return media.R2Key, nil
 }
 
 // --- Taxons ---
@@ -839,7 +839,7 @@ func productMediaFromRow(r sqlcgen.ProductMedium) *domain.ProductMedia {
 		ID:        r.ID,
 		ProductID: r.ProductID,
 		VariantID: r.VariantID,
-		CFImageID: r.CfImageID,
+		R2Key:     r.R2Key,
 		AltText:   r.AltText,
 		Position:  int(r.Position),
 		MediaType: domain.MediaType(r.MediaType),

@@ -108,7 +108,7 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 				return mediaErr
 			}
 			if len(media) > 0 {
-				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].CFImageID, mediapkg.VariantCard)
+				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
 			}
 
 			// Get price from default variant.
@@ -204,7 +204,7 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 				return mediaErr
 			}
 			if len(media) > 0 {
-				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].CFImageID, mediapkg.VariantCard)
+				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
 			}
 
 			variants, varErr := d.CatalogService.ListVariants(ctx, tx, p.ID)

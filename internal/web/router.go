@@ -38,6 +38,7 @@ type Deps struct {
 	WebhookStore        *store.WebhookStore
 	CustomerStore       *store.CustomerStore
 	MagicLinkStore      *store.MagicLinkStore
+	CustomerGroupStore  *store.CustomerGroupStore
 	RiverClient         *river.Client[pgx.Tx]
 }
 
@@ -152,6 +153,13 @@ func NewRouter(deps *Deps) http.Handler {
 	// Admin customers
 	adminMux.HandleFunc("GET /admin/customers", deps.handleAdminCustomerList)
 	adminMux.HandleFunc("GET /admin/customers/{id}", deps.handleAdminCustomerShow)
+	adminMux.HandleFunc("POST /admin/customers/{id}/groups/add", deps.handleAdminCustomerGroupAdd)
+	adminMux.HandleFunc("POST /admin/customers/{id}/groups/{groupID}/remove", deps.handleAdminCustomerGroupRemove)
+
+	// Admin customer groups
+	adminMux.HandleFunc("GET /admin/groups", deps.handleAdminGroupList)
+	adminMux.HandleFunc("POST /admin/groups", deps.handleAdminGroupCreate)
+	adminMux.HandleFunc("POST /admin/groups/{id}/delete", deps.handleAdminGroupDelete)
 
 	// Admin subscription plans
 	adminMux.HandleFunc("GET /admin/plans", deps.handleAdminPlanList)

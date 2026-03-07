@@ -177,8 +177,9 @@ func run() error {
 		PaymentProvider:  paymentProvider,
 		WebhookStore:    webhookStore,
 		CustomerStore:   customerStore,
-		MagicLinkStore:  magicLinkStore,
-		RiverClient:     riverClient,
+		MagicLinkStore:     magicLinkStore,
+		CustomerGroupStore: customerGroupStore,
+		RiverClient:        riverClient,
 	}
 
 	handler := web.NewRouter(deps)

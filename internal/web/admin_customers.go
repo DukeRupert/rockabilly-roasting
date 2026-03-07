@@ -73,6 +73,8 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 
 	var customer *domain.Customer
 	var addresses []domain.Address
+	var memberGroups []domain.CustomerGroup
+	var allGroups []domain.CustomerGroup
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -81,6 +83,14 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		addresses, txErr = d.CustomerService.ListAddresses(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		memberGroups, txErr = d.CustomerGroupStore.ListByCustomer(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		allGroups, txErr = d.CustomerGroupStore.List(ctx, tx)
 		return txErr
 	})
 	if err != nil {
@@ -90,10 +100,12 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.CustomerShowProps{
-		Customer:  customer,
-		Addresses: addresses,
-		StaffName: name,
-		StaffRole: role,
+		Customer:     customer,
+		Addresses:    addresses,
+		MemberGroups: memberGroups,
+		AllGroups:    allGroups,
+		StaffName:    name,
+		StaffRole:    role,
 	}
 
 	if IsHTMX(r) {

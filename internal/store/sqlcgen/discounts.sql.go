@@ -15,7 +15,7 @@ import (
 const createCouponCode = `-- name: CreateCouponCode :one
 INSERT INTO coupon_codes (id, discount_id, code, customer_id)
 VALUES ($1, $2, $3, $4)
-RETURNING id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at
+RETURNING id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at, redeemed_by_order_id
 `
 
 type CreateCouponCodeParams struct {
@@ -41,6 +41,7 @@ func (q *Queries) CreateCouponCode(ctx context.Context, arg CreateCouponCodePara
 		&i.RedeemedAt,
 		&i.RedeemedBy,
 		&i.CreatedAt,
+		&i.RedeemedByOrderID,
 	)
 	return i, err
 }
@@ -111,7 +112,7 @@ func (q *Queries) DeleteDiscount(ctx context.Context, id uuid.UUID) error {
 }
 
 const getCouponCodeByCode = `-- name: GetCouponCodeByCode :one
-SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at FROM coupon_codes WHERE code = $1
+SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at, redeemed_by_order_id FROM coupon_codes WHERE code = $1
 `
 
 func (q *Queries) GetCouponCodeByCode(ctx context.Context, code string) (CouponCode, error) {
@@ -125,12 +126,13 @@ func (q *Queries) GetCouponCodeByCode(ctx context.Context, code string) (CouponC
 		&i.RedeemedAt,
 		&i.RedeemedBy,
 		&i.CreatedAt,
+		&i.RedeemedByOrderID,
 	)
 	return i, err
 }
 
 const getCouponCodeByID = `-- name: GetCouponCodeByID :one
-SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at FROM coupon_codes WHERE id = $1
+SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at, redeemed_by_order_id FROM coupon_codes WHERE id = $1
 `
 
 func (q *Queries) GetCouponCodeByID(ctx context.Context, id uuid.UUID) (CouponCode, error) {
@@ -144,6 +146,7 @@ func (q *Queries) GetCouponCodeByID(ctx context.Context, id uuid.UUID) (CouponCo
 		&i.RedeemedAt,
 		&i.RedeemedBy,
 		&i.CreatedAt,
+		&i.RedeemedByOrderID,
 	)
 	return i, err
 }
@@ -172,7 +175,7 @@ func (q *Queries) GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, 
 }
 
 const listCouponCodesByDiscount = `-- name: ListCouponCodesByDiscount :many
-SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at FROM coupon_codes
+SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at, redeemed_by_order_id FROM coupon_codes
 WHERE discount_id = $1
 ORDER BY created_at DESC
 `
@@ -194,6 +197,7 @@ func (q *Queries) ListCouponCodesByDiscount(ctx context.Context, discountID uuid
 			&i.RedeemedAt,
 			&i.RedeemedBy,
 			&i.CreatedAt,
+			&i.RedeemedByOrderID,
 		); err != nil {
 			return nil, err
 		}
@@ -219,6 +223,40 @@ type MarkCouponCodeRedeemedParams struct {
 func (q *Queries) MarkCouponCodeRedeemed(ctx context.Context, arg MarkCouponCodeRedeemedParams) error {
 	_, err := q.db.Exec(ctx, markCouponCodeRedeemed, arg.ID, arg.RedeemedBy)
 	return err
+}
+
+const redeemCouponCode = `-- name: RedeemCouponCode :one
+UPDATE coupon_codes
+SET redeemed_at = now(),
+    redeemed_by = $2,
+    redeemed_by_order_id = $3
+WHERE id = $1
+  AND redeemed_at IS NULL
+RETURNING id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at, redeemed_by_order_id
+`
+
+type RedeemCouponCodeParams struct {
+	ID                uuid.UUID  `json:"id"`
+	RedeemedBy        *uuid.UUID `json:"redeemed_by"`
+	RedeemedByOrderID *uuid.UUID `json:"redeemed_by_order_id"`
+}
+
+// Atomically redeem a coupon — only succeeds if redeemed_at IS NULL.
+// Returns the row if successful; pgx.ErrNoRows if already redeemed.
+func (q *Queries) RedeemCouponCode(ctx context.Context, arg RedeemCouponCodeParams) (CouponCode, error) {
+	row := q.db.QueryRow(ctx, redeemCouponCode, arg.ID, arg.RedeemedBy, arg.RedeemedByOrderID)
+	var i CouponCode
+	err := row.Scan(
+		&i.ID,
+		&i.DiscountID,
+		&i.Code,
+		&i.CustomerID,
+		&i.RedeemedAt,
+		&i.RedeemedBy,
+		&i.CreatedAt,
+		&i.RedeemedByOrderID,
+	)
+	return i, err
 }
 
 const updateDiscount = `-- name: UpdateDiscount :one

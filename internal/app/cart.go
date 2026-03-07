@@ -24,6 +24,18 @@ func NewCartService(carts *store.CartStore, pricing *store.PricingStore) *CartSe
 	return &CartService{carts: carts, pricing: pricing}
 }
 
+// GetCart returns a cart by ID.
+func (s *CartService) GetCart(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Cart, error) {
+	cart, err := s.carts.GetCartByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCartNotFound
+		}
+		return nil, fmt.Errorf("get cart: %w", err)
+	}
+	return cart, nil
+}
+
 // GetOrCreateCart returns the cart for the given ID, or creates a new one.
 func (s *CartService) GetOrCreateCart(ctx context.Context, tx pgx.Tx, cartID *uuid.UUID) (*domain.Cart, error) {
 	if cartID != nil {

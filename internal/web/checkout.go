@@ -55,6 +55,23 @@ type checkoutAddressResponse struct {
 	CustomerID string `json:"customer_id"`
 }
 
+type checkoutApplyCouponRequest struct {
+	CartID string `json:"cart_id"`
+	Code   string `json:"code"`
+}
+
+type checkoutApplyCouponResponse struct {
+	Valid          bool   `json:"valid"`
+	DiscountName   string `json:"discount_name,omitempty"`
+	DiscountType   string `json:"discount_type,omitempty"`
+	DiscountValue  int    `json:"discount_value,omitempty"`
+	ErrorMessage   string `json:"error_message,omitempty"`
+}
+
+type checkoutRemoveCouponRequest struct {
+	CartID string `json:"cart_id"`
+}
+
 type checkoutPaymentIntentRequest struct {
 	CartID     string `json:"cart_id"`
 	AddressID  string `json:"address_id"`
@@ -62,11 +79,15 @@ type checkoutPaymentIntentRequest struct {
 }
 
 type checkoutPaymentIntentResponse struct {
-	ClientSecret string `json:"client_secret"`
-	Amount       int    `json:"amount"`
-	Currency     string `json:"currency"`
-	TaxTotal     int    `json:"tax_total"`
-	TaxLabel     string `json:"tax_label,omitempty"`
+	ClientSecret   string `json:"client_secret"`
+	Amount         int    `json:"amount"`
+	Currency       string `json:"currency"`
+	Subtotal       int    `json:"subtotal"`
+	DiscountTotal  int    `json:"discount_total"`
+	DiscountName   string `json:"discount_name,omitempty"`
+	CouponCode     string `json:"coupon_code,omitempty"`
+	TaxTotal       int    `json:"tax_total"`
+	TaxLabel       string `json:"tax_label,omitempty"`
 }
 
 type checkoutConfirmRequest struct {
@@ -261,6 +282,111 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 	JSON(w, http.StatusOK, resp)
 }
 
+// handleCheckoutApplyCoupon validates and applies a coupon code to the cart.
+func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := logging.FromContext(ctx)
+
+	var req checkoutApplyCouponRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	code := strings.TrimSpace(req.Code)
+	if code == "" {
+		JSON(w, http.StatusOK, checkoutApplyCouponResponse{
+			Valid:        false,
+			ErrorMessage: "Please enter a coupon code.",
+		})
+		return
+	}
+
+	cartID, err := uuid.Parse(req.CartID)
+	if err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid cart_id"})
+		return
+	}
+
+	var resp checkoutApplyCouponResponse
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		discount, txErr := d.CheckoutService.ApplyCoupon(ctx, tx, code)
+		if txErr != nil {
+			switch {
+			case errors.Is(txErr, app.ErrCouponNotFound):
+				resp = checkoutApplyCouponResponse{ErrorMessage: "That code doesn't look right."}
+			case errors.Is(txErr, app.ErrCouponAlreadyUsed):
+				resp = checkoutApplyCouponResponse{ErrorMessage: "That code has already been used."}
+			case errors.Is(txErr, app.ErrDiscountNotActive):
+				resp = checkoutApplyCouponResponse{ErrorMessage: "That code is no longer active."}
+			case errors.Is(txErr, app.ErrDiscountExpired):
+				resp = checkoutApplyCouponResponse{ErrorMessage: "That code has expired."}
+			default:
+				return txErr
+			}
+			return nil
+		}
+
+		// Look up the coupon code to get its ID for cart storage.
+		coupon, txErr := d.CheckoutService.GetCouponCodeByCode(ctx, tx, code)
+		if txErr != nil {
+			return fmt.Errorf("get coupon code: %w", txErr)
+		}
+
+		// Apply to cart.
+		_, txErr = d.OrderService.UpdateCartDiscount(ctx, tx, cartID, &discount.ID, &coupon.ID)
+		if txErr != nil {
+			return fmt.Errorf("update cart discount: %w", txErr)
+		}
+
+		resp = checkoutApplyCouponResponse{
+			Valid:         true,
+			DiscountName:  discount.Name,
+			DiscountType:  string(discount.Type),
+			DiscountValue: discount.Value,
+		}
+		return nil
+	})
+	if err != nil {
+		logger.Error("apply coupon", "error", err)
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to apply coupon"})
+		return
+	}
+
+	JSON(w, http.StatusOK, resp)
+}
+
+// handleCheckoutRemoveCoupon removes the applied coupon from the cart.
+func (d *Deps) handleCheckoutRemoveCoupon(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := logging.FromContext(ctx)
+
+	var req checkoutRemoveCouponRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	cartID, err := uuid.Parse(req.CartID)
+	if err != nil {
+		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid cart_id"})
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.UpdateCartDiscount(ctx, tx, cartID, nil, nil)
+		return txErr
+	})
+	if err != nil {
+		logger.Error("remove coupon", "error", err)
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to remove coupon"})
+		return
+	}
+
+	JSON(w, http.StatusOK, map[string]string{"status": "removed"})
+}
+
 // handleCheckoutPaymentIntent creates a Stripe PaymentIntent for the cart total.
 func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -289,6 +415,9 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	}
 
 	var subtotal int
+	var discountTotal int
+	var discountName string
+	var couponCode string
 	var taxTotal int
 	var taxLabel string
 	var shippingAddr *domain.Address
@@ -308,7 +437,6 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			lineTotal := ci.UnitPrice * ci.Quantity
 			subtotal += lineTotal
 
-			// Look up product to check tax_exempt.
 			variant, vErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
 			if vErr != nil {
 				return fmt.Errorf("get variant for tax: %w", vErr)
@@ -325,7 +453,33 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			}
 		}
 
-		// Resolve customer for tax exemption status.
+		// Check for applied coupon on cart.
+		cart, txErr := d.CartService.GetCart(ctx, tx, cartID)
+		if txErr != nil {
+			return fmt.Errorf("get cart: %w", txErr)
+		}
+		if cart.AppliedCouponCodeID != nil {
+			cc, ccErr := d.CheckoutService.GetCouponCodeByID(ctx, tx, *cart.AppliedCouponCodeID)
+			if ccErr == nil && cc.RedeemedAt == nil {
+				discount, dErr := d.DiscountService.GetDiscount(ctx, tx, cc.DiscountID)
+				if dErr == nil && discount.Active {
+					discountTotal = calculateDiscountAmount(discount, subtotal)
+					discountName = discount.Name
+					couponCode = cc.Code
+				}
+			}
+		}
+
+		// Tax is on discounted subtotal.
+		discountedSubtotal := subtotal - discountTotal
+		for i := range taxLineItems {
+			if discountTotal > 0 && discountedSubtotal > 0 {
+				// Proportionally reduce each line's taxable amount.
+				ratio := float64(discountedSubtotal) / float64(subtotal)
+				taxLineItems[i].Subtotal = int(float64(taxLineItems[i].Subtotal) * ratio)
+			}
+		}
+
 		customer, txErr := d.CustomerService.GetCustomer(ctx, tx, customerID)
 		if txErr != nil {
 			return fmt.Errorf("get customer for tax: %w", txErr)
@@ -356,8 +510,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Shipping: $0 for now
-	totalCents := subtotal + taxTotal
+	totalCents := subtotal - discountTotal + taxTotal
 
 	// Create Stripe PaymentIntent (external call — outside transaction)
 	pi, err := d.PaymentProvider.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
@@ -385,11 +538,15 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	}
 
 	JSON(w, http.StatusOK, checkoutPaymentIntentResponse{
-		ClientSecret: pi.ClientSecret,
-		Amount:       totalCents,
-		Currency:     "usd",
-		TaxTotal:     taxTotal,
-		TaxLabel:     taxLabel,
+		ClientSecret:  pi.ClientSecret,
+		Amount:        totalCents,
+		Currency:      "usd",
+		Subtotal:      subtotal,
+		DiscountTotal: discountTotal,
+		DiscountName:  discountName,
+		CouponCode:    couponCode,
+		TaxTotal:      taxTotal,
+		TaxLabel:      taxLabel,
 	})
 }
 
@@ -443,6 +600,7 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 			return app.ErrCartEmpty
 		}
 
+		subtotal := 0
 		orderItems := make([]app.CartItem, len(items))
 		taxLineItems := make([]domain.TaxLineItem, len(items))
 		for i, ci := range items {
@@ -452,6 +610,7 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 				UnitPrice: ci.UnitPrice,
 			}
 			lineTotal := ci.UnitPrice * ci.Quantity
+			subtotal += lineTotal
 
 			variant, vErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
 			if vErr != nil {
@@ -466,6 +625,33 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 				LineIndex: i,
 				Subtotal:  lineTotal,
 				TaxExempt: product.TaxExempt,
+			}
+		}
+
+		// Check for applied coupon on cart.
+		var couponCode *string
+		discountTotal := 0
+		cart, txErr := d.CartService.GetCart(ctx, tx, cartID)
+		if txErr != nil {
+			return fmt.Errorf("get cart: %w", txErr)
+		}
+		if cart.AppliedCouponCodeID != nil {
+			cc, ccErr := d.CheckoutService.GetCouponCodeByID(ctx, tx, *cart.AppliedCouponCodeID)
+			if ccErr == nil && cc.RedeemedAt == nil {
+				discount, dErr := d.DiscountService.GetDiscount(ctx, tx, cc.DiscountID)
+				if dErr == nil && discount.Active {
+					discountTotal = calculateDiscountAmount(discount, subtotal)
+					couponCode = &cc.Code
+				}
+			}
+		}
+
+		// Tax is on discounted subtotal.
+		discountedSubtotal := subtotal - discountTotal
+		for i := range taxLineItems {
+			if discountTotal > 0 && discountedSubtotal > 0 {
+				ratio := float64(discountedSubtotal) / float64(subtotal)
+				taxLineItems[i].Subtotal = int(float64(taxLineItems[i].Subtotal) * ratio)
 			}
 		}
 
@@ -486,6 +672,7 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 			ShippingAddressID: addressID,
 			BillingAddressID:  addressID,
 			CurrencyCode:      "USD",
+			CouponCode:        couponCode,
 			ShippingCents:     0,
 			TaxCents:          taxResult.TaxTotal,
 		}, app.Actor{
@@ -544,6 +731,21 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 	})
 
 	JSON(w, http.StatusOK, resp)
+}
+
+// calculateDiscountAmount computes the discount amount in cents.
+func calculateDiscountAmount(d *domain.Discount, subtotal int) int {
+	switch d.Type {
+	case domain.DiscountTypePercentage:
+		return subtotal * d.Value / 100
+	case domain.DiscountTypeFixedAmount:
+		if d.Value > subtotal {
+			return subtotal
+		}
+		return d.Value
+	default:
+		return 0
+	}
 }
 
 func ptrToString(s *string) string {

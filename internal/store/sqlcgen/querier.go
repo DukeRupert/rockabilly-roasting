@@ -166,6 +166,9 @@ type Querier interface {
 	MarkWebhookEventProcessed(ctx context.Context, id uuid.UUID) error
 	NextInvoiceNumber(ctx context.Context) (int32, error)
 	PruneExpiredSessions(ctx context.Context) (int64, error)
+	// Atomically redeem a coupon — only succeeds if redeemed_at IS NULL.
+	// Returns the row if successful; pgx.ErrNoRows if already redeemed.
+	RedeemCouponCode(ctx context.Context, arg RedeemCouponCodeParams) (CouponCode, error)
 	RedeemMagicLinkToken(ctx context.Context, tokenHash string) (MagicLinkToken, error)
 	ReleaseReservation(ctx context.Context, arg ReleaseReservationParams) (StockLevel, error)
 	RemoveCustomerGroupMembership(ctx context.Context, arg RemoveCustomerGroupMembershipParams) error

@@ -46,9 +46,10 @@ var (
 	ErrDiscountNotFound    = errors.New("discount not found")
 	ErrDiscountExpired     = errors.New("discount has expired")
 	ErrDiscountNotActive   = errors.New("discount is not active")
-	ErrCouponAlreadyUsed   = errors.New("coupon code already used")
-	ErrCouponNotFound      = errors.New("coupon code not found")
-	ErrMinimumOrderNotMet  = errors.New("minimum order amount not met")
+	ErrCouponAlreadyUsed     = errors.New("coupon code already used")
+	ErrCouponAlreadyRedeemed = errors.New("coupon code was just redeemed by someone else")
+	ErrCouponNotFound        = errors.New("coupon code not found")
+	ErrMinimumOrderNotMet    = errors.New("minimum order amount not met")
 
 	// Auth errors
 	ErrSessionExpired    = errors.New("session expired")

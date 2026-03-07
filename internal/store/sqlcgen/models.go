@@ -77,13 +77,14 @@ type CartItem struct {
 }
 
 type CouponCode struct {
-	ID         uuid.UUID          `json:"id"`
-	DiscountID uuid.UUID          `json:"discount_id"`
-	Code       string             `json:"code"`
-	CustomerID *uuid.UUID         `json:"customer_id"`
-	RedeemedAt pgtype.Timestamptz `json:"redeemed_at"`
-	RedeemedBy *uuid.UUID         `json:"redeemed_by"`
-	CreatedAt  time.Time          `json:"created_at"`
+	ID                uuid.UUID          `json:"id"`
+	DiscountID        uuid.UUID          `json:"discount_id"`
+	Code              string             `json:"code"`
+	CustomerID        *uuid.UUID         `json:"customer_id"`
+	RedeemedAt        pgtype.Timestamptz `json:"redeemed_at"`
+	RedeemedBy        *uuid.UUID         `json:"redeemed_by"`
+	CreatedAt         time.Time          `json:"created_at"`
+	RedeemedByOrderID *uuid.UUID         `json:"redeemed_by_order_id"`
 }
 
 type Customer struct {

@@ -234,6 +234,20 @@ func (s *DiscountStore) MarkCouponCodeRedeemed(ctx context.Context, tx pgx.Tx, i
 	return nil
 }
 
+// RedeemCouponCode atomically marks a coupon as redeemed.
+// Returns the coupon if successful, or pgx.ErrNoRows if already redeemed (race condition).
+func (s *DiscountStore) RedeemCouponCode(ctx context.Context, tx pgx.Tx, couponID uuid.UUID, customerID *uuid.UUID, orderID uuid.UUID) (*domain.CouponCode, error) {
+	row, err := sqlcgen.New(tx).RedeemCouponCode(ctx, sqlcgen.RedeemCouponCodeParams{
+		ID:                couponID,
+		RedeemedBy:        customerID,
+		RedeemedByOrderID: &orderID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("redeem coupon code: %w", err)
+	}
+	return couponCodeFromRow(row), nil
+}
+
 // DeleteCouponCode removes a coupon code by ID.
 func (s *DiscountStore) DeleteCouponCode(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if err := sqlcgen.New(tx).DeleteCouponCode(ctx, id); err != nil {
@@ -262,12 +276,13 @@ func discountFromRow(r sqlcgen.Discount) *domain.Discount {
 
 func couponCodeFromRow(r sqlcgen.CouponCode) *domain.CouponCode {
 	return &domain.CouponCode{
-		ID:         r.ID,
-		DiscountID: r.DiscountID,
-		Code:       r.Code,
-		CustomerID: r.CustomerID,
-		RedeemedAt: timestampFromPG(r.RedeemedAt),
-		RedeemedBy: r.RedeemedBy,
-		CreatedAt:  r.CreatedAt,
+		ID:                r.ID,
+		DiscountID:        r.DiscountID,
+		Code:              r.Code,
+		CustomerID:        r.CustomerID,
+		RedeemedAt:        timestampFromPG(r.RedeemedAt),
+		RedeemedBy:        r.RedeemedBy,
+		RedeemedByOrderID: r.RedeemedByOrderID,
+		CreatedAt:         r.CreatedAt,
 	}
 }

@@ -37,5 +37,16 @@ UPDATE coupon_codes
 SET redeemed_at = now(), redeemed_by = $2
 WHERE id = $1;
 
+-- name: RedeemCouponCode :one
+-- Atomically redeem a coupon — only succeeds if redeemed_at IS NULL.
+-- Returns the row if successful; pgx.ErrNoRows if already redeemed.
+UPDATE coupon_codes
+SET redeemed_at = now(),
+    redeemed_by = $2,
+    redeemed_by_order_id = $3
+WHERE id = $1
+  AND redeemed_at IS NULL
+RETURNING *;
+
 -- name: DeleteCouponCode :exec
 DELETE FROM coupon_codes WHERE id = $1;

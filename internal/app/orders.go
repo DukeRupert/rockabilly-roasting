@@ -323,6 +323,15 @@ func (s *OrderService) UpdatePaymentStatus(ctx context.Context, tx pgx.Tx, id uu
 	return order, nil
 }
 
+// UpdateCartDiscount updates a cart's applied discount and coupon code.
+func (s *OrderService) UpdateCartDiscount(ctx context.Context, tx pgx.Tx, cartID uuid.UUID, discountID, couponCodeID *uuid.UUID) (*domain.Cart, error) {
+	cart, err := s.orders.UpdateCartDiscount(ctx, tx, cartID, discountID, couponCodeID)
+	if err != nil {
+		return nil, fmt.Errorf("update cart discount: %w", err)
+	}
+	return cart, nil
+}
+
 // UpdateStripePaymentIntentID sets the Stripe PaymentIntent ID on an order.
 func (s *OrderService) UpdateStripePaymentIntentID(ctx context.Context, tx pgx.Tx, id uuid.UUID, intentID string) (*domain.Order, error) {
 	order, err := s.orders.UpdateOrderStripePaymentIntentID(ctx, tx, id, intentID)

@@ -152,12 +152,16 @@ Tax is calculated after discounts — the taxable amount is the discounted subto
     "client_secret": "pi_..._secret_...",
     "amount": 4459,
     "currency": "usd",
-    "tax_total": 324,
+    "subtotal": 3600,
+    "discount_total": 360,
+    "discount_name": "10% Off",
+    "coupon_code": "SAVE10",
+    "tax_total": 283,
     "tax_label": "WA Sales Tax"
 }
 ```
 
-The frontend displays the tax line only when `tax_total > 0`.
+The frontend displays the tax line only when `tax_total > 0`. Discount fields are included when a coupon is applied to the cart (see `lean-commerce-discounts.md` for the coupon flow).
 
 ### Tax display at checkout
 

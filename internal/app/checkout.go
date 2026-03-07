@@ -214,7 +214,7 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		}
 	}
 
-	// Create discount adjustment and mark coupon redeemed.
+	// Create discount adjustment and atomically redeem coupon.
 	if appliedDiscount != nil && coupon != nil {
 		_, err := s.orders.CreateAdjustment(ctx, tx, store.CreateAdjustmentParams{
 			OrderID:    order.ID,
@@ -227,8 +227,12 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 			return nil, fmt.Errorf("create discount adjustment: %w", err)
 		}
 
-		if err := s.discounts.MarkCouponCodeRedeemed(ctx, tx, coupon.ID, &p.CustomerID); err != nil {
-			return nil, fmt.Errorf("mark coupon redeemed: %w", err)
+		_, err = s.discounts.RedeemCouponCode(ctx, tx, coupon.ID, &p.CustomerID, order.ID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrCouponAlreadyRedeemed
+			}
+			return nil, fmt.Errorf("redeem coupon code: %w", err)
 		}
 	}
 
@@ -245,6 +249,30 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 	}
 
 	return order, nil
+}
+
+// GetCouponCodeByID returns a coupon code by ID.
+func (s *CheckoutService) GetCouponCodeByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.CouponCode, error) {
+	coupon, err := s.discounts.GetCouponCodeByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCouponNotFound
+		}
+		return nil, fmt.Errorf("get coupon code: %w", err)
+	}
+	return coupon, nil
+}
+
+// GetCouponCodeByCode returns a coupon code by its code string.
+func (s *CheckoutService) GetCouponCodeByCode(ctx context.Context, tx pgx.Tx, code string) (*domain.CouponCode, error) {
+	coupon, err := s.discounts.GetCouponCodeByCode(ctx, tx, code)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCouponNotFound
+		}
+		return nil, fmt.Errorf("get coupon code: %w", err)
+	}
+	return coupon, nil
 }
 
 // ApplyCoupon validates a coupon code and returns its associated discount for preview.

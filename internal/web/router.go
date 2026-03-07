@@ -83,6 +83,8 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /checkout", deps.handleCheckoutPage)
 	mux.HandleFunc("GET /api/checkout/cart", deps.handleCheckoutCart)
 	mux.HandleFunc("POST /api/checkout/address", deps.handleCheckoutAddress)
+	mux.HandleFunc("POST /api/checkout/coupon", deps.handleCheckoutApplyCoupon)
+	mux.HandleFunc("DELETE /api/checkout/coupon", deps.handleCheckoutRemoveCoupon)
 	mux.HandleFunc("POST /api/checkout/payment-intent", deps.handleCheckoutPaymentIntent)
 	mux.HandleFunc("POST /api/checkout/confirm", deps.handleCheckoutConfirm)
 

@@ -335,6 +335,81 @@ River was chosen over a hand-rolled `SKIP LOCKED` queue because it solves real e
 
 ---
 
+## 9. Email Delivery & Notifications
+
+**Decision: provider-agnostic `Sender` interface; embedded HTML/text templates; transactional job enqueueing.**
+
+Email delivery is split into two packages with distinct responsibilities:
+
+### `platform/email/` — Delivery Abstraction
+
+The `Sender` interface decouples the application from any specific email provider:
+
+```go
+type Sender interface {
+    Send(ctx context.Context, msg Message) (*SendResult, error)
+    SendTemplate(ctx context.Context, msg TemplatedMessage) (*SendResult, error)
+}
+```
+
+`Message` carries pre-rendered HTML + text bodies. `TemplatedMessage` delegates rendering to the provider's server-side templates (Postmark template aliases, etc.). `SendResult` returns the provider's message ID for debugging.
+
+**Current implementation: Postmark** (`PostmarkSender` via `mrz1836/postmark`). Swapping to SendGrid, AWS SES, or any other provider means implementing the same two-method interface — no application code changes.
+
+**`TestSender`** captures sent messages in-memory for unit tests. Thread-safe, provides `Last()` and `Reset()` helpers. Tests assert on email content without network calls.
+
+### `emailtemplates/` — Template Rendering
+
+A standalone package that owns all email HTML/text content. Templates are embedded into the binary via `go:embed` — no filesystem dependency at runtime.
+
+```go
+//go:embed html/*.html text/*.txt
+var templateFiles embed.FS
+```
+
+**Template pairs:** every email has both an HTML and a plain-text variant, rendered from separate template files. The `Renderer.Render(name, data)` method returns both bodies.
+
+**Six template types:**
+- `order_confirm` — order placed confirmation with line items and totals
+- `subscription_confirm` — new subscription welcome with plan details
+- `invoice_sent` — invoice notification with payment link
+- `magic_link` — passwordless login link
+- `wholesale_approved` — wholesale application approval notification
+- `wholesale_application` — staff notification of new wholesale application
+
+**Template data structs** are defined in the renderer package. Money values are passed as cents (int); the `formatCents` template helper renders `$18.00`. Dates use `formatDate` which handles both `time.Time` and `*time.Time`. `FormatAddress` is exported for workers that need to build address strings.
+
+**HTML templates use inline CSS** for email client compatibility. Brand palette: cream background (`#F5F0E6`), dark text (`#1A1612`), red CTA buttons (`#C0271D`).
+
+### Notification Flow
+
+Email sending always goes through a River job — never sent synchronously in an HTTP handler:
+
+```
+Handler
+  └─▶ store.Tx(ctx, db, func(tx) {
+          // Domain write
+          order = checkoutService.PlaceOrder(ctx, tx, ...)
+          // Enqueue email in same transaction
+          river.InsertTx(ctx, tx, OrderConfirmEmailArgs{OrderID: order.ID}, nil)
+      })
+```
+
+The job worker loads the data it needs, calls `Renderer.Render()`, then calls `Sender.Send()`. External email delivery happens outside any database transaction.
+
+**Why transactional enqueueing matters:** if the order transaction rolls back, the email job disappears too. No orphaned confirmation emails for orders that don't exist.
+
+**Worker constructors receive:** the relevant stores (to load data), the `pgxpool.Pool` (for read transactions), the `Sender`, the `Renderer`, and config values (`fromAddr`, `baseURL`, `storeName`). Workers are thin: load data → render template → send email.
+
+**Environment variables:**
+- `POSTMARK_SERVER_TOKEN` — Postmark API key
+- `EMAIL_FROM` — sender address (e.g., `orders@example.com`)
+- `BASE_URL` — used in email links (e.g., `https://shop.example.com`)
+- `STORE_NAME` — used in email subject lines and body text
+- `STAFF_NOTIFICATION_EMAIL` — recipient for staff-facing notifications (wholesale applications)
+
+---
+
 ## Domain concerns with dedicated design documents
 
 The following domain concerns have separate detailed documents that complement this infrastructure overview:
@@ -354,7 +429,7 @@ These concerns integrate with the infrastructure layer as follows:
 
 ---
 
-## How the Eight Concerns Compose
+## How the Nine Concerns Compose
 
 ```
 HTTP Request
@@ -396,5 +471,11 @@ Background Job (River worker)
     ├─▶ COMMIT
     └─▶ Metrics increment      (jobs_processed_total, subscription_renewals_total, etc.)
 ```
+
+Email Notification (River worker)
+    │
+    ├─▶ Load data (order, customer, etc.) — read-only tx
+    ├─▶ Renderer.Render(name, data) — produces HTML + text bodies
+    └─▶ Sender.Send(ctx, message) — external call, no tx
 
 **The invariant that holds throughout:** domain logic sits in the middle of every stack, unaware of what wraps it. Services receive explicit parameters — `tx`, `actor`, `customerID` — and operate on them. No service reaches into a context for authorization state, no repository omits a `customer_id` scope, no handler contains a rate limit check. Each concern is independently testable, independently replaceable, and auditable by reading a single layer.

@@ -117,8 +117,30 @@ lean-commerce/
 │       │   ├── provider.go      ← LabelProvider interface, LabelRequest, LabelResult
 │       │   ├── shippo.go        ← ShippoProvider
 │       │   └── easypost.go      ← EasyPostProvider
+│       ├── email/
+│       │   ├── provider.go      ← Sender interface, Message, TemplatedMessage, SendResult
+│       │   ├── postmark.go      ← PostmarkSender (Postmark API)
+│       │   └── test_sender.go   ← TestSender (captures emails for tests)
 │       └── logging/
 │           └── logging.go       ← logger setup, LoggerFromContext, field constants
+│
+│   ├── emailtemplates/            ← email rendering; imports nothing from this project
+│   │   ├── renderer.go           ← Renderer, data structs, embed.FS, Render(name, data)
+│   │   ├── renderer_test.go
+│   │   ├── html/                 ← HTML email templates (inline CSS)
+│   │   │   ├── order_confirm.html
+│   │   │   ├── subscription_confirm.html
+│   │   │   ├── invoice_sent.html
+│   │   │   ├── magic_link.html
+│   │   │   ├── wholesale_approved.html
+│   │   │   └── wholesale_application.html
+│   │   └── text/                 ← plain-text email templates
+│   │       ├── order_confirm.txt
+│   │       ├── subscription_confirm.txt
+│   │       ├── invoice_sent.txt
+│   │       ├── magic_link.txt
+│   │       ├── wholesale_approved.txt
+│   │       └── wholesale_application.txt
 │
 ├── ui/                          ← Svelte checkout component (separate from internal/ui/)
 │   └── checkout/
@@ -183,7 +205,10 @@ internal/ui       ──▶ internal/domain
 
 internal/jobs     ──▶ internal/app
                   ──▶ internal/platform/*
+                  ──▶ internal/emailtemplates
                   ──▶ internal/domain
+
+internal/emailtemplates ──▶ (nothing from this project — pure templates + stdlib)
 
 internal/app      ──▶ internal/store
                   ──▶ internal/platform/audit
@@ -645,6 +670,8 @@ platform/
   sessions/     ← session creation, lookup, expiry, middleware
   auth/         ← context helpers, permission map, RequirePermission middleware
   ratelimit/    ← Limiter, Store interface, InMemoryStore, RedisStore
+  shipping/     ← LabelProvider interface, EasyPostProvider
+  email/        ← Sender interface, PostmarkSender, TestSender
   logging/      ← slog setup, LoggerFromContext, field name constants
 ```
 

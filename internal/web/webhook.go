@@ -46,6 +46,7 @@ func (d *Deps) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Info("webhook received", "event_id", event.ID, "type", event.Type)
+	d.Metrics.StripeWebhooksReceived.WithLabelValues(event.Type).Inc()
 
 	// Dedup + persist event in a transaction
 	var webhookEvent *domain.WebhookEvent
@@ -63,6 +64,7 @@ func (d *Deps) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	// nil means duplicate — already processed
 	if webhookEvent == nil {
 		logger.Info("webhook: duplicate event, skipping", "event_id", event.ID)
+		d.Metrics.StripeWebhooksProcessed.WithLabelValues(event.Type, "duplicate").Inc()
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -70,6 +72,7 @@ func (d *Deps) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	// Process the event
 	if err := d.processWebhookEvent(r, webhookEvent, event); err != nil {
 		logger.Error("webhook: processing failed", "event_id", event.ID, "type", event.Type, "error", err)
+		d.Metrics.StripeWebhooksProcessed.WithLabelValues(event.Type, "failed").Inc()
 		// Mark as failed but still return 200 to Stripe (prevent retries for known failures)
 		reason := err.Error()
 		_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -78,6 +81,8 @@ func (d *Deps) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+
+	d.Metrics.StripeWebhooksProcessed.WithLabelValues(event.Type, "success").Inc()
 
 	// Mark as processed
 	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -142,7 +147,6 @@ func (d *Deps) handlePaymentIntentSucceeded(ctx context.Context, event *payments
 			}
 		}
 
-		d.Metrics.PaymentsCapturedTotal.WithLabelValues("stripe").Inc()
 		return nil
 	})
 }
@@ -179,7 +183,6 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 			}
 		}
 
-		d.Metrics.PaymentsFailedTotal.WithLabelValues("stripe", "payment_failed").Inc()
 		return nil
 	})
 }

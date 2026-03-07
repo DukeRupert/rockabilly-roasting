@@ -266,6 +266,8 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	d.Metrics.CheckoutStarted.WithLabelValues("wholesale").Inc()
+
 	poNumber := r.FormValue("po_number")
 	notes := r.FormValue("notes")
 	cartID := getCartID(r)
@@ -319,9 +321,13 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		return d.CartService.DeleteCart(ctx, tx, cart.ID)
 	})
 	if err != nil {
+		reason := classifyCheckoutError(err)
+		d.Metrics.CheckoutFailed.WithLabelValues("wholesale", reason).Inc()
 		Error(w, r, err)
 		return
 	}
+
+	d.Metrics.CheckoutCompleted.WithLabelValues("wholesale").Inc()
 
 	// Clear cart cookie.
 	http.SetCookie(w, &http.Cookie{

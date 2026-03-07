@@ -35,7 +35,8 @@ func (rw *responseWriter) WriteHeader(code int) {
 }
 
 // loggingMiddleware logs each request with duration and status.
-func loggingMiddleware(next http.Handler, logger *slog.Logger, m *metrics.Registry) http.Handler {
+// 5xx responses get logged at Error level with full context for diagnostics.
+func loggingMiddleware(next http.Handler, logger *slog.Logger, _ *metrics.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
@@ -43,11 +44,22 @@ func loggingMiddleware(next http.Handler, logger *slog.Logger, m *metrics.Regist
 		next.ServeHTTP(rw, r)
 
 		duration := time.Since(start)
-		logger.Info("request",
-			slog.String(logging.FieldMethod, r.Method),
-			slog.String(logging.FieldPath, r.URL.Path),
-			slog.Int(logging.FieldStatus, rw.statusCode),
-			slog.Float64(logging.FieldDurationMS, float64(duration.Milliseconds())),
-		)
+		ctxLogger := logging.FromContext(r.Context())
+
+		if rw.statusCode >= 500 {
+			ctxLogger.Error("request failed",
+				slog.String(logging.FieldMethod, r.Method),
+				slog.String(logging.FieldPath, r.URL.Path),
+				slog.Int(logging.FieldStatus, rw.statusCode),
+				slog.Float64(logging.FieldDurationMS, float64(duration.Milliseconds())),
+			)
+		} else {
+			logger.Info("request",
+				slog.String(logging.FieldMethod, r.Method),
+				slog.String(logging.FieldPath, r.URL.Path),
+				slog.Int(logging.FieldStatus, rw.statusCode),
+				slog.Float64(logging.FieldDurationMS, float64(duration.Milliseconds())),
+			)
+		}
 	})
 }

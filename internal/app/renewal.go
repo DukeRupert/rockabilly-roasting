@@ -122,7 +122,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
 			return nil
 		})
-		s.metrics.SubscriptionRenewalFailuresTotal.WithLabelValues("no_payment_method").Inc()
+		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("customer %s has no saved payment methods", customer.ID)
 	}
 
@@ -152,7 +152,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
 			return nil
 		})
-		s.metrics.SubscriptionRenewalFailuresTotal.WithLabelValues("payment_failed").Inc()
+		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("create renewal payment intent: %w", err)
 	}
 
@@ -247,7 +247,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		return nil, fmt.Errorf("renewal write phase: %w", err)
 	}
 
-	s.metrics.SubscriptionRenewalsTotal.WithLabelValues("success").Inc()
+	s.metrics.SubscriptionRenewals.WithLabelValues("success").Inc()
 	return order, nil
 }
 
@@ -364,7 +364,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			}
 			return nil
 		})
-		s.metrics.SubscriptionRenewalFailuresTotal.WithLabelValues("no_payment_method").Inc()
+		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("customer %s has no saved payment methods", customer.ID)
 	}
 
@@ -401,7 +401,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			}
 			return nil
 		})
-		s.metrics.SubscriptionRenewalFailuresTotal.WithLabelValues("payment_failed").Inc()
+		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("create batch renewal payment intent: %w", err)
 	}
 
@@ -501,7 +501,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		return nil, fmt.Errorf("batch renewal write phase: %w", err)
 	}
 
-	s.metrics.SubscriptionRenewalsTotal.WithLabelValues("success").Inc()
+	s.metrics.SubscriptionRenewals.WithLabelValues("success").Inc()
 	return order, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -11,6 +12,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
 )
 
@@ -26,6 +28,7 @@ type RenewalSchedulerWorker struct {
 	subscriptionSvc *app.SubscriptionService
 	pool            *pgxpool.Pool
 	client          *river.Client[pgx.Tx]
+	metrics         *metrics.Registry
 }
 
 // NewRenewalSchedulerWorker creates a new RenewalSchedulerWorker.
@@ -33,11 +36,13 @@ func NewRenewalSchedulerWorker(
 	subscriptionSvc *app.SubscriptionService,
 	pool *pgxpool.Pool,
 	client *river.Client[pgx.Tx],
+	m *metrics.Registry,
 ) *RenewalSchedulerWorker {
 	return &RenewalSchedulerWorker{
 		subscriptionSvc: subscriptionSvc,
 		pool:            pool,
 		client:          client,
+		metrics:         m,
 	}
 }
 
@@ -51,6 +56,7 @@ type batchKey struct {
 // Work scans for due subscriptions, groups them by customer + address,
 // and enqueues one batch renewal job per group.
 func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalSchedulerArgs]) error {
+	start := time.Now()
 	logger := slog.Default()
 
 	var batchCount int
@@ -78,11 +84,15 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 			if txErr != nil {
 				return fmt.Errorf("enqueue batch renewal: %w", txErr)
 			}
+			metrics.TrackJobEnqueued(w.metrics, "batch_renewal")
 			batchCount++
 		}
 
 		return nil
 	})
+
+	metrics.TrackJob(w.metrics, "renewal_scheduler", start, err)
+
 	if err != nil {
 		return err
 	}

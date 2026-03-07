@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -315,12 +316,16 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 		if txErr != nil {
 			switch {
 			case errors.Is(txErr, app.ErrCouponNotFound):
+				d.Metrics.CouponRejected.WithLabelValues("not_found").Inc()
 				resp = checkoutApplyCouponResponse{ErrorMessage: "That code doesn't look right."}
 			case errors.Is(txErr, app.ErrCouponAlreadyUsed):
+				d.Metrics.CouponRejected.WithLabelValues("already_used").Inc()
 				resp = checkoutApplyCouponResponse{ErrorMessage: "That code has already been used."}
 			case errors.Is(txErr, app.ErrDiscountNotActive):
+				d.Metrics.CouponRejected.WithLabelValues("not_active").Inc()
 				resp = checkoutApplyCouponResponse{ErrorMessage: "That code is no longer active."}
 			case errors.Is(txErr, app.ErrDiscountExpired):
+				d.Metrics.CouponRejected.WithLabelValues("expired").Inc()
 				resp = checkoutApplyCouponResponse{ErrorMessage: "That code has expired."}
 			default:
 				return txErr
@@ -340,6 +345,7 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 			return fmt.Errorf("update cart discount: %w", txErr)
 		}
 
+		d.Metrics.CouponApplied.Inc()
 		resp = checkoutApplyCouponResponse{
 			Valid:         true,
 			DiscountName:  discount.Name,
@@ -391,6 +397,8 @@ func (d *Deps) handleCheckoutRemoveCoupon(w http.ResponseWriter, r *http.Request
 func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.FromContext(ctx)
+
+	d.Metrics.CheckoutStarted.WithLabelValues("retail").Inc()
 
 	var req checkoutPaymentIntentRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -554,6 +562,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.FromContext(ctx)
+	checkoutStart := time.Now()
 
 	var req checkoutConfirmRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -585,6 +594,8 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pi.Status != payments.PaymentIntentStatusSucceeded {
+		d.Metrics.CheckoutFailed.WithLabelValues("retail", "payment_failed").Inc()
+		d.Metrics.CheckoutDuration.WithLabelValues("retail").Observe(time.Since(checkoutStart).Seconds())
 		JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "payment has not succeeded"})
 		return
 	}
@@ -718,9 +729,15 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		logger.Error("checkout confirm", "error", err)
+		reason := classifyCheckoutError(err)
+		d.Metrics.CheckoutFailed.WithLabelValues("retail", reason).Inc()
+		d.Metrics.CheckoutDuration.WithLabelValues("retail").Observe(time.Since(checkoutStart).Seconds())
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create order"})
 		return
 	}
+
+	d.Metrics.CheckoutCompleted.WithLabelValues("retail").Inc()
+	d.Metrics.CheckoutDuration.WithLabelValues("retail").Observe(time.Since(checkoutStart).Seconds())
 
 	// Clear cart cookie
 	http.SetCookie(w, &http.Cookie{
@@ -753,4 +770,20 @@ func ptrToString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// classifyCheckoutError maps checkout errors to failure_reason metric labels.
+func classifyCheckoutError(err error) string {
+	switch {
+	case errors.Is(err, app.ErrPaymentFailed):
+		return "payment_failed"
+	case errors.Is(err, app.ErrCouponAlreadyRedeemed):
+		return "coupon_redeemed"
+	case errors.Is(err, app.ErrInsufficientStock):
+		return "inventory_unavailable"
+	case errors.Is(err, app.ErrCartEmpty):
+		return "validation_error"
+	default:
+		return "internal_error"
+	}
 }

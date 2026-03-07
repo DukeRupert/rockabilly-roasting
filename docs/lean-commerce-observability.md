@@ -14,61 +14,43 @@ These are different data sources that complement each other. Metrics answer "how
 
 ### Foundation: `slog`
 
-Use Go's standard `log/slog` package (available since Go 1.21). It supports structured key-value output, pluggable handlers, and level filtering with no external dependency. For production, configure a JSON handler writing to stdout:
+Go's standard `log/slog` package (Go 1.21+). JSON handler writing to stdout. No external dependency.
 
 ```go
-// cmd/server/main.go
-func initLogger(env string) *slog.Logger {
-    level := slog.LevelInfo
-    if env == "development" {
-        level = slog.LevelDebug
-    }
-
-    handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+// platform/logging/logging.go
+func New(level slog.Level) *slog.Logger {
+    return slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
         Level: level,
-        // Replace the default "time" key with "ts" for Loki compatibility
-        ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
-            if a.Key == slog.TimeKey {
-                a.Key = "ts"
-            }
-            return a
-        },
-    })
-    return slog.New(handler)
+    }))
 }
 ```
 
-Stdout → Promtail/Alloy → Loki. No file rotation, no log library, no external dependency. The host process is responsible for log shipping, not the application.
+Stdout → Promtail/Alloy → Loki. The host process handles log shipping, not the application.
 
 ---
 
 ### Standard fields
 
-Every log line must carry a consistent base set of fields. This is what makes Loki queries useful — you can filter by `request_id` across all lines emitted during one request, or by `actor_id` to see everything one staff member triggered.
+Defined in `platform/logging/logging.go`:
 
 ```go
-// Standard fields present on every log line
 const (
     FieldRequestID   = "request_id"    // unique per HTTP request
     FieldActorID     = "actor_id"      // authenticated user/staff ID
     FieldActorType   = "actor_type"    // "customer" | "staff" | "system"
     FieldMethod      = "method"        // HTTP method
-    FieldPath        = "path"          // URL path — never include query params
+    FieldPath        = "path"          // URL path
     FieldStatus      = "status"        // HTTP response status code
     FieldDurationMS  = "duration_ms"   // request processing time
-    FieldService     = "service"       // "lean-commerce" — useful in multi-app Loki
+    FieldService     = "service"       // "lean-commerce"
     FieldEnv         = "env"           // "production" | "staging"
-)
-
-// Business event fields — added on top of standard fields
-const (
-    FieldEvent        = "event"         // namespaced: "order.placed", "payment.captured"
+    FieldEvent       = "event"         // "order.placed", "payment.captured"
     FieldResourceType = "resource_type"
-    FieldResourceID   = "resource_id"
-    FieldOrderID      = "order_id"
-    FieldCustomerID   = "customer_id"
-    FieldAmount       = "amount"        // always in cents
-    FieldCurrency     = "currency"
+    FieldResourceID  = "resource_id"
+    FieldOrderID     = "order_id"
+    FieldCustomerID  = "customer_id"
+    FieldAmount      = "amount"        // always in cents
+    FieldCurrency    = "currency"
 )
 ```
 
@@ -76,383 +58,202 @@ const (
 
 ### Request-scoped logger via context
 
-The logger for a request is built once in middleware, enriched with request-scoped fields, and passed through context. Downstream handlers and services pull it from context — they never construct their own logger.
+The logger for a request is built in `requestIDMiddleware`, enriched with a unique request ID, and passed through context. Downstream handlers and services pull it via `logging.FromContext(ctx)`.
 
 ```go
-type contextKey string
-const loggerKey contextKey = "logger"
+// web/middleware.go — requestIDMiddleware
+requestID := uuid.New().String()
+logger := logging.FromContext(ctx).With(slog.String(logging.FieldRequestID, requestID))
+ctx = logging.WithContext(ctx, logger)
+w.Header().Set("X-Request-ID", requestID)
+```
 
-// LoggerFromContext retrieves the request-scoped logger.
-// Falls back to the global logger if none is set.
-func LoggerFromContext(ctx context.Context) *slog.Logger {
-    if l, ok := ctx.Value(loggerKey).(*slog.Logger); ok {
-        return l
-    }
-    return slog.Default()
-}
+### 5xx error logging
 
-// withLogger stores a logger in context.
-func withLogger(ctx context.Context, l *slog.Logger) context.Context {
-    return context.WithValue(ctx, loggerKey, l)
+The `loggingMiddleware` differentiates between normal and error responses. 5xx errors are logged at `Error` level using the context logger (which carries the request_id), providing full diagnostic context:
+
+```go
+if rw.statusCode >= 500 {
+    ctxLogger.Error("request failed",
+        slog.String(logging.FieldMethod, r.Method),
+        slog.String(logging.FieldPath, r.URL.Path),
+        slog.Int(logging.FieldStatus, rw.statusCode),
+        slog.Float64(logging.FieldDurationMS, float64(duration.Milliseconds())),
+    )
 }
 ```
 
-The logging middleware wraps every request:
+### Job failure logging
+
+River job workers log failures with full context for diagnosis via Loki:
 
 ```go
-func LoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            start := time.Now()
-            requestID := r.Header.Get("X-Request-ID")
-            if requestID == "" {
-                requestID = uuid.New().String()
-            }
-
-            // Build request-scoped logger with base fields
-            reqLogger := logger.With(
-                FieldRequestID, requestID,
-                FieldMethod,    r.Method,
-                FieldPath,      r.URL.Path,  // NOT r.URL.String() — no query params
-            )
-
-            // Inject into context
-            ctx := withLogger(r.Context(), reqLogger)
-
-            // Inject request ID into response headers for client correlation
-            w.Header().Set("X-Request-ID", requestID)
-
-            // Wrap ResponseWriter to capture status code
-            rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
-            next.ServeHTTP(rw, r.WithContext(ctx))
-
-            // Emit request log after handler completes
-            reqLogger.Info("request",
-                FieldStatus,     rw.status,
-                FieldDurationMS, time.Since(start).Milliseconds(),
-            )
-        })
-    }
-}
-```
-
-After the session middleware runs, the actor is known — enrich the logger immediately:
-
-```go
-// Inside session middleware, after actor is resolved:
-reqLogger := LoggerFromContext(r.Context()).With(
-    FieldActorID,   actor.ID.String(),
-    FieldActorType, actor.Type,
+slog.ErrorContext(ctx, "job failed",
+    "job_kind",        "subscription_renewal",
+    "job_id",          job.ID,
+    "attempt",         job.Attempt,
+    "subscription_id", job.Args.SubscriptionID,
+    "error",           err.Error(),
 )
-ctx = withLogger(r.Context(), reqLogger)
 ```
-
-From this point on, every log line emitted during the request automatically carries actor context.
 
 ---
 
-### Log levels — used correctly
+### Log levels
 
 | Level | When |
 |---|---|
-| `DEBUG` | Detailed flow tracing. Off in production by default. Enabled per-request via a query param or header in staging. |
-| `INFO` | Business events worth recording: order placed, payment captured, subscription renewed. Also: request completed. |
-| `WARN` | Unexpected but handled: payment retry attempt, deprecated API call, cache miss on critical path. |
-| `ERROR` | Failures requiring investigation: unhandled error, database connection failure, River job exhausted retries. |
+| `DEBUG` | Detailed flow tracing. Off in production. |
+| `INFO` | Business events: order placed, payment captured, subscription renewed. Request completed. |
+| `WARN` | Unexpected but handled: payment retry, deprecated API, cache miss. |
+| `ERROR` | Failures requiring investigation: 5xx, DB failures, job exhausted retries. |
 
-The most common mistake is treating every non-200 as `ERROR`. A 404 is expected. A 422 is a client error. `ERROR` should mean "a human should look at this."
-
-```go
-// Good
-logger.Info("order.placed", FieldOrderID, order.ID, FieldAmount, order.Total)
-logger.Warn("payment.retry_attempt", "attempt", attempt, FieldOrderID, order.ID)
-logger.Error("db.query_failed", "err", err, FieldResourceType, "order")
-
-// Bad — 404 is not an error
-logger.Error("order not found", FieldOrderID, id)  // use Info or omit entirely
-```
-
----
-
-### Business event logging
-
-Key business events get explicit log lines at `INFO` with structured fields. These are the lines you'll query in Loki when something goes wrong with an order or a renewal.
-
-```go
-// Order placed
-log.Info("order.placed",
-    FieldOrderID,    order.ID,
-    FieldCustomerID, order.CustomerID,
-    FieldAmount,     order.Total,
-    FieldCurrency,   order.Currency,
-)
-
-// Payment captured
-log.Info("payment.captured",
-    FieldOrderID, order.ID,
-    FieldAmount,  payment.Amount,
-    "provider",   "stripe",
-    "payment_intent_id", payment.ProviderID,
-)
-
-// Subscription renewal
-log.Info("subscription.renewed",
-    "subscription_id", sub.ID,
-    FieldCustomerID,   sub.CustomerID,
-    FieldAmount,       sub.Amount,
-    "river_job_id",    jobID,
-)
-
-// Renewal failure
-log.Error("subscription.renewal_failed",
-    "subscription_id", sub.ID,
-    FieldCustomerID,   sub.CustomerID,
-    "attempt",         attempt,
-    "err",             err,
-)
-```
-
----
-
-### Loki query examples
-
-With consistent field names, Loki LogQL queries are straightforward:
-
-```logql
-# All errors in the last hour
-{service="lean-commerce"} | json | level="ERROR"
-
-# Everything that happened to a specific order
-{service="lean-commerce"} | json | order_id="<uuid>"
-
-# All payment failures today
-{service="lean-commerce"} | json | event="payment.failed"
-
-# Slow requests (> 500ms)
-{service="lean-commerce"} | json | duration_ms > 500
-
-# What did this staff member do?
-{service="lean-commerce"} | json | actor_id="<uuid>" | actor_type="staff"
-```
-
-These queries work because every field is consistently named and present. Inconsistent field names (mixing `order_id` and `orderId` and `oid`) make Loki close to useless.
+A 404 is not an error. A 422 is a client error. `ERROR` means "a human should look at this."
 
 ---
 
 ## Part 2: Metrics
 
-### Library: `prometheus/client_golang`
+### Registry
 
-```go
-import "github.com/prometheus/client_golang/prometheus"
-import "github.com/prometheus/client_golang/prometheus/promhttp"
-```
+All metrics are defined in `platform/metrics/registry.go` and registered on a custom Prometheus registry (not the global default). The registry includes Go runtime + process collectors.
 
-MIT licensed. The standard for Go + Prometheus. Metrics are registered on a custom registry (not the default global) to make testing easier and avoid conflicts with library metrics.
+**Metric inventory:**
 
-```go
-// internal/metrics/registry.go
-type Registry struct {
-    reg *prometheus.Registry
+#### HTTP layer
+| Metric | Type | Labels |
+|---|---|---|
+| `http_requests_total` | counter | `method`, `path_pattern`, `status_code` |
+| `http_request_duration_seconds` | histogram | `method`, `path_pattern`, `status_code` |
+| `http_requests_in_flight` | gauge | — |
 
-    // HTTP
-    HTTPRequestsTotal    *prometheus.CounterVec
-    HTTPRequestDuration  *prometheus.HistogramVec
+`path_pattern` uses normalized patterns (`/admin/catalog/{id}`) not raw URLs (`/admin/catalog/abc-123`). UUIDs are replaced with `{id}`, static assets collapsed to `/static/{file}`. Commerce-tuned histogram buckets: 5ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s.
 
-    // Business — orders
-    OrdersPlacedTotal    *prometheus.CounterVec
-    OrdersRevenueTotal   *prometheus.CounterVec
+#### Database
+| Metric | Type | Labels |
+|---|---|---|
+| `db_query_duration_seconds` | histogram | `query_name`, `success` |
+| `db_pool_open_connections` | gauge | — |
+| `db_pool_idle_connections` | gauge | — |
+| `db_pool_wait_count_total` | counter | — |
 
-    // Business — payments
-    PaymentsCapturedTotal *prometheus.CounterVec
-    PaymentsFailedTotal   *prometheus.CounterVec
+Pool metrics scraped from `pgxpool.Stat()` every 15 seconds by a background goroutine. Query timing via `metrics.TrackQuery()` helper at the store layer.
 
-    // Business — subscriptions
-    SubscriptionRenewalsTotal *prometheus.CounterVec
-    SubscriptionRenewalFailuresTotal *prometheus.CounterVec
-    ActiveSubscriptionsGauge  *prometheus.GaugeVec
+#### River jobs
+| Metric | Type | Labels |
+|---|---|---|
+| `river_jobs_enqueued_total` | counter | `job_kind` |
+| `river_jobs_completed_total` | counter | `job_kind` |
+| `river_jobs_failed_total` | counter | `job_kind` |
+| `river_jobs_pending` | gauge | `job_kind`, `state` |
+| `river_job_duration_seconds` | histogram | `job_kind`, `success` |
 
-    // Background jobs
-    JobsProcessedTotal  *prometheus.CounterVec
-    JobsFailedTotal     *prometheus.CounterVec
-    JobQueueDepth       *prometheus.GaugeVec
-}
+Queue depth populated by a background goroutine querying `river_job` table every 15 seconds. Per-job counters via `metrics.TrackJob()` helper in worker `Work` methods.
 
-func NewRegistry() *Registry {
-    reg := prometheus.NewRegistry()
-    r := &Registry{reg: reg}
+#### Checkout funnel
+| Metric | Type | Labels |
+|---|---|---|
+| `checkout_started_total` | counter | `customer_type` (retail\|wholesale) |
+| `checkout_completed_total` | counter | `customer_type` |
+| `checkout_failed_total` | counter | `customer_type`, `failure_reason` |
+| `checkout_duration_seconds` | histogram | `customer_type` |
+| `coupon_applied_total` | counter | — |
+| `coupon_rejected_total` | counter | `rejection_reason` |
 
-    r.HTTPRequestsTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "http_requests_total",
-            Help: "Total HTTP requests by method, path, and status.",
-        },
-        []string{"method", "path", "status"},
-    )
+`failure_reason` labels: `payment_failed`, `coupon_redeemed`, `inventory_unavailable`, `validation_error`, `internal_error`. Conversion rate: `rate(checkout_completed_total[5m]) / rate(checkout_started_total[5m])`.
 
-    r.HTTPRequestDuration = prometheus.NewHistogramVec(
-        prometheus.HistogramOpts{
-            Name:    "http_request_duration_seconds",
-            Help:    "HTTP request duration in seconds.",
-            Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5},
-        },
-        []string{"method", "path", "status"},
-    )
+#### Subscription health
+| Metric | Type | Labels |
+|---|---|---|
+| `subscriptions_active_total` | gauge | — |
+| `subscriptions_paused_total` | gauge | — |
+| `subscriptions_cancelled_total` | gauge | — |
+| `subscription_renewals_total` | counter | `result` (success\|failed) |
 
-    r.OrdersPlacedTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "orders_placed_total",
-            Help: "Total orders placed.",
-        },
-        []string{"currency"},
-    )
+Status gauges populated by a background goroutine querying `subscriptions` table every 60 seconds.
 
-    r.OrdersRevenueTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "orders_revenue_cents_total",
-            Help: "Cumulative order revenue in cents.",
-        },
-        []string{"currency"},
-    )
+#### Stripe webhooks
+| Metric | Type | Labels |
+|---|---|---|
+| `stripe_webhooks_received_total` | counter | `event_type` |
+| `stripe_webhooks_processed_total` | counter | `event_type`, `result` (success\|failed\|duplicate) |
 
-    r.PaymentsCapturedTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "payments_captured_total",
-            Help: "Total payments successfully captured.",
-        },
-        []string{"provider"},
-    )
-
-    r.PaymentsFailedTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "payments_failed_total",
-            Help: "Total payment failures.",
-        },
-        []string{"provider", "reason"},
-    )
-
-    r.SubscriptionRenewalsTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "subscription_renewals_total",
-            Help: "Total subscription renewal attempts.",
-        },
-        []string{"status"}, // "success" | "failed" | "skipped"
-    )
-
-    r.ActiveSubscriptionsGauge = prometheus.NewGaugeVec(
-        prometheus.GaugeOpts{
-            Name: "active_subscriptions",
-            Help: "Current count of active subscriptions.",
-        },
-        []string{"plan_interval"}, // "monthly" | "weekly" etc.
-    )
-
-    r.JobsProcessedTotal = prometheus.NewCounterVec(
-        prometheus.CounterOpts{
-            Name: "jobs_processed_total",
-            Help: "Total background jobs processed.",
-        },
-        []string{"kind", "status"}, // status: "completed" | "failed" | "cancelled"
-    )
-
-    r.JobQueueDepth = prometheus.NewGaugeVec(
-        prometheus.GaugeOpts{
-            Name: "job_queue_depth",
-            Help: "Current number of pending jobs by kind.",
-        },
-        []string{"kind"},
-    )
-
-    reg.MustRegister(
-        r.HTTPRequestsTotal,
-        r.HTTPRequestDuration,
-        r.OrdersPlacedTotal,
-        r.OrdersRevenueTotal,
-        r.PaymentsCapturedTotal,
-        r.PaymentsFailedTotal,
-        r.SubscriptionRenewalsTotal,
-        r.ActiveSubscriptionsGauge,
-        r.JobsProcessedTotal,
-        r.JobQueueDepth,
-        // Standard Go runtime metrics
-        collectors.NewGoCollector(),
-        collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-    )
-
-    return r
-}
-
-// Handler exposes the /metrics endpoint for Prometheus scraping.
-func (r *Registry) Handler() http.Handler {
-    return promhttp.HandlerFor(r.reg, promhttp.HandlerOpts{})
-}
-```
+#### Rate limiting
+| Metric | Type | Labels |
+|---|---|---|
+| `rate_limit_hits_total` | counter | `config`, `key_type` |
 
 ---
 
 ### HTTP metrics middleware
 
-Increment counters and observe histograms after every request. This wraps the entire handler chain so it catches all requests including 404s and 500s.
+Implemented in `platform/metrics/middleware.go`. Wraps the entire handler chain as outermost middleware. Tracks in-flight requests, request count, and duration.
 
 ```go
-func MetricsMiddleware(reg *metrics.Registry) func(http.Handler) http.Handler {
-    return func(next http.Handler) http.Handler {
-        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-            start := time.Now()
-            rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
-
-            next.ServeHTTP(rw, r)
-
-            duration := time.Since(start).Seconds()
-            status := strconv.Itoa(rw.status)
-
-            // Normalize path to avoid high-cardinality label explosion.
-            // /orders/abc-123 and /orders/def-456 should be the same label.
-            path := normalizePath(r.URL.Path) // e.g. /orders/{id}
-
-            reg.HTTPRequestsTotal.WithLabelValues(r.Method, path, status).Inc()
-            reg.HTTPRequestDuration.WithLabelValues(r.Method, path, status).Observe(duration)
-        })
-    }
-}
+// web/router.go — middleware stack (outermost runs first)
+var handler http.Handler = mux
+handler = requestIDMiddleware(handler)
+handler = loggingMiddleware(handler, deps.Logger, deps.Metrics)
+handler = metrics.HTTPMiddleware(deps.Metrics)(handler)
 ```
 
-**Path normalization is critical.** Without it, every unique order UUID becomes a separate label value — Prometheus cardinality explodes and scraping becomes unusable. `/orders/{id}` is the correct label; `/orders/abc-123-def-456` is not. Use your router's pattern (chi, stdlib mux) to extract the route template rather than the matched path.
+Path normalization replaces UUID segments with `{id}` and collapses `/static/` paths to prevent cardinality explosion.
 
 ---
 
-### Business metric instrumentation points
+### Background metric collectors
 
-Business metrics are incremented at the service layer, not the handler layer — the service is where the business event actually occurs, and it has access to the relevant values (amount, currency, plan).
+Started in `cmd/server/main.go` at startup, stopped via context cancellation at shutdown:
 
 ```go
-// OrderService.Create
-func (s *OrderService) Create(ctx context.Context, tx pgx.Tx, ...) (*Order, error) {
-    order, err := s.repo.Create(ctx, tx, ...)
-    if err != nil { return nil, err }
+metrics.CollectPoolMetrics(ctx, metricsReg, pool, 15*time.Second)
+metrics.CollectRiverMetrics(ctx, metricsReg, pool, 15*time.Second)
+metrics.CollectSubscriptionMetrics(ctx, metricsReg, pool, 60*time.Second)
+```
 
-    s.metrics.OrdersPlacedTotal.WithLabelValues(order.Currency).Inc()
-    s.metrics.OrdersRevenueTotal.WithLabelValues(order.Currency).Add(float64(order.Total))
+---
 
-    return order, nil
-}
+### DB query instrumentation
 
-// PaymentService.Capture
-func (s *PaymentService) Capture(ctx context.Context, ...) error {
-    err := s.stripe.Capture(...)
-    if err != nil {
-        reason := classifyPaymentError(err) // "card_declined" | "insufficient_funds" | etc.
-        s.metrics.PaymentsFailedTotal.WithLabelValues("stripe", reason).Inc()
-        return err
-    }
-    s.metrics.PaymentsCapturedTotal.WithLabelValues("stripe").Inc()
-    return nil
+Use `metrics.TrackQuery()` in store methods:
+
+```go
+func (s *Store) ListOrders(ctx context.Context, tx pgx.Tx) (result []Order, err error) {
+    defer metrics.TrackQuery(s.metrics, "orders.list", time.Now(), &err)
+    // ... query
 }
 ```
 
 ---
 
-### Prometheus scrape config
+### River job instrumentation
+
+Use `metrics.TrackJob()` in worker `Work` methods:
+
+```go
+func (w *MyWorker) Work(ctx context.Context, job *river.Job[MyArgs]) error {
+    start := time.Now()
+    err := w.doWork(ctx, job)
+    metrics.TrackJob(w.metrics, "my_job_kind", start, err)
+    return err
+}
+```
+
+Use `metrics.TrackJobEnqueued()` when enqueueing jobs.
+
+---
+
+### Prometheus endpoint
+
+Exposed at `GET /metrics` using the custom registry:
+
+```go
+mux.Handle("GET /metrics", promhttp.HandlerFor(deps.Metrics.Reg, promhttp.HandlerOpts{}))
+```
+
+In production, this should be protected via IP allowlisting or moved to an internal port. Metrics expose internal application state.
+
+### Scrape config
 
 ```yaml
 # prometheus.yml
@@ -464,80 +265,94 @@ scrape_configs:
     scrape_interval: 15s
 ```
 
-The `/metrics` endpoint should not be exposed on the public-facing port in production. Route it on an internal port (e.g. `8081`) or protect it with IP allowlisting. Prometheus metrics expose internal application state — not something that should be publicly queryable.
-
 ---
 
 ## Part 3: Grafana Dashboards
 
-Two dashboards cover the two questions this system needs to answer.
+Four dashboards:
 
-### Dashboard 1: System Health
+### 1. System Health — "Is the app up and healthy?"
 
-Panels:
-
-**Request rate** (requests/sec, by status class 2xx/4xx/5xx)
+**Request rate** (by status class):
 ```promql
-sum by (status_class) (
-  rate(http_requests_total[5m])
-)
+sum by (status_code) (rate(http_requests_total[5m]))
 ```
 
-**Error rate** (% of requests that are 5xx)
+**Error rate** (% 5xx):
 ```promql
-sum(rate(http_requests_total{status=~"5.."}[5m]))
-/
-sum(rate(http_requests_total[5m]))
+sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+/ sum(rate(http_requests_total[5m]))
 ```
 
-**p50 / p95 / p99 latency**
+**p50 / p95 / p99 latency**:
 ```promql
 histogram_quantile(0.95,
   sum by (le) (rate(http_request_duration_seconds_bucket[5m]))
 )
 ```
 
-**Payment failure rate**
+**DB pool utilization**:
 ```promql
-rate(payments_failed_total[5m])
+db_pool_open_connections
+db_pool_idle_connections
 ```
 
-**Job queue depth** (are background jobs keeping up?)
+**Slow query heatmap** — which `query_name` values are in the top percentiles:
 ```promql
-job_queue_depth
+histogram_quantile(0.95,
+  sum by (query_name, le) (rate(db_query_duration_seconds_bucket[5m]))
+)
 ```
 
-### Dashboard 2: Business Activity
+### 2. Checkout Health — "Is the store making money?"
 
-Panels:
-
-**Orders per hour**
+**Checkout conversion rate**:
 ```promql
-sum(increase(orders_placed_total[1h]))
+rate(checkout_completed_total[5m]) / rate(checkout_started_total[5m])
 ```
 
-**Revenue per hour (in dollars)**
+**Checkout failure breakdown**:
 ```promql
-sum(increase(orders_revenue_cents_total[1h])) / 100
+sum by (failure_reason) (rate(checkout_failed_total[5m]))
 ```
 
-**Subscription renewal success rate**
+**Coupon usage**:
 ```promql
-rate(subscription_renewals_total{status="success"}[1h])
-/
-rate(subscription_renewals_total[1h])
+rate(coupon_applied_total[5m])
+sum by (rejection_reason) (rate(coupon_rejected_total[5m]))
 ```
 
-**Active subscriptions by interval**
+### 3. Subscription Health — "Is recurring revenue healthy?"
+
+**Active / paused / cancelled counts**:
 ```promql
-active_subscriptions
+subscriptions_active_total
+subscriptions_paused_total
+subscriptions_cancelled_total
+```
+
+**Renewal success rate**:
+```promql
+rate(subscription_renewals_total{result="success"}[1h])
+/ rate(subscription_renewals_total[1h])
+```
+
+### 4. Background Jobs — "Is async work keeping up?"
+
+**Job completion/failure rate by kind**:
+```promql
+sum by (job_kind) (rate(river_jobs_completed_total[5m]))
+sum by (job_kind) (rate(river_jobs_failed_total[5m]))
+```
+
+**Queue depth trends**:
+```promql
+river_jobs_pending
 ```
 
 ---
 
 ## Part 4: Alerting
-
-Minimum viable alert set. These are the alerts that wake someone up:
 
 ```yaml
 # alerts.yml
@@ -546,7 +361,7 @@ groups:
     rules:
       - alert: HighErrorRate
         expr: |
-          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
           / sum(rate(http_requests_total[5m])) > 0.05
         for: 2m
         annotations:
@@ -561,42 +376,57 @@ groups:
         annotations:
           summary: "p95 latency above 2s for 5 minutes"
 
-      - alert: JobQueueBacklog
-        expr: job_queue_depth > 500
+      - alert: CheckoutConversionDrop
+        expr: |
+          rate(checkout_completed_total[10m])
+          / rate(checkout_started_total[10m]) < 0.7
         for: 10m
         annotations:
-          summary: "Job queue depth above 500 for 10 minutes"
+          summary: "Checkout conversion rate below 70% for 10 minutes"
 
-      - alert: SubscriptionRenewalFailureSpike
+      - alert: RiverJobFailureSpike
         expr: |
-          rate(subscription_renewals_total{status="failed"}[15m]) > 0.1
+          sum by (job_kind) (rate(river_jobs_failed_total[5m])) > 0
         for: 5m
         annotations:
-          summary: "Subscription renewal failure rate elevated"
+          summary: "River job failures detected for {{ $labels.job_kind }}"
+
+      - alert: RiverQueueBacklog
+        expr: |
+          sum by (job_kind) (river_jobs_pending) > 500
+        for: 10m
+        annotations:
+          summary: "Job queue depth above 500 for {{ $labels.job_kind }}"
+
+      - alert: SubscriptionRenewalFailureRate
+        expr: |
+          rate(subscription_renewals_total{result="failed"}[1h])
+          / rate(subscription_renewals_total[1h]) > 0.05
+        for: 15m
+        annotations:
+          summary: "Subscription renewal failure rate above 5%"
 ```
 
 ---
 
 ## How metrics and logs complement each other
 
-Metrics and logs answer different questions and should not be used interchangeably:
-
 | Question | Tool |
 |---|---|
 | Is error rate elevated right now? | Prometheus metric + Grafana alert |
 | Which specific requests are erroring? | Loki — filter by `level=ERROR` |
-| How many orders in the last hour? | Prometheus counter |
-| What happened to order X specifically? | Loki — filter by `order_id` |
-| Is the job queue backing up? | Prometheus gauge |
-| Why did job Y fail? | Loki — filter by `river_job_id` |
+| Is checkout converting? | Prometheus checkout funnel counters |
+| Why did checkout X fail? | Loki — filter by `request_id` from 5xx log |
+| Is the job queue backing up? | Prometheus `river_jobs_pending` gauge |
+| Why did job Y fail? | Loki — filter by `job_kind` + `job_id` |
 | What's p95 latency trending over a week? | Prometheus histogram + Grafana |
 | What did this staff member do today? | Loki — filter by `actor_id` |
 
-The `request_id` and `river_job_id` fields are the bridge between the two systems. A Grafana alert fires on elevated error rate → you open Loki and filter by `level=ERROR` in the same time window → you find the `request_id` → you see the full request context. The observability stack is only useful if these correlation IDs are present and consistent.
+The `request_id` and `job_id` fields bridge the two systems. A Grafana alert fires on elevated error rate → open Loki, filter by `level=ERROR` in the same window → find the `request_id` → see full context.
 
 ---
 
-## Promtail configuration (log shipping)
+## Promtail configuration
 
 ```yaml
 # promtail-config.yml
@@ -624,4 +454,4 @@ scrape_configs:
           actor_id:
 ```
 
-This promotes `level`, `request_id`, and `actor_id` to Loki labels — making them indexed and fast to filter on. Don't promote high-cardinality fields (like `order_id`) to labels; keep those as log line content and use `| json | order_id="..."` in LogQL queries.
+Promote `level`, `request_id`, and `actor_id` to Loki labels for indexed, fast filtering. Don't promote high-cardinality fields like `order_id` — use `| json | order_id="..."` in LogQL queries.

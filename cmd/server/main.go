@@ -142,8 +142,8 @@ func run() error {
 
 	// River job workers
 	workers := river.NewWorkers()
-	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool))
-	river.AddWorker(workers, jobs.NewBatchRenewalWorker(renewalSvc, pool))
+	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool, metricsReg))
+	river.AddWorker(workers, jobs.NewBatchRenewalWorker(renewalSvc, pool, metricsReg))
 	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
 	river.AddWorker(workers, jobs.NewInvoiceSendWorker(invoiceStore, orderStore, customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
 	river.AddWorker(workers, jobs.NewWholesaleApplicationNotifyWorker(customerStore, pool, mailer, emailRenderer, fromAddr, staffEmail, baseURL, storeName))
@@ -178,7 +178,7 @@ func run() error {
 	}
 
 	// Register scheduler worker (needs the client for transactional inserts)
-	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient))
+	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient, metricsReg))
 
 	// Run River migrations
 	migrator, err := rivermigrate.New(riverpgxv5.New(pool), nil)
@@ -195,6 +195,11 @@ func run() error {
 		return fmt.Errorf("start river client: %w", err)
 	}
 	logger.Info("river workers started")
+
+	// Background metrics collectors
+	metrics.CollectPoolMetrics(ctx, metricsReg, pool, 15*time.Second)
+	metrics.CollectRiverMetrics(ctx, metricsReg, pool, 15*time.Second)
+	metrics.CollectSubscriptionMetrics(ctx, metricsReg, pool, 60*time.Second)
 
 	// Router
 	deps := &web.Deps{

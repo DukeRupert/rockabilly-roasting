@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/media"
@@ -56,6 +57,9 @@ func NewRouter(deps *Deps) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok")) //nolint:errcheck
 	})
+
+	// Prometheus metrics endpoint
+	mux.Handle("GET /metrics", promhttp.HandlerFor(deps.Metrics.Reg, promhttp.HandlerOpts{}))
 
 	// Static assets
 	mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler("internal/ui/assets")))
@@ -255,10 +259,11 @@ func NewRouter(deps *Deps) http.Handler {
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)
 
-	// Apply middleware stack
+	// Apply middleware stack (outermost runs first)
 	var handler http.Handler = mux
 	handler = requestIDMiddleware(handler)
 	handler = loggingMiddleware(handler, deps.Logger, deps.Metrics)
+	handler = metrics.HTTPMiddleware(deps.Metrics)(handler)
 
 	return handler
 }

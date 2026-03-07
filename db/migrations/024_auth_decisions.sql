@@ -1,16 +1,7 @@
 -- +goose Up
 
--- Safety check: ensure no meaningful guest rows exist before dropping.
--- If this fails, handle guest records before re-running.
--- +goose StatementBegin
-DO $$
-BEGIN
-    IF (SELECT count(*) FROM customers WHERE is_guest = true) > 0 THEN
-        RAISE EXCEPTION 'Found rows with is_guest = true. Handle these before dropping the column.';
-    END IF;
-END $$;
--- +goose StatementEnd
-
+-- Per auth-decisions.md: is_guest is no longer needed. All customer rows
+-- are persistent records regardless of the old is_guest flag. Just drop it.
 ALTER TABLE customers
     DROP COLUMN is_guest;
 

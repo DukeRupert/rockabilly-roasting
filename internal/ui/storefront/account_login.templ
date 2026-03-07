@@ -9,49 +9,58 @@ type AccountLoginProps struct {
 }
 
 templ AccountLoginContent(props AccountLoginProps) {
-	<div class="mx-auto max-w-sm">
-		<div class="text-center">
-			<h1 class="text-2xl font-bold text-hiri-text">Sign in to your account</h1>
-			<p class="mt-2 text-sm text-hiri-text-secondary">
+	<div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
+		<div class="sm:mx-auto sm:w-full sm:max-w-md">
+			<h2 class="text-center text-2xl/9 font-bold tracking-tight text-gray-900">Sign in to your account</h2>
+			<p class="mt-2 text-center text-sm/6 text-gray-500">
 				Enter your email and we'll send you a sign-in link.
 			</p>
 		</div>
-		if props.Error != "" {
-			<div class="mt-4 rounded-md bg-red-50 p-3">
-				<p class="text-sm text-red-700">{ props.Error }</p>
+		<div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
+			<div class="bg-white px-6 py-12 shadow-sm sm:rounded-lg sm:px-12">
+				if props.Error != "" {
+					<div class="mb-6 rounded-md bg-red-50 p-3">
+						<p class="text-sm/6 text-red-700">{ props.Error }</p>
+					</div>
+				}
+				if props.Success != "" {
+					<div class="rounded-md bg-green-50 p-4">
+						<div class="flex">
+							<svg class="mr-3 size-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"></path>
+							</svg>
+							<p class="text-sm/6 text-green-700">{ props.Success }</p>
+						</div>
+					</div>
+				} else {
+					<form method="post" action="/account/login" class="space-y-6">
+						<div>
+							<label for="email" class="block text-sm/6 font-medium text-gray-900">Email address</label>
+							<div class="mt-2">
+								<input
+									type="email"
+									name="email"
+									id="email"
+									required
+									autocomplete="email"
+									value={ props.Email }
+									placeholder="you@example.com"
+									class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal sm:text-sm/6"
+								/>
+							</div>
+						</div>
+						<div>
+							<button
+								type="submit"
+								class="flex w-full justify-center rounded-md bg-hiri-teal px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+							>
+								Send sign-in link
+							</button>
+						</div>
+					</form>
+				}
 			</div>
-		}
-		if props.Success != "" {
-			<div class="mt-4 rounded-md bg-green-50 p-3">
-				<div class="flex">
-					<svg class="mr-2 size-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"></path>
-					</svg>
-					<p class="text-sm text-green-700">{ props.Success }</p>
-				</div>
-			</div>
-		} else {
-			<form method="post" action="/account/login" class="mt-8 space-y-5">
-				<div>
-					<label for="email" class="block text-sm font-medium text-hiri-text">Email address</label>
-					<input
-						type="email"
-						name="email"
-						id="email"
-						required
-						value={ props.Email }
-						placeholder="you@example.com"
-						class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm"
-					/>
-				</div>
-				<button
-					type="submit"
-					class="flex w-full justify-center rounded-md bg-hiri-teal px-3 py-3 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
-				>
-					Send sign-in link
-				</button>
-			</form>
-		}
+		</div>
 	</div>
 }
 
@@ -64,16 +73,18 @@ templ AccountLoginPage(props AccountLoginProps) {
 }
 
 templ MagicLinkExpiredContent() {
-	<div class="mx-auto max-w-sm text-center">
-		<svg class="mx-auto size-16 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-			<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
-		</svg>
-		<h1 class="mt-4 text-2xl font-bold text-hiri-text">Link Expired</h1>
-		<p class="mt-2 text-sm text-hiri-text-secondary">
-			This sign-in link has expired or has already been used. Please request a new one.
-		</p>
-		<div class="mt-8">
-			<a href="/account/login" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Request new link</a>
+	<div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
+		<div class="sm:mx-auto sm:w-full sm:max-w-md text-center">
+			<svg class="mx-auto size-16 text-amber-500" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+			</svg>
+			<h2 class="mt-4 text-2xl/9 font-bold tracking-tight text-gray-900">Link Expired</h2>
+			<p class="mt-2 text-sm/6 text-gray-500">
+				This sign-in link has expired or has already been used. Please request a new one.
+			</p>
+			<div class="mt-8">
+				<a href="/account/login" class="text-sm/6 font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Request new link</a>
+			</div>
 		</div>
 	</div>
 }

@@ -1,0 +1,17 @@
+{{define "subscription_confirm.txt"}}Subscription Started
+
+Hi {{.CustomerName}},
+
+Your subscription is now active!
+
+Product:   {{.ProductName}}
+Plan:      {{.PlanName}}
+Quantity:  {{.Quantity}}
+Frequency: {{.Interval}}
+Price:     {{cents .UnitPrice}} each
+
+You can manage your subscription from your account page.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

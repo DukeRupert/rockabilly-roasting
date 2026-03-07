@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -18,20 +19,24 @@ type WholesaleApplicationNotifyWorker struct {
 	customers  *store.CustomerStore
 	pool       *pgxpool.Pool
 	mailer     email.Sender
+	renderer   *emailtemplates.Renderer
 	fromAddr   string
 	staffEmail string
 	baseURL    string
+	storeName  string
 }
 
 // NewWholesaleApplicationNotifyWorker creates a new WholesaleApplicationNotifyWorker.
-func NewWholesaleApplicationNotifyWorker(customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, fromAddr, staffEmail, baseURL string) *WholesaleApplicationNotifyWorker {
+func NewWholesaleApplicationNotifyWorker(customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, renderer *emailtemplates.Renderer, fromAddr, staffEmail, baseURL, storeName string) *WholesaleApplicationNotifyWorker {
 	return &WholesaleApplicationNotifyWorker{
 		customers:  customers,
 		pool:       pool,
 		mailer:     mailer,
+		renderer:   renderer,
 		fromAddr:   fromAddr,
 		staffEmail: staffEmail,
 		baseURL:    baseURL,
+		storeName:  storeName,
 	}
 }
 
@@ -58,12 +63,22 @@ func (w *WholesaleApplicationNotifyWorker) Work(ctx context.Context, job *river.
 	}
 
 	reviewURL := fmt.Sprintf("%s/admin/wholesale", w.baseURL)
+	html, text, err := w.renderer.Render("wholesale_application", emailtemplates.WholesaleApplicationData{
+		CompanyName:   companyName,
+		CustomerEmail: customer.Email,
+		ReviewURL:     reviewURL,
+		StoreName:     w.storeName,
+	})
+	if err != nil {
+		return fmt.Errorf("render wholesale application template: %w", err)
+	}
+
 	result, err := w.mailer.Send(ctx, email.Message{
 		From:    w.fromAddr,
 		To:      w.staffEmail,
 		Subject: fmt.Sprintf("New wholesale application: %s", companyName),
-		HTML:    fmt.Sprintf(`<p><strong>%s</strong> (%s) has applied for a wholesale account.</p><p><a href="%s">Review Application</a></p>`, companyName, customer.Email, reviewURL),
-		Text:    fmt.Sprintf("%s (%s) has applied for a wholesale account.\n\nReview: %s", companyName, customer.Email, reviewURL),
+		HTML:    html,
+		Text:    text,
 		Tag:     "wholesale-application",
 	})
 	if err != nil {
@@ -73,7 +88,7 @@ func (w *WholesaleApplicationNotifyWorker) Work(ctx context.Context, job *river.
 	slog.Info("wholesale application notification sent",
 		"customer_id", customer.ID,
 		"email", customer.Email,
-		"company", customer.CompanyName,
+		"company", companyName,
 		"message_id", result.MessageID,
 		"river_job_id", job.ID,
 	)

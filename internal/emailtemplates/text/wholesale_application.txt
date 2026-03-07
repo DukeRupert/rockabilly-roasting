@@ -1,0 +1,8 @@
+{{define "wholesale_application.txt"}}New Wholesale Application
+
+{{.CompanyName}} ({{.CustomerEmail}}) has applied for a wholesale account.
+
+Review: {{.ReviewURL}}
+
+{{.StoreName}} — Staff notification
+{{end}}

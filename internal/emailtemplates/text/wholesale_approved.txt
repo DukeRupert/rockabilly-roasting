@@ -1,0 +1,11 @@
+{{define "wholesale_approved.txt"}}Welcome to Wholesale
+
+Great news, {{.CompanyName}}! Your wholesale account has been approved.
+
+Log in to the wholesale portal: {{.PortalURL}}
+
+Use the email and password you registered with to sign in.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

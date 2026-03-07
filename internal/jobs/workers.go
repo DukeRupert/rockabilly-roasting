@@ -49,13 +49,23 @@ type PaymentRetryArgs struct {
 // Kind returns the job kind identifier.
 func (PaymentRetryArgs) Kind() string { return "payment_retry" }
 
-// OrderConfirmationArgs sends an order confirmation.
-type OrderConfirmationArgs struct {
-	OrderID uuid.UUID `json:"order_id"`
+// OrderConfirmEmailArgs sends an order confirmation email.
+type OrderConfirmEmailArgs struct {
+	OrderID    uuid.UUID `json:"order_id"`
+	CustomerID uuid.UUID `json:"customer_id"`
 }
 
 // Kind returns the job kind identifier.
-func (OrderConfirmationArgs) Kind() string { return "order_confirmation" }
+func (OrderConfirmEmailArgs) Kind() string { return "email:order_confirm" }
+
+// SubscriptionConfirmEmailArgs sends a subscription confirmation email.
+type SubscriptionConfirmEmailArgs struct {
+	SubscriptionID uuid.UUID `json:"subscription_id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (SubscriptionConfirmEmailArgs) Kind() string { return "email:subscription_confirm" }
 
 // CartExpiryArgs expires an abandoned cart.
 type CartExpiryArgs struct {

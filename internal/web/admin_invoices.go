@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
@@ -107,6 +108,14 @@ func (d *Deps) handleAdminInvoiceSend(w http.ResponseWriter, r *http.Request) {
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		_, txErr := d.InvoiceService.SendInvoice(ctx, tx, id, actor)
+		if txErr != nil {
+			return txErr
+		}
+
+		// Enqueue invoice email in the same transaction.
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.InvoiceSendArgs{
+			InvoiceID: id,
+		}, nil)
 		return txErr
 	})
 	if err != nil {
@@ -114,7 +123,6 @@ func (d *Deps) handleAdminInvoiceSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: Enqueue InvoiceSendArgs job for email delivery.
 	http.Redirect(w, r, "/admin/invoices/"+id.String(), http.StatusSeeOther)
 }
 

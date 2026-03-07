@@ -13,6 +13,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/store"
@@ -445,6 +446,15 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 		txErr = d.CartService.DeleteCart(ctx, tx, cartID)
 		if txErr != nil {
 			return fmt.Errorf("delete cart: %w", txErr)
+		}
+
+		// Enqueue order confirmation email in the same transaction.
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.OrderConfirmEmailArgs{
+			OrderID:    order.ID,
+			CustomerID: customerID,
+		}, nil)
+		if txErr != nil {
+			return fmt.Errorf("enqueue order confirm email: %w", txErr)
 		}
 
 		resp.OrderID = order.ID.String()

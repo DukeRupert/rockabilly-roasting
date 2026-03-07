@@ -13,6 +13,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/store"
@@ -425,6 +426,23 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 		txErr = d.SubscriptionService.LinkOrder(ctx, tx, sub.ID, order.ID, sub.CurrentPeriodStart, sub.CurrentPeriodEnd)
 		if txErr != nil {
 			return fmt.Errorf("link order: %w", txErr)
+		}
+
+		// Enqueue confirmation emails in the same transaction.
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.OrderConfirmEmailArgs{
+			OrderID:    order.ID,
+			CustomerID: customer.ID,
+		}, nil)
+		if txErr != nil {
+			return fmt.Errorf("enqueue order confirm email: %w", txErr)
+		}
+
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionConfirmEmailArgs{
+			SubscriptionID: sub.ID,
+			CustomerID:     customer.ID,
+		}, nil)
+		if txErr != nil {
+			return fmt.Errorf("enqueue subscription confirm email: %w", txErr)
 		}
 
 		return nil

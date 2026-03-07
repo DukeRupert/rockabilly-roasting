@@ -1,0 +1,11 @@
+{{define "magic_link.txt"}}Your Sign-In Link
+
+Hi{{if .CustomerName}} {{.CustomerName}}{{end}}, use the link below to sign in. It expires in {{.ExpiresIn}}.
+
+{{.MagicLinkURL}}
+
+If you didn't request this link, you can safely ignore this email.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

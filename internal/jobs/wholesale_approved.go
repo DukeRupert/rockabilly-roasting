@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -18,18 +19,22 @@ type WholesaleApprovedWorker struct {
 	customers *store.CustomerStore
 	pool      *pgxpool.Pool
 	mailer    email.Sender
+	renderer  *emailtemplates.Renderer
 	fromAddr  string
 	baseURL   string
+	storeName string
 }
 
 // NewWholesaleApprovedWorker creates a new WholesaleApprovedWorker.
-func NewWholesaleApprovedWorker(customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, fromAddr, baseURL string) *WholesaleApprovedWorker {
+func NewWholesaleApprovedWorker(customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, renderer *emailtemplates.Renderer, fromAddr, baseURL, storeName string) *WholesaleApprovedWorker {
 	return &WholesaleApprovedWorker{
 		customers: customers,
 		pool:      pool,
 		mailer:    mailer,
+		renderer:  renderer,
 		fromAddr:  fromAddr,
 		baseURL:   baseURL,
+		storeName: storeName,
 	}
 }
 
@@ -56,12 +61,22 @@ func (w *WholesaleApprovedWorker) Work(ctx context.Context, job *river.Job[Whole
 	}
 
 	portalURL := fmt.Sprintf("%s/wholesale/login", w.baseURL)
+	html, text, err := w.renderer.Render("wholesale_approved", emailtemplates.WholesaleApprovedData{
+		CompanyName: companyName,
+		PortalURL:   portalURL,
+		StoreName:   w.storeName,
+		StoreURL:    w.baseURL,
+	})
+	if err != nil {
+		return fmt.Errorf("render wholesale approved template: %w", err)
+	}
+
 	result, err := w.mailer.Send(ctx, email.Message{
 		From:    w.fromAddr,
 		To:      customer.Email,
 		Subject: "Your wholesale account has been approved",
-		HTML:    fmt.Sprintf(`<p>Welcome, <strong>%s</strong>! Your wholesale account has been approved.</p><p><a href="%s">Log in to the wholesale portal</a> to start ordering.</p>`, companyName, portalURL),
-		Text:    fmt.Sprintf("Welcome, %s! Your wholesale account has been approved.\n\nLog in to the wholesale portal: %s", companyName, portalURL),
+		HTML:    html,
+		Text:    text,
 		Tag:     "wholesale-approved",
 	})
 	if err != nil {
@@ -71,7 +86,7 @@ func (w *WholesaleApprovedWorker) Work(ctx context.Context, job *river.Job[Whole
 	slog.Info("wholesale approved email sent",
 		"customer_id", customer.ID,
 		"email", customer.Email,
-		"company", customer.CompanyName,
+		"company", companyName,
 		"message_id", result.MessageID,
 		"river_job_id", job.ID,
 	)

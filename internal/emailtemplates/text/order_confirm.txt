@@ -1,0 +1,23 @@
+{{define "order_confirm.txt"}}Order Confirmed — {{.OrderNumber}}
+
+Hi {{.CustomerName}},
+
+Thank you for your order!
+
+Order #: {{.OrderNumber}}
+Date: {{date .OrderDate}}
+
+Items:
+{{range .Items}}- {{.ProductName}} x{{.Quantity}} — {{cents .Total}}
+{{end}}
+Subtotal:  {{cents .Subtotal}}{{if .DiscountTotal}}
+Discount:  -{{cents .DiscountTotal}}{{end}}
+Shipping:  {{cents .ShippingTotal}}
+Tax:       {{cents .TaxTotal}}
+Total:     {{cents .OrderTotal}}
+{{if .ShippingAddr}}
+Ships to: {{.ShippingAddr}}
+{{end}}
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

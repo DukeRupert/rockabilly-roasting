@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -20,20 +21,24 @@ type InvoiceSendWorker struct {
 	customers *store.CustomerStore
 	pool      *pgxpool.Pool
 	mailer    email.Sender
+	renderer  *emailtemplates.Renderer
 	fromAddr  string
 	baseURL   string
+	storeName string
 }
 
 // NewInvoiceSendWorker creates a new InvoiceSendWorker.
-func NewInvoiceSendWorker(invoices *store.InvoiceStore, orders *store.OrderStore, customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, fromAddr, baseURL string) *InvoiceSendWorker {
+func NewInvoiceSendWorker(invoices *store.InvoiceStore, orders *store.OrderStore, customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, renderer *emailtemplates.Renderer, fromAddr, baseURL, storeName string) *InvoiceSendWorker {
 	return &InvoiceSendWorker{
 		invoices:  invoices,
 		orders:    orders,
 		customers: customers,
 		pool:      pool,
 		mailer:    mailer,
+		renderer:  renderer,
 		fromAddr:  fromAddr,
 		baseURL:   baseURL,
+		storeName: storeName,
 	}
 }
 
@@ -55,13 +60,14 @@ func (w *InvoiceSendWorker) Work(ctx context.Context, job *river.Job[InvoiceSend
 		return fmt.Errorf("get order %s: %w", invoice.OrderID, err)
 	}
 
-	var customerEmail string
+	var customerEmail, customerName string
 	if order.CustomerID != nil {
 		customer, err := w.customers.GetByID(ctx, tx, *order.CustomerID)
 		if err != nil {
 			return fmt.Errorf("get customer: %w", err)
 		}
 		customerEmail = customer.Email
+		customerName = customer.FirstName
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -77,12 +83,26 @@ func (w *InvoiceSendWorker) Work(ctx context.Context, job *river.Job[InvoiceSend
 	}
 
 	paymentURL := fmt.Sprintf("%s/invoices/%s/pay", w.baseURL, invoice.ID)
+	html, text, err := w.renderer.Render("invoice_sent", emailtemplates.InvoiceSentData{
+		CustomerName:  customerName,
+		InvoiceNumber: invoice.Number,
+		OrderNumber:   order.Number,
+		Total:         invoice.Total,
+		DueDate:       invoice.DueDate,
+		PaymentURL:    paymentURL,
+		StoreName:     w.storeName,
+		StoreURL:      w.baseURL,
+	})
+	if err != nil {
+		return fmt.Errorf("render invoice template: %w", err)
+	}
+
 	result, err := w.mailer.Send(ctx, email.Message{
 		From:    w.fromAddr,
 		To:      customerEmail,
 		Subject: fmt.Sprintf("Invoice %s", invoice.Number),
-		HTML:    fmt.Sprintf(`<p>Invoice <strong>%s</strong> for $%.2f is ready.</p><p><a href="%s">View &amp; Pay Invoice</a></p>`, invoice.Number, float64(invoice.Total)/100, paymentURL),
-		Text:    fmt.Sprintf("Invoice %s for $%.2f is ready.\n\nView & pay: %s", invoice.Number, float64(invoice.Total)/100, paymentURL),
+		HTML:    html,
+		Text:    text,
 		Tag:     "invoice",
 	})
 	if err != nil {

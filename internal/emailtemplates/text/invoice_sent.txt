@@ -1,0 +1,14 @@
+{{define "invoice_sent.txt"}}Invoice {{.InvoiceNumber}}
+
+Hi {{.CustomerName}},
+
+An invoice has been issued for your order {{.OrderNumber}}.
+
+Amount Due: {{cents .Total}}{{if .DueDate}}
+Due Date:   {{date .DueDate}}{{end}}
+
+View & pay: {{.PaymentURL}}
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

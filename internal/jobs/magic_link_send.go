@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -18,18 +19,22 @@ type MagicLinkSendWorker struct {
 	customers *store.CustomerStore
 	pool      *pgxpool.Pool
 	mailer    email.Sender
+	renderer  *emailtemplates.Renderer
 	fromAddr  string
 	baseURL   string
+	storeName string
 }
 
 // NewMagicLinkSendWorker creates a new MagicLinkSendWorker.
-func NewMagicLinkSendWorker(customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, fromAddr, baseURL string) *MagicLinkSendWorker {
+func NewMagicLinkSendWorker(customers *store.CustomerStore, pool *pgxpool.Pool, mailer email.Sender, renderer *emailtemplates.Renderer, fromAddr, baseURL, storeName string) *MagicLinkSendWorker {
 	return &MagicLinkSendWorker{
 		customers: customers,
 		pool:      pool,
 		mailer:    mailer,
+		renderer:  renderer,
 		fromAddr:  fromAddr,
 		baseURL:   baseURL,
+		storeName: storeName,
 	}
 }
 
@@ -51,12 +56,23 @@ func (w *MagicLinkSendWorker) Work(ctx context.Context, job *river.Job[MagicLink
 	}
 
 	magicURL := fmt.Sprintf("%s/account/magic?token=%s", w.baseURL, job.Args.RawToken)
+	html, text, err := w.renderer.Render("magic_link", emailtemplates.MagicLinkData{
+		CustomerName: customer.FirstName,
+		MagicLinkURL: magicURL,
+		ExpiresIn:    "15 minutes",
+		StoreName:    w.storeName,
+		StoreURL:     w.baseURL,
+	})
+	if err != nil {
+		return fmt.Errorf("render magic link template: %w", err)
+	}
+
 	result, err := w.mailer.Send(ctx, email.Message{
 		From:    w.fromAddr,
 		To:      customer.Email,
-		Subject: "Your login link",
-		HTML:    fmt.Sprintf(`<p>Click <a href="%s">here</a> to log in. This link expires in 15 minutes.</p>`, magicURL),
-		Text:    fmt.Sprintf("Log in here: %s\n\nThis link expires in 15 minutes.", magicURL),
+		Subject: "Your sign-in link",
+		HTML:    html,
+		Text:    text,
 		Tag:     "magic-link",
 	})
 	if err != nil {

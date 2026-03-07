@@ -17,6 +17,7 @@ import (
 	"github.com/riverqueue/river/rivermigrate"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/email"
@@ -78,8 +79,13 @@ func run() error {
 	)
 	labelProvider := shipping.NewEasyPostProvider(os.Getenv("EASYPOST_API_KEY"))
 	mailer := email.NewPostmarkSender(os.Getenv("POSTMARK_SERVER_TOKEN"))
+	emailRenderer, err := emailtemplates.New()
+	if err != nil {
+		return fmt.Errorf("create email renderer: %w", err)
+	}
 	fromAddr := os.Getenv("EMAIL_FROM")
 	baseURL := os.Getenv("BASE_URL")
+	storeName := os.Getenv("STORE_NAME")
 	staffEmail := os.Getenv("STAFF_NOTIFICATION_EMAIL")
 
 	// Stores
@@ -118,10 +124,12 @@ func run() error {
 	workers := river.NewWorkers()
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool))
 	river.AddWorker(workers, jobs.NewBatchRenewalWorker(renewalSvc, pool))
-	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(customerStore, pool, mailer, fromAddr, baseURL))
-	river.AddWorker(workers, jobs.NewInvoiceSendWorker(invoiceStore, orderStore, customerStore, pool, mailer, fromAddr, baseURL))
-	river.AddWorker(workers, jobs.NewWholesaleApplicationNotifyWorker(customerStore, pool, mailer, fromAddr, staffEmail, baseURL))
-	river.AddWorker(workers, jobs.NewWholesaleApprovedWorker(customerStore, pool, mailer, fromAddr, baseURL))
+	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
+	river.AddWorker(workers, jobs.NewInvoiceSendWorker(invoiceStore, orderStore, customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
+	river.AddWorker(workers, jobs.NewWholesaleApplicationNotifyWorker(customerStore, pool, mailer, emailRenderer, fromAddr, staffEmail, baseURL, storeName))
+	river.AddWorker(workers, jobs.NewWholesaleApprovedWorker(customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
+	river.AddWorker(workers, jobs.NewOrderConfirmEmailWorker(orderStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
+	river.AddWorker(workers, jobs.NewSubscriptionConfirmEmailWorker(subscriptionStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
 
 	// River client — we create it first, then pass it to the scheduler worker
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{

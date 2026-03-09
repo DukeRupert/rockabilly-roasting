@@ -115,6 +115,7 @@ func run() error {
 	pricingStore := store.NewPricingStore()
 	cartStore := store.NewCartStore()
 	settingsStore := store.NewSettingsStore()
+	attributeStore := store.NewAttributeStore()
 	auditStore := store.NewAuditStore()
 
 	// Services
@@ -134,6 +135,7 @@ func run() error {
 	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, paymentProvider, auditWriter, metricsReg)
 	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg)
+	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
 	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg)
 
 	// River job workers
@@ -215,6 +217,7 @@ func run() error {
 		PricingService:  pricingSvc,
 		CartService:      cartSvc,
 		WholesaleService: wholesaleSvc,
+		AttributeService:    attributeSvc,
 		InvoiceService:   invoiceSvc,
 		PaymentProvider:  paymentProvider,
 		AuditStore:      auditStore,

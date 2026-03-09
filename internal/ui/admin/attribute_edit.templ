@@ -1,0 +1,220 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type AttributeSetEditProps struct {
+	Set       *domain.AttributeSet
+	Keys      []domain.AttributeKey
+	Flash     string
+	StaffName string
+	StaffRole string
+}
+
+templ AttributeSetEditContent(props AttributeSetEditProps) {
+	<!-- Page header -->
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="text-base/7 font-semibold text-rr-heading">{ props.Set.Name }</h1>
+			<p class="mt-2 text-sm text-rr-muted">Edit attribute set and manage its keys.</p>
+		</div>
+		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+			<a
+				href="/admin/attributes"
+				class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
+			>
+				Back to sets
+			</a>
+		</div>
+	</div>
+	if props.Flash != "" {
+		<div class="mt-4 rounded-sm badge-green p-4">
+			<div class="flex">
+				<div class="flex-shrink-0">
+					<svg class="size-5" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+				<div class="ml-3">
+					<p class="text-sm font-medium">{ props.Flash }</p>
+				</div>
+			</div>
+		</div>
+	}
+	<!-- Edit set form -->
+	<div class="mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+		<div class="px-4 py-5 sm:px-6">
+			<h3 class="text-base/7 font-semibold text-rr-heading">Set details</h3>
+		</div>
+		<div class="border-t border-rr-border px-4 py-5 sm:px-6">
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s", props.Set.ID)) } class="flex items-end gap-3 flex-wrap">
+				<div class="flex-1 min-w-[200px]">
+					<label for="set_name" class="block text-sm/6 font-medium text-rr-heading">Name</label>
+					<div class="mt-2">
+						<input type="text" id="set_name" name="name" value={ props.Set.Name } required class={ inputClasses(false) }/>
+					</div>
+				</div>
+				<div class="flex-1 min-w-[200px]">
+					<label for="set_slug" class="block text-sm/6 font-medium text-rr-heading">Slug</label>
+					<div class="mt-2">
+						<input type="text" id="set_slug" name="slug" value={ props.Set.Slug } class={ inputClasses(false) }/>
+					</div>
+				</div>
+				<div class="w-20">
+					<label for="set_position" class="block text-sm/6 font-medium text-rr-heading">Order</label>
+					<div class="mt-2">
+						<input type="number" id="set_position" name="position" value={ fmt.Sprintf("%d", props.Set.Position) } class={ inputClasses(false) }/>
+					</div>
+				</div>
+				<button type="submit" class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+					Save
+				</button>
+			</form>
+		</div>
+	</div>
+	<!-- Keys list -->
+	<div class="mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+		<div class="px-4 py-5 sm:px-6">
+			<h3 class="text-base/7 font-semibold text-rr-heading">Attribute keys</h3>
+			<p class="mt-1 text-sm text-rr-muted">Keys define the individual attributes in this set (e.g. "Origin", "Tasting Notes").</p>
+		</div>
+		<div class="border-t border-rr-border">
+			if len(props.Keys) > 0 {
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Name</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Type</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Filterable</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Sortable</th>
+							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+								<span class="sr-only">Actions</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, key := range props.Keys {
+							<tr>
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+									<span class="font-medium text-rr-heading">{ key.Name }</span>
+									<span class="ml-1 text-rr-muted">({ key.Slug })</span>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+									if key.ValueType == domain.AttributeValueTypeMulti {
+										<span class="badge badge-blue">multi</span>
+									} else {
+										<span class="badge badge-neutral">single</span>
+									}
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+									if key.Filterable {
+										<span class="text-green-600">Yes</span>
+									} else {
+										<span class="text-rr-border">&mdash;</span>
+									}
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+									if key.Sortable {
+										<span class="text-green-600">Yes</span>
+									} else {
+										<span class="text-rr-border">&mdash;</span>
+									}
+								</td>
+								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+									<form
+										method="post"
+										action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/keys/%s/delete", props.Set.ID, key.ID)) }
+										onsubmit="return confirm('Delete this attribute key?')"
+										class="inline"
+									>
+										<button type="submit" class="text-rr-red hover:text-rr-red-lt">Delete</button>
+									</form>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			} else {
+				<div class="px-4 py-5 sm:px-6">
+					<p class="text-sm text-rr-muted">No keys defined yet.</p>
+				</div>
+			}
+			<!-- Add key form -->
+			<div class="border-t border-rr-border px-4 py-5 sm:px-6">
+				<h4 class="text-sm font-medium text-rr-heading mb-4">Add key</h4>
+				<form
+					method="post"
+					action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/keys", props.Set.ID)) }
+					class="flex items-end gap-3 flex-wrap"
+				>
+					<div class="flex-1 min-w-[150px]">
+						<label for="key_name" class="block text-sm/6 font-medium text-rr-heading">Name</label>
+						<div class="mt-2">
+							<input type="text" id="key_name" name="name" placeholder="e.g. Tasting Notes" required class={ inputClasses(false) }/>
+						</div>
+					</div>
+					<div class="w-32">
+						<label for="key_type" class="block text-sm/6 font-medium text-rr-heading">Type</label>
+						<div class="mt-2">
+							<select id="key_type" name="value_type" class={ inputClasses(false) }>
+								<option value="single">Single</option>
+								<option value="multi">Multi</option>
+							</select>
+						</div>
+					</div>
+					<div class="w-20">
+						<label for="key_position" class="block text-sm/6 font-medium text-rr-heading">Order</label>
+						<div class="mt-2">
+							<input type="number" id="key_position" name="position" value="0" class={ inputClasses(false) }/>
+						</div>
+					</div>
+					<div class="flex items-center gap-4 pb-1.5">
+						<div class="flex items-center gap-1.5">
+							<input type="checkbox" id="key_filterable" name="filterable" value="true" class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
+							<label for="key_filterable" class="text-sm text-rr-heading">Filterable</label>
+						</div>
+						<div class="flex items-center gap-1.5">
+							<input type="checkbox" id="key_sortable" name="sortable" value="true" class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
+							<label for="key_sortable" class="text-sm text-rr-heading">Sortable</label>
+						</div>
+					</div>
+					<button type="submit" class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+						Add key
+					</button>
+				</form>
+			</div>
+		</div>
+	</div>
+	<!-- Danger zone -->
+	<div class="mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+		<div class="px-4 py-5 sm:px-6 flex items-center justify-between">
+			<div>
+				<h3 class="text-sm font-medium text-rr-heading">Delete attribute set</h3>
+				<p class="mt-0.5 text-sm text-rr-muted">This will remove the set and all its keys. Product values using these keys will be lost.</p>
+			</div>
+			<form
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/delete", props.Set.ID)) }
+				onsubmit="return confirm('Are you sure you want to delete this attribute set?')"
+			>
+				<button type="submit" class="badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer">
+					Delete set
+				</button>
+			</form>
+		</div>
+	</div>
+}
+
+templ AttributeSetEdit(props AttributeSetEditProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      props.Set.Name + " - Attribute Set",
+		ActivePath: "/admin/attributes",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@AttributeSetEditContent(props)
+	}
+}

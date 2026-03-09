@@ -79,4 +79,10 @@ const (
 	AuditInvoiceSent            = "invoice.sent"
 	AuditInvoiceVoided          = "invoice.voided"
 	AuditInvoicePaymentRecorded = "invoice.payment_recorded"
+
+	// Attribute actions
+	AuditAttributeSetCreated      = "attribute_set.created"
+	AuditAttributeSetUpdated      = "attribute_set.updated"
+	AuditAttributeSetDeleted      = "attribute_set.deleted"
+	AuditProductAttributesUpdated = "product.attributes_updated"
 )

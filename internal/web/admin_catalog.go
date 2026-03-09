@@ -243,6 +243,9 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var options []admin.OptionWithValues
 	var groups []domain.CustomerGroup
 	var mediaList []domain.ProductMedia
+	var assignedSets []domain.AttributeSet
+	var allSets []domain.AttributeSet
+	var attrValues []domain.ProductAttributeValue
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -311,6 +314,27 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 
 		// Load customer groups
 		groups, txErr = d.CustomerGroupStore.List(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+
+		// Load product attributes
+		assignedSets, txErr = d.AttributeService.ListProductAttributeSets(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		for i := range assignedSets {
+			keys, kErr := d.AttributeService.ListAttributeKeys(ctx, tx, assignedSets[i].ID)
+			if kErr != nil {
+				return kErr
+			}
+			assignedSets[i].Keys = keys
+		}
+		allSets, txErr = d.AttributeService.ListAttributeSets(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		attrValues, txErr = d.AttributeService.ListProductAttributeValues(ctx, tx, id)
 		return txErr
 	})
 	if err != nil {
@@ -328,17 +352,20 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.ProductEditProps{
-		Product:     product,
-		Taxons:      taxons,
-		Variants:    variants,
-		Options:     options,
-		Groups:      groups,
-		Media:       mediaList,
-		MediaConfig: d.MediaConfig,
-		TaxonName:   taxonName,
-		Flash:       r.URL.Query().Get("flash"),
-		StaffName:   name,
-		StaffRole:   role,
+		Product:         product,
+		Taxons:          taxons,
+		Variants:        variants,
+		Options:         options,
+		Groups:          groups,
+		Media:           mediaList,
+		MediaConfig:     d.MediaConfig,
+		TaxonName:       taxonName,
+		Flash:           r.URL.Query().Get("flash"),
+		StaffName:       name,
+		StaffRole:       role,
+		AssignedSets:    assignedSets,
+		AllSets:         allSets,
+		AttributeValues: attrValues,
 	}
 	if IsHTMX(r) {
 		admin.ProductEditContent(props).Render(ctx, w) //nolint:errcheck

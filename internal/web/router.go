@@ -36,6 +36,7 @@ type Deps struct {
 	PricingService      *app.PricingService
 	CartService         *app.CartService
 	WholesaleService    *app.WholesaleService
+	AttributeService    *app.AttributeService
 	InvoiceService      *app.InvoiceService
 	PaymentProvider     payments.Provider
 	WebhookStore        *store.WebhookStore
@@ -263,6 +264,21 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/invoices/{id}/send", deps.handleAdminInvoiceSend)
 	adminMux.HandleFunc("POST /admin/invoices/{id}/payment", deps.handleAdminInvoiceRecordPayment)
 	adminMux.HandleFunc("POST /admin/invoices/{id}/void", deps.handleAdminInvoiceVoid)
+
+	// Admin attributes
+	adminMux.HandleFunc("GET /admin/attributes", deps.handleAdminAttributeSetList)
+	adminMux.HandleFunc("POST /admin/attributes", deps.handleAdminAttributeSetCreate)
+	adminMux.HandleFunc("GET /admin/attributes/{id}", deps.handleAdminAttributeSetEdit)
+	adminMux.HandleFunc("POST /admin/attributes/{id}", deps.handleAdminAttributeSetUpdate)
+	adminMux.HandleFunc("POST /admin/attributes/{id}/delete", deps.handleAdminAttributeSetDelete)
+	adminMux.HandleFunc("POST /admin/attributes/{id}/keys", deps.handleAdminAttributeKeyCreate)
+	adminMux.HandleFunc("POST /admin/attributes/{id}/keys/{keyID}", deps.handleAdminAttributeKeyUpdate)
+	adminMux.HandleFunc("POST /admin/attributes/{id}/keys/{keyID}/delete", deps.handleAdminAttributeKeyDelete)
+
+	// Product attributes (on product edit page)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/attributes/assign", deps.handleAdminProductAttributeAssign)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/attributes/remove", deps.handleAdminProductAttributeRemove)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/attributes/save", deps.handleAdminProductAttributeSave)
 
 	// Admin audit log
 	adminMux.HandleFunc("GET /admin/audit", deps.handleAdminAuditList)

@@ -97,6 +97,10 @@ var (
 	ErrWholesaleNotPending  = errors.New("wholesale application is not pending")
 	ErrMOQViolation         = errors.New("minimum order quantity not met")
 
+	// Attribute errors
+	ErrAttributeSetNotFound = errors.New("attribute set not found")
+	ErrAttributeKeyNotFound = errors.New("attribute key not found")
+
 	// Invoice errors
 	ErrInvoiceNotFound    = errors.New("invoice not found")
 	ErrOrderNotInvoiceable = errors.New("order cannot be invoiced")

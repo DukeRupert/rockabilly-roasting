@@ -1,0 +1,166 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/google/uuid"
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+type AttributesPanelProps struct {
+	Product      *domain.Product
+	AssignedSets []domain.AttributeSet
+	AllSets      []domain.AttributeSet
+	Values       []domain.ProductAttributeValue
+}
+
+// valueForKey looks up the current value for a given attribute key.
+func valueForKey(vals []domain.ProductAttributeValue, keyID uuid.UUID) string {
+	for _, v := range vals {
+		if v.KeyID == keyID {
+			return v.DisplayValue()
+		}
+	}
+	return ""
+}
+
+// valueTypeForKey returns the value type for an attribute key.
+func valueTypeForKey(vals []domain.ProductAttributeValue, keyID uuid.UUID) domain.AttributeValueType {
+	for _, v := range vals {
+		if v.KeyID == keyID {
+			return v.ValueType
+		}
+	}
+	return domain.AttributeValueTypeSingle
+}
+
+// isSetAssigned checks if a set is already assigned to the product.
+func isSetAssigned(assignedSets []domain.AttributeSet, setID uuid.UUID) bool {
+	for _, s := range assignedSets {
+		if s.ID == setID {
+			return true
+		}
+	}
+	return false
+}
+
+// unassignedSets returns attribute sets not yet assigned to this product.
+func unassignedSets(allSets, assignedSets []domain.AttributeSet) []domain.AttributeSet {
+	var result []domain.AttributeSet
+	for _, s := range allSets {
+		if !isSetAssigned(assignedSets, s.ID) {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+templ AttributesPanel(props AttributesPanelProps) {
+	<div id="attributes-panel">
+		<!-- Assigned sets & value entry -->
+		if len(props.AssignedSets) > 0 {
+			<form
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/attributes/save", props.Product.ID)) }
+				hx-post={ fmt.Sprintf("/admin/catalog/%s/attributes/save", props.Product.ID) }
+				hx-target="#attributes-panel"
+				hx-swap="outerHTML"
+			>
+				for _, set := range props.AssignedSets {
+					<div class="rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border mb-4">
+						<div class="px-4 py-3 sm:px-6 flex items-center justify-between bg-rr-raised border-b border-rr-border">
+							<h4 class="text-sm font-semibold text-rr-heading">{ set.Name }</h4>
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/attributes/remove", props.Product.ID)) }
+								hx-post={ fmt.Sprintf("/admin/catalog/%s/attributes/remove", props.Product.ID) }
+								hx-target="#attributes-panel"
+								hx-swap="outerHTML"
+								class="inline"
+							>
+								<input type="hidden" name="attribute_set_id" value={ set.ID.String() }/>
+								<button type="submit" class="text-xs text-rr-red hover:text-rr-red-lt">Remove set</button>
+							</form>
+						</div>
+						<div class="px-4 py-4 sm:px-6 space-y-4">
+							for _, key := range set.Keys {
+								<div>
+									<label class="block text-sm/6 font-medium text-rr-heading">{ key.Name }</label>
+									<input type="hidden" name={ fmt.Sprintf("vt_%s", key.ID) } value={ string(key.ValueType) }/>
+									if key.ValueType == domain.AttributeValueTypeMulti {
+										<div class="mt-1">
+											<input
+												type="text"
+												name={ fmt.Sprintf("attr_%s", key.ID) }
+												value={ valueForKey(props.Values, key.ID) }
+												placeholder="Comma-separated values"
+												class={ inputClasses(false) }
+											/>
+											<p class="mt-1 text-xs text-rr-muted">Separate multiple values with commas.</p>
+										</div>
+									} else {
+										<div class="mt-1">
+											<input
+												type="text"
+												name={ fmt.Sprintf("attr_%s", key.ID) }
+												value={ valueForKey(props.Values, key.ID) }
+												class={ inputClasses(false) }
+											/>
+										</div>
+									}
+								</div>
+							}
+						</div>
+					</div>
+				}
+				<div class="flex justify-end">
+					<button type="submit" class="rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+						Save attributes
+					</button>
+				</div>
+			</form>
+		} else {
+			<div class="rounded-sm border-2 border-dashed border-rr-border p-8 text-center mb-4">
+				<h3 class="text-sm font-semibold text-rr-heading">No attribute sets assigned</h3>
+				<p class="mt-1 text-sm text-rr-muted">Assign an attribute set below to start adding product attributes.</p>
+			</div>
+		}
+		<!-- Assign set -->
+		if available := unassignedSets(props.AllSets, props.AssignedSets); len(available) > 0 {
+			<div class="mt-4 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+				<div class="px-4 py-4 sm:px-6">
+					<form
+						method="post"
+						action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/attributes/assign", props.Product.ID)) }
+						hx-post={ fmt.Sprintf("/admin/catalog/%s/attributes/assign", props.Product.ID) }
+						hx-target="#attributes-panel"
+						hx-swap="outerHTML"
+						class="flex items-end gap-3"
+					>
+						<div class="flex-1">
+							<label for="assign_set" class="block text-sm/6 font-medium text-rr-heading">Assign attribute set</label>
+							<div class="mt-2">
+								<select id="assign_set" name="attribute_set_id" required class={ inputClasses(false) }>
+									<option value="">Select a set</option>
+									for _, s := range available {
+										<option value={ s.ID.String() }>{ s.Name }</option>
+									}
+								</select>
+							</div>
+						</div>
+						<button type="submit" class="rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised">
+							Assign
+						</button>
+					</form>
+				</div>
+			</div>
+		}
+		if len(props.AllSets) == 0 {
+			<div class="mt-4">
+				<p class="text-sm text-rr-muted">
+					No attribute sets exist yet.
+					<a href="/admin/attributes" class="text-rr-red hover:text-rr-red-lt">Create attribute sets</a> first.
+				</p>
+			</div>
+		}
+	</div>
+}

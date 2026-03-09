@@ -5,12 +5,56 @@
 package sqlcgen
 
 import (
+	"database/sql/driver"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type AttributeValueType string
+
+const (
+	AttributeValueTypeSingle AttributeValueType = "single"
+	AttributeValueTypeMulti  AttributeValueType = "multi"
+)
+
+func (e *AttributeValueType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = AttributeValueType(s)
+	case string:
+		*e = AttributeValueType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for AttributeValueType: %T", src)
+	}
+	return nil
+}
+
+type NullAttributeValueType struct {
+	AttributeValueType AttributeValueType `json:"attribute_value_type"`
+	Valid              bool               `json:"valid"` // Valid is true if AttributeValueType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullAttributeValueType) Scan(value interface{}) error {
+	if value == nil {
+		ns.AttributeValueType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.AttributeValueType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullAttributeValueType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.AttributeValueType), nil
+}
 
 type Address struct {
 	ID          uuid.UUID  `json:"id"`
@@ -35,6 +79,25 @@ type Adjustment struct {
 	Amount     int32      `json:"amount"`
 	SourceType string     `json:"source_type"`
 	SourceID   uuid.UUID  `json:"source_id"`
+}
+
+type AttributeKey struct {
+	ID             uuid.UUID          `json:"id"`
+	AttributeSetID uuid.UUID          `json:"attribute_set_id"`
+	Name           string             `json:"name"`
+	Slug           string             `json:"slug"`
+	ValueType      AttributeValueType `json:"value_type"`
+	Position       int32              `json:"position"`
+	Filterable     bool               `json:"filterable"`
+	Sortable       bool               `json:"sortable"`
+}
+
+type AttributeSet struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Slug      string    `json:"slug"`
+	Position  int32     `json:"position"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type AuditLog struct {
@@ -313,6 +376,19 @@ type Product struct {
 	Subscribable  bool               `json:"subscribable"`
 	Visibility    string             `json:"visibility"`
 	TaxExempt     bool               `json:"tax_exempt"`
+}
+
+type ProductAttributeSet struct {
+	ProductID      uuid.UUID `json:"product_id"`
+	AttributeSetID uuid.UUID `json:"attribute_set_id"`
+}
+
+type ProductAttributeValue struct {
+	ID             uuid.UUID `json:"id"`
+	ProductID      uuid.UUID `json:"product_id"`
+	AttributeKeyID uuid.UUID `json:"attribute_key_id"`
+	Value          *string   `json:"value"`
+	Values         []byte    `json:"values"`
 }
 
 type ProductGroupVisibility struct {

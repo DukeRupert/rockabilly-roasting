@@ -14,12 +14,15 @@ type Querier interface {
 	AddCustomerGroupMembership(ctx context.Context, arg AddCustomerGroupMembershipParams) error
 	AdjustStockQuantity(ctx context.Context, arg AdjustStockQuantityParams) (StockLevel, error)
 	ApproveWholesaleCustomer(ctx context.Context, arg ApproveWholesaleCustomerParams) (Customer, error)
+	AssignAttributeSetToProduct(ctx context.Context, arg AssignAttributeSetToProductParams) error
 	CancelSubscription(ctx context.Context, id uuid.UUID) error
 	ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error
 	CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error)
 	CountWholesaleByStatus(ctx context.Context, wholesaleStatus *string) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
 	CreateAdjustment(ctx context.Context, arg CreateAdjustmentParams) (Adjustment, error)
+	CreateAttributeKey(ctx context.Context, arg CreateAttributeKeyParams) (AttributeKey, error)
+	CreateAttributeSet(ctx context.Context, arg CreateAttributeSetParams) (AttributeSet, error)
 	CreateAuditEntry(ctx context.Context, arg CreateAuditEntryParams) (AuditLog, error)
 	CreateCart(ctx context.Context, arg CreateCartParams) (Cart, error)
 	CreateCartForSession(ctx context.Context, arg CreateCartForSessionParams) (Cart, error)
@@ -58,6 +61,8 @@ type Querier interface {
 	CreateWholesaleCustomer(ctx context.Context, arg CreateWholesaleCustomerParams) (Customer, error)
 	DeleteAddress(ctx context.Context, arg DeleteAddressParams) error
 	DeleteAdjustment(ctx context.Context, id uuid.UUID) error
+	DeleteAttributeKey(ctx context.Context, id uuid.UUID) error
+	DeleteAttributeSet(ctx context.Context, id uuid.UUID) error
 	DeleteBasePrice(ctx context.Context, arg DeleteBasePriceParams) error
 	DeleteCart(ctx context.Context, id uuid.UUID) error
 	DeleteCartItem(ctx context.Context, id uuid.UUID) error
@@ -72,6 +77,8 @@ type Querier interface {
 	DeleteLineItemsByOrder(ctx context.Context, orderID uuid.UUID) error
 	DeleteOrder(ctx context.Context, id uuid.UUID) error
 	DeleteProduct(ctx context.Context, id uuid.UUID) error
+	DeleteProductAttributeValuesByKey(ctx context.Context, attributeKeyID uuid.UUID) error
+	DeleteProductAttributeValuesByProduct(ctx context.Context, productID uuid.UUID) error
 	DeleteProductMedia(ctx context.Context, id uuid.UUID) error
 	DeleteProductOption(ctx context.Context, id uuid.UUID) error
 	DeleteProductOptionValue(ctx context.Context, id uuid.UUID) error
@@ -80,6 +87,8 @@ type Querier interface {
 	DeleteVariantOptionValuesByVariant(ctx context.Context, variantID uuid.UUID) error
 	GetAddress(ctx context.Context, arg GetAddressParams) (Address, error)
 	GetAddressByID(ctx context.Context, id uuid.UUID) (Address, error)
+	GetAttributeKeyByID(ctx context.Context, id uuid.UUID) (AttributeKey, error)
+	GetAttributeSetByID(ctx context.Context, id uuid.UUID) (AttributeSet, error)
 	GetBasePrice(ctx context.Context, arg GetBasePriceParams) (Price, error)
 	GetCartByCustomerID(ctx context.Context, customerID *uuid.UUID) (Cart, error)
 	GetCartByID(ctx context.Context, id uuid.UUID) (Cart, error)
@@ -125,6 +134,8 @@ type Querier interface {
 	ListAddresses(ctx context.Context, customerID *uuid.UUID) ([]Address, error)
 	ListAdjustmentsByLineItem(ctx context.Context, lineItemID *uuid.UUID) ([]Adjustment, error)
 	ListAdjustmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Adjustment, error)
+	ListAttributeKeysBySet(ctx context.Context, attributeSetID uuid.UUID) ([]AttributeKey, error)
+	ListAttributeSets(ctx context.Context) ([]AttributeSet, error)
 	ListAuditByAction(ctx context.Context, action string) ([]AuditLog, error)
 	ListAuditByActor(ctx context.Context, actorID *uuid.UUID) ([]AuditLog, error)
 	ListAuditByResource(ctx context.Context, arg ListAuditByResourceParams) ([]AuditLog, error)
@@ -141,6 +152,7 @@ type Querier interface {
 	ListInvoicePaymentsByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoicePayment, error)
 	ListInvoicesByOrder(ctx context.Context, orderID uuid.UUID) ([]Invoice, error)
 	ListLineItemsByOrder(ctx context.Context, orderID uuid.UUID) ([]LineItem, error)
+	ListProductAttributeSets(ctx context.Context, productID uuid.UUID) ([]AttributeSet, error)
 	ListProductGroupVisibility(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
 	ListProductMediaByProduct(ctx context.Context, productID uuid.UUID) ([]ProductMedium, error)
 	ListProductOptionValuesByOption(ctx context.Context, productOptionID uuid.UUID) ([]ProductOptionValue, error)
@@ -171,6 +183,7 @@ type Querier interface {
 	RedeemCouponCode(ctx context.Context, arg RedeemCouponCodeParams) (CouponCode, error)
 	RedeemMagicLinkToken(ctx context.Context, tokenHash string) (MagicLinkToken, error)
 	ReleaseReservation(ctx context.Context, arg ReleaseReservationParams) (StockLevel, error)
+	RemoveAttributeSetFromProduct(ctx context.Context, arg RemoveAttributeSetFromProductParams) error
 	RemoveCustomerGroupMembership(ctx context.Context, arg RemoveCustomerGroupMembershipParams) error
 	RemoveProductGroupVisibility(ctx context.Context, arg RemoveProductGroupVisibilityParams) error
 	ReserveStock(ctx context.Context, arg ReserveStockParams) (StockLevel, error)
@@ -182,6 +195,8 @@ type Querier interface {
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)
 	SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error)
 	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)
+	UpdateAttributeKey(ctx context.Context, arg UpdateAttributeKeyParams) (AttributeKey, error)
+	UpdateAttributeSet(ctx context.Context, arg UpdateAttributeSetParams) (AttributeSet, error)
 	UpdateCartAddresses(ctx context.Context, arg UpdateCartAddressesParams) (Cart, error)
 	UpdateCartDiscount(ctx context.Context, arg UpdateCartDiscountParams) (Cart, error)
 	UpdateCustomerEmail(ctx context.Context, arg UpdateCustomerEmailParams) (Customer, error)
@@ -232,6 +247,7 @@ type Querier interface {
 	UpsertBasePrice(ctx context.Context, arg UpsertBasePriceParams) (Price, error)
 	UpsertCartItem(ctx context.Context, arg UpsertCartItemParams) (CartItem, error)
 	UpsertGroupPrice(ctx context.Context, arg UpsertGroupPriceParams) (Price, error)
+	UpsertProductAttributeValue(ctx context.Context, arg UpsertProductAttributeValueParams) error
 }
 
 var _ Querier = (*Queries)(nil)

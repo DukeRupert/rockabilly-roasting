@@ -1,0 +1,133 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type AttributeSetListProps struct {
+	Sets      []domain.AttributeSet
+	Flash     string
+	StaffName string
+	StaffRole string
+}
+
+templ AttributeSetListContent(props AttributeSetListProps) {
+	<!-- Page header -->
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="text-base/7 font-semibold text-rr-heading">Attribute Sets</h1>
+			<p class="mt-2 text-sm text-rr-muted">Define groups of attributes like "Coffee Profile" to attach to products.</p>
+		</div>
+	</div>
+	if props.Flash != "" {
+		<div class="mt-4 rounded-sm badge-green p-4">
+			<div class="flex">
+				<div class="flex-shrink-0">
+					<svg class="size-5" viewBox="0 0 20 20" fill="currentColor">
+						<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+				<div class="ml-3">
+					<p class="text-sm font-medium">{ props.Flash }</p>
+				</div>
+			</div>
+		</div>
+	}
+	<!-- Attribute sets list -->
+	<div class="mt-8 space-y-4">
+		if len(props.Sets) > 0 {
+			for _, set := range props.Sets {
+				<div class="rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+					<div class="px-4 py-4 sm:px-6 flex items-center justify-between">
+						<div>
+							<a href={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s", set.ID)) } class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">
+								{ set.Name }
+							</a>
+							<p class="mt-0.5 text-xs text-rr-muted">
+								{ fmt.Sprintf("%d key", len(set.Keys)) }
+								if len(set.Keys) != 1 {
+									s
+								}
+								&middot; slug: { set.Slug }
+							</p>
+						</div>
+						<div class="flex items-center gap-3">
+							<a href={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s", set.ID)) } class="text-sm text-rr-body hover:text-rr-heading">Edit</a>
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/delete", set.ID)) }
+								onsubmit="return confirm('Delete this attribute set and all its keys?')"
+								class="inline"
+							>
+								<button type="submit" class="text-sm text-rr-red hover:text-rr-red-lt">Delete</button>
+							</form>
+						</div>
+					</div>
+					if len(set.Keys) > 0 {
+						<div class="border-t border-rr-border px-4 py-3 sm:px-6">
+							<div class="flex flex-wrap gap-2">
+								for _, key := range set.Keys {
+									<span class="inline-flex items-center rounded-sm bg-rr-raised px-2 py-0.5 text-xs font-medium text-rr-body">
+										{ key.Name }
+										if key.ValueType == domain.AttributeValueTypeMulti {
+											<span class="ml-1 text-rr-muted">(multi)</span>
+										}
+									</span>
+								}
+							</div>
+						</div>
+					}
+				</div>
+			}
+		} else {
+			<div class="rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
+				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No attribute sets</h3>
+				<p class="mt-1 text-sm text-rr-muted">Create your first attribute set to start defining product attributes.</p>
+			</div>
+		}
+	</div>
+	<!-- Create form -->
+	<div class="mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+		<div class="px-4 py-5 sm:px-6">
+			<h3 class="text-base/7 font-semibold text-rr-heading">Create attribute set</h3>
+		</div>
+		<div class="border-t border-rr-border px-4 py-5 sm:px-6">
+			<form method="post" action="/admin/attributes" class="flex items-end gap-3 flex-wrap">
+				<div class="flex-1 min-w-[200px]">
+					<label for="set_name" class="block text-sm/6 font-medium text-rr-heading">Name</label>
+					<div class="mt-2">
+						<input type="text" id="set_name" name="name" placeholder="e.g. Coffee Profile" required class={ inputClasses(false) }/>
+					</div>
+				</div>
+				<div class="flex-1 min-w-[200px]">
+					<label for="set_slug" class="block text-sm/6 font-medium text-rr-heading">Slug</label>
+					<div class="mt-2">
+						<input type="text" id="set_slug" name="slug" placeholder="auto-generated" class={ inputClasses(false) }/>
+					</div>
+				</div>
+				<div class="w-20">
+					<label for="set_position" class="block text-sm/6 font-medium text-rr-heading">Order</label>
+					<div class="mt-2">
+						<input type="number" id="set_position" name="position" value="0" class={ inputClasses(false) }/>
+					</div>
+				</div>
+				<button type="submit" class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+					Create
+				</button>
+			</form>
+		</div>
+	</div>
+}
+
+templ AttributeSetList(props AttributeSetListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Attribute Sets",
+		ActivePath: "/admin/attributes",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@AttributeSetListContent(props)
+	}
+}

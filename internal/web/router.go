@@ -70,6 +70,8 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /{$}", deps.handleStorefrontHome)
 	mux.HandleFunc("GET /catalog", deps.handleStorefrontCatalog)
 	mux.HandleFunc("GET /catalog/{slug}", deps.handleStorefrontProduct)
+	mux.HandleFunc("GET /privacy", deps.handlePrivacyPage)
+	mux.HandleFunc("GET /terms", deps.handleTermsPage)
 
 	// Cart routes
 	mux.HandleFunc("POST /cart/add", deps.handleCartAdd)

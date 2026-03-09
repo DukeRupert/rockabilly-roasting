@@ -310,6 +310,30 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 	storefront.SubscriptionsPage(props).Render(ctx, w) //nolint:errcheck
 }
 
+// handlePrivacyPage renders the privacy policy page.
+func (d *Deps) handlePrivacyPage(w http.ResponseWriter, r *http.Request) {
+	props := storefront.PrivacyProps{
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+	if IsHTMX(r) {
+		storefront.PrivacyContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.PrivacyPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleTermsPage renders the terms of service page.
+func (d *Deps) handleTermsPage(w http.ResponseWriter, r *http.Request) {
+	props := storefront.TermsProps{
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+	if IsHTMX(r) {
+		storefront.TermsContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.TermsPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
 // handleStorefrontProduct renders a single product detail page.
 func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

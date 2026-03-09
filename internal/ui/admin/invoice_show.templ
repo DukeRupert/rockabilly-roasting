@@ -31,10 +31,10 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-base/7 font-semibold text-stone-900">Invoice { props.Invoice.Number }</h1>
+				<h1 class="text-base/7 font-semibold text-rr-heading">Invoice { props.Invoice.Number }</h1>
 				@InvoiceStatusBadge(props.Invoice.Status)
 			</div>
-			<p class="mt-1 text-sm text-stone-500">
+			<p class="mt-1 text-sm text-rr-muted">
 				Created { props.Invoice.CreatedAt.Format("January 2, 2006") }
 				if props.Invoice.DueDate != nil {
 					 — Due { props.Invoice.DueDate.Format("January 2, 2006") }
@@ -56,7 +56,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/invoices/%s/send", props.Invoice.ID.String())) }>
 				<button
 					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-md bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
 				>
 					Send Invoice
 				</button>
@@ -66,7 +66,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/invoices/%s/void", props.Invoice.ID.String())) }>
 				<button
 					type="submit"
-					class="inline-flex items-center rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-inset ring-red-600/20 hover:bg-red-100"
+					class="badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer"
 					onclick="return confirm('Void this invoice? This cannot be undone.')"
 				>
 					Void Invoice
@@ -76,60 +76,60 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 	</div>
 	<!-- Summary cards -->
 	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
-			<dt class="text-sm font-medium text-stone-500">Subtotal</dt>
-			<dd class="mt-1 text-lg font-semibold text-stone-900 tabular-nums">{ formatCents(props.Invoice.Subtotal) }</dd>
+		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+			<dt class="text-sm font-medium text-rr-muted">Subtotal</dt>
+			<dd class="mt-1 text-lg font-semibold text-rr-heading tabular-nums">{ formatCents(props.Invoice.Subtotal) }</dd>
 		</div>
-		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
-			<dt class="text-sm font-medium text-stone-500">Total</dt>
-			<dd class="mt-1 text-lg font-semibold text-stone-900 tabular-nums">{ formatCents(props.Invoice.Total) }</dd>
+		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+			<dt class="text-sm font-medium text-rr-muted">Total</dt>
+			<dd class="mt-1 text-lg font-semibold text-rr-heading tabular-nums">{ formatCents(props.Invoice.Total) }</dd>
 		</div>
-		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
-			<dt class="text-sm font-medium text-stone-500">Paid</dt>
-			<dd class="mt-1 text-lg font-semibold text-green-600 tabular-nums">{ formatCents(props.Invoice.AmountPaid) }</dd>
+		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+			<dt class="text-sm font-medium text-rr-muted">Paid</dt>
+			<dd class="mt-1 text-lg font-semibold text-rr-teal tabular-nums">{ formatCents(props.Invoice.AmountPaid) }</dd>
 		</div>
-		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
-			<dt class="text-sm font-medium text-stone-500">Amount Due</dt>
-			<dd class="mt-1 text-lg font-semibold text-stone-900 tabular-nums">{ formatCents(props.Invoice.AmountDue) }</dd>
+		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+			<dt class="text-sm font-medium text-rr-muted">Amount Due</dt>
+			<dd class="mt-1 text-lg font-semibold text-rr-heading tabular-nums">{ formatCents(props.Invoice.AmountDue) }</dd>
 		</div>
 	</div>
 	<!-- Notes -->
 	if props.Invoice.Notes != nil && *props.Invoice.Notes != "" {
-		<div class="mt-6 rounded-lg bg-stone-50 p-4 ring-1 ring-stone-900/5">
-			<p class="text-sm text-stone-600">
+		<div class="mt-6 rounded-sm bg-rr-raised p-4 ring-1 ring-rr-border">
+			<p class="text-sm text-rr-body">
 				<span class="font-medium">Notes:</span> { *props.Invoice.Notes }
 			</p>
 		</div>
 	}
 	<!-- Line items -->
 	<div class="mt-8">
-		<h2 class="text-sm font-semibold text-stone-900">Line items</h2>
+		<h2 class="text-sm font-semibold text-rr-heading">Line items</h2>
 		if len(props.Lines) == 0 {
-			<p class="mt-2 text-sm text-stone-500">No line items.</p>
+			<p class="mt-2 text-sm text-rr-muted">No line items.</p>
 		} else {
-			<div class="mt-2 overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
-				<table class="min-w-full divide-y divide-stone-300">
-					<thead class="bg-stone-50">
+			<div class="mt-2 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
 						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Description</th>
-							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Qty</th>
-							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Unit Price</th>
-							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Total</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Description</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Qty</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Unit Price</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Total</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-stone-200 bg-white">
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, line := range props.Lines {
 							<tr>
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-stone-900 sm:pl-6">
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-rr-heading sm:pl-6">
 									{ line.Description }
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500 text-right tabular-nums">
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted text-right tabular-nums">
 									{ fmt.Sprintf("%d", line.Quantity) }
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500 text-right tabular-nums">
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted text-right tabular-nums">
 									{ formatCents(line.UnitPrice) }
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-900 text-right tabular-nums font-medium">
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-heading text-right tabular-nums font-medium">
 									{ formatCents(line.Total) }
 								</td>
 							</tr>
@@ -141,37 +141,37 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 	</div>
 	<!-- Payments -->
 	<div class="mt-8">
-		<h2 class="text-sm font-semibold text-stone-900">Payments</h2>
+		<h2 class="text-sm font-semibold text-rr-heading">Payments</h2>
 		if len(props.Payments) == 0 {
-			<p class="mt-2 text-sm text-stone-500">No payments recorded.</p>
+			<p class="mt-2 text-sm text-rr-muted">No payments recorded.</p>
 		} else {
-			<div class="mt-2 overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
-				<table class="min-w-full divide-y divide-stone-300">
-					<thead class="bg-stone-50">
+			<div class="mt-2 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
 						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Date</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Method</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Reference</th>
-							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Amount</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Date</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Method</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Reference</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Amount</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-stone-200 bg-white">
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, p := range props.Payments {
 							<tr>
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-stone-500 sm:pl-6">
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-rr-muted sm:pl-6">
 									{ p.PaidAt.Format("Jan 2, 2006") }
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500">
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
 									{ string(p.Method) }
 								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 sm:table-cell">
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
 									if p.Reference != nil {
 										{ *p.Reference }
 									} else {
-										<span class="text-stone-400">&mdash;</span>
+										<span class="text-rr-border">&mdash;</span>
 									}
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-900 text-right tabular-nums font-medium">
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-heading text-right tabular-nums font-medium">
 									{ formatCents(p.Amount) }
 								</td>
 							</tr>
@@ -182,24 +182,24 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 		}
 		<!-- Record payment form -->
 		if canRecordPayment(props.Invoice) {
-			<div class="mt-4 rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
-				<h3 class="text-sm font-semibold text-stone-900">Record Payment</h3>
+			<div class="mt-4 rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+				<h3 class="text-sm font-semibold text-rr-heading">Record Payment</h3>
 				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/invoices/%s/payment", props.Invoice.ID.String())) } class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
 					<div>
-						<label for="amount" class="block text-sm font-medium text-stone-700">Amount (cents)</label>
+						<label for="amount" class="block text-sm font-medium text-rr-body">Amount (cents)</label>
 						<input
 							type="number"
 							name="amount"
 							id="amount"
 							min="1"
 							required
-							class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-rr-red focus:ring-rr-red sm:text-sm"
+							class="mt-1 block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 							placeholder={ fmt.Sprintf("%d", props.Invoice.AmountDue) }
 						/>
 					</div>
 					<div>
-						<label for="method" class="block text-sm font-medium text-stone-700">Method</label>
-						<select name="method" id="method" required class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-rr-red focus:ring-rr-red sm:text-sm">
+						<label for="method" class="block text-sm font-medium text-rr-body">Method</label>
+						<select name="method" id="method" required class="mt-1 block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red">
 							<option value="check">Check</option>
 							<option value="ach">ACH</option>
 							<option value="stripe">Stripe</option>
@@ -208,13 +208,13 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 						</select>
 					</div>
 					<div>
-						<label for="reference" class="block text-sm font-medium text-stone-700">Reference</label>
-						<input type="text" name="reference" id="reference" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-rr-red focus:ring-rr-red sm:text-sm" placeholder="Check #, transaction ID"/>
+						<label for="reference" class="block text-sm font-medium text-rr-body">Reference</label>
+						<input type="text" name="reference" id="reference" class="mt-1 block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red" placeholder="Check #, transaction ID"/>
 					</div>
 					<div class="flex items-end">
 						<button
 							type="submit"
-							class="inline-flex items-center rounded-md bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+							class="inline-flex items-center rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
 						>
 							Record
 						</button>

@@ -28,17 +28,17 @@ func mediaURL(m domain.ProductMedia, cfg *media.Config) string {
 // This is the htmx-swappable partial — used by both the initial page render and
 // after image add/delete operations.
 templ MediaGallery(props MediaGalleryProps) {
-	<div id="media-gallery" class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+	<div id="media-gallery" class="rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
 		<div class="px-4 py-5 sm:px-6">
-			<h3 class="text-base/7 font-semibold text-stone-900">Images</h3>
-			<p class="mt-1 text-sm text-stone-500">Product photos displayed on the storefront. First image is the primary.</p>
+			<h3 class="text-base/7 font-semibold text-rr-heading">Images</h3>
+			<p class="mt-1 text-sm text-rr-muted">Product photos displayed on the storefront. First image is the primary.</p>
 		</div>
-		<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
+		<div class="border-t border-rr-border px-4 py-5 sm:px-6">
 			if len(props.Media) > 0 {
 				<div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
 					for i, m := range props.Media {
 						<div class="group relative">
-							<div class="aspect-square overflow-hidden rounded-lg bg-stone-100">
+							<div class="aspect-square overflow-hidden rounded-sm bg-rr-raised">
 								<img
 									src={ mediaURL(m, props.MediaConfig) }
 									alt={ m.AltText }
@@ -46,7 +46,7 @@ templ MediaGallery(props MediaGalleryProps) {
 								/>
 							</div>
 							if i == 0 {
-								<span class="absolute top-2 left-2 inline-flex items-center rounded-md bg-rr-red px-1.5 py-0.5 text-xs font-medium text-white">
+								<span class="absolute top-2 left-2 inline-flex items-center rounded-sm bg-rr-red px-1.5 py-0.5 text-xs font-medium text-white">
 									Primary
 								</span>
 							}
@@ -83,25 +83,25 @@ templ MediaGallery(props MediaGalleryProps) {
 					@dragover.prevent="dragging = true"
 					@dragleave.prevent="dragging = false"
 					@drop.prevent="dragging = false; handleDrop($event)"
-					:class="dragging ? 'border-rr-red bg-rr-red/5' : 'border-stone-900/25'"
-					class="flex cursor-pointer justify-center rounded-lg border border-dashed px-6 py-10 transition-colors"
+					:class="dragging ? 'border-rr-red bg-rr-red/5' : 'border-rr-border'"
+					class="flex cursor-pointer justify-center rounded-sm border border-dashed px-6 py-10 transition-colors"
 				>
 					<div class="text-center">
-						<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="mx-auto size-12 text-stone-300">
+						<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="mx-auto size-12 text-rr-border">
 							<path
 								fill-rule="evenodd"
 								clip-rule="evenodd"
 								d="M1.5 6a2.25 2.25 0 0 1 2.25-2.25h16.5A2.25 2.25 0 0 1 22.5 6v12a2.25 2.25 0 0 1-2.25 2.25H3.75A2.25 2.25 0 0 1 1.5 18V6ZM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0 0 21 18v-1.94l-2.69-2.689a1.5 1.5 0 0 0-2.12 0l-.88.879.97.97a.75.75 0 1 1-1.06 1.06l-5.16-5.159a1.5 1.5 0 0 0-2.12 0L3 16.061Zm10.125-7.81a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Z"
 							></path>
 						</svg>
-						<div class="mt-4 flex text-sm/6 text-stone-600">
+						<div class="mt-4 flex text-sm/6 text-rr-muted">
 							<span class="font-semibold text-rr-red hover:text-rr-red-lt" x-show="!uploading">Upload a file</span>
-							<span class="font-semibold text-stone-500" x-show="uploading" x-cloak>
+							<span class="font-semibold text-rr-muted" x-show="uploading" x-cloak>
 								Uploading <span x-text="progress"></span>...
 							</span>
 							<p class="pl-1" x-show="!uploading">or drag and drop</p>
 						</div>
-						<p class="text-xs/5 text-stone-600">PNG, JPG, GIF up to 10MB</p>
+						<p class="text-xs/5 text-rr-muted">PNG, JPG, GIF up to 10MB</p>
 						<!-- Error display -->
 						<template x-if="error">
 							<p class="mt-2 text-sm text-red-600" x-text="error"></p>

@@ -68,9 +68,9 @@ func getError(errors map[string]string, field string) string {
 
 func inputClasses(hasErr bool) string {
 	if hasErr {
-		return "block w-full rounded-md bg-white px-3 py-1.5 text-base text-stone-900 outline-1 -outline-offset-1 outline-red-300 placeholder:text-stone-400 focus:outline-2 focus:-outline-offset-2 focus:outline-red-500 sm:text-sm/6"
+		return "block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-red-300 placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-red-500 sm:text-sm/6"
 	}
-	return "block w-full rounded-md bg-white px-3 py-1.5 text-base text-stone-900 outline-1 -outline-offset-1 outline-stone-300 placeholder:text-stone-400 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6"
+	return "block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6"
 }
 
 func ProductForm(props ProductFormProps) templ.Component {
@@ -107,7 +107,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><div class=\"space-y-12\"><!-- General section --><div class=\"border-b border-stone-900/10 pb-12\"><h2 class=\"text-base/7 font-semibold text-stone-900\">General</h2><p class=\"mt-1 text-sm/6 text-stone-600\">Basic product information.</p><div class=\"mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6\"><!-- Title --><div class=\"sm:col-span-4\"><label for=\"title\" class=\"block text-sm/6 font-medium text-stone-900\">Title</label><div class=\"mt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><div class=\"space-y-12\"><!-- General section --><div class=\"border-b border-rr-border pb-12\"><h2 class=\"text-base/7 font-semibold text-rr-heading\">General</h2><p class=\"mt-1 text-sm/6 text-rr-muted\">Basic product information.</p><div class=\"mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6\"><!-- Title --><div class=\"sm:col-span-4\"><label for=\"title\" class=\"block text-sm/6 font-medium text-rr-heading\">Title</label><div class=\"mt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -165,7 +165,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div><!-- Slug --><div class=\"sm:col-span-4\"><label for=\"slug\" class=\"block text-sm/6 font-medium text-stone-900\">Slug</label><div class=\"mt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div><!-- Slug --><div class=\"sm:col-span-4\"><label for=\"slug\" class=\"block text-sm/6 font-medium text-rr-heading\">Slug</label><div class=\"mt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -223,7 +223,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div><!-- Description --><div class=\"col-span-full\"><label for=\"description\" class=\"block text-sm/6 font-medium text-stone-900\">Description</label><div class=\"mt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div><!-- Description --><div class=\"col-span-full\"><label for=\"description\" class=\"block text-sm/6 font-medium text-rr-heading\">Description</label><div class=\"mt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -258,7 +258,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</textarea></div></div><!-- Category --><div class=\"sm:col-span-3\"><label for=\"taxon_id\" class=\"block text-sm/6 font-medium text-stone-900\">Category</label><div class=\"mt-2 grid grid-cols-1\"><select id=\"taxon_id\" name=\"taxon_id\" class=\"col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-base text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6\"><option value=\"\">No category</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</textarea></div></div><!-- Category --><div class=\"sm:col-span-3\"><label for=\"taxon_id\" class=\"block text-sm/6 font-medium text-rr-heading\">Category</label><div class=\"mt-2 grid grid-cols-1\"><select id=\"taxon_id\" name=\"taxon_id\" class=\"col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6\"><option value=\"\">No category</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -327,7 +327,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div></div></div></div><!-- Availability section --><div class=\"border-b border-stone-900/10 pb-12\"><h2 class=\"text-base/7 font-semibold text-stone-900\">Availability</h2><p class=\"mt-1 text-sm/6 text-stone-600\">Control when this product is available for purchase.</p><div class=\"mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6\"><div class=\"sm:col-span-3\"><label for=\"available_on\" class=\"block text-sm/6 font-medium text-stone-900\">Available on</label><div class=\"mt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div></div></div></div><!-- Availability section --><div class=\"border-b border-rr-border pb-12\"><h2 class=\"text-base/7 font-semibold text-rr-heading\">Availability</h2><p class=\"mt-1 text-sm/6 text-rr-muted\">Control when this product is available for purchase.</p><div class=\"mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6\"><div class=\"sm:col-span-3\"><label for=\"available_on\" class=\"block text-sm/6 font-medium text-rr-heading\">Available on</label><div class=\"mt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -362,7 +362,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\"></div><p class=\"mt-2 text-sm text-stone-500\">Leave blank to make available immediately.</p></div><div class=\"sm:col-span-3\"><label for=\"discontinue_on\" class=\"block text-sm/6 font-medium text-stone-900\">Discontinue on</label><div class=\"mt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\"></div><p class=\"mt-2 text-sm text-rr-muted\">Leave blank to make available immediately.</p></div><div class=\"sm:col-span-3\"><label for=\"discontinue_on\" class=\"block text-sm/6 font-medium text-rr-heading\">Discontinue on</label><div class=\"mt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -397,7 +397,7 @@ func ProductForm(props ProductFormProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\"></div><p class=\"mt-2 text-sm text-stone-500\">Leave blank to keep available indefinitely.</p></div></div></div></div><!-- Footer --><div class=\"mt-6 flex items-center justify-end gap-x-6\"><a href=\"/admin/catalog\" class=\"text-sm/6 font-semibold text-stone-900\">Cancel</a> <button type=\"submit\" class=\"rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\"></div><p class=\"mt-2 text-sm text-rr-muted\">Leave blank to keep available indefinitely.</p></div></div></div></div><!-- Footer --><div class=\"mt-6 flex items-center justify-end gap-x-6\"><a href=\"/admin/catalog\" class=\"text-sm/6 font-semibold text-rr-heading\">Cancel</a> <button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

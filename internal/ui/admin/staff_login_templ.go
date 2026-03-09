@@ -29,19 +29,19 @@ func StaffLoginPage(errMsg string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full bg-stone-50\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Staff Login — Hiri</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"></head><body class=\"h-full\"><div class=\"flex min-h-full flex-col justify-center px-6 py-12 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-sm\"><h1 class=\"text-center text-2xl font-bold tracking-tight text-stone-900\">Hiri</h1><h2 class=\"mt-2 text-center text-base text-stone-600\">Sign in to your account</h2></div><div class=\"mt-8 sm:mx-auto sm:w-full sm:max-w-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full bg-rr-raised\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Staff Login — Hiri</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><style>\n\t\t\t\t/* Admin login uses kraft-paper light palette */\n\t\t\t\t:root {\n\t\t\t\t\t--color-rr-bg: #F9F6F1 !important;\n\t\t\t\t\t--color-rr-surface: #EDE5D8 !important;\n\t\t\t\t\t--color-rr-raised: #E4DAC8 !important;\n\t\t\t\t\t--color-rr-border: #9A8C7C !important;\n\t\t\t\t\t--color-rr-muted: #7A6E60 !important;\n\t\t\t\t\t--color-rr-body: #3A3028 !important;\n\t\t\t\t\t--color-rr-heading: #1C1610 !important;\n\t\t\t\t}\n\t\t\t</style></head><body class=\"h-full\"><div class=\"flex min-h-full flex-col justify-center px-6 py-12 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-sm\"><h1 class=\"text-center text-2xl font-bold tracking-tight text-rr-heading\">Hiri</h1><h2 class=\"mt-2 text-center text-base text-rr-muted\">Sign in to your account</h2></div><div class=\"mt-8 sm:mx-auto sm:w-full sm:max-w-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if errMsg != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"mb-4 rounded-md bg-red-50 p-3 ring-1 ring-inset ring-red-600/20\"><p class=\"text-sm text-red-700\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"mb-4 rounded-sm bg-red-50 p-3 ring-1 ring-inset ring-red-600/20\"><p class=\"text-sm text-red-700\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(errMsg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/staff_login.templ`, Line: 21, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/staff_login.templ`, Line: 33, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -52,7 +52,7 @@ func StaffLoginPage(errMsg string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"post\" action=\"/auth/staff/login\" class=\"space-y-5\"><div><label for=\"email\" class=\"block text-sm font-medium text-stone-900\">Email address</label><div class=\"mt-1\"><input id=\"email\" name=\"email\" type=\"email\" autocomplete=\"email\" required class=\"block w-full rounded-md bg-white px-3 py-2 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 placeholder:text-stone-400 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div></div><div><label for=\"password\" class=\"block text-sm font-medium text-stone-900\">Password</label><div class=\"mt-1\"><input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" required class=\"block w-full rounded-md bg-white px-3 py-2 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 placeholder:text-stone-400 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div></div><div><button type=\"submit\" class=\"flex w-full justify-center rounded-md bg-rr-red px-3 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Sign in</button></div></form></div></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"post\" action=\"/auth/staff/login\" class=\"space-y-5\"><div><label for=\"email\" class=\"block text-sm font-medium text-rr-heading\">Email address</label><div class=\"mt-1\"><input id=\"email\" name=\"email\" type=\"email\" autocomplete=\"email\" required class=\"block w-full rounded-sm bg-rr-surface px-3 py-2 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div></div><div><label for=\"password\" class=\"block text-sm font-medium text-rr-heading\">Password</label><div class=\"mt-1\"><input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" required class=\"block w-full rounded-sm bg-rr-surface px-3 py-2 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div></div><div><button type=\"submit\" class=\"flex w-full justify-center rounded-sm bg-rr-red px-3 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Sign in</button></div></form></div></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

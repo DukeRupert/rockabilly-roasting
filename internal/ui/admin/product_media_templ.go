@@ -56,7 +56,7 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"media-gallery\" class=\"rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-stone-900\">Images</h3><p class=\"mt-1 text-sm text-stone-500\">Product photos displayed on the storefront. First image is the primary.</p></div><div class=\"border-t border-stone-200 px-4 py-5 sm:px-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"media-gallery\" class=\"rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Images</h3><p class=\"mt-1 text-sm text-rr-muted\">Product photos displayed on the storefront. First image is the primary.</p></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -66,7 +66,7 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for i, m := range props.Media {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"group relative\"><div class=\"aspect-square overflow-hidden rounded-lg bg-stone-100\"><img src=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"group relative\"><div class=\"aspect-square overflow-hidden rounded-sm bg-rr-raised\"><img src=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -97,7 +97,7 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				if i == 0 {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<span class=\"absolute top-2 left-2 inline-flex items-center rounded-md bg-rr-red px-1.5 py-0.5 text-xs font-medium text-white\">Primary</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<span class=\"absolute top-2 left-2 inline-flex items-center rounded-sm bg-rr-red px-1.5 py-0.5 text-xs font-medium text-white\">Primary</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -173,7 +173,7 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><div @click=\"$refs.fileInput.click()\" @dragover.prevent=\"dragging = true\" @dragleave.prevent=\"dragging = false\" @drop.prevent=\"dragging = false; handleDrop($event)\" :class=\"dragging ? 'border-rr-red bg-rr-red/5' : 'border-stone-900/25'\" class=\"flex cursor-pointer justify-center rounded-lg border border-dashed px-6 py-10 transition-colors\"><div class=\"text-center\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\" class=\"mx-auto size-12 text-stone-300\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M1.5 6a2.25 2.25 0 0 1 2.25-2.25h16.5A2.25 2.25 0 0 1 22.5 6v12a2.25 2.25 0 0 1-2.25 2.25H3.75A2.25 2.25 0 0 1 1.5 18V6ZM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0 0 21 18v-1.94l-2.69-2.689a1.5 1.5 0 0 0-2.12 0l-.88.879.97.97a.75.75 0 1 1-1.06 1.06l-5.16-5.159a1.5 1.5 0 0 0-2.12 0L3 16.061Zm10.125-7.81a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Z\"></path></svg><div class=\"mt-4 flex text-sm/6 text-stone-600\"><span class=\"font-semibold text-rr-red hover:text-rr-red-lt\" x-show=\"!uploading\">Upload a file</span> <span class=\"font-semibold text-stone-500\" x-show=\"uploading\" x-cloak>Uploading <span x-text=\"progress\"></span>...</span><p class=\"pl-1\" x-show=\"!uploading\">or drag and drop</p></div><p class=\"text-xs/5 text-stone-600\">PNG, JPG, GIF up to 10MB</p><!-- Error display --><template x-if=\"error\"><p class=\"mt-2 text-sm text-red-600\" x-text=\"error\"></p></template></div></div><input type=\"file\" accept=\"image/png,image/jpeg,image/gif\" multiple x-ref=\"fileInput\" @change=\"handleFiles($event)\" class=\"sr-only\"></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><div @click=\"$refs.fileInput.click()\" @dragover.prevent=\"dragging = true\" @dragleave.prevent=\"dragging = false\" @drop.prevent=\"dragging = false; handleDrop($event)\" :class=\"dragging ? 'border-rr-red bg-rr-red/5' : 'border-rr-border'\" class=\"flex cursor-pointer justify-center rounded-sm border border-dashed px-6 py-10 transition-colors\"><div class=\"text-center\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\" class=\"mx-auto size-12 text-rr-border\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M1.5 6a2.25 2.25 0 0 1 2.25-2.25h16.5A2.25 2.25 0 0 1 22.5 6v12a2.25 2.25 0 0 1-2.25 2.25H3.75A2.25 2.25 0 0 1 1.5 18V6ZM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0 0 21 18v-1.94l-2.69-2.689a1.5 1.5 0 0 0-2.12 0l-.88.879.97.97a.75.75 0 1 1-1.06 1.06l-5.16-5.159a1.5 1.5 0 0 0-2.12 0L3 16.061Zm10.125-7.81a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Z\"></path></svg><div class=\"mt-4 flex text-sm/6 text-rr-muted\"><span class=\"font-semibold text-rr-red hover:text-rr-red-lt\" x-show=\"!uploading\">Upload a file</span> <span class=\"font-semibold text-rr-muted\" x-show=\"uploading\" x-cloak>Uploading <span x-text=\"progress\"></span>...</span><p class=\"pl-1\" x-show=\"!uploading\">or drag and drop</p></div><p class=\"text-xs/5 text-rr-muted\">PNG, JPG, GIF up to 10MB</p><!-- Error display --><template x-if=\"error\"><p class=\"mt-2 text-sm text-red-600\" x-text=\"error\"></p></template></div></div><input type=\"file\" accept=\"image/png,image/jpeg,image/gif\" multiple x-ref=\"fileInput\" @change=\"handleFiles($event)\" class=\"sr-only\"></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

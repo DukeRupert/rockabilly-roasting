@@ -19,28 +19,28 @@ templ CategoryListContent(props CategoryListProps) {
 		<!-- Page header -->
 		<div class="sm:flex sm:items-center">
 			<div class="sm:flex-auto">
-				<h1 class="text-base/7 font-semibold text-stone-900">Categories</h1>
-				<p class="mt-1 text-sm text-stone-500">Organize products into categories</p>
+				<h1 class="text-base/7 font-semibold text-rr-heading">Categories</h1>
+				<p class="mt-1 text-sm text-rr-muted">Organize products into categories</p>
 			</div>
 			<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
 				<a
 					href="/admin/catalog"
-					class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
 				>
 					Back to products
 				</a>
 			</div>
 		</div>
 		if props.Flash != "" {
-			<div class="mt-4 rounded-md bg-green-50 p-4">
+			<div class="mt-4 rounded-sm badge-green p-4">
 				<div class="flex">
 					<div class="flex-shrink-0">
-						<svg class="size-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+						<svg class="size-5" viewBox="0 0 20 20" fill="currentColor">
 							<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path>
 						</svg>
 					</div>
 					<div class="ml-3">
-						<p class="text-sm font-medium text-green-800">{ props.Flash }</p>
+						<p class="text-sm font-medium">{ props.Flash }</p>
 					</div>
 				</div>
 			</div>
@@ -49,39 +49,39 @@ templ CategoryListContent(props CategoryListProps) {
 			<!-- Category table -->
 			<div class="lg:col-span-2">
 				if len(props.Taxons) == 0 {
-					<div class="rounded-lg border-2 border-dashed border-stone-300 p-12 text-center">
-						<p class="text-sm text-stone-500">No categories yet. Create one to get started.</p>
+					<div class="rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
+						<p class="text-sm text-rr-muted">No categories yet. Create one to get started.</p>
 					</div>
 				} else {
-					<div class="overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
-						<table class="min-w-full divide-y divide-stone-300">
-							<thead class="bg-stone-50">
+					<div class="overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+						<table class="min-w-full divide-y divide-rr-border">
+							<thead class="bg-rr-raised">
 								<tr>
-									<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Name</th>
-									<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Slug</th>
-									<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Position</th>
+									<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Name</th>
+									<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Slug</th>
+									<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Position</th>
 									<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 										<span class="sr-only">Actions</span>
 									</th>
 								</tr>
 							</thead>
-							<tbody class="divide-y divide-stone-200 bg-white">
+							<tbody class="divide-y divide-rr-border bg-rr-surface">
 								for _, t := range props.Taxons {
 									<tr>
-										<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-stone-900 sm:pl-6">
+										<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-rr-heading sm:pl-6">
 											{ t.Name }
 										</td>
 										<td class="hidden whitespace-nowrap px-3 py-4 text-sm sm:table-cell">
-											<span class="font-mono text-stone-500">{ t.Slug }</span>
+											<span class="font-mono text-rr-muted">{ t.Slug }</span>
 										</td>
-										<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500">
+										<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
 											{ strconv.Itoa(t.Position) }
 										</td>
 										<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 											<div class="flex items-center justify-end gap-3">
 												<a href={ templ.SafeURL(fmt.Sprintf("/admin/categories?edit=%s", t.ID)) } class="text-rr-red hover:text-rr-red-lt">Edit</a>
 												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/categories/%s/delete", t.ID)) } class="inline" onsubmit="return confirm('Delete this category? Products in this category will become uncategorized.')">
-													<button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
+													<button type="submit" class="text-rr-red hover:text-rr-red-lt">Delete</button>
 												</form>
 											</div>
 										</td>
@@ -94,9 +94,9 @@ templ CategoryListContent(props CategoryListProps) {
 			</div>
 			<!-- Create/Edit form -->
 			<div>
-				<div class="rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
+				<div class="rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
 					<div class="px-4 py-5 sm:px-6">
-						<h3 class="text-base/7 font-semibold text-stone-900">
+						<h3 class="text-base/7 font-semibold text-rr-heading">
 							if props.Editing != nil {
 								Edit category
 							} else {
@@ -104,32 +104,32 @@ templ CategoryListContent(props CategoryListProps) {
 							}
 						</h3>
 					</div>
-					<div class="border-t border-stone-200 px-4 py-5 sm:px-6">
+					<div class="border-t border-rr-border px-4 py-5 sm:px-6">
 						if props.Editing != nil {
 							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/categories/%s", props.Editing.ID)) } class="space-y-4">
 								<div>
-									<label for="cat_name" class="block text-sm/6 font-medium text-stone-900">Name</label>
+									<label for="cat_name" class="block text-sm/6 font-medium text-rr-heading">Name</label>
 									<div class="mt-2">
 										<input type="text" id="cat_name" name="name" value={ props.Editing.Name } required class={ inputClasses(false) }/>
 									</div>
 								</div>
 								<div>
-									<label for="cat_slug" class="block text-sm/6 font-medium text-stone-900">Slug</label>
+									<label for="cat_slug" class="block text-sm/6 font-medium text-rr-heading">Slug</label>
 									<div class="mt-2">
 										<input type="text" id="cat_slug" name="slug" value={ props.Editing.Slug } required class={ inputClasses(false) }/>
 									</div>
 								</div>
 								<div>
-									<label for="cat_position" class="block text-sm/6 font-medium text-stone-900">Position</label>
+									<label for="cat_position" class="block text-sm/6 font-medium text-rr-heading">Position</label>
 									<div class="mt-2">
 										<input type="number" id="cat_position" name="position" value={ strconv.Itoa(props.Editing.Position) } class={ inputClasses(false) }/>
 									</div>
 								</div>
 								<div class="flex flex-col gap-3 pt-2">
-									<button type="submit" class="w-full rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+									<button type="submit" class="w-full rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
 										Save changes
 									</button>
-									<a href="/admin/categories" class="w-full rounded-md bg-white px-3 py-2 text-center text-sm font-semibold text-stone-900 shadow-xs ring-1 ring-inset ring-stone-300 hover:bg-stone-50">
+									<a href="/admin/categories" class="w-full rounded-sm bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised">
 										Cancel
 									</a>
 								</div>
@@ -137,24 +137,24 @@ templ CategoryListContent(props CategoryListProps) {
 						} else {
 							<form method="post" action="/admin/categories" class="space-y-4">
 								<div>
-									<label for="cat_name" class="block text-sm/6 font-medium text-stone-900">Name</label>
+									<label for="cat_name" class="block text-sm/6 font-medium text-rr-heading">Name</label>
 									<div class="mt-2">
 										<input type="text" id="cat_name" name="name" placeholder="Category name" required class={ inputClasses(false) }/>
 									</div>
 								</div>
 								<div>
-									<label for="cat_slug" class="block text-sm/6 font-medium text-stone-900">Slug</label>
+									<label for="cat_slug" class="block text-sm/6 font-medium text-rr-heading">Slug</label>
 									<div class="mt-2">
 										<input type="text" id="cat_slug" name="slug" placeholder="category-slug" required class={ inputClasses(false) }/>
 									</div>
 								</div>
 								<div>
-									<label for="cat_position" class="block text-sm/6 font-medium text-stone-900">Position</label>
+									<label for="cat_position" class="block text-sm/6 font-medium text-rr-heading">Position</label>
 									<div class="mt-2">
 										<input type="number" id="cat_position" name="position" value="0" class={ inputClasses(false) }/>
 									</div>
 								</div>
-								<button type="submit" class="w-full rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+								<button type="submit" class="w-full rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
 									Create category
 								</button>
 							</form>

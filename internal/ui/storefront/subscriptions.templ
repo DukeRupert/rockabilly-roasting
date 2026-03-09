@@ -31,17 +31,17 @@ templ SubscriptionsContent(props SubscriptionsPageProps) {
 		</div>
 		<!-- How it works -->
 		<div class="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
-			<div class="rounded-lg border border-stone-200 bg-white p-5">
+			<div class="rounded-lg border border-rr-border bg-rr-surface p-5">
 				<div class="mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red">1</div>
 				<h3 class="text-sm font-semibold text-rr-heading">Choose your coffee</h3>
 				<p class="mt-1 text-xs text-rr-muted">Pick from any of our subscribable products below.</p>
 			</div>
-			<div class="rounded-lg border border-stone-200 bg-white p-5">
+			<div class="rounded-lg border border-rr-border bg-rr-surface p-5">
 				<div class="mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red">2</div>
 				<h3 class="text-sm font-semibold text-rr-heading">Pick your frequency</h3>
 				<p class="mt-1 text-xs text-rr-muted">Select how often you want it delivered.</p>
 			</div>
-			<div class="rounded-lg border border-stone-200 bg-white p-5">
+			<div class="rounded-lg border border-rr-border bg-rr-surface p-5">
 				<div class="mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red">3</div>
 				<h3 class="text-sm font-semibold text-rr-heading">Save on every order</h3>
 				<p class="mt-1 text-xs text-rr-muted">
@@ -59,7 +59,7 @@ templ SubscriptionsContent(props SubscriptionsPageProps) {
 				<h2 class="mb-3 text-lg font-semibold text-rr-heading">Delivery frequencies</h2>
 				<div class="flex flex-wrap gap-2">
 					for _, plan := range props.Plans {
-						<div class="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm">
+						<div class="inline-flex items-center gap-2 rounded-full border border-rr-border bg-rr-surface px-4 py-2 text-sm">
 							<span class="font-medium text-rr-heading">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
 							if plan.DiscountPct > 0 {
 								<span class="rounded-full bg-rr-red/10 px-2 py-0.5 text-xs font-medium text-rr-red">
@@ -88,8 +88,8 @@ templ SubscriptionsContent(props SubscriptionsPageProps) {
 }
 
 templ subscriptionProductCard(card SubscriptionProductCard) {
-	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug + "?mode=subscribe") } class="group rounded-lg border border-stone-200 bg-white transition-shadow hover:shadow-md">
-		<div class="aspect-square w-full overflow-hidden rounded-t-lg bg-stone-100">
+	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug + "?mode=subscribe") } class="group rounded-lg border border-rr-border bg-rr-surface transition-shadow hover:shadow-md">
+		<div class="aspect-square w-full overflow-hidden rounded-t-lg bg-rr-bg">
 			if card.ThumbnailURL != "" {
 				<img
 					src={ card.ThumbnailURL }
@@ -98,7 +98,7 @@ templ subscriptionProductCard(card SubscriptionProductCard) {
 				/>
 			} else {
 				<div class="flex h-full w-full items-center justify-center">
-					<svg class="size-12 text-stone-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
+					<svg class="size-12 text-rr-faint" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"></path>
 					</svg>
 				</div>

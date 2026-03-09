@@ -94,7 +94,7 @@ func (Dev) Templ() error {
 
 // CSS compiles Tailwind CSS.
 func (Dev) CSS() error {
-	return sh.RunV("tailwindcss",
+	return sh.RunV("npx", "@tailwindcss/cli",
 		"-i", "internal/ui/assets/css/input.css",
 		"-o", "internal/ui/assets/css/output.css",
 		"--minify",
@@ -103,7 +103,7 @@ func (Dev) CSS() error {
 
 // Watch runs Tailwind CSS in watch mode.
 func (Dev) Watch() error {
-	return sh.RunV("tailwindcss",
+	return sh.RunV("npx", "@tailwindcss/cli",
 		"-i", "internal/ui/assets/css/input.css",
 		"-o", "internal/ui/assets/css/output.css",
 		"--watch",

@@ -27,9 +27,9 @@ type CatalogPageProps struct {
 
 func categoryPillClasses(active bool) string {
 	if active {
-		return "inline-flex items-center rounded-full bg-rr-red px-4 py-2 text-sm font-medium text-white"
+		return "label-font inline-flex items-center rounded-sm border-2 border-rr-red bg-rr-red/5 px-3 py-1.5 text-rr-red"
 	}
-	return "inline-flex items-center rounded-full bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-200"
+	return "label-font inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-rr-muted hover:border-rr-amber hover:text-rr-heading transition-colors"
 }
 
 // catalogURL builds a /catalog URL preserving the given query params.
@@ -54,38 +54,39 @@ func catalogURL(category, search string, page int) string {
 templ CatalogContent(props CatalogPageProps) {
 	<div>
 		<!-- Page heading -->
-		<div class="mb-8">
-			<h1 class="text-3xl font-bold tracking-tight text-rr-heading">Shop</h1>
-			<p class="mt-2 text-sm text-rr-muted">Browse our collection</p>
-		</div>
-		<!-- Search -->
-		<form class="mb-6" action="/catalog" method="get">
-			if props.ActiveTaxon != "" {
-				<input type="hidden" name="category" value={ props.ActiveTaxon }/>
-			}
-			<div class="relative max-w-md">
-				<input
-					type="search"
-					name="q"
-					value={ props.Search }
-					placeholder="Search products..."
-					class="w-full rounded-lg border border-stone-300 bg-white py-2 pl-10 pr-4 text-sm text-rr-heading placeholder:text-stone-400 focus:border-rr-red focus:outline-none focus:ring-1 focus:ring-rr-red"
-				/>
-				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-					<svg class="size-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path>
-					</svg>
-				</div>
+		<div class="flex items-baseline justify-between border-b border-rr-border pb-6 mb-6">
+			<div>
+				<h1 class="font-display text-4xl tracking-widest text-rr-heading">SHOP</h1>
+				<p class="mt-1 font-body text-sm text-rr-muted">Browse our collection</p>
 			</div>
-		</form>
+			<!-- Search -->
+			<form action="/catalog" method="get">
+				if props.ActiveTaxon != "" {
+					<input type="hidden" name="category" value={ props.ActiveTaxon }/>
+				}
+				<div class="relative">
+					<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rr-amber" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+						<circle cx="11" cy="11" r="8"></circle>
+						<path d="m21 21-4.35-4.35"></path>
+					</svg>
+					<input
+						type="search"
+						name="q"
+						value={ props.Search }
+						placeholder="Search roasts..."
+						class="rr-input w-56 rounded-sm border border-rr-border bg-rr-bg font-body text-sm text-rr-heading pl-10 pr-4 py-2 placeholder:text-rr-border"
+					/>
+				</div>
+			</form>
+		</div>
 		<!-- Category filter pills -->
 		if len(props.Taxons) > 0 {
-			<div class="mb-8 flex flex-wrap gap-2">
+			<div class="mb-6 flex flex-wrap gap-2">
 				<a
 					href={ templ.SafeURL(catalogURL("", props.Search, 1)) }
 					class={ categoryPillClasses(props.ActiveTaxon == "") }
 				>
-					All
+					ALL
 				</a>
 				for _, taxon := range props.Taxons {
 					<a
@@ -97,13 +98,13 @@ templ CatalogContent(props CatalogPageProps) {
 				}
 			</div>
 		}
-		<!-- Product grid -->
+		<!-- Product grid — compact BRCC-style layout -->
 		if len(props.Products) == 0 {
-			<div class="text-center py-12">
-				<p class="text-rr-muted">No products found.</p>
+			<div class="text-center py-16">
+				<p class="font-body text-rr-muted">No products found.</p>
 			</div>
 		} else {
-			<div class="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+			<div class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
 				for _, card := range props.Products {
 					@productCard(card)
 				}
@@ -111,24 +112,24 @@ templ CatalogContent(props CatalogPageProps) {
 		}
 		<!-- Pagination -->
 		if props.TotalPages > 1 {
-			<nav class="mt-12 flex items-center justify-center gap-2" aria-label="Pagination">
+			<nav class="mt-10 flex items-center justify-center gap-1.5" aria-label="Pagination">
 				if props.Page > 1 {
 					<a
 						href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, props.Page-1)) }
-						class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+						class="btn label-font text-rr-muted border border-rr-border px-3 py-2 rounded-sm text-xs bg-rr-bg"
 					>
-						Previous
+						&lsaquo;
 					</a>
 				}
 				for _, p := range pageRange(props.Page, props.TotalPages) {
 					if p == props.Page {
-						<span class="inline-flex items-center rounded-lg bg-rr-red px-4 py-2 text-sm font-medium text-white">
+						<span class="label-font text-white w-8 h-8 rounded-sm text-xs flex items-center justify-center bg-rr-red">
 							{ fmt.Sprintf("%d", p) }
 						</span>
 					} else {
 						<a
 							href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, p)) }
-							class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+							class="btn label-font text-rr-muted border border-rr-border w-8 h-8 rounded-sm text-xs flex items-center justify-center bg-rr-bg hover:border-rr-amber transition-colors"
 						>
 							{ fmt.Sprintf("%d", p) }
 						</a>
@@ -137,9 +138,9 @@ templ CatalogContent(props CatalogPageProps) {
 				if props.Page < props.TotalPages {
 					<a
 						href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, props.Page+1)) }
-						class="inline-flex items-center rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+						class="btn label-font text-rr-muted border border-rr-border px-3 py-2 rounded-sm text-xs bg-rr-bg"
 					>
-						Next
+						&rsaquo;
 					</a>
 				}
 			</nav>
@@ -148,26 +149,32 @@ templ CatalogContent(props CatalogPageProps) {
 }
 
 templ productCard(card ProductCard) {
-	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug) } class="group">
-		<div class="aspect-square w-full overflow-hidden rounded-lg bg-stone-100">
+	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug) } class="product-card group rounded-sm overflow-hidden border border-rr-border bg-rr-surface">
+		<!-- Compact image — 3:4 aspect ratio instead of square -->
+		<div class="aspect-3/4 w-full overflow-hidden bg-rr-bg relative">
 			if card.ThumbnailURL != "" {
 				<img
 					src={ card.ThumbnailURL }
 					alt={ card.Product.Title }
-					class="h-full w-full object-cover object-center group-hover:opacity-75 transition-opacity"
+					class="h-full w-full object-cover object-center group-hover:opacity-80 transition-opacity"
+					loading="lazy"
 				/>
 			} else {
-				<div class="flex h-full w-full items-center justify-center">
-					<svg class="size-12 text-stone-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"></path>
-					</svg>
+				<div class="texture-dots absolute inset-0"></div>
+				<div class="flex h-full w-full items-center justify-center relative">
+					<div class="w-16 h-16 rounded-full border-2 border-rr-border bg-rr-surface flex items-center justify-center">
+						<span class="font-display text-rr-muted text-lg tracking-widest">
+							{ string([]rune(card.Product.Title)[0:1]) }
+						</span>
+					</div>
 				</div>
 			}
 		</div>
-		<div class="mt-4">
-			<h3 class="text-sm font-medium text-rr-heading group-hover:text-rr-red">{ card.Product.Title }</h3>
+		<!-- Product info — tight padding -->
+		<div class="p-3">
+			<h3 class="font-heading text-rr-heading text-base leading-tight group-hover:text-rr-red transition-colors">{ card.Product.Title }</h3>
 			if card.BasePrice != nil {
-				<p class="mt-1 text-sm font-semibold text-rr-red">{ formatCents(*card.BasePrice) }</p>
+				<p class="mt-1 font-heading text-rr-heading text-lg">{ formatCents(*card.BasePrice) }</p>
 			}
 		</div>
 	</a>

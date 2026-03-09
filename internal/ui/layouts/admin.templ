@@ -61,7 +61,7 @@ func navIconColor(active bool) string {
 
 templ Admin(props AdminProps) {
 	<!DOCTYPE html>
-	<html lang="en" class="h-full bg-rr-bg">
+	<html lang="en" class="h-full" style="background:#FAF9F7;">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -70,6 +70,18 @@ templ Admin(props AdminProps) {
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<script defer src="/static/js/alpine.min.js"></script>
 			<script src="/static/js/htmx.min.js"></script>
+			<style>
+				/* Admin stays light — override dark storefront tokens */
+				:root {
+					--color-rr-bg: #FAF9F7;
+					--color-rr-surface: #FFFFFF;
+					--color-rr-raised: #F5F0E6;
+					--color-rr-border: #E5E2DE;
+					--color-rr-muted: #78716C;
+					--color-rr-body: #3A3028;
+					--color-rr-heading: #1C1917;
+				}
+			</style>
 		</head>
 		<body class="h-full overflow-x-hidden" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">
 			<!-- Mobile sidebar overlay -->

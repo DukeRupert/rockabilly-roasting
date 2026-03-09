@@ -18,14 +18,16 @@
 	--color-rr-teal-lt: #0EA898;
 	--color-rr-brick: #8A4A30;
 
-	/* Light mode surface tokens */
-	--color-rr-bg: #F9F6F1;
-	--color-rr-surface: #EDE5D8;
-	--color-rr-raised: #E4DAC8;
-	--color-rr-border: #9A8C7C;
-	--color-rr-muted: #7A6E60;
-	--color-rr-body: #3A3028;
-	--color-rr-heading: #1C1610;
+	/* Dark mode surface tokens */
+	--color-rr-void: #0E0F10;
+	--color-rr-bg: #161A1E;
+	--color-rr-surface: #1E2428;
+	--color-rr-raised: #262D32;
+	--color-rr-border: #323C42;
+	--color-rr-muted: #8A9EA8;
+	--color-rr-faint: #6A7A84;
+	--color-rr-body: #C4D0D8;
+	--color-rr-heading: #D8E4E8;
 
 	/* Font families */
 	--font-display: 'Bebas Neue', sans-serif;
@@ -79,16 +81,16 @@ html {
 	--destructive-foreground: #FFFFFF;
 	--muted: var(--color-rr-surface);
 	--muted-foreground: var(--color-rr-muted);
-	--card: #FFFFFF;
+	--card: var(--color-rr-surface);
 	--card-foreground: var(--color-rr-heading);
 	--border: var(--color-rr-border);
 	--input: var(--color-rr-border);
 	--ring: var(--color-rr-amber);
 
 	/* Sidebar tokens (admin) */
-	--sidebar: #FFFFFF;
+	--sidebar: var(--color-rr-surface);
 	--sidebar-foreground: var(--color-rr-heading);
-	--sidebar-accent: var(--color-rr-surface);
+	--sidebar-accent: var(--color-rr-raised);
 	--sidebar-accent-foreground: var(--color-rr-heading);
 	--sidebar-border: var(--color-rr-border);
 	--sidebar-ring: var(--color-rr-amber);
@@ -147,7 +149,7 @@ html {
 }
 .product-card:hover {
 	transform: translateY(-3px);
-	box-shadow: 0 12px 32px rgba(28, 22, 16, 0.18), 0 0 0 1px rgba(184, 32, 24, 0.2);
+	box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(232, 146, 26, 0.2);
 }
 
 /* Marquee ticker animation */
@@ -173,10 +175,10 @@ html {
 	animation: badge-pulse 2.2s ease-in-out infinite;
 }
 
-/* Ink drop shadow for light mode buttons */
-.ink-drop-red { box-shadow: 3px 3px 0 #7A1210; }
-.ink-drop-teal { box-shadow: 3px 3px 0 #065050; }
-.ink-drop-dark { box-shadow: 3px 3px 0 #9A8C7C; }
+/* Glow shadows for dark mode buttons */
+.glow-red { box-shadow: 0 0 20px rgba(184, 32, 24, 0.45); }
+.glow-teal { box-shadow: 0 0 18px rgba(10, 120, 112, 0.35); }
+.glow-amber { box-shadow: 0 0 24px rgba(232, 146, 26, 0.25); }
 
 /* Button press effect */
 .btn {

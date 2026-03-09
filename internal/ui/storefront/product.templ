@@ -33,70 +33,35 @@ type ProductDetailProps struct {
 templ ProductContent(props ProductDetailProps) {
 	<div>
 		<!-- Breadcrumb -->
-		<nav class="mb-8">
-			<ol class="flex items-center gap-2 text-sm text-rr-muted">
-				<li><a href="/catalog" class="hover:text-rr-red">Shop</a></li>
-				<li><span class="mx-1">/</span></li>
-				<li class="text-rr-heading">{ props.Product.Title }</li>
+		<nav class="mb-6">
+			<ol class="flex items-center gap-2 font-body text-sm text-rr-muted">
+				<li><a href="/catalog" class="hover:text-rr-heading transition-colors">Shop</a></li>
+				<li><span class="text-rr-border">&rsaquo;</span></li>
+				<li class="text-rr-heading font-medium">{ props.Product.Title }</li>
 			</ol>
 		</nav>
-		<!-- Product layout: 2 columns -->
-		<div class="lg:grid lg:grid-cols-2 lg:gap-x-16">
-			<!-- Image gallery -->
-			<div>
-				if len(props.Media) > 0 {
-					<!-- Main image -->
-					<div class="aspect-square w-full overflow-hidden rounded-lg bg-stone-100">
-						<img
-							src={ props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantHero) }
-							alt={ props.Media[0].AltText }
-							class="h-full w-full object-cover object-center"
-						/>
-					</div>
-					<!-- Thumbnails -->
-					if len(props.Media) > 1 {
-						<div class="mt-4 grid grid-cols-4 gap-4">
-							for _, m := range props.Media {
-								<div class="aspect-square overflow-hidden rounded-lg bg-stone-100">
-									<img
-										src={ props.MediaConfig.ProductImageURL(m.R2Key, media.VariantThumbnail) }
-										alt={ m.AltText }
-										class="h-full w-full object-cover object-center"
-									/>
-								</div>
-							}
-						</div>
-					}
-				} else {
-					<div class="aspect-square w-full overflow-hidden rounded-lg bg-stone-100 flex items-center justify-center">
-						<svg class="size-24 text-stone-300" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z"></path>
-						</svg>
-					</div>
-				}
-			</div>
-			<!-- Product info -->
-			<div class="mt-8 lg:mt-0">
-				<h1 class="text-3xl font-bold tracking-tight text-rr-heading">{ props.Product.Title }</h1>
-				<!-- Price display -->
+		<!-- Product layout: info-first, image-second (BRCC style) -->
+		<div class="lg:grid lg:grid-cols-2 lg:gap-x-12">
+			<!-- LEFT: Product info + actions (above the fold) -->
+			<div class="lg:max-w-lg">
+				<h1 class="font-display text-4xl tracking-widest text-rr-heading sm:text-5xl">{ props.Product.Title }</h1>
+				<!-- Price — big and bold -->
 				if props.DefaultPrice != nil {
 					<div class="mt-3" id="price-display">
-						<span class="text-2xl font-semibold text-rr-heading" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
+						<span class="font-heading text-3xl text-rr-heading" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
 					</div>
 				}
 				<!-- Description -->
 				if props.Product.Description != "" {
-					<div class="mt-6">
-						<p class="text-base text-rr-muted">{ props.Product.Description }</p>
-					</div>
+					<p class="mt-4 font-body text-sm text-rr-muted leading-relaxed">{ props.Product.Description }</p>
 				}
-				<!-- Options -->
+				<!-- Variant options (grind, size, etc.) as button pills -->
 				if len(props.Options) > 0 {
-					<div class="mt-8 space-y-6">
+					<div class="mt-6 space-y-5">
 						for _, opt := range props.Options {
 							<div>
-								<h3 class="text-sm font-medium text-rr-heading">{ opt.Option.Name }</h3>
-								<div class="mt-2 flex flex-wrap gap-2">
+								<label class="label-font text-rr-muted mb-2 block">{ opt.Option.Name }</label>
+								<div class="flex flex-wrap gap-2">
 									for i, val := range opt.Values {
 										<button
 											type="button"
@@ -112,37 +77,37 @@ templ ProductContent(props ProductDetailProps) {
 				}
 				if len(props.Variants) > 0 {
 					<!-- Purchase mode selector -->
-					<div class="mt-8" id="purchase-section">
+					<div class="mt-6" id="purchase-section">
 						if len(props.SubscriptionPlans) > 0 {
-							<!-- Mode toggle tabs -->
+							<!-- Mode toggle — two bold tabs -->
 							<div class="grid grid-cols-2 gap-3" id="purchase-mode-toggle">
 								<button
 									type="button"
 									data-mode="onetime"
-									class="purchase-mode-btn relative rounded-lg border-2 border-rr-red bg-rr-red/5 p-4 text-left transition-colors"
+									class="purchase-mode-btn relative rounded-sm border-2 border-rr-amber bg-rr-amber/5 p-3 text-left transition-colors"
 								>
-									<span class="block text-sm font-semibold text-rr-heading">One-Time Purchase</span>
+									<span class="block label-font text-rr-heading">ONE-TIME</span>
 								</button>
 								<button
 									type="button"
 									data-mode="subscribe"
-									class="purchase-mode-btn relative rounded-lg border-2 border-rr-border bg-white p-4 text-left transition-colors"
+									class="purchase-mode-btn relative rounded-sm border-2 border-rr-border bg-rr-surface p-3 text-left transition-colors"
 								>
-									<span class="block text-sm font-semibold text-rr-heading">Subscribe &amp; Save</span>
-									<span class="block text-xs text-rr-red font-medium mt-0.5">
+									<span class="block label-font text-rr-heading">SUBSCRIBE</span>
+									<span class="block font-body text-xs text-rr-amber font-semibold mt-0.5">
 										{ fmt.Sprintf("Save up to %d%%", maxDiscount(props.SubscriptionPlans)) }
 									</span>
 								</button>
 							</div>
 							<!-- Subscription frequency options (hidden by default) -->
 							<div id="subscribe-options" class="hidden mt-4">
-								<p class="text-sm font-medium text-rr-heading mb-3">Delivery every</p>
+								<p class="label-font text-rr-muted mb-2">DELIVERY EVERY</p>
 								<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
 									for i, plan := range props.SubscriptionPlans {
 										<label
-											class={ "subscribe-frequency-option flex items-center justify-between rounded-lg border p-3 cursor-pointer transition-colors",
-												templ.KV("border-rr-red bg-rr-red/5", i == 0),
-												templ.KV("border-rr-border hover:border-stone-300", i != 0) }
+											class={ "subscribe-frequency-option flex items-center justify-between rounded-sm border p-3 cursor-pointer transition-colors",
+												templ.KV("border-rr-amber bg-rr-amber/5", i == 0),
+												templ.KV("border-rr-border hover:border-rr-amber", i != 0) }
 											data-plan-id={ plan.ID.String() }
 											data-discount={ fmt.Sprintf("%d", plan.DiscountPct) }
 										>
@@ -154,13 +119,13 @@ templ ProductContent(props ProductDetailProps) {
 													if i == 0 {
 														checked
 													}
-													class="size-4 border-stone-300 text-rr-red focus:ring-rr-red"
+													class="size-4 border-rr-border text-rr-amber focus:ring-rr-amber"
 												/>
-												<span class="text-sm text-rr-heading">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
+												<span class="font-body text-sm text-rr-heading">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
 											</div>
 											if plan.DiscountPct > 0 {
-												<span class="inline-flex items-center rounded-md bg-rr-red/10 px-2 py-0.5 text-xs font-medium text-rr-red">
-													{ fmt.Sprintf("Save %d%%", plan.DiscountPct) }
+												<span class="label-font px-2 py-0.5 rounded-sm text-rr-amber border border-rr-amber bg-rr-amber/5">
+													{ fmt.Sprintf("SAVE %d%%", plan.DiscountPct) }
 												</span>
 											}
 										</label>
@@ -168,8 +133,8 @@ templ ProductContent(props ProductDetailProps) {
 								</div>
 							</div>
 						}
-						<!-- One-time purchase form -->
-						<div id="onetime-form" class="mt-4">
+						<!-- One-time purchase form — BOLD CTA -->
+						<div id="onetime-form" class="mt-5">
 							<form
 								method="post"
 								action="/cart/add"
@@ -180,23 +145,23 @@ templ ProductContent(props ProductDetailProps) {
 								<input type="hidden" name="quantity" value="1"/>
 								<button
 									type="submit"
-									class="w-full rounded-md bg-rr-red px-6 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
+									class="btn w-full rounded-sm bg-rr-red px-6 py-4 label-font text-white text-sm glow-red hover:bg-rr-red-lt transition-colors"
 								>
-									Add to Cart
+									ADD TO CART
 								</button>
 							</form>
 						</div>
 						<!-- Subscribe form (hidden by default) -->
 						if len(props.SubscriptionPlans) > 0 {
-							<div id="subscribe-form" class="hidden mt-4">
+							<div id="subscribe-form" class="hidden mt-5">
 								<!-- Quantity selector -->
 								<div class="mb-4">
-									<label for="subscribe-quantity" class="text-sm font-medium text-rr-heading">Quantity</label>
-									<div class="mt-1 flex items-center gap-2">
+									<label for="subscribe-quantity" class="label-font text-rr-muted mb-2 block">QUANTITY</label>
+									<div class="flex">
 										<button
 											type="button"
 											id="subscribe-qty-minus"
-											class="flex size-9 items-center justify-center rounded-md border border-stone-300 text-stone-600 hover:bg-stone-50 disabled:opacity-40"
+											class="btn bg-rr-raised border border-rr-border text-rr-heading font-bold px-4 py-2 rounded-l-sm text-lg leading-none border-r-0 transition-colors hover:bg-rr-red hover:text-white"
 										>
 											&minus;
 										</button>
@@ -206,12 +171,12 @@ templ ProductContent(props ProductDetailProps) {
 											value="1"
 											min="1"
 											max="10"
-											class="w-14 rounded-md border border-stone-300 px-2 py-1.5 text-center text-sm font-medium text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+											class="rr-input w-14 border-y border-rr-border text-rr-heading font-body text-sm text-center py-2 bg-rr-bg [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 										/>
 										<button
 											type="button"
 											id="subscribe-qty-plus"
-											class="flex size-9 items-center justify-center rounded-md border border-stone-300 text-stone-600 hover:bg-stone-50 disabled:opacity-40"
+											class="btn bg-rr-raised border border-rr-border text-rr-heading font-bold px-4 py-2 rounded-r-sm text-lg leading-none border-l-0 transition-colors hover:bg-rr-red hover:text-white"
 										>
 											+
 										</button>
@@ -220,13 +185,58 @@ templ ProductContent(props ProductDetailProps) {
 								<button
 									type="button"
 									id="subscribe-action"
-									class="block w-full rounded-md bg-rr-red px-6 py-3.5 text-center text-base font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
+									class="btn block w-full rounded-sm bg-rr-red px-6 py-4 text-center label-font text-white text-sm glow-red hover:bg-rr-red-lt transition-colors"
 								>
-									Subscribe
+									SUBSCRIBE &amp; SAVE
 								</button>
-								<p class="mt-2 text-center text-xs text-rr-muted">Cancel or modify anytime from your account.</p>
+								<p class="mt-2 text-center font-body text-xs text-rr-muted">Cancel or modify anytime from your account.</p>
 							</div>
 						}
+					</div>
+				}
+				<!-- In stock indicator -->
+				<div class="mt-4 flex items-center gap-2">
+					<svg class="size-4 text-rr-amber" viewBox="0 0 20 20" fill="currentColor">
+						<path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd"></path>
+					</svg>
+					<p class="font-body text-sm text-rr-muted">In stock and ready to ship</p>
+				</div>
+			</div>
+			<!-- RIGHT: Product image (secondary, smaller) -->
+			<div class="mt-8 lg:mt-0 lg:row-span-2">
+				if len(props.Media) > 0 {
+					<!-- Main image — contained, not dominant -->
+					<div class="aspect-square w-full overflow-hidden rounded-sm bg-rr-bg border border-rr-border">
+						<img
+							src={ props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantHero) }
+							alt={ props.Media[0].AltText }
+							class="h-full w-full object-cover object-center"
+						/>
+					</div>
+					<!-- Thumbnails -->
+					if len(props.Media) > 1 {
+						<div class="mt-3 grid grid-cols-4 gap-3">
+							for _, m := range props.Media {
+								<div class="aspect-square overflow-hidden rounded-sm bg-rr-bg border border-rr-border cursor-pointer hover:border-rr-amber transition-colors">
+									<img
+										src={ props.MediaConfig.ProductImageURL(m.R2Key, media.VariantThumbnail) }
+										alt={ m.AltText }
+										class="h-full w-full object-cover object-center"
+									/>
+								</div>
+							}
+						</div>
+					}
+				} else {
+					<div class="aspect-square w-full overflow-hidden rounded-sm bg-rr-bg border border-rr-border relative">
+						<div class="texture-dots absolute inset-0"></div>
+						<div class="flex h-full w-full items-center justify-center relative">
+							<div class="w-24 h-24 rounded-full border-2 border-rr-border bg-rr-surface flex items-center justify-center">
+								<span class="font-display text-rr-muted text-2xl tracking-widest">
+									{ string([]rune(props.Product.Title)[0:2]) }
+								</span>
+							</div>
+						</div>
 					</div>
 				}
 			</div>
@@ -261,9 +271,9 @@ func maxDiscount(plans []domain.SubscriptionPlan) int {
 
 func optionPillClasses(selected bool) string {
 	if selected {
-		return "rounded-full border-2 border-rr-red bg-rr-red/5 px-4 py-2 text-sm font-medium text-rr-red"
+		return "label-font border-2 border-rr-amber bg-rr-amber/5 px-4 py-2 rounded-sm text-rr-amber"
 	}
-	return "rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-rr-red hover:text-rr-red"
+	return "label-font border border-rr-border px-4 py-2 rounded-sm text-rr-muted hover:border-rr-amber hover:text-rr-heading transition-colors"
 }
 
 func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) string {
@@ -299,9 +309,9 @@ templ purchaseModeScript() {
 					// Update tab styles
 					document.querySelectorAll('.purchase-mode-btn').forEach(function(b) {
 						if (b.dataset.mode === mode) {
-							b.className = 'purchase-mode-btn relative rounded-lg border-2 border-rr-red bg-rr-red/5 p-4 text-left transition-colors';
+							b.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-amber bg-rr-amber/5 p-3 text-left transition-colors';
 						} else {
-							b.className = 'purchase-mode-btn relative rounded-lg border-2 border-rr-border bg-white p-4 text-left transition-colors';
+							b.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-border bg-rr-surface p-3 text-left transition-colors';
 						}
 					});
 					// Toggle form visibility
@@ -374,11 +384,11 @@ templ purchaseModeScript() {
 				radio.addEventListener('change', function() {
 					// Update selected styles
 					document.querySelectorAll('.subscribe-frequency-option').forEach(function(l) {
-						l.classList.remove('border-rr-red', 'bg-rr-red/5');
+						l.classList.remove('border-rr-amber', 'bg-rr-amber/5');
 						l.classList.add('border-rr-border');
 					});
 					label.classList.remove('border-rr-border');
-					label.classList.add('border-rr-red', 'bg-rr-red/5');
+					label.classList.add('border-rr-amber', 'bg-rr-amber/5');
 					// Update subscribe link
 					updateSubscribeLink(label.dataset.planId);
 					updatePrice();
@@ -423,10 +433,10 @@ templ purchaseModeScript() {
 				var display = document.getElementById('price-display');
 				var qtyPrefix = qty > 1 ? qty + ' × ' : '';
 				if (discount > 0) {
-					display.innerHTML = '<span class="text-lg text-rr-muted line-through">' + formatCents(baseCents) + '</span>' +
-						' <span class="text-2xl font-semibold text-rr-red">' + qtyPrefix + formatCents(totalCents) + '</span>';
+					display.innerHTML = '<span class="font-heading text-xl text-rr-muted line-through">' + formatCents(baseCents) + '</span>' +
+						' <span class="font-heading text-3xl text-rr-amber">' + qtyPrefix + formatCents(totalCents) + '</span>';
 				} else {
-					display.innerHTML = '<span class="text-2xl font-semibold text-rr-heading">' + qtyPrefix + formatCents(totalCents) + '</span>';
+					display.innerHTML = '<span class="font-heading text-3xl text-rr-heading">' + qtyPrefix + formatCents(totalCents) + '</span>';
 				}
 			}
 
@@ -435,7 +445,7 @@ templ purchaseModeScript() {
 				if (!priceEl) return;
 				var baseCents = parseInt(priceEl.dataset.basePrice, 10);
 				var display = document.getElementById('price-display');
-				display.innerHTML = '<span class="text-2xl font-semibold text-rr-heading" data-base-price="' + baseCents + '">' + formatCents(baseCents) + '</span>';
+				display.innerHTML = '<span class="font-heading text-3xl text-rr-heading" data-base-price="' + baseCents + '">' + formatCents(baseCents) + '</span>';
 			}
 
 			function formatCents(cents) {

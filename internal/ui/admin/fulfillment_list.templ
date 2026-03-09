@@ -30,7 +30,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 			<select
 				name="status"
 				onchange="this.form.submit()"
-				class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal"
+				class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 			>
 				<option value="">All statuses</option>
 				<option value="unfulfilled" selected?={ props.StatusFilter == "unfulfilled" }>Unfulfilled</option>
@@ -73,7 +73,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 						for _, o := range props.Orders {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="font-medium text-stone-900 hover:text-hiri-teal">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="font-medium text-stone-900 hover:text-rr-red">
 										{ o.Number }
 									</a>
 								</td>
@@ -90,7 +90,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 									{ o.PlacedAt.Format("Jan 2, 2006") }
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="text-hiri-teal hover:text-hiri-teal-dark">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="text-rr-red hover:text-rr-red-lt">
 										View<span class="sr-only">, { o.Number }</span>
 									</a>
 								</td>

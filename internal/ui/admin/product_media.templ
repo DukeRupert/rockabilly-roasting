@@ -46,7 +46,7 @@ templ MediaGallery(props MediaGalleryProps) {
 								/>
 							</div>
 							if i == 0 {
-								<span class="absolute top-2 left-2 inline-flex items-center rounded-md bg-hiri-teal px-1.5 py-0.5 text-xs font-medium text-white">
+								<span class="absolute top-2 left-2 inline-flex items-center rounded-md bg-rr-red px-1.5 py-0.5 text-xs font-medium text-white">
 									Primary
 								</span>
 							}
@@ -83,7 +83,7 @@ templ MediaGallery(props MediaGalleryProps) {
 					@dragover.prevent="dragging = true"
 					@dragleave.prevent="dragging = false"
 					@drop.prevent="dragging = false; handleDrop($event)"
-					:class="dragging ? 'border-hiri-teal bg-hiri-teal/5' : 'border-stone-900/25'"
+					:class="dragging ? 'border-rr-red bg-rr-red/5' : 'border-stone-900/25'"
 					class="flex cursor-pointer justify-center rounded-lg border border-dashed px-6 py-10 transition-colors"
 				>
 					<div class="text-center">
@@ -95,7 +95,7 @@ templ MediaGallery(props MediaGalleryProps) {
 							></path>
 						</svg>
 						<div class="mt-4 flex text-sm/6 text-stone-600">
-							<span class="font-semibold text-hiri-teal hover:text-hiri-teal-dark" x-show="!uploading">Upload a file</span>
+							<span class="font-semibold text-rr-red hover:text-rr-red-lt" x-show="!uploading">Upload a file</span>
 							<span class="font-semibold text-stone-500" x-show="uploading" x-cloak>
 								Uploading <span x-text="progress"></span>...
 							</span>

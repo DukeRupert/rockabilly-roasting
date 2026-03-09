@@ -40,7 +40,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			<p class="mt-1 text-sm text-stone-500">Created { props.Subscription.CreatedAt.Format("January 2, 2006 at 3:04 PM") }</p>
 		</div>
 		<div class="mt-4 sm:mt-0">
-			<a href="/admin/subscriptions" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Back to subscriptions</a>
+			<a href="/admin/subscriptions" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">&larr; Back to subscriptions</a>
 		</div>
 	</div>
 	<!-- Actions -->
@@ -91,7 +91,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 		<div class="rounded-lg bg-white p-4 shadow-xs ring-1 ring-stone-900/5">
 			<dt class="text-sm font-medium text-stone-500">Customer</dt>
 			<dd class="mt-1 text-sm font-semibold text-stone-900">
-				<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())) } class="text-hiri-teal hover:text-hiri-teal-dark">
+				<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())) } class="text-rr-red hover:text-rr-red-lt">
 					{ props.Customer.FirstName } { props.Customer.LastName }
 				</a>
 			</dd>
@@ -144,7 +144,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
 									<a
 										href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", so.OrderID.String())) }
-										class="font-medium text-hiri-teal hover:text-hiri-teal-dark"
+										class="font-medium text-rr-red hover:text-rr-red-lt"
 									>
 										{ so.OrderID.String()[:8] }...
 									</a>

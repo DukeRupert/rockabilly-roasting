@@ -15,7 +15,7 @@ import (
 func accountNavClass(path, active string) string {
 	base := "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
 	if path == active {
-		return base + " bg-hiri-teal/10 text-hiri-teal"
+		return base + " bg-rr-red/10 text-rr-red"
 	}
 	return base + " text-stone-600 hover:bg-stone-100 hover:text-stone-900"
 }
@@ -78,7 +78,7 @@ templ accountLayout(activePath string) {
 func mobileNavClass(path, active string) string {
 	base := "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium"
 	if path == active {
-		return base + " bg-hiri-teal text-white"
+		return base + " bg-rr-red text-white"
 	}
 	return base + " text-stone-600 hover:bg-stone-100"
 }
@@ -115,22 +115,22 @@ templ AccountSettingsContent(props AccountSettingsProps) {
 					<div>
 						<label for="first_name" class="block text-sm font-medium text-stone-700 mb-1">First name</label>
 						<input type="text" id="first_name" name="first_name" value={ props.Customer.FirstName }
-							class="block w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal" required/>
+							class="block w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-rr-red focus:ring-1 focus:ring-rr-red" required/>
 					</div>
 					<div>
 						<label for="last_name" class="block text-sm font-medium text-stone-700 mb-1">Last name</label>
 						<input type="text" id="last_name" name="last_name" value={ props.Customer.LastName }
-							class="block w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal" required/>
+							class="block w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-rr-red focus:ring-1 focus:ring-rr-red" required/>
 					</div>
 				</div>
 				<div>
 					<label for="email" class="block text-sm font-medium text-stone-700 mb-1">Email</label>
 					<input type="email" id="email" name="email" value={ props.Customer.Email }
-						class="block w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal" required/>
+						class="block w-full rounded-md border border-stone-300 px-3 py-2 text-sm shadow-sm focus:border-rr-red focus:ring-1 focus:ring-rr-red" required/>
 					<p class="mt-1 text-xs text-stone-500">Your sign-in link will be sent to this address.</p>
 				</div>
 				<div class="pt-2">
-					<button type="submit" class="rounded-md bg-hiri-teal px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark">
+					<button type="submit" class="rounded-md bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
 						Save changes
 					</button>
 				</div>
@@ -161,7 +161,7 @@ templ AccountOrdersContent(props AccountOrdersProps) {
 				<h3 class="mt-2 text-sm font-semibold text-stone-900">No orders yet</h3>
 				<p class="mt-1 text-sm text-stone-500">Time to change that.</p>
 				<div class="mt-6">
-					<a href="/catalog" class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark">
+					<a href="/catalog" class="rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
 						Browse products
 					</a>
 				</div>
@@ -170,7 +170,7 @@ templ AccountOrdersContent(props AccountOrdersProps) {
 			<div class="space-y-3">
 				for _, order := range props.Orders {
 					<a href={ templ.SafeURL("/account/orders/" + order.ID.String()) }
-						class="block rounded-lg border border-stone-200 p-4 hover:border-hiri-teal/50 hover:bg-stone-50 transition-colors">
+						class="block rounded-lg border border-stone-200 p-4 hover:border-rr-red/50 hover:bg-stone-50 transition-colors">
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-4">
 								<span class="font-medium text-stone-900">{ order.Number }</span>
@@ -251,7 +251,7 @@ templ AccountOrderShowContent(props AccountOrderShowProps) {
 	@accountLayout("/account/orders") {
 		<div>
 			<div class="mb-6">
-				<a href="/account/orders" class="text-sm text-hiri-teal hover:underline">&larr; Back to orders</a>
+				<a href="/account/orders" class="text-sm text-rr-red hover:underline">&larr; Back to orders</a>
 			</div>
 			<div class="flex items-center gap-4 mb-6">
 				<h1 class="text-2xl font-semibold text-stone-900">{ props.Order.Number }</h1>
@@ -389,7 +389,7 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 				<h3 class="mt-2 text-sm font-semibold text-stone-900">No subscriptions</h3>
 				<p class="mt-1 text-sm text-stone-500">Subscribe to your favorites and never run out.</p>
 				<div class="mt-6">
-					<a href="/subscriptions" class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark">
+					<a href="/subscriptions" class="rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
 						View subscription plans
 					</a>
 				</div>
@@ -439,7 +439,7 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 						if sub.Status == domain.SubscriptionStatusPaused {
 							<p class="text-sm text-stone-600 mb-4">Paused &mdash; no upcoming orders.</p>
 							<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/resume") }>
-								<button type="submit" class="rounded-md bg-hiri-teal px-3 py-1.5 text-sm font-medium text-white hover:bg-hiri-teal-dark">
+								<button type="submit" class="rounded-md bg-rr-red px-3 py-1.5 text-sm font-medium text-white hover:bg-rr-red-lt">
 									Resume
 								</button>
 							</form>
@@ -477,7 +477,7 @@ templ AccountAddressesContent(props AccountAddressesProps) {
 		<div class="flex items-center justify-between mb-6">
 			<h1 class="text-2xl font-semibold text-stone-900">Addresses</h1>
 			<button type="button" x-data x-on:click="$dispatch('toggle-add-address')"
-				class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark">
+				class="rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
 				+ Add address
 			</button>
 		</div>
@@ -499,7 +499,7 @@ templ AccountAddressesContent(props AccountAddressesProps) {
 								<div>
 									<span class="font-medium text-stone-900">{ addr.FirstName } { addr.LastName }</span>
 									if addr.IsDefault {
-										<span class="ml-2 inline-flex items-center rounded-full bg-hiri-teal/10 px-2 py-0.5 text-xs font-medium text-hiri-teal">Default</span>
+										<span class="ml-2 inline-flex items-center rounded-full bg-rr-red/10 px-2 py-0.5 text-xs font-medium text-rr-red">Default</span>
 									}
 								</div>
 							</div>
@@ -511,7 +511,7 @@ templ AccountAddressesContent(props AccountAddressesProps) {
 								{ addr.City }, { addr.State } { addr.PostalCode }
 							</p>
 							<div class="mt-3 flex gap-2">
-								<button x-on:click="editing = true" class="text-sm text-hiri-teal hover:underline">Edit</button>
+								<button x-on:click="editing = true" class="text-sm text-rr-red hover:underline">Edit</button>
 								if !addr.IsDefault {
 									<form method="POST" action={ templ.SafeURL("/account/addresses/" + addr.ID.String() + "/default") }>
 										<button type="submit" class="text-sm text-stone-600 hover:underline">Set default</button>
@@ -581,7 +581,7 @@ templ addressForm(action string, addr *domain.Address) {
 					class="block w-full rounded-md border border-stone-300 px-3 py-1.5 text-sm"/>
 			</div>
 		</div>
-		<button type="submit" class="rounded-md bg-hiri-teal px-3 py-1.5 text-sm font-semibold text-white hover:bg-hiri-teal-dark">
+		<button type="submit" class="rounded-md bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red-lt">
 			Save
 		</button>
 	</form>

@@ -33,7 +33,7 @@ templ GroupPricingContent(props GroupPricingProps) {
 			<p class="mt-1 text-sm text-stone-500">
 				Set base and group-specific prices for all variants.
 				if len(props.Groups) == 0 {
-					<a href="/admin/groups" class="text-hiri-teal hover:text-hiri-teal-dark">Create customer groups</a> to enable group pricing.
+					<a href="/admin/groups" class="text-rr-red hover:text-rr-red-lt">Create customer groups</a> to enable group pricing.
 				}
 			</p>
 		</div>
@@ -61,7 +61,7 @@ templ GroupPricingContent(props GroupPricingProps) {
 							<h2 class="text-sm font-semibold text-stone-900">{ pg.Product.Title }</h2>
 							<a
 								href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", pg.Product.ID)) }
-								class="text-xs text-hiri-teal hover:text-hiri-teal-dark"
+								class="text-xs text-rr-red hover:text-rr-red-lt"
 							>
 								Edit product
 							</a>
@@ -132,9 +132,9 @@ templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group
 										if vp.PriceCents != nil {
 											value={ priceToDollars(*vp.PriceCents) }
 										}
-										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
+										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
-									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-hiri-teal hover:text-hiri-teal-dark">
+									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt">
 										Save
 									</button>
 								</form>
@@ -161,9 +161,9 @@ templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group
 										if cents, ok := vp.GroupPrices[group.ID]; ok {
 											value={ priceToDollars(cents) }
 										}
-										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
+										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
-									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-hiri-teal hover:text-hiri-teal-dark">
+									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt">
 										Save
 									</button>
 								</form>

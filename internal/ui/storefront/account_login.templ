@@ -49,14 +49,14 @@ templ AccountLoginContent(props AccountLoginProps) {
 									autocomplete="email"
 									value={ props.Email }
 									placeholder="you@example.com"
-									class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal sm:text-sm/6"
+									class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6"
 								/>
 							</div>
 						</div>
 						<div>
 							<button
 								type="submit"
-								class="flex w-full justify-center rounded-md bg-hiri-teal px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+								class="flex w-full justify-center rounded-md bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
 							>
 								Send sign-in link
 							</button>
@@ -87,7 +87,7 @@ templ MagicLinkExpiredContent() {
 				This sign-in link has expired or has already been used. Please request a new one.
 			</p>
 			<div class="mt-8">
-				<a href="/account/login" class="text-sm/6 font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Request new link</a>
+				<a href="/account/login" class="text-sm/6 font-semibold text-rr-red hover:text-rr-red-lt">&larr; Request new link</a>
 			</div>
 		</div>
 	</div>

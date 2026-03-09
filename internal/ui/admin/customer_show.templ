@@ -49,7 +49,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 			}
 		</div>
 		<div class="mt-4 sm:mt-0">
-			<a href="/admin/customers" class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark">&larr; Back to customers</a>
+			<a href="/admin/customers" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">&larr; Back to customers</a>
 		</div>
 	</div>
 	<!-- Wholesale status banner -->
@@ -162,7 +162,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 				<div class="flex-1 max-w-xs">
 					<label for="group_id" class="block text-sm/6 font-medium text-gray-900">Add to group</label>
 					<div class="mt-2">
-						<select name="group_id" id="group_id" required class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal sm:text-sm/6">
+						<select name="group_id" id="group_id" required class="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6">
 							<option value="">Select a group...</option>
 							for _, g := range available {
 								<option value={ g.ID.String() }>{ g.Name }</option>
@@ -170,7 +170,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 						</select>
 					</div>
 				</div>
-				<button type="submit" class="rounded-md bg-hiri-teal px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal">
+				<button type="submit" class="rounded-md bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red">
 					Add
 				</button>
 			</form>
@@ -178,7 +178,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 		if len(props.AllGroups) == 0 {
 			<p class="mt-2 text-sm text-stone-500">
 				No groups exist yet.
-				<a href="/admin/groups" class="font-semibold text-hiri-teal hover:text-hiri-teal-dark">Create one</a>
+				<a href="/admin/groups" class="font-semibold text-rr-red hover:text-rr-red-lt">Create one</a>
 			</p>
 		}
 	</div>

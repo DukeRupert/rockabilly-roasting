@@ -24,11 +24,11 @@ type CartPageProps struct {
 
 templ CartContent(props CartPageProps) {
 	<div>
-		<h1 class="text-3xl font-bold tracking-tight text-hiri-text mb-8">Your Cart</h1>
+		<h1 class="text-3xl font-bold tracking-tight text-rr-heading mb-8">Your Cart</h1>
 		if len(props.Items) == 0 {
 			<div class="text-center py-12">
-				<p class="text-hiri-text-secondary mb-4">Your cart is empty.</p>
-				<a href="/catalog" class="text-hiri-teal hover:text-hiri-teal-dark font-medium">Continue shopping</a>
+				<p class="text-rr-muted mb-4">Your cart is empty.</p>
+				<a href="/catalog" class="text-rr-red hover:text-rr-red-lt font-medium">Continue shopping</a>
 			</div>
 		} else {
 			<div id="cart-items">
@@ -71,9 +71,9 @@ templ CartContent(props CartPageProps) {
 											name="quantity"
 											value={ fmt.Sprintf("%d", item.Quantity) }
 											min="1"
-											class="w-16 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
+											class="w-16 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 focus:ring-2 focus:ring-inset focus:ring-rr-red"
 										/>
-										<button type="submit" class="text-xs font-medium text-hiri-teal hover:text-hiri-teal-dark">
+										<button type="submit" class="text-xs font-medium text-rr-red hover:text-rr-red-lt">
 											Update
 										</button>
 									</form>
@@ -110,13 +110,13 @@ templ CartContent(props CartPageProps) {
 						<a
 							href="/checkout"
 							hx-boost="false"
-							class="block w-full rounded-md bg-hiri-teal px-6 py-3 text-center text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+							class="block w-full rounded-md bg-rr-red px-6 py-3 text-center text-base font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
 						>
 							Checkout
 						</a>
 					</div>
 					<div class="mt-4 text-center">
-						<a href="/catalog" class="text-sm text-hiri-teal hover:text-hiri-teal-dark font-medium">
+						<a href="/catalog" class="text-sm text-rr-red hover:text-rr-red-lt font-medium">
 							Continue shopping
 						</a>
 					</div>
@@ -137,7 +137,7 @@ templ CartPage(props CartPageProps) {
 
 templ CartBadge(count int) {
 	if count > 0 {
-		<span id="cart-badge" hx-swap-oob="true" class="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-hiri-teal text-xs font-bold text-white">
+		<span id="cart-badge" hx-swap-oob="true" class="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-rr-red text-xs font-bold text-white">
 			{ fmt.Sprintf("%d", count) }
 		</span>
 	} else {

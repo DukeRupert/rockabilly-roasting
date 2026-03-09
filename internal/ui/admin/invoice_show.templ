@@ -44,7 +44,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 		<div class="mt-4 flex items-center gap-3 sm:mt-0">
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", props.Invoice.OrderID.String())) }
-				class="text-sm font-semibold text-hiri-teal hover:text-hiri-teal-dark"
+				class="text-sm font-semibold text-rr-red hover:text-rr-red-lt"
 			>
 				&larr; Back to order
 			</a>
@@ -56,7 +56,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/invoices/%s/send", props.Invoice.ID.String())) }>
 				<button
 					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-md bg-hiri-teal px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark"
+					class="inline-flex items-center gap-1.5 rounded-md bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
 				>
 					Send Invoice
 				</button>
@@ -193,13 +193,13 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 							id="amount"
 							min="1"
 							required
-							class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm"
+							class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-rr-red focus:ring-rr-red sm:text-sm"
 							placeholder={ fmt.Sprintf("%d", props.Invoice.AmountDue) }
 						/>
 					</div>
 					<div>
 						<label for="method" class="block text-sm font-medium text-stone-700">Method</label>
-						<select name="method" id="method" required class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm">
+						<select name="method" id="method" required class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-rr-red focus:ring-rr-red sm:text-sm">
 							<option value="check">Check</option>
 							<option value="ach">ACH</option>
 							<option value="stripe">Stripe</option>
@@ -209,12 +209,12 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 					</div>
 					<div>
 						<label for="reference" class="block text-sm font-medium text-stone-700">Reference</label>
-						<input type="text" name="reference" id="reference" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-hiri-teal focus:ring-hiri-teal sm:text-sm" placeholder="Check #, transaction ID"/>
+						<input type="text" name="reference" id="reference" class="mt-1 block w-full rounded-md border-stone-300 shadow-sm focus:border-rr-red focus:ring-rr-red sm:text-sm" placeholder="Check #, transaction ID"/>
 					</div>
 					<div class="flex items-end">
 						<button
 							type="submit"
-							class="inline-flex items-center rounded-md bg-hiri-teal px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-hiri-teal-dark"
+							class="inline-flex items-center rounded-md bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
 						>
 							Record
 						</button>

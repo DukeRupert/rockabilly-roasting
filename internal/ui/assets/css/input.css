@@ -7,24 +7,31 @@
 @source "../../../../../ui/checkout/src/**/*.svelte";
 
 @theme inline {
-	/* Hiri design system colors */
-	--color-hiri-teal: #2D7A7A;
-	--color-hiri-teal-dark: #1E5E5E;
-	--color-hiri-amber: #C4873A;
-	--color-hiri-red: #B85C4A;
-	--color-hiri-green: #3D8B6E;
-	--color-hiri-blue: #4A7FA8;
-	--color-hiri-bg: #FAF9F7;
-	--color-hiri-border: #E5E2DE;
-	--color-hiri-surface: #FFFFFF;
-	--color-hiri-text: #1C1917;
-	--color-hiri-text-secondary: #78716C;
+	/* Rockabilly Roasting — Brand Colors (invariant) */
+	--color-rr-red: #B82018;
+	--color-rr-red-lt: #D42820;
+	--color-rr-red-dark: #7A1210;
+	--color-rr-amber: #E8921A;
+	--color-rr-amber-lt: #F5A832;
+	--color-rr-amber-dark: #A8620A;
+	--color-rr-teal: #0A7870;
+	--color-rr-teal-lt: #0EA898;
+	--color-rr-brick: #8A4A30;
 
-	/* Heritage tones */
-	--color-hiri-clay: #A66B4B;
-	--color-hiri-kina: #F5F0E6;
-	--color-hiri-lakatoi: #3D2E27;
-	--color-hiri-sail: #D4C4A8;
+	/* Light mode surface tokens */
+	--color-rr-bg: #F9F6F1;
+	--color-rr-surface: #EDE5D8;
+	--color-rr-raised: #E4DAC8;
+	--color-rr-border: #9A8C7C;
+	--color-rr-muted: #7A6E60;
+	--color-rr-body: #3A3028;
+	--color-rr-heading: #1C1610;
+
+	/* Font families */
+	--font-display: 'Bebas Neue', sans-serif;
+	--font-heading: 'Boogaloo', sans-serif;
+	--font-serif: 'Playfair Display', serif;
+	--font-body: 'Barlow', sans-serif;
 
 	/* templui semantic colors (reference CSS vars set in :root) */
 	--color-background: var(--background);
@@ -59,35 +66,134 @@ html {
 }
 
 :root {
-	/* templui semantic tokens mapped to Hiri palette */
-	--background: var(--color-hiri-bg);
-	--foreground: var(--color-hiri-text);
-	--primary: var(--color-hiri-teal);
+	/* templui semantic tokens mapped to Rockabilly Roasting palette */
+	--background: var(--color-rr-bg);
+	--foreground: var(--color-rr-heading);
+	--primary: var(--color-rr-red);
 	--primary-foreground: #FFFFFF;
-	--secondary: var(--color-hiri-kina);
-	--secondary-foreground: var(--color-hiri-text);
-	--accent: var(--color-stone-100);
-	--accent-foreground: var(--color-hiri-text);
-	--destructive: var(--color-hiri-red);
+	--secondary: var(--color-rr-surface);
+	--secondary-foreground: var(--color-rr-body);
+	--accent: var(--color-rr-raised);
+	--accent-foreground: var(--color-rr-body);
+	--destructive: var(--color-rr-red);
 	--destructive-foreground: #FFFFFF;
-	--muted: var(--color-stone-100);
-	--muted-foreground: var(--color-hiri-text-secondary);
-	--card: var(--color-hiri-surface);
-	--card-foreground: var(--color-hiri-text);
-	--border: var(--color-hiri-border);
-	--input: var(--color-hiri-border);
-	--ring: var(--color-hiri-teal);
+	--muted: var(--color-rr-surface);
+	--muted-foreground: var(--color-rr-muted);
+	--card: #FFFFFF;
+	--card-foreground: var(--color-rr-heading);
+	--border: var(--color-rr-border);
+	--input: var(--color-rr-border);
+	--ring: var(--color-rr-amber);
 
-	/* Sidebar tokens */
-	--sidebar: var(--color-hiri-surface);
-	--sidebar-foreground: var(--color-hiri-text);
-	--sidebar-accent: var(--color-stone-100);
-	--sidebar-accent-foreground: var(--color-hiri-text);
-	--sidebar-border: var(--color-hiri-border);
-	--sidebar-ring: var(--color-hiri-teal);
-	--sidebar-primary: var(--color-hiri-teal);
+	/* Sidebar tokens (admin) */
+	--sidebar: #FFFFFF;
+	--sidebar-foreground: var(--color-rr-heading);
+	--sidebar-accent: var(--color-rr-surface);
+	--sidebar-accent-foreground: var(--color-rr-heading);
+	--sidebar-border: var(--color-rr-border);
+	--sidebar-ring: var(--color-rr-amber);
+	--sidebar-primary: var(--color-rr-red);
 	--sidebar-primary-foreground: #FFFFFF;
 
-	/* Radius */
-	--radius: 0.375rem;
+	/* Radius — sharp edges per brand guide */
+	--radius: 0.125rem;
+}
+
+/* Flame stripe — brand signature divider */
+.flame-stripe {
+	height: 3px;
+	background: linear-gradient(90deg, #7A1210, #B82018, #E8921A, #B82018, #7A1210);
+}
+
+/* Amber focus ring for inputs */
+.rr-input:focus {
+	outline: none;
+	border-color: var(--color-rr-amber);
+	box-shadow: 0 0 0 2px rgba(232, 146, 26, 0.2);
+}
+
+/* Label font utility — Barlow bold uppercase */
+.label-font {
+	font-family: 'Barlow', sans-serif;
+	font-weight: 700;
+	letter-spacing: 0.18em;
+	text-transform: uppercase;
+	font-size: 0.68rem;
+}
+
+/* Nav link amber underline */
+.nav-link {
+	position: relative;
+}
+.nav-link::after {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: -3px;
+	height: 2px;
+	background: var(--color-rr-amber);
+	transform: scaleX(0);
+	transform-origin: left;
+	transition: transform 180ms ease;
+}
+.nav-link:hover::after {
+	transform: scaleX(1);
+}
+
+/* Product card hover */
+.product-card {
+	transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.product-card:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 12px 32px rgba(28, 22, 16, 0.18), 0 0 0 1px rgba(184, 32, 24, 0.2);
+}
+
+/* Marquee ticker animation */
+@keyframes marquee {
+	from { transform: translateX(0); }
+	to { transform: translateX(-50%); }
+}
+.marquee-inner {
+	animation: marquee 22s linear infinite;
+	white-space: nowrap;
+	display: flex;
+}
+.marquee-inner:hover {
+	animation-play-state: paused;
+}
+
+/* Badge pulse for "NEW" indicators */
+@keyframes badge-pulse {
+	0%, 100% { opacity: 1; }
+	50% { opacity: 0.6; }
+}
+.badge-pulse {
+	animation: badge-pulse 2.2s ease-in-out infinite;
+}
+
+/* Ink drop shadow for light mode buttons */
+.ink-drop-red { box-shadow: 3px 3px 0 #7A1210; }
+.ink-drop-teal { box-shadow: 3px 3px 0 #065050; }
+.ink-drop-dark { box-shadow: 3px 3px 0 #9A8C7C; }
+
+/* Button press effect */
+.btn {
+	transition: transform 80ms ease, box-shadow 80ms ease, background 120ms ease;
+}
+.btn:active {
+	transform: translateY(2px);
+	box-shadow: none !important;
+}
+
+/* Texture overlays */
+.texture-dots {
+	background-image: radial-gradient(circle, rgba(232, 146, 26, 0.12) 1px, transparent 1px);
+	background-size: 18px 18px;
+}
+.texture-grid {
+	background-image:
+		repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(168, 184, 192, 0.04) 4px, rgba(168, 184, 192, 0.04) 5px),
+		repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(168, 184, 192, 0.04) 4px, rgba(168, 184, 192, 0.04) 5px);
 }

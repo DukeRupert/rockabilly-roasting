@@ -51,7 +51,7 @@ templ CustomerListContent(props CustomerListProps) {
 						for _, c := range props.Customers {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="font-medium text-stone-900 hover:text-hiri-teal">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="font-medium text-stone-900 hover:text-rr-red">
 										{ c.FirstName } { c.LastName }
 									</a>
 								</td>
@@ -72,7 +72,7 @@ templ CustomerListContent(props CustomerListProps) {
 									{ c.CreatedAt.Format("Jan 2, 2006") }
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-hiri-teal hover:text-hiri-teal-dark">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
 										View<span class="sr-only">, { c.FirstName } { c.LastName }</span>
 									</a>
 								</td>

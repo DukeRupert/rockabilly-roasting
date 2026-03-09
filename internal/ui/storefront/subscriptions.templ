@@ -23,8 +23,8 @@ templ SubscriptionsContent(props SubscriptionsPageProps) {
 	<div>
 		<!-- Hero -->
 		<div class="mb-10">
-			<h1 class="text-3xl font-bold tracking-tight text-hiri-text">Subscribe & Save</h1>
-			<p class="mt-2 max-w-2xl text-base text-hiri-text-secondary">
+			<h1 class="text-3xl font-bold tracking-tight text-rr-heading">Subscribe & Save</h1>
+			<p class="mt-2 max-w-2xl text-base text-rr-muted">
 				Never run out of your favorite coffee. Choose your products, pick a delivery frequency, and save on every order.
 				Subscribe to multiple products and they'll ship together.
 			</p>
@@ -32,19 +32,19 @@ templ SubscriptionsContent(props SubscriptionsPageProps) {
 		<!-- How it works -->
 		<div class="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
 			<div class="rounded-lg border border-stone-200 bg-white p-5">
-				<div class="mb-2 flex size-8 items-center justify-center rounded-full bg-hiri-teal/10 text-sm font-bold text-hiri-teal">1</div>
-				<h3 class="text-sm font-semibold text-hiri-text">Choose your coffee</h3>
-				<p class="mt-1 text-xs text-hiri-text-secondary">Pick from any of our subscribable products below.</p>
+				<div class="mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red">1</div>
+				<h3 class="text-sm font-semibold text-rr-heading">Choose your coffee</h3>
+				<p class="mt-1 text-xs text-rr-muted">Pick from any of our subscribable products below.</p>
 			</div>
 			<div class="rounded-lg border border-stone-200 bg-white p-5">
-				<div class="mb-2 flex size-8 items-center justify-center rounded-full bg-hiri-teal/10 text-sm font-bold text-hiri-teal">2</div>
-				<h3 class="text-sm font-semibold text-hiri-text">Pick your frequency</h3>
-				<p class="mt-1 text-xs text-hiri-text-secondary">Select how often you want it delivered.</p>
+				<div class="mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red">2</div>
+				<h3 class="text-sm font-semibold text-rr-heading">Pick your frequency</h3>
+				<p class="mt-1 text-xs text-rr-muted">Select how often you want it delivered.</p>
 			</div>
 			<div class="rounded-lg border border-stone-200 bg-white p-5">
-				<div class="mb-2 flex size-8 items-center justify-center rounded-full bg-hiri-teal/10 text-sm font-bold text-hiri-teal">3</div>
-				<h3 class="text-sm font-semibold text-hiri-text">Save on every order</h3>
-				<p class="mt-1 text-xs text-hiri-text-secondary">
+				<div class="mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red">3</div>
+				<h3 class="text-sm font-semibold text-rr-heading">Save on every order</h3>
+				<p class="mt-1 text-xs text-rr-muted">
 					if props.maxDiscount() > 0 {
 						{ fmt.Sprintf("Up to %d%% off", props.maxDiscount()) } every delivery. Modify or cancel anytime.
 					} else {
@@ -56,13 +56,13 @@ templ SubscriptionsContent(props SubscriptionsPageProps) {
 		<!-- Frequency options summary -->
 		if len(props.Plans) > 0 {
 			<div class="mb-10">
-				<h2 class="mb-3 text-lg font-semibold text-hiri-text">Delivery frequencies</h2>
+				<h2 class="mb-3 text-lg font-semibold text-rr-heading">Delivery frequencies</h2>
 				<div class="flex flex-wrap gap-2">
 					for _, plan := range props.Plans {
 						<div class="inline-flex items-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm">
-							<span class="font-medium text-hiri-text">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
+							<span class="font-medium text-rr-heading">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
 							if plan.DiscountPct > 0 {
-								<span class="rounded-full bg-hiri-teal/10 px-2 py-0.5 text-xs font-medium text-hiri-teal">
+								<span class="rounded-full bg-rr-red/10 px-2 py-0.5 text-xs font-medium text-rr-red">
 									{ fmt.Sprintf("Save %d%%", plan.DiscountPct) }
 								</span>
 							}
@@ -74,10 +74,10 @@ templ SubscriptionsContent(props SubscriptionsPageProps) {
 		<!-- Product grid -->
 		if len(props.Products) == 0 {
 			<div class="py-12 text-center">
-				<p class="text-hiri-text-secondary">No subscribable products available yet.</p>
+				<p class="text-rr-muted">No subscribable products available yet.</p>
 			</div>
 		} else {
-			<h2 class="mb-4 text-lg font-semibold text-hiri-text">Our products</h2>
+			<h2 class="mb-4 text-lg font-semibold text-rr-heading">Our products</h2>
 			<div class="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 				for _, card := range props.Products {
 					@subscriptionProductCard(card)
@@ -105,20 +105,20 @@ templ subscriptionProductCard(card SubscriptionProductCard) {
 			}
 		</div>
 		<div class="p-4">
-			<h3 class="text-sm font-medium text-hiri-text group-hover:text-hiri-teal">{ card.Product.Title }</h3>
+			<h3 class="text-sm font-medium text-rr-heading group-hover:text-rr-red">{ card.Product.Title }</h3>
 			if card.Product.Description != "" {
-				<p class="mt-1 text-xs text-hiri-text-secondary line-clamp-2">{ card.Product.Description }</p>
+				<p class="mt-1 text-xs text-rr-muted line-clamp-2">{ card.Product.Description }</p>
 			}
 			<div class="mt-3 flex items-center gap-2">
 				if card.BasePrice != nil && card.MaxDiscount > 0 {
-					<span class="text-sm text-hiri-text-secondary line-through">{ formatCents(*card.BasePrice) }</span>
-					<span class="text-sm font-semibold text-hiri-teal">{ formatCents(discountedPrice(*card.BasePrice, card.MaxDiscount)) }</span>
+					<span class="text-sm text-rr-muted line-through">{ formatCents(*card.BasePrice) }</span>
+					<span class="text-sm font-semibold text-rr-red">{ formatCents(discountedPrice(*card.BasePrice, card.MaxDiscount)) }</span>
 				} else if card.BasePrice != nil {
-					<span class="text-sm font-semibold text-hiri-text">{ formatCents(*card.BasePrice) }</span>
+					<span class="text-sm font-semibold text-rr-heading">{ formatCents(*card.BasePrice) }</span>
 				}
 			</div>
 			<div class="mt-3">
-				<span class="inline-flex w-full items-center justify-center rounded-md border border-hiri-teal px-3 py-2 text-sm font-medium text-hiri-teal group-hover:bg-hiri-teal group-hover:text-white transition-colors">
+				<span class="inline-flex w-full items-center justify-center rounded-md border border-rr-red px-3 py-2 text-sm font-medium text-rr-red group-hover:bg-rr-red group-hover:text-white transition-colors">
 					Subscribe
 				</span>
 			</div>

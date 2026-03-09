@@ -71,7 +71,7 @@ templ ProductEditContent(props ProductEditProps) {
 	<div class="mt-6" id="product-tabs">
 		<!-- Mobile dropdown -->
 		<div class="grid grid-cols-1 sm:hidden">
-			<select aria-label="Select a tab" data-tab-select class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-2 pr-8 pl-3 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal">
+			<select aria-label="Select a tab" data-tab-select class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-2 pr-8 pl-3 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red">
 				<option value="details" selected>Details</option>
 				<option value="media">Media</option>
 				<option value="variants">Variants</option>
@@ -85,7 +85,7 @@ templ ProductEditContent(props ProductEditProps) {
 		<div class="hidden sm:block">
 			<div class="border-b border-stone-200">
 				<nav aria-label="Tabs" class="-mb-px flex space-x-8">
-					<button type="button" data-tab="details" class="border-b-2 border-hiri-teal px-1 py-4 text-sm font-medium whitespace-nowrap text-hiri-teal">Details</button>
+					<button type="button" data-tab="details" class="border-b-2 border-rr-red px-1 py-4 text-sm font-medium whitespace-nowrap text-rr-red">Details</button>
 					<button type="button" data-tab="media" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-stone-500 hover:border-stone-300 hover:text-stone-700">Media</button>
 					<button type="button" data-tab="variants" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-stone-500 hover:border-stone-300 hover:text-stone-700">Variants</button>
 					<button type="button" data-tab="pricing" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-stone-500 hover:border-stone-300 hover:text-stone-700">Pricing</button>
@@ -110,7 +110,7 @@ templ ProductEditContent(props ProductEditProps) {
 	</div>
 	<script>
 		(function() {
-			var activeClass = 'border-hiri-teal text-hiri-teal';
+			var activeClass = 'border-rr-red text-rr-red';
 			var inactiveClass = 'border-transparent text-stone-500 hover:border-stone-300 hover:text-stone-700';
 
 			function switchTab(name) {
@@ -226,7 +226,7 @@ templ productPricingTab(props ProductEditProps) {
 		<p class="text-sm text-stone-500">
 			Set base and group-specific prices for this product's variants.
 			if len(props.Groups) == 0 {
-				<a href="/admin/groups" class="text-hiri-teal hover:text-hiri-teal-dark">Create customer groups</a> to enable group pricing.
+				<a href="/admin/groups" class="text-rr-red hover:text-rr-red-lt">Create customer groups</a> to enable group pricing.
 			}
 		</p>
 		if len(props.Variants) == 0 {
@@ -293,7 +293,7 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 										if vwo.PriceCents != nil {
 											value={ priceToDollars(*vwo.PriceCents) }
 										}
-										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
+										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
 								</form>
 							} else {
@@ -317,7 +317,7 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 										if cents, ok := vwo.GroupPrices[group.ID]; ok {
 											value={ priceToDollars(cents) }
 										}
-										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-hiri-teal"
+										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
 								</form>
 							}
@@ -413,7 +413,7 @@ templ OptionsPanel(product *domain.Product, options []OptionWithValues) {
 							<input type="text" id="option_name" name="name" placeholder="e.g. Roast Level" required class={ inputClasses(false) }/>
 						</div>
 					</div>
-					<button type="submit" class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
+					<button type="submit" class="rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
 						Add option
 					</button>
 				</form>
@@ -579,10 +579,10 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 						</div>
 					</div>
 					<div class="flex items-center gap-2 pb-1.5">
-						<input type="checkbox" id="variant_default" name="is_default" value="true" class="size-4 rounded border-stone-300 text-hiri-teal focus:ring-hiri-teal"/>
+						<input type="checkbox" id="variant_default" name="is_default" value="true" class="size-4 rounded border-stone-300 text-rr-red focus:ring-rr-red"/>
 						<label for="variant_default" class="text-sm font-medium text-stone-900">Default</label>
 					</div>
-					<button type="submit" class="rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
+					<button type="submit" class="rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
 						Add
 					</button>
 				</form>

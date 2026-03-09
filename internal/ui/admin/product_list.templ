@@ -30,7 +30,7 @@ templ ProductListContent(props ProductListProps) {
 			<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
 				<a
 					href="/admin/catalog/new"
-					class="block rounded-md bg-hiri-teal px-3 py-2 text-center text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+					class="block rounded-md bg-rr-red px-3 py-2 text-center text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
 				>
 					Add product
 				</a>
@@ -42,7 +42,7 @@ templ ProductListContent(props ProductListProps) {
 				<select
 					name="status"
 					onchange="this.form.submit()"
-					class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal"
+					class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 				>
 					<option value="">All statuses</option>
 					<option value="draft" selected?={ props.StatusFilter == "draft" }>Draft</option>
@@ -57,7 +57,7 @@ templ ProductListContent(props ProductListProps) {
 				<select
 					name="taxon"
 					onchange="this.form.submit()"
-					class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-hiri-teal"
+					class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 				>
 					<option value="">All categories</option>
 					for _, t := range props.Taxons {
@@ -79,7 +79,7 @@ templ ProductListContent(props ProductListProps) {
 					<h3 class="mt-2 text-sm font-semibold text-stone-900">No products</h3>
 					<p class="mt-1 text-sm text-stone-500">Get started by creating a new product.</p>
 					<div class="mt-6">
-						<a href="/admin/catalog/new" class="inline-flex items-center rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-hiri-teal-dark">
+						<a href="/admin/catalog/new" class="inline-flex items-center rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
 							Add product
 						</a>
 					</div>
@@ -102,7 +102,7 @@ templ ProductListContent(props ProductListProps) {
 							for _, p := range props.Products {
 								<tr>
 									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-										<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="font-medium text-stone-900 hover:text-hiri-teal">
+										<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="font-medium text-stone-900 hover:text-rr-red">
 											{ p.Title }
 										</a>
 									</td>
@@ -120,7 +120,7 @@ templ ProductListContent(props ProductListProps) {
 										{ p.CreatedAt.Format("Jan 2, 2006") }
 									</td>
 									<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-										<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="text-hiri-teal hover:text-hiri-teal-dark">
+										<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="text-rr-red hover:text-rr-red-lt">
 											Edit<span class="sr-only">, { p.Title }</span>
 										</a>
 									</td>

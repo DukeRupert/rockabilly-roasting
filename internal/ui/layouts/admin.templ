@@ -47,21 +47,21 @@ func staffInitials(name string) string {
 
 func navItemClasses(active bool) string {
 	if active {
-		return "group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-hiri-teal"
+		return "group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-rr-red"
 	}
-	return "group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-hiri-teal"
+	return "group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-rr-red"
 }
 
 func navIconColor(active bool) string {
 	if active {
-		return "size-6 shrink-0 text-hiri-teal"
+		return "size-6 shrink-0 text-rr-red"
 	}
-	return "size-6 shrink-0 text-stone-400 group-hover:text-hiri-teal"
+	return "size-6 shrink-0 text-stone-400 group-hover:text-rr-red"
 }
 
 templ Admin(props AdminProps) {
 	<!DOCTYPE html>
-	<html lang="en" class="h-full bg-hiri-bg">
+	<html lang="en" class="h-full bg-rr-bg">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -88,7 +88,7 @@ templ Admin(props AdminProps) {
 							</button>
 						</div>
 						<!-- Mobile sidebar content -->
-						<div class="flex grow flex-col gap-y-5 overflow-y-auto bg-hiri-surface px-6 pb-4 border-r border-hiri-border">
+						<div class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border">
 							<div class="flex h-16 shrink-0 items-center">
 								@adminLogo()
 							</div>
@@ -123,7 +123,7 @@ templ Admin(props AdminProps) {
 			</div>
 			<!-- Desktop sidebar -->
 			<div id="desktop-sidebar" class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-16 lg:flex-col transition-all duration-300">
-				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 overflow-y-auto bg-hiri-surface border-r border-hiri-border px-2 pb-4 transition-all duration-300">
+				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface border-r border-rr-border px-2 pb-4 transition-all duration-300">
 					<div class="flex h-16 shrink-0 items-center">
 						@adminSidebarToggle()
 					</div>
@@ -154,7 +154,7 @@ templ Admin(props AdminProps) {
 			<!-- Main content area -->
 			<div id="main-content-wrapper" class="lg:pl-16 transition-all duration-300 overflow-x-hidden">
 				<!-- Top bar -->
-				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-hiri-border bg-hiri-surface px-4 shadow-xs sm:gap-x-6 sm:px-6 lg:px-8">
+				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 shadow-xs sm:gap-x-6 sm:px-6 lg:px-8">
 					<button type="button" id="mobile-menu-btn" class="-m-2.5 p-2.5 text-stone-700 lg:hidden">
 						<span class="sr-only">Open sidebar</span>
 						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -170,7 +170,7 @@ templ Admin(props AdminProps) {
 							<div class="relative hidden lg:block" data-dropdown>
 								<button type="button" class="-m-1.5 flex items-center p-1.5" data-dropdown-trigger>
 									<span class="sr-only">Open user menu</span>
-									<span class="inline-flex size-8 items-center justify-center rounded-full bg-hiri-teal">
+									<span class="inline-flex size-8 items-center justify-center rounded-full bg-rr-red">
 										<span class="text-sm font-medium text-white">{ staffInitials(props.StaffName) }</span>
 									</span>
 									<span class="hidden lg:flex lg:items-center">
@@ -297,10 +297,10 @@ templ Admin(props AdminProps) {
 						});
 					});
 				// Active nav highlighting after htmx navigation
-				var activeLink = 'group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-hiri-teal';
-				var inactiveLink = 'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-hiri-teal';
-				var activeIcon = 'size-6 shrink-0 text-hiri-teal';
-				var inactiveIcon = 'size-6 shrink-0 text-stone-400 group-hover:text-hiri-teal';
+				var activeLink = 'group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-rr-red';
+				var inactiveLink = 'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-rr-red';
+				var activeIcon = 'size-6 shrink-0 text-rr-red';
+				var inactiveIcon = 'size-6 shrink-0 text-stone-400 group-hover:text-rr-red';
 
 				function updateActiveNav() {
 					var path = window.location.pathname;
@@ -356,9 +356,9 @@ templ adminLogo() {
 }
 
 templ adminSidebarToggle() {
-	<button type="button" onclick="toggleSidebar()" class="group flex w-full gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-hiri-teal transition-colors">
+	<button type="button" onclick="toggleSidebar()" class="group flex w-full gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-rr-red transition-colors">
 		<!-- Menu icon: shown when collapsed -->
-		<svg id="sidebar-menu-icon" class="size-6 shrink-0 text-stone-400 group-hover:text-hiri-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+		<svg id="sidebar-menu-icon" class="size-6 shrink-0 text-stone-400 group-hover:text-rr-red" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
 		</svg>
 		<!-- Logo mark: shown when expanded -->
@@ -373,7 +373,7 @@ templ adminSidebarToggle() {
 templ adminUserFooter(props AdminProps) {
 	<div class="relative" data-dropdown>
 		<button type="button" data-dropdown-trigger class="flex w-full items-center gap-x-4 rounded-md px-2 py-3 text-sm/6 font-semibold text-stone-900 hover:bg-stone-100">
-			<span class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-hiri-teal">
+			<span class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-rr-red">
 				<span class="text-sm font-medium text-white">{ staffInitials(props.StaffName) }</span>
 			</span>
 			<span data-sidebar-label class="hidden opacity-0 flex-1 text-left transition-opacity duration-200">

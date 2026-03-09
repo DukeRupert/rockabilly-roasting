@@ -17,7 +17,7 @@ type WholesaleListProps struct {
 
 func wholesaleFilterClasses(current, filter string) string {
 	if current == filter {
-		return "inline-flex items-center rounded-md bg-hiri-teal px-3 py-2 text-sm font-semibold text-white shadow-sm"
+		return "inline-flex items-center rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm"
 	}
 	return "inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
 }
@@ -116,10 +116,10 @@ templ WholesaleListContent(props WholesaleListProps) {
 										}
 										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
 											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
-												<button type="submit" class="relative inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-hiri-teal inset-ring-1 inset-ring-gray-300 hover:bg-green-50 focus:z-10" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
+												<button type="submit" class="relative inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-rr-red inset-ring-1 inset-ring-gray-300 hover:bg-green-50 focus:z-10" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
 											</form>
 										}
-										<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-hiri-teal hover:text-hiri-teal-dark">
+										<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
 											View
 										</a>
 									</div>

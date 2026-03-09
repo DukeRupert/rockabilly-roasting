@@ -34,10 +34,10 @@ templ ProductContent(props ProductDetailProps) {
 	<div>
 		<!-- Breadcrumb -->
 		<nav class="mb-8">
-			<ol class="flex items-center gap-2 text-sm text-hiri-text-secondary">
-				<li><a href="/catalog" class="hover:text-hiri-teal">Shop</a></li>
+			<ol class="flex items-center gap-2 text-sm text-rr-muted">
+				<li><a href="/catalog" class="hover:text-rr-red">Shop</a></li>
 				<li><span class="mx-1">/</span></li>
-				<li class="text-hiri-text">{ props.Product.Title }</li>
+				<li class="text-rr-heading">{ props.Product.Title }</li>
 			</ol>
 		</nav>
 		<!-- Product layout: 2 columns -->
@@ -77,17 +77,17 @@ templ ProductContent(props ProductDetailProps) {
 			</div>
 			<!-- Product info -->
 			<div class="mt-8 lg:mt-0">
-				<h1 class="text-3xl font-bold tracking-tight text-hiri-text">{ props.Product.Title }</h1>
+				<h1 class="text-3xl font-bold tracking-tight text-rr-heading">{ props.Product.Title }</h1>
 				<!-- Price display -->
 				if props.DefaultPrice != nil {
 					<div class="mt-3" id="price-display">
-						<span class="text-2xl font-semibold text-hiri-text" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
+						<span class="text-2xl font-semibold text-rr-heading" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
 					</div>
 				}
 				<!-- Description -->
 				if props.Product.Description != "" {
 					<div class="mt-6">
-						<p class="text-base text-hiri-text-secondary">{ props.Product.Description }</p>
+						<p class="text-base text-rr-muted">{ props.Product.Description }</p>
 					</div>
 				}
 				<!-- Options -->
@@ -95,7 +95,7 @@ templ ProductContent(props ProductDetailProps) {
 					<div class="mt-8 space-y-6">
 						for _, opt := range props.Options {
 							<div>
-								<h3 class="text-sm font-medium text-hiri-text">{ opt.Option.Name }</h3>
+								<h3 class="text-sm font-medium text-rr-heading">{ opt.Option.Name }</h3>
 								<div class="mt-2 flex flex-wrap gap-2">
 									for i, val := range opt.Values {
 										<button
@@ -119,30 +119,30 @@ templ ProductContent(props ProductDetailProps) {
 								<button
 									type="button"
 									data-mode="onetime"
-									class="purchase-mode-btn relative rounded-lg border-2 border-hiri-teal bg-hiri-teal/5 p-4 text-left transition-colors"
+									class="purchase-mode-btn relative rounded-lg border-2 border-rr-red bg-rr-red/5 p-4 text-left transition-colors"
 								>
-									<span class="block text-sm font-semibold text-hiri-text">One-Time Purchase</span>
+									<span class="block text-sm font-semibold text-rr-heading">One-Time Purchase</span>
 								</button>
 								<button
 									type="button"
 									data-mode="subscribe"
-									class="purchase-mode-btn relative rounded-lg border-2 border-hiri-border bg-white p-4 text-left transition-colors"
+									class="purchase-mode-btn relative rounded-lg border-2 border-rr-border bg-white p-4 text-left transition-colors"
 								>
-									<span class="block text-sm font-semibold text-hiri-text">Subscribe &amp; Save</span>
-									<span class="block text-xs text-hiri-teal font-medium mt-0.5">
+									<span class="block text-sm font-semibold text-rr-heading">Subscribe &amp; Save</span>
+									<span class="block text-xs text-rr-red font-medium mt-0.5">
 										{ fmt.Sprintf("Save up to %d%%", maxDiscount(props.SubscriptionPlans)) }
 									</span>
 								</button>
 							</div>
 							<!-- Subscription frequency options (hidden by default) -->
 							<div id="subscribe-options" class="hidden mt-4">
-								<p class="text-sm font-medium text-hiri-text mb-3">Delivery every</p>
+								<p class="text-sm font-medium text-rr-heading mb-3">Delivery every</p>
 								<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
 									for i, plan := range props.SubscriptionPlans {
 										<label
 											class={ "subscribe-frequency-option flex items-center justify-between rounded-lg border p-3 cursor-pointer transition-colors",
-												templ.KV("border-hiri-teal bg-hiri-teal/5", i == 0),
-												templ.KV("border-hiri-border hover:border-stone-300", i != 0) }
+												templ.KV("border-rr-red bg-rr-red/5", i == 0),
+												templ.KV("border-rr-border hover:border-stone-300", i != 0) }
 											data-plan-id={ plan.ID.String() }
 											data-discount={ fmt.Sprintf("%d", plan.DiscountPct) }
 										>
@@ -154,12 +154,12 @@ templ ProductContent(props ProductDetailProps) {
 													if i == 0 {
 														checked
 													}
-													class="size-4 border-stone-300 text-hiri-teal focus:ring-hiri-teal"
+													class="size-4 border-stone-300 text-rr-red focus:ring-rr-red"
 												/>
-												<span class="text-sm text-hiri-text">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
+												<span class="text-sm text-rr-heading">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
 											</div>
 											if plan.DiscountPct > 0 {
-												<span class="inline-flex items-center rounded-md bg-hiri-teal/10 px-2 py-0.5 text-xs font-medium text-hiri-teal">
+												<span class="inline-flex items-center rounded-md bg-rr-red/10 px-2 py-0.5 text-xs font-medium text-rr-red">
 													{ fmt.Sprintf("Save %d%%", plan.DiscountPct) }
 												</span>
 											}
@@ -180,7 +180,7 @@ templ ProductContent(props ProductDetailProps) {
 								<input type="hidden" name="quantity" value="1"/>
 								<button
 									type="submit"
-									class="w-full rounded-md bg-hiri-teal px-6 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+									class="w-full rounded-md bg-rr-red px-6 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
 								>
 									Add to Cart
 								</button>
@@ -191,7 +191,7 @@ templ ProductContent(props ProductDetailProps) {
 							<div id="subscribe-form" class="hidden mt-4">
 								<!-- Quantity selector -->
 								<div class="mb-4">
-									<label for="subscribe-quantity" class="text-sm font-medium text-hiri-text">Quantity</label>
+									<label for="subscribe-quantity" class="text-sm font-medium text-rr-heading">Quantity</label>
 									<div class="mt-1 flex items-center gap-2">
 										<button
 											type="button"
@@ -206,7 +206,7 @@ templ ProductContent(props ProductDetailProps) {
 											value="1"
 											min="1"
 											max="10"
-											class="w-14 rounded-md border border-stone-300 px-2 py-1.5 text-center text-sm font-medium text-hiri-text focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+											class="w-14 rounded-md border border-stone-300 px-2 py-1.5 text-center text-sm font-medium text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 										/>
 										<button
 											type="button"
@@ -220,11 +220,11 @@ templ ProductContent(props ProductDetailProps) {
 								<button
 									type="button"
 									id="subscribe-action"
-									class="block w-full rounded-md bg-hiri-teal px-6 py-3.5 text-center text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal"
+									class="block w-full rounded-md bg-rr-red px-6 py-3.5 text-center text-base font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
 								>
 									Subscribe
 								</button>
-								<p class="mt-2 text-center text-xs text-hiri-text-secondary">Cancel or modify anytime from your account.</p>
+								<p class="mt-2 text-center text-xs text-rr-muted">Cancel or modify anytime from your account.</p>
 							</div>
 						}
 					</div>
@@ -261,9 +261,9 @@ func maxDiscount(plans []domain.SubscriptionPlan) int {
 
 func optionPillClasses(selected bool) string {
 	if selected {
-		return "rounded-full border-2 border-hiri-teal bg-hiri-teal/5 px-4 py-2 text-sm font-medium text-hiri-teal"
+		return "rounded-full border-2 border-rr-red bg-rr-red/5 px-4 py-2 text-sm font-medium text-rr-red"
 	}
-	return "rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-hiri-teal hover:text-hiri-teal"
+	return "rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:border-rr-red hover:text-rr-red"
 }
 
 func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) string {
@@ -299,9 +299,9 @@ templ purchaseModeScript() {
 					// Update tab styles
 					document.querySelectorAll('.purchase-mode-btn').forEach(function(b) {
 						if (b.dataset.mode === mode) {
-							b.className = 'purchase-mode-btn relative rounded-lg border-2 border-hiri-teal bg-hiri-teal/5 p-4 text-left transition-colors';
+							b.className = 'purchase-mode-btn relative rounded-lg border-2 border-rr-red bg-rr-red/5 p-4 text-left transition-colors';
 						} else {
-							b.className = 'purchase-mode-btn relative rounded-lg border-2 border-hiri-border bg-white p-4 text-left transition-colors';
+							b.className = 'purchase-mode-btn relative rounded-lg border-2 border-rr-border bg-white p-4 text-left transition-colors';
 						}
 					});
 					// Toggle form visibility
@@ -374,11 +374,11 @@ templ purchaseModeScript() {
 				radio.addEventListener('change', function() {
 					// Update selected styles
 					document.querySelectorAll('.subscribe-frequency-option').forEach(function(l) {
-						l.classList.remove('border-hiri-teal', 'bg-hiri-teal/5');
-						l.classList.add('border-hiri-border');
+						l.classList.remove('border-rr-red', 'bg-rr-red/5');
+						l.classList.add('border-rr-border');
 					});
-					label.classList.remove('border-hiri-border');
-					label.classList.add('border-hiri-teal', 'bg-hiri-teal/5');
+					label.classList.remove('border-rr-border');
+					label.classList.add('border-rr-red', 'bg-rr-red/5');
 					// Update subscribe link
 					updateSubscribeLink(label.dataset.planId);
 					updatePrice();
@@ -423,10 +423,10 @@ templ purchaseModeScript() {
 				var display = document.getElementById('price-display');
 				var qtyPrefix = qty > 1 ? qty + ' × ' : '';
 				if (discount > 0) {
-					display.innerHTML = '<span class="text-lg text-hiri-text-secondary line-through">' + formatCents(baseCents) + '</span>' +
-						' <span class="text-2xl font-semibold text-hiri-teal">' + qtyPrefix + formatCents(totalCents) + '</span>';
+					display.innerHTML = '<span class="text-lg text-rr-muted line-through">' + formatCents(baseCents) + '</span>' +
+						' <span class="text-2xl font-semibold text-rr-red">' + qtyPrefix + formatCents(totalCents) + '</span>';
 				} else {
-					display.innerHTML = '<span class="text-2xl font-semibold text-hiri-text">' + qtyPrefix + formatCents(totalCents) + '</span>';
+					display.innerHTML = '<span class="text-2xl font-semibold text-rr-heading">' + qtyPrefix + formatCents(totalCents) + '</span>';
 				}
 			}
 
@@ -435,7 +435,7 @@ templ purchaseModeScript() {
 				if (!priceEl) return;
 				var baseCents = parseInt(priceEl.dataset.basePrice, 10);
 				var display = document.getElementById('price-display');
-				display.innerHTML = '<span class="text-2xl font-semibold text-hiri-text" data-base-price="' + baseCents + '">' + formatCents(baseCents) + '</span>';
+				display.innerHTML = '<span class="text-2xl font-semibold text-rr-heading" data-base-price="' + baseCents + '">' + formatCents(baseCents) + '</span>';
 			}
 
 			function formatCents(cents) {

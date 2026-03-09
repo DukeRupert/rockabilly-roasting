@@ -15,9 +15,74 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
 
-// handleStorefrontHome redirects / to /catalog.
+// handleStorefrontHome renders the landing page with featured products.
 func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/catalog", http.StatusFound)
+	ctx := r.Context()
+
+	// Fetch up to 4 active products for the featured section.
+	activeStatus := domain.ProductStatusActive
+	filter := store.ProductFilter{
+		Limit:  4,
+		Offset: 0,
+		Status: &activeStatus,
+	}
+
+	var products []domain.Product
+	var cards []storefront.ProductCard
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		products, txErr = d.CatalogService.ListProducts(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+
+		cards = make([]storefront.ProductCard, len(products))
+		for i, p := range products {
+			cards[i] = storefront.ProductCard{
+				Product:      p,
+				CurrencyCode: "USD",
+			}
+
+			media, mediaErr := d.CatalogService.ListProductMedia(ctx, tx, p.ID)
+			if mediaErr != nil {
+				return mediaErr
+			}
+			if len(media) > 0 {
+				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
+			}
+
+			variants, varErr := d.CatalogService.ListVariants(ctx, tx, p.ID)
+			if varErr != nil {
+				return varErr
+			}
+			for _, v := range variants {
+				if v.IsDefault {
+					price, priceErr := d.PricingService.GetBasePrice(ctx, tx, v.ID, "USD")
+					if priceErr == nil {
+						cards[i].BasePrice = &price.Amount
+					}
+					break
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	props := storefront.HomePageProps{
+		FeaturedProducts: cards,
+		CartCount:        d.cartItemCountFromCookie(r),
+	}
+
+	if IsHTMX(r) {
+		storefront.HomeContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	storefront.HomePage(props).Render(ctx, w) //nolint:errcheck
 }
 
 const catalogPageSize = 12

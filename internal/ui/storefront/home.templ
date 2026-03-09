@@ -1,0 +1,111 @@
+package storefront
+
+import (
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type HomePageProps struct {
+	FeaturedProducts []ProductCard
+	CartCount        int
+}
+
+templ HomeContent(props HomePageProps) {
+	<!-- Hero -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 -mt-8">
+		<div class="relative overflow-hidden bg-rr-void">
+			<div class="texture-grid absolute inset-0"></div>
+			<div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36">
+				<div class="max-w-2xl">
+					<p class="label-font text-rr-amber text-xs tracking-widest mb-4">KENNEWICK, WA &middot; EST. 2019</p>
+					<h1 class="font-display text-5xl sm:text-6xl lg:text-7xl tracking-widest text-rr-heading leading-none">
+						ROASTED FRESH<br/>TO ORDER
+					</h1>
+					<p class="mt-6 font-body text-lg text-rr-muted max-w-lg leading-relaxed">
+						Small-batch specialty coffee with bold flavor and a rebellious spirit. From our roaster to your cup.
+					</p>
+					<div class="mt-8 flex flex-wrap gap-4">
+						<a href="/catalog" class="btn label-font px-8 py-3.5 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors">
+							SHOP COFFEE
+						</a>
+						<a href="/catalog?mode=subscribe" class="btn label-font px-8 py-3.5 rounded-sm text-rr-heading text-sm border-2 border-rr-border hover:border-rr-amber transition-colors">
+							SUBSCRIBE &amp; SAVE
+						</a>
+					</div>
+				</div>
+			</div>
+			<div class="flame-stripe"></div>
+		</div>
+	</section>
+	<!-- Featured roasts -->
+	if len(props.FeaturedProducts) > 0 {
+		<section class="mt-16">
+			<div class="flex items-baseline justify-between mb-8">
+				<div>
+					<h2 class="font-display text-3xl tracking-widest text-rr-heading">POPULAR ROASTS</h2>
+					<p class="mt-1 font-body text-sm text-rr-muted">Our most-loved coffees, roasted to perfection.</p>
+				</div>
+				<a href="/catalog" class="hidden sm:inline-block label-font text-rr-amber text-xs hover:text-rr-amber-lt transition-colors">
+					VIEW ALL &rarr;
+				</a>
+			</div>
+			<div class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+				for _, card := range props.FeaturedProducts {
+					@productCard(card)
+				}
+			</div>
+			<div class="mt-6 text-center sm:hidden">
+				<a href="/catalog" class="label-font text-rr-amber text-xs hover:text-rr-amber-lt transition-colors">
+					VIEW ALL &rarr;
+				</a>
+			</div>
+		</section>
+	}
+	<!-- Subscribe CTA -->
+	<section class="mt-20">
+		<div class="relative overflow-hidden rounded-sm bg-rr-surface border border-rr-border">
+			<div class="texture-dots absolute inset-0 opacity-40"></div>
+			<div class="relative px-6 py-12 sm:px-12 sm:py-16 lg:flex lg:items-center lg:justify-between lg:px-16">
+				<div>
+					<h2 class="font-display text-3xl tracking-widest text-rr-heading sm:text-4xl">NEVER RUN OUT</h2>
+					<p class="mt-2 font-body text-rr-muted max-w-xl">
+						Subscribe and get fresh coffee delivered on your schedule. Save up to 10% on every bag and modify or cancel anytime.
+					</p>
+				</div>
+				<div class="mt-6 lg:mt-0 lg:flex-shrink-0">
+					<a href="/catalog?mode=subscribe" class="btn label-font px-8 py-3.5 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors">
+						START A SUBSCRIPTION
+					</a>
+				</div>
+			</div>
+		</div>
+	</section>
+	<!-- Testimonials -->
+	<section class="mt-20 mb-8">
+		<h2 class="font-display text-3xl tracking-widest text-rr-heading text-center mb-10">WHAT PEOPLE ARE SAYING</h2>
+		<div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
+			@testimonial("Kari Anne", "Best coffee I've ever had. The freshness is unreal — you can tell it was just roasted. I'll never go back to store-bought.")
+			@testimonial("Tristen", "Switched to a subscription and it's been perfect. Great coffee shows up right when I need it, every time.")
+			@testimonial("John", "The Chop Top blend is incredible. Bold, smooth, and the customer service is top-notch. Highly recommend.")
+		</div>
+	</section>
+}
+
+templ testimonial(name, quote string) {
+	<div class="rounded-sm bg-rr-surface border border-rr-border p-6">
+		<svg class="size-6 text-rr-amber mb-3" viewBox="0 0 24 24" fill="currentColor">
+			<path d="M11.3 2.7c-.4-.7-1.4-.7-1.8 0L6.6 7.5l-5.3.8c-.8.1-1.1 1.1-.5 1.6l3.8 3.7-.9 5.3c-.1.8.7 1.4 1.4 1l4.7-2.5 4.7 2.5c.7.4 1.5-.2 1.4-1l-.9-5.3 3.8-3.7c.6-.6.3-1.5-.5-1.6l-5.3-.8L11.3 2.7z"></path>
+		</svg>
+		<p class="font-serif text-rr-body italic leading-relaxed mb-4">"{ quote }"</p>
+		<p class="label-font text-rr-muted text-xs">&mdash; { name }</p>
+	</div>
+}
+
+templ HomePage(props HomePageProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Fresh Roasted Coffee",
+		Description: "Small-batch specialty coffee roasted fresh to order in Kennewick, WA.",
+		CartCount:   props.CartCount,
+	}) {
+		@HomeContent(props)
+	}
+}

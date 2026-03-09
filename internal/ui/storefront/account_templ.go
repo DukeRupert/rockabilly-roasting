@@ -345,7 +345,7 @@ func AccountSettingsContent(props AccountSettingsProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if props.Success != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"mb-6 rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"mb-6 rounded-sm bg-green-400/10 border border-green-400/20 px-4 py-3 text-sm font-body text-green-400\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -364,7 +364,7 @@ func AccountSettingsContent(props AccountSettingsProps) templ.Component {
 				}
 			}
 			if props.Error != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"mb-6 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"mb-6 rounded-sm bg-rr-red/10 border border-rr-red/20 px-4 py-3 text-sm font-body text-rr-red-lt\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -709,7 +709,7 @@ func orderStatusBadge(status domain.OrderStatus, fulfillment domain.FulfillmentS
 		}
 		ctx = templ.ClearChildren(ctx)
 		if fulfillment == domain.FulfillmentStatusDelivered {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-green-400 bg-green-400/10 ring-1 ring-inset ring-green-400/20\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -727,7 +727,7 @@ func orderStatusBadge(status domain.OrderStatus, fulfillment domain.FulfillmentS
 				return templ_7745c5c3_Err
 			}
 		} else if fulfillment == domain.FulfillmentStatusShipped {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<span class=\"inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<span class=\"inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-blue-400 bg-blue-400/10 ring-1 ring-inset ring-blue-400/20\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -745,7 +745,7 @@ func orderStatusBadge(status domain.OrderStatus, fulfillment domain.FulfillmentS
 				return templ_7745c5c3_Err
 			}
 		} else if status == domain.OrderStatusCancelled || status == domain.OrderStatusRefunded {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<span class=\"inline-flex items-center rounded-full bg-rr-bg px-2 py-1 text-xs font-medium text-rr-body ring-1 ring-inset ring-stone-500/10\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<span class=\"inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-rr-muted bg-rr-surface ring-1 ring-inset ring-rr-border\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -763,7 +763,7 @@ func orderStatusBadge(status domain.OrderStatus, fulfillment domain.FulfillmentS
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<span class=\"inline-flex items-center rounded-full bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<span class=\"inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-rr-amber bg-rr-amber/10 ring-1 ring-inset ring-rr-amber/20\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -862,7 +862,7 @@ func AccountOrderShowContent(props AccountOrderShowProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</div><!-- Line items --><div class=\"rounded-lg border border-rr-border overflow-hidden mb-6\"><table class=\"min-w-full divide-y divide-stone-200\"><thead class=\"bg-rr-bg\"><tr><th class=\"px-4 py-3 text-left text-xs font-medium text-rr-muted uppercase\">Item</th><th class=\"px-4 py-3 text-right text-xs font-medium text-rr-muted uppercase\">Qty</th><th class=\"px-4 py-3 text-right text-xs font-medium text-rr-muted uppercase\">Price</th><th class=\"px-4 py-3 text-right text-xs font-medium text-rr-muted uppercase\">Total</th></tr></thead> <tbody class=\"divide-y divide-stone-200\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "</div><!-- Line items --><div class=\"rounded-lg border border-rr-border overflow-hidden mb-6\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-bg\"><tr><th class=\"px-4 py-3 text-left text-xs font-medium text-rr-muted uppercase\">Item</th><th class=\"px-4 py-3 text-right text-xs font-medium text-rr-muted uppercase\">Qty</th><th class=\"px-4 py-3 text-right text-xs font-medium text-rr-muted uppercase\">Price</th><th class=\"px-4 py-3 text-right text-xs font-medium text-rr-muted uppercase\">Total</th></tr></thead> <tbody class=\"divide-y divide-rr-border\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1213,15 +1213,15 @@ type AccountSubscriptionsProps struct {
 func subscriptionStatusBadgeClass(status domain.SubscriptionStatus) string {
 	switch status {
 	case domain.SubscriptionStatusActive:
-		return "bg-green-50 text-green-700 ring-green-600/20"
+		return "bg-green-400/10 text-green-400 ring-green-400/20"
 	case domain.SubscriptionStatusPaused:
-		return "bg-yellow-50 text-yellow-800 ring-yellow-600/20"
+		return "bg-rr-amber/10 text-rr-amber ring-rr-amber/20"
 	case domain.SubscriptionStatusCancelled:
-		return "bg-rr-bg text-rr-body ring-stone-500/10"
+		return "bg-rr-surface text-rr-muted ring-rr-border"
 	case domain.SubscriptionStatusPastDue:
-		return "bg-red-50 text-red-700 ring-red-600/20"
+		return "bg-rr-red/10 text-rr-red-lt ring-rr-red/20"
 	default:
-		return "bg-rr-bg text-rr-body ring-stone-500/10"
+		return "bg-rr-surface text-rr-muted ring-rr-border"
 	}
 }
 
@@ -1403,7 +1403,7 @@ func AccountSubscriptionsContent(props AccountSubscriptionsProps) templ.Componen
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "\"><button type=\"submit\" class=\"rounded-md bg-yellow-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-yellow-600\">Yes, pause</button></form><button x-on:click=\"confirming = ''\" class=\"text-sm text-rr-muted hover:text-rr-body\">Cancel</button></div><button x-show=\"confirming !== 'cancel'\" x-on:click=\"confirming = 'cancel'\" class=\"rounded-md border border-red-300 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50\">Cancel</button><div x-show=\"confirming === 'cancel'\" x-cloak class=\"flex items-center gap-2\"><span class=\"text-sm text-rr-body\">Cancel this subscription?</span><form method=\"POST\" action=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "\"><button type=\"submit\" class=\"btn rounded-sm bg-rr-amber px-3 py-1.5 text-sm font-medium text-white hover:bg-rr-amber-lt\">Yes, pause</button></form><button x-on:click=\"confirming = ''\" class=\"text-sm text-rr-muted hover:text-rr-body\">Cancel</button></div><button x-show=\"confirming !== 'cancel'\" x-on:click=\"confirming = 'cancel'\" class=\"btn rounded-sm border border-rr-red px-3 py-1.5 text-sm font-medium text-rr-red hover:bg-rr-red/10\">Cancel</button><div x-show=\"confirming === 'cancel'\" x-cloak class=\"flex items-center gap-2\"><span class=\"text-sm text-rr-body\">Cancel this subscription?</span><form method=\"POST\" action=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -1416,7 +1416,7 @@ func AccountSubscriptionsContent(props AccountSubscriptionsProps) templ.Componen
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "\"><button type=\"submit\" class=\"rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700\">Yes, cancel</button></form><button x-on:click=\"confirming = ''\" class=\"text-sm text-rr-muted hover:text-rr-body\">Never mind</button></div></div>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "\"><button type=\"submit\" class=\"btn rounded-sm bg-rr-red px-3 py-1.5 text-sm font-medium text-white hover:bg-rr-red-lt\">Yes, cancel</button></form><button x-on:click=\"confirming = ''\" class=\"text-sm text-rr-muted hover:text-rr-body\">Never mind</button></div></div>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -1729,7 +1729,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "\" x-data x-on:submit=\"if (!confirm('Delete this address?')) $event.preventDefault()\"><button type=\"submit\" class=\"text-sm text-red-600 hover:underline\">Delete</button></form>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "\" x-data x-on:submit=\"if (!confirm('Delete this address?')) $event.preventDefault()\"><button type=\"submit\" class=\"text-sm text-rr-red hover:text-rr-red-lt\">Delete</button></form>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}

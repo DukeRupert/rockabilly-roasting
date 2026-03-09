@@ -5,15 +5,15 @@ import "github.com/dukerupert/hiri/internal/ui/layouts"
 templ DashboardContent() {
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
-			<h1 class="text-base/7 font-semibold text-stone-900">Dashboard</h1>
-			<p class="mt-1 text-sm text-stone-500">Welcome to the Hiri admin panel</p>
+			<h1 class="text-base/7 font-semibold text-rr-heading">Dashboard</h1>
+			<p class="mt-1 text-sm text-rr-muted">Welcome to the Hiri admin panel</p>
 		</div>
 	</div>
 	<!-- Dev testing -->
-	<div class="mt-8 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-		<h2 class="text-sm font-semibold text-yellow-800">Dev Testing</h2>
+	<div class="mt-8 rounded-sm border border-rr-amber/30 bg-rr-amber/5 p-4">
+		<h2 class="text-sm font-semibold text-rr-amber-dark">Dev Testing</h2>
 		<div class="mt-2 flex gap-3">
-			<a href="/admin/dev/error" class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500">
+			<a href="/admin/dev/error" class="inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
 				Trigger Server Error
 			</a>
 		</div>

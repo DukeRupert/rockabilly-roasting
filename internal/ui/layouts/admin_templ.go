@@ -55,16 +55,16 @@ func staffInitials(name string) string {
 
 func navItemClasses(active bool) string {
 	if active {
-		return "group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-rr-red"
+		return "group flex gap-x-3 rounded-sm bg-rr-raised p-2 text-sm/6 font-semibold text-rr-red"
 	}
-	return "group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-rr-red"
+	return "group flex gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red"
 }
 
 func navIconColor(active bool) string {
 	if active {
 		return "size-6 shrink-0 text-rr-red"
 	}
-	return "size-6 shrink-0 text-stone-400 group-hover:text-rr-red"
+	return "size-6 shrink-0 text-rr-muted group-hover:text-rr-red"
 }
 
 func Admin(props AdminProps) templ.Component {
@@ -88,7 +88,7 @@ func Admin(props AdminProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full\" style=\"background:#FAF9F7;\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full\" style=\"background:#F9F6F1;\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -101,7 +101,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Hiri Admin</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/hiri-favicon.svg\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/alpine.min.js\"></script><script src=\"/static/js/htmx.min.js\"></script><style>\n\t\t\t\t/* Admin stays light — override dark storefront tokens */\n\t\t\t\t:root {\n\t\t\t\t\t--color-rr-bg: #FAF9F7;\n\t\t\t\t\t--color-rr-surface: #FFFFFF;\n\t\t\t\t\t--color-rr-raised: #F5F0E6;\n\t\t\t\t\t--color-rr-border: #E5E2DE;\n\t\t\t\t\t--color-rr-muted: #78716C;\n\t\t\t\t\t--color-rr-body: #3A3028;\n\t\t\t\t\t--color-rr-heading: #1C1917;\n\t\t\t\t}\n\t\t\t</style></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-stone-900/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border\"><div class=\"flex h-16 shrink-0 items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Hiri Admin</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/hiri-favicon.svg\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/alpine.min.js\"></script><script src=\"/static/js/htmx.min.js\"></script><style>\n\t\t\t\t/* Admin light mode — kraft paper palette from brand guide v3 */\n\t\t\t\t:root {\n\t\t\t\t\t--color-rr-bg: #F9F6F1 !important;      /* warm concrete */\n\t\t\t\t\t--color-rr-surface: #EDE5D8 !important;  /* kraft paper */\n\t\t\t\t\t--color-rr-raised: #E4DAC8 !important;   /* nav, raised */\n\t\t\t\t\t--color-rr-border: #9A8C7C !important;   /* visible borders */\n\t\t\t\t\t--color-rr-muted: #7A6E60 !important;    /* muted text */\n\t\t\t\t\t--color-rr-body: #3A3028 !important;     /* body text */\n\t\t\t\t\t--color-rr-heading: #1C1610 !important;  /* near-black warm */\n\t\t\t\t}\n\t\t\t\tbody { font-family: 'Barlow', sans-serif; }\n\t\t\t</style></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-rr-heading/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border\"><div class=\"flex h-16 shrink-0 items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -130,7 +130,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var4 templ.SafeURL
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 113, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 117, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -160,7 +160,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 115, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 119, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -238,7 +238,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var10 templ.SafeURL
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 148, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 152, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -272,7 +272,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 150, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 154, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -313,33 +313,33 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<span data-sidebar-label class=\"hidden opacity-0 transition-opacity duration-200\">Settings</span></a></li></ul></li></ul></nav></div></div><!-- Main content area --><div id=\"main-content-wrapper\" class=\"lg:pl-16 transition-all duration-300 overflow-x-hidden\"><!-- Top bar --><div class=\"sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 shadow-xs sm:gap-x-6 sm:px-6 lg:px-8\"><button type=\"button\" id=\"mobile-menu-btn\" class=\"-m-2.5 p-2.5 text-stone-700 lg:hidden\"><span class=\"sr-only\">Open sidebar</span> <svg class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg></button><!-- Separator --><div class=\"h-6 w-px bg-stone-200 lg:hidden\" aria-hidden=\"true\"></div><div class=\"flex flex-1 gap-x-4 self-stretch lg:gap-x-6\"><div class=\"flex-1\"></div><div class=\"flex items-center gap-x-4 lg:gap-x-6\"><!-- Desktop user dropdown --><div class=\"relative hidden lg:block\" data-dropdown><button type=\"button\" class=\"-m-1.5 flex items-center p-1.5\" data-dropdown-trigger><span class=\"sr-only\">Open user menu</span> <span class=\"inline-flex size-8 items-center justify-center rounded-full bg-rr-red\"><span class=\"text-sm font-medium text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<span data-sidebar-label class=\"hidden opacity-0 transition-opacity duration-200\">Settings</span></a></li></ul></li></ul></nav></div></div><!-- Main content area --><div id=\"main-content-wrapper\" class=\"lg:pl-16 transition-all duration-300 overflow-x-hidden\"><!-- Top bar --><div class=\"sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 shadow-xs sm:gap-x-6 sm:px-6 lg:px-8\"><button type=\"button\" id=\"mobile-menu-btn\" class=\"-m-2.5 p-2.5 text-rr-body lg:hidden\"><span class=\"sr-only\">Open sidebar</span> <svg class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg></button><!-- Separator --><div class=\"h-6 w-px bg-rr-border lg:hidden\" aria-hidden=\"true\"></div><div class=\"flex flex-1 gap-x-4 self-stretch lg:gap-x-6\"><div class=\"flex-1\"></div><div class=\"flex items-center gap-x-4 lg:gap-x-6\"><!-- Desktop user dropdown --><div class=\"relative hidden lg:block\" data-dropdown><button type=\"button\" class=\"-m-1.5 flex items-center p-1.5\" data-dropdown-trigger><span class=\"sr-only\">Open user menu</span> <span class=\"inline-flex size-8 items-center justify-center rounded-full bg-rr-red\"><span class=\"text-sm font-medium text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 186, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 190, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span></span> <span class=\"hidden lg:flex lg:items-center\"><span class=\"ml-4 text-sm/6 font-semibold text-stone-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span></span> <span class=\"hidden lg:flex lg:items-center\"><span class=\"ml-4 text-sm/6 font-semibold text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 189, Col: 85}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 193, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span> <svg class=\"ml-2 size-5 text-stone-400\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></span></button><div data-dropdown-menu class=\"hidden absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-stone-900/5\"><a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50\">Settings</a><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50\">Sign out</button></form></div></div></div></div></div><main class=\"py-10\"><div id=\"main-content\" class=\"px-4 sm:px-6 lg:px-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span> <svg class=\"ml-2 size-5 text-rr-muted\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></span></button><div data-dropdown-menu class=\"hidden absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border\"><a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Settings</a><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div></div></div></div><div class=\"flame-stripe\"></div><main class=\"py-10\"><div id=\"main-content\" class=\"px-4 sm:px-6 lg:px-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -347,7 +347,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"assertive\"></div></div><script>\n\t\t\t\t// Desktop sidebar toggle\n\t\t\t\tfunction toggleSidebar() {\n\t\t\t\t\tvar sb = document.getElementById('desktop-sidebar');\n\t\t\t\t\tvar inner = document.getElementById('desktop-sidebar-inner');\n\t\t\t\t\tvar wrapper = document.getElementById('main-content-wrapper');\n\t\t\t\t\tvar labels = document.querySelectorAll('[data-sidebar-label]');\n\t\t\t\t\tvar menuIcon = document.getElementById('sidebar-menu-icon');\n\t\t\t\t\tvar logoIcon = document.getElementById('sidebar-logo-icon');\n\t\t\t\t\tvar expanded = sb.classList.contains('lg:w-72');\n\n\t\t\t\t\tif (expanded) {\n\t\t\t\t\t\t// Collapse\n\t\t\t\t\t\tsb.classList.remove('lg:w-72');\n\t\t\t\t\t\tsb.classList.add('lg:w-16');\n\t\t\t\t\t\tinner.classList.remove('px-6');\n\t\t\t\t\t\tinner.classList.add('px-2');\n\t\t\t\t\t\twrapper.classList.remove('lg:pl-72');\n\t\t\t\t\t\twrapper.classList.add('lg:pl-16');\n\t\t\t\t\t\tmenuIcon.classList.remove('hidden');\n\t\t\t\t\t\tlogoIcon.classList.add('hidden');\n\t\t\t\t\t\tlabels.forEach(function(el) {\n\t\t\t\t\t\t\tel.classList.add('opacity-0');\n\t\t\t\t\t\t\tsetTimeout(function() { el.classList.add('hidden'); }, 200);\n\t\t\t\t\t\t});\n\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'true');\n\t\t\t\t\t} else {\n\t\t\t\t\t\t// Expand\n\t\t\t\t\t\tsb.classList.remove('lg:w-16');\n\t\t\t\t\t\tsb.classList.add('lg:w-72');\n\t\t\t\t\t\tinner.classList.remove('px-2');\n\t\t\t\t\t\tinner.classList.add('px-6');\n\t\t\t\t\t\twrapper.classList.remove('lg:pl-16');\n\t\t\t\t\t\twrapper.classList.add('lg:pl-72');\n\t\t\t\t\t\tmenuIcon.classList.add('hidden');\n\t\t\t\t\t\tlogoIcon.classList.remove('hidden');\n\t\t\t\t\t\tlabels.forEach(function(el) {\n\t\t\t\t\t\t\tel.classList.remove('hidden');\n\t\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\t\tel.classList.remove('opacity-0');\n\t\t\t\t\t\t\t\tel.classList.add('opacity-100');\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t});\n\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'false');\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t(function() {\n\t\t\t\t\t// Restore sidebar state from localStorage\n\t\t\t\t\tvar collapsed = localStorage.getItem('sidebar-collapsed');\n\t\t\t\t\tif (collapsed === 'false') {\n\t\t\t\t\t\ttoggleSidebar(); // expand from default collapsed\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile sidebar\n\t\t\t\t\tvar sidebar = document.getElementById('mobile-sidebar');\n\t\t\t\t\tvar openBtn = document.getElementById('mobile-menu-btn');\n\t\t\t\t\tvar closeBtn = document.getElementById('mobile-sidebar-close');\n\t\t\t\t\tvar backdrop = document.getElementById('mobile-sidebar-backdrop');\n\n\t\t\t\t\tfunction openSidebar() {\n\t\t\t\t\t\tsidebar.classList.remove('hidden');\n\t\t\t\t\t}\n\t\t\t\t\tfunction closeSidebar() {\n\t\t\t\t\t\tsidebar.classList.add('hidden');\n\t\t\t\t\t}\n\n\t\t\t\t\tif (openBtn) openBtn.addEventListener('click', openSidebar);\n\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', closeSidebar);\n\t\t\t\t\tif (backdrop) backdrop.addEventListener('click', closeSidebar);\n\n\t\t\t\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\t\t\t\tif (e.key === 'Escape') closeSidebar();\n\t\t\t\t\t});\n\n\t\t\t\t\t// Dropdown menus\n\t\t\t\t\tdocument.querySelectorAll('[data-dropdown]').forEach(function(dropdown) {\n\t\t\t\t\t\tvar trigger = dropdown.querySelector('[data-dropdown-trigger]');\n\t\t\t\t\t\tvar menu = dropdown.querySelector('[data-dropdown-menu]');\n\n\t\t\t\t\t\tif (trigger && menu) {\n\t\t\t\t\t\t\ttrigger.addEventListener('click', function(e) {\n\t\t\t\t\t\t\t\te.stopPropagation();\n\t\t\t\t\t\t\t\tvar isOpen = !menu.classList.contains('hidden');\n\t\t\t\t\t\t\t\t// Close all other dropdowns\n\t\t\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\tif (!isOpen) {\n\t\t\t\t\t\t\t\t\tmenu.classList.remove('hidden');\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\n\t\t\t\t\tdocument.addEventListener('click', function() {\n\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t// Active nav highlighting after htmx navigation\n\t\t\t\tvar activeLink = 'group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-rr-red';\n\t\t\t\tvar inactiveLink = 'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-rr-red';\n\t\t\t\tvar activeIcon = 'size-6 shrink-0 text-rr-red';\n\t\t\t\tvar inactiveIcon = 'size-6 shrink-0 text-stone-400 group-hover:text-rr-red';\n\n\t\t\t\tfunction updateActiveNav() {\n\t\t\t\t\tvar path = window.location.pathname;\n\t\t\t\t\tdocument.querySelectorAll('nav a[href^=\"/admin\"]').forEach(function(a) {\n\t\t\t\t\t\tvar href = a.getAttribute('href');\n\t\t\t\t\t\tvar isActive = (href === '/admin' && path === '/admin') ||\n\t\t\t\t\t\t\t(href !== '/admin' && path.startsWith(href));\n\t\t\t\t\t\ta.className = isActive ? activeLink : inactiveLink;\n\t\t\t\t\t\tvar icon = a.querySelector('svg');\n\t\t\t\t\t\tif (icon) icon.className = isActive ? activeIcon : inactiveIcon;\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:afterSettle', updateActiveNav);\n\n\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t// Force initial off-screen state, then slide in on next frame\n\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t});\n\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\tvar btn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\tif (btn) btn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"assertive\"></div></div><script>\n\t\t\t\t// Desktop sidebar toggle\n\t\t\t\tfunction toggleSidebar() {\n\t\t\t\t\tvar sb = document.getElementById('desktop-sidebar');\n\t\t\t\t\tvar inner = document.getElementById('desktop-sidebar-inner');\n\t\t\t\t\tvar wrapper = document.getElementById('main-content-wrapper');\n\t\t\t\t\tvar labels = document.querySelectorAll('[data-sidebar-label]');\n\t\t\t\t\tvar menuIcon = document.getElementById('sidebar-menu-icon');\n\t\t\t\t\tvar logoIcon = document.getElementById('sidebar-logo-icon');\n\t\t\t\t\tvar expanded = sb.classList.contains('lg:w-72');\n\n\t\t\t\t\tif (expanded) {\n\t\t\t\t\t\t// Collapse\n\t\t\t\t\t\tsb.classList.remove('lg:w-72');\n\t\t\t\t\t\tsb.classList.add('lg:w-16');\n\t\t\t\t\t\tinner.classList.remove('px-6');\n\t\t\t\t\t\tinner.classList.add('px-2');\n\t\t\t\t\t\twrapper.classList.remove('lg:pl-72');\n\t\t\t\t\t\twrapper.classList.add('lg:pl-16');\n\t\t\t\t\t\tmenuIcon.classList.remove('hidden');\n\t\t\t\t\t\tlogoIcon.classList.add('hidden');\n\t\t\t\t\t\tlabels.forEach(function(el) {\n\t\t\t\t\t\t\tel.classList.add('opacity-0');\n\t\t\t\t\t\t\tsetTimeout(function() { el.classList.add('hidden'); }, 200);\n\t\t\t\t\t\t});\n\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'true');\n\t\t\t\t\t} else {\n\t\t\t\t\t\t// Expand\n\t\t\t\t\t\tsb.classList.remove('lg:w-16');\n\t\t\t\t\t\tsb.classList.add('lg:w-72');\n\t\t\t\t\t\tinner.classList.remove('px-2');\n\t\t\t\t\t\tinner.classList.add('px-6');\n\t\t\t\t\t\twrapper.classList.remove('lg:pl-16');\n\t\t\t\t\t\twrapper.classList.add('lg:pl-72');\n\t\t\t\t\t\tmenuIcon.classList.add('hidden');\n\t\t\t\t\t\tlogoIcon.classList.remove('hidden');\n\t\t\t\t\t\tlabels.forEach(function(el) {\n\t\t\t\t\t\t\tel.classList.remove('hidden');\n\t\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\t\tel.classList.remove('opacity-0');\n\t\t\t\t\t\t\t\tel.classList.add('opacity-100');\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t});\n\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'false');\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t(function() {\n\t\t\t\t\t// Restore sidebar state from localStorage\n\t\t\t\t\tvar collapsed = localStorage.getItem('sidebar-collapsed');\n\t\t\t\t\tif (collapsed === 'false') {\n\t\t\t\t\t\ttoggleSidebar(); // expand from default collapsed\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile sidebar\n\t\t\t\t\tvar sidebar = document.getElementById('mobile-sidebar');\n\t\t\t\t\tvar openBtn = document.getElementById('mobile-menu-btn');\n\t\t\t\t\tvar closeBtn = document.getElementById('mobile-sidebar-close');\n\t\t\t\t\tvar backdrop = document.getElementById('mobile-sidebar-backdrop');\n\n\t\t\t\t\tfunction openSidebar() {\n\t\t\t\t\t\tsidebar.classList.remove('hidden');\n\t\t\t\t\t}\n\t\t\t\t\tfunction closeSidebar() {\n\t\t\t\t\t\tsidebar.classList.add('hidden');\n\t\t\t\t\t}\n\n\t\t\t\t\tif (openBtn) openBtn.addEventListener('click', openSidebar);\n\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', closeSidebar);\n\t\t\t\t\tif (backdrop) backdrop.addEventListener('click', closeSidebar);\n\n\t\t\t\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\t\t\t\tif (e.key === 'Escape') closeSidebar();\n\t\t\t\t\t});\n\n\t\t\t\t\t// Dropdown menus\n\t\t\t\t\tdocument.querySelectorAll('[data-dropdown]').forEach(function(dropdown) {\n\t\t\t\t\t\tvar trigger = dropdown.querySelector('[data-dropdown-trigger]');\n\t\t\t\t\t\tvar menu = dropdown.querySelector('[data-dropdown-menu]');\n\n\t\t\t\t\t\tif (trigger && menu) {\n\t\t\t\t\t\t\ttrigger.addEventListener('click', function(e) {\n\t\t\t\t\t\t\t\te.stopPropagation();\n\t\t\t\t\t\t\t\tvar isOpen = !menu.classList.contains('hidden');\n\t\t\t\t\t\t\t\t// Close all other dropdowns\n\t\t\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\tif (!isOpen) {\n\t\t\t\t\t\t\t\t\tmenu.classList.remove('hidden');\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\n\t\t\t\t\tdocument.addEventListener('click', function() {\n\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t// Active nav highlighting after htmx navigation\n\t\t\t\tvar activeLink = 'group flex gap-x-3 rounded-sm bg-rr-raised p-2 text-sm/6 font-semibold text-rr-red';\n\t\t\t\tvar inactiveLink = 'group flex gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red';\n\t\t\t\tvar activeIcon = 'size-6 shrink-0 text-rr-red';\n\t\t\t\tvar inactiveIcon = 'size-6 shrink-0 text-rr-muted group-hover:text-rr-red';\n\n\t\t\t\tfunction updateActiveNav() {\n\t\t\t\t\tvar path = window.location.pathname;\n\t\t\t\t\tdocument.querySelectorAll('nav a[href^=\"/admin\"]').forEach(function(a) {\n\t\t\t\t\t\tvar href = a.getAttribute('href');\n\t\t\t\t\t\tvar isActive = (href === '/admin' && path === '/admin') ||\n\t\t\t\t\t\t\t(href !== '/admin' && path.startsWith(href));\n\t\t\t\t\t\ta.className = isActive ? activeLink : inactiveLink;\n\t\t\t\t\t\tvar icon = a.querySelector('svg');\n\t\t\t\t\t\tif (icon) icon.className = isActive ? activeIcon : inactiveIcon;\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:afterSettle', updateActiveNav);\n\n\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t// Force initial off-screen state, then slide in on next frame\n\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t});\n\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\tvar btn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\tif (btn) btn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -376,7 +376,7 @@ func adminLogo() templ.Component {
 			templ_7745c5c3_Var17 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<a href=\"/admin\" class=\"flex items-center gap-2\"><svg width=\"32\" height=\"25\" viewBox=\"0 0 56 44\" fill=\"none\"><path d=\"M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z\" fill=\"#2D7A7A\" opacity=\"0.35\"></path> <path d=\"M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z\" fill=\"#2D7A7A\"></path></svg> <span class=\"text-lg font-semibold tracking-tight text-stone-900\">hiri</span></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<a href=\"/admin\" class=\"flex items-center gap-2\"><svg width=\"32\" height=\"25\" viewBox=\"0 0 56 44\" fill=\"none\"><path d=\"M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z\" fill=\"#2D7A7A\" opacity=\"0.35\"></path> <path d=\"M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z\" fill=\"#2D7A7A\"></path></svg> <span class=\"text-lg font-semibold tracking-tight text-rr-heading\">hiri</span></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -405,7 +405,7 @@ func adminSidebarToggle() templ.Component {
 			templ_7745c5c3_Var18 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<button type=\"button\" onclick=\"toggleSidebar()\" class=\"group flex w-full gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-rr-red transition-colors\"><!-- Menu icon: shown when collapsed --><svg id=\"sidebar-menu-icon\" class=\"size-6 shrink-0 text-stone-400 group-hover:text-rr-red\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg><!-- Logo mark: shown when expanded --><svg id=\"sidebar-logo-icon\" class=\"hidden size-6 shrink-0\" viewBox=\"0 0 56 44\" fill=\"none\"><path d=\"M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z\" fill=\"#2D7A7A\" opacity=\"0.35\"></path> <path d=\"M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z\" fill=\"#2D7A7A\"></path></svg> <span data-sidebar-label class=\"hidden opacity-0 text-lg font-semibold tracking-tight text-stone-900 transition-opacity duration-200\">hiri</span></button>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<button type=\"button\" onclick=\"toggleSidebar()\" class=\"group flex w-full gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors\"><!-- Menu icon: shown when collapsed --><svg id=\"sidebar-menu-icon\" class=\"size-6 shrink-0 text-rr-muted group-hover:text-rr-red\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg><!-- Logo mark: shown when expanded --><svg id=\"sidebar-logo-icon\" class=\"hidden size-6 shrink-0\" viewBox=\"0 0 56 44\" fill=\"none\"><path d=\"M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z\" fill=\"#2D7A7A\" opacity=\"0.35\"></path> <path d=\"M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z\" fill=\"#2D7A7A\"></path></svg> <span data-sidebar-label class=\"hidden opacity-0 text-lg font-semibold tracking-tight text-rr-heading transition-opacity duration-200\">hiri</span></button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -434,46 +434,46 @@ func adminUserFooter(props AdminProps) templ.Component {
 			templ_7745c5c3_Var19 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"relative\" data-dropdown><button type=\"button\" data-dropdown-trigger class=\"flex w-full items-center gap-x-4 rounded-md px-2 py-3 text-sm/6 font-semibold text-stone-900 hover:bg-stone-100\"><span class=\"inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-rr-red\"><span class=\"text-sm font-medium text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"relative\" data-dropdown><button type=\"button\" data-dropdown-trigger class=\"flex w-full items-center gap-x-4 rounded-sm px-2 py-3 text-sm/6 font-semibold text-rr-heading hover:bg-rr-raised\"><span class=\"inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-rr-red\"><span class=\"text-sm font-medium text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 389, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 394, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</span></span> <span data-sidebar-label class=\"hidden opacity-0 flex-1 text-left transition-opacity duration-200\"><span class=\"block text-sm font-semibold text-stone-900\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</span></span> <span data-sidebar-label class=\"hidden opacity-0 flex-1 text-left transition-opacity duration-200\"><span class=\"block text-sm font-semibold text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 392, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 397, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</span> <span class=\"block text-xs text-stone-500\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</span> <span class=\"block text-xs text-rr-muted\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 393, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 398, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</span></span> <svg data-sidebar-label class=\"hidden opacity-0 size-5 text-stone-400 transition-opacity duration-200\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z\" clip-rule=\"evenodd\"></path></svg></button><div data-dropdown-menu class=\"hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-md bg-white py-2 shadow-lg ring-1 ring-stone-900/5\"><a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50\">Settings</a><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50\">Sign out</button></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</span></span> <svg data-sidebar-label class=\"hidden opacity-0 size-5 text-rr-muted transition-opacity duration-200\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z\" clip-rule=\"evenodd\"></path></svg></button><div data-dropdown-menu class=\"hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border\"><a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Settings</a><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

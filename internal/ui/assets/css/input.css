@@ -6,7 +6,7 @@
 @source "../../storefront/**/*.templ";
 @source "../../../../../ui/checkout/src/**/*.svelte";
 
-@theme inline {
+@theme {
 	/* Rockabilly Roasting — Brand Colors (invariant) */
 	--color-rr-red: #B82018;
 	--color-rr-red-lt: #D42820;

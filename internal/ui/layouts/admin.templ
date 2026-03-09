@@ -47,47 +47,51 @@ func staffInitials(name string) string {
 
 func navItemClasses(active bool) string {
 	if active {
-		return "group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-rr-red"
+		return "group flex gap-x-3 rounded-sm bg-rr-raised p-2 text-sm/6 font-semibold text-rr-red"
 	}
-	return "group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-rr-red"
+	return "group flex gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red"
 }
 
 func navIconColor(active bool) string {
 	if active {
 		return "size-6 shrink-0 text-rr-red"
 	}
-	return "size-6 shrink-0 text-stone-400 group-hover:text-rr-red"
+	return "size-6 shrink-0 text-rr-muted group-hover:text-rr-red"
 }
 
 templ Admin(props AdminProps) {
 	<!DOCTYPE html>
-	<html lang="en" class="h-full" style="background:#FAF9F7;">
+	<html lang="en" class="h-full" style="background:#F9F6F1;">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ props.Title } - Hiri Admin</title>
 			<link rel="icon" type="image/svg+xml" href="/static/hiri-favicon.svg"/>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<script defer src="/static/js/alpine.min.js"></script>
 			<script src="/static/js/htmx.min.js"></script>
 			<style>
-				/* Admin stays light — override dark storefront tokens */
+				/* Admin light mode — kraft paper palette from brand guide v3 */
 				:root {
-					--color-rr-bg: #FAF9F7;
-					--color-rr-surface: #FFFFFF;
-					--color-rr-raised: #F5F0E6;
-					--color-rr-border: #E5E2DE;
-					--color-rr-muted: #78716C;
-					--color-rr-body: #3A3028;
-					--color-rr-heading: #1C1917;
+					--color-rr-bg: #F9F6F1 !important;      /* warm concrete */
+					--color-rr-surface: #EDE5D8 !important;  /* kraft paper */
+					--color-rr-raised: #E4DAC8 !important;   /* nav, raised */
+					--color-rr-border: #9A8C7C !important;   /* visible borders */
+					--color-rr-muted: #7A6E60 !important;    /* muted text */
+					--color-rr-body: #3A3028 !important;     /* body text */
+					--color-rr-heading: #1C1610 !important;  /* near-black warm */
 				}
+				body { font-family: 'Barlow', sans-serif; }
 			</style>
 		</head>
 		<body class="h-full overflow-x-hidden" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">
 			<!-- Mobile sidebar overlay -->
 			<div id="mobile-sidebar" class="relative z-50 lg:hidden hidden" role="dialog" aria-modal="true">
 				<!-- Backdrop -->
-				<div id="mobile-sidebar-backdrop" class="fixed inset-0 bg-stone-900/80 transition-opacity"></div>
+				<div id="mobile-sidebar-backdrop" class="fixed inset-0 bg-rr-heading/80 transition-opacity"></div>
 				<div class="fixed inset-0 flex">
 					<div id="mobile-sidebar-panel" class="relative mr-16 flex w-full max-w-xs flex-1">
 						<!-- Close button -->
@@ -167,14 +171,14 @@ templ Admin(props AdminProps) {
 			<div id="main-content-wrapper" class="lg:pl-16 transition-all duration-300 overflow-x-hidden">
 				<!-- Top bar -->
 				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 shadow-xs sm:gap-x-6 sm:px-6 lg:px-8">
-					<button type="button" id="mobile-menu-btn" class="-m-2.5 p-2.5 text-stone-700 lg:hidden">
+					<button type="button" id="mobile-menu-btn" class="-m-2.5 p-2.5 text-rr-body lg:hidden">
 						<span class="sr-only">Open sidebar</span>
 						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
 						</svg>
 					</button>
 					<!-- Separator -->
-					<div class="h-6 w-px bg-stone-200 lg:hidden" aria-hidden="true"></div>
+					<div class="h-6 w-px bg-rr-border lg:hidden" aria-hidden="true"></div>
 					<div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
 						<div class="flex-1"></div>
 						<div class="flex items-center gap-x-4 lg:gap-x-6">
@@ -186,21 +190,22 @@ templ Admin(props AdminProps) {
 										<span class="text-sm font-medium text-white">{ staffInitials(props.StaffName) }</span>
 									</span>
 									<span class="hidden lg:flex lg:items-center">
-										<span class="ml-4 text-sm/6 font-semibold text-stone-900">{ props.StaffName }</span>
-										<svg class="ml-2 size-5 text-stone-400" viewBox="0 0 20 20" fill="currentColor">
+										<span class="ml-4 text-sm/6 font-semibold text-rr-heading">{ props.StaffName }</span>
+										<svg class="ml-2 size-5 text-rr-muted" viewBox="0 0 20 20" fill="currentColor">
 											<path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
 										</svg>
 									</span>
 								</button>
-								<div data-dropdown-menu class="hidden absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-md bg-white py-2 shadow-lg ring-1 ring-stone-900/5">
-									<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Settings</a>
-									<form method="post" action="/auth/staff/logout"><button type="submit" class="block w-full text-left px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Sign out</button></form>
+								<div data-dropdown-menu class="hidden absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border">
+									<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Settings</a>
+									<form method="post" action="/auth/staff/logout"><button type="submit" class="block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Sign out</button></form>
 								</div>
 							</div>
 						</div>
 					</div>
 				</div>
-				<main class="py-10">
+				<div class="flame-stripe"></div>
+			<main class="py-10">
 					<div id="main-content" class="px-4 sm:px-6 lg:px-8">
 						{ children... }
 					</div>
@@ -309,10 +314,10 @@ templ Admin(props AdminProps) {
 						});
 					});
 				// Active nav highlighting after htmx navigation
-				var activeLink = 'group flex gap-x-3 rounded-md bg-stone-100 p-2 text-sm/6 font-semibold text-rr-red';
-				var inactiveLink = 'group flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-rr-red';
+				var activeLink = 'group flex gap-x-3 rounded-sm bg-rr-raised p-2 text-sm/6 font-semibold text-rr-red';
+				var inactiveLink = 'group flex gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red';
 				var activeIcon = 'size-6 shrink-0 text-rr-red';
-				var inactiveIcon = 'size-6 shrink-0 text-stone-400 group-hover:text-rr-red';
+				var inactiveIcon = 'size-6 shrink-0 text-rr-muted group-hover:text-rr-red';
 
 				function updateActiveNav() {
 					var path = window.location.pathname;
@@ -363,14 +368,14 @@ templ adminLogo() {
 			<path d="M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z" fill="#2D7A7A" opacity="0.35"></path>
 			<path d="M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z" fill="#2D7A7A"></path>
 		</svg>
-		<span class="text-lg font-semibold tracking-tight text-stone-900">hiri</span>
+		<span class="text-lg font-semibold tracking-tight text-rr-heading">hiri</span>
 	</a>
 }
 
 templ adminSidebarToggle() {
-	<button type="button" onclick="toggleSidebar()" class="group flex w-full gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-stone-700 hover:bg-stone-100 hover:text-rr-red transition-colors">
+	<button type="button" onclick="toggleSidebar()" class="group flex w-full gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors">
 		<!-- Menu icon: shown when collapsed -->
-		<svg id="sidebar-menu-icon" class="size-6 shrink-0 text-stone-400 group-hover:text-rr-red" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+		<svg id="sidebar-menu-icon" class="size-6 shrink-0 text-rr-muted group-hover:text-rr-red" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
 		</svg>
 		<!-- Logo mark: shown when expanded -->
@@ -378,27 +383,27 @@ templ adminSidebarToggle() {
 			<path d="M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z" fill="#2D7A7A" opacity="0.35"></path>
 			<path d="M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z" fill="#2D7A7A"></path>
 		</svg>
-		<span data-sidebar-label class="hidden opacity-0 text-lg font-semibold tracking-tight text-stone-900 transition-opacity duration-200">hiri</span>
+		<span data-sidebar-label class="hidden opacity-0 text-lg font-semibold tracking-tight text-rr-heading transition-opacity duration-200">hiri</span>
 	</button>
 }
 
 templ adminUserFooter(props AdminProps) {
 	<div class="relative" data-dropdown>
-		<button type="button" data-dropdown-trigger class="flex w-full items-center gap-x-4 rounded-md px-2 py-3 text-sm/6 font-semibold text-stone-900 hover:bg-stone-100">
+		<button type="button" data-dropdown-trigger class="flex w-full items-center gap-x-4 rounded-sm px-2 py-3 text-sm/6 font-semibold text-rr-heading hover:bg-rr-raised">
 			<span class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-rr-red">
 				<span class="text-sm font-medium text-white">{ staffInitials(props.StaffName) }</span>
 			</span>
 			<span data-sidebar-label class="hidden opacity-0 flex-1 text-left transition-opacity duration-200">
-				<span class="block text-sm font-semibold text-stone-900">{ props.StaffName }</span>
-				<span class="block text-xs text-stone-500">{ props.StaffRole }</span>
+				<span class="block text-sm font-semibold text-rr-heading">{ props.StaffName }</span>
+				<span class="block text-xs text-rr-muted">{ props.StaffRole }</span>
 			</span>
-			<svg data-sidebar-label class="hidden opacity-0 size-5 text-stone-400 transition-opacity duration-200" viewBox="0 0 20 20" fill="currentColor">
+			<svg data-sidebar-label class="hidden opacity-0 size-5 text-rr-muted transition-opacity duration-200" viewBox="0 0 20 20" fill="currentColor">
 				<path fill-rule="evenodd" d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z" clip-rule="evenodd"></path>
 			</svg>
 		</button>
-		<div data-dropdown-menu class="hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-md bg-white py-2 shadow-lg ring-1 ring-stone-900/5">
-			<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Settings</a>
-			<form method="post" action="/auth/staff/logout"><button type="submit" class="block w-full text-left px-3 py-1 text-sm/6 text-stone-900 hover:bg-stone-50">Sign out</button></form>
+		<div data-dropdown-menu class="hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border">
+			<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Settings</a>
+			<form method="post" action="/auth/staff/logout"><button type="submit" class="block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Sign out</button></form>
 		</div>
 	</div>
 }

@@ -17,17 +17,17 @@ type WholesaleListProps struct {
 
 func wholesaleFilterClasses(current, filter string) string {
 	if current == filter {
-		return "inline-flex items-center rounded-md bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm"
+		return "inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm"
 	}
-	return "inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+	return "inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
 }
 
 templ WholesaleListContent(props WholesaleListProps) {
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
-			<h1 class="text-base/7 font-semibold text-stone-900">Wholesale</h1>
-			<p class="mt-1 text-sm text-stone-500">Manage wholesale applications and accounts</p>
+			<h1 class="text-base/7 font-semibold text-rr-heading">Wholesale</h1>
+			<p class="mt-1 text-sm text-rr-muted">Manage wholesale applications and accounts</p>
 		</div>
 	</div>
 	<!-- Status filters -->
@@ -45,12 +45,12 @@ templ WholesaleListContent(props WholesaleListProps) {
 	<!-- Applications table -->
 	<div class="mt-6">
 		if len(props.Customers) == 0 {
-			<div class="rounded-lg border-2 border-dashed border-stone-300 p-12 text-center">
-				<svg class="mx-auto size-12 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+			<div class="rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
+				<svg class="mx-auto size-12 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"></path>
 				</svg>
-				<h3 class="mt-2 text-sm font-semibold text-stone-900">No { props.StatusFilter } applications</h3>
-				<p class="mt-1 text-sm text-stone-500">
+				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No { props.StatusFilter } applications</h3>
+				<p class="mt-1 text-sm text-rr-muted">
 					if props.StatusFilter == "pending" {
 						New wholesale applications will appear here.
 					} else {
@@ -59,37 +59,37 @@ templ WholesaleListContent(props WholesaleListProps) {
 				</p>
 			</div>
 		} else {
-			<div class="overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
-				<table class="min-w-full divide-y divide-stone-300">
-					<thead class="bg-stone-50">
+			<div class="overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
 						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Company</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Contact</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 sm:table-cell">Email</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 lg:table-cell">Applied</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Status</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Company</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Contact</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Email</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Applied</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
 							</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-stone-200 bg-white">
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, c := range props.Customers {
 							<tr>
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-stone-900 sm:pl-6">
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-rr-heading sm:pl-6">
 									if c.CompanyName != nil {
 										{ *c.CompanyName }
 									} else {
-										<span class="text-stone-400">&mdash;</span>
+										<span class="text-rr-border">&mdash;</span>
 									}
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-500">
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
 									{ c.FirstName } { c.LastName }
 								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 sm:table-cell">
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
 									{ c.Email }
 								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 lg:table-cell">
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
 									{ c.CreatedAt.Format("Jan 2, 2006") }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
@@ -100,23 +100,23 @@ templ WholesaleListContent(props WholesaleListProps) {
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 									<div class="flex items-center justify-end gap-3">
 										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
-											<span class="isolate inline-flex rounded-md shadow-xs">
+											<span class="isolate inline-flex rounded-sm shadow-xs">
 												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)) }>
-													<button type="submit" class="relative inline-flex items-center rounded-l-md bg-white px-3 py-2 text-sm font-semibold text-green-700 inset-ring-1 inset-ring-gray-300 hover:bg-green-50 focus:z-10">Approve</button>
+													<button type="submit" class="badge badge-green relative inline-flex items-center rounded-l-sm px-3 py-2 text-sm font-semibold cursor-pointer">Approve</button>
 												</form>
 												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
-													<button type="submit" class="relative -ml-px inline-flex items-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-red-700 inset-ring-1 inset-ring-gray-300 hover:bg-red-50 focus:z-10" onclick="return confirm('Decline this application?')">Decline</button>
+													<button type="submit" class="badge badge-red relative -ml-px inline-flex items-center rounded-r-sm px-3 py-2 text-sm font-semibold cursor-pointer" onclick="return confirm('Decline this application?')">Decline</button>
 												</form>
 											</span>
 										}
 										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
 											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
-												<button type="submit" class="relative inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-red-700 inset-ring-1 inset-ring-gray-300 hover:bg-red-50 focus:z-10" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
+												<button type="submit" class="badge badge-red relative inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold cursor-pointer" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
 											</form>
 										}
 										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
 											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
-												<button type="submit" class="relative inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-rr-red inset-ring-1 inset-ring-gray-300 hover:bg-green-50 focus:z-10" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
+												<button type="submit" class="badge badge-green relative inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold cursor-pointer" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
 											</form>
 										}
 										<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
@@ -130,12 +130,12 @@ templ WholesaleListContent(props WholesaleListProps) {
 				</table>
 			</div>
 			<!-- Pagination -->
-			<nav class="flex items-center justify-between border-t border-stone-200 px-4 pt-4 sm:px-0" aria-label="Pagination">
+			<nav class="flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
 				<div class="-mt-px flex w-0 flex-1">
 					if props.Page > 1 {
 						<a
 							href={ templ.SafeURL(fmt.Sprintf("/admin/wholesale?status=%s&page=%d", props.StatusFilter, props.Page-1)) }
-							class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
 						>
 							Previous
 						</a>
@@ -145,7 +145,7 @@ templ WholesaleListContent(props WholesaleListProps) {
 					if props.HasMore {
 						<a
 							href={ templ.SafeURL(fmt.Sprintf("/admin/wholesale?status=%s&page=%d", props.StatusFilter, props.Page+1)) }
-							class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
 						>
 							Next
 						</a>

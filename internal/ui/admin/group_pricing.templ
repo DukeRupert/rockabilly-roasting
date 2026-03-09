@@ -29,8 +29,8 @@ templ GroupPricingContent(props GroupPricingProps) {
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
-			<h1 class="text-base/7 font-semibold text-stone-900">Group Pricing</h1>
-			<p class="mt-1 text-sm text-stone-500">
+			<h1 class="text-base/7 font-semibold text-rr-heading">Group Pricing</h1>
+			<p class="mt-1 text-sm text-rr-muted">
 				Set base and group-specific prices for all variants.
 				if len(props.Groups) == 0 {
 					<a href="/admin/groups" class="text-rr-red hover:text-rr-red-lt">Create customer groups</a> to enable group pricing.
@@ -40,16 +40,16 @@ templ GroupPricingContent(props GroupPricingProps) {
 		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
 			<a
 				href="/admin/groups"
-				class="block rounded-md bg-white px-3 py-2 text-center text-sm font-semibold text-stone-900 shadow-xs ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+				class="block rounded-sm bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
 			>
 				Manage groups
 			</a>
 		</div>
 	</div>
 	if len(props.Products) == 0 {
-		<div class="mt-8 rounded-lg border-2 border-dashed border-stone-300 p-12 text-center">
-			<h3 class="mt-2 text-sm font-semibold text-stone-900">No products with variants</h3>
-			<p class="mt-1 text-sm text-stone-500">Create products and add variants to start setting prices.</p>
+		<div class="mt-8 rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
+			<h3 class="mt-2 text-sm font-semibold text-rr-heading">No products with variants</h3>
+			<p class="mt-1 text-sm text-rr-muted">Create products and add variants to start setting prices.</p>
 		</div>
 	} else {
 		<div class="mt-8 space-y-10">
@@ -58,7 +58,7 @@ templ GroupPricingContent(props GroupPricingProps) {
 					<div>
 						<!-- Product heading -->
 						<div class="flex items-center justify-between mb-4">
-							<h2 class="text-sm font-semibold text-stone-900">{ pg.Product.Title }</h2>
+							<h2 class="text-sm font-semibold text-rr-heading">{ pg.Product.Title }</h2>
 							<a
 								href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", pg.Product.ID)) }
 								class="text-xs text-rr-red hover:text-rr-red-lt"
@@ -83,30 +83,28 @@ templ GroupPricingContent(props GroupPricingProps) {
 }
 
 templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group *domain.CustomerGroup, props GroupPricingProps) {
-	<div class="overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
-		<div class="border-b border-stone-200 bg-stone-50 px-4 py-2.5 sm:px-6">
+	<div class="overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+		<div class="border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6">
 			if group != nil {
-				<h3 class="text-sm font-medium text-indigo-600">{ title }</h3>
+				<h3 class="text-sm font-medium text-rr-teal">{ title }</h3>
 			} else {
-				<h3 class="text-sm font-medium text-stone-700">{ title }</h3>
+				<h3 class="text-sm font-medium text-rr-body">{ title }</h3>
 			}
 		</div>
-		<table class="min-w-full divide-y divide-stone-300">
-			<thead class="bg-stone-50">
+		<table class="min-w-full divide-y divide-rr-border">
+			<thead class="bg-rr-raised">
 				<tr>
-					<th scope="col" class="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-stone-900 sm:pl-6">SKU</th>
-					<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-stone-900">Unit Price</th>
+					<th scope="col" class="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-rr-heading sm:pl-6">SKU</th>
+					<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-rr-heading">Unit Price</th>
 				</tr>
 			</thead>
-			<tbody class="divide-y divide-stone-200 bg-white">
+			<tbody class="divide-y divide-rr-border bg-rr-surface">
 				for _, vp := range pg.Variants {
 					<tr>
 						<td class="whitespace-nowrap py-2.5 pl-4 pr-3 text-sm sm:pl-6">
-							<span class="font-mono font-medium text-stone-900">{ vp.Variant.SKU }</span>
+							<span class="font-mono font-medium text-rr-heading">{ vp.Variant.SKU }</span>
 							if vp.Variant.IsDefault {
-								<span class="ml-1.5 inline-flex items-center rounded-md bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-									Default
-								</span>
+								<span class="badge badge-green ml-1.5">Default</span>
 							}
 						</td>
 						<td class="whitespace-nowrap px-3 py-2.5 text-sm">
@@ -122,7 +120,7 @@ templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group
 								>
 									<input type="hidden" name="product_id" value={ pg.Product.ID.String() }/>
 									<input type="hidden" name="variant_id" value={ vp.Variant.ID.String() }/>
-									<span class="text-stone-400">$</span>
+									<span class="text-rr-muted">$</span>
 									<input
 										type="number"
 										name="price"
@@ -132,7 +130,7 @@ templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group
 										if vp.PriceCents != nil {
 											value={ priceToDollars(*vp.PriceCents) }
 										}
-										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-rr-red"
+										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading ring-1 ring-inset ring-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
 									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt">
 										Save
@@ -151,7 +149,7 @@ templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group
 									<input type="hidden" name="product_id" value={ pg.Product.ID.String() }/>
 									<input type="hidden" name="variant_id" value={ vp.Variant.ID.String() }/>
 									<input type="hidden" name="group_id" value={ group.ID.String() }/>
-									<span class="text-stone-400">$</span>
+									<span class="text-rr-muted">$</span>
 									<input
 										type="number"
 										name="price"
@@ -161,7 +159,7 @@ templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group
 										if cents, ok := vp.GroupPrices[group.ID]; ok {
 											value={ priceToDollars(cents) }
 										}
-										class="w-24 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 placeholder:text-stone-400 focus:ring-2 focus:ring-inset focus:ring-rr-red"
+										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading ring-1 ring-inset ring-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
 									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt">
 										Save

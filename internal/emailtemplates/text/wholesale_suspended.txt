@@ -2,7 +2,7 @@
 
 Hi {{.CompanyName}}, your wholesale account has been suspended.
 
-If you believe this is an error or have questions, please contact us and we'll be happy to help.
+If something's not right, reach out and we'll sort it out.
 
 {{.StoreName}}
 {{.StoreURL}}

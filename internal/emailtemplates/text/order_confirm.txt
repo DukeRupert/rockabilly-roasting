@@ -2,7 +2,7 @@
 
 Hi {{.CustomerName}},
 
-Thank you for your order!
+Thanks for your order. Here's what we've got:
 
 Order #: {{.OrderNumber}}
 Date: {{date .OrderDate}}

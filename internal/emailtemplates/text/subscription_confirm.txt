@@ -2,7 +2,7 @@
 
 Hi {{.CustomerName}},
 
-Your subscription is now active!
+Your {{.ProductName}} subscription is set. Here are the details:
 
 Product:   {{.ProductName}}
 Plan:      {{.PlanName}}

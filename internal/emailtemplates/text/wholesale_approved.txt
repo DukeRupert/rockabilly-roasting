@@ -1,8 +1,8 @@
 {{define "wholesale_approved.txt"}}Welcome to Wholesale
 
-Great news, {{.CompanyName}}! Your wholesale account has been approved.
+{{.CompanyName}}, your wholesale account has been approved.
 
-To get started, set up your password by visiting the link below:
+Set up your password below and you're good to go.
 
 {{.SetupURL}}
 

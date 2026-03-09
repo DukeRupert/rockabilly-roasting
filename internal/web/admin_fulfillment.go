@@ -11,10 +11,17 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
 
+// FulfillmentActionStatuses are the fulfillment statuses that require action.
+var FulfillmentActionStatuses = []domain.FulfillmentStatus{
+	domain.FulfillmentStatusUnfulfilled,
+	domain.FulfillmentStatusPartiallyFulfilled,
+	domain.FulfillmentStatusFulfilled,
+}
+
 func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	statusFilter := r.URL.Query().Get("status")
+	filterParam := r.URL.Query().Get("filter")
 	pageStr := r.URL.Query().Get("page")
 
 	page := 1
@@ -28,8 +35,17 @@ func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request
 		Offset: (page - 1) * perPage,
 	}
 
-	if statusFilter != "" {
-		s := domain.FulfillmentStatus(statusFilter)
+	switch filterParam {
+	case "", "needs_action":
+		filterParam = "needs_action"
+		filter.FulfillmentStatuses = FulfillmentActionStatuses
+	case "ready_to_ship":
+		s := domain.FulfillmentStatusFulfilled
+		filter.FulfillmentStatus = &s
+	case "all":
+		// no filter
+	default:
+		s := domain.FulfillmentStatus(filterParam)
 		filter.FulfillmentStatus = &s
 	}
 
@@ -52,13 +68,12 @@ func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request
 
 	name, role := staffNameRole(r)
 	props := admin.FulfillmentListProps{
-		Orders:       orders,
-		StatusFilter: statusFilter,
-		Page:         page,
-		PerPage:      perPage,
-		HasMore:      hasMore,
-		StaffName:    name,
-		StaffRole:    role,
+		Orders:    orders,
+		Filter:    filterParam,
+		Page:      page,
+		HasMore:   hasMore,
+		StaffName: name,
+		StaffRole: role,
 	}
 
 	if IsHTMX(r) {

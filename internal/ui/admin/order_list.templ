@@ -20,29 +20,6 @@ func formatCents(cents int) string {
 	return fmt.Sprintf("$%d.%02d", cents/100, cents%100)
 }
 
-func orderProgressLabel(o domain.Order) string {
-	if o.Status == domain.OrderStatusCancelled {
-		return "Cancelled"
-	}
-	if o.Status == domain.OrderStatusRefunded {
-		return "Refunded"
-	}
-	if o.FulfillmentStatus == domain.FulfillmentStatusShipped ||
-		o.FulfillmentStatus == domain.FulfillmentStatusDelivered {
-		return "Shipped"
-	}
-	if o.FulfillmentStatus == domain.FulfillmentStatusFulfilled {
-		return "Fulfilled"
-	}
-	if o.PaymentStatus == domain.PaymentStatusCaptured {
-		return "Paid"
-	}
-	if o.PaymentStatus == domain.PaymentStatusFailed {
-		return "Payment Failed"
-	}
-	return "Awaiting Payment"
-}
-
 templ OrderListContent(props OrderListProps) {
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
@@ -89,7 +66,8 @@ templ OrderListContent(props OrderListProps) {
 					<thead class="bg-rr-raised">
 						<tr>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Progress</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Order Status</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Fulfillment</th>
 							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Total</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Date</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
@@ -106,14 +84,10 @@ templ OrderListContent(props OrderListProps) {
 									</a>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									if o.Status == domain.OrderStatusCancelled || o.Status == domain.OrderStatusRefunded {
-										@OrderStatusBadge(o.Status)
-									} else {
-										<div class="flex items-center gap-2">
-											@orderProgressDots(&o)
-											<span class="text-xs text-rr-muted">{ orderProgressLabel(o) }</span>
-										</div>
-									}
+									@OrderStatusBadge(o.Status)
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									@FulfillmentStatusBadge(o.FulfillmentStatus)
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-heading text-right tabular-nums">
 									{ formatCents(o.Total) }
@@ -154,31 +128,6 @@ templ OrderListContent(props OrderListProps) {
 					}
 				</div>
 			</nav>
-		}
-	</div>
-}
-
-templ orderProgressDots(o *domain.Order) {
-	<div class="flex items-center gap-1" title={ fmt.Sprintf("Paid: %s / Fulfilled: %s / Shipped: %s", o.PaymentStatus, o.FulfillmentStatus, o.FulfillmentStatus) }>
-		<!-- Paid -->
-		if o.PaymentStatus == domain.PaymentStatusCaptured {
-			<div class="size-2.5 rounded-full bg-rr-red"></div>
-		} else if o.PaymentStatus == domain.PaymentStatusFailed {
-			<div class="size-2.5 rounded-full bg-red-500"></div>
-		} else {
-			<div class="size-2.5 rounded-full bg-rr-border"></div>
-		}
-		<!-- Fulfilled -->
-		if o.FulfillmentStatus == domain.FulfillmentStatusFulfilled || o.FulfillmentStatus == domain.FulfillmentStatusShipped || o.FulfillmentStatus == domain.FulfillmentStatusDelivered {
-			<div class="size-2.5 rounded-full bg-rr-red"></div>
-		} else {
-			<div class="size-2.5 rounded-full bg-rr-border"></div>
-		}
-		<!-- Shipped -->
-		if o.FulfillmentStatus == domain.FulfillmentStatusShipped || o.FulfillmentStatus == domain.FulfillmentStatusDelivered {
-			<div class="size-2.5 rounded-full bg-rr-red"></div>
-		} else {
-			<div class="size-2.5 rounded-full bg-rr-border"></div>
 		}
 	</div>
 }

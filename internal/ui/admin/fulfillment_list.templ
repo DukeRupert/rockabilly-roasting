@@ -7,86 +7,78 @@ import (
 )
 
 type FulfillmentListProps struct {
-	Orders       []domain.Order
-	StatusFilter string
-	Page         int
-	PerPage      int
-	HasMore      bool
-	StaffName    string
-	StaffRole    string
+	Orders []domain.Order
+	Filter string
+	Page   int
+	HasMore   bool
+	StaffName string
+	StaffRole string
 }
 
 templ FulfillmentListContent(props FulfillmentListProps) {
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
-			<h1 class="text-base/7 font-semibold text-stone-900">Fulfillment</h1>
-			<p class="mt-1 text-sm text-stone-500">Orders requiring fulfillment and shipping</p>
+			<h1 class="text-base/7 font-semibold text-rr-heading">Fulfillment</h1>
+			<p class="mt-1 text-sm text-rr-muted">Pack and ship orders</p>
 		</div>
 	</div>
 	<!-- Filters -->
 	<form method="get" action="/admin/fulfillment" class="mt-6 flex items-center gap-3">
 		<div class="grid grid-cols-1">
 			<select
-				name="status"
+				name="filter"
 				onchange="this.form.submit()"
-				class="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-1.5 pl-3 pr-8 text-sm text-stone-900 outline-1 -outline-offset-1 outline-stone-300 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+				class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 			>
-				<option value="">All statuses</option>
-				<option value="unfulfilled" selected?={ props.StatusFilter == "unfulfilled" }>Unfulfilled</option>
-				<option value="partially_fulfilled" selected?={ props.StatusFilter == "partially_fulfilled" }>Partially Fulfilled</option>
-				<option value="fulfilled" selected?={ props.StatusFilter == "fulfilled" }>Fulfilled</option>
-				<option value="shipped" selected?={ props.StatusFilter == "shipped" }>Shipped</option>
-				<option value="delivered" selected?={ props.StatusFilter == "delivered" }>Delivered</option>
+				<option value="needs_action" selected?={ props.Filter == "" || props.Filter == "needs_action" }>Needs Action</option>
+				<option value="unfulfilled" selected?={ props.Filter == "unfulfilled" }>Unfulfilled</option>
+				<option value="partially_fulfilled" selected?={ props.Filter == "partially_fulfilled" }>Partially Fulfilled</option>
+				<option value="ready_to_ship" selected?={ props.Filter == "ready_to_ship" }>Ready to Ship</option>
+				<option value="shipped" selected?={ props.Filter == "shipped" }>Shipped</option>
+				<option value="delivered" selected?={ props.Filter == "delivered" }>Delivered</option>
+				<option value="all" selected?={ props.Filter == "all" }>All</option>
 			</select>
-			<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-stone-500 sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+			<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
 				<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
 			</svg>
 		</div>
 	</form>
-	<!-- Order table -->
+	<!-- Fulfillment table -->
 	<div class="mt-6">
 		if len(props.Orders) == 0 {
-			<div class="rounded-lg border-2 border-dashed border-stone-300 p-12 text-center">
-				<svg class="mx-auto size-12 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+			<div class="rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
+				<svg class="mx-auto size-12 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25m-2.25 0h-2.25m0 0V6A2.25 2.25 0 0 1 12 3.75h4.5A2.25 2.25 0 0 1 18.75 6v3.75m-13.5 0h13.5"></path>
 				</svg>
-				<h3 class="mt-2 text-sm font-semibold text-stone-900">No orders to fulfill</h3>
-				<p class="mt-1 text-sm text-stone-500">Orders needing fulfillment will appear here.</p>
+				<h3 class="mt-2 text-sm font-semibold text-rr-heading">All caught up</h3>
+				<p class="mt-1 text-sm text-rr-muted">No orders need fulfillment right now.</p>
 			</div>
 		} else {
-			<div class="overflow-hidden rounded-lg bg-white shadow-xs ring-1 ring-stone-900/5">
-				<table class="min-w-full divide-y divide-stone-300">
-					<thead class="bg-stone-50">
+			<div class="overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
 						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-stone-900 sm:pl-6">Order</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Order Status</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Fulfillment</th>
-							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Total</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-stone-900 lg:table-cell">Date</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Fulfillment</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Placed</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">View</span>
 							</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-stone-200 bg-white">
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, o := range props.Orders {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="font-medium text-stone-900 hover:text-rr-red">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="font-medium text-rr-heading hover:text-rr-red">
 										{ o.Number }
 									</a>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									@OrderStatusBadge(o.Status)
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									@FulfillmentStatusBadge(o.FulfillmentStatus)
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-900 text-right tabular-nums">
-									{ formatCents(o.Total) }
-								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-stone-500 lg:table-cell">
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
 									{ o.PlacedAt.Format("Jan 2, 2006") }
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
@@ -100,12 +92,12 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 				</table>
 			</div>
 			<!-- Pagination -->
-			<nav class="flex items-center justify-between border-t border-stone-200 px-4 pt-4 sm:px-0" aria-label="Pagination">
+			<nav class="flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
 				<div class="-mt-px flex w-0 flex-1">
 					if props.Page > 1 {
 						<a
-							href={ templ.SafeURL(fmt.Sprintf("/admin/fulfillment?page=%d&status=%s", props.Page-1, props.StatusFilter)) }
-							class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+							href={ templ.SafeURL(fmt.Sprintf("/admin/fulfillment?page=%d&filter=%s", props.Page-1, props.Filter)) }
+							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
 						>
 							Previous
 						</a>
@@ -114,8 +106,8 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 				<div class="-mt-px flex w-0 flex-1 justify-end">
 					if props.HasMore {
 						<a
-							href={ templ.SafeURL(fmt.Sprintf("/admin/fulfillment?page=%d&status=%s", props.Page+1, props.StatusFilter)) }
-							class="inline-flex items-center rounded-md px-3 py-2 text-sm font-semibold text-stone-900 ring-1 ring-inset ring-stone-300 hover:bg-stone-50"
+							href={ templ.SafeURL(fmt.Sprintf("/admin/fulfillment?page=%d&filter=%s", props.Page+1, props.Filter)) }
+							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
 						>
 							Next
 						</a>

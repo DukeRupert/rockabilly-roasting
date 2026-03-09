@@ -1,6 +1,7 @@
 package storefront
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/media"
@@ -18,12 +19,19 @@ type VariantWithPrice struct {
 	CurrencyCode string
 }
 
+// VariantOptionEntry maps a variant to its option value IDs and price for JS variant resolution.
+type VariantOptionEntry struct {
+	OptionValueIDs []string `json:"optionValueIDs"`
+	Price          *int     `json:"price"`
+}
+
 type ProductDetailProps struct {
 	Product           *domain.Product
 	Media             []domain.ProductMedia
 	MediaConfig       *media.Config
 	Variants          []VariantWithPrice
 	Options           []OptionWithValues
+	VariantMap        map[string]VariantOptionEntry // variantID -> option value IDs + price
 	DefaultPrice      *int
 	CurrencyCode      string
 	CartCount         int
@@ -61,11 +69,13 @@ templ ProductContent(props ProductDetailProps) {
 						for _, opt := range props.Options {
 							<div>
 								<label class="label-font text-rr-muted mb-2 block">{ opt.Option.Name }</label>
-								<div class="flex flex-wrap gap-2">
+								<div class="flex flex-wrap gap-2" data-option-id={ opt.Option.ID.String() }>
 									for i, val := range opt.Values {
 										<button
 											type="button"
-											class={ optionPillClasses(i == 0) }
+											class={ "option-pill " + optionPillClasses(i == 0) }
+											data-option-id={ opt.Option.ID.String() }
+											data-value-id={ val.ID.String() }
 										>
 											{ val.Value }
 										</button>
@@ -242,6 +252,9 @@ templ ProductContent(props ProductDetailProps) {
 			</div>
 		</div>
 	</div>
+	if len(props.Options) > 0 && len(props.VariantMap) > 0 {
+		@optionSelectionScript(props.VariantMap)
+	}
 	if len(props.SubscriptionPlans) > 0 && len(props.Variants) > 0 {
 		@purchaseModeScript()
 	}
@@ -269,6 +282,11 @@ func maxDiscount(plans []domain.SubscriptionPlan) int {
 	return max
 }
 
+func variantMapJSON(m map[string]VariantOptionEntry) string {
+	b, _ := json.Marshal(m)
+	return string(b)
+}
+
 func optionPillClasses(selected bool) string {
 	if selected {
 		return "label-font border-2 border-rr-amber bg-rr-amber/5 px-4 py-2 rounded-sm text-rr-amber"
@@ -291,6 +309,63 @@ func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) 
 	default:
 		return string(interval)
 	}
+}
+
+templ optionSelectionScript(variantMap map[string]VariantOptionEntry) {
+	<script data-variant-map={ variantMapJSON(variantMap) }>
+		(function() {
+			var scriptEl = document.querySelector('script[data-variant-map]');
+			var variantMap = JSON.parse(scriptEl.dataset.variantMap);
+			var activeCls = 'option-pill label-font border-2 border-rr-amber bg-rr-amber/5 px-4 py-2 rounded-sm text-rr-amber';
+			var inactiveCls = 'option-pill label-font border border-rr-border px-4 py-2 rounded-sm text-rr-muted hover:border-rr-amber hover:text-rr-heading transition-colors';
+
+			// Handle option pill clicks
+			document.querySelectorAll('.option-pill').forEach(function(btn) {
+				btn.addEventListener('click', function() {
+					var optionId = btn.dataset.optionId;
+					// Deselect siblings, select this one
+					document.querySelectorAll('.option-pill[data-option-id="' + optionId + '"]').forEach(function(b) {
+						b.className = inactiveCls;
+					});
+					btn.className = activeCls;
+					// Resolve variant from all selected options
+					resolveVariant();
+				});
+			});
+
+			function resolveVariant() {
+				// Gather selected value IDs across all option groups
+				var selected = [];
+				document.querySelectorAll('div[data-option-id]').forEach(function(group) {
+					var active = group.querySelector('.option-pill.border-rr-amber');
+					if (active) selected.push(active.dataset.valueId);
+				});
+				if (selected.length === 0) return;
+				// Find variant that matches all selected option values
+				for (var vid in variantMap) {
+					var entry = variantMap[vid];
+					var ids = entry.optionValueIDs;
+					if (ids.length === selected.length && selected.every(function(s) { return ids.indexOf(s) !== -1; })) {
+						// Update hidden input
+						var input = document.getElementById('selected-variant-id');
+						if (input) input.value = vid;
+						// Update price display
+						if (entry.price !== null) {
+							var display = document.getElementById('price-display');
+							if (display) {
+								display.innerHTML = '<span class="font-heading text-3xl text-rr-heading" data-base-price="' + entry.price + '">' + formatCents(entry.price) + '</span>';
+							}
+						}
+						break;
+					}
+				}
+			}
+
+			function formatCents(cents) {
+				return '$' + (cents / 100).toFixed(2);
+			}
+		})();
+	</script>
 }
 
 templ purchaseModeScript() {

@@ -255,6 +255,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	var variants []domain.Variant
 	var options []storefront.OptionWithValues
 	var variantsWithPrices []storefront.VariantWithPrice
+	var variantMap map[string]storefront.VariantOptionEntry
 	var defaultPrice *int
 	var plans []domain.SubscriptionPlan
 
@@ -299,6 +300,23 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 			variantsWithPrices[i] = vwp
 		}
 
+		// Build variant → option value mapping for JS variant resolution.
+		variantMap = make(map[string]storefront.VariantOptionEntry, len(variantsWithPrices))
+		for _, vwp := range variantsWithPrices {
+			vovs, vovErr := d.CatalogService.ListVariantOptionValues(ctx, tx, vwp.Variant.ID)
+			if vovErr != nil {
+				return vovErr
+			}
+			ids := make([]string, len(vovs))
+			for j, vov := range vovs {
+				ids[j] = vov.ProductOptionValueID.String()
+			}
+			variantMap[vwp.Variant.ID.String()] = storefront.VariantOptionEntry{
+				OptionValueIDs: ids,
+				Price:          vwp.BasePrice,
+			}
+		}
+
 		// Only load subscription plans for subscribable products.
 		if product.Subscribable {
 			plans, txErr = d.SubscriptionService.ListActivePlans(ctx, tx)
@@ -338,6 +356,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		MediaConfig:       d.MediaConfig,
 		Variants:          variantsWithPrices,
 		Options:           options,
+		VariantMap:        variantMap,
 		DefaultPrice:      defaultPrice,
 		CurrencyCode:      "USD",
 		CartCount:         d.cartItemCountFromCookie(r),

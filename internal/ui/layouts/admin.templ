@@ -85,6 +85,42 @@ templ Admin(props AdminProps) {
 					--color-rr-heading: #1C1610 !important;  /* near-black warm */
 				}
 				body { font-family: 'Barlow', sans-serif; }
+
+				/* ── Admin status badges ── */
+				.badge {
+					display: inline-flex;
+					align-items: center;
+					gap: 0.35rem;
+					padding: 0.2rem 0.6rem;
+					border-radius: 2px;
+					border: 1px solid transparent;
+					font-family: 'Barlow', sans-serif;
+					font-weight: 700;
+					letter-spacing: 0.14em;
+					text-transform: uppercase;
+					font-size: 0.65rem;
+					line-height: 1.6;
+					white-space: nowrap;
+				}
+				.badge-dot::before {
+					content: '';
+					display: block;
+					width: 5px;
+					height: 5px;
+					border-radius: 50%;
+					background: currentColor;
+					flex-shrink: 0;
+				}
+				.badge-green      { background:#DFF0E4; color:#2A6644; border-color:#A8D4B8; }
+				.badge-green-solid { background:#2A6644; color:#F0FAF4; border-color:#1E4E32; }
+				.badge-amber      { background:#FBF0D8; color:#7A4E08; border-color:#E8C070; }
+				.badge-slate      { background:#E4EAF0; color:#2E4A60; border-color:#A8BED0; }
+				.badge-teal       { background:#D8F0EE; color:#0A5E5C; border-color:#7ACCC8; }
+				.badge-teal-solid { background:#0A7870; color:#F0FAFA; border-color:#065858; }
+				.badge-red        { background:#FAE4E4; color:#7A1210; border-color:#E0A8A8; }
+				.badge-grey       { background:#E8E0D8; color:#5A5048; border-color:#B8ACA0; }
+				.badge-pastdue    { background:#FCE8D8; color:#7A3010; border-color:#E8B090; }
+				.badge-partial    { background:#EEF0D8; color:#4A5218; border-color:#C0C888; }
 			</style>
 		</head>
 		<body class="h-full overflow-x-hidden" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">

@@ -10,18 +10,25 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/dukerupert/hiri/internal/domain"
 
-// Badge class helpers for various status types
+// Badge class helpers — semantic colors from brand guide v3.
+// CSS for .badge, .badge-dot, and color variants lives in admin.templ <style>.
 
 func orderStatusBadgeClasses(status domain.OrderStatus) string {
 	switch status {
 	case domain.OrderStatusComplete:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
-	case domain.OrderStatusCancelled, domain.OrderStatusRefunded:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-green"
+	case domain.OrderStatusConfirmed:
+		return "badge badge-dot badge-green"
+	case domain.OrderStatusProcessing:
+		return "badge badge-dot badge-amber"
 	case domain.OrderStatusOnHold:
-		return "inline-flex items-center rounded-sm bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
+		return "badge badge-dot badge-amber"
+	case domain.OrderStatusCancelled:
+		return "badge badge-dot badge-red"
+	case domain.OrderStatusRefunded:
+		return "badge badge-dot badge-grey"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-slate"
 	}
 }
 
@@ -71,7 +78,7 @@ func OrderStatusBadge(status domain.OrderStatus) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 22, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 29, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -88,13 +95,15 @@ func OrderStatusBadge(status domain.OrderStatus) templ.Component {
 func paymentStatusBadgeClasses(status domain.PaymentStatus) string {
 	switch status {
 	case domain.PaymentStatusCaptured:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
-	case domain.PaymentStatusFailed, domain.PaymentStatusVoided:
-		return "inline-flex items-center rounded-sm bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
+		return "badge badge-dot badge-green"
+	case domain.PaymentStatusFailed:
+		return "badge badge-dot badge-red"
+	case domain.PaymentStatusVoided:
+		return "badge badge-dot badge-red"
 	case domain.PaymentStatusRefunded:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-slate"
 	}
 }
 
@@ -144,7 +153,7 @@ func PaymentStatusBadge(status domain.PaymentStatus) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 41, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 50, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -161,13 +170,15 @@ func PaymentStatusBadge(status domain.PaymentStatus) templ.Component {
 func fulfillmentStatusBadgeClasses(status domain.FulfillmentStatus) string {
 	switch status {
 	case domain.FulfillmentStatusDelivered:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
-	case domain.FulfillmentStatusShipped, domain.FulfillmentStatusFulfilled:
-		return "inline-flex items-center rounded-sm bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20"
+		return "badge badge-dot badge-teal"
+	case domain.FulfillmentStatusShipped:
+		return "badge badge-dot badge-green-solid"
+	case domain.FulfillmentStatusFulfilled:
+		return "badge badge-dot badge-green"
 	case domain.FulfillmentStatusReturned:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-slate"
 	}
 }
 
@@ -217,7 +228,7 @@ func FulfillmentStatusBadge(status domain.FulfillmentStatus) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 60, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 71, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -234,13 +245,13 @@ func FulfillmentStatusBadge(status domain.FulfillmentStatus) templ.Component {
 func subscriptionStatusBadgeClasses(status domain.SubscriptionStatus) string {
 	switch status {
 	case domain.SubscriptionStatusActive:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-teal-solid"
 	case domain.SubscriptionStatusPaused:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-amber"
 	case domain.SubscriptionStatusPastDue:
-		return "inline-flex items-center rounded-sm bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
+		return "badge badge-dot badge-pastdue"
 	default:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	}
 }
 
@@ -290,7 +301,7 @@ func SubscriptionStatusBadge(status domain.SubscriptionStatus) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 79, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 90, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -307,13 +318,13 @@ func SubscriptionStatusBadge(status domain.SubscriptionStatus) templ.Component {
 func fulfillmentItemStatusBadgeClasses(status domain.FulfillmentItemStatus) string {
 	switch status {
 	case domain.FulfillmentItemStatusDelivered:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-teal"
 	case domain.FulfillmentItemStatusShipped:
-		return "inline-flex items-center rounded-sm bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20"
+		return "badge badge-dot badge-green-solid"
 	case domain.FulfillmentItemStatusCancelled:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-red"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-slate"
 	}
 }
 
@@ -363,7 +374,7 @@ func FulfillmentItemStatusBadge(status domain.FulfillmentItemStatus) templ.Compo
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 98, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 109, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -379,9 +390,9 @@ func FulfillmentItemStatusBadge(status domain.FulfillmentItemStatus) templ.Compo
 
 func discountActiveBadgeClasses(active bool) string {
 	if active {
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-green"
 	}
-	return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+	return "badge badge-dot badge-grey"
 }
 
 func DiscountActiveBadge(active bool) templ.Component {
@@ -456,21 +467,14 @@ func DiscountActiveBadge(active bool) templ.Component {
 	})
 }
 
-func boolBadgeClasses(val bool, trueColor string) string {
-	if val {
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
-	}
-	return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
-}
-
 func wholesaleStatusBadgeClasses(status domain.WholesaleStatus) string {
 	switch status {
 	case domain.WholesaleStatusApproved:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-green"
 	case domain.WholesaleStatusSuspended:
-		return "inline-flex items-center rounded-sm bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
+		return "badge badge-dot badge-red"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-amber"
 	}
 }
 
@@ -520,7 +524,7 @@ func WholesaleStatusBadge(status domain.WholesaleStatus) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 137, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 141, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -537,15 +541,15 @@ func WholesaleStatusBadge(status domain.WholesaleStatus) templ.Component {
 func invoiceStatusBadgeClasses(status domain.InvoiceStatus) string {
 	switch status {
 	case domain.InvoiceStatusPaid:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-green"
 	case domain.InvoiceStatusVoid:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	case domain.InvoiceStatusSent:
-		return "inline-flex items-center rounded-sm bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20"
+		return "badge badge-dot badge-slate"
 	case domain.InvoiceStatusPartiallyPaid:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-amber"
 	default:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	}
 }
 
@@ -595,7 +599,7 @@ func InvoiceStatusBadge(status domain.InvoiceStatus) templ.Component {
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 158, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 162, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {

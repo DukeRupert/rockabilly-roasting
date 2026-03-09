@@ -2,18 +2,25 @@ package admin
 
 import "github.com/dukerupert/hiri/internal/domain"
 
-// Badge class helpers for various status types
+// Badge class helpers — semantic colors from brand guide v3.
+// CSS for .badge, .badge-dot, and color variants lives in admin.templ <style>.
 
 func orderStatusBadgeClasses(status domain.OrderStatus) string {
 	switch status {
 	case domain.OrderStatusComplete:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
-	case domain.OrderStatusCancelled, domain.OrderStatusRefunded:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-green"
+	case domain.OrderStatusConfirmed:
+		return "badge badge-dot badge-green"
+	case domain.OrderStatusProcessing:
+		return "badge badge-dot badge-amber"
 	case domain.OrderStatusOnHold:
-		return "inline-flex items-center rounded-sm bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
+		return "badge badge-dot badge-amber"
+	case domain.OrderStatusCancelled:
+		return "badge badge-dot badge-red"
+	case domain.OrderStatusRefunded:
+		return "badge badge-dot badge-grey"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-slate"
 	}
 }
 
@@ -26,13 +33,15 @@ templ OrderStatusBadge(status domain.OrderStatus) {
 func paymentStatusBadgeClasses(status domain.PaymentStatus) string {
 	switch status {
 	case domain.PaymentStatusCaptured:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
-	case domain.PaymentStatusFailed, domain.PaymentStatusVoided:
-		return "inline-flex items-center rounded-sm bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
+		return "badge badge-dot badge-green"
+	case domain.PaymentStatusFailed:
+		return "badge badge-dot badge-red"
+	case domain.PaymentStatusVoided:
+		return "badge badge-dot badge-red"
 	case domain.PaymentStatusRefunded:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-slate"
 	}
 }
 
@@ -45,13 +54,15 @@ templ PaymentStatusBadge(status domain.PaymentStatus) {
 func fulfillmentStatusBadgeClasses(status domain.FulfillmentStatus) string {
 	switch status {
 	case domain.FulfillmentStatusDelivered:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
-	case domain.FulfillmentStatusShipped, domain.FulfillmentStatusFulfilled:
-		return "inline-flex items-center rounded-sm bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20"
+		return "badge badge-dot badge-teal"
+	case domain.FulfillmentStatusShipped:
+		return "badge badge-dot badge-green-solid"
+	case domain.FulfillmentStatusFulfilled:
+		return "badge badge-dot badge-green"
 	case domain.FulfillmentStatusReturned:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-slate"
 	}
 }
 
@@ -64,13 +75,13 @@ templ FulfillmentStatusBadge(status domain.FulfillmentStatus) {
 func subscriptionStatusBadgeClasses(status domain.SubscriptionStatus) string {
 	switch status {
 	case domain.SubscriptionStatusActive:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-teal-solid"
 	case domain.SubscriptionStatusPaused:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-amber"
 	case domain.SubscriptionStatusPastDue:
-		return "inline-flex items-center rounded-sm bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
+		return "badge badge-dot badge-pastdue"
 	default:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	}
 }
 
@@ -83,13 +94,13 @@ templ SubscriptionStatusBadge(status domain.SubscriptionStatus) {
 func fulfillmentItemStatusBadgeClasses(status domain.FulfillmentItemStatus) string {
 	switch status {
 	case domain.FulfillmentItemStatusDelivered:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-teal"
 	case domain.FulfillmentItemStatusShipped:
-		return "inline-flex items-center rounded-sm bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20"
+		return "badge badge-dot badge-green-solid"
 	case domain.FulfillmentItemStatusCancelled:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-red"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-slate"
 	}
 }
 
@@ -101,9 +112,9 @@ templ FulfillmentItemStatusBadge(status domain.FulfillmentItemStatus) {
 
 func discountActiveBadgeClasses(active bool) string {
 	if active {
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-green"
 	}
-	return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+	return "badge badge-dot badge-grey"
 }
 
 templ DiscountActiveBadge(active bool) {
@@ -114,21 +125,14 @@ templ DiscountActiveBadge(active bool) {
 	}
 }
 
-func boolBadgeClasses(val bool, trueColor string) string {
-	if val {
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
-	}
-	return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
-}
-
 func wholesaleStatusBadgeClasses(status domain.WholesaleStatus) string {
 	switch status {
 	case domain.WholesaleStatusApproved:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-green"
 	case domain.WholesaleStatusSuspended:
-		return "inline-flex items-center rounded-sm bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20"
+		return "badge badge-dot badge-red"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-amber"
 	}
 }
 
@@ -141,15 +145,15 @@ templ WholesaleStatusBadge(status domain.WholesaleStatus) {
 func invoiceStatusBadgeClasses(status domain.InvoiceStatus) string {
 	switch status {
 	case domain.InvoiceStatusPaid:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-dot badge-green"
 	case domain.InvoiceStatusVoid:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	case domain.InvoiceStatusSent:
-		return "inline-flex items-center rounded-sm bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20"
+		return "badge badge-dot badge-slate"
 	case domain.InvoiceStatusPartiallyPaid:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-dot badge-amber"
 	default:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-dot badge-grey"
 	}
 }
 

@@ -24,7 +24,7 @@ type CartPageProps struct {
 
 templ CartContent(props CartPageProps) {
 	<div>
-		<h1 class="text-3xl font-bold tracking-tight text-rr-heading mb-8">Your Cart</h1>
+		<h1 class="font-display text-4xl tracking-widest text-rr-heading mb-8">YOUR CART</h1>
 		if len(props.Items) == 0 {
 			<div class="text-center py-12">
 				<p class="text-rr-muted mb-4">Your cart is empty.</p>
@@ -32,28 +32,28 @@ templ CartContent(props CartPageProps) {
 			</div>
 		} else {
 			<div id="cart-items">
-				<table class="min-w-full divide-y divide-stone-200">
+				<table class="min-w-full divide-y divide-rr-border">
 					<thead>
 						<tr>
-							<th scope="col" class="py-3.5 pl-0 pr-3 text-left text-sm font-semibold text-stone-900">Product</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Price</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-stone-900">Quantity</th>
-							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-stone-900">Total</th>
+							<th scope="col" class="py-3.5 pl-0 pr-3 text-left label-font text-rr-muted">Product</th>
+							<th scope="col" class="px-3 py-3.5 text-left label-font text-rr-muted">Price</th>
+							<th scope="col" class="px-3 py-3.5 text-left label-font text-rr-muted">Quantity</th>
+							<th scope="col" class="px-3 py-3.5 text-right label-font text-rr-muted">Total</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-0">
 								<span class="sr-only">Remove</span>
 							</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-stone-100">
+					<tbody class="divide-y divide-rr-border">
 						for _, item := range props.Items {
 							<tr>
 								<td class="py-4 pl-0 pr-3">
 									<div>
-										<p class="text-sm font-medium text-stone-900">{ item.ProductTitle }</p>
-										<p class="text-sm text-stone-500 font-mono">{ item.SKU }</p>
+										<p class="text-sm font-medium text-rr-heading">{ item.ProductTitle }</p>
+										<p class="text-sm text-rr-muted font-mono">{ item.SKU }</p>
 									</div>
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-stone-700">
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-body">
 									{ formatCents(item.UnitPrice) }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
@@ -71,14 +71,14 @@ templ CartContent(props CartPageProps) {
 											name="quantity"
 											value={ fmt.Sprintf("%d", item.Quantity) }
 											min="1"
-											class="w-16 rounded-md border-0 py-1 px-2 text-sm text-stone-900 ring-1 ring-inset ring-stone-300 focus:ring-2 focus:ring-inset focus:ring-rr-red"
+											class="w-16 rounded-sm border border-rr-border bg-rr-bg py-1 px-2 text-sm font-body text-rr-heading focus:border-rr-amber focus:ring-1 focus:ring-rr-amber"
 										/>
 										<button type="submit" class="text-xs font-medium text-rr-red hover:text-rr-red-lt">
 											Update
 										</button>
 									</form>
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-right font-medium text-stone-900">
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-right font-medium text-rr-heading">
 									{ formatCents(item.LineTotal) }
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-0 text-right text-sm">
@@ -90,7 +90,7 @@ templ CartContent(props CartPageProps) {
 										hx-swap="innerHTML"
 									>
 										<input type="hidden" name="item_id" value={ item.ItemID.String() }/>
-										<button type="submit" class="text-red-600 hover:text-red-900 text-sm font-medium">
+										<button type="submit" class="text-rr-red hover:text-rr-red-lt text-sm font-medium">
 											Remove
 										</button>
 									</form>
@@ -100,17 +100,17 @@ templ CartContent(props CartPageProps) {
 					</tbody>
 				</table>
 				<!-- Subtotal -->
-				<div class="mt-8 border-t border-stone-200 pt-6">
-					<div class="flex justify-between text-base font-medium text-stone-900">
+				<div class="mt-8 border-t border-rr-border pt-6">
+					<div class="flex justify-between text-base font-medium text-rr-heading">
 						<p>Subtotal</p>
 						<p>{ formatCents(props.Subtotal) }</p>
 					</div>
-					<p class="mt-1 text-sm text-stone-500">Shipping and taxes calculated at checkout.</p>
+					<p class="mt-1 text-sm text-rr-muted">Shipping and taxes calculated at checkout.</p>
 					<div class="mt-6">
 						<a
 							href="/checkout"
 							hx-boost="false"
-							class="block w-full rounded-md bg-rr-red px-6 py-3 text-center text-base font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
+							class="btn block w-full rounded-sm bg-rr-red px-6 py-4 text-center label-font text-sm text-white glow-red hover:bg-rr-red-lt"
 						>
 							Checkout
 						</a>

@@ -48,8 +48,8 @@
   let formValid = $state(false);
 
   const inputClasses =
-    'w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal focus:outline-none';
-  const labelClasses = 'block text-sm font-medium text-stone-700 mb-1';
+    'w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-sm font-body text-rr-heading placeholder:text-rr-border focus:border-rr-amber focus:ring-1 focus:ring-rr-amber focus:outline-none';
+  const labelClasses = 'label-font text-rr-muted mb-1 block';
 
   // Validate required fields
   $effect(() => {
@@ -191,13 +191,13 @@
 {#if step === 'form'}
   <div class="mt-8">
     {#if error}
-      <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
+      <div class="mb-4 rounded-sm bg-rr-red/10 p-3 text-sm text-rr-red-lt">{error}</div>
     {/if}
 
     <form onsubmit={handleSubmit} class="space-y-6">
       <!-- Contact & Shipping -->
       <div class="space-y-4">
-        <h2 class="text-xl font-semibold text-stone-900">Contact & shipping</h2>
+        <h2 class="font-display text-2xl tracking-widest text-rr-heading">Contact & shipping</h2>
 
         <div>
           <label for="sub-email" class={labelClasses}>Email</label>
@@ -313,11 +313,11 @@
 
       <!-- Payment -->
       <div class="space-y-4">
-        <h2 class="text-xl font-semibold text-stone-900">Payment</h2>
+        <h2 class="font-display text-2xl tracking-widest text-rr-heading">Payment</h2>
 
         {#if !stripeReady}
-          <div class="rounded-md border border-stone-200 bg-stone-50 p-6 text-center">
-            <p class="text-sm text-stone-500">
+          <div class="rounded-sm border border-rr-border bg-rr-surface p-6 text-center">
+            <p class="text-sm text-rr-muted">
               {#if formValid}
                 Loading payment...
               {:else}
@@ -333,7 +333,7 @@
       <button
         type="submit"
         disabled={processing || !stripeReady}
-        class="w-full rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal disabled:opacity-50 disabled:cursor-not-allowed"
+        class="btn w-full rounded-sm bg-rr-red px-6 py-3 label-font text-sm text-white glow-red hover:bg-rr-red-lt disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {#if processing}
           Processing...
@@ -346,9 +346,9 @@
 {:else}
   <!-- Confirmation -->
   <div class="mt-8 text-center py-12">
-    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 mb-6">
+    <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rr-amber/10 mb-6">
       <svg
-        class="h-8 w-8 text-green-600"
+        class="h-8 w-8 text-rr-amber"
         fill="none"
         viewBox="0 0 24 24"
         stroke-width="2"
@@ -358,17 +358,17 @@
       </svg>
     </div>
 
-    <h2 class="text-2xl font-bold text-stone-900 mb-2">You're subscribed!</h2>
-    <p class="text-stone-600 mb-1">
+    <h2 class="font-display text-3xl tracking-widest text-rr-heading mb-2">You're subscribed!</h2>
+    <p class="text-rr-muted mb-1">
       Your <span class="font-medium">{planName}</span> subscription is now active.
     </p>
-    <p class="text-sm text-stone-500 mt-4 mb-8">
+    <p class="text-sm text-rr-muted mt-4 mb-8">
       We'll send a confirmation email with your subscription details shortly.
     </p>
 
     <a
       href="/catalog"
-      class="inline-block rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark"
+      class="btn inline-block rounded-sm bg-rr-red px-6 py-3 label-font text-sm text-white glow-red hover:bg-rr-red-lt"
     >
       Continue shopping
     </a>

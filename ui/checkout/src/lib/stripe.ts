@@ -13,10 +13,17 @@ export function createElements(stripe: Stripe, clientSecret: string): StripeElem
   return stripe.elements({
     clientSecret,
     appearance: {
-      theme: 'stripe',
+      theme: 'night',
       variables: {
-        colorPrimary: '#2D7A7A',
-        borderRadius: '6px',
+        colorPrimary: '#B82018',
+        colorBackground: '#161A1E',
+        colorText: '#D8E4E8',
+        colorTextSecondary: '#8A9EA8',
+        colorDanger: '#D42820',
+        fontFamily: 'Barlow, sans-serif',
+        borderRadius: '2px',
+        colorInputBackground: '#161A1E',
+        colorInputText: '#D8E4E8',
       },
     },
   });

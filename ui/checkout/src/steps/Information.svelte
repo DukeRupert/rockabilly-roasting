@@ -57,16 +57,16 @@
   }
 
   const inputClasses =
-    'w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-hiri-teal focus:ring-1 focus:ring-hiri-teal focus:outline-none';
-  const labelClasses = 'block text-sm font-medium text-stone-700 mb-1';
-  const errorClasses = 'mt-1 text-sm text-red-600';
+    'w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-sm font-body text-rr-heading placeholder:text-rr-border focus:border-rr-amber focus:ring-1 focus:ring-rr-amber focus:outline-none';
+  const labelClasses = 'label-font text-rr-muted mb-1 block';
+  const errorClasses = 'mt-1 text-sm text-rr-red';
 </script>
 
 <div>
-  <h2 class="text-xl font-semibold text-stone-900 mb-6">Contact & shipping</h2>
+  <h2 class="font-display text-2xl tracking-widest text-rr-heading mb-6">CONTACT &amp; SHIPPING</h2>
 
   {#if generalError}
-    <div class="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{generalError}</div>
+    <div class="mb-4 rounded-sm bg-rr-red/10 p-3 text-sm text-rr-red-lt">{generalError}</div>
   {/if}
 
   <form onsubmit={handleSubmit} class="space-y-4">
@@ -152,7 +152,7 @@
     <button
       type="submit"
       disabled={submitting}
-      class="w-full rounded-md bg-hiri-teal px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-hiri-teal-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hiri-teal disabled:opacity-50 disabled:cursor-not-allowed"
+      class="btn w-full rounded-sm bg-rr-red px-6 py-3 label-font text-sm text-white glow-red hover:bg-rr-red-lt disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {#if submitting}
         Saving...

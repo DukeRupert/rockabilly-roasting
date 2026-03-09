@@ -62,14 +62,14 @@
     <ol class="flex items-center gap-2 text-sm">
       {#each steps as s, i}
         {#if i > 0}
-          <li class="text-stone-300">/</li>
+          <li class="text-rr-border">/</li>
         {/if}
         <li
           class={i === currentStepIndex
-            ? 'font-semibold text-hiri-teal'
+            ? 'font-semibold text-rr-red'
             : i < currentStepIndex
-              ? 'text-hiri-text'
-              : 'text-stone-400'}
+              ? 'text-rr-heading'
+              : 'text-rr-faint'}
         >
           {s.label}
         </li>
@@ -79,12 +79,12 @@
 
   {#if loading}
     <div class="text-center py-12">
-      <p class="text-stone-500">Loading checkout...</p>
+      <p class="text-rr-muted">Loading checkout...</p>
     </div>
   {:else if error && !cart?.items.length}
     <div class="text-center py-12">
-      <p class="text-stone-500 mb-4">{error}</p>
-      <a href="/cart" class="text-hiri-teal hover:text-hiri-teal-dark font-medium">Return to cart</a
+      <p class="text-rr-muted mb-4">{error}</p>
+      <a href="/cart" class="text-rr-red hover:text-rr-red-lt font-medium">Return to cart</a
       >
     </div>
   {:else if cart}
@@ -106,31 +106,31 @@
 
       <!-- Order summary sidebar -->
         <div class="mt-8 lg:mt-0 lg:col-span-2">
-          <div class="rounded-lg bg-stone-50 p-6">
-            <h2 class="text-lg font-semibold text-stone-900 mb-4">Order summary</h2>
-            <ul class="divide-y divide-stone-200">
+          <div class="rounded-sm bg-rr-surface border border-rr-border p-6">
+            <h2 class="font-display text-xl tracking-widest text-rr-heading mb-4">ORDER SUMMARY</h2>
+            <ul class="divide-y divide-rr-border">
               {#each cart.items as item}
-                <li class="py-3 flex justify-between text-sm">
+                <li class="py-3 flex justify-between text-sm font-body">
                   <div>
-                    <p class="font-medium text-stone-900">{item.product_title}</p>
-                    <p class="text-stone-500">
+                    <p class="font-medium text-rr-heading">{item.product_title}</p>
+                    <p class="text-rr-muted">
                       {item.sku} &times; {item.quantity}
                     </p>
                   </div>
-                  <p class="font-medium text-stone-900">{formatCents(item.line_total)}</p>
+                  <p class="font-medium text-rr-heading">{formatCents(item.line_total)}</p>
                 </li>
               {/each}
             </ul>
-            <div class="mt-4 border-t border-stone-200 pt-4">
+            <div class="mt-4 border-t border-rr-border pt-4">
               <div class="flex justify-between text-sm">
-                <p class="text-stone-500">Subtotal</p>
-                <p class="font-medium text-stone-900">{formatCents(cart.subtotal)}</p>
+                <p class="text-rr-muted">Subtotal</p>
+                <p class="font-medium text-rr-heading">{formatCents(cart.subtotal)}</p>
               </div>
               <div class="flex justify-between text-sm mt-1">
-                <p class="text-stone-500">Shipping</p>
-                <p class="text-stone-500">Free</p>
+                <p class="text-rr-muted">Shipping</p>
+                <p class="text-rr-muted">Free</p>
               </div>
-              <div class="flex justify-between text-base font-semibold mt-3 pt-3 border-t border-stone-200">
+              <div class="flex justify-between text-base font-semibold mt-3 pt-3 border-t border-rr-border">
                 <p>Total</p>
                 <p>{formatCents(cart.subtotal)}</p>
               </div>

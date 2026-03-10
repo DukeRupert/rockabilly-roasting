@@ -165,11 +165,11 @@ func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *Credentials)
 	}
 
 	// Encrypt new tokens
-	encAccess, err := c.encrypt(tokenResp.AccessToken)
+	encAccess, err := c.Encrypt(tokenResp.AccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt access token: %w", err)
 	}
-	encRefresh, err := c.encrypt(tokenResp.RefreshToken)
+	encRefresh, err := c.Encrypt(tokenResp.RefreshToken)
 	if err != nil {
 		return nil, fmt.Errorf("encrypt refresh token: %w", err)
 	}
@@ -260,8 +260,8 @@ func classifyError(statusCode int, body []byte) error {
 	}
 }
 
-// encrypt encrypts plaintext using AES-256-GCM.
-func (c *QBClient) encrypt(plaintext string) (string, error) {
+// Encrypt encrypts plaintext using AES-256-GCM.
+func (c *QBClient) Encrypt(plaintext string) (string, error) {
 	block, err := aes.NewCipher(c.config.EncryptionKey)
 	if err != nil {
 		return "", err

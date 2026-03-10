@@ -432,26 +432,33 @@ event type alone.
 
 ---
 
-## Platform package structure
+## Platform package structure — IMPLEMENTED
 
 ```
-platform/quickbooks/
-    client.go          — QBClient: HTTP client, token management, request signing
+internal/platform/quickbooks/
+    provider.go        — Client interface, domain types (Invoice, Credentials, etc.)
+    client.go          — QBClient: HTTP client, token management, AES-256-GCM encryption
     auth.go            — OAuth2 flow: authorization URL, token exchange, refresh
     customers.go       — CreateCustomer, UpdateCustomer
     invoices.go        — CreateInvoice, GetInvoice
-    webhook.go         — verifyQBSignature, QBWebhookPayload types
+    webhook.go         — VerifySignature (HMAC-SHA256), WebhookPayload types
     errors.go          — QB API error types, retry classification
 
 internal/jobs/
-    qb_ensure_customer.go
-    qb_create_invoice.go
-    qb_process_invoice_update.go
-    qb_sync_customer.go
+    qb_ensure_customer.go       — EnsureQBCustomerWorker (create/sync + chain to invoice)
+    qb_create_invoice.go        — CreateQBInvoiceWorker (with product descriptions)
+    qb_process_invoice_update.go — ProcessQBInvoiceUpdateWorker (webhook → payment captured)
+    qb_sync_customer.go         — SyncQBCustomerWorker (profile update sync)
 
-web/handlers/
-    webhooks/quickbooks.go   — POST /webhooks/quickbooks
-    admin/integrations/qb.go — Connect/callback/disconnect handlers
+internal/store/
+    qb_credentials.go  — QBCredentialStore (GetByTenantID, Upsert, Delete)
+
+internal/web/
+    webhook_qb.go      — POST /webhooks/quickbooks handler
+    admin_settings.go   — Settings page + OAuth connect/callback/disconnect handlers
+
+internal/ui/admin/
+    settings.templ      — Admin settings page template with QB integration panel
 ```
 
 ### QBClient interface
@@ -521,41 +528,59 @@ func (c *Client) refreshToken(ctx context.Context, creds *QBCredentials) (*QBCre
 
 ---
 
-## Admin UI
+## Admin UI — IMPLEMENTED
 
-### `/admin/settings/integrations`
+### `/admin/settings`
 
-Integration status panel — shows connected/disconnected state for each provider:
+Settings page with QuickBooks integration panel. Accessible via the sidebar "Settings"
+link (already wired in the admin layout).
 
-```
-QuickBooks Online    [Connected — Rockabilly Roasting Co.]  [Disconnect]
-                     Refresh token expires: 87 days
-                     Last sync: 2 minutes ago
-```
+**Routes:**
 
-If disconnected:
-```
-QuickBooks Online    [Not connected]  [Connect to QuickBooks →]
-```
+| Method | Path | Handler |
+|---|---|---|
+| GET | `/admin/settings` | Settings page with QB status |
+| GET | `/admin/settings/integrations/quickbooks/connect` | Initiates OAuth2 flow |
+| GET | `/admin/settings/integrations/quickbooks/callback` | OAuth2 callback |
+| POST | `/admin/settings/integrations/quickbooks/disconnect` | Remove QB connection |
 
-### `/admin/settings/integrations/quickbooks`
+**Files:**
+- Template: `internal/ui/admin/settings.templ`
+- Handler: `internal/web/admin_settings.go`
 
-Detail view after connecting:
-- Realm ID, company name (fetched from QB CompanyInfo endpoint on connect)
-- Token expiry dates
+**Connection states:**
+
+When disconnected:
+- Green "Connect to QuickBooks" button redirects to QBO OAuth2 authorization
+- If `QB_CLIENT_ID` env var is not set, shows a message that QB is not configured
+
+When connected:
+- Shows Realm ID (company ID), refresh token expiry with urgency colors:
+  - Green text: >30 days remaining
+  - Amber text: 14–30 days remaining
+  - Red text + warning banner: <14 days remaining
+- "Reconnect" button (same OAuth flow, upserts new tokens)
+- "Disconnect" button with confirmation dialog
+
+**OAuth2 CSRF protection:** Uses HMAC-SHA256 signed cookie for state parameter
+validation. The signing key is derived from `QB_TOKEN_ENCRYPTION_KEY`.
+
+### Future enhancements (not yet built)
+- Fetch company name from QB CompanyInfo endpoint on connect
 - Recent sync log (last 20 QB API calls with status)
-- Manual "Re-sync all customers" button — enqueues SyncQBCustomer for all wholesale
-  customers with `qb_customer_id IS NOT NULL` — useful after a QB data migration
+- Manual "Re-sync all customers" button
 
 ---
 
-## Audit actions to add
+## Audit actions — IMPLEMENTED
+
+Defined in `internal/platform/audit/actions.go`:
 
 ```go
-AuditQBCustomerCreated  = "qb.customer_created"
-AuditQBCustomerUpdated  = "qb.customer_synced"
-AuditQBInvoiceCreated   = "qb.invoice_created"
-AuditOrderPaymentCaptured = "order.payment_captured"  // new — used for ACH payment received
+AuditQBCustomerCreated    = "qb.customer_created"
+AuditQBCustomerSynced     = "qb.customer_synced"
+AuditQBInvoiceCreated     = "qb.invoice_created"
+AuditOrderPaymentCaptured = "order.payment_captured"
 ```
 
 `order.payment_captured` is actor=system, metadata includes `qb_invoice_id` and
@@ -564,9 +589,9 @@ and from which source.
 
 ---
 
-## Migration
+## Migration — IMPLEMENTED
 
-Migration `025_quickbooks`:
+Migration `031_quickbooks.sql` (in `db/migrations/`):
 
 ```sql
 -- Token storage
@@ -609,7 +634,7 @@ CREATE INDEX idx_orders_qb_invoice ON orders (qb_invoice_id)
 # OAuth2
 QB_CLIENT_ID=...
 QB_CLIENT_SECRET=...
-QB_REDIRECT_URI=https://yourdomain.com/admin/integrations/quickbooks/callback
+QB_REDIRECT_URI=https://yourdomain.com/admin/settings/integrations/quickbooks/callback
 
 # Webhook verification
 QB_WEBHOOK_VERIFIER_TOKEN=...
@@ -623,6 +648,19 @@ QB_ENVIRONMENT=sandbox  # or "production"
 
 `QB_TOKEN_ENCRYPTION_KEY` is separate from the application's main secret — rotating it
 requires re-encrypting stored tokens, which is a deliberate operational step.
+
+---
+
+## Still TODO
+
+- **Wholesale checkout integration** — enqueue `EnsureQBCustomer` job atomically with
+  wholesale order placement in the checkout flow
+- **EmailInvoicePaid worker** — sends payment confirmation email when ACH clears
+- **Refresh token expiry alert job** — periodic River job that checks refresh token age
+  and sends alert email to tenant admin when <14 days remain
+- **Admin sync log** — recent QB API calls with status on the settings detail page
+- **Manual re-sync button** — enqueue SyncQBCustomer for all wholesale customers
+- **Fetch company name** from QB CompanyInfo endpoint on OAuth connect
 
 ---
 

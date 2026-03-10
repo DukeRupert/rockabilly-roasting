@@ -50,7 +50,11 @@ type Deps struct {
 	R2Client            *media.R2Client
 	MediaConfig         *media.Config
 	QBClient                quickbooks.Client
+	QBConfig                quickbooks.ClientConfig
+	QBCredentialStore       *store.QBCredentialStore
 	QBWebhookVerifierToken  string
+	QBOAuthHMACKey          []byte
+	QBHTTPClient            *http.Client
 	RateLimiter             *ratelimit.Limiter
 }
 
@@ -282,6 +286,12 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/catalog/{id}/attributes/assign", deps.handleAdminProductAttributeAssign)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/attributes/remove", deps.handleAdminProductAttributeRemove)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/attributes/save", deps.handleAdminProductAttributeSave)
+
+	// Admin settings / integrations
+	adminMux.HandleFunc("GET /admin/settings", deps.handleAdminSettings)
+	adminMux.HandleFunc("GET /admin/settings/integrations/quickbooks/connect", deps.handleAdminQBConnect)
+	adminMux.HandleFunc("GET /admin/settings/integrations/quickbooks/callback", deps.handleAdminQBCallback)
+	adminMux.HandleFunc("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)
 
 	// Admin audit log
 	adminMux.HandleFunc("GET /admin/audit", deps.handleAdminAuditList)

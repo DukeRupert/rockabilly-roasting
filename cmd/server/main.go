@@ -95,7 +95,10 @@ func run() error {
 	// QuickBooks Online integration
 	qbCredStore := store.NewQBCredentialStore()
 	var qbClient quickbooks.Client
+	var qbConfig quickbooks.ClientConfig
 	qbWebhookVerifier := os.Getenv("QB_WEBHOOK_VERIFIER_TOKEN")
+	// HMAC key for OAuth state cookie signing (derived from webhook verifier or encryption key)
+	var qbOAuthHMACKey []byte
 	if qbClientID := os.Getenv("QB_CLIENT_ID"); qbClientID != "" {
 		qbEncKeyB64 := os.Getenv("QB_TOKEN_ENCRYPTION_KEY")
 		qbEncKey, decodeErr := base64DecodeKey(qbEncKeyB64)
@@ -106,13 +109,15 @@ func run() error {
 		// In a multi-tenant setup this would come from the request context.
 		tenantID := tenantIDFromEnv()
 
-		qbClient = quickbooks.NewQBClient(quickbooks.ClientConfig{
+		qbConfig = quickbooks.ClientConfig{
 			ClientID:      qbClientID,
 			ClientSecret:  os.Getenv("QB_CLIENT_SECRET"),
 			EncryptionKey: qbEncKey,
 			Environment:   os.Getenv("QB_ENVIRONMENT"),
 			RedirectURI:   os.Getenv("QB_REDIRECT_URI"),
-		}, tenantID, qbCredStore, pool)
+		}
+		qbClient = quickbooks.NewQBClient(qbConfig, tenantID, qbCredStore, pool)
+		qbOAuthHMACKey = qbEncKey // reuse the encryption key for HMAC signing
 		logger.Info("quickbooks integration configured", "environment", os.Getenv("QB_ENVIRONMENT"))
 	}
 
@@ -269,7 +274,11 @@ func run() error {
 		R2Client:           r2Client,
 		MediaConfig:        mediaConfig,
 		QBClient:               qbClient,
+		QBConfig:               qbConfig,
+		QBCredentialStore:      qbCredStore,
 		QBWebhookVerifierToken: qbWebhookVerifier,
+		QBOAuthHMACKey:         qbOAuthHMACKey,
+		QBHTTPClient:           &http.Client{Timeout: 30 * time.Second},
 		RateLimiter:            rateLimiter,
 	}
 

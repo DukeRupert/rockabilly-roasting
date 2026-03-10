@@ -71,8 +71,13 @@ func MetricsMux(reg *metrics.Registry) http.Handler {
 func NewRouter(deps *Deps) http.Handler {
 	mux := http.NewServeMux()
 
-	// Health check
+	// Health check — pings the database to verify connectivity.
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+		if err := deps.Pool.Ping(r.Context()); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("db unhealthy")) //nolint:errcheck
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok")) //nolint:errcheck
 	})

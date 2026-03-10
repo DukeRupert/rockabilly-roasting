@@ -113,6 +113,11 @@ func (c *QBClient) GetInvoice(ctx context.Context, qbInvoiceID string) (*Invoice
 }
 
 // centsToFloat converts an amount in cents to a float64 dollar amount.
+// Note: float64 division by 100 can introduce rounding for some values
+// (e.g., 33 cents → 0.32999... instead of 0.33). This is acceptable because
+// QB rounds to 2 decimal places on display and in calculations. For amounts
+// up to $999,999.99, float64 has more than enough precision (15+ significant
+// digits) to represent any cent value exactly after QB's rounding.
 func centsToFloat(cents int) float64 {
 	return float64(cents) / 100.0
 }

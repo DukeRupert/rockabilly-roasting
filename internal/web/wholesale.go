@@ -145,8 +145,8 @@ func (d *Deps) handleWholesaleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(password) < 8 {
-		renderErr("Password must be at least 8 characters.")
+	if len(password) < 10 {
+		renderErr("Password must be at least 10 characters.")
 		return
 	}
 

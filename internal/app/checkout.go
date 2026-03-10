@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -172,7 +175,7 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 
 	total := subtotal - discountAmount + p.ShippingCents + p.TaxCents
 
-	orderNumber := fmt.Sprintf("ORD-%d", time.Now().UnixMilli())
+	orderNumber := generateOrderNumber()
 	customerID := p.CustomerID
 
 	order, err := s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
@@ -322,4 +325,15 @@ func calculateDiscount(d *domain.Discount, subtotal int) int {
 	default:
 		return 0
 	}
+}
+
+// generateOrderNumber creates a non-guessable order number using random bytes.
+// Format: "ORD-XXXXXXXXXX" where X is uppercase alphanumeric (5 random bytes → 10 hex chars).
+func generateOrderNumber() string {
+	b := make([]byte, 5)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to timestamp if crypto/rand fails (extremely unlikely).
+		return fmt.Sprintf("ORD-%d", time.Now().UnixMilli())
+	}
+	return "ORD-" + strings.ToUpper(hex.EncodeToString(b))
 }

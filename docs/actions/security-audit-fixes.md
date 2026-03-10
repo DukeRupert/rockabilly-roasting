@@ -145,32 +145,32 @@
 
 - **File:** `internal/platform/quickbooks/invoices.go:23,30,116–118`
 - **Note:** `centsToFloat()` divides by 100.0, which can introduce floating-point rounding. QB rounds on display so this is cosmetic, but should be documented and tested for edge cases.
-- [ ] Add comment documenting the rounding behavior
-- [ ] Add test for edge-case amounts (e.g., $0.10, $33.33)
+- [x] Add comment documenting the rounding behavior
+- [x] Add test for edge-case amounts (e.g., $0.10, $33.33)
 
 ### L2: Guessable order numbers
 
 - **File:** `internal/app/checkout.go:175`
 - **Note:** `ORD-<unix_milli>` reveals order timing and is enumerable. Not a direct vulnerability (orders are fetched by UUID), but could reveal order volume. Consider shorter random alphanumeric codes.
-- [ ] Evaluate switching to random order number format
+- [x] Switched to `ORD-<10 random hex chars>` using crypto/rand
 
 ### L3: Hardcoded dev database password in Docker Compose
 
 - **File:** `docker-compose.yml:5–7`
 - **Note:** `localdevpassword` is committed. Low risk since it's dev-only, but developers may reuse passwords.
-- [ ] Move to `.env` or document as dev-only
+- [x] Added comment documenting dev-only usage
 
 ### L4: Health check has no database liveness check
 
 - **File:** `internal/web/router.go:66`
 - **Note:** `GET /health` returns 200 unconditionally. Load balancer won't detect DB connectivity loss.
-- [ ] Add optional DB ping to health check
+- [x] Added DB ping; returns 503 on failure
 
 ### L5: Minimum password length of 8 characters
 
 - **File:** `internal/app/auth.go:287`
 - **Note:** Meets NIST minimum but is at the floor. Consider checking against known breach lists (Have I Been Pwned API) or raising minimum to 10+.
-- [ ] Evaluate stronger password policy
+- [x] Raised minimum to 10 characters
 
 ---
 

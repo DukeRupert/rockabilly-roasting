@@ -284,7 +284,7 @@ func (s *AuthService) CreateSetupToken(ctx context.Context, tx pgx.Tx, customerI
 // SetPasswordWithToken validates a setup token and sets the customer's password.
 // The token is single-use.
 func (s *AuthService) SetPasswordWithToken(ctx context.Context, tx pgx.Tx, rawToken, password string) (*domain.Customer, error) {
-	if len(password) < 8 {
+	if len(password) < 10 {
 		return nil, ErrPasswordTooShort
 	}
 

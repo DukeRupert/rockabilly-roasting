@@ -53,8 +53,8 @@
 - **File:** `internal/web/router.go:72`
 - **Risk:** The metrics endpoint is mounted on the main mux with no auth. Anyone can query it and observe internal counters — webhook event counts, checkout conversion rates, DB pool stats, River queue depth, subscription counts.
 - **Fix:** Either move the metrics handler to a separate internal-only listener (e.g., `:9090` bound to `127.0.0.1`) or add Bearer token authentication with a secret from env.
-- [ ] Decide approach (separate listener vs auth)
-- [ ] Implement fix
+- [x] Decide approach (separate listener vs auth) — chose separate internal listener
+- [x] Implement fix
 - [ ] Verify metrics no longer accessible from public port
 
 ### H3: Session cookies missing `Secure` flag behind reverse proxy

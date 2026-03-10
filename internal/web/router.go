@@ -58,6 +58,13 @@ type Deps struct {
 	RateLimiter             *ratelimit.Limiter
 }
 
+// MetricsMux returns a handler for the internal metrics listener.
+func MetricsMux(reg *metrics.Registry) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", promhttp.HandlerFor(reg.Reg, promhttp.HandlerOpts{}))
+	return mux
+}
+
 // NewRouter creates a new HTTP router with all routes and middleware registered.
 func NewRouter(deps *Deps) http.Handler {
 	mux := http.NewServeMux()
@@ -68,8 +75,7 @@ func NewRouter(deps *Deps) http.Handler {
 		w.Write([]byte("ok")) //nolint:errcheck
 	})
 
-	// Prometheus metrics endpoint
-	mux.Handle("GET /metrics", promhttp.HandlerFor(deps.Metrics.Reg, promhttp.HandlerOpts{}))
+	// Prometheus metrics served on a separate internal listener (see MetricsMux).
 
 	// Static assets
 	mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler("internal/ui/assets")))

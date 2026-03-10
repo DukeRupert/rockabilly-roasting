@@ -299,8 +299,26 @@ func run() error {
 		IdleTimeout:  60 * time.Second,
 	}
 
+	// Internal metrics server (localhost-only)
+	metricsAddr := os.Getenv("METRICS_ADDR")
+	if metricsAddr == "" {
+		metricsAddr = "127.0.0.1:9090"
+	}
+	metricsSrv := &http.Server{
+		Addr:         metricsAddr,
+		Handler:      web.MetricsMux(metricsReg),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+
 	// Graceful shutdown
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
+	go func() {
+		logger.Info("metrics server starting", "addr", metricsAddr)
+		if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errCh <- fmt.Errorf("metrics server: %w", err)
+		}
+	}()
 	go func() {
 		logger.Info("server starting", "addr", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -327,6 +345,9 @@ func run() error {
 		logger.Error("river stop", "error", err)
 	}
 
+	if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("metrics server shutdown", "error", err)
+	}
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("server shutdown: %w", err)
 	}

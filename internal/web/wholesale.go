@@ -471,6 +471,12 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	cartID := getWholesaleCartID(r)
+	if cartID == nil {
+		http.Error(w, "no cart", http.StatusBadRequest)
+		return
+	}
+
 	itemID, err := uuid.Parse(r.URL.Query().Get("item_id"))
 	if err != nil {
 		http.Error(w, "invalid item", http.StatusBadRequest)
@@ -484,7 +490,7 @@ func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request)
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CartService.UpdateItemQuantity(ctx, tx, itemID, quantity)
+		_, txErr := d.CartService.UpdateItemQuantity(ctx, tx, *cartID, itemID, quantity)
 		return txErr
 	})
 	if err != nil {
@@ -499,6 +505,12 @@ func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request)
 func (d *Deps) handleWholesaleCartRemove(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	cartID := getWholesaleCartID(r)
+	if cartID == nil {
+		http.Error(w, "no cart", http.StatusBadRequest)
+		return
+	}
+
 	itemID, err := uuid.Parse(r.URL.Query().Get("item_id"))
 	if err != nil {
 		http.Error(w, "invalid item", http.StatusBadRequest)
@@ -506,7 +518,7 @@ func (d *Deps) handleWholesaleCartRemove(w http.ResponseWriter, r *http.Request)
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CartService.RemoveItem(ctx, tx, itemID)
+		return d.CartService.RemoveItem(ctx, tx, *cartID, itemID)
 	})
 	if err != nil {
 		Error(w, r, err)

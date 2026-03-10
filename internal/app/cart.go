@@ -80,7 +80,8 @@ func (s *CartService) AddItem(ctx context.Context, tx pgx.Tx, cartID, variantID 
 }
 
 // UpdateItemQuantity sets the quantity of a cart item.
-func (s *CartService) UpdateItemQuantity(ctx context.Context, tx pgx.Tx, itemID uuid.UUID, quantity int) (*domain.CartItem, error) {
+// cartID is used for ownership verification — the item must belong to this cart.
+func (s *CartService) UpdateItemQuantity(ctx context.Context, tx pgx.Tx, cartID, itemID uuid.UUID, quantity int) (*domain.CartItem, error) {
 	if quantity <= 0 {
 		return nil, ErrInvalidQuantity
 	}
@@ -88,11 +89,30 @@ func (s *CartService) UpdateItemQuantity(ctx context.Context, tx pgx.Tx, itemID 
 	if err != nil {
 		return nil, fmt.Errorf("update cart item quantity: %w", err)
 	}
+	if item.CartID != cartID {
+		return nil, ErrCartNotFound
+	}
 	return item, nil
 }
 
 // RemoveItem removes an item from the cart.
-func (s *CartService) RemoveItem(ctx context.Context, tx pgx.Tx, itemID uuid.UUID) error {
+// cartID is used for ownership verification — the item must belong to this cart.
+func (s *CartService) RemoveItem(ctx context.Context, tx pgx.Tx, cartID, itemID uuid.UUID) error {
+	// Verify item belongs to this cart by listing items and checking.
+	items, err := s.carts.ListCartItems(ctx, tx, cartID)
+	if err != nil {
+		return fmt.Errorf("list cart items for ownership check: %w", err)
+	}
+	found := false
+	for _, item := range items {
+		if item.ID == itemID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return ErrCartNotFound
+	}
 	if err := s.carts.DeleteCartItem(ctx, tx, itemID); err != nil {
 		return fmt.Errorf("remove cart item: %w", err)
 	}

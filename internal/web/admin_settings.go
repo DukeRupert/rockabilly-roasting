@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -62,7 +63,11 @@ func (d *Deps) handleAdminQBConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	qbCfg := d.QBConfig
-	state := generateOAuthState()
+	state, err := generateOAuthState()
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 
 	// Store state in a signed cookie (CSRF protection)
 	setOAuthStateCookie(w, state, d.QBOAuthHMACKey)
@@ -168,10 +173,12 @@ func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 const oauthStateCookieName = "qb_oauth_state"
 
 // generateOAuthState creates a random state parameter for CSRF protection.
-func generateOAuthState() string {
+func generateOAuthState() (string, error) {
 	b := make([]byte, 16)
-	rand.Read(b) //nolint:errcheck
-	return hex.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("generate oauth state: %w", err)
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // setOAuthStateCookie sets a signed cookie with the OAuth state.

@@ -91,14 +91,14 @@
 - **File:** `.gitignore`
 - **Risk:** `.env` exists at project root with live secrets. A `git add .` will silently commit it.
 - **Fix:** `echo -e ".env\n.env.*" >> .gitignore`
-- [ ] Add `.env` patterns to `.gitignore`
+- [x] Add `.env` patterns to `.gitignore`
 
 ### M2: Cart item manipulation without ownership check
 
 - **Files:** `internal/web/cart.go:194–208,226–232`, `wholesale.go:487,509`
 - **Risk:** `handleCartUpdateQuantity` and `handleCartRemoveItem` accept an `item_id` UUID without verifying the item belongs to the cookie's cart. An attacker who discovers another cart's item UUID can modify or delete items in another user's cart.
 - **Fix:** Add ownership verification — either check `item.CartID == cookieCartID` before mutation, or add `cart_id` to the WHERE clause in the store method (atomic ownership check).
-- [ ] Add `cart_id` scoping to store delete/update methods
+- [x] Add `cart_id` scoping to store delete/update methods
 - [ ] Add tests for cross-cart item manipulation
 
 ### M3: QB webhook verifier token not required at startup
@@ -106,36 +106,36 @@
 - **File:** `cmd/server/main.go:99`
 - **Risk:** `QB_WEBHOOK_VERIFIER_TOKEN` is read but not validated. A misconfigured deployment silently rejects all valid QB webhooks.
 - **Fix:** At startup, if `QB_CLIENT_ID` is set, require `QB_WEBHOOK_VERIFIER_TOKEN` to also be non-empty. Log a fatal error otherwise.
-- [ ] Add startup validation
+- [x] Add startup validation
 
 ### M4: `rand.Read` error suppressed in OAuth state generation
 
 - **File:** `internal/web/admin_settings.go:173`
 - **Risk:** `//nolint:errcheck` suppresses the error from `crypto/rand.Read`. If the OS random source fails, the state token is all zeros, making CSRF protection trivially bypassable.
 - **Fix:** Check the error and return HTTP 500 if `rand.Read` fails.
-- [ ] Remove `//nolint:errcheck` and handle the error
+- [x] Remove `//nolint:errcheck` and handle the error
 
 ### M5: Session IP recorded from proxy address, not client
 
 - **Files:** `internal/web/auth.go:107`, `customer_auth.go:228,325`
 - **Risk:** `r.RemoteAddr` is the proxy's IP when behind a reverse proxy. Session audit logs record the wrong IP.
 - **Fix:** Use the same `ClientIP(r)` function used for rate limiting (after H4 is fixed to properly resolve client IP).
-- [ ] Update login handlers to use `ClientIP(r)`
+- [x] Update login handlers to use `ClientIP(r)`
 
 ### M6: No request body size limits on form endpoints
 
 - **File:** `cmd/server/main.go:294–300`
 - **Risk:** No `MaxHeaderBytes` configured and no `http.MaxBytesReader` on form-encoded request bodies (only webhook routes have limits). Large form submissions to admin or checkout address endpoints are unbounded.
 - **Fix:** Add `MaxHeaderBytes` to the server config. Apply `http.MaxBytesReader` middleware to all non-webhook routes with a reasonable limit (e.g., 1MB).
-- [ ] Set `MaxHeaderBytes` on server
-- [ ] Add body size limit middleware
+- [x] Set `MaxHeaderBytes` on server
+- [x] Add body size limit middleware
 
 ### M7: Session cookies use `SameSite=Lax` instead of `Strict`
 
 - **Files:** `internal/web/auth.go:132`, `customer_auth.go:252,363`
 - **Risk:** Lax allows session cookies on top-level cross-site navigations. Since there is no OAuth or cross-site redirect flow requiring Lax for the session cookie, Strict provides better CSRF protection.
 - **Fix:** Change `SameSite: http.SameSiteLaxMode` to `http.SameSiteStrictMode`.
-- [ ] Update all session cookie settings
+- [x] Update all session cookie settings
 
 ---
 

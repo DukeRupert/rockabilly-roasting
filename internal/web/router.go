@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -324,10 +325,22 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Apply middleware stack (outermost runs first)
 	var handler http.Handler = mux
+	handler = maxBodySizeMiddleware(handler, 1<<20) // 1 MB limit, excludes /webhooks/
 	handler = requestIDMiddleware(handler)
 	handler = loggingMiddleware(handler, deps.Logger, deps.Metrics)
 	handler = ratelimit.GlobalLimit(deps.RateLimiter, ratelimit.GlobalIPLimit, ratelimit.GlobalWindow)(handler)
 	handler = metrics.HTTPMiddleware(deps.Metrics)(handler)
 
 	return handler
+}
+
+// maxBodySizeMiddleware limits request body size for non-webhook routes.
+// Webhook endpoints manage their own body limits via io.LimitReader.
+func maxBodySizeMiddleware(next http.Handler, maxBytes int64) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/webhooks/") {
+			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+		}
+		next.ServeHTTP(w, r)
+	})
 }

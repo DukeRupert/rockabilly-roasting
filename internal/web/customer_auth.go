@@ -225,7 +225,7 @@ func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ip := r.RemoteAddr
+	ip := ratelimit.ClientIP(r)
 	ua := r.UserAgent()
 
 	var sessionToken string
@@ -249,7 +249,7 @@ func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) 
 		Path:     "/",
 		MaxAge:   int(app.MagicLinkSessionDuration.Seconds()),
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 		Secure:   d.SecureCookies,
 	})
 
@@ -322,7 +322,7 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := r.RemoteAddr
+	ip := ratelimit.ClientIP(r)
 	ua := r.UserAgent()
 
 	var rawToken string
@@ -360,7 +360,7 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   int(duration.Seconds()),
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 		Secure:   d.SecureCookies,
 	})
 

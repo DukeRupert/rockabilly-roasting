@@ -174,6 +174,12 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 func (d *Deps) handleCartUpdateQuantity(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	cartID := getCartID(r)
+	if cartID == nil {
+		http.Error(w, "no cart", http.StatusBadRequest)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -192,7 +198,7 @@ func (d *Deps) handleCartUpdateQuantity(w http.ResponseWriter, r *http.Request) 
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CartService.UpdateItemQuantity(ctx, tx, itemID, quantity)
+		_, txErr := d.CartService.UpdateItemQuantity(ctx, tx, *cartID, itemID, quantity)
 		return txErr
 	})
 	if err != nil {
@@ -212,6 +218,12 @@ func (d *Deps) handleCartUpdateQuantity(w http.ResponseWriter, r *http.Request) 
 func (d *Deps) handleCartRemoveItem(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	cartID := getCartID(r)
+	if cartID == nil {
+		http.Error(w, "no cart", http.StatusBadRequest)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
@@ -224,7 +236,7 @@ func (d *Deps) handleCartRemoveItem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CartService.RemoveItem(ctx, tx, itemID)
+		return d.CartService.RemoveItem(ctx, tx, *cartID, itemID)
 	})
 	if err != nil {
 		Error(w, r, err)

@@ -104,7 +104,7 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ip := r.RemoteAddr
+	ip := ratelimit.ClientIP(r)
 	ua := r.UserAgent()
 
 	var rawToken string
@@ -129,7 +129,7 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   int(sessions.StaffSessionDuration.Seconds()),
 		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 		Secure:   d.SecureCookies,
 	})
 

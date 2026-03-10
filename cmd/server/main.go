@@ -114,6 +114,9 @@ func run() error {
 	// HMAC key for OAuth state cookie signing (derived from webhook verifier or encryption key)
 	var qbOAuthHMACKey []byte
 	if qbClientID := os.Getenv("QB_CLIENT_ID"); qbClientID != "" {
+		if qbWebhookVerifier == "" {
+			return fmt.Errorf("QB_WEBHOOK_VERIFIER_TOKEN is required when QB_CLIENT_ID is set")
+		}
 		qbEncKeyB64 := os.Getenv("QB_TOKEN_ENCRYPTION_KEY")
 		qbEncKey, decodeErr := base64DecodeKey(qbEncKeyB64)
 		if decodeErr != nil {
@@ -307,11 +310,12 @@ func run() error {
 	}
 
 	srv := &http.Server{
-		Addr:         addr,
-		Handler:      handler,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:           addr,
+		Handler:        handler,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   30 * time.Second,
+		IdleTimeout:    60 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 
 	// Internal metrics server (localhost-only)

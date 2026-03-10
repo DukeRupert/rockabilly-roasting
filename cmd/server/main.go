@@ -220,6 +220,7 @@ func run() error {
 		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, catalogStore, qbClient, auditWriter, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewProcessQBInvoiceUpdateWorker(orderStore, qbClient, auditWriter, pool, riverClient, metricsReg))
 		river.AddWorker(workers, jobs.NewSyncQBCustomerWorker(customerStore, qbClient, auditWriter, pool, metricsReg))
+		river.AddWorker(workers, jobs.NewSyncQBPaymentWorker(orderStore, customerStore, qbClient, auditWriter, pool, metricsReg))
 		logger.Info("quickbooks workers registered")
 	}
 

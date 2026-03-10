@@ -8,11 +8,13 @@ the loop when payment is collected.
 
 ## Data flow
 
+### Path A: Automated ACH billing (default)
+
 ```
 1. Wholesale order placed in Hiri
        ↓
 2. River job: EnsureQBCustomer
-   — create QB customer if first order, update if details have changed
+   — find existing QB customer by company name / email, or create new
        ↓
 3. River job: CreateQBInvoice
    — create QB invoice from order line items, due date = placed_at + 7 days
@@ -35,6 +37,38 @@ the loop when payment is collected.
 Each step is independently retryable. Steps 2 and 3 are River jobs enqueued atomically
 with the order placement transaction. Steps 6 and 7 are driven by QB's webhook — Hiri
 is a passive receiver.
+
+### Path B: Manual payment (check, cash, etc.)
+
+When a customer pays outside the automated ACH flow (check at delivery, cash, etc.),
+staff records the payment manually in the Hiri admin. The system syncs it to QB so both
+systems stay in sync and ACH won't double-bill.
+
+```
+1. Staff records payment in admin → POST /admin/invoices/{id}/payment
+   — amount, method (check/cash/other), reference (check #), optional note
+       ↓
+2. Hiri updates invoice status (partially_paid or paid)
+   — syncs order.payment_status to match
+   — enqueues River job: SyncQBPayment (atomically in same transaction)
+       ↓
+3. River job: SyncQBPayment
+   — reads order to get qb_invoice_id
+   — reads customer to get qb_customer_id
+   — calls QB Payment API to record payment against the QB invoice
+       ↓
+4. QB invoice balance reduced (or zeroed out)
+   — if fully paid, ACH will NOT fire (nothing to collect)
+   — QB books reflect the manual payment with method and reference
+       ↓
+5. If QB later sends a webhook for this invoice (balance now 0):
+   — Hiri sees order already "captured" → idempotency no-op
+```
+
+**Why record the payment in QB instead of voiding the invoice?** QB is the system of
+record for B2B accounting. Voiding the invoice would erase the sale from the books.
+Recording the payment preserves the invoice, the payment method, and the amount — the
+accountant sees a complete picture in QB without needing to cross-reference Hiri.
 
 ---
 
@@ -147,51 +181,32 @@ ALTER TABLE customers
     ADD COLUMN qb_synced_at   timestamptz; -- last successful sync timestamp
 ```
 
-### EnsureQBCustomer River job
+### EnsureQBCustomer River job — IMPLEMENTED (find-or-create)
 
 Runs after every wholesale order placement. Idempotent — safe to retry.
 
-```go
-type EnsureQBCustomerArgs struct {
-    CustomerID uuid.UUID `json:"customer_id"`
-    OrderID    uuid.UUID `json:"order_id"` // for chaining to CreateQBInvoice
-}
+**Key design decision:** Many wholesale clients already exist in QuickBooks before Hiri
+is deployed. The worker uses a **find-or-create** pattern to avoid duplicate QB customers:
 
-func (w *EnsureQBCustomerWorker) Work(ctx context.Context, job *river.Job[EnsureQBCustomerArgs]) error {
-    customer, err := w.customers.GetByID(ctx, job.Args.CustomerID)
-    if err != nil {
-        return err
-    }
+1. Query QB by `DisplayName` (company name) — unique in QB, most reliable match
+2. If no match, query QB by `PrimaryEmailAddr` (email) — fallback
+3. If found, **link** the existing QB customer to the Hiri customer record
+4. If not found, **create** a new QB customer in QB
 
-    if customer.QBCustomerID == nil {
-        // First order — create QB customer
-        qbID, err := w.qb.CreateCustomer(ctx, customer)
-        if err != nil {
-            return fmt.Errorf("qb: create customer: %w", err)
-        }
-        if err := w.customers.SetQBCustomerID(ctx, customer.ID, qbID); err != nil {
-            return err
-        }
-        customer.QBCustomerID = &qbID
-    } else {
-        // Existing customer — sync if details have changed since last sync
-        if customer.UpdatedAt.After(customer.QBSyncedAt) {
-            if err := w.qb.UpdateCustomer(ctx, *customer.QBCustomerID, customer); err != nil {
-                return fmt.Errorf("qb: update customer: %w", err)
-            }
-            if err := w.customers.SetQBSyncedAt(ctx, customer.ID, time.Now()); err != nil {
-                return err
-            }
-        }
-    }
+This means the first wholesale order for a pre-existing client links to their existing QB
+record rather than creating a duplicate. The audit trail distinguishes linked vs created
+(`qb.customer_linked` vs `qb.customer_created`).
 
-    // Chain to invoice creation
-    _, err = w.river.Insert(ctx, CreateQBInvoiceArgs{
-        OrderID:      job.Args.OrderID,
-        QBCustomerID: *customer.QBCustomerID,
-    }, nil)
-    return err
-}
+```
+EnsureQBCustomer flow:
+  customer.QBCustomerID == nil?
+    ├─ YES → FindCustomer(displayName, email)
+    │         ├─ found    → link existing QB customer (audit: qb.customer_linked)
+    │         └─ not found → CreateCustomer (audit: qb.customer_created)
+    └─ NO  → customer changed since last sync?
+              ├─ YES → UpdateCustomer (audit: qb.customer_synced)
+              └─ NO  → skip (no-op)
+  then → chain to CreateQBInvoice
 ```
 
 Chaining: `EnsureQBCustomer` inserts `CreateQBInvoice` after it succeeds. This keeps the
@@ -436,19 +451,21 @@ event type alone.
 
 ```
 internal/platform/quickbooks/
-    provider.go        — Client interface, domain types (Invoice, Credentials, etc.)
+    provider.go        — Client interface, domain types (Invoice, Payment, Credentials, etc.)
     client.go          — QBClient: HTTP client, token management, AES-256-GCM encryption
     auth.go            — OAuth2 flow: authorization URL, token exchange, refresh
-    customers.go       — CreateCustomer, UpdateCustomer
+    customers.go       — FindCustomer, CreateCustomer, UpdateCustomer
     invoices.go        — CreateInvoice, GetInvoice
+    payments.go        — CreatePayment (record payment against QB invoice)
     webhook.go         — VerifySignature (HMAC-SHA256), WebhookPayload types
     errors.go          — QB API error types, retry classification
 
 internal/jobs/
-    qb_ensure_customer.go       — EnsureQBCustomerWorker (create/sync + chain to invoice)
+    qb_ensure_customer.go       — EnsureQBCustomerWorker (find-or-create + chain to invoice)
     qb_create_invoice.go        — CreateQBInvoiceWorker (with product descriptions)
     qb_process_invoice_update.go — ProcessQBInvoiceUpdateWorker (webhook → payment captured)
     qb_sync_customer.go         — SyncQBCustomerWorker (profile update sync)
+    qb_sync_payment.go          — SyncQBPaymentWorker (manual payment → QB Payment API)
 
 internal/store/
     qb_credentials.go  — QBCredentialStore (GetByTenantID, Upsert, Delete)
@@ -464,13 +481,15 @@ internal/ui/admin/
 ### QBClient interface
 
 ```go
-// platform/quickbooks/client.go
+// platform/quickbooks/provider.go
 
-type QBClient interface {
+type Client interface {
+    FindCustomer(ctx context.Context, displayName, email string) (*QBCustomer, error)
     CreateCustomer(ctx context.Context, c *domain.Customer) (qbCustomerID string, err error)
     UpdateCustomer(ctx context.Context, qbID string, c *domain.Customer) error
-    CreateInvoice(ctx context.Context, p QBInvoiceParams) (*QBInvoice, error)
-    GetInvoice(ctx context.Context, qbInvoiceID string) (*QBInvoice, error)
+    CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice, error)
+    GetInvoice(ctx context.Context, qbInvoiceID string) (*Invoice, error)
+    CreatePayment(ctx context.Context, p PaymentParams) (*Payment, error)
 }
 ```
 
@@ -577,15 +596,24 @@ validation. The signing key is derived from `QB_TOKEN_ENCRYPTION_KEY`.
 Defined in `internal/platform/audit/actions.go`:
 
 ```go
-AuditQBCustomerCreated    = "qb.customer_created"
-AuditQBCustomerSynced     = "qb.customer_synced"
-AuditQBInvoiceCreated     = "qb.invoice_created"
-AuditOrderPaymentCaptured = "order.payment_captured"
+AuditQBCustomerCreated    = "qb.customer_created"    // new customer created in QB
+AuditQBCustomerLinked     = "qb.customer_linked"     // existing QB customer linked to Hiri customer
+AuditQBCustomerSynced     = "qb.customer_synced"     // customer details updated in QB
+AuditQBInvoiceCreated     = "qb.invoice_created"     // invoice created in QB
+AuditQBPaymentSynced      = "qb.payment_synced"      // manual payment recorded in QB
+AuditOrderPaymentCaptured = "order.payment_captured"  // order marked paid (ACH or manual)
 ```
 
 `order.payment_captured` is actor=system, metadata includes `qb_invoice_id` and
 `payment_method: "ach"`. This is the audit trail entry that proves payment was received
 and from which source.
+
+`qb.customer_linked` vs `qb.customer_created` — the metadata includes `"linked": true`
+when an existing QB customer was found, making it easy to audit how many customers were
+linked vs newly created.
+
+`qb.payment_synced` — metadata includes `qb_payment_id`, `amount_cents`, and `method`.
+This proves the manual payment was successfully recorded in QB.
 
 ---
 
@@ -661,6 +689,8 @@ requires re-encrypting stored tokens, which is a deliberate operational step.
 - **Admin sync log** — recent QB API calls with status on the settings detail page
 - **Manual re-sync button** — enqueue SyncQBCustomer for all wholesale customers
 - **Fetch company name** from QB CompanyInfo endpoint on OAuth connect
+- **Overdue invoice detection** — periodic job to flag orders where QB invoice is past
+  due and no payment has been received (neither ACH nor manual)
 
 ---
 

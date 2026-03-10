@@ -46,8 +46,34 @@ type Credentials struct {
 	UpdatedAt        time.Time
 }
 
+// QBCustomer represents a customer record returned from a QBO query.
+type QBCustomer struct {
+	ID          string // QB internal customer ID
+	DisplayName string
+	Email       string
+}
+
+// PaymentParams holds the data needed to record a payment in QBO.
+type PaymentParams struct {
+	CustomerID  string  // QB customer ID
+	InvoiceID   string  // QB invoice ID to apply payment against
+	Amount      int     // payment amount in cents
+	Method      string  // payment method (check, cash, etc.)
+	Reference   string  // optional reference (check number, etc.)
+}
+
+// Payment represents a recorded payment in QBO.
+type Payment struct {
+	ID     string  // QB payment ID
+	Amount float64 // payment amount
+}
+
 // Client is the interface for QuickBooks Online API operations.
 type Client interface {
+	// FindCustomer searches QBO for an existing customer by display name, then
+	// by email. Returns nil (not an error) if no match is found.
+	FindCustomer(ctx context.Context, displayName, email string) (*QBCustomer, error)
+
 	// CreateCustomer creates a customer in QBO and returns their QB customer ID.
 	CreateCustomer(ctx context.Context, c *domain.Customer) (qbCustomerID string, err error)
 
@@ -59,4 +85,7 @@ type Client interface {
 
 	// GetInvoice fetches the current state of an invoice from QBO.
 	GetInvoice(ctx context.Context, qbInvoiceID string) (*Invoice, error)
+
+	// CreatePayment records a payment against a QB invoice.
+	CreatePayment(ctx context.Context, p PaymentParams) (*Payment, error)
 }

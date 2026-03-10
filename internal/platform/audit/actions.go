@@ -82,8 +82,10 @@ const (
 
 	// QuickBooks integration actions
 	AuditQBCustomerCreated    = "qb.customer_created"
+	AuditQBCustomerLinked     = "qb.customer_linked"
 	AuditQBCustomerSynced     = "qb.customer_synced"
 	AuditQBInvoiceCreated     = "qb.invoice_created"
+	AuditQBPaymentSynced      = "qb.payment_synced"
 	AuditOrderPaymentCaptured = "order.payment_captured"
 
 	// Attribute actions

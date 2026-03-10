@@ -18,6 +18,15 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 )
 
+// customerDisplayName returns the display name for a QB customer.
+// Uses CompanyName if available (wholesale), otherwise "FirstName LastName".
+func customerDisplayName(c *domain.Customer) string {
+	if c.CompanyName != nil && *c.CompanyName != "" {
+		return *c.CompanyName
+	}
+	return c.FirstName + " " + c.LastName
+}
+
 // EnsureQBCustomerWorker creates or updates a QB customer, then chains to CreateQBInvoice.
 type EnsureQBCustomerWorker struct {
 	river.WorkerDefaults[EnsureQBCustomerArgs]
@@ -83,10 +92,27 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 	}
 
 	if customer.QBCustomerID == nil {
-		// First order — create QB customer (external call outside transaction)
-		qbID, err := w.qb.CreateCustomer(ctx, customer)
+		// Try to find an existing QB customer before creating a new one.
+		// Many wholesale clients already exist in QuickBooks.
+		displayName := customerDisplayName(customer)
+		found, err := w.qb.FindCustomer(ctx, displayName, customer.Email)
 		if err != nil {
-			return fmt.Errorf("qb create customer: %w", err)
+			return fmt.Errorf("qb find customer: %w", err)
+		}
+
+		var qbID string
+		var auditAction string
+		if found != nil {
+			// Link to existing QB customer
+			qbID = found.ID
+			auditAction = audit.AuditQBCustomerLinked
+		} else {
+			// No match — create a new QB customer
+			qbID, err = w.qb.CreateCustomer(ctx, customer)
+			if err != nil {
+				return fmt.Errorf("qb create customer: %w", err)
+			}
+			auditAction = audit.AuditQBCustomerCreated
 		}
 
 		// Persist QB customer ID in a transaction with audit
@@ -97,12 +123,13 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 			return w.audit.Record(ctx, tx, audit.AuditEntry{
 				ActorType:    domain.AuditActorTypeSystem,
 				ActorName:    "qb_ensure_customer",
-				Action:       audit.AuditQBCustomerCreated,
+				Action:       auditAction,
 				ResourceType: "customer",
 				ResourceID:   customer.ID,
 				Metadata: map[string]any{
 					"qb_customer_id": qbID,
 					"river_job_id":   job.ID,
+					"linked":         found != nil,
 				},
 			})
 		})

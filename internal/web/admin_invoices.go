@@ -159,9 +159,32 @@ func (d *Deps) handleAdminInvoiceRecordPayment(w http.ResponseWriter, r *http.Re
 
 	actor := staffActor(r)
 
+	var invoice *domain.Invoice
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.InvoiceService.RecordPayment(ctx, tx, id, amount, method, reference, note, actor)
-		return txErr
+		var txErr error
+		invoice, txErr = d.InvoiceService.RecordPayment(ctx, tx, id, amount, method, reference, note, actor)
+		if txErr != nil {
+			return txErr
+		}
+
+		// Enqueue QB payment sync if QB is connected (atomically in the same tx)
+		if d.QBClient != nil {
+			ref := ""
+			if reference != nil {
+				ref = *reference
+			}
+			_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.SyncQBPaymentArgs{
+				OrderID:   invoice.OrderID,
+				InvoiceID: invoice.ID,
+				Amount:    amount,
+				Method:    method,
+				Reference: ref,
+			}, nil)
+			if txErr != nil {
+				return txErr
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)

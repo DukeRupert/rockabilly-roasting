@@ -187,6 +187,18 @@ type SyncQBCustomerArgs struct {
 // Kind returns the job kind identifier.
 func (SyncQBCustomerArgs) Kind() string { return "qb_sync_customer" }
 
+// SyncQBPaymentArgs records a manual payment in QBO against the linked invoice.
+type SyncQBPaymentArgs struct {
+	OrderID   uuid.UUID `json:"order_id"`
+	InvoiceID uuid.UUID `json:"invoice_id"` // Hiri invoice ID
+	Amount    int       `json:"amount"`      // payment amount in cents
+	Method    string    `json:"method"`      // check, cash, other
+	Reference string    `json:"reference,omitempty"`
+}
+
+// Kind returns the job kind identifier.
+func (SyncQBPaymentArgs) Kind() string { return "qb_sync_payment" }
+
 // EmailInvoicePaidArgs sends a payment confirmation email for a QB/ACH payment.
 type EmailInvoicePaidArgs struct {
 	OrderID    uuid.UUID `json:"order_id"`

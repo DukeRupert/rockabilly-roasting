@@ -114,7 +114,7 @@ func (w *SubscriptionConfirmEmailWorker) Work(ctx context.Context, job *river.Jo
 
 	slog.Info("subscription confirmation email sent",
 		"subscription_id", sub.ID,
-		"customer_email", customer.Email,
+		"customer_id", customer.ID,
 		"message_id", result.MessageID,
 		"river_job_id", job.ID,
 	)

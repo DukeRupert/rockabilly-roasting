@@ -136,7 +136,7 @@ func (w *OrderConfirmEmailWorker) Work(ctx context.Context, job *river.Job[Order
 	slog.Info("order confirmation email sent",
 		"order_id", order.ID,
 		"order_number", order.Number,
-		"customer_email", customer.Email,
+		"customer_id", customer.ID,
 		"message_id", result.MessageID,
 		"river_job_id", job.ID,
 	)

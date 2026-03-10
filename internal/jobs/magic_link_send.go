@@ -85,7 +85,6 @@ func (w *MagicLinkSendWorker) Work(ctx context.Context, job *river.Job[MagicLink
 
 	slog.Info("magic link email sent",
 		"customer_id", customer.ID,
-		"email", customer.Email,
 		"message_id", result.MessageID,
 		"river_job_id", job.ID,
 	)

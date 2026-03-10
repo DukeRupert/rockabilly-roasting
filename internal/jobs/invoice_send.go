@@ -112,7 +112,7 @@ func (w *InvoiceSendWorker) Work(ctx context.Context, job *river.Job[InvoiceSend
 	slog.Info("invoice email sent",
 		"invoice_id", invoice.ID,
 		"invoice_number", invoice.Number,
-		"customer_email", customerEmail,
+		"customer_id", order.CustomerID,
 		"message_id", result.MessageID,
 		"river_job_id", job.ID,
 	)

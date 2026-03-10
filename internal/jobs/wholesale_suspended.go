@@ -83,7 +83,6 @@ func (w *WholesaleSuspendedWorker) Work(ctx context.Context, job *river.Job[Whol
 
 	slog.Info("wholesale suspended email sent",
 		"customer_id", customer.ID,
-		"email", customer.Email,
 		"company", companyName,
 		"message_id", result.MessageID,
 		"river_job_id", job.ID,

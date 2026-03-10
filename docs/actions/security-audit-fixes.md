@@ -79,8 +79,8 @@
 - **Files:** `internal/jobs/magic_link_send.go:89`, `invoice_send.go:112`, `wholesale_approved.go:109`, `wholesale_suspended.go:84`
 - **Risk:** PII (email addresses) persisted in application logs. Under GDPR/CCPA, this is a compliance concern. Log aggregation systems may retain these indefinitely.
 - **Fix:** Replace `"email", customer.Email` log fields with `"customer_id", customer.ID`. If delivery debugging is needed, log the `message_id` returned by the mailer.
-- [ ] Update all job log statements
-- [ ] Grep for any other email logging instances
+- [x] Update all job log statements (7 instances across 7 files)
+- [x] Grep for any other email logging instances
 
 ---
 

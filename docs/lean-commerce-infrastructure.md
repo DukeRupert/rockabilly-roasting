@@ -143,7 +143,74 @@ Audit log rows are append-only and never updated or deleted. Retention: keep 2 y
 
 Library: `github.com/prometheus/client_golang` (MIT licensed). Metrics are registered on a custom `prometheus.Registry` — not the default global — to prevent conflicts and simplify testing.
 
-The `/metrics` endpoint is exposed on an internal port only (not the public-facing port). Prometheus scrapes every 15 seconds.
+The `/metrics` endpoint is served on a separate internal-only listener, **not** the public-facing port. Default bind address is `127.0.0.1:9090`, configurable via the `METRICS_ADDR` env var. Prometheus scrapes every 15 seconds.
+
+### Connecting Prometheus from a separate VPS
+
+When Prometheus, Grafana, and Loki run on a different server than the application, the metrics endpoint must be reachable across the network. Two options:
+
+**Option A: Bind to private network interface (recommended)**
+
+If both VPSs share a private/internal network (e.g., Hetzner vSwitch, DigitalOcean VPC, Linode VLAN), bind the metrics listener to the app server's private IP:
+
+```bash
+# On the app server (.env or systemd environment)
+METRICS_ADDR=10.0.0.2:9090
+```
+
+```yaml
+# prometheus.yml on the monitoring VPS
+scrape_configs:
+  - job_name: hiri
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["10.0.0.2:9090"]
+```
+
+Firewall the metrics port to only accept connections from the monitoring VPS private IP:
+
+```bash
+# ufw example
+ufw allow from 10.0.0.3 to any port 9090 proto tcp
+```
+
+**Option B: SSH tunnel (no private network available)**
+
+If there's no private network between the VPSs, use an SSH tunnel from the monitoring server:
+
+```bash
+# On the monitoring VPS — forward local :9090 to app server's localhost:9090
+ssh -N -L 9090:127.0.0.1:9090 deploy@app-server.example.com
+```
+
+Then configure Prometheus to scrape `localhost:9090`. Use autossh or a systemd unit to keep the tunnel alive:
+
+```ini
+# /etc/systemd/system/metrics-tunnel.service
+[Unit]
+Description=SSH tunnel to app server metrics
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/ssh -N -o ServerAliveInterval=60 -o ExitOnForwardFailure=yes -L 9090:127.0.0.1:9090 deploy@app-server.example.com
+Restart=always
+RestartSec=10
+User=prometheus
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: hiri
+    scrape_interval: 15s
+    static_configs:
+      - targets: ["localhost:9090"]
+```
+
+**Do not** bind `METRICS_ADDR` to `0.0.0.0` on a public interface without additional firewall rules — it would expose internal counters (webhook event counts, checkout conversion rates, DB pool stats, queue depth) to the internet.
 
 **Two classes of metrics serving two questions:**
 

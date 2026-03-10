@@ -76,9 +76,44 @@ func (w *SyncQBCustomerWorker) work(ctx context.Context, job *river.Job[SyncQBCu
 		return fmt.Errorf("get customer: %w", err)
 	}
 
-	// Skip if customer has no QB ID (never synced)
 	if customer.QBCustomerID == nil {
-		return nil
+		// No QB customer yet — find-or-create (e.g., on wholesale approval).
+		displayName := customerDisplayName(customer)
+		found, findErr := w.qb.FindCustomer(ctx, displayName, customer.Email)
+		if findErr != nil {
+			return fmt.Errorf("qb find customer: %w", findErr)
+		}
+
+		var qbID string
+		var auditAction string
+		if found != nil {
+			qbID = found.ID
+			auditAction = audit.AuditQBCustomerLinked
+		} else {
+			qbID, findErr = w.qb.CreateCustomer(ctx, customer)
+			if findErr != nil {
+				return fmt.Errorf("qb create customer: %w", findErr)
+			}
+			auditAction = audit.AuditQBCustomerCreated
+		}
+
+		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
+			if txErr := w.customers.SetQBCustomerID(ctx, tx, customer.ID, qbID); txErr != nil {
+				return txErr
+			}
+			return w.audit.Record(ctx, tx, audit.AuditEntry{
+				ActorType:    domain.AuditActorTypeSystem,
+				ActorName:    "qb_sync_customer",
+				Action:       auditAction,
+				ResourceType: "customer",
+				ResourceID:   customer.ID,
+				Metadata: map[string]any{
+					"qb_customer_id": qbID,
+					"river_job_id":   job.ID,
+					"linked":         found != nil,
+				},
+			})
+		})
 	}
 
 	// Skip if already synced after last update

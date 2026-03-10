@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
@@ -427,9 +428,20 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		}
 
 		actor := customerActor(r)
-		_, txErr = d.WholesaleService.PlaceWholesaleOrder(ctx, tx, orderParams, actor)
+		order, txErr := d.WholesaleService.PlaceWholesaleOrder(ctx, tx, orderParams, actor)
 		if txErr != nil {
 			return txErr
+		}
+
+		// Enqueue QB customer + invoice chain if QB is connected.
+		if d.QBClient != nil {
+			_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.EnsureQBCustomerArgs{
+				CustomerID: customer.ID,
+				OrderID:    order.ID,
+			}, nil)
+			if txErr != nil {
+				return txErr
+			}
 		}
 
 		// Delete the cart after successful order.

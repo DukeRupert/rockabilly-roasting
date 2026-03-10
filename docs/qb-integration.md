@@ -8,13 +8,40 @@ the loop when payment is collected.
 
 ## Data flow
 
+### Wholesale account lifecycle with QB — IMPLEMENTED
+
+QB integration is **wholesale-only**. Retail/storefront orders never touch QB. The gating
+happens at multiple levels:
+
+1. `SyncQBCustomer` is only enqueued from the wholesale approval handler
+2. `EnsureQBCustomer` is only enqueued from the wholesale order placement handler
+3. `SyncQBPayment` is only enqueued for invoices (which can only be created from
+   `pending_invoice` orders, a status exclusive to wholesale)
+4. All entry points are gated behind `d.QBClient != nil` (QB must be configured)
+
+```
+Wholesale application submitted
+       ↓
+Staff approves in admin → POST /admin/wholesale/{id}/approve
+  — enqueues WholesaleApproved (welcome email)
+  — enqueues SyncQBCustomer (find-or-create QB customer)
+       ↓
+River job: SyncQBCustomer
+  — QB customer ready before first order is placed
+       ↓
+Customer places wholesale order
+  — enqueues EnsureQBCustomer atomically with order
+```
+
 ### Path A: Automated ACH billing (default)
 
 ```
 1. Wholesale order placed in Hiri
+   — EnsureQBCustomer enqueued atomically in same transaction
        ↓
 2. River job: EnsureQBCustomer
-   — find existing QB customer by company name / email, or create new
+   — customer already linked from approval → sync if details changed
+   — chains to CreateQBInvoice
        ↓
 3. River job: CreateQBInvoice
    — create QB invoice from order line items, due date = placed_at + 7 days
@@ -34,8 +61,8 @@ the loop when payment is collected.
 7. River job: EmailInvoicePaid → wholesale customer notified
 ```
 
-Each step is independently retryable. Steps 2 and 3 are River jobs enqueued atomically
-with the order placement transaction. Steps 6 and 7 are driven by QB's webhook — Hiri
+Each step is independently retryable. Steps 1-2 are River jobs enqueued atomically
+with the order placement transaction. Steps 5-7 are driven by QB's webhook — Hiri
 is a passive receiver.
 
 ### Path B: Manual payment (check, cash, etc.)
@@ -212,33 +239,32 @@ EnsureQBCustomer flow:
 Chaining: `EnsureQBCustomer` inserts `CreateQBInvoice` after it succeeds. This keeps the
 jobs sequenced without a single large job — each step is independently retryable.
 
-### Customer sync on profile update
+### SyncQBCustomer River job — IMPLEMENTED (find-or-create + update)
 
-When a wholesale customer's details change in Hiri (name, email, address), a River job
-is enqueued to sync the update to QB. This is separate from the order flow.
+`SyncQBCustomer` handles two scenarios with the same job:
 
-```go
-type SyncQBCustomerArgs struct {
-    CustomerID uuid.UUID `json:"customer_id"`
-}
+1. **Wholesale approval (no QB customer yet):** find-or-create using the same
+   DisplayName/email search as `EnsureQBCustomer`. This pre-creates the QB customer
+   before the first order, so `EnsureQBCustomer` at order time is a fast no-op.
+
+2. **Profile update (QB customer already linked):** sync changed details to QB.
+   Enqueued from `app/customers.go: Update` whenever a wholesale customer record is
+   saved.
+
+```
+SyncQBCustomer flow:
+  customer.QBCustomerID == nil?
+    ├─ YES → FindCustomer(displayName, email)
+    │         ├─ found    → link existing (audit: qb.customer_linked)
+    │         └─ not found → create new (audit: qb.customer_created)
+    └─ NO  → customer changed since last sync?
+              ├─ YES → UpdateCustomer (audit: qb.customer_synced)
+              └─ NO  → skip (no-op)
 ```
 
-Enqueued from `app/customers.go: Update` whenever a wholesale customer record is saved,
-using River's unique job feature to deduplicate — if a sync is already pending for this
-customer, don't enqueue another one.
-
-```go
-// Deduplicate: only one pending sync per customer at a time
-riverClient.Insert(ctx, SyncQBCustomerArgs{CustomerID: id}, &river.InsertOpts{
-    UniqueOpts: river.UniqueOpts{
-        ByArgs: true,
-        ByState: []rivertype.JobState{
-            rivertype.JobStateAvailable,
-            rivertype.JobStateRunning,
-        },
-    },
-})
-```
+**Wiring points:**
+- `web/admin_wholesale.go: handleAdminWholesaleApprove` — enqueued atomically with approval
+- `app/customers.go: Update` — enqueued on profile changes (TODO: add dedup with River unique opts)
 
 ---
 
@@ -681,8 +707,8 @@ requires re-encrypting stored tokens, which is a deliberate operational step.
 
 ## Still TODO
 
-- **Wholesale checkout integration** — enqueue `EnsureQBCustomer` job atomically with
-  wholesale order placement in the checkout flow
+- ~~**Wholesale checkout integration**~~ — DONE: `EnsureQBCustomer` enqueued atomically
+  in `web/wholesale.go` wholesale order placement handler
 - **EmailInvoicePaid worker** — sends payment confirmation email when ACH clears
 - **Refresh token expiry alert job** — periodic River job that checks refresh token age
   and sends alert email to tenant admin when <14 days remain
@@ -691,6 +717,8 @@ requires re-encrypting stored tokens, which is a deliberate operational step.
 - **Fetch company name** from QB CompanyInfo endpoint on OAuth connect
 - **Overdue invoice detection** — periodic job to flag orders where QB invoice is past
   due and no payment has been received (neither ACH nor manual)
+- **Profile update sync wiring** — enqueue `SyncQBCustomer` from `app/customers.go: Update`
+  with River unique opts for deduplication
 
 ---
 

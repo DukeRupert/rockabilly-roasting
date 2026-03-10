@@ -86,7 +86,17 @@ func (d *Deps) handleAdminWholesaleApprove(w http.ResponseWriter, r *http.Reques
 			return txErr
 		}
 		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.WholesaleApprovedArgs{CustomerID: id}, nil)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+		// Pre-create QB customer so it's ready before first order.
+		if d.QBClient != nil {
+			_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.SyncQBCustomerArgs{CustomerID: id}, nil)
+			if txErr != nil {
+				return txErr
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)

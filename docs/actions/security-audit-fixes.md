@@ -44,7 +44,7 @@
 - **File:** `internal/web/customer_auth.go:368–372`
 - **Risk:** The `redirect` query parameter is accepted after successful wholesale login and passed directly to `http.Redirect` with no validation. An attacker can craft `/wholesale/login?redirect=https://evil.com` to redirect authenticated users to a phishing site.
 - **Fix:** Apply the same path validation used on the `next` parameter in `handleAccountMagicRedeem`: only allow values starting with `/` and not starting with `//`. Reject all others, falling back to `/wholesale/portal`.
-- [ ] Implement fix
+- [x] Implement fix
 - [ ] Add test for external URL rejection
 - [ ] Add test for `//evil.com` rejection
 

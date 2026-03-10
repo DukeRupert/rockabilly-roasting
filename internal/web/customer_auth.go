@@ -364,10 +364,12 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 		Secure:   r.TLS != nil,
 	})
 
-	// Redirect to the wholesale portal.
-	redirect := r.URL.Query().Get("redirect")
-	if redirect == "" {
-		redirect = "/wholesale/portal"
+	// Redirect to the wholesale portal. Only allow local paths to prevent open redirect.
+	redirect := "/wholesale/portal"
+	if next := r.URL.Query().Get("redirect"); next != "" {
+		if strings.HasPrefix(next, "/") && !strings.HasPrefix(next, "//") {
+			redirect = next
+		}
 	}
 	http.Redirect(w, r, redirect, http.StatusSeeOther)
 }

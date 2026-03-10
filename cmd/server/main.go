@@ -295,6 +295,7 @@ func run() error {
 		QBOAuthHMACKey:         qbOAuthHMACKey,
 		QBHTTPClient:           &http.Client{Timeout: 30 * time.Second},
 		RateLimiter:            rateLimiter,
+		SecureCookies:          os.Getenv("INSECURE_COOKIES") != "true",
 	}
 
 	handler := web.NewRouter(deps)

@@ -130,7 +130,7 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   int(sessions.StaffSessionDuration.Seconds()),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   d.SecureCookies,
 	})
 
 	http.Redirect(w, r, "/admin/orders", http.StatusSeeOther)

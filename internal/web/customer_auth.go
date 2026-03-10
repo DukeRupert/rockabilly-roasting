@@ -250,7 +250,7 @@ func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) 
 		MaxAge:   int(app.MagicLinkSessionDuration.Seconds()),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   d.SecureCookies,
 	})
 
 	redirectTo := "/account"
@@ -361,7 +361,7 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   int(duration.Seconds()),
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		Secure:   r.TLS != nil,
+		Secure:   d.SecureCookies,
 	})
 
 	// Redirect to the wholesale portal. Only allow local paths to prevent open redirect.

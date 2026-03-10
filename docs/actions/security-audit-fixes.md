@@ -62,7 +62,7 @@
 - **Files:** `internal/web/auth.go:133`, `customer_auth.go:253,364`
 - **Risk:** `Secure: r.TLS != nil` evaluates to `false` when TLS terminates at a reverse proxy (nginx, Cloudflare), which is the standard production deployment. Both `hiri_session` and `hiri_customer` cookies are then sent without the Secure flag, allowing browsers to transmit session tokens over plain HTTP.
 - **Fix:** Hard-code `Secure: true` on all session cookies. For local development, add an env flag (`INSECURE_COOKIES=true`) that opts out.
-- [ ] Implement fix
+- [x] Implement fix
 - [ ] Verify cookies have Secure flag in staging
 
 ### H4: Rate limiter trusts `X-Forwarded-For` without proxy allowlisting

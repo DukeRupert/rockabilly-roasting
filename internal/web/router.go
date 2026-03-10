@@ -56,6 +56,7 @@ type Deps struct {
 	QBOAuthHMACKey          []byte
 	QBHTTPClient            *http.Client
 	RateLimiter             *ratelimit.Limiter
+	SecureCookies           bool
 }
 
 // MetricsMux returns a handler for the internal metrics listener.

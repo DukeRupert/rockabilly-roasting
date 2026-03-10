@@ -31,9 +31,9 @@
 - **File:** `internal/platform/quickbooks/customers.go:83`
 - **Risk:** `queryCustomer` builds a QB query via `fmt.Sprintf` with user-controlled values (customer display name, email). The `escapeQBQuery` function uses backslash escaping, but QB's query language does not recognize backslash as an escape character. A crafted display name can produce malformed or injected queries.
 - **Fix:** Whitelist the allowed field names in a switch statement with static query strings per field. URL-encode the value parameter rather than attempting manual escaping. Verify QB's actual escaping rules in their API documentation.
-- [ ] Research QB query parameterization or correct escaping
-- [ ] Implement fix
-- [ ] Add test with adversarial input (single quotes, backslashes)
+- [x] Research QB query parameterization or correct escaping
+- [x] Implement fix
+- [x] Add test with adversarial input (single quotes, backslashes)
 
 ---
 

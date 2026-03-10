@@ -78,7 +78,15 @@ func (c *QBClient) FindCustomer(ctx context.Context, displayName, email string) 
 
 // queryCustomer runs a QB query for a customer by a single field.
 func (c *QBClient) queryCustomer(ctx context.Context, field, value string) (*QBCustomer, error) {
-	// QB query language uses single quotes, escape them in the value
+	// Whitelist allowed query fields to prevent injection via the field parameter.
+	switch field {
+	case "DisplayName", "PrimaryEmailAddr":
+		// allowed
+	default:
+		return nil, fmt.Errorf("qb customer query: unsupported field %q", field)
+	}
+
+	// QB query language uses doubled single quotes to escape (like SQL), not backslashes.
 	escaped := escapeQBQuery(value)
 	query := fmt.Sprintf("SELECT * FROM Customer WHERE %s = '%s'", field, escaped)
 
@@ -108,11 +116,12 @@ func (c *QBClient) queryCustomer(ctx context.Context, field, value string) (*QBC
 }
 
 // escapeQBQuery escapes single quotes for QB's query language.
+// QB uses doubled single quotes ('') as the escape sequence, like SQL.
 func escapeQBQuery(s string) string {
 	result := make([]byte, 0, len(s))
 	for i := 0; i < len(s); i++ {
 		if s[i] == '\'' {
-			result = append(result, '\\', '\'')
+			result = append(result, '\'', '\'')
 		} else {
 			result = append(result, s[i])
 		}

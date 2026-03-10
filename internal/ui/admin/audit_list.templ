@@ -124,7 +124,6 @@ templ AuditListContent(props AuditListProps) {
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Actor</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Action</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Resource</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Reason</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
@@ -147,13 +146,6 @@ templ AuditListContent(props AuditListProps) {
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
 									<span class="text-rr-body">{ e.ResourceType }</span>
 									<span class="ml-1 font-mono text-xs text-rr-border">{ e.ResourceID.String()[:8] }</span>
-								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
-									if e.Reason != nil {
-										{ *e.Reason }
-									} else {
-										<span class="text-rr-border">&mdash;</span>
-									}
 								</td>
 							</tr>
 						}

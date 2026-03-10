@@ -13,6 +13,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
+	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/store"
@@ -48,7 +49,9 @@ type Deps struct {
 	RiverClient         *river.Client[pgx.Tx]
 	R2Client            *media.R2Client
 	MediaConfig         *media.Config
-	RateLimiter         *ratelimit.Limiter
+	QBClient                quickbooks.Client
+	QBWebhookVerifierToken  string
+	RateLimiter             *ratelimit.Limiter
 }
 
 // NewRouter creates a new HTTP router with all routes and middleware registered.
@@ -300,6 +303,7 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)
+	mux.HandleFunc("POST /webhooks/quickbooks", deps.handleQBWebhook)
 
 	// Apply middleware stack (outermost runs first)
 	var handler http.Handler = mux

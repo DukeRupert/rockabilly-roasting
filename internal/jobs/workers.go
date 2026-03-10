@@ -149,3 +149,49 @@ type StoreLabelToR2Args struct {
 
 // Kind returns the job kind identifier.
 func (StoreLabelToR2Args) Kind() string { return "store_label_to_r2" }
+
+// --- QuickBooks integration jobs ---
+
+// EnsureQBCustomerArgs creates or updates a QB customer, then chains to CreateQBInvoice.
+type EnsureQBCustomerArgs struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+	OrderID    uuid.UUID `json:"order_id"`
+}
+
+// Kind returns the job kind identifier.
+func (EnsureQBCustomerArgs) Kind() string { return "qb_ensure_customer" }
+
+// CreateQBInvoiceArgs creates a QB invoice for a wholesale order.
+type CreateQBInvoiceArgs struct {
+	OrderID      uuid.UUID `json:"order_id"`
+	QBCustomerID string    `json:"qb_customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (CreateQBInvoiceArgs) Kind() string { return "qb_create_invoice" }
+
+// ProcessQBInvoiceUpdateArgs handles a QB webhook notification about an invoice update.
+type ProcessQBInvoiceUpdateArgs struct {
+	QBInvoiceID string `json:"qb_invoice_id"`
+	RealmID     string `json:"realm_id"`
+}
+
+// Kind returns the job kind identifier.
+func (ProcessQBInvoiceUpdateArgs) Kind() string { return "qb_process_invoice_update" }
+
+// SyncQBCustomerArgs syncs customer details to QB (triggered by profile updates).
+type SyncQBCustomerArgs struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (SyncQBCustomerArgs) Kind() string { return "qb_sync_customer" }
+
+// EmailInvoicePaidArgs sends a payment confirmation email for a QB/ACH payment.
+type EmailInvoicePaidArgs struct {
+	OrderID    uuid.UUID `json:"order_id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (EmailInvoicePaidArgs) Kind() string { return "email:invoice_paid" }

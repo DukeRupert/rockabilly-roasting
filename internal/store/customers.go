@@ -386,6 +386,83 @@ func (s *CustomerStore) DeleteAddress(ctx context.Context, tx pgx.Tx, id, custom
 	return nil
 }
 
+// --- QuickBooks sync methods ---
+
+// SetQBCustomerID sets the QB customer ID on a customer.
+func (s *CustomerStore) SetQBCustomerID(ctx context.Context, tx pgx.Tx, id uuid.UUID, qbID string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE customers SET qb_customer_id = $2, qb_synced_at = now(), updated_at = now() WHERE id = $1`,
+		id, qbID,
+	)
+	if err != nil {
+		return fmt.Errorf("set qb customer id: %w", err)
+	}
+	return nil
+}
+
+// SetQBSyncedAt updates the QB sync timestamp on a customer.
+func (s *CustomerStore) SetQBSyncedAt(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE customers SET qb_synced_at = now(), updated_at = now() WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("set qb synced at: %w", err)
+	}
+	return nil
+}
+
+// ListWholesaleWithQBCustomerID returns all wholesale customers that have a QB customer ID.
+// Used for the "Re-sync all customers" admin action.
+func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pgx.Tx) ([]domain.Customer, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT id, email, email_verified, password_hash, first_name, last_name, phone,
+		        tax_exempt, tax_exempt_reason, stripe_customer_id,
+		        customer_group_id, account_type, wholesale_status, company_name,
+		        website, wholesale_notes, approved_at, approved_by,
+		        qb_customer_id, qb_synced_at,
+		        two_fa_enabled, two_fa_method,
+		        metadata, created_at, updated_at
+		 FROM customers
+		 WHERE account_type = 'wholesale' AND qb_customer_id IS NOT NULL
+		 ORDER BY company_name`)
+	if err != nil {
+		return nil, fmt.Errorf("list wholesale with qb id: %w", err)
+	}
+	defer rows.Close()
+
+	var customers []domain.Customer
+	for rows.Next() {
+		var c domain.Customer
+		var accountType string
+		var wholesaleStatus *string
+		var metadata []byte
+		var approvedAt pgtype.Timestamptz
+		var qbSyncedAt pgtype.Timestamptz
+		if err := rows.Scan(
+			&c.ID, &c.Email, &c.EmailVerified, &c.PasswordHash, &c.FirstName, &c.LastName, &c.Phone,
+			&c.TaxExempt, &c.TaxExemptReason, &c.StripeCustomerID,
+			&c.CustomerGroupID, &accountType, &wholesaleStatus, &c.CompanyName,
+			&c.Website, &c.WholesaleNotes, &approvedAt, &c.ApprovedBy,
+			&c.QBCustomerID, &qbSyncedAt,
+			&c.TwoFAEnabled, &c.TwoFAMethod,
+			&metadata, &c.CreatedAt, &c.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan wholesale customer: %w", err)
+		}
+		c.AccountType = domain.AccountType(accountType)
+		if wholesaleStatus != nil {
+			ws := domain.WholesaleStatus(*wholesaleStatus)
+			c.WholesaleStatus = &ws
+		}
+		c.ApprovedAt = timestampFromPG(approvedAt)
+		c.QBSyncedAt = timestampFromPG(qbSyncedAt)
+		c.Metadata = metadataFromJSON(metadata)
+		customers = append(customers, c)
+	}
+	return customers, rows.Err()
+}
+
 // --- Row converters ---
 
 func customerFromRow(r sqlcgen.Customer) *domain.Customer {

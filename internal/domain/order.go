@@ -97,6 +97,9 @@ type Order struct {
 	TaxExemptReason   *string
 	StripeTaxID            *string
 	StripePaymentIntentID  *string
+	QBInvoiceID            *string
+	QBInvoiceNo            *string
+	QBSyncedAt             *time.Time
 	CustomerPONumber       *string
 	InternalNote           *string
 	Notes                  *string

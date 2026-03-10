@@ -275,6 +275,59 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	return orders, rows.Err()
 }
 
+// --- QuickBooks sync methods ---
+
+// SetQBInvoice stores the QB invoice ID and number on an order.
+func (s *OrderStore) SetQBInvoice(ctx context.Context, tx pgx.Tx, id uuid.UUID, qbInvoiceID, qbInvoiceNo string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE orders SET qb_invoice_id = $2, qb_invoice_no = $3, qb_synced_at = now(), updated_at = now() WHERE id = $1`,
+		id, qbInvoiceID, qbInvoiceNo,
+	)
+	if err != nil {
+		return fmt.Errorf("set qb invoice: %w", err)
+	}
+	return nil
+}
+
+// GetOrderByQBInvoiceID returns an order by its QB invoice ID.
+func (s *OrderStore) GetOrderByQBInvoiceID(ctx context.Context, tx pgx.Tx, qbInvoiceID string) (*domain.Order, error) {
+	var o domain.Order
+	var status, paymentStatus, fulfillmentStatus string
+	var subtotal, discountTotal, shippingTotal, taxTotal, total int32
+	var metadata json.RawMessage
+	err := tx.QueryRow(ctx,
+		`SELECT id, number, customer_id, status, payment_status, fulfillment_status,
+		        currency_code, subtotal, discount_total, shipping_total, tax_total, total,
+		        shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
+		        tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
+		        qb_invoice_id, qb_invoice_no, qb_synced_at,
+		        customer_po_number, internal_note,
+		        notes, metadata, placed_at, created_at, updated_at
+		 FROM orders WHERE qb_invoice_id = $1`, qbInvoiceID,
+	).Scan(
+		&o.ID, &o.Number, &o.CustomerID, &status, &paymentStatus, &fulfillmentStatus,
+		&o.CurrencyCode, &subtotal, &discountTotal, &shippingTotal, &taxTotal, &total,
+		&o.ShippingAddressID, &o.BillingAddressID, &o.SubscriptionID, &o.DraftByUserID,
+		&o.TaxExempt, &o.TaxExemptReason, &o.StripeTaxID, &o.StripePaymentIntentID,
+		&o.QBInvoiceID, &o.QBInvoiceNo, &o.QBSyncedAt,
+		&o.CustomerPONumber, &o.InternalNote,
+		&o.Notes, &metadata, &o.PlacedAt, &o.CreatedAt, &o.UpdatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("get order by qb invoice id: %w", err)
+	}
+	o.Status = domain.OrderStatus(status)
+	o.PaymentStatus = domain.PaymentStatus(paymentStatus)
+	o.FulfillmentStatus = domain.FulfillmentStatus(fulfillmentStatus)
+	o.Subtotal = int(subtotal)
+	o.DiscountTotal = int(discountTotal)
+	o.ShippingTotal = int(shippingTotal)
+	o.TaxTotal = int(taxTotal)
+	o.Total = int(total)
+	o.Metadata = metadataFromJSON(metadata)
+	return &o, nil
+}
+
 // --- Carts ---
 
 // CreateCartParams holds the fields needed to create a cart.

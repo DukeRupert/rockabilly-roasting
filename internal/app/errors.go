@@ -101,6 +101,9 @@ var (
 	ErrAttributeSetNotFound = errors.New("attribute set not found")
 	ErrAttributeKeyNotFound = errors.New("attribute key not found")
 
+	// QuickBooks errors
+	ErrQBNotConnected = errors.New("quickbooks is not connected")
+
 	// Invoice errors
 	ErrInvoiceNotFound    = errors.New("invoice not found")
 	ErrOrderNotInvoiceable = errors.New("order cannot be invoiced")

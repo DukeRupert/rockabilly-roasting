@@ -80,6 +80,12 @@ const (
 	AuditInvoiceVoided          = "invoice.voided"
 	AuditInvoicePaymentRecorded = "invoice.payment_recorded"
 
+	// QuickBooks integration actions
+	AuditQBCustomerCreated    = "qb.customer_created"
+	AuditQBCustomerSynced     = "qb.customer_synced"
+	AuditQBInvoiceCreated     = "qb.invoice_created"
+	AuditOrderPaymentCaptured = "order.payment_captured"
+
 	// Attribute actions
 	AuditAttributeSetCreated      = "attribute_set.created"
 	AuditAttributeSetUpdated      = "attribute_set.updated"

@@ -43,6 +43,8 @@ type Customer struct {
 	WholesaleNotes   *string
 	ApprovedAt       *time.Time
 	ApprovedBy       *uuid.UUID
+	QBCustomerID     *string
+	QBSyncedAt       *time.Time
 	TwoFAEnabled     bool
 	TwoFAMethod      *string
 	Metadata         map[string]any

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/riverqueue/river"
@@ -25,6 +27,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
+	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/platform/shipping"
@@ -89,6 +92,30 @@ func run() error {
 	storeName := os.Getenv("STORE_NAME")
 	staffEmail := os.Getenv("STAFF_NOTIFICATION_EMAIL")
 
+	// QuickBooks Online integration
+	qbCredStore := store.NewQBCredentialStore()
+	var qbClient quickbooks.Client
+	qbWebhookVerifier := os.Getenv("QB_WEBHOOK_VERIFIER_TOKEN")
+	if qbClientID := os.Getenv("QB_CLIENT_ID"); qbClientID != "" {
+		qbEncKeyB64 := os.Getenv("QB_TOKEN_ENCRYPTION_KEY")
+		qbEncKey, decodeErr := base64DecodeKey(qbEncKeyB64)
+		if decodeErr != nil {
+			return fmt.Errorf("decode QB_TOKEN_ENCRYPTION_KEY: %w", decodeErr)
+		}
+		// TenantID: for single-tenant, use a fixed UUID or derive from config.
+		// In a multi-tenant setup this would come from the request context.
+		tenantID := tenantIDFromEnv()
+
+		qbClient = quickbooks.NewQBClient(quickbooks.ClientConfig{
+			ClientID:      qbClientID,
+			ClientSecret:  os.Getenv("QB_CLIENT_SECRET"),
+			EncryptionKey: qbEncKey,
+			Environment:   os.Getenv("QB_ENVIRONMENT"),
+			RedirectURI:   os.Getenv("QB_REDIRECT_URI"),
+		}, tenantID, qbCredStore, pool)
+		logger.Info("quickbooks integration configured", "environment", os.Getenv("QB_ENVIRONMENT"))
+	}
+
 	// Media (R2 storage + Cloudflare Image Transformations)
 	mediaConfig := &media.Config{
 		MediaBaseURL: os.Getenv("MEDIA_BASE_URL"),
@@ -152,6 +179,9 @@ func run() error {
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
 
+	// QB workers are registered after the river client is created (they need it for job chaining)
+	// See below after riverClient creation.
+
 	// River client — we create it first, then pass it to the scheduler worker
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Queues: map[string]river.QueueConfig{
@@ -178,6 +208,15 @@ func run() error {
 
 	// Register scheduler worker (needs the client for transactional inserts)
 	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient, metricsReg))
+
+	// Register QB workers (need riverClient for job chaining)
+	if qbClient != nil {
+		river.AddWorker(workers, jobs.NewEnsureQBCustomerWorker(customerStore, qbClient, auditWriter, pool, riverClient, metricsReg))
+		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, catalogStore, qbClient, auditWriter, pool, metricsReg))
+		river.AddWorker(workers, jobs.NewProcessQBInvoiceUpdateWorker(orderStore, qbClient, auditWriter, pool, riverClient, metricsReg))
+		river.AddWorker(workers, jobs.NewSyncQBCustomerWorker(customerStore, qbClient, auditWriter, pool, metricsReg))
+		logger.Info("quickbooks workers registered")
+	}
 
 	// Run River migrations
 	migrator, err := rivermigrate.New(riverpgxv5.New(pool), nil)
@@ -229,7 +268,9 @@ func run() error {
 		RiverClient:        riverClient,
 		R2Client:           r2Client,
 		MediaConfig:        mediaConfig,
-		RateLimiter:        rateLimiter,
+		QBClient:               qbClient,
+		QBWebhookVerifierToken: qbWebhookVerifier,
+		RateLimiter:            rateLimiter,
 	}
 
 	handler := web.NewRouter(deps)
@@ -282,4 +323,31 @@ func run() error {
 
 	logger.Info("server stopped")
 	return nil
+}
+
+// base64DecodeKey decodes a base64-encoded AES-256 key (32 bytes).
+func base64DecodeKey(encoded string) ([]byte, error) {
+	if encoded == "" {
+		return nil, fmt.Errorf("empty encryption key")
+	}
+	key, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return nil, err
+	}
+	if len(key) != 32 {
+		return nil, fmt.Errorf("encryption key must be 32 bytes, got %d", len(key))
+	}
+	return key, nil
+}
+
+// tenantIDFromEnv returns the tenant ID from TENANT_ID env var, or a fixed UUID for single-tenant.
+func tenantIDFromEnv() uuid.UUID {
+	if s := os.Getenv("TENANT_ID"); s != "" {
+		id, err := uuid.Parse(s)
+		if err == nil {
+			return id
+		}
+	}
+	// Single-tenant default — a deterministic UUID for this deployment
+	return uuid.MustParse("00000000-0000-0000-0000-000000000001")
 }

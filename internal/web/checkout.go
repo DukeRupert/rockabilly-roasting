@@ -701,6 +701,16 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 			return fmt.Errorf("place order: %w", txErr)
 		}
 
+		// Verify payment amount matches server-computed order total
+		if int64(order.Total) != pi.AmountCents {
+			logger.Error("payment amount mismatch",
+				"order_total_cents", order.Total,
+				"pi_amount_cents", pi.AmountCents,
+				"payment_intent_id", req.PaymentIntentID,
+			)
+			return app.ErrPaymentAmountMismatch
+		}
+
 		_, txErr = d.OrderService.UpdateStripePaymentIntentID(ctx, tx, order.ID, req.PaymentIntentID)
 		if txErr != nil {
 			return fmt.Errorf("update stripe payment intent: %w", txErr)
@@ -739,6 +749,10 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 		reason := classifyCheckoutError(err)
 		d.Metrics.CheckoutFailed.WithLabelValues("retail", reason).Inc()
 		d.Metrics.CheckoutDuration.WithLabelValues("retail").Observe(time.Since(checkoutStart).Seconds())
+		if errors.Is(err, app.ErrPaymentAmountMismatch) {
+			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "payment amount does not match order total"})
+			return
+		}
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create order"})
 		return
 	}
@@ -805,6 +819,8 @@ func classifyCheckoutError(err error) string {
 	switch {
 	case errors.Is(err, app.ErrPaymentFailed):
 		return "payment_failed"
+	case errors.Is(err, app.ErrPaymentAmountMismatch):
+		return "payment_amount_mismatch"
 	case errors.Is(err, app.ErrCouponAlreadyRedeemed):
 		return "coupon_redeemed"
 	case errors.Is(err, app.ErrInsufficientStock):

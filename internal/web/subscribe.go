@@ -414,6 +414,16 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 		}
 		resp.OrderID = order.ID.String()
 
+		// Verify payment amount matches server-computed order total
+		if int64(order.Total) != pi.AmountCents {
+			logger.Error("subscription payment amount mismatch",
+				"order_total_cents", order.Total,
+				"pi_amount_cents", pi.AmountCents,
+				"payment_intent_id", req.PaymentIntentID,
+			)
+			return app.ErrPaymentAmountMismatch
+		}
+
 		// Store Stripe PI ID + mark payment captured
 		_, txErr = d.OrderService.UpdateStripePaymentIntentID(ctx, tx, order.ID, req.PaymentIntentID)
 		if txErr != nil {
@@ -454,6 +464,10 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		logger.Error("subscribe confirm", "error", err)
+		if errors.Is(err, app.ErrPaymentAmountMismatch) {
+			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "payment amount does not match order total"})
+			return
+		}
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create subscription"})
 		return
 	}

@@ -63,7 +63,8 @@ var (
 	ErrPasswordTooShort  = errors.New("password must be at least 8 characters")
 
 	// Payment errors
-	ErrPaymentFailed = errors.New("payment failed")
+	ErrPaymentFailed         = errors.New("payment failed")
+	ErrPaymentAmountMismatch = errors.New("payment amount does not match order total")
 
 	// Tax errors
 	ErrTaxCalculationFailed = errors.New("tax calculation failed")

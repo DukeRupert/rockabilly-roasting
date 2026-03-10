@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -75,6 +76,19 @@ func run() error {
 	metricsReg := metrics.NewRegistry()
 	rateLimitStore := ratelimit.NewMemoryStore(5 * time.Minute)
 	rateLimiter := ratelimit.NewLimiter(rateLimitStore)
+
+	// Configure trusted reverse proxy CIDRs for accurate client IP extraction.
+	// Comma-separated list of CIDRs, e.g. "10.0.0.0/8,172.16.0.1/32".
+	if proxyCIDRs := os.Getenv("TRUSTED_PROXIES"); proxyCIDRs != "" {
+		cidrs := strings.Split(proxyCIDRs, ",")
+		for i := range cidrs {
+			cidrs[i] = strings.TrimSpace(cidrs[i])
+		}
+		if err := ratelimit.SetTrustedProxies(cidrs); err != nil {
+			return fmt.Errorf("trusted proxies: %w", err)
+		}
+		logger.Info("trusted proxies configured", "cidrs", cidrs)
+	}
 	sessionStore := store.NewSessionStore()
 	sessionMgr := sessions.NewManager(sessionStore)
 	paymentProvider := payments.NewStripeProvider(

@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -59,27 +60,81 @@ func (l *Limiter) Reset(ctx context.Context, key string) error {
 	return l.store.Reset(ctx, key)
 }
 
-// ClientIP extracts the client IP from the request.
-// It checks X-Forwarded-For and X-Real-IP first (for reverse proxies),
-// then falls back to RemoteAddr.
-func ClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP (before any comma).
-		for i := 0; i < len(xff); i++ {
-			if xff[i] == ',' {
-				return strings.TrimSpace(xff[:i])
-			}
+// trustedProxies holds the CIDRs of trusted reverse proxies.
+// Only connections from these addresses will have X-Forwarded-For / X-Real-IP
+// headers honored. Set once at startup via SetTrustedProxies.
+var (
+	trustedMu      sync.RWMutex
+	trustedProxies []*net.IPNet
+)
+
+// SetTrustedProxies configures which source IPs are allowed to set
+// forwarded headers. Pass CIDR strings like "10.0.0.0/8" or "172.16.0.1/32".
+// Must be called before serving requests (typically in main).
+func SetTrustedProxies(cidrs []string) error {
+	nets := make([]*net.IPNet, 0, len(cidrs))
+	for _, cidr := range cidrs {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return fmt.Errorf("parse trusted proxy CIDR %q: %w", cidr, err)
 		}
-		return strings.TrimSpace(xff)
+		nets = append(nets, ipNet)
 	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
+	trustedMu.Lock()
+	trustedProxies = nets
+	trustedMu.Unlock()
+	return nil
+}
+
+// isTrustedProxy checks whether ip is within a configured trusted proxy CIDR.
+func isTrustedProxy(ip string) bool {
+	trustedMu.RLock()
+	proxies := trustedProxies
+	trustedMu.RUnlock()
+
+	if len(proxies) == 0 {
+		return false
 	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
+
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return false
+	}
+	for _, cidr := range proxies {
+		if cidr.Contains(parsed) {
+			return true
+		}
+	}
+	return false
+}
+
+// ClientIP extracts the client IP from the request.
+// Forwarded headers (X-Forwarded-For, X-Real-IP) are only trusted when
+// RemoteAddr matches a configured trusted proxy CIDR. Otherwise RemoteAddr
+// is used directly, preventing attackers from spoofing their IP.
+func ClientIP(r *http.Request) string {
+	remoteHost, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		remoteHost = r.RemoteAddr
 	}
-	return host
+
+	// Only read forwarded headers if the direct connection is from a trusted proxy.
+	if isTrustedProxy(remoteHost) {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			// Take the first IP (the original client).
+			for i := 0; i < len(xff); i++ {
+				if xff[i] == ',' {
+					return strings.TrimSpace(xff[:i])
+				}
+			}
+			return strings.TrimSpace(xff)
+		}
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			return xri
+		}
+	}
+
+	return remoteHost
 }
 
 // HashIdentifier returns a hex-encoded SHA-256 hash of an identifier (email).

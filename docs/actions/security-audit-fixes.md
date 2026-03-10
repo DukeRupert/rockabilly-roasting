@@ -70,9 +70,9 @@
 - **File:** `internal/platform/ratelimit/limiter.go:63–82`
 - **Risk:** `ClientIP()` reads `X-Forwarded-For` and `X-Real-IP` unconditionally. An attacker can rotate their effective IP on every request by changing the header, entirely defeating per-IP rate limits on login, magic link, coupon, and checkout endpoints.
 - **Fix:** Add a `TrustedProxies []net.IPNet` config (loaded from env). Only read forwarded headers when `r.RemoteAddr` matches a trusted CIDR. Otherwise use `r.RemoteAddr` directly.
-- [ ] Implement trusted proxy configuration
-- [ ] Update `ClientIP()` logic
-- [ ] Add tests for spoofed header rejection
+- [x] Implement trusted proxy configuration
+- [x] Update `ClientIP()` logic
+- [x] Add tests for spoofed header rejection
 
 ### H5: Customer email addresses logged in plaintext
 

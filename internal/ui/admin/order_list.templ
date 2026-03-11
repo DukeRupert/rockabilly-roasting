@@ -68,6 +68,7 @@ templ OrderListContent(props OrderListProps) {
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Order Status</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Fulfillment</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Shipping</th>
 							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Total</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Date</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
@@ -88,6 +89,13 @@ templ OrderListContent(props OrderListProps) {
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									@FulfillmentStatusBadge(o.FulfillmentStatus)
+								</td>
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm md:table-cell">
+									if o.ShippingMethod != nil {
+										@ShippingMethodBadge(*o.ShippingMethod)
+									} else {
+										<span class="text-rr-border">&mdash;</span>
+									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-heading text-right tabular-nums">
 									{ formatCents(o.Total) }

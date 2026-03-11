@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -113,4 +114,60 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.CustomerShow(props).Render(ctx, w) //nolint:errcheck
+}
+
+func (d *Deps) handleAdminCustomerPaymentTerms(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var days *int
+	if v := r.FormValue("payment_terms_days"); v != "" {
+		d, err := strconv.Atoi(v)
+		if err != nil || (d != 7 && d != 15 && d != 21 && d != 30) {
+			http.Error(w, "Invalid payment terms", http.StatusBadRequest)
+			return
+		}
+		days = &d
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.CustomerStore.UpdatePaymentTerms(ctx, tx, id, days)
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/customers/%s", id), http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminCustomerBillingMethod(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	method := domain.BillingMethod(r.FormValue("billing_method"))
+	if method != domain.BillingMethodManual && method != domain.BillingMethodACH && method != domain.BillingMethodCreditCard {
+		http.Error(w, "Invalid billing method", http.StatusBadRequest)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.CustomerStore.UpdateBillingMethod(ctx, tx, id, method)
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/customers/%s", id), http.StatusSeeOther)
 }

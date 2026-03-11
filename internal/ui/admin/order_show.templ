@@ -251,6 +251,31 @@ templ OrderShowContent(props OrderShowProps) {
 			</div>
 		}
 	</div>
+	<!-- Shipping method & delivery date -->
+	if props.Order.ShippingMethod != nil || props.Order.RequestedDeliveryDate != nil || (props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "") {
+		<div class="mt-4 rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+			<div class="flex flex-wrap items-center gap-4">
+				if props.Order.ShippingMethod != nil {
+					<div class="flex items-center gap-2">
+						<span class="text-sm font-medium text-rr-muted">Shipping:</span>
+						@ShippingMethodBadge(*props.Order.ShippingMethod)
+					</div>
+				}
+				if props.Order.RequestedDeliveryDate != nil {
+					<div class="flex items-center gap-2">
+						<span class="text-sm font-medium text-rr-muted">Delivery date:</span>
+						<span class="text-sm text-rr-heading">{ props.Order.RequestedDeliveryDate.Format("January 2, 2006") }</span>
+					</div>
+				}
+				if props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "" {
+					<div class="flex items-center gap-2">
+						<span class="text-sm font-medium text-rr-muted">PO #:</span>
+						<span class="text-sm text-rr-heading">{ *props.Order.CustomerPONumber }</span>
+					</div>
+				}
+			</div>
+		</div>
+	}
 	<!-- Stripe info -->
 	if props.Order.StripePaymentIntentID != nil && *props.Order.StripePaymentIntentID != "" {
 		<div class="mt-4 rounded-sm bg-rr-raised p-4 ring-1 ring-rr-border">

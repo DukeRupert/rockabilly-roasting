@@ -132,6 +132,70 @@ templ CustomerShowContent(props CustomerShowProps) {
 			</dl>
 		</div>
 	</div>
+	<!-- Wholesale billing settings -->
+	if props.Customer.AccountType == domain.AccountTypeWholesale {
+		<div class="mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+			<div class="px-4 py-5 sm:px-6">
+				<h2 class="text-sm font-semibold text-rr-heading">Billing Settings</h2>
+			</div>
+			<div class="border-t border-rr-border">
+				<dl class="divide-y divide-rr-border">
+					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+						<dt class="text-sm font-medium text-rr-muted">Payment terms</dt>
+						<dd class="mt-1 sm:col-span-2 sm:mt-0">
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/payment-terms", props.Customer.ID)) }
+								class="flex items-center gap-2"
+							>
+								<div class="grid grid-cols-1">
+									<select
+										name="payment_terms_days"
+										onchange="this.form.submit()"
+										class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+									>
+										<option value="" selected?={ props.Customer.PaymentTermsDays == nil }>Not set</option>
+										<option value="7" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 7 }>Net 7</option>
+										<option value="15" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 15 }>Net 15</option>
+										<option value="21" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 21 }>Net 21</option>
+										<option value="30" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 30 }>Net 30</option>
+									</select>
+									<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+										<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+									</svg>
+								</div>
+							</form>
+						</dd>
+					</div>
+					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+						<dt class="text-sm font-medium text-rr-muted">Billing method</dt>
+						<dd class="mt-1 sm:col-span-2 sm:mt-0">
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/billing-method", props.Customer.ID)) }
+								class="flex items-center gap-2"
+							>
+								<div class="grid grid-cols-1">
+									<select
+										name="billing_method"
+										onchange="this.form.submit()"
+										class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+									>
+										<option value="manual" selected?={ props.Customer.BillingMethod == domain.BillingMethodManual }>Manual</option>
+										<option value="ach" selected?={ props.Customer.BillingMethod == domain.BillingMethodACH }>ACH</option>
+										<option value="credit_card" selected?={ props.Customer.BillingMethod == domain.BillingMethodCreditCard }>Credit Card</option>
+									</select>
+									<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+										<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+									</svg>
+								</div>
+							</form>
+						</dd>
+					</div>
+				</dl>
+			</div>
+		</div>
+	}
 	<!-- Customer Groups -->
 	<div class="mt-8">
 		<div class="sm:flex sm:items-center sm:justify-between">

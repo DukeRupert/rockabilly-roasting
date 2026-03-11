@@ -142,6 +142,70 @@ templ WholesaleStatusBadge(status domain.WholesaleStatus) {
 	</span>
 }
 
+func shippingMethodBadgeClasses(method domain.ShippingMethod) string {
+	switch method {
+	case domain.ShippingMethodPickup:
+		return "badge badge-dot badge-slate"
+	case domain.ShippingMethodLocalDelivery:
+		return "badge badge-dot badge-teal"
+	case domain.ShippingMethodShipped:
+		return "badge badge-dot badge-green-solid"
+	default:
+		return "badge badge-dot badge-grey"
+	}
+}
+
+func shippingMethodLabel(method domain.ShippingMethod) string {
+	switch method {
+	case domain.ShippingMethodPickup:
+		return "Pickup"
+	case domain.ShippingMethodLocalDelivery:
+		return "Local Delivery"
+	case domain.ShippingMethodShipped:
+		return "Shipped"
+	default:
+		return string(method)
+	}
+}
+
+templ ShippingMethodBadge(method domain.ShippingMethod) {
+	<span class={ shippingMethodBadgeClasses(method) }>
+		{ shippingMethodLabel(method) }
+	</span>
+}
+
+func billingMethodBadgeClasses(method domain.BillingMethod) string {
+	switch method {
+	case domain.BillingMethodManual:
+		return "badge badge-dot badge-slate"
+	case domain.BillingMethodACH:
+		return "badge badge-dot badge-green"
+	case domain.BillingMethodCreditCard:
+		return "badge badge-dot badge-teal"
+	default:
+		return "badge badge-dot badge-grey"
+	}
+}
+
+func billingMethodLabel(method domain.BillingMethod) string {
+	switch method {
+	case domain.BillingMethodManual:
+		return "Manual"
+	case domain.BillingMethodACH:
+		return "ACH"
+	case domain.BillingMethodCreditCard:
+		return "Credit Card"
+	default:
+		return string(method)
+	}
+}
+
+templ BillingMethodBadge(method domain.BillingMethod) {
+	<span class={ billingMethodBadgeClasses(method) }>
+		{ billingMethodLabel(method) }
+	</span>
+}
+
 func invoiceStatusBadgeClasses(status domain.InvoiceStatus) string {
 	switch status {
 	case domain.InvoiceStatusPaid:

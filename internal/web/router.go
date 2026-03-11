@@ -240,6 +240,8 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("GET /admin/customers/{id}", deps.handleAdminCustomerShow)
 	adminMux.HandleFunc("POST /admin/customers/{id}/groups/add", deps.handleAdminCustomerGroupAdd)
 	adminMux.HandleFunc("POST /admin/customers/{id}/groups/{groupID}/remove", deps.handleAdminCustomerGroupRemove)
+	adminMux.HandleFunc("POST /admin/customers/{id}/payment-terms", deps.handleAdminCustomerPaymentTerms)
+	adminMux.HandleFunc("POST /admin/customers/{id}/billing-method", deps.handleAdminCustomerBillingMethod)
 
 	// Admin customer groups
 	adminMux.HandleFunc("GET /admin/groups", deps.handleAdminGroupList)

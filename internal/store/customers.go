@@ -81,6 +81,7 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	                 tax_exempt, tax_exempt_reason, stripe_customer_id,
 	                 customer_group_id, account_type, wholesale_status, company_name,
 	                 website, wholesale_notes, approved_at, approved_by,
+	                 payment_terms_days, billing_method,
 	                 two_fa_enabled, two_fa_method,
 	                 metadata, created_at, updated_at
 	          FROM customers WHERE true`
@@ -129,6 +130,8 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 		var c domain.Customer
 		var accountType string
 		var wholesaleStatus *string
+		var billingMethod string
+		var paymentTermsDays *int32
 		var metadata []byte
 		var approvedAt pgtype.Timestamptz
 		if err := rows.Scan(
@@ -136,12 +139,18 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 			&c.TaxExempt, &c.TaxExemptReason, &c.StripeCustomerID,
 			&c.CustomerGroupID, &accountType, &wholesaleStatus, &c.CompanyName,
 			&c.Website, &c.WholesaleNotes, &approvedAt, &c.ApprovedBy,
+			&paymentTermsDays, &billingMethod,
 			&c.TwoFAEnabled, &c.TwoFAMethod,
 			&metadata, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
 		}
 		c.AccountType = domain.AccountType(accountType)
+		c.BillingMethod = domain.BillingMethod(billingMethod)
+		if paymentTermsDays != nil {
+			v := int(*paymentTermsDays)
+			c.PaymentTermsDays = &v
+		}
 		if wholesaleStatus != nil {
 			ws := domain.WholesaleStatus(*wholesaleStatus)
 			c.WholesaleStatus = &ws
@@ -386,6 +395,35 @@ func (s *CustomerStore) DeleteAddress(ctx context.Context, tx pgx.Tx, id, custom
 	return nil
 }
 
+// UpdatePaymentTerms sets a customer's payment terms in days.
+func (s *CustomerStore) UpdatePaymentTerms(ctx context.Context, tx pgx.Tx, id uuid.UUID, days *int) error {
+	var dbDays *int32
+	if days != nil {
+		v := int32(*days)
+		dbDays = &v
+	}
+	err := sqlcgen.New(tx).UpdateCustomerPaymentTerms(ctx, sqlcgen.UpdateCustomerPaymentTermsParams{
+		ID:               id,
+		PaymentTermsDays: dbDays,
+	})
+	if err != nil {
+		return fmt.Errorf("update customer payment terms: %w", err)
+	}
+	return nil
+}
+
+// UpdateBillingMethod sets a customer's billing method.
+func (s *CustomerStore) UpdateBillingMethod(ctx context.Context, tx pgx.Tx, id uuid.UUID, method domain.BillingMethod) error {
+	err := sqlcgen.New(tx).UpdateCustomerBillingMethod(ctx, sqlcgen.UpdateCustomerBillingMethodParams{
+		ID:            id,
+		BillingMethod: string(method),
+	})
+	if err != nil {
+		return fmt.Errorf("update customer billing method: %w", err)
+	}
+	return nil
+}
+
 // --- QuickBooks sync methods ---
 
 // SetQBCustomerID sets the QB customer ID on a customer.
@@ -420,6 +458,7 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 		        tax_exempt, tax_exempt_reason, stripe_customer_id,
 		        customer_group_id, account_type, wholesale_status, company_name,
 		        website, wholesale_notes, approved_at, approved_by,
+		        payment_terms_days, billing_method,
 		        qb_customer_id, qb_synced_at,
 		        two_fa_enabled, two_fa_method,
 		        metadata, created_at, updated_at
@@ -436,6 +475,8 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 		var c domain.Customer
 		var accountType string
 		var wholesaleStatus *string
+		var billingMethod string
+		var paymentTermsDays *int32
 		var metadata []byte
 		var approvedAt pgtype.Timestamptz
 		var qbSyncedAt pgtype.Timestamptz
@@ -444,6 +485,7 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 			&c.TaxExempt, &c.TaxExemptReason, &c.StripeCustomerID,
 			&c.CustomerGroupID, &accountType, &wholesaleStatus, &c.CompanyName,
 			&c.Website, &c.WholesaleNotes, &approvedAt, &c.ApprovedBy,
+			&paymentTermsDays, &billingMethod,
 			&c.QBCustomerID, &qbSyncedAt,
 			&c.TwoFAEnabled, &c.TwoFAMethod,
 			&metadata, &c.CreatedAt, &c.UpdatedAt,
@@ -451,6 +493,11 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 			return nil, fmt.Errorf("scan wholesale customer: %w", err)
 		}
 		c.AccountType = domain.AccountType(accountType)
+		c.BillingMethod = domain.BillingMethod(billingMethod)
+		if paymentTermsDays != nil {
+			v := int(*paymentTermsDays)
+			c.PaymentTermsDays = &v
+		}
 		if wholesaleStatus != nil {
 			ws := domain.WholesaleStatus(*wholesaleStatus)
 			c.WholesaleStatus = &ws
@@ -484,11 +531,16 @@ func customerFromRow(r sqlcgen.Customer) *domain.Customer {
 		WholesaleNotes:   r.WholesaleNotes,
 		ApprovedAt:       timestampFromPG(r.ApprovedAt),
 		ApprovedBy:       r.ApprovedBy,
+		BillingMethod:    domain.BillingMethod(r.BillingMethod),
 		TwoFAEnabled:     r.TwoFaEnabled,
 		TwoFAMethod:      r.TwoFaMethod,
 		Metadata:         metadataFromJSON(r.Metadata),
 		CreatedAt:        r.CreatedAt,
 		UpdatedAt:        r.UpdatedAt,
+	}
+	if r.PaymentTermsDays != nil {
+		v := int(*r.PaymentTermsDays)
+		c.PaymentTermsDays = &v
 	}
 	if r.WholesaleStatus != nil {
 		ws := domain.WholesaleStatus(*r.WholesaleStatus)

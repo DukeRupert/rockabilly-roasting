@@ -44,6 +44,16 @@ UPDATE customers
 SET customer_group_id = $2, updated_at = now()
 WHERE id = $1;
 
+-- name: UpdateCustomerPaymentTerms :exec
+UPDATE customers
+SET payment_terms_days = $2, updated_at = now()
+WHERE id = $1;
+
+-- name: UpdateCustomerBillingMethod :exec
+UPDATE customers
+SET billing_method = $2, updated_at = now()
+WHERE id = $1;
+
 -- name: UpdateCustomerStripeCustomerID :one
 UPDATE customers
 SET stripe_customer_id = $2, updated_at = now()

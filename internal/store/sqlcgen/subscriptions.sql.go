@@ -27,24 +27,26 @@ func (q *Queries) CancelSubscription(ctx context.Context, id uuid.UUID) error {
 
 const createSubscription = `-- name: CreateSubscription :one
 INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
-                           current_period_start, current_period_end, next_order_at, ends_at, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at
+                           current_period_start, current_period_end, next_order_at, ends_at,
+                           stripe_payment_method_id, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id
 `
 
 type CreateSubscriptionParams struct {
-	ID                 uuid.UUID          `json:"id"`
-	CustomerID         uuid.UUID          `json:"customer_id"`
-	PlanID             uuid.UUID          `json:"plan_id"`
-	VariantID          uuid.UUID          `json:"variant_id"`
-	Quantity           int32              `json:"quantity"`
-	Status             string             `json:"status"`
-	ShippingAddressID  uuid.UUID          `json:"shipping_address_id"`
-	CurrentPeriodStart time.Time          `json:"current_period_start"`
-	CurrentPeriodEnd   time.Time          `json:"current_period_end"`
-	NextOrderAt        time.Time          `json:"next_order_at"`
-	EndsAt             pgtype.Timestamptz `json:"ends_at"`
-	Metadata           json.RawMessage    `json:"metadata"`
+	ID                    uuid.UUID          `json:"id"`
+	CustomerID            uuid.UUID          `json:"customer_id"`
+	PlanID                uuid.UUID          `json:"plan_id"`
+	VariantID             uuid.UUID          `json:"variant_id"`
+	Quantity              int32              `json:"quantity"`
+	Status                string             `json:"status"`
+	ShippingAddressID     uuid.UUID          `json:"shipping_address_id"`
+	CurrentPeriodStart    time.Time          `json:"current_period_start"`
+	CurrentPeriodEnd      time.Time          `json:"current_period_end"`
+	NextOrderAt           time.Time          `json:"next_order_at"`
+	EndsAt                pgtype.Timestamptz `json:"ends_at"`
+	StripePaymentMethodID *string            `json:"stripe_payment_method_id"`
+	Metadata              json.RawMessage    `json:"metadata"`
 }
 
 func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error) {
@@ -60,6 +62,7 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		arg.CurrentPeriodEnd,
 		arg.NextOrderAt,
 		arg.EndsAt,
+		arg.StripePaymentMethodID,
 		arg.Metadata,
 	)
 	var i Subscription
@@ -80,6 +83,7 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.VariantID,
 		&i.Quantity,
 		&i.EndsAt,
+		&i.StripePaymentMethodID,
 	)
 	return i, err
 }
@@ -146,7 +150,7 @@ func (q *Queries) CreateSubscriptionPlan(ctx context.Context, arg CreateSubscrip
 }
 
 const getSubscriptionByID = `-- name: GetSubscriptionByID :one
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at FROM subscriptions WHERE id = $1
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id FROM subscriptions WHERE id = $1
 `
 
 func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscription, error) {
@@ -169,12 +173,13 @@ func (q *Queries) GetSubscriptionByID(ctx context.Context, id uuid.UUID) (Subscr
 		&i.VariantID,
 		&i.Quantity,
 		&i.EndsAt,
+		&i.StripePaymentMethodID,
 	)
 	return i, err
 }
 
 const getSubscriptionByIDAndCustomer = `-- name: GetSubscriptionByIDAndCustomer :one
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at FROM subscriptions WHERE id = $1 AND customer_id = $2
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id FROM subscriptions WHERE id = $1 AND customer_id = $2
 `
 
 type GetSubscriptionByIDAndCustomerParams struct {
@@ -202,6 +207,7 @@ func (q *Queries) GetSubscriptionByIDAndCustomer(ctx context.Context, arg GetSub
 		&i.VariantID,
 		&i.Quantity,
 		&i.EndsAt,
+		&i.StripePaymentMethodID,
 	)
 	return i, err
 }
@@ -289,7 +295,7 @@ func (q *Queries) ListSubscriptionPlans(ctx context.Context) ([]SubscriptionPlan
 }
 
 const listSubscriptionsByCustomer = `-- name: ListSubscriptionsByCustomer :many
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at FROM subscriptions
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id FROM subscriptions
 WHERE customer_id = $1
 ORDER BY created_at DESC
 `
@@ -320,6 +326,7 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 			&i.VariantID,
 			&i.Quantity,
 			&i.EndsAt,
+			&i.StripePaymentMethodID,
 		); err != nil {
 			return nil, err
 		}
@@ -332,7 +339,7 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 }
 
 const listSubscriptionsDueForRenewal = `-- name: ListSubscriptionsDueForRenewal :many
-SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at FROM subscriptions
+SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id FROM subscriptions
 WHERE status = 'active' AND next_order_at <= now()
   AND (ends_at IS NULL OR ends_at > now())
 ORDER BY next_order_at ASC
@@ -364,6 +371,7 @@ func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscri
 			&i.VariantID,
 			&i.Quantity,
 			&i.EndsAt,
+			&i.StripePaymentMethodID,
 		); err != nil {
 			return nil, err
 		}
@@ -446,7 +454,7 @@ const updateSubscriptionStatus = `-- name: UpdateSubscriptionStatus :one
 UPDATE subscriptions
 SET status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id
 `
 
 type UpdateSubscriptionStatusParams struct {
@@ -474,6 +482,23 @@ func (q *Queries) UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscr
 		&i.VariantID,
 		&i.Quantity,
 		&i.EndsAt,
+		&i.StripePaymentMethodID,
 	)
 	return i, err
+}
+
+const updateSubscriptionStripePaymentMethodID = `-- name: UpdateSubscriptionStripePaymentMethodID :exec
+UPDATE subscriptions
+SET stripe_payment_method_id = $2, updated_at = now()
+WHERE id = $1
+`
+
+type UpdateSubscriptionStripePaymentMethodIDParams struct {
+	ID                    uuid.UUID `json:"id"`
+	StripePaymentMethodID *string   `json:"stripe_payment_method_id"`
+}
+
+func (q *Queries) UpdateSubscriptionStripePaymentMethodID(ctx context.Context, arg UpdateSubscriptionStripePaymentMethodIDParams) error {
+	_, err := q.db.Exec(ctx, updateSubscriptionStripePaymentMethodID, arg.ID, arg.StripePaymentMethodID)
+	return err
 }

@@ -50,6 +50,15 @@ const (
 	FulfillmentStatusReturned           FulfillmentStatus = "returned"
 )
 
+// ShippingMethod represents how an order is fulfilled.
+type ShippingMethod string
+
+const (
+	ShippingMethodPickup        ShippingMethod = "pickup"
+	ShippingMethodLocalDelivery ShippingMethod = "local_delivery"
+	ShippingMethodShipped       ShippingMethod = "shipped"
+)
+
 // Cart represents a shopping cart.
 type Cart struct {
 	ID                  uuid.UUID
@@ -100,6 +109,8 @@ type Order struct {
 	QBInvoiceID            *string
 	QBInvoiceNo            *string
 	QBSyncedAt             *time.Time
+	ShippingMethod         *ShippingMethod
+	RequestedDeliveryDate  *time.Time
 	CustomerPONumber       *string
 	InternalNote           *string
 	Notes                  *string

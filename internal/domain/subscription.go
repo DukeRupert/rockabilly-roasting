@@ -49,7 +49,8 @@ type Subscription struct {
 	VariantID          uuid.UUID
 	Quantity           int
 	Status             SubscriptionStatus
-	ShippingAddressID  uuid.UUID
+	ShippingAddressID      uuid.UUID
+	StripePaymentMethodID  *string
 	CurrentPeriodStart time.Time
 	CurrentPeriodEnd   time.Time
 	NextOrderAt        time.Time

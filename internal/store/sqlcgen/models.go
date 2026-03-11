@@ -176,6 +176,8 @@ type Customer struct {
 	TwoFaMethod      *string            `json:"two_fa_method"`
 	QbCustomerID     *string            `json:"qb_customer_id"`
 	QbSyncedAt       pgtype.Timestamptz `json:"qb_synced_at"`
+	PaymentTermsDays *int32             `json:"payment_terms_days"`
+	BillingMethod    string             `json:"billing_method"`
 }
 
 type CustomerGroup struct {
@@ -336,6 +338,8 @@ type Order struct {
 	QbInvoiceID           *string            `json:"qb_invoice_id"`
 	QbInvoiceNo           *string            `json:"qb_invoice_no"`
 	QbSyncedAt            pgtype.Timestamptz `json:"qb_synced_at"`
+	ShippingMethod        *string            `json:"shipping_method"`
+	RequestedDeliveryDate pgtype.Timestamptz `json:"requested_delivery_date"`
 }
 
 type Price struct {
@@ -525,22 +529,23 @@ type StoreSetting struct {
 }
 
 type Subscription struct {
-	ID                 uuid.UUID          `json:"id"`
-	CustomerID         uuid.UUID          `json:"customer_id"`
-	PlanID             uuid.UUID          `json:"plan_id"`
-	Status             string             `json:"status"`
-	ShippingAddressID  uuid.UUID          `json:"shipping_address_id"`
-	CurrentPeriodStart time.Time          `json:"current_period_start"`
-	CurrentPeriodEnd   time.Time          `json:"current_period_end"`
-	NextOrderAt        time.Time          `json:"next_order_at"`
-	CancelledAt        pgtype.Timestamptz `json:"cancelled_at"`
-	PauseUntil         pgtype.Timestamptz `json:"pause_until"`
-	Metadata           json.RawMessage    `json:"metadata"`
-	CreatedAt          time.Time          `json:"created_at"`
-	UpdatedAt          time.Time          `json:"updated_at"`
-	VariantID          uuid.UUID          `json:"variant_id"`
-	Quantity           int32              `json:"quantity"`
-	EndsAt             pgtype.Timestamptz `json:"ends_at"`
+	ID                    uuid.UUID          `json:"id"`
+	CustomerID            uuid.UUID          `json:"customer_id"`
+	PlanID                uuid.UUID          `json:"plan_id"`
+	Status                string             `json:"status"`
+	ShippingAddressID     uuid.UUID          `json:"shipping_address_id"`
+	CurrentPeriodStart    time.Time          `json:"current_period_start"`
+	CurrentPeriodEnd      time.Time          `json:"current_period_end"`
+	NextOrderAt           time.Time          `json:"next_order_at"`
+	CancelledAt           pgtype.Timestamptz `json:"cancelled_at"`
+	PauseUntil            pgtype.Timestamptz `json:"pause_until"`
+	Metadata              json.RawMessage    `json:"metadata"`
+	CreatedAt             time.Time          `json:"created_at"`
+	UpdatedAt             time.Time          `json:"updated_at"`
+	VariantID             uuid.UUID          `json:"variant_id"`
+	Quantity              int32              `json:"quantity"`
+	EndsAt                pgtype.Timestamptz `json:"ends_at"`
+	StripePaymentMethodID *string            `json:"stripe_payment_method_id"`
 }
 
 type SubscriptionOrder struct {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store/sqlcgen"
@@ -25,54 +26,63 @@ func NewOrderStore() *OrderStore {
 
 // CreateOrderParams holds the fields needed to create an order.
 type CreateOrderParams struct {
-	Number            string
-	CustomerID        *uuid.UUID
-	Status            domain.OrderStatus
-	PaymentStatus     domain.PaymentStatus
-	FulfillmentStatus domain.FulfillmentStatus
-	CurrencyCode      string
-	Subtotal          int
-	DiscountTotal     int
-	ShippingTotal     int
-	TaxTotal          int
-	Total             int
-	ShippingAddressID uuid.UUID
-	BillingAddressID  uuid.UUID
-	SubscriptionID    *uuid.UUID
-	DraftByUserID     *uuid.UUID
-	TaxExempt         bool
-	TaxExemptReason   *string
-	StripeTaxID       *string
-	Notes             *string
-	Metadata          map[string]any
-	PlacedAt          time.Time
+	Number                string
+	CustomerID            *uuid.UUID
+	Status                domain.OrderStatus
+	PaymentStatus         domain.PaymentStatus
+	FulfillmentStatus     domain.FulfillmentStatus
+	CurrencyCode          string
+	Subtotal              int
+	DiscountTotal         int
+	ShippingTotal         int
+	TaxTotal              int
+	Total                 int
+	ShippingAddressID     uuid.UUID
+	BillingAddressID      uuid.UUID
+	SubscriptionID        *uuid.UUID
+	DraftByUserID         *uuid.UUID
+	TaxExempt             bool
+	TaxExemptReason       *string
+	StripeTaxID           *string
+	ShippingMethod        *domain.ShippingMethod
+	RequestedDeliveryDate *time.Time
+	Notes                 *string
+	Metadata              map[string]any
+	PlacedAt              time.Time
 }
 
 // CreateOrder inserts a new order and returns it.
 func (s *OrderStore) CreateOrder(ctx context.Context, tx pgx.Tx, p CreateOrderParams) (*domain.Order, error) {
+	var shippingMethod *string
+	if p.ShippingMethod != nil {
+		s := string(*p.ShippingMethod)
+		shippingMethod = &s
+	}
 	row, err := sqlcgen.New(tx).CreateOrder(ctx, sqlcgen.CreateOrderParams{
-		ID:                uuid.New(),
-		Number:            p.Number,
-		CustomerID:        p.CustomerID,
-		Status:            string(p.Status),
-		PaymentStatus:     string(p.PaymentStatus),
-		FulfillmentStatus: string(p.FulfillmentStatus),
-		CurrencyCode:      p.CurrencyCode,
-		Subtotal:          int32(p.Subtotal),
-		DiscountTotal:     int32(p.DiscountTotal),
-		ShippingTotal:     int32(p.ShippingTotal),
-		TaxTotal:          int32(p.TaxTotal),
-		Total:             int32(p.Total),
-		ShippingAddressID: p.ShippingAddressID,
-		BillingAddressID:  p.BillingAddressID,
-		SubscriptionID:    p.SubscriptionID,
-		DraftByUserID:     p.DraftByUserID,
-		TaxExempt:         p.TaxExempt,
-		TaxExemptReason:   p.TaxExemptReason,
-		StripeTaxID:       p.StripeTaxID,
-		Notes:             p.Notes,
-		Metadata:          metadataToJSON(p.Metadata),
-		PlacedAt:          p.PlacedAt,
+		ID:                    uuid.New(),
+		Number:                p.Number,
+		CustomerID:            p.CustomerID,
+		Status:                string(p.Status),
+		PaymentStatus:         string(p.PaymentStatus),
+		FulfillmentStatus:     string(p.FulfillmentStatus),
+		CurrencyCode:          p.CurrencyCode,
+		Subtotal:              int32(p.Subtotal),
+		DiscountTotal:         int32(p.DiscountTotal),
+		ShippingTotal:         int32(p.ShippingTotal),
+		TaxTotal:              int32(p.TaxTotal),
+		Total:                 int32(p.Total),
+		ShippingAddressID:     p.ShippingAddressID,
+		BillingAddressID:      p.BillingAddressID,
+		SubscriptionID:        p.SubscriptionID,
+		DraftByUserID:         p.DraftByUserID,
+		TaxExempt:             p.TaxExempt,
+		TaxExemptReason:       p.TaxExemptReason,
+		StripeTaxID:           p.StripeTaxID,
+		ShippingMethod:        shippingMethod,
+		RequestedDeliveryDate: timestampToPG(p.RequestedDeliveryDate),
+		Notes:                 p.Notes,
+		Metadata:              metadataToJSON(p.Metadata),
+		PlacedAt:              p.PlacedAt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert order: %w", err)
@@ -181,6 +191,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	                 currency_code, subtotal, discount_total, shipping_total, tax_total, total,
 	                 shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
 	                 tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
+	                 shipping_method, requested_delivery_date,
 	                 customer_po_number, internal_note,
 	                 notes, metadata, placed_at, created_at, updated_at
 	          FROM orders WHERE true`
@@ -249,6 +260,8 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	for rows.Next() {
 		var o domain.Order
 		var status, paymentStatus, fulfillmentStatus string
+		var shippingMethod *string
+		var requestedDeliveryDate pgtype.Timestamptz
 		var subtotal, discountTotal, shippingTotal, taxTotal, total int32
 		var metadata json.RawMessage
 		if err := rows.Scan(
@@ -256,6 +269,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 			&o.CurrencyCode, &subtotal, &discountTotal, &shippingTotal, &taxTotal, &total,
 			&o.ShippingAddressID, &o.BillingAddressID, &o.SubscriptionID, &o.DraftByUserID,
 			&o.TaxExempt, &o.TaxExemptReason, &o.StripeTaxID, &o.StripePaymentIntentID,
+			&shippingMethod, &requestedDeliveryDate,
 			&o.CustomerPONumber, &o.InternalNote,
 			&o.Notes, &metadata, &o.PlacedAt, &o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
@@ -269,6 +283,11 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 		o.ShippingTotal = int(shippingTotal)
 		o.TaxTotal = int(taxTotal)
 		o.Total = int(total)
+		if shippingMethod != nil {
+			sm := domain.ShippingMethod(*shippingMethod)
+			o.ShippingMethod = &sm
+		}
+		o.RequestedDeliveryDate = timestampFromPG(requestedDeliveryDate)
 		o.Metadata = metadataFromJSON(metadata)
 		orders = append(orders, o)
 	}
@@ -293,6 +312,8 @@ func (s *OrderStore) SetQBInvoice(ctx context.Context, tx pgx.Tx, id uuid.UUID, 
 func (s *OrderStore) GetOrderByQBInvoiceID(ctx context.Context, tx pgx.Tx, qbInvoiceID string) (*domain.Order, error) {
 	var o domain.Order
 	var status, paymentStatus, fulfillmentStatus string
+	var shippingMethod *string
+	var requestedDeliveryDate pgtype.Timestamptz
 	var subtotal, discountTotal, shippingTotal, taxTotal, total int32
 	var metadata json.RawMessage
 	err := tx.QueryRow(ctx,
@@ -300,6 +321,7 @@ func (s *OrderStore) GetOrderByQBInvoiceID(ctx context.Context, tx pgx.Tx, qbInv
 		        currency_code, subtotal, discount_total, shipping_total, tax_total, total,
 		        shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
 		        tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
+		        shipping_method, requested_delivery_date,
 		        qb_invoice_id, qb_invoice_no, qb_synced_at,
 		        customer_po_number, internal_note,
 		        notes, metadata, placed_at, created_at, updated_at
@@ -309,6 +331,7 @@ func (s *OrderStore) GetOrderByQBInvoiceID(ctx context.Context, tx pgx.Tx, qbInv
 		&o.CurrencyCode, &subtotal, &discountTotal, &shippingTotal, &taxTotal, &total,
 		&o.ShippingAddressID, &o.BillingAddressID, &o.SubscriptionID, &o.DraftByUserID,
 		&o.TaxExempt, &o.TaxExemptReason, &o.StripeTaxID, &o.StripePaymentIntentID,
+		&shippingMethod, &requestedDeliveryDate,
 		&o.QBInvoiceID, &o.QBInvoiceNo, &o.QBSyncedAt,
 		&o.CustomerPONumber, &o.InternalNote,
 		&o.Notes, &metadata, &o.PlacedAt, &o.CreatedAt, &o.UpdatedAt,
@@ -324,6 +347,11 @@ func (s *OrderStore) GetOrderByQBInvoiceID(ctx context.Context, tx pgx.Tx, qbInv
 	o.ShippingTotal = int(shippingTotal)
 	o.TaxTotal = int(taxTotal)
 	o.Total = int(total)
+	if shippingMethod != nil {
+		sm := domain.ShippingMethod(*shippingMethod)
+		o.ShippingMethod = &sm
+	}
+	o.RequestedDeliveryDate = timestampFromPG(requestedDeliveryDate)
 	o.Metadata = metadataFromJSON(metadata)
 	return &o, nil
 }
@@ -539,7 +567,7 @@ func (s *OrderStore) DeleteAdjustment(ctx context.Context, tx pgx.Tx, id uuid.UU
 // --- Row converters ---
 
 func orderFromRow(r sqlcgen.Order) *domain.Order {
-	return &domain.Order{
+	o := &domain.Order{
 		ID:                r.ID,
 		Number:            r.Number,
 		CustomerID:        r.CustomerID,
@@ -558,16 +586,22 @@ func orderFromRow(r sqlcgen.Order) *domain.Order {
 		DraftByUserID:     r.DraftByUserID,
 		TaxExempt:         r.TaxExempt,
 		TaxExemptReason:   r.TaxExemptReason,
-		StripeTaxID:           r.StripeTaxID,
-		StripePaymentIntentID: r.StripePaymentIntentID,
-		CustomerPONumber:      r.CustomerPoNumber,
-		InternalNote:          r.InternalNote,
-		Notes:                 r.Notes,
-		Metadata:              metadataFromJSON(r.Metadata),
+		StripeTaxID:              r.StripeTaxID,
+		StripePaymentIntentID:    r.StripePaymentIntentID,
+		RequestedDeliveryDate:    timestampFromPG(r.RequestedDeliveryDate),
+		CustomerPONumber:         r.CustomerPoNumber,
+		InternalNote:             r.InternalNote,
+		Notes:                    r.Notes,
+		Metadata:                 metadataFromJSON(r.Metadata),
 		PlacedAt:          r.PlacedAt,
 		CreatedAt:         r.CreatedAt,
 		UpdatedAt:         r.UpdatedAt,
 	}
+	if r.ShippingMethod != nil {
+		sm := domain.ShippingMethod(*r.ShippingMethod)
+		o.ShippingMethod = &sm
+	}
+	return o
 }
 
 func cartFromRow(r sqlcgen.Cart) *domain.Cart {

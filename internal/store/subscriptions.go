@@ -128,34 +128,36 @@ func (s *SubscriptionStore) ListActivePlans(ctx context.Context, tx pgx.Tx) ([]d
 
 // CreateSubscriptionParams holds the fields needed to create a subscription.
 type CreateSubscriptionParams struct {
-	CustomerID         uuid.UUID
-	PlanID             uuid.UUID
-	VariantID          uuid.UUID
-	Quantity           int
-	Status             domain.SubscriptionStatus
-	ShippingAddressID  uuid.UUID
-	CurrentPeriodStart time.Time
-	CurrentPeriodEnd   time.Time
-	NextOrderAt        time.Time
-	EndsAt             *time.Time
-	Metadata           map[string]any
+	CustomerID            uuid.UUID
+	PlanID                uuid.UUID
+	VariantID             uuid.UUID
+	Quantity              int
+	Status                domain.SubscriptionStatus
+	ShippingAddressID     uuid.UUID
+	StripePaymentMethodID *string
+	CurrentPeriodStart    time.Time
+	CurrentPeriodEnd      time.Time
+	NextOrderAt           time.Time
+	EndsAt                *time.Time
+	Metadata              map[string]any
 }
 
 // Create inserts a new subscription and returns it.
 func (s *SubscriptionStore) Create(ctx context.Context, tx pgx.Tx, p CreateSubscriptionParams) (*domain.Subscription, error) {
 	row, err := sqlcgen.New(tx).CreateSubscription(ctx, sqlcgen.CreateSubscriptionParams{
-		ID:                 uuid.New(),
-		CustomerID:         p.CustomerID,
-		PlanID:             p.PlanID,
-		VariantID:          p.VariantID,
-		Quantity:           int32(p.Quantity),
-		Status:             string(p.Status),
-		ShippingAddressID:  p.ShippingAddressID,
-		CurrentPeriodStart: p.CurrentPeriodStart,
-		CurrentPeriodEnd:   p.CurrentPeriodEnd,
-		NextOrderAt:        p.NextOrderAt,
-		EndsAt:             timestampToPG(p.EndsAt),
-		Metadata:           metadataToJSON(p.Metadata),
+		ID:                    uuid.New(),
+		CustomerID:            p.CustomerID,
+		PlanID:                p.PlanID,
+		VariantID:             p.VariantID,
+		Quantity:              int32(p.Quantity),
+		Status:                string(p.Status),
+		ShippingAddressID:     p.ShippingAddressID,
+		CurrentPeriodStart:    p.CurrentPeriodStart,
+		CurrentPeriodEnd:      p.CurrentPeriodEnd,
+		NextOrderAt:           p.NextOrderAt,
+		EndsAt:                timestampToPG(p.EndsAt),
+		StripePaymentMethodID: p.StripePaymentMethodID,
+		Metadata:              metadataToJSON(p.Metadata),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert subscription: %w", err)
@@ -266,6 +268,7 @@ type SubscriptionFilter struct {
 // List returns subscriptions matching the given filter (hand-written for dynamic WHERE).
 func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionFilter) ([]domain.Subscription, error) {
 	query := `SELECT id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
+	                 stripe_payment_method_id,
 	                 current_period_start, current_period_end, next_order_at,
 	                 ends_at, cancelled_at, pause_until, metadata, created_at, updated_at
 	          FROM subscriptions WHERE true`
@@ -307,6 +310,7 @@ func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionF
 		var metadata []byte
 		if err := rows.Scan(
 			&sub.ID, &sub.CustomerID, &sub.PlanID, &sub.VariantID, &sub.Quantity, &status, &sub.ShippingAddressID,
+			&sub.StripePaymentMethodID,
 			&sub.CurrentPeriodStart, &sub.CurrentPeriodEnd, &sub.NextOrderAt,
 			&endsAt, &cancelledAt, &pauseUntil, &metadata, &sub.CreatedAt, &sub.UpdatedAt,
 		); err != nil {
@@ -372,21 +376,22 @@ func planFromRow(r sqlcgen.SubscriptionPlan) *domain.SubscriptionPlan {
 
 func subscriptionFromRow(r sqlcgen.Subscription) *domain.Subscription {
 	return &domain.Subscription{
-		ID:                 r.ID,
-		CustomerID:         r.CustomerID,
-		PlanID:             r.PlanID,
-		VariantID:          r.VariantID,
-		Quantity:           int(r.Quantity),
-		Status:             domain.SubscriptionStatus(r.Status),
-		ShippingAddressID:  r.ShippingAddressID,
-		CurrentPeriodStart: r.CurrentPeriodStart,
-		CurrentPeriodEnd:   r.CurrentPeriodEnd,
-		NextOrderAt:        r.NextOrderAt,
-		EndsAt:             timestampFromPG(r.EndsAt),
-		CancelledAt:        timestampFromPG(r.CancelledAt),
-		PauseUntil:         timestampFromPG(r.PauseUntil),
-		Metadata:           metadataFromJSON(r.Metadata),
-		CreatedAt:          r.CreatedAt,
-		UpdatedAt:          r.UpdatedAt,
+		ID:                    r.ID,
+		CustomerID:            r.CustomerID,
+		PlanID:                r.PlanID,
+		VariantID:             r.VariantID,
+		Quantity:              int(r.Quantity),
+		Status:                domain.SubscriptionStatus(r.Status),
+		ShippingAddressID:     r.ShippingAddressID,
+		StripePaymentMethodID: r.StripePaymentMethodID,
+		CurrentPeriodStart:    r.CurrentPeriodStart,
+		CurrentPeriodEnd:      r.CurrentPeriodEnd,
+		NextOrderAt:           r.NextOrderAt,
+		EndsAt:                timestampFromPG(r.EndsAt),
+		CancelledAt:           timestampFromPG(r.CancelledAt),
+		PauseUntil:            timestampFromPG(r.PauseUntil),
+		Metadata:              metadataFromJSON(r.Metadata),
+		CreatedAt:             r.CreatedAt,
+		UpdatedAt:             r.UpdatedAt,
 	}
 }

@@ -2,8 +2,9 @@
 INSERT INTO orders (id, number, customer_id, status, payment_status, fulfillment_status,
                     currency_code, subtotal, discount_total, shipping_total, tax_total, total,
                     shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
-                    tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+                    tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at,
+                    shipping_method, requested_delivery_date)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
 RETURNING *;
 
 -- name: GetOrderByID :one
@@ -38,6 +39,18 @@ RETURNING *;
 
 -- name: GetOrderByStripePaymentIntentID :one
 SELECT * FROM orders WHERE stripe_payment_intent_id = $1;
+
+-- name: UpdateOrderShippingMethod :one
+UPDATE orders
+SET shipping_method = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateOrderRequestedDeliveryDate :one
+UPDATE orders
+SET requested_delivery_date = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
 
 -- name: DeleteOrder :exec
 DELETE FROM orders WHERE id = $1;

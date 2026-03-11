@@ -199,11 +199,13 @@ type Querier interface {
 	UpdateAttributeSet(ctx context.Context, arg UpdateAttributeSetParams) (AttributeSet, error)
 	UpdateCartAddresses(ctx context.Context, arg UpdateCartAddressesParams) (Cart, error)
 	UpdateCartDiscount(ctx context.Context, arg UpdateCartDiscountParams) (Cart, error)
+	UpdateCustomerBillingMethod(ctx context.Context, arg UpdateCustomerBillingMethodParams) error
 	UpdateCustomerEmail(ctx context.Context, arg UpdateCustomerEmailParams) (Customer, error)
 	UpdateCustomerEmailVerified(ctx context.Context, arg UpdateCustomerEmailVerifiedParams) error
 	UpdateCustomerGroup(ctx context.Context, arg UpdateCustomerGroupParams) error
 	UpdateCustomerName(ctx context.Context, arg UpdateCustomerNameParams) (Customer, error)
 	UpdateCustomerPassword(ctx context.Context, arg UpdateCustomerPasswordParams) error
+	UpdateCustomerPaymentTerms(ctx context.Context, arg UpdateCustomerPaymentTermsParams) error
 	UpdateCustomerStripeCustomerID(ctx context.Context, arg UpdateCustomerStripeCustomerIDParams) (Customer, error)
 	UpdateCustomerTaxExempt(ctx context.Context, arg UpdateCustomerTaxExemptParams) error
 	UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) (Discount, error)
@@ -216,6 +218,8 @@ type Querier interface {
 	UpdateInvoiceVoided(ctx context.Context, id uuid.UUID) (Invoice, error)
 	UpdateOrderFulfillmentStatus(ctx context.Context, arg UpdateOrderFulfillmentStatusParams) (Order, error)
 	UpdateOrderPaymentStatus(ctx context.Context, arg UpdateOrderPaymentStatusParams) (Order, error)
+	UpdateOrderRequestedDeliveryDate(ctx context.Context, arg UpdateOrderRequestedDeliveryDateParams) (Order, error)
+	UpdateOrderShippingMethod(ctx context.Context, arg UpdateOrderShippingMethodParams) (Order, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
 	UpdateOrderStripePaymentIntentID(ctx context.Context, arg UpdateOrderStripePaymentIntentIDParams) (Order, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
@@ -239,6 +243,7 @@ type Querier interface {
 	UpdateSubscriptionPlanActive(ctx context.Context, arg UpdateSubscriptionPlanActiveParams) error
 	UpdateSubscriptionPlanDiscount(ctx context.Context, arg UpdateSubscriptionPlanDiscountParams) error
 	UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscriptionStatusParams) (Subscription, error)
+	UpdateSubscriptionStripePaymentMethodID(ctx context.Context, arg UpdateSubscriptionStripePaymentMethodIDParams) error
 	UpdateTaxConfig(ctx context.Context, arg UpdateTaxConfigParams) (StoreSetting, error)
 	UpdateTaxon(ctx context.Context, arg UpdateTaxonParams) (Taxon, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (Variant, error)

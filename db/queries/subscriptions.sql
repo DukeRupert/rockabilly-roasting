@@ -17,8 +17,9 @@ UPDATE subscription_plans SET discount_pct = $2 WHERE id = $1;
 
 -- name: CreateSubscription :one
 INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
-                           current_period_start, current_period_end, next_order_at, ends_at, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                           current_period_start, current_period_end, next_order_at, ends_at,
+                           stripe_payment_method_id, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING *;
 
 -- name: GetSubscriptionByID :one
@@ -46,6 +47,11 @@ WHERE id = $1;
 -- name: UpdateSubscriptionPauseUntil :exec
 UPDATE subscriptions
 SET pause_until = $2, updated_at = now()
+WHERE id = $1;
+
+-- name: UpdateSubscriptionStripePaymentMethodID :exec
+UPDATE subscriptions
+SET stripe_payment_method_id = $2, updated_at = now()
 WHERE id = $1;
 
 -- name: CancelSubscription :exec

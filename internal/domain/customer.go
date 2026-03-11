@@ -23,6 +23,15 @@ const (
 	WholesaleStatusSuspended WholesaleStatus = "suspended"
 )
 
+// BillingMethod controls how a wholesale customer is billed.
+type BillingMethod string
+
+const (
+	BillingMethodManual     BillingMethod = "manual"
+	BillingMethodACH        BillingMethod = "ach"
+	BillingMethodCreditCard BillingMethod = "credit_card"
+)
+
 // Customer represents a registered or guest customer.
 type Customer struct {
 	ID              uuid.UUID
@@ -43,6 +52,8 @@ type Customer struct {
 	WholesaleNotes   *string
 	ApprovedAt       *time.Time
 	ApprovedBy       *uuid.UUID
+	PaymentTermsDays *int
+	BillingMethod    BillingMethod
 	QBCustomerID     *string
 	QBSyncedAt       *time.Time
 	TwoFAEnabled     bool

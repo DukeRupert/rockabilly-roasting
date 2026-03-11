@@ -1,0 +1,37 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+type AboutProps struct {
+	CartCount int
+}
+
+templ AboutContent(props AboutProps) {
+	<div class="mx-auto max-w-3xl py-16 text-center">
+		<h1 class="font-display text-4xl text-rr-heading tracking-wide mb-4">ABOUT US</h1>
+		<div class="w-16 h-1 bg-rr-red mx-auto mb-8 rounded-full"></div>
+		<p class="font-body text-lg text-rr-muted leading-relaxed mb-6">
+			Small-batch specialty coffee with bold flavor and a rebellious spirit.
+		</p>
+		<p class="font-body text-base text-rr-muted leading-relaxed mb-10">
+			More information coming soon. In the meantime, stop by the cafe or give us a call.
+		</p>
+		<div class="rounded-lg border border-rr-border bg-rr-surface p-8 inline-block">
+			<p class="label-font text-rr-muted text-xs mb-3">VISIT US</p>
+			<p class="font-body text-rr-body text-sm">101 W. Kennewick Ave.</p>
+			<p class="font-body text-rr-body text-sm">Kennewick, WA</p>
+			<p class="font-body text-rr-muted text-sm mt-2">509-585-2320</p>
+			<p class="font-body text-rr-muted text-sm">info@rockabillyroasting.com</p>
+		</div>
+	</div>
+}
+
+templ AboutPage(props AboutProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "About",
+		Description: "About Rockabilly Roasting Co. — small-batch specialty coffee in Kennewick, WA",
+		CartCount:   props.CartCount,
+	}) {
+		@AboutContent(props)
+	}
+}

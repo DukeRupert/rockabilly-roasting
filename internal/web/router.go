@@ -58,6 +58,7 @@ type Deps struct {
 	QBHTTPClient            *http.Client
 	RateLimiter             *ratelimit.Limiter
 	SecureCookies           bool
+	BaseURL                 string // public site URL, e.g. "https://rockabillyroasting.com"
 }
 
 // MetricsMux returns a handler for the internal metrics listener.
@@ -87,12 +88,19 @@ func NewRouter(deps *Deps) http.Handler {
 	// Static assets
 	mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler("internal/ui/assets")))
 
+	// SEO files
+	mux.HandleFunc("GET /robots.txt", deps.handleRobotsTxt)
+	mux.HandleFunc("GET /sitemap.xml", deps.handleSitemapXML)
+
 	// Storefront routes
 	mux.HandleFunc("GET /{$}", deps.handleStorefrontHome)
 	mux.HandleFunc("GET /catalog", deps.handleStorefrontCatalog)
 	mux.HandleFunc("GET /catalog/{slug}", deps.handleStorefrontProduct)
+	mux.HandleFunc("GET /about", deps.handleAboutPage)
+	mux.HandleFunc("GET /wholesale", deps.handleWholesaleLandingPage)
 	mux.HandleFunc("GET /privacy", deps.handlePrivacyPage)
 	mux.HandleFunc("GET /terms", deps.handleTermsPage)
+	mux.HandleFunc("GET /shipping", deps.handleShippingPage)
 
 	// Cart routes
 	mux.HandleFunc("POST /cart/add", deps.handleCartAdd)
@@ -329,6 +337,9 @@ func NewRouter(deps *Deps) http.Handler {
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)
 	mux.HandleFunc("POST /webhooks/quickbooks", deps.handleQBWebhook)
+
+	// Catch-all 404 for unmatched GET routes (branded error page)
+	mux.HandleFunc("GET /", deps.handleNotFoundPage)
 
 	// Apply middleware stack (outermost runs first)
 	var handler http.Handler = mux

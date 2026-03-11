@@ -299,6 +299,7 @@ func run() error {
 		QBHTTPClient:           &http.Client{Timeout: 30 * time.Second},
 		RateLimiter:            rateLimiter,
 		SecureCookies:          os.Getenv("INSECURE_COOKIES") != "true",
+		BaseURL:                baseURL,
 	}
 
 	handler := web.NewRouter(deps)

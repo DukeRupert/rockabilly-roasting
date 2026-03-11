@@ -1,0 +1,35 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+type NotFoundProps struct {
+	CartCount int
+}
+
+templ NotFoundContent(props NotFoundProps) {
+	<div class="mx-auto max-w-xl py-24 text-center">
+		<p class="font-display text-8xl text-rr-red mb-4">404</p>
+		<h1 class="font-display text-3xl text-rr-heading tracking-wide mb-4">PAGE NOT FOUND</h1>
+		<p class="font-body text-rr-muted mb-8">
+			Looks like this page skipped town. Let's get you back on track.
+		</p>
+		<div class="flex flex-wrap justify-center gap-4">
+			<a href="/" class="btn label-font px-6 py-3 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors">
+				BACK TO HOME
+			</a>
+			<a href="/catalog" class="btn label-font px-6 py-3 rounded-sm text-rr-heading text-sm border-2 border-rr-border hover:border-rr-amber transition-colors">
+				SHOP COFFEE
+			</a>
+		</div>
+	</div>
+}
+
+templ NotFoundPage(props NotFoundProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Page Not Found",
+		Description: "The page you're looking for doesn't exist.",
+		CartCount:   props.CartCount,
+	}) {
+		@NotFoundContent(props)
+	}
+}

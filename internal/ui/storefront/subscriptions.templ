@@ -23,7 +23,7 @@ templ SubscriptionsContent(props SubscriptionsPageProps) {
 	<div>
 		<!-- Hero -->
 		<div class="mb-10">
-			<h1 class="text-3xl font-bold tracking-tight text-rr-heading">Subscribe & Save</h1>
+			<h1 class="font-display text-4xl text-rr-heading tracking-wide">THE DAILY GRIND</h1>
 			<p class="mt-2 max-w-2xl text-base text-rr-muted">
 				Never run out of your favorite coffee. Choose your products, pick a delivery frequency, and save on every order.
 				Subscribe to multiple products and they'll ship together.
@@ -138,8 +138,8 @@ func (p SubscriptionsPageProps) maxDiscount() int {
 
 templ SubscriptionsPage(props SubscriptionsPageProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "Subscribe & Save",
-		Description: "Subscribe to your favorite products and save on every delivery",
+		Title:       "The Daily Grind",
+		Description: "Join The Daily Grind — subscribe to your favorite coffee and save on every delivery",
 		CartCount:   props.CartCount,
 	}) {
 		@SubscriptionsContent(props)

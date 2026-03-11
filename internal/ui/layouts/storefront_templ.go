@@ -11,10 +11,13 @@ import templruntime "github.com/a-h/templ/runtime"
 import "fmt"
 
 type StorefrontProps struct {
-	Title       string
-	Description string
-	CartCount   int
-	CartURL     string // defaults to "/cart" if empty
+	Title        string
+	Description  string
+	CartCount    int
+	CartURL      string // defaults to "/cart" if empty
+	CanonicalURL string // full URL, e.g. "https://rockabillyroasting.com/about"
+	OGImage      string // full URL to share image; falls back to logo
+	OGType       string // "website", "product", etc.; defaults to "website"
 }
 
 func (p StorefrontProps) cartURL() string {
@@ -22,6 +25,17 @@ func (p StorefrontProps) cartURL() string {
 		return p.CartURL
 	}
 	return "/cart"
+}
+
+func (p StorefrontProps) ogType() string {
+	if p.OGType != "" {
+		return p.OGType
+	}
+	return "website"
+}
+
+func (p StorefrontProps) fullTitle() string {
+	return p.Title + " - Rockabilly Roasting Co."
 }
 
 func Storefront(props StorefrontProps) templ.Component {
@@ -52,7 +66,7 @@ func Storefront(props StorefrontProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 25, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 39, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -70,7 +84,7 @@ func Storefront(props StorefrontProps) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 27, Col: 56}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 41, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -81,48 +95,213 @@ func Storefront(props StorefrontProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/static/favicon-32x32.png\"><link rel=\"icon\" type=\"image/png\" sizes=\"16x16\" href=\"/static/favicon-16x16.png\"><link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/static/apple-touch-icon.png\"><link rel=\"manifest\" href=\"/static/site.webmanifest\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Boogaloo&family=Playfair+Display:ital,wght@0,700;1,400;1,700&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"/static/js/htmx.min.js\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><style>[x-cloak] { display: none !important; }</style></head><body class=\"h-full font-body text-rr-body bg-rr-bg\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML\"><!-- Promo ticker (disabled — uncomment class to re-enable) --><div class=\"hidden overflow-hidden bg-rr-amber-dark\"><div class=\"marquee-inner py-1.5\"><span class=\"label-font text-white px-8 text-xs\">FREE SHIPPING ON ORDERS OVER $40</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">SUBSCRIBE &amp; SAVE 10%</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">ROASTED FRESH TO ORDER</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">FREE SHIPPING ON ORDERS OVER $40</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">SUBSCRIBE &amp; SAVE 10%</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">ROASTED FRESH TO ORDER</span> <span class=\"px-5 text-white/40\">&loz;</span></div></div><!-- Header --><header class=\"bg-rr-raised border-b border-rr-border\"><nav class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8\"><div class=\"flex h-16 items-center justify-between\"><!-- Logo --><div class=\"flex items-center\"><a href=\"/\" class=\"flex items-center gap-3\"><div class=\"flex-shrink-0 bg-white rounded-xl p-1\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-8 w-auto\"></div><div><p class=\"font-display text-rr-heading text-lg leading-none tracking-widest\">ROCKABILLY</p><p class=\"label-font text-rr-amber text-[0.55rem]\" style=\"letter-spacing:0.3em;\">ROASTING CO.</p></div></a></div><!-- Desktop nav --><div class=\"hidden sm:flex sm:items-center sm:gap-x-7\"><a href=\"/catalog\" class=\"nav-link font-body text-sm font-semibold text-rr-heading\">Shop</a> <a href=\"/wholesale\" class=\"nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors\">Wholesale</a> <a href=\"/about\" class=\"nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors\">About</a></div><!-- Cart + Subscribe + mobile menu --><div class=\"flex items-center gap-x-3\"><!-- Cart icon --><div class=\"relative\"><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<!-- Open Graph --><meta property=\"og:type\" content=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var4 templ.SafeURL
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(props.cartURL()))
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(props.ogType())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 86, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 44, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"block p-2 text-rr-muted hover:text-rr-heading transition-colors\"><span class=\"sr-only\">Cart</span> <svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z\"></path></svg></a> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"><meta property=\"og:title\" content=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if props.CartCount > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<span id=\"cart-badge\" class=\"absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-rr-red text-[8px] font-bold text-white font-body\">")
+		var templ_7745c5c3_Var5 string
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(props.fullTitle())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 45, Col: 56}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if props.Description != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<meta property=\"og:description\" content=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.CartCount))
+			var templ_7745c5c3_Var6 string
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 94, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 47, Col: 63}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if props.CanonicalURL != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<meta property=\"og:url\" content=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var7 string
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(props.CanonicalURL)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 50, Col: 56}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"><link rel=\"canonical\" href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var8 templ.SafeURL
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs(props.CanonicalURL)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 51, Col: 51}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if props.OGImage != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<meta property=\"og:image\" content=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var9 string
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.OGImage)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 54, Col: 53}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<span id=\"cart-badge\" class=\"absolute -top-0.5 -right-0.5\"></span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<meta property=\"og:image\" content=\"/static/rockabilly-logo.png\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div><!-- Subscribe CTA --><a href=\"/subscribe\" class=\"hidden sm:inline-block btn label-font px-4 py-2 rounded-sm text-white text-xs bg-rr-red glow-red hover:bg-rr-red-lt transition-colors\">SUBSCRIBE</a><!-- Mobile menu button --><button type=\"button\" id=\"sf-mobile-menu-btn\" class=\"sm:hidden -m-2.5 p-2.5 text-rr-muted\"><span class=\"sr-only\">Open menu</span> <svg class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg></button></div></div></nav><!-- Mobile menu --><div id=\"sf-mobile-menu\" class=\"hidden sm:hidden border-t border-rr-border\"><div class=\"space-y-1 px-4 py-3 bg-rr-bg\"><a href=\"/catalog\" class=\"block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-heading hover:bg-rr-surface\">Shop</a> <a href=\"/wholesale\" class=\"block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading\">Wholesale</a> <a href=\"/about\" class=\"block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading\">About</a> <a href=\"/subscribe\" class=\"block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-teal hover:bg-rr-surface\">Subscribe &amp; Save</a></div></div></header><!-- Main content --><main><div id=\"main-content\" class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<meta property=\"og:site_name\" content=\"Rockabilly Roasting Co.\"><!-- Twitter Card --><meta name=\"twitter:card\" content=\"summary\"><meta name=\"twitter:title\" content=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var10 string
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(props.fullTitle())
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 61, Col: 57}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if props.Description != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<meta name=\"twitter:description\" content=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var11 string
+			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(props.Description)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 63, Col: 64}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if props.OGImage != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<meta name=\"twitter:image\" content=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var12 string
+			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(props.OGImage)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 66, Col: 54}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<meta name=\"twitter:image\" content=\"/static/rockabilly-logo.png\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/static/favicon-32x32.png\"><link rel=\"icon\" type=\"image/png\" sizes=\"16x16\" href=\"/static/favicon-16x16.png\"><link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/static/apple-touch-icon.png\"><link rel=\"manifest\" href=\"/static/site.webmanifest\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Boogaloo&family=Playfair+Display:ital,wght@0,700;1,400;1,700&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script src=\"/static/js/htmx.min.js\"></script><script defer src=\"https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js\"></script><style>[x-cloak] { display: none !important; }</style></head><body class=\"h-full font-body text-rr-body bg-rr-bg\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML\"><!-- Promo ticker (disabled — uncomment class to re-enable) --><div class=\"hidden overflow-hidden bg-rr-amber-dark\"><div class=\"marquee-inner py-1.5\"><span class=\"label-font text-white px-8 text-xs\">FREE SHIPPING ON ORDERS OVER $40</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">SUBSCRIBE &amp; SAVE 10%</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">ROASTED FRESH TO ORDER</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">FREE SHIPPING ON ORDERS OVER $40</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">SUBSCRIBE &amp; SAVE 10%</span> <span class=\"px-5 text-white/40\">&loz;</span> <span class=\"label-font text-white px-8 text-xs\">ROASTED FRESH TO ORDER</span> <span class=\"px-5 text-white/40\">&loz;</span></div></div><!-- Header --><header class=\"bg-rr-raised border-b border-rr-border\"><nav class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8\"><div class=\"flex h-16 items-center justify-between\"><!-- Logo --><div class=\"flex items-center\"><a href=\"/\" class=\"flex items-center gap-3\"><div class=\"flex-shrink-0 bg-white rounded-xl p-1\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-8 w-auto\"></div><div><p class=\"font-display text-rr-heading text-lg leading-none tracking-widest\">ROCKABILLY</p><p class=\"label-font text-rr-amber text-[0.55rem]\" style=\"letter-spacing:0.3em;\">ROASTING CO.</p></div></a></div><!-- Desktop nav --><div class=\"hidden sm:flex sm:items-center sm:gap-x-7\"><a href=\"/catalog\" class=\"nav-link font-body text-sm font-semibold text-rr-heading\">Shop</a> <a href=\"/subscriptions\" class=\"nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors\">The Daily Grind</a> <a href=\"/wholesale\" class=\"nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors\">Wholesale</a> <a href=\"/about\" class=\"nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors\">About</a></div><!-- Cart + Sign In + mobile menu --><div class=\"flex items-center gap-x-3\"><!-- Cart icon --><div class=\"relative\"><a href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var13 templ.SafeURL
+		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(props.cartURL()))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 128, Col: 48}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" class=\"block p-2 text-rr-muted hover:text-rr-heading transition-colors\"><span class=\"sr-only\">Cart</span> <svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z\"></path></svg></a> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if props.CartCount > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<span id=\"cart-badge\" class=\"absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-rr-red text-[8px] font-bold text-white font-body\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var14 string
+			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.CartCount))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 136, Col: 46}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<span id=\"cart-badge\" class=\"absolute -top-0.5 -right-0.5\"></span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</div><!-- Sign In --><a href=\"/account/login\" class=\"hidden sm:flex items-center gap-1.5 font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors\"><svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z\"></path></svg> Sign In</a><!-- Mobile menu button --><button type=\"button\" id=\"sf-mobile-menu-btn\" class=\"sm:hidden -m-2.5 p-2.5 text-rr-muted\"><span class=\"sr-only\">Open menu</span> <svg class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg></button></div></div></nav><!-- Mobile menu --><div id=\"sf-mobile-menu\" class=\"hidden sm:hidden border-t border-rr-border\"><div class=\"space-y-1 px-4 py-3 bg-rr-bg\"><a href=\"/catalog\" class=\"block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-heading hover:bg-rr-surface\">Shop</a> <a href=\"/subscriptions\" class=\"block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading\">The Daily Grind</a> <a href=\"/wholesale\" class=\"block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading\">Wholesale</a> <a href=\"/about\" class=\"block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading\">About</a><div class=\"border-t border-rr-border mt-2 pt-2\"><a href=\"/account/login\" class=\"flex items-center gap-2 rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading\"><svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z\"></path></svg> Sign In</a></div></div></div></header><!-- Main content --><main><div id=\"main-content\" class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -130,7 +309,7 @@ func Storefront(props StorefrontProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"assertive\"></div><!-- Footer --><div class=\"flame-stripe\"></div><footer class=\"bg-rr-raised\"><div class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12\"><div class=\"grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4\"><!-- Logo column --><div><div class=\"flex items-center gap-3 mb-3\"><div class=\"flex-shrink-0 bg-white rounded-xl p-1\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-10 w-auto\"></div><div><p class=\"font-display text-rr-heading text-2xl tracking-widest leading-none\">ROCKABILLY</p><p class=\"label-font text-rr-amber text-[0.55rem] mt-0.5\" style=\"letter-spacing:0.3em;\">ROASTING CO.</p></div></div><p class=\"font-body text-rr-muted text-xs leading-relaxed\">101 W. Kennewick Ave.<br>Kennewick, WA &middot; 509-585-2320</p></div><!-- Shop links --><div><p class=\"label-font text-rr-muted mb-3 text-xs\">SHOP</p><ul class=\"space-y-1.5\"><li><a href=\"/catalog\" class=\"font-body text-sm text-rr-muted hover:text-rr-heading transition-colors\">Coffee</a></li><li><a href=\"/subscribe\" class=\"font-body text-sm text-rr-muted hover:text-rr-heading transition-colors\">Subscriptions</a></li><li><a href=\"/wholesale\" class=\"font-body text-sm text-rr-muted hover:text-rr-heading transition-colors\">Wholesale</a></li></ul></div><!-- Cafe hours --><div><p class=\"label-font text-rr-muted mb-3 text-xs\">CAFE HOURS</p><div class=\"space-y-1 font-body text-rr-muted text-xs\"><p>Mon &ndash; Thurs: 7am &ndash; 2pm</p><p>Friday: 7am &ndash; 4pm</p><p>Saturday: 8am &ndash; 4pm</p><p>Sunday: Closed</p></div><div class=\"flex gap-4 mt-4\"><a href=\"#\" class=\"label-font text-rr-muted hover:text-rr-heading text-xs transition-colors\">FACEBOOK</a> <a href=\"#\" class=\"label-font text-rr-muted hover:text-rr-heading text-xs transition-colors\">INSTAGRAM</a></div></div><!-- Newsletter --><div><p class=\"label-font text-rr-muted mb-3 text-xs\">STAY IN THE LOOP</p><p class=\"font-body text-rr-muted text-xs mb-4\">Sign up for roast drops and deals.</p><form class=\"flex gap-x-2\"><input type=\"email\" placeholder=\"name@example.com\" class=\"rr-input min-w-0 flex-auto rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2 text-sm font-body text-rr-heading placeholder:text-rr-border\"> <button type=\"submit\" class=\"btn flex-none rounded-sm bg-rr-red px-3.5 py-2 text-sm text-white label-font hover:bg-rr-red-lt transition-colors\">JOIN</button></form></div></div><!-- Copyright bar --><div class=\"mt-12 border-t border-rr-border pt-8 flex flex-col sm:flex-row justify-between gap-2\"><p class=\"font-body text-xs text-rr-muted\">&copy; 2026 Rockabilly Roasting Co.</p><div class=\"flex gap-4\"><a href=\"/privacy\" class=\"font-body text-xs text-rr-muted hover:text-rr-heading transition-colors\">Privacy</a> <a href=\"/terms\" class=\"font-body text-xs text-rr-muted hover:text-rr-heading transition-colors\">Terms</a> <span class=\"font-body text-xs text-rr-muted\">Powered by Hiri</span></div></div></div></footer><script>\n\t\t\t\t(function() {\n\t\t\t\t\t// Mobile menu toggle\n\t\t\t\t\tvar btn = document.getElementById('sf-mobile-menu-btn');\n\t\t\t\t\tvar menu = document.getElementById('sf-mobile-menu');\n\t\t\t\t\tif (btn && menu) {\n\t\t\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\t\t\tmenu.classList.toggle('hidden');\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t\t}\n\n\t\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t\t});\n\t\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\t\tvar closeBtn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"assertive\"></div><!-- Footer --><div class=\"flame-stripe\"></div><footer class=\"bg-rr-raised\"><div class=\"mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12\"><div class=\"grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4\"><!-- Logo column --><div><div class=\"flex items-center gap-3 mb-3\"><div class=\"flex-shrink-0 bg-white rounded-xl p-1\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-10 w-auto\"></div><div><p class=\"font-display text-rr-heading text-2xl tracking-widest leading-none\">ROCKABILLY</p><p class=\"label-font text-rr-amber text-[0.55rem] mt-0.5\" style=\"letter-spacing:0.3em;\">ROASTING CO.</p></div></div><p class=\"font-body text-rr-muted text-xs leading-relaxed\">101 W. Kennewick Ave.<br>Kennewick, WA &middot; 509-585-2320</p></div><!-- Shop links --><div><p class=\"label-font text-rr-muted mb-3 text-xs\">SHOP</p><ul class=\"space-y-1.5\"><li><a href=\"/catalog\" class=\"font-body text-sm text-rr-muted hover:text-rr-heading transition-colors\">Coffee</a></li><li><a href=\"/subscriptions\" class=\"font-body text-sm text-rr-muted hover:text-rr-heading transition-colors\">The Daily Grind</a></li><li><a href=\"/wholesale\" class=\"font-body text-sm text-rr-muted hover:text-rr-heading transition-colors\">Wholesale</a></li><li><a href=\"/account/login\" class=\"font-body text-sm text-rr-muted hover:text-rr-heading transition-colors\">My Account</a></li></ul></div><!-- Cafe hours --><div><p class=\"label-font text-rr-muted mb-3 text-xs\">CAFE HOURS</p><div class=\"space-y-1 font-body text-rr-muted text-xs\"><p>Mon &ndash; Thurs: 7am &ndash; 2pm</p><p>Friday: 7am &ndash; 4pm</p><p>Saturday: 8am &ndash; 4pm</p><p>Sunday: Closed</p></div><div class=\"flex gap-4 mt-4\"><a href=\"#\" class=\"label-font text-rr-muted hover:text-rr-heading text-xs transition-colors\">FACEBOOK</a> <a href=\"#\" class=\"label-font text-rr-muted hover:text-rr-heading text-xs transition-colors\">INSTAGRAM</a></div></div><!-- Newsletter --><div><p class=\"label-font text-rr-muted mb-3 text-xs\">STAY IN THE LOOP</p><p class=\"font-body text-rr-muted text-xs mb-4\">Sign up for roast drops and deals.</p><form class=\"flex gap-x-2\"><input type=\"email\" placeholder=\"name@example.com\" class=\"rr-input min-w-0 flex-auto rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2 text-sm font-body text-rr-heading placeholder:text-rr-border\"> <button type=\"submit\" class=\"btn flex-none rounded-sm bg-rr-red px-3.5 py-2 text-sm text-white label-font hover:bg-rr-red-lt transition-colors\">JOIN</button></form></div></div><!-- Copyright bar --><div class=\"mt-12 border-t border-rr-border pt-8 flex flex-col sm:flex-row justify-between gap-2\"><p class=\"font-body text-xs text-rr-muted\">&copy; 2026 Rockabilly Roasting Co.</p><div class=\"flex gap-4\"><a href=\"/shipping\" class=\"font-body text-xs text-rr-muted hover:text-rr-heading transition-colors\">Shipping &amp; Returns</a> <a href=\"/privacy\" class=\"font-body text-xs text-rr-muted hover:text-rr-heading transition-colors\">Privacy</a> <a href=\"/terms\" class=\"font-body text-xs text-rr-muted hover:text-rr-heading transition-colors\">Terms</a> <span class=\"font-body text-xs text-rr-muted\">Powered by Hiri</span></div></div></div></footer><script>\n\t\t\t\t(function() {\n\t\t\t\t\t// Mobile menu toggle\n\t\t\t\t\tvar btn = document.getElementById('sf-mobile-menu-btn');\n\t\t\t\t\tvar menu = document.getElementById('sf-mobile-menu');\n\t\t\t\t\tif (btn && menu) {\n\t\t\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\t\t\tmenu.classList.toggle('hidden');\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t\t}\n\n\t\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t\t});\n\t\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\t\tvar closeBtn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

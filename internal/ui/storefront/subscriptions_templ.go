@@ -48,7 +48,7 @@ func SubscriptionsContent(props SubscriptionsPageProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><!-- Hero --><div class=\"mb-10\"><h1 class=\"text-3xl font-bold tracking-tight text-rr-heading\">Subscribe & Save</h1><p class=\"mt-2 max-w-2xl text-base text-rr-muted\">Never run out of your favorite coffee. Choose your products, pick a delivery frequency, and save on every order. Subscribe to multiple products and they'll ship together.</p></div><!-- How it works --><div class=\"mb-10 grid grid-cols-1 gap-4 sm:grid-cols-3\"><div class=\"rounded-lg border border-rr-border bg-rr-surface p-5\"><div class=\"mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red\">1</div><h3 class=\"text-sm font-semibold text-rr-heading\">Choose your coffee</h3><p class=\"mt-1 text-xs text-rr-muted\">Pick from any of our subscribable products below.</p></div><div class=\"rounded-lg border border-rr-border bg-rr-surface p-5\"><div class=\"mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red\">2</div><h3 class=\"text-sm font-semibold text-rr-heading\">Pick your frequency</h3><p class=\"mt-1 text-xs text-rr-muted\">Select how often you want it delivered.</p></div><div class=\"rounded-lg border border-rr-border bg-rr-surface p-5\"><div class=\"mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red\">3</div><h3 class=\"text-sm font-semibold text-rr-heading\">Save on every order</h3><p class=\"mt-1 text-xs text-rr-muted\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div><!-- Hero --><div class=\"mb-10\"><h1 class=\"font-display text-4xl text-rr-heading tracking-wide\">THE DAILY GRIND</h1><p class=\"mt-2 max-w-2xl text-base text-rr-muted\">Never run out of your favorite coffee. Choose your products, pick a delivery frequency, and save on every order. Subscribe to multiple products and they'll ship together.</p></div><!-- How it works --><div class=\"mb-10 grid grid-cols-1 gap-4 sm:grid-cols-3\"><div class=\"rounded-lg border border-rr-border bg-rr-surface p-5\"><div class=\"mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red\">1</div><h3 class=\"text-sm font-semibold text-rr-heading\">Choose your coffee</h3><p class=\"mt-1 text-xs text-rr-muted\">Pick from any of our subscribable products below.</p></div><div class=\"rounded-lg border border-rr-border bg-rr-surface p-5\"><div class=\"mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red\">2</div><h3 class=\"text-sm font-semibold text-rr-heading\">Pick your frequency</h3><p class=\"mt-1 text-xs text-rr-muted\">Select how often you want it delivered.</p></div><div class=\"rounded-lg border border-rr-border bg-rr-surface p-5\"><div class=\"mb-2 flex size-8 items-center justify-center rounded-full bg-rr-red/10 text-sm font-bold text-rr-red\">3</div><h3 class=\"text-sm font-semibold text-rr-heading\">Save on every order</h3><p class=\"mt-1 text-xs text-rr-muted\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -384,8 +384,8 @@ func SubscriptionsPage(props SubscriptionsPageProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title:       "Subscribe & Save",
-			Description: "Subscribe to your favorite products and save on every delivery",
+			Title:       "The Daily Grind",
+			Description: "Join The Daily Grind — subscribe to your favorite coffee and save on every delivery",
 			CartCount:   props.CartCount,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var15), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {

@@ -3,10 +3,13 @@ package layouts
 import "fmt"
 
 type StorefrontProps struct {
-	Title       string
-	Description string
-	CartCount   int
-	CartURL     string // defaults to "/cart" if empty
+	Title        string
+	Description  string
+	CartCount    int
+	CartURL      string // defaults to "/cart" if empty
+	CanonicalURL string // full URL, e.g. "https://rockabillyroasting.com/about"
+	OGImage      string // full URL to share image; falls back to logo
+	OGType       string // "website", "product", etc.; defaults to "website"
 }
 
 func (p StorefrontProps) cartURL() string {
@@ -14,6 +17,17 @@ func (p StorefrontProps) cartURL() string {
 		return p.CartURL
 	}
 	return "/cart"
+}
+
+func (p StorefrontProps) ogType() string {
+	if p.OGType != "" {
+		return p.OGType
+	}
+	return "website"
+}
+
+func (p StorefrontProps) fullTitle() string {
+	return p.Title + " - Rockabilly Roasting Co."
 }
 
 templ Storefront(props StorefrontProps) {
@@ -25,6 +39,33 @@ templ Storefront(props StorefrontProps) {
 			<title>{ props.Title } - Rockabilly Roasting Co.</title>
 			if props.Description != "" {
 				<meta name="description" content={ props.Description }/>
+			}
+			<!-- Open Graph -->
+			<meta property="og:type" content={ props.ogType() }/>
+			<meta property="og:title" content={ props.fullTitle() }/>
+			if props.Description != "" {
+				<meta property="og:description" content={ props.Description }/>
+			}
+			if props.CanonicalURL != "" {
+				<meta property="og:url" content={ props.CanonicalURL }/>
+				<link rel="canonical" href={ props.CanonicalURL }/>
+			}
+			if props.OGImage != "" {
+				<meta property="og:image" content={ props.OGImage }/>
+			} else {
+				<meta property="og:image" content="/static/rockabilly-logo.png"/>
+			}
+			<meta property="og:site_name" content="Rockabilly Roasting Co."/>
+			<!-- Twitter Card -->
+			<meta name="twitter:card" content="summary"/>
+			<meta name="twitter:title" content={ props.fullTitle() }/>
+			if props.Description != "" {
+				<meta name="twitter:description" content={ props.Description }/>
+			}
+			if props.OGImage != "" {
+				<meta name="twitter:image" content={ props.OGImage }/>
+			} else {
+				<meta name="twitter:image" content="/static/rockabilly-logo.png"/>
 			}
 			<link rel="icon" type="image/svg+xml" href="/static/rockabilly-logo.svg"/>
 			<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png"/>
@@ -76,10 +117,11 @@ templ Storefront(props StorefrontProps) {
 						<!-- Desktop nav -->
 						<div class="hidden sm:flex sm:items-center sm:gap-x-7">
 							<a href="/catalog" class="nav-link font-body text-sm font-semibold text-rr-heading">Shop</a>
+							<a href="/subscriptions" class="nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors">The Daily Grind</a>
 							<a href="/wholesale" class="nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors">Wholesale</a>
 							<a href="/about" class="nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors">About</a>
 						</div>
-						<!-- Cart + Subscribe + mobile menu -->
+						<!-- Cart + Sign In + mobile menu -->
 						<div class="flex items-center gap-x-3">
 							<!-- Cart icon -->
 							<div class="relative">
@@ -97,9 +139,12 @@ templ Storefront(props StorefrontProps) {
 									<span id="cart-badge" class="absolute -top-0.5 -right-0.5"></span>
 								}
 							</div>
-							<!-- Subscribe CTA -->
-							<a href="/subscribe" class="hidden sm:inline-block btn label-font px-4 py-2 rounded-sm text-white text-xs bg-rr-red glow-red hover:bg-rr-red-lt transition-colors">
-								SUBSCRIBE
+							<!-- Sign In -->
+							<a href="/account/login" class="hidden sm:flex items-center gap-1.5 font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors">
+								<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"></path>
+								</svg>
+								Sign In
 							</a>
 							<!-- Mobile menu button -->
 							<button type="button" id="sf-mobile-menu-btn" class="sm:hidden -m-2.5 p-2.5 text-rr-muted">
@@ -115,9 +160,17 @@ templ Storefront(props StorefrontProps) {
 				<div id="sf-mobile-menu" class="hidden sm:hidden border-t border-rr-border">
 					<div class="space-y-1 px-4 py-3 bg-rr-bg">
 						<a href="/catalog" class="block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-heading hover:bg-rr-surface">Shop</a>
+						<a href="/subscriptions" class="block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading">The Daily Grind</a>
 						<a href="/wholesale" class="block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading">Wholesale</a>
 						<a href="/about" class="block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading">About</a>
-						<a href="/subscribe" class="block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-teal hover:bg-rr-surface">Subscribe &amp; Save</a>
+						<div class="border-t border-rr-border mt-2 pt-2">
+							<a href="/account/login" class="flex items-center gap-2 rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading">
+								<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"></path>
+								</svg>
+								Sign In
+							</a>
+						</div>
 					</div>
 				</div>
 			</header>
@@ -155,8 +208,9 @@ templ Storefront(props StorefrontProps) {
 							<p class="label-font text-rr-muted mb-3 text-xs">SHOP</p>
 							<ul class="space-y-1.5">
 								<li><a href="/catalog" class="font-body text-sm text-rr-muted hover:text-rr-heading transition-colors">Coffee</a></li>
-								<li><a href="/subscribe" class="font-body text-sm text-rr-muted hover:text-rr-heading transition-colors">Subscriptions</a></li>
+								<li><a href="/subscriptions" class="font-body text-sm text-rr-muted hover:text-rr-heading transition-colors">The Daily Grind</a></li>
 								<li><a href="/wholesale" class="font-body text-sm text-rr-muted hover:text-rr-heading transition-colors">Wholesale</a></li>
+								<li><a href="/account/login" class="font-body text-sm text-rr-muted hover:text-rr-heading transition-colors">My Account</a></li>
 							</ul>
 						</div>
 						<!-- Cafe hours -->
@@ -189,6 +243,7 @@ templ Storefront(props StorefrontProps) {
 					<div class="mt-12 border-t border-rr-border pt-8 flex flex-col sm:flex-row justify-between gap-2">
 						<p class="font-body text-xs text-rr-muted">&copy; 2026 Rockabilly Roasting Co.</p>
 						<div class="flex gap-4">
+							<a href="/shipping" class="font-body text-xs text-rr-muted hover:text-rr-heading transition-colors">Shipping &amp; Returns</a>
 							<a href="/privacy" class="font-body text-xs text-rr-muted hover:text-rr-heading transition-colors">Privacy</a>
 							<a href="/terms" class="font-body text-xs text-rr-muted hover:text-rr-heading transition-colors">Terms</a>
 							<span class="font-body text-xs text-rr-muted">Powered by Hiri</span>

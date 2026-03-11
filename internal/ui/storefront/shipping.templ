@@ -1,0 +1,59 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+type ShippingProps struct {
+	CartCount int
+}
+
+templ ShippingContent(props ShippingProps) {
+	<div class="mx-auto max-w-3xl py-8">
+		<h1 class="font-display text-3xl text-rr-heading tracking-wide mb-8">SHIPPING &amp; RETURNS</h1>
+
+		<div class="space-y-8 font-body text-sm text-rr-body leading-relaxed">
+			<section>
+				<h2 class="label-font text-rr-heading text-xs mb-3">ROASTED FRESH TO ORDER</h2>
+				<p>Every order is roasted after you place it. We typically roast and ship within 1 to 3 business days so your coffee arrives at peak freshness.</p>
+			</section>
+
+			<section>
+				<h2 class="label-font text-rr-heading text-xs mb-3">SHIPPING RATES</h2>
+				<p>Shipping is calculated at checkout based on your location and order weight. Orders over $40 ship free within the contiguous United States.</p>
+			</section>
+
+			<section>
+				<h2 class="label-font text-rr-heading text-xs mb-3">DELIVERY TIMES</h2>
+				<p>Once shipped, delivery typically takes 2 to 5 business days depending on your location. You will receive a tracking number via email as soon as your order ships.</p>
+			</section>
+
+			<section>
+				<h2 class="label-font text-rr-heading text-xs mb-3">SUBSCRIPTIONS</h2>
+				<p>Subscription orders are roasted and shipped automatically on your selected schedule. You can pause, modify, or cancel anytime from your account page. Changes take effect on your next billing cycle.</p>
+			</section>
+
+			<section>
+				<h2 class="label-font text-rr-heading text-xs mb-3">RETURNS &amp; ISSUES</h2>
+				<p>Because coffee is perishable, we generally cannot accept returns. However, if something is wrong with your order — damaged in shipping, wrong item, or a quality issue — contact us within 14 days and we will make it right.</p>
+			</section>
+
+			<section>
+				<h2 class="label-font text-rr-heading text-xs mb-3">CONTACT US</h2>
+				<p>Questions about an order? We're here to help.</p>
+				<p class="mt-2">
+					<a href="mailto:info@rockabillyroasting.com" class="text-rr-red hover:text-rr-red-lt underline">info@rockabillyroasting.com</a><br/>
+					509-585-2320
+				</p>
+			</section>
+		</div>
+	</div>
+}
+
+templ ShippingPage(props ShippingProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Shipping & Returns",
+		Description: "Shipping rates, delivery times, and return policy for Rockabilly Roasting Co.",
+		CartCount:   props.CartCount,
+	}) {
+		@ShippingContent(props)
+	}
+}

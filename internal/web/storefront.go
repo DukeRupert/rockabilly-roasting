@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -334,6 +335,55 @@ func (d *Deps) handleTermsPage(w http.ResponseWriter, r *http.Request) {
 	storefront.TermsPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
+// handleAboutPage renders the about placeholder page.
+func (d *Deps) handleAboutPage(w http.ResponseWriter, r *http.Request) {
+	props := storefront.AboutProps{
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+	if IsHTMX(r) {
+		storefront.AboutContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.AboutPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleWholesaleLandingPage renders the wholesale & white label info page.
+func (d *Deps) handleWholesaleLandingPage(w http.ResponseWriter, r *http.Request) {
+	props := storefront.WholesaleProps{
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+	if IsHTMX(r) {
+		storefront.WholesaleContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.WholesalePage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleShippingPage renders the shipping & returns policy page.
+func (d *Deps) handleShippingPage(w http.ResponseWriter, r *http.Request) {
+	props := storefront.ShippingProps{
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+	if IsHTMX(r) {
+		storefront.ShippingContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.ShippingPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleNotFoundPage renders the branded 404 page.
+func (d *Deps) handleNotFoundPage(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotFound)
+	props := storefront.NotFoundProps{
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+	if IsHTMX(r) {
+		storefront.NotFoundContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.NotFoundPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
 // handleStorefrontProduct renders a single product detail page.
 func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -457,4 +507,78 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	storefront.ProductPage(props).Render(ctx, w) //nolint:errcheck
+}
+
+// handleRobotsTxt serves the robots.txt file.
+func (d *Deps) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	sitemapURL := d.BaseURL + "/sitemap.xml"
+	body := "User-agent: *\nAllow: /\n\n" +
+		"Disallow: /admin/\n" +
+		"Disallow: /account/\n" +
+		"Disallow: /cart\n" +
+		"Disallow: /checkout\n" +
+		"Disallow: /api/\n" +
+		"Disallow: /auth/\n" +
+		"Disallow: /webhooks/\n" +
+		"Disallow: /wholesale/portal\n" +
+		"Disallow: /wholesale/checkout\n\n" +
+		"Sitemap: " + sitemapURL + "\n"
+	w.Write([]byte(body)) //nolint:errcheck
+}
+
+// handleSitemapXML serves a sitemap with static pages and product URLs.
+func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	base := strings.TrimRight(d.BaseURL, "/")
+
+	type sitemapURL struct {
+		Loc        string
+		ChangeFreq string
+		Priority   string
+	}
+
+	// Static pages
+	urls := []sitemapURL{
+		{Loc: base + "/", ChangeFreq: "weekly", Priority: "1.0"},
+		{Loc: base + "/catalog", ChangeFreq: "daily", Priority: "0.9"},
+		{Loc: base + "/subscriptions", ChangeFreq: "weekly", Priority: "0.8"},
+		{Loc: base + "/wholesale", ChangeFreq: "monthly", Priority: "0.6"},
+		{Loc: base + "/about", ChangeFreq: "monthly", Priority: "0.5"},
+		{Loc: base + "/shipping", ChangeFreq: "monthly", Priority: "0.4"},
+		{Loc: base + "/privacy", ChangeFreq: "yearly", Priority: "0.2"},
+		{Loc: base + "/terms", ChangeFreq: "yearly", Priority: "0.2"},
+	}
+
+	// Add active product pages
+	activeStatus := domain.ProductStatusActive
+	filter := store.ProductFilter{
+		Status: &activeStatus,
+		Limit:  500,
+	}
+	var products []domain.Product
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		products, txErr = d.CatalogService.ListProducts(ctx, tx, filter)
+		return txErr
+	})
+	if err != nil {
+		d.Logger.Error("sitemap: failed to list products", "error", err)
+		// Continue with static pages only
+	}
+	for _, p := range products {
+		urls = append(urls, sitemapURL{
+			Loc:        base + "/catalog/" + p.Slug,
+			ChangeFreq: "weekly",
+			Priority:   "0.8",
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?>`)
+	fmt.Fprint(w, `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
+	for _, u := range urls {
+		fmt.Fprintf(w, `<url><loc>%s</loc><changefreq>%s</changefreq><priority>%s</priority></url>`, u.Loc, u.ChangeFreq, u.Priority)
+	}
+	fmt.Fprint(w, `</urlset>`)
 }

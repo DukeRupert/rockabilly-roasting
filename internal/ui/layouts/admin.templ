@@ -66,8 +66,8 @@ templ Admin(props AdminProps) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>{ props.Title } - Hiri Admin</title>
-			<link rel="icon" type="image/svg+xml" href="/static/hiri-favicon.svg"/>
+			<title>{ props.Title } - Rockabilly Roasting Admin</title>
+			<link rel="icon" type="image/svg+xml" href="/static/rockabilly-logo.svg"/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 			<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
@@ -401,11 +401,8 @@ templ Admin(props AdminProps) {
 
 templ adminLogo() {
 	<a href="/admin" class="flex items-center gap-2">
-		<svg width="32" height="25" viewBox="0 0 56 44" fill="none">
-			<path d="M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z" fill="#2D7A7A" opacity="0.35"></path>
-			<path d="M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z" fill="#2D7A7A"></path>
-		</svg>
-		<span class="text-lg font-semibold tracking-tight text-rr-heading">hiri</span>
+		<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-8 w-auto"/>
+		<span class="text-lg font-semibold tracking-tight text-rr-heading">Rockabilly</span>
 	</a>
 }
 
@@ -416,11 +413,8 @@ templ adminSidebarToggle() {
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
 		</svg>
 		<!-- Logo mark: shown when expanded -->
-		<svg id="sidebar-logo-icon" class="hidden size-6 shrink-0" viewBox="0 0 56 44" fill="none">
-			<path d="M 6 4 C 14 14, 10 26, -2 36 C 10 42, 26 44, 38 38 C 34 14, 6 4, 6 4 Z" fill="#2D7A7A" opacity="0.35"></path>
-			<path d="M 20 4 C 28 14, 24 26, 12 36 C 24 42, 42 44, 56 38 C 52 14, 20 4, 20 4 Z" fill="#2D7A7A"></path>
-		</svg>
-		<span data-sidebar-label class="hidden opacity-0 text-lg font-semibold tracking-tight text-rr-heading transition-opacity duration-200">hiri</span>
+		<img id="sidebar-logo-icon" src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="hidden size-6 shrink-0"/>
+		<span data-sidebar-label class="hidden opacity-0 text-lg font-semibold tracking-tight text-rr-heading transition-opacity duration-200">Rockabilly</span>
 	</button>
 }
 

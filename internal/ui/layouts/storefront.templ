@@ -26,6 +26,7 @@ templ Storefront(props StorefrontProps) {
 			if props.Description != "" {
 				<meta name="description" content={ props.Description }/>
 			}
+			<link rel="icon" type="image/svg+xml" href="/static/rockabilly-logo.svg"/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 			<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Boogaloo&family=Playfair+Display:ital,wght@0,700;1,400;1,700&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
@@ -59,9 +60,7 @@ templ Storefront(props StorefrontProps) {
 						<!-- Logo -->
 						<div class="flex items-center">
 							<a href="/" class="flex items-center gap-3">
-								<div class="w-9 h-9 rounded-full border-2 border-rr-red bg-rr-bg flex items-center justify-center flex-shrink-0">
-									<span class="font-display text-sm text-rr-red">RR</span>
-								</div>
+								<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-10 w-auto flex-shrink-0"/>
 								<div>
 									<p class="font-display text-rr-heading text-lg leading-none tracking-widest">ROCKABILLY</p>
 									<p class="label-font text-rr-amber text-[0.55rem]" style="letter-spacing:0.3em;">ROASTING CO.</p>
@@ -131,9 +130,12 @@ templ Storefront(props StorefrontProps) {
 					<div class="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
 						<!-- Logo column -->
 						<div>
-							<div>
-								<p class="font-display text-rr-heading text-2xl tracking-widest leading-none">ROCKABILLY</p>
-								<p class="label-font text-rr-amber text-[0.55rem] mt-0.5 mb-3" style="letter-spacing:0.3em;">ROASTING CO.</p>
+							<div class="flex items-center gap-3 mb-3">
+								<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-12 w-auto"/>
+								<div>
+									<p class="font-display text-rr-heading text-2xl tracking-widest leading-none">ROCKABILLY</p>
+									<p class="label-font text-rr-amber text-[0.55rem] mt-0.5" style="letter-spacing:0.3em;">ROASTING CO.</p>
+								</div>
 							</div>
 							<p class="font-body text-rr-muted text-xs leading-relaxed">
 								101 W. Kennewick Ave.<br/>

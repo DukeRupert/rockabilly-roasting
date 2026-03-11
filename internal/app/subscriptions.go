@@ -504,6 +504,8 @@ func nextPeriodEnd(start time.Time, interval domain.SubscriptionInterval, count 
 	switch interval {
 	case domain.SubscriptionIntervalEvery2Minutes:
 		return start.Add(time.Duration(2*count) * time.Minute)
+	case domain.SubscriptionIntervalEvery7Days:
+		return start.AddDate(0, 0, 7*count)
 	case domain.SubscriptionIntervalEvery14Days:
 		return start.AddDate(0, 0, 14*count)
 	case domain.SubscriptionIntervalEvery21Days:
@@ -512,6 +514,8 @@ func nextPeriodEnd(start time.Time, interval domain.SubscriptionInterval, count 
 		return start.AddDate(0, 0, 30*count)
 	case domain.SubscriptionIntervalEvery60Days:
 		return start.AddDate(0, 0, 60*count)
+	case domain.SubscriptionIntervalEvery90Days:
+		return start.AddDate(0, 0, 90*count)
 	default:
 		return start.AddDate(0, 0, 30*count)
 	}

@@ -298,14 +298,18 @@ func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) 
 	switch interval {
 	case domain.SubscriptionIntervalEvery2Minutes:
 		return "Every 2 Minutes"
+	case domain.SubscriptionIntervalEvery7Days:
+		return "Every Week"
 	case domain.SubscriptionIntervalEvery14Days:
-		return "Every 14 Days"
+		return "Every 2 Weeks"
 	case domain.SubscriptionIntervalEvery21Days:
-		return "Every 21 Days"
+		return "Every 3 Weeks"
 	case domain.SubscriptionIntervalEvery30Days:
-		return "Every 30 Days"
+		return "Every Month"
 	case domain.SubscriptionIntervalEvery60Days:
-		return "Every 60 Days"
+		return "Every 2 Months"
+	case domain.SubscriptionIntervalEvery90Days:
+		return "Every 3 Months"
 	default:
 		return string(interval)
 	}

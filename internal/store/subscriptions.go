@@ -137,6 +137,7 @@ type CreateSubscriptionParams struct {
 	CurrentPeriodStart time.Time
 	CurrentPeriodEnd   time.Time
 	NextOrderAt        time.Time
+	EndsAt             *time.Time
 	Metadata           map[string]any
 }
 
@@ -153,6 +154,7 @@ func (s *SubscriptionStore) Create(ctx context.Context, tx pgx.Tx, p CreateSubsc
 		CurrentPeriodStart: p.CurrentPeriodStart,
 		CurrentPeriodEnd:   p.CurrentPeriodEnd,
 		NextOrderAt:        p.NextOrderAt,
+		EndsAt:             timestampToPG(p.EndsAt),
 		Metadata:           metadataToJSON(p.Metadata),
 	})
 	if err != nil {
@@ -265,7 +267,7 @@ type SubscriptionFilter struct {
 func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionFilter) ([]domain.Subscription, error) {
 	query := `SELECT id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
 	                 current_period_start, current_period_end, next_order_at,
-	                 cancelled_at, pause_until, metadata, created_at, updated_at
+	                 ends_at, cancelled_at, pause_until, metadata, created_at, updated_at
 	          FROM subscriptions WHERE true`
 	args := []any{}
 	argN := 1
@@ -301,16 +303,17 @@ func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionF
 	for rows.Next() {
 		var sub domain.Subscription
 		var status string
-		var cancelledAt, pauseUntil pgtype.Timestamptz
+		var endsAt, cancelledAt, pauseUntil pgtype.Timestamptz
 		var metadata []byte
 		if err := rows.Scan(
 			&sub.ID, &sub.CustomerID, &sub.PlanID, &sub.VariantID, &sub.Quantity, &status, &sub.ShippingAddressID,
 			&sub.CurrentPeriodStart, &sub.CurrentPeriodEnd, &sub.NextOrderAt,
-			&cancelledAt, &pauseUntil, &metadata, &sub.CreatedAt, &sub.UpdatedAt,
+			&endsAt, &cancelledAt, &pauseUntil, &metadata, &sub.CreatedAt, &sub.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan subscription: %w", err)
 		}
 		sub.Status = domain.SubscriptionStatus(status)
+		sub.EndsAt = timestampFromPG(endsAt)
 		sub.CancelledAt = timestampFromPG(cancelledAt)
 		sub.PauseUntil = timestampFromPG(pauseUntil)
 		sub.Metadata = metadataFromJSON(metadata)
@@ -379,6 +382,7 @@ func subscriptionFromRow(r sqlcgen.Subscription) *domain.Subscription {
 		CurrentPeriodStart: r.CurrentPeriodStart,
 		CurrentPeriodEnd:   r.CurrentPeriodEnd,
 		NextOrderAt:        r.NextOrderAt,
+		EndsAt:             timestampFromPG(r.EndsAt),
 		CancelledAt:        timestampFromPG(r.CancelledAt),
 		PauseUntil:         timestampFromPG(r.PauseUntil),
 		Metadata:           metadataFromJSON(r.Metadata),

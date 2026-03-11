@@ -149,7 +149,7 @@ INSERT INTO orders (id, number, customer_id, status, payment_status, fulfillment
                     shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
                     tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
-RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note
+RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at
 `
 
 type CreateOrderParams struct {
@@ -231,6 +231,9 @@ func (q *Queries) CreateOrder(ctx context.Context, arg CreateOrderParams) (Order
 		&i.StripePaymentIntentID,
 		&i.CustomerPoNumber,
 		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
 	)
 	return i, err
 }
@@ -325,7 +328,7 @@ func (q *Queries) GetCartByID(ctx context.Context, id uuid.UUID) (Cart, error) {
 }
 
 const getOrderByID = `-- name: GetOrderByID :one
-SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note FROM orders WHERE id = $1
+SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at FROM orders WHERE id = $1
 `
 
 func (q *Queries) GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error) {
@@ -359,12 +362,15 @@ func (q *Queries) GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 		&i.StripePaymentIntentID,
 		&i.CustomerPoNumber,
 		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
 	)
 	return i, err
 }
 
 const getOrderByNumber = `-- name: GetOrderByNumber :one
-SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note FROM orders WHERE number = $1
+SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at FROM orders WHERE number = $1
 `
 
 func (q *Queries) GetOrderByNumber(ctx context.Context, number string) (Order, error) {
@@ -398,12 +404,15 @@ func (q *Queries) GetOrderByNumber(ctx context.Context, number string) (Order, e
 		&i.StripePaymentIntentID,
 		&i.CustomerPoNumber,
 		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
 	)
 	return i, err
 }
 
 const getOrderByStripePaymentIntentID = `-- name: GetOrderByStripePaymentIntentID :one
-SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note FROM orders WHERE stripe_payment_intent_id = $1
+SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at FROM orders WHERE stripe_payment_intent_id = $1
 `
 
 func (q *Queries) GetOrderByStripePaymentIntentID(ctx context.Context, stripePaymentIntentID *string) (Order, error) {
@@ -437,6 +446,9 @@ func (q *Queries) GetOrderByStripePaymentIntentID(ctx context.Context, stripePay
 		&i.StripePaymentIntentID,
 		&i.CustomerPoNumber,
 		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
 	)
 	return i, err
 }
@@ -612,7 +624,7 @@ const updateOrderFulfillmentStatus = `-- name: UpdateOrderFulfillmentStatus :one
 UPDATE orders
 SET fulfillment_status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note
+RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at
 `
 
 type UpdateOrderFulfillmentStatusParams struct {
@@ -651,6 +663,9 @@ func (q *Queries) UpdateOrderFulfillmentStatus(ctx context.Context, arg UpdateOr
 		&i.StripePaymentIntentID,
 		&i.CustomerPoNumber,
 		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
 	)
 	return i, err
 }
@@ -659,7 +674,7 @@ const updateOrderPaymentStatus = `-- name: UpdateOrderPaymentStatus :one
 UPDATE orders
 SET payment_status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note
+RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at
 `
 
 type UpdateOrderPaymentStatusParams struct {
@@ -698,6 +713,9 @@ func (q *Queries) UpdateOrderPaymentStatus(ctx context.Context, arg UpdateOrderP
 		&i.StripePaymentIntentID,
 		&i.CustomerPoNumber,
 		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
 	)
 	return i, err
 }
@@ -706,7 +724,7 @@ const updateOrderStatus = `-- name: UpdateOrderStatus :one
 UPDATE orders
 SET status = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note
+RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at
 `
 
 type UpdateOrderStatusParams struct {
@@ -745,6 +763,9 @@ func (q *Queries) UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusPa
 		&i.StripePaymentIntentID,
 		&i.CustomerPoNumber,
 		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
 	)
 	return i, err
 }
@@ -753,7 +774,7 @@ const updateOrderStripePaymentIntentID = `-- name: UpdateOrderStripePaymentInten
 UPDATE orders
 SET stripe_payment_intent_id = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note
+RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at
 `
 
 type UpdateOrderStripePaymentIntentIDParams struct {
@@ -792,6 +813,9 @@ func (q *Queries) UpdateOrderStripePaymentIntentID(ctx context.Context, arg Upda
 		&i.StripePaymentIntentID,
 		&i.CustomerPoNumber,
 		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
 	)
 	return i, err
 }

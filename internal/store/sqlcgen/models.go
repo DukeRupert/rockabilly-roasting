@@ -174,6 +174,8 @@ type Customer struct {
 	ApprovedBy       *uuid.UUID         `json:"approved_by"`
 	TwoFaEnabled     bool               `json:"two_fa_enabled"`
 	TwoFaMethod      *string            `json:"two_fa_method"`
+	QbCustomerID     *string            `json:"qb_customer_id"`
+	QbSyncedAt       pgtype.Timestamptz `json:"qb_synced_at"`
 }
 
 type CustomerGroup struct {
@@ -304,33 +306,36 @@ type MagicLinkToken struct {
 }
 
 type Order struct {
-	ID                    uuid.UUID       `json:"id"`
-	Number                string          `json:"number"`
-	CustomerID            *uuid.UUID      `json:"customer_id"`
-	Status                string          `json:"status"`
-	PaymentStatus         string          `json:"payment_status"`
-	FulfillmentStatus     string          `json:"fulfillment_status"`
-	CurrencyCode          string          `json:"currency_code"`
-	Subtotal              int32           `json:"subtotal"`
-	DiscountTotal         int32           `json:"discount_total"`
-	ShippingTotal         int32           `json:"shipping_total"`
-	TaxTotal              int32           `json:"tax_total"`
-	Total                 int32           `json:"total"`
-	ShippingAddressID     uuid.UUID       `json:"shipping_address_id"`
-	BillingAddressID      uuid.UUID       `json:"billing_address_id"`
-	SubscriptionID        *uuid.UUID      `json:"subscription_id"`
-	DraftByUserID         *uuid.UUID      `json:"draft_by_user_id"`
-	TaxExempt             bool            `json:"tax_exempt"`
-	TaxExemptReason       *string         `json:"tax_exempt_reason"`
-	StripeTaxID           *string         `json:"stripe_tax_id"`
-	Notes                 *string         `json:"notes"`
-	Metadata              json.RawMessage `json:"metadata"`
-	PlacedAt              time.Time       `json:"placed_at"`
-	CreatedAt             time.Time       `json:"created_at"`
-	UpdatedAt             time.Time       `json:"updated_at"`
-	StripePaymentIntentID *string         `json:"stripe_payment_intent_id"`
-	CustomerPoNumber      *string         `json:"customer_po_number"`
-	InternalNote          *string         `json:"internal_note"`
+	ID                    uuid.UUID          `json:"id"`
+	Number                string             `json:"number"`
+	CustomerID            *uuid.UUID         `json:"customer_id"`
+	Status                string             `json:"status"`
+	PaymentStatus         string             `json:"payment_status"`
+	FulfillmentStatus     string             `json:"fulfillment_status"`
+	CurrencyCode          string             `json:"currency_code"`
+	Subtotal              int32              `json:"subtotal"`
+	DiscountTotal         int32              `json:"discount_total"`
+	ShippingTotal         int32              `json:"shipping_total"`
+	TaxTotal              int32              `json:"tax_total"`
+	Total                 int32              `json:"total"`
+	ShippingAddressID     uuid.UUID          `json:"shipping_address_id"`
+	BillingAddressID      uuid.UUID          `json:"billing_address_id"`
+	SubscriptionID        *uuid.UUID         `json:"subscription_id"`
+	DraftByUserID         *uuid.UUID         `json:"draft_by_user_id"`
+	TaxExempt             bool               `json:"tax_exempt"`
+	TaxExemptReason       *string            `json:"tax_exempt_reason"`
+	StripeTaxID           *string            `json:"stripe_tax_id"`
+	Notes                 *string            `json:"notes"`
+	Metadata              json.RawMessage    `json:"metadata"`
+	PlacedAt              time.Time          `json:"placed_at"`
+	CreatedAt             time.Time          `json:"created_at"`
+	UpdatedAt             time.Time          `json:"updated_at"`
+	StripePaymentIntentID *string            `json:"stripe_payment_intent_id"`
+	CustomerPoNumber      *string            `json:"customer_po_number"`
+	InternalNote          *string            `json:"internal_note"`
+	QbInvoiceID           *string            `json:"qb_invoice_id"`
+	QbInvoiceNo           *string            `json:"qb_invoice_no"`
+	QbSyncedAt            pgtype.Timestamptz `json:"qb_synced_at"`
 }
 
 type Price struct {
@@ -418,6 +423,17 @@ type ProductOptionValue struct {
 	ProductOptionID uuid.UUID `json:"product_option_id"`
 	Value           string    `json:"value"`
 	Position        int32     `json:"position"`
+}
+
+type QbCredential struct {
+	ID               uuid.UUID `json:"id"`
+	RealmID          string    `json:"realm_id"`
+	AccessToken      string    `json:"access_token"`
+	RefreshToken     string    `json:"refresh_token"`
+	AccessExpiresAt  time.Time `json:"access_expires_at"`
+	RefreshExpiresAt time.Time `json:"refresh_expires_at"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type ResetToken struct {
@@ -524,6 +540,7 @@ type Subscription struct {
 	UpdatedAt          time.Time          `json:"updated_at"`
 	VariantID          uuid.UUID          `json:"variant_id"`
 	Quantity           int32              `json:"quantity"`
+	EndsAt             pgtype.Timestamptz `json:"ends_at"`
 }
 
 type SubscriptionOrder struct {

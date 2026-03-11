@@ -367,6 +367,8 @@ func subscriptionStatusBadgeClass(status domain.SubscriptionStatus) string {
 
 func intervalLabel(interval domain.SubscriptionInterval) string {
 	switch interval {
+	case domain.SubscriptionIntervalEvery7Days:
+		return "Weekly"
 	case domain.SubscriptionIntervalEvery14Days:
 		return "Every 2 weeks"
 	case domain.SubscriptionIntervalEvery21Days:
@@ -375,6 +377,8 @@ func intervalLabel(interval domain.SubscriptionInterval) string {
 		return "Monthly"
 	case domain.SubscriptionIntervalEvery60Days:
 		return "Every 2 months"
+	case domain.SubscriptionIntervalEvery90Days:
+		return "Every 3 months"
 	default:
 		return string(interval)
 	}

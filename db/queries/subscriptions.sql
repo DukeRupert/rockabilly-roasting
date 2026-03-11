@@ -17,8 +17,8 @@ UPDATE subscription_plans SET discount_pct = $2 WHERE id = $1;
 
 -- name: CreateSubscription :one
 INSERT INTO subscriptions (id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
-                           current_period_start, current_period_end, next_order_at, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                           current_period_start, current_period_end, next_order_at, ends_at, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 RETURNING *;
 
 -- name: GetSubscriptionByID :one
@@ -56,6 +56,7 @@ WHERE id = $1;
 -- name: ListSubscriptionsDueForRenewal :many
 SELECT * FROM subscriptions
 WHERE status = 'active' AND next_order_at <= now()
+  AND (ends_at IS NULL OR ends_at > now())
 ORDER BY next_order_at ASC;
 
 -- name: CreateSubscriptionOrder :exec

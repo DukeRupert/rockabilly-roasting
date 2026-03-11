@@ -102,7 +102,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Rockabilly Roasting Admin</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/alpine.min.js\"></script><script src=\"/static/js/htmx.min.js\"></script><style>\n\t\t\t\t/* Admin light mode — kraft paper palette from brand guide v3 */\n\t\t\t\t:root {\n\t\t\t\t\t--color-rr-bg: #F9F6F1 !important;      /* warm concrete */\n\t\t\t\t\t--color-rr-surface: #EDE5D8 !important;  /* kraft paper */\n\t\t\t\t\t--color-rr-raised: #E4DAC8 !important;   /* nav, raised */\n\t\t\t\t\t--color-rr-border: #9A8C7C !important;   /* visible borders */\n\t\t\t\t\t--color-rr-muted: #7A6E60 !important;    /* muted text */\n\t\t\t\t\t--color-rr-body: #3A3028 !important;     /* body text */\n\t\t\t\t\t--color-rr-heading: #1C1610 !important;  /* near-black warm */\n\t\t\t\t}\n\t\t\t\tbody { font-family: 'Barlow', sans-serif; }\n\n\t\t\t\t/* ── Admin status badges ── */\n\t\t\t\t.badge {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.35rem;\n\t\t\t\t\tpadding: 0.2rem 0.6rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tborder: 1px solid transparent;\n\t\t\t\t\tfont-family: 'Barlow', sans-serif;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tletter-spacing: 0.14em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tfont-size: 0.65rem;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t\t.badge-dot::before {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\twidth: 5px;\n\t\t\t\t\theight: 5px;\n\t\t\t\t\tborder-radius: 50%;\n\t\t\t\t\tbackground: currentColor;\n\t\t\t\t\tflex-shrink: 0;\n\t\t\t\t}\n\t\t\t\t.badge-green      { background:#DFF0E4; color:#2A6644; border-color:#A8D4B8; }\n\t\t\t\t.badge-green-solid { background:#2A6644; color:#F0FAF4; border-color:#1E4E32; }\n\t\t\t\t.badge-amber      { background:#FBF0D8; color:#7A4E08; border-color:#E8C070; }\n\t\t\t\t.badge-slate      { background:#E4EAF0; color:#2E4A60; border-color:#A8BED0; }\n\t\t\t\t.badge-teal       { background:#D8F0EE; color:#0A5E5C; border-color:#7ACCC8; }\n\t\t\t\t.badge-teal-solid { background:#0A7870; color:#F0FAFA; border-color:#065858; }\n\t\t\t\t.badge-red        { background:#FAE4E4; color:#7A1210; border-color:#E0A8A8; }\n\t\t\t\t.badge-grey       { background:#E8E0D8; color:#5A5048; border-color:#B8ACA0; }\n\t\t\t\t.badge-pastdue    { background:#FCE8D8; color:#7A3010; border-color:#E8B090; }\n\t\t\t\t.badge-partial    { background:#EEF0D8; color:#4A5218; border-color:#C0C888; }\n\t\t\t</style></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-rr-heading/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border\"><div class=\"flex h-16 shrink-0 items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Rockabilly Roasting Admin</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/static/favicon-32x32.png\"><link rel=\"icon\" type=\"image/png\" sizes=\"16x16\" href=\"/static/favicon-16x16.png\"><link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/static/apple-touch-icon.png\"><link rel=\"manifest\" href=\"/static/site.webmanifest\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/alpine.min.js\"></script><script src=\"/static/js/htmx.min.js\"></script><style>\n\t\t\t\t/* Admin light mode — kraft paper palette from brand guide v3 */\n\t\t\t\t:root {\n\t\t\t\t\t--color-rr-bg: #F9F6F1 !important;      /* warm concrete */\n\t\t\t\t\t--color-rr-surface: #EDE5D8 !important;  /* kraft paper */\n\t\t\t\t\t--color-rr-raised: #E4DAC8 !important;   /* nav, raised */\n\t\t\t\t\t--color-rr-border: #9A8C7C !important;   /* visible borders */\n\t\t\t\t\t--color-rr-muted: #7A6E60 !important;    /* muted text */\n\t\t\t\t\t--color-rr-body: #3A3028 !important;     /* body text */\n\t\t\t\t\t--color-rr-heading: #1C1610 !important;  /* near-black warm */\n\t\t\t\t}\n\t\t\t\tbody { font-family: 'Barlow', sans-serif; }\n\n\t\t\t\t/* ── Admin status badges ── */\n\t\t\t\t.badge {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.35rem;\n\t\t\t\t\tpadding: 0.2rem 0.6rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tborder: 1px solid transparent;\n\t\t\t\t\tfont-family: 'Barlow', sans-serif;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tletter-spacing: 0.14em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tfont-size: 0.65rem;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t\t.badge-dot::before {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\twidth: 5px;\n\t\t\t\t\theight: 5px;\n\t\t\t\t\tborder-radius: 50%;\n\t\t\t\t\tbackground: currentColor;\n\t\t\t\t\tflex-shrink: 0;\n\t\t\t\t}\n\t\t\t\t.badge-green      { background:#DFF0E4; color:#2A6644; border-color:#A8D4B8; }\n\t\t\t\t.badge-green-solid { background:#2A6644; color:#F0FAF4; border-color:#1E4E32; }\n\t\t\t\t.badge-amber      { background:#FBF0D8; color:#7A4E08; border-color:#E8C070; }\n\t\t\t\t.badge-slate      { background:#E4EAF0; color:#2E4A60; border-color:#A8BED0; }\n\t\t\t\t.badge-teal       { background:#D8F0EE; color:#0A5E5C; border-color:#7ACCC8; }\n\t\t\t\t.badge-teal-solid { background:#0A7870; color:#F0FAFA; border-color:#065858; }\n\t\t\t\t.badge-red        { background:#FAE4E4; color:#7A1210; border-color:#E0A8A8; }\n\t\t\t\t.badge-grey       { background:#E8E0D8; color:#5A5048; border-color:#B8ACA0; }\n\t\t\t\t.badge-pastdue    { background:#FCE8D8; color:#7A3010; border-color:#E8B090; }\n\t\t\t\t.badge-partial    { background:#EEF0D8; color:#4A5218; border-color:#C0C888; }\n\t\t\t</style></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-rr-heading/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border\"><div class=\"flex h-16 shrink-0 items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -131,7 +131,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var4 templ.SafeURL
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 154, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 158, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -161,7 +161,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 156, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 160, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -239,7 +239,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var10 templ.SafeURL
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 189, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 193, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -273,7 +273,7 @@ func Admin(props AdminProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 191, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 195, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -321,7 +321,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 227, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 231, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -334,7 +334,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 230, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 234, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -442,7 +442,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 425, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 429, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -455,7 +455,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 428, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 432, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -468,7 +468,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 429, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 433, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {

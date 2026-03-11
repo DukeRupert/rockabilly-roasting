@@ -16,6 +16,16 @@ Hiri is a green-field single-merchant ecommerce platform written in Go. It deplo
 - **Testing:** `testify/assert` + `uber/mock`
 - **External services:** Stripe (payments + tax), Shippo/EasyPost (shipping), AWS S3 (assets), go-mail (email)
 
+## Local Development Setup
+
+```bash
+docker compose up -d          # Postgres 17 on localhost:5433
+cp .env.example .env          # fill in API keys
+mage db:migrate               # run migrations
+mage dev:seed                 # create admin user (set SEED_EMAIL, SEED_PASSWORD, SEED_NAME)
+mage dev:run                  # generate templ + CSS, build, and run server
+```
+
 ## Build & Run Commands
 
 This project uses [Mage](https://magefile.org/) as a Go-native task runner. Install with `go install github.com/magefile/mage@latest`. Targets are defined in `magefiles/mage.go`.
@@ -71,7 +81,7 @@ platform/ → domain/ only (audit sub-package)
 - `web/` — thin HTTP handlers: parse request → call service → render response. Route registration + middleware in `router.go`
 - `ui/` — templ templates organized as `layouts/`, `storefront/`, `admin/`, `components/`
 - `jobs/` — River workers, one file per job type. Workers are thin: open tx, call service, return
-- `platform/` — infrastructure sub-packages: `audit/`, `auth/`, `email/`, `logging/`, `media/`, `metrics/`, `payments/`, `ratelimit/`, `sessions/`, `shipping/`, `tax/`
+- `platform/` — infrastructure sub-packages: `audit/`, `auth/`, `email/`, `logging/`, `media/`, `metrics/`, `payments/`, `quickbooks/`, `ratelimit/`, `sessions/`, `shipping/`, `tax/`
 - `emailtemplates/` — templ-based email templates
 - `testutil/` — shared test helpers
 
@@ -130,6 +140,20 @@ Every admin HTML page uses htmx for in-page navigation. The pattern:
 - **Permissions:** `Perm<Resource><Action>` in `platform/auth/permissions.go`
 - **Status types:** typed strings with named constants, never bare strings
 
+## Testing
+
+Tests use **testcontainers** — Docker must be running. The test infrastructure:
+- `testutil.SetupTestDB()` spins up a Postgres container and runs all migrations (used in `TestMain`)
+- `testutil.NewTestTx(t, pool)` creates a transaction that rolls back on cleanup — each test gets perfect isolation without re-running migrations
+- `testutil/fixtures.go` has factory functions for test data
+- `testutil/assertions.go` has domain-specific assertion helpers
+
+```bash
+mage test                                    # all tests
+go test ./internal/app/ -run TestOrderRefund # single test
+mage testVerbose                             # verbose output
+```
+
 ## Key Design Docs
 
 Detailed specifications live in `docs/`:
@@ -138,4 +162,9 @@ Detailed specifications live in `docs/`:
 - `lean-commerce-domain-model.md` — 6 domains: Catalog, Pricing, Customer, Order, Fulfillment, Subscription
 - `lean-commerce-auth.md` — session strategy, customer vs staff auth flows
 - `lean-commerce-infrastructure.md` — 8 infrastructure concerns
+- `lean-commerce-subscriptions.md` — subscription lifecycle and renewal
+- `lean-commerce-b2b.md` — wholesale/B2B customer workflows
+- `lean-commerce-discounts.md` — discount and coupon system
+- `lean-commerce-tax.md` — tax calculation via Stripe Tax
+- `lean-commerce-shipping.md` — shipping label and rate workflows
 - `UI_DIRECTION.md` — design system, color palette, component specs

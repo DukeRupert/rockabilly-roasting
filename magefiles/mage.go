@@ -134,3 +134,13 @@ func (Dev) Run() error {
 func (Dev) Seed() error {
 	return sh.RunV("go", "run", "./cmd/seed")
 }
+
+// Migrate imports WooCommerce subscriptions into Hiri.
+// Set WC_CONSUMER_KEY, WC_CONSUMER_SECRET, and DATABASE_URL.
+// Use --dry-run to validate without importing.
+// Use --mapping=path/to/mapping.json for variant ID mapping.
+func (Dev) Migrate(args ...string) error {
+	cmdArgs := []string{"run", "./cmd/migrate"}
+	cmdArgs = append(cmdArgs, args...)
+	return sh.RunV("go", cmdArgs...)
+}

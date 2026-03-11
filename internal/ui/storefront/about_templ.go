@@ -11,7 +11,9 @@ import templruntime "github.com/a-h/templ/runtime"
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type AboutProps struct {
-	CartCount int
+	CartCount      int
+	ContactSuccess bool
+	ContactError   string
 }
 
 func AboutContent(props AboutProps) templ.Component {
@@ -35,7 +37,41 @@ func AboutContent(props AboutProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mx-auto max-w-3xl py-16 text-center\"><h1 class=\"font-display text-4xl text-rr-heading tracking-wide mb-4\">ABOUT US</h1><div class=\"w-16 h-1 bg-rr-red mx-auto mb-8 rounded-full\"></div><p class=\"font-body text-lg text-rr-muted leading-relaxed mb-6\">Small-batch specialty coffee with bold flavor and a rebellious spirit.</p><p class=\"font-body text-base text-rr-muted leading-relaxed mb-10\">More information coming soon. In the meantime, stop by the cafe or give us a call.</p><div class=\"rounded-lg border border-rr-border bg-rr-surface p-8 inline-block\"><p class=\"label-font text-rr-muted text-xs mb-3\">VISIT US</p><p class=\"font-body text-rr-body text-sm\">101 W. Kennewick Ave.</p><p class=\"font-body text-rr-body text-sm\">Kennewick, WA</p><p class=\"font-body text-rr-muted text-sm mt-2\">509-585-2320</p><p class=\"font-body text-rr-muted text-sm\">info@rockabillyroasting.com</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mx-auto max-w-3xl py-16\"><div class=\"text-center mb-16\"><h1 class=\"font-display text-4xl text-rr-heading tracking-wide mb-4\">ABOUT US</h1><div class=\"w-16 h-1 bg-rr-red mx-auto mb-8 rounded-full\"></div><p class=\"font-body text-lg text-rr-muted leading-relaxed mb-6\">Small-batch specialty coffee with bold flavor and a rebellious spirit.</p><p class=\"font-body text-base text-rr-muted leading-relaxed mb-10\">More information coming soon. In the meantime, stop by the cafe or give us a call.</p><div class=\"rounded-lg border border-rr-border bg-rr-surface p-8 inline-block\"><p class=\"label-font text-rr-muted text-xs mb-3\">VISIT US</p><p class=\"font-body text-rr-body text-sm\">101 W. Kennewick Ave.</p><p class=\"font-body text-rr-body text-sm\">Kennewick, WA</p><p class=\"font-body text-rr-muted text-sm mt-2\">509-585-2320</p><p class=\"font-body text-rr-muted text-sm\">info@rockabillyroasting.com</p></div></div><!-- Contact Form --><div class=\"border-t border-rr-border pt-16\"><h2 class=\"font-display text-2xl text-rr-heading tracking-wide text-center mb-2\">GET IN TOUCH</h2><p class=\"font-body text-sm text-rr-muted text-center mb-8\">Questions, feedback, or wholesale inquiries — we'd love to hear from you.</p>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if props.ContactSuccess {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"rounded-lg border border-green-700/50 bg-green-900/20 p-6 text-center\"><p class=\"font-body text-green-400 font-semibold mb-1\">Message sent!</p><p class=\"font-body text-sm text-rr-muted\">We'll get back to you as soon as we can.</p></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			if props.ContactError != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"rounded-lg border border-red-700/50 bg-red-900/20 p-4 mb-6 text-center\"><p class=\"font-body text-red-400 text-sm\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var2 string
+				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.ContactError)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/about.templ`, Line: 42, Col: 68}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, " <form method=\"POST\" action=\"/about/contact\" class=\"space-y-5\"><div class=\"grid grid-cols-1 sm:grid-cols-2 gap-5\"><div><label for=\"contact-name\" class=\"label-font text-rr-muted text-xs mb-1.5 block\">NAME</label> <input type=\"text\" id=\"contact-name\" name=\"name\" required class=\"rr-input w-full rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2.5 text-sm font-body text-rr-heading placeholder:text-rr-border focus:border-rr-amber focus:outline-none\" placeholder=\"Your name\"></div><div><label for=\"contact-email\" class=\"label-font text-rr-muted text-xs mb-1.5 block\">EMAIL</label> <input type=\"email\" id=\"contact-email\" name=\"email\" required class=\"rr-input w-full rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2.5 text-sm font-body text-rr-heading placeholder:text-rr-border focus:border-rr-amber focus:outline-none\" placeholder=\"you@example.com\"></div></div><div><label for=\"contact-subject\" class=\"label-font text-rr-muted text-xs mb-1.5 block\">SUBJECT</label> <input type=\"text\" id=\"contact-subject\" name=\"subject\" required class=\"rr-input w-full rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2.5 text-sm font-body text-rr-heading placeholder:text-rr-border focus:border-rr-amber focus:outline-none\" placeholder=\"What's this about?\"></div><div><label for=\"contact-message\" class=\"label-font text-rr-muted text-xs mb-1.5 block\">MESSAGE</label> <textarea id=\"contact-message\" name=\"message\" required rows=\"5\" class=\"rr-input w-full rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2.5 text-sm font-body text-rr-heading placeholder:text-rr-border focus:border-rr-amber focus:outline-none resize-y\" placeholder=\"Tell us what's on your mind...\"></textarea></div><!-- Honeypot field — hidden from real users, catches bots --><div class=\"hidden\" aria-hidden=\"true\"><input type=\"text\" name=\"website\" tabindex=\"-1\" autocomplete=\"off\"></div><div class=\"text-center\"><button type=\"submit\" class=\"btn rounded-sm bg-rr-red px-8 py-2.5 text-sm text-white label-font hover:bg-rr-red-lt transition-colors\">SEND MESSAGE</button></div></form>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -59,12 +95,12 @@ func AboutPage(props AboutProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var2 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var2 == nil {
-			templ_7745c5c3_Var2 = templ.NopComponent
+		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var3 == nil {
+			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var4 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -86,7 +122,7 @@ func AboutPage(props AboutProps) templ.Component {
 			Title:       "About",
 			Description: "About Rockabilly Roasting Co. — small-batch specialty coffee in Kennewick, WA",
 			CartCount:   props.CartCount,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

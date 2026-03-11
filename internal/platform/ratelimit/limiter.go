@@ -35,6 +35,10 @@ var (
 	CheckoutSessionLimit = 5
 	CheckoutWindow       = 10 * time.Minute
 
+	// Contact form.
+	ContactIPLimit = 3
+	ContactWindow  = time.Hour
+
 	// Global per-IP.
 	GlobalIPLimit = 300
 	GlobalWindow  = time.Minute
@@ -152,4 +156,5 @@ func MagicLinkIPKey(ip string) string            { return "magic:ip:" + ip }
 func CouponSessionKey(sessionID string) string   { return "coupon:sess:" + sessionID }
 func CouponIPKey(ip string) string               { return "coupon:ip:" + ip }
 func CheckoutSessionKey(sessionID string) string { return "checkout:sess:" + sessionID }
+func ContactIPKey(ip string) string               { return "contact:ip:" + ip }
 func GlobalIPKey(ip string) string               { return "global:ip:" + ip }

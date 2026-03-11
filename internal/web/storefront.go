@@ -3,6 +3,7 @@ package web
 import (
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/email"
 	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
@@ -335,16 +337,95 @@ func (d *Deps) handleTermsPage(w http.ResponseWriter, r *http.Request) {
 	storefront.TermsPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
-// handleAboutPage renders the about placeholder page.
+// handleAboutPage renders the about page with optional contact form success.
 func (d *Deps) handleAboutPage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.AboutProps{
-		CartCount: d.cartItemCountFromCookie(r),
+		CartCount:      d.cartItemCountFromCookie(r),
+		ContactSuccess: r.URL.Query().Get("sent") == "1",
 	}
 	if IsHTMX(r) {
 		storefront.AboutContent(props).Render(r.Context(), w) //nolint:errcheck
 		return
 	}
 	storefront.AboutPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleContactSubmit processes the contact form submission and sends the email via Postmark.
+func (d *Deps) handleContactSubmit(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	// Honeypot — if the hidden "website" field is filled, silently accept (bot).
+	if r.FormValue("website") != "" {
+		http.Redirect(w, r, "/about?sent=1", http.StatusSeeOther)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	fromEmail := strings.TrimSpace(r.FormValue("email"))
+	subject := strings.TrimSpace(r.FormValue("subject"))
+	message := strings.TrimSpace(r.FormValue("message"))
+
+	// Basic validation
+	if name == "" || fromEmail == "" || subject == "" || message == "" {
+		props := storefront.AboutProps{
+			CartCount:    d.cartItemCountFromCookie(r),
+			ContactError: "Please fill in all fields.",
+		}
+		if IsHTMX(r) {
+			storefront.AboutContent(props).Render(ctx, w) //nolint:errcheck
+			return
+		}
+		storefront.AboutPage(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+
+	// Send email to staff
+	htmlBody := fmt.Sprintf(
+		"<h2>Contact Form Submission</h2>"+
+			"<p><strong>Name:</strong> %s</p>"+
+			"<p><strong>Email:</strong> %s</p>"+
+			"<p><strong>Subject:</strong> %s</p>"+
+			"<hr/>"+
+			"<p>%s</p>",
+		html.EscapeString(name),
+		html.EscapeString(fromEmail),
+		html.EscapeString(subject),
+		strings.ReplaceAll(html.EscapeString(message), "\n", "<br/>"),
+	)
+	textBody := fmt.Sprintf(
+		"Contact Form Submission\n\nName: %s\nEmail: %s\nSubject: %s\n\n%s",
+		name, fromEmail, subject, message,
+	)
+
+	_, err := d.Mailer.Send(ctx, email.Message{
+		From:    d.EmailFrom,
+		To:      d.StaffEmail,
+		Subject: "Contact: " + subject,
+		HTML:    htmlBody,
+		Text:    textBody,
+		Tag:     "contact-form",
+	})
+	if err != nil {
+		d.Logger.Error("contact form email failed", "error", err)
+		props := storefront.AboutProps{
+			CartCount:    d.cartItemCountFromCookie(r),
+			ContactError: "Something went wrong sending your message. Please try again.",
+		}
+		if IsHTMX(r) {
+			storefront.AboutContent(props).Render(ctx, w) //nolint:errcheck
+			return
+		}
+		storefront.AboutPage(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+
+	// Redirect to avoid form resubmission on refresh
+	http.Redirect(w, r, "/about?sent=1", http.StatusSeeOther)
 }
 
 // handleWholesaleLandingPage renders the wholesale & white label info page.

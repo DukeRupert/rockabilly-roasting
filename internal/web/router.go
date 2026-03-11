@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
@@ -59,6 +60,9 @@ type Deps struct {
 	RateLimiter             *ratelimit.Limiter
 	SecureCookies           bool
 	BaseURL                 string // public site URL, e.g. "https://rockabillyroasting.com"
+	Mailer                  email.Sender
+	EmailFrom               string // sender address for transactional emails
+	StaffEmail              string // staff notification recipient
 }
 
 // MetricsMux returns a handler for the internal metrics listener.
@@ -97,6 +101,10 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /catalog", deps.handleStorefrontCatalog)
 	mux.HandleFunc("GET /catalog/{slug}", deps.handleStorefrontProduct)
 	mux.HandleFunc("GET /about", deps.handleAboutPage)
+	contactIPLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.ContactIPLimit, ratelimit.ContactWindow, func(r *http.Request) string {
+		return ratelimit.ContactIPKey(ratelimit.ClientIP(r))
+	})
+	mux.Handle("POST /about/contact", contactIPLimit(http.HandlerFunc(deps.handleContactSubmit)))
 	mux.HandleFunc("GET /wholesale", deps.handleWholesaleLandingPage)
 	mux.HandleFunc("GET /privacy", deps.handlePrivacyPage)
 	mux.HandleFunc("GET /terms", deps.handleTermsPage)

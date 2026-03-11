@@ -300,6 +300,9 @@ func run() error {
 		RateLimiter:            rateLimiter,
 		SecureCookies:          os.Getenv("INSECURE_COOKIES") != "true",
 		BaseURL:                baseURL,
+		Mailer:                 mailer,
+		EmailFrom:              fromAddr,
+		StaffEmail:             staffEmail,
 	}
 
 	handler := web.NewRouter(deps)

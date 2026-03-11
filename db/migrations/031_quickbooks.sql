@@ -1,17 +1,15 @@
 -- +goose Up
 
--- Token storage for QuickBooks Online OAuth2 credentials
+-- Token storage for QuickBooks Online OAuth2 credentials (single-merchant)
 CREATE TABLE qb_credentials (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id          uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-    realm_id           text NOT NULL,
+    realm_id           text NOT NULL UNIQUE,
     access_token       text NOT NULL,
     refresh_token      text NOT NULL,
     access_expires_at  timestamptz NOT NULL,
     refresh_expires_at timestamptz NOT NULL,
     created_at         timestamptz NOT NULL DEFAULT now(),
-    updated_at         timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT uq_qb_tenant UNIQUE (tenant_id)
+    updated_at         timestamptz NOT NULL DEFAULT now()
 );
 
 -- Customer sync tracking

@@ -405,7 +405,9 @@ templ Admin(props AdminProps) {
 
 templ adminLogo() {
 	<a href="/admin" class="flex items-center gap-2">
-		<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-8 w-auto"/>
+		<div class="flex-shrink-0 bg-white rounded-lg p-0.5">
+			<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-7 w-auto"/>
+		</div>
 		<span class="text-lg font-semibold tracking-tight text-rr-heading">Rockabilly</span>
 	</a>
 }
@@ -417,7 +419,9 @@ templ adminSidebarToggle() {
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
 		</svg>
 		<!-- Logo mark: shown when expanded -->
-		<img id="sidebar-logo-icon" src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="hidden size-6 shrink-0"/>
+		<div id="sidebar-logo-icon" class="hidden shrink-0 bg-white rounded-lg p-0.5">
+			<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="size-5"/>
+		</div>
 		<span data-sidebar-label class="hidden opacity-0 text-lg font-semibold tracking-tight text-rr-heading transition-opacity duration-200">Rockabilly</span>
 	</button>
 }

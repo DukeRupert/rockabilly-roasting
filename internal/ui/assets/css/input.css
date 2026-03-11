@@ -194,6 +194,16 @@ html {
 	background-image: radial-gradient(circle, rgba(232, 146, 26, 0.12) 1px, transparent 1px);
 	background-size: 18px 18px;
 }
+/* Amber window glow — radial warmth for dark hero (Edison bulb feel) */
+.window-glow {
+	background: radial-gradient(ellipse at 60% 50%, rgba(232, 146, 26, 0.12) 0%, rgba(232, 146, 26, 0.04) 40%, transparent 70%);
+}
+/* String light glow strip */
+.string-lights {
+	background-image: repeating-radial-gradient(circle at 0 50%, rgba(232, 146, 26, 0) 0, rgba(232, 146, 26, 0) 20px, transparent 20px),
+		repeating-linear-gradient(90deg, rgba(232, 146, 26, 0.35) 0px, rgba(232, 146, 26, 0) 18px, transparent 40px);
+	background-size: 40px 100%;
+}
 .texture-grid {
 	background-image:
 		repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(168, 184, 192, 0.04) 4px, rgba(168, 184, 192, 0.04) 5px),

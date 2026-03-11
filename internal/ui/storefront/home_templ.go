@@ -38,7 +38,7 @@ func HomeContent(props HomePageProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Hero --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 -mt-8\"><div class=\"relative overflow-hidden bg-rr-void\"><div class=\"texture-grid absolute inset-0\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36\"><div class=\"max-w-2xl\"><p class=\"label-font text-rr-amber text-xs tracking-widest mb-4\">KENNEWICK, WA &middot; EST. 2019</p><h1 class=\"font-display text-5xl sm:text-6xl lg:text-7xl tracking-widest text-rr-heading leading-none\">ROASTED FRESH<br>TO ORDER</h1><p class=\"mt-6 font-body text-lg text-rr-muted max-w-lg leading-relaxed\">Small-batch specialty coffee with bold flavor and a rebellious spirit. From our roaster to your cup.</p><div class=\"mt-8 flex flex-wrap gap-4\"><a href=\"/catalog\" class=\"btn label-font px-8 py-3.5 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors\">SHOP COFFEE</a> <a href=\"/catalog?mode=subscribe\" class=\"btn label-font px-8 py-3.5 rounded-sm text-rr-heading text-sm border-2 border-rr-border hover:border-rr-amber transition-colors\">SUBSCRIBE &amp; SAVE</a></div></div></div><div class=\"flame-stripe\"></div></div></section><!-- Featured roasts -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Hero --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 -mt-8\"><div class=\"relative overflow-hidden bg-rr-void\"><div class=\"texture-dots absolute inset-0\"></div><div class=\"texture-grid absolute inset-0\"></div><div class=\"window-glow absolute inset-0\"></div><div class=\"relative mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36 text-center\"><p class=\"label-font text-rr-amber text-xs mb-4\" style=\"letter-spacing: 0.35em;\">KENNEWICK, WA &middot; EST. 2014</p><div class=\"mt-4\"><h1 class=\"font-display leading-none text-rr-red\" style=\"font-size: clamp(4rem, 12vw, 8.5rem); letter-spacing: 0.05em;\">ROCKABILLY</h1><div class=\"flex items-center justify-center -mt-1\"><div class=\"flex-1 h-px\" style=\"background: linear-gradient(to right, transparent, #E8921A);\"></div><span class=\"font-display text-rr-amber px-5\" style=\"font-size: clamp(0.85rem, 2.2vw, 1.5rem); letter-spacing: 0.4em;\">ROASTING CO.</span><div class=\"flex-1 h-px\" style=\"background: linear-gradient(to left, transparent, #E8921A);\"></div></div></div><p class=\"mt-6 font-body text-lg text-rr-muted max-w-lg mx-auto leading-relaxed\">Small-batch specialty coffee with bold flavor and a rebellious spirit. From our roaster to your cup.</p><div class=\"mt-8 flex flex-wrap justify-center gap-4\"><a href=\"/catalog\" class=\"btn label-font px-8 py-3.5 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors\">SHOP COFFEE</a> <a href=\"/catalog?mode=subscribe\" class=\"btn label-font px-8 py-3.5 rounded-sm text-rr-heading text-sm border-2 border-rr-border hover:border-rr-amber transition-colors\">SUBSCRIBE &amp; SAVE</a></div></div><div class=\"flame-stripe\"></div></div></section><!-- Featured roasts -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -110,7 +110,7 @@ func testimonial(name, quote string) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(quote)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 98, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 105, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -123,7 +123,7 @@ func testimonial(name, quote string) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 99, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 106, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {

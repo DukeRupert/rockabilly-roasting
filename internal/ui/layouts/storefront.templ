@@ -64,7 +64,9 @@ templ Storefront(props StorefrontProps) {
 						<!-- Logo -->
 						<div class="flex items-center">
 							<a href="/" class="flex items-center gap-3">
-								<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-10 w-auto flex-shrink-0"/>
+								<div class="flex-shrink-0 bg-white rounded-xl p-1">
+									<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-8 w-auto"/>
+								</div>
 								<div>
 									<p class="font-display text-rr-heading text-lg leading-none tracking-widest">ROCKABILLY</p>
 									<p class="label-font text-rr-amber text-[0.55rem]" style="letter-spacing:0.3em;">ROASTING CO.</p>
@@ -135,7 +137,9 @@ templ Storefront(props StorefrontProps) {
 						<!-- Logo column -->
 						<div>
 							<div class="flex items-center gap-3 mb-3">
-								<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-12 w-auto"/>
+								<div class="flex-shrink-0 bg-white rounded-xl p-1">
+									<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-10 w-auto"/>
+								</div>
 								<div>
 									<p class="font-display text-rr-heading text-2xl tracking-widest leading-none">ROCKABILLY</p>
 									<p class="label-font text-rr-amber text-[0.55rem] mt-0.5" style="letter-spacing:0.3em;">ROASTING CO.</p>
@@ -162,7 +166,7 @@ templ Storefront(props StorefrontProps) {
 								<p>Mon &ndash; Thurs: 7am &ndash; 2pm</p>
 								<p>Friday: 7am &ndash; 4pm</p>
 								<p>Saturday: 8am &ndash; 4pm</p>
-								<p class="text-rr-border">Sunday: Closed</p>
+								<p>Sunday: Closed</p>
 							</div>
 							<div class="flex gap-4 mt-4">
 								<a href="#" class="label-font text-rr-muted hover:text-rr-heading text-xs transition-colors">FACEBOOK</a>
@@ -183,11 +187,11 @@ templ Storefront(props StorefrontProps) {
 					</div>
 					<!-- Copyright bar -->
 					<div class="mt-12 border-t border-rr-border pt-8 flex flex-col sm:flex-row justify-between gap-2">
-						<p class="font-body text-xs text-rr-border">&copy; 2026 Rockabilly Roasting Co.</p>
+						<p class="font-body text-xs text-rr-muted">&copy; 2026 Rockabilly Roasting Co.</p>
 						<div class="flex gap-4">
-							<a href="/privacy" class="font-body text-xs text-rr-border hover:text-rr-muted transition-colors">Privacy</a>
-							<a href="/terms" class="font-body text-xs text-rr-border hover:text-rr-muted transition-colors">Terms</a>
-							<span class="font-body text-xs text-rr-border">Powered by Hiri</span>
+							<a href="/privacy" class="font-body text-xs text-rr-muted hover:text-rr-heading transition-colors">Privacy</a>
+							<a href="/terms" class="font-body text-xs text-rr-muted hover:text-rr-heading transition-colors">Terms</a>
+							<span class="font-body text-xs text-rr-muted">Powered by Hiri</span>
 						</div>
 					</div>
 				</div>

@@ -3,11 +3,11 @@ services:
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_USER: hiri
-      POSTGRES_PASSWORD: localdevpassword
-      POSTGRES_DB: hiri
+      POSTGRES_USER: rr
+      POSTGRES_PASSWORD: firefly
+      POSTGRES_DB: rr
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
 

@@ -1,0 +1,9 @@
+.git
+.env
+.env.*
+*.md
+docs/
+node_modules/
+ui/checkout/node_modules/
+tmp/
+server

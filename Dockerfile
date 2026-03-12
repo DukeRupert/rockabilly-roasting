@@ -49,8 +49,10 @@ COPY --from=frontend /src/internal/ui/assets/checkout/ ./internal/ui/assets/chec
 # Generate templ
 RUN templ generate
 
-# Build binary
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server
+# Build binaries
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server && \
+    CGO_ENABLED=0 GOOS=linux go build -o /app/seed ./cmd/seed && \
+    CGO_ENABLED=0 GOOS=linux go build -o /app/migrate ./cmd/migrate
 
 # Stage 3: Minimal runtime
 FROM alpine:3.21
@@ -59,8 +61,10 @@ RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-# Copy binary and goose
+# Copy binaries and goose
 COPY --from=builder /app/server ./server
+COPY --from=builder /app/seed ./seed
+COPY --from=builder /app/migrate ./migrate
 COPY --from=builder /go/bin/goose /usr/local/bin/goose
 
 # Copy static assets

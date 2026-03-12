@@ -544,6 +544,38 @@ templ purchaseModeScript() {
 	</script>
 }
 
+// productJSONLDScript returns a <script type="application/ld+json"> tag with Product structured data.
+func productJSONLDScript(props ProductDetailProps) string {
+	ld := map[string]any{
+		"@context":    "https://schema.org",
+		"@type":       "Product",
+		"name":        props.Product.Title,
+		"description": props.Product.Description,
+		"url":         "https://rockabillyroasting.com/catalog/" + props.Product.Slug,
+		"brand": map[string]any{
+			"@type": "Brand",
+			"name":  "Rockabilly Roasting Co.",
+		},
+	}
+
+	if len(props.Media) > 0 && props.MediaConfig != nil {
+		ld["image"] = props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantPublic)
+	}
+
+	if props.DefaultPrice != nil {
+		ld["offers"] = map[string]any{
+			"@type":         "Offer",
+			"price":         fmt.Sprintf("%.2f", float64(*props.DefaultPrice)/100),
+			"priceCurrency": props.CurrencyCode,
+			"availability":  "https://schema.org/InStock",
+			"url":           "https://rockabillyroasting.com/catalog/" + props.Product.Slug,
+		}
+	}
+
+	b, _ := json.Marshal(ld)
+	return `<script type="application/ld+json">` + string(b) + `</script>`
+}
+
 templ ProductPage(props ProductDetailProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
 		Title:       props.Product.Title,
@@ -551,5 +583,6 @@ templ ProductPage(props ProductDetailProps) {
 		CartCount:   props.CartCount,
 	}) {
 		@ProductContent(props)
+		@templ.Raw(productJSONLDScript(props))
 	}
 }

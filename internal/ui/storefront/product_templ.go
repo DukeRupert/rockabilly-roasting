@@ -674,6 +674,38 @@ func purchaseModeScript() templ.Component {
 	})
 }
 
+// productJSONLDScript returns a <script type="application/ld+json"> tag with Product structured data.
+func productJSONLDScript(props ProductDetailProps) string {
+	ld := map[string]any{
+		"@context":    "https://schema.org",
+		"@type":       "Product",
+		"name":        props.Product.Title,
+		"description": props.Product.Description,
+		"url":         "https://rockabillyroasting.com/catalog/" + props.Product.Slug,
+		"brand": map[string]any{
+			"@type": "Brand",
+			"name":  "Rockabilly Roasting Co.",
+		},
+	}
+
+	if len(props.Media) > 0 && props.MediaConfig != nil {
+		ld["image"] = props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantPublic)
+	}
+
+	if props.DefaultPrice != nil {
+		ld["offers"] = map[string]any{
+			"@type":         "Offer",
+			"price":         fmt.Sprintf("%.2f", float64(*props.DefaultPrice)/100),
+			"priceCurrency": props.CurrencyCode,
+			"availability":  "https://schema.org/InStock",
+			"url":           "https://rockabillyroasting.com/catalog/" + props.Product.Slug,
+		}
+	}
+
+	b, _ := json.Marshal(ld)
+	return `<script type="application/ld+json">` + string(b) + `</script>`
+}
+
 func ProductPage(props ProductDetailProps) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -708,6 +740,14 @@ func ProductPage(props ProductDetailProps) templ.Component {
 			}
 			ctx = templ.InitializeContext(ctx)
 			templ_7745c5c3_Err = ProductContent(props).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, " ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templ.Raw(productJSONLDScript(props)).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -67,6 +67,33 @@ templ Storefront(props StorefrontProps) {
 			} else {
 				<meta name="twitter:image" content="/static/rockabilly-logo.png"/>
 			}
+			<!-- JSON-LD: Organization -->
+			<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "CafeOrCoffeeShop",
+				"name": "Rockabilly Roasting Co.",
+				"url": "https://rockabillyroasting.com",
+				"logo": "https://rockabillyroasting.com/static/rockabilly-logo.png",
+				"image": "https://rockabillyroasting.com/static/rockabilly-logo.png",
+				"telephone": "+1-509-585-2320",
+				"email": "info@rockabillyroasting.com",
+				"address": {
+					"@type": "PostalAddress",
+					"streetAddress": "101 W. Kennewick Ave.",
+					"addressLocality": "Kennewick",
+					"addressRegion": "WA",
+					"postalCode": "99336",
+					"addressCountry": "US"
+				},
+				"openingHoursSpecification": [
+					{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday"], "opens": "07:00", "closes": "14:00"},
+					{"@type": "OpeningHoursSpecification", "dayOfWeek": "Friday", "opens": "07:00", "closes": "16:00"},
+					{"@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "08:00", "closes": "16:00"}
+				],
+				"sameAs": []
+			}
+			</script>
 			<link rel="icon" type="image/svg+xml" href="/static/rockabilly-logo.svg"/>
 			<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png"/>
 			<link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png"/>
@@ -251,8 +278,39 @@ templ Storefront(props StorefrontProps) {
 					</div>
 				</div>
 			</footer>
+			<!-- Back to top -->
+			<button
+				id="back-to-top"
+				type="button"
+				aria-label="Back to top"
+				class="fixed bottom-6 right-6 z-40 hidden size-10 items-center justify-center rounded-full bg-rr-raised border border-rr-border text-rr-muted shadow-lg hover:text-rr-heading hover:border-rr-amber transition-all duration-200"
+			>
+				<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"></path>
+				</svg>
+			</button>
 			<script>
 				(function() {
+					// Back to top button
+					var btt = document.getElementById('back-to-top');
+					if (btt) {
+						var shown = false;
+						window.addEventListener('scroll', function() {
+							if (window.scrollY > 400 && !shown) {
+								btt.classList.remove('hidden');
+								btt.classList.add('flex');
+								shown = true;
+							} else if (window.scrollY <= 400 && shown) {
+								btt.classList.add('hidden');
+								btt.classList.remove('flex');
+								shown = false;
+							}
+						}, { passive: true });
+						btt.addEventListener('click', function() {
+							window.scrollTo({ top: 0, behavior: 'smooth' });
+						});
+					}
+
 					// Mobile menu toggle
 					var btn = document.getElementById('sf-mobile-menu-btn');
 					var menu = document.getElementById('sf-mobile-menu');

@@ -31,8 +31,9 @@ RUN apk add --no-cache git
 
 WORKDIR /src
 
-# Install templ
-RUN go install github.com/a-h/templ/cmd/templ@latest
+# Install templ and goose
+RUN go install github.com/a-h/templ/cmd/templ@latest && \
+    go install github.com/pressly/goose/v3/cmd/goose@latest
 
 # Cache Go modules
 COPY go.mod go.sum ./
@@ -58,8 +59,9 @@ RUN apk add --no-cache ca-certificates tzdata
 
 WORKDIR /app
 
-# Copy binary
+# Copy binary and goose
 COPY --from=builder /app/server ./server
+COPY --from=builder /go/bin/goose /usr/local/bin/goose
 
 # Copy static assets
 COPY --from=builder /src/internal/ui/assets/ ./internal/ui/assets/
@@ -71,6 +73,9 @@ COPY --from=builder /src/db/migrations/ ./db/migrations/
 COPY --from=builder /src/internal/emailtemplates/html/ ./internal/emailtemplates/html/
 COPY --from=builder /src/internal/emailtemplates/text/ ./internal/emailtemplates/text/
 
+# Copy entrypoint
+COPY entrypoint.sh ./entrypoint.sh
+
 EXPOSE 8080
 
-CMD ["./server"]
+ENTRYPOINT ["./entrypoint.sh"]

@@ -228,12 +228,12 @@ func run() error {
 
 	if *dryRun {
 		logger.Info("=== DRY RUN MODE ===")
-		dryRunValidation(allSubs, variantMap, planMap, report, logger)
+		dryRunValidation(ctx, allSubs, variantMap, planMap, wcBaseURL, wcKey, wcSecret, report, logger)
 	} else {
 		if len(variantMap) == 0 {
 			return fmt.Errorf("variant mapping is required for import (use --mapping flag)")
 		}
-		importSubscriptions(ctx, pool, customerStore, subscriptionStore, allSubs, variantMap, planMap, report, logger)
+		importSubscriptions(ctx, pool, customerStore, subscriptionStore, allSubs, variantMap, planMap, wcBaseURL, wcKey, wcSecret, report, logger)
 	}
 
 	// Print report
@@ -398,18 +398,52 @@ func parseWCDate(s string) time.Time {
 	return t
 }
 
-func getStripeCustomerID(sub wcSubscription) string {
-	// Check metadata for Stripe customer ID across different WC Stripe plugin variants
-	keys := []string{
-		"_stripe_customer_id",  // WC Stripe Gateway plugin
-		"_wc_stripe_customer",  // alternate key
-		"_wcpay_customer_id",   // WooCommerce Payments (Stripe-powered)
+// fetchParentOrder fetches a single order by ID via the v3 API.
+// The v3 endpoint exposes meta_data (including Stripe IDs) that v1 strips out.
+func fetchParentOrder(ctx context.Context, baseURL, key, secret string, orderID int) ([]wcMeta, error) {
+	if orderID == 0 {
+		return nil, nil
 	}
-	for _, m := range sub.MetaData {
-		for _, key := range keys {
-			if m.Key == key {
-				if s, ok := m.Value.(string); ok && s != "" {
-					return s
+	url := fmt.Sprintf("%s/wp-json/wc/v3/orders/%d?consumer_key=%s&consumer_secret=%s",
+		baseURL, orderID, key, secret)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("fetch order %d: %w", orderID, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read order %d: %w", orderID, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("order %d returned %d: %s", orderID, resp.StatusCode, string(body[:min(200, len(body))]))
+	}
+
+	var order struct {
+		MetaData []wcMeta `json:"meta_data"`
+	}
+	if err := json.Unmarshal(body, &order); err != nil {
+		return nil, fmt.Errorf("decode order %d: %w", orderID, err)
+	}
+	return order.MetaData, nil
+}
+
+// findMetaValue searches one or more metadata slices for the first matching key.
+func findMetaValue(keys []string, metaSources ...[]wcMeta) string {
+	for _, meta := range metaSources {
+		for _, m := range meta {
+			for _, key := range keys {
+				if m.Key == key {
+					if s, ok := m.Value.(string); ok && s != "" {
+						return s
+					}
 				}
 			}
 		}
@@ -417,23 +451,20 @@ func getStripeCustomerID(sub wcSubscription) string {
 	return ""
 }
 
-func getStripeSourceID(sub wcSubscription) string {
-	// Check metadata for Stripe payment method across different WC Stripe plugin variants
-	keys := []string{
+func getStripeCustomerID(meta ...[]wcMeta) string {
+	return findMetaValue([]string{
+		"_stripe_customer_id",  // WC Stripe Gateway plugin
+		"_wc_stripe_customer",  // alternate key
+		"_wcpay_customer_id",   // WooCommerce Payments (Stripe-powered)
+	}, meta...)
+}
+
+func getStripeSourceID(meta ...[]wcMeta) string {
+	return findMetaValue([]string{
 		"_stripe_source_id",        // WC Stripe Gateway plugin (legacy sources)
 		"_stripe_payment_method",   // WC Stripe Gateway plugin (PaymentIntents)
 		"_wcpay_payment_method_id", // WooCommerce Payments
-	}
-	for _, m := range sub.MetaData {
-		for _, key := range keys {
-			if m.Key == key {
-				if s, ok := m.Value.(string); ok && s != "" {
-					return s
-				}
-			}
-		}
-	}
-	return ""
+	}, meta...)
 }
 
 func strPtr(s string) *string {
@@ -444,10 +475,11 @@ func strPtr(s string) *string {
 }
 
 // dryRunValidation checks all mappings without touching the database.
-func dryRunValidation(subs []wcSubscription, variantMap map[int]uuid.UUID, planMap map[string]uuid.UUID, report *migrationReport, logger *slog.Logger) {
+func dryRunValidation(ctx context.Context, subs []wcSubscription, variantMap map[int]uuid.UUID, planMap map[string]uuid.UUID, wcBaseURL, wcKey, wcSecret string, report *migrationReport, logger *slog.Logger) {
 	customerEmails := make(map[string]int)   // email → WC customer ID
 	variantIDs := make(map[int]string)        // WC variation ID → product name
 	missingVariants := make(map[int]string)   // unmapped variation IDs
+	parentOrderCache := make(map[int][]wcMeta) // parent_id → metadata
 
 	for _, sub := range subs {
 		email := strings.ToLower(strings.TrimSpace(sub.Billing.Email))
@@ -475,14 +507,24 @@ func dryRunValidation(subs []wcSubscription, variantMap map[int]uuid.UUID, planM
 			}
 		}
 
-		// Check Stripe customer ID
-		stripeID := getStripeCustomerID(sub)
+		// Fetch parent order metadata (cached) for Stripe IDs
+		parentMeta, ok := parentOrderCache[sub.ParentID]
+		if !ok && sub.ParentID != 0 {
+			parentMeta, err = fetchParentOrder(ctx, wcBaseURL, wcKey, wcSecret, sub.ParentID)
+			if err != nil {
+				report.addWarning("sub %d: failed to fetch parent order %d: %v", sub.ID, sub.ParentID, err)
+			}
+			parentOrderCache[sub.ParentID] = parentMeta
+		}
+
+		// Check Stripe customer ID (subscription meta, then parent order meta)
+		stripeID := getStripeCustomerID(sub.MetaData, parentMeta)
 		if stripeID == "" {
 			report.addWarning("sub %d (customer %d, %s): no Stripe customer ID", sub.ID, sub.CustomerID, email)
 		}
 
-		// Check Stripe source ID
-		sourceID := getStripeSourceID(sub)
+		// Check Stripe source ID (subscription meta, then parent order meta)
+		sourceID := getStripeSourceID(sub.MetaData, parentMeta)
 		if sourceID == "" {
 			report.addWarning("sub %d: no Stripe source/payment method ID", sub.ID)
 		}
@@ -530,11 +572,14 @@ func importSubscriptions(
 	subs []wcSubscription,
 	variantMap map[int]uuid.UUID,
 	planMap map[string]uuid.UUID,
+	wcBaseURL, wcKey, wcSecret string,
 	report *migrationReport,
 	logger *slog.Logger,
 ) {
 	// Track customers by email to avoid duplicates
 	customerByEmail := make(map[string]uuid.UUID)
+	// Cache parent order metadata to avoid duplicate fetches
+	parentOrderCache := make(map[int][]wcMeta)
 
 	for _, sub := range subs {
 		email := strings.ToLower(strings.TrimSpace(sub.Billing.Email))
@@ -559,6 +604,17 @@ func importSubscriptions(
 			continue
 		}
 
+		// Fetch parent order metadata for Stripe IDs
+		parentMeta, ok := parentOrderCache[sub.ParentID]
+		if !ok && sub.ParentID != 0 {
+			var fetchErr error
+			parentMeta, fetchErr = fetchParentOrder(ctx, wcBaseURL, wcKey, wcSecret, sub.ParentID)
+			if fetchErr != nil {
+				report.addWarning("sub %d: failed to fetch parent order %d: %v", sub.ID, sub.ParentID, fetchErr)
+			}
+			parentOrderCache[sub.ParentID] = parentMeta
+		}
+
 		// Process each line item as a separate subscription (handles multi-item subs)
 		for liIdx, li := range sub.LineItems {
 			hiriVariantID, ok := variantMap[li.VariationID]
@@ -571,7 +627,7 @@ func importSubscriptions(
 
 			err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 				// 1. Find or create customer
-				customerID, err := findOrCreateCustomer(ctx, tx, cs, sub, email, customerByEmail, report)
+				customerID, err := findOrCreateCustomer(ctx, tx, cs, sub, parentMeta, email, customerByEmail, report)
 				if err != nil {
 					return fmt.Errorf("customer: %w", err)
 				}
@@ -621,7 +677,7 @@ func importSubscriptions(
 					"wc_product_name":    li.Name,
 					"wc_variation_id":    li.VariationID,
 				}
-				if stripeSource := getStripeSourceID(sub); stripeSource != "" {
+				if stripeSource := getStripeSourceID(sub.MetaData, parentMeta); stripeSource != "" {
 					metadata["stripe_payment_method_id"] = stripeSource
 				}
 				for _, sl := range sub.ShippingLines {
@@ -669,6 +725,7 @@ func findOrCreateCustomer(
 	tx pgx.Tx,
 	cs *store.CustomerStore,
 	sub wcSubscription,
+	parentMeta []wcMeta,
 	email string,
 	cache map[string]uuid.UUID,
 	report *migrationReport,
@@ -679,6 +736,8 @@ func findOrCreateCustomer(
 		return id, nil
 	}
 
+	stripeID := getStripeCustomerID(sub.MetaData, parentMeta)
+
 	// Try to find existing customer by email
 	existing, err := cs.GetByEmail(ctx, tx, email)
 	if err == nil {
@@ -686,7 +745,6 @@ func findOrCreateCustomer(
 		report.CustomersFound++
 
 		// Update Stripe customer ID if not set
-		stripeID := getStripeCustomerID(sub)
 		if existing.StripeCustomerID == nil && stripeID != "" {
 			_, err := cs.UpdateStripeCustomerID(ctx, tx, existing.ID, stripeID)
 			if err != nil {
@@ -712,7 +770,6 @@ func findOrCreateCustomer(
 	}
 
 	// Set Stripe customer ID
-	stripeID := getStripeCustomerID(sub)
 	if stripeID != "" {
 		_, err := cs.UpdateStripeCustomerID(ctx, tx, customer.ID, stripeID)
 		if err != nil {

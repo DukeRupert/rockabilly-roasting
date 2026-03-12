@@ -122,6 +122,7 @@ func main() {
 
 func run() error {
 	dryRun := flag.Bool("dry-run", false, "Validate mappings and report issues without importing")
+	dumpMeta := flag.Bool("dump-meta", false, "Print all metadata keys from the first 3 subscriptions and exit")
 	onHoldDays := flag.Int("on-hold-days", 60, "Only import on-hold subs with next_payment_date within this many days")
 	mappingFile := flag.String("mapping", "", "Path to variant mapping JSON file (required for import)")
 	emailFilter := flag.String("email", "", "Migrate only subscriptions for this customer email")
@@ -163,6 +164,19 @@ func run() error {
 		return fmt.Errorf("fetch active subscriptions: %w", err)
 	}
 	logger.Info("fetched active subscriptions", "count", len(activeSubs))
+
+	if *dumpMeta {
+		limit := min(3, len(activeSubs))
+		for i := 0; i < limit; i++ {
+			sub := activeSubs[i]
+			fmt.Printf("\n=== Sub %d (customer %d, %s) ===\n", sub.ID, sub.CustomerID, sub.Billing.Email)
+			fmt.Printf("Payment method: %s\n", sub.PaymentMethod)
+			for _, m := range sub.MetaData {
+				fmt.Printf("  %s = %v\n", m.Key, m.Value)
+			}
+		}
+		return nil
+	}
 
 	onHoldSubs, err := fetchSubscriptions(ctx, wcBaseURL, wcKey, wcSecret, "on-hold")
 	if err != nil {
@@ -385,11 +399,18 @@ func parseWCDate(s string) time.Time {
 }
 
 func getStripeCustomerID(sub wcSubscription) string {
-	// Check parent order metadata for Stripe customer ID
+	// Check metadata for Stripe customer ID across different WC Stripe plugin variants
+	keys := []string{
+		"_stripe_customer_id",  // WC Stripe Gateway plugin
+		"_wc_stripe_customer",  // alternate key
+		"_wcpay_customer_id",   // WooCommerce Payments (Stripe-powered)
+	}
 	for _, m := range sub.MetaData {
-		if m.Key == "_stripe_customer_id" {
-			if s, ok := m.Value.(string); ok && s != "" {
-				return s
+		for _, key := range keys {
+			if m.Key == key {
+				if s, ok := m.Value.(string); ok && s != "" {
+					return s
+				}
 			}
 		}
 	}
@@ -397,10 +418,18 @@ func getStripeCustomerID(sub wcSubscription) string {
 }
 
 func getStripeSourceID(sub wcSubscription) string {
+	// Check metadata for Stripe payment method across different WC Stripe plugin variants
+	keys := []string{
+		"_stripe_source_id",        // WC Stripe Gateway plugin (legacy sources)
+		"_stripe_payment_method",   // WC Stripe Gateway plugin (PaymentIntents)
+		"_wcpay_payment_method_id", // WooCommerce Payments
+	}
 	for _, m := range sub.MetaData {
-		if m.Key == "_stripe_source_id" {
-			if s, ok := m.Value.(string); ok && s != "" {
-				return s
+		for _, key := range keys {
+			if m.Key == key {
+				if s, ok := m.Value.(string); ok && s != "" {
+					return s
+				}
 			}
 		}
 	}

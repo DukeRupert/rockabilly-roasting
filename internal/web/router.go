@@ -170,11 +170,8 @@ func NewRouter(deps *Deps) http.Handler {
 	accountMux.HandleFunc("POST /account/addresses/{id}", deps.handleAccountAddressUpdate)
 	accountMux.HandleFunc("POST /account/addresses/{id}/delete", deps.handleAccountAddressDelete)
 	accountMux.HandleFunc("POST /account/addresses/{id}/default", deps.handleAccountAddressSetDefault)
-	mux.Handle("/account/", deps.requireRetailCustomer(accountMux))
-	mux.Handle("/account/settings", deps.requireRetailCustomer(accountMux))
-	mux.Handle("/account/orders", deps.requireRetailCustomer(accountMux))
-	mux.Handle("/account/subscriptions", deps.requireRetailCustomer(accountMux))
-	mux.Handle("/account/addresses", deps.requireRetailCustomer(accountMux))
+	mux.Handle("GET /account/{path...}", deps.requireRetailCustomer(accountMux))
+	mux.Handle("POST /account/{path...}", deps.requireRetailCustomer(accountMux))
 
 	// Wholesale auth routes (password, no session required)
 	wholesaleAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.AuthWindow, func(r *http.Request) string {
@@ -194,11 +191,13 @@ func NewRouter(deps *Deps) http.Handler {
 	wholesaleMux.HandleFunc("POST /wholesale/checkout/confirm", deps.handleWholesaleCheckoutConfirm)
 	wholesaleMux.HandleFunc("POST /wholesale/cart/update", deps.handleWholesaleCartUpdate)
 	wholesaleMux.HandleFunc("POST /wholesale/cart/remove", deps.handleWholesaleCartRemove)
-	mux.Handle("/wholesale/portal", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("/wholesale/portal/", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("/wholesale/checkout", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("/wholesale/checkout/", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("/wholesale/cart/", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/portal", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/portal/", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("POST /wholesale/portal/{path...}", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/checkout", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/checkout/", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("POST /wholesale/checkout/{path...}", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("POST /wholesale/cart/{path...}", deps.requireApprovedWholesale(wholesaleMux))
 
 	// Staff auth routes (no session required)
 	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {
@@ -336,11 +335,12 @@ func NewRouter(deps *Deps) http.Handler {
 	})
 
 	// Mount admin mux behind session middleware
-	mux.Handle("/admin/", deps.requireStaffSession(adminMux))
+	mux.Handle("GET /admin/", deps.requireStaffSession(adminMux))
+	mux.Handle("POST /admin/{path...}", deps.requireStaffSession(adminMux))
 	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
-	mux.Handle("/auth/staff/logout", deps.requireStaffSession(adminMux))
+	mux.Handle("POST /auth/staff/logout", deps.requireStaffSession(adminMux))
 
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)

@@ -1,0 +1,867 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/store"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
+)
+
+// OrderSpace API types
+
+type osToken struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+}
+
+type osCustomer struct {
+	ID             string          `json:"id"`
+	CompanyName    string          `json:"company_name"`
+	CreatedAt      string          `json:"created_at"`
+	Status         string          `json:"status"` // new, active, closed
+	Reference      string          `json:"reference"`
+	InternalNote   string          `json:"internal_note"`
+	Buyers         []osBuyer       `json:"buyers"`
+	Phone          string          `json:"phone"`
+	EmailAddresses osEmails        `json:"email_addresses"`
+	TaxNumber      string          `json:"tax_number"`
+	Addresses      []osAddress     `json:"addresses"`
+	MinimumSpend   *float64        `json:"minimum_spend"`
+	CustomerGroupID string         `json:"customer_group_id"`
+	PriceListID    string          `json:"price_list_id"`
+	PaymentTermsID string          `json:"payment_terms_id"`
+}
+
+type osBuyer struct {
+	Name         string `json:"name"`
+	EmailAddress string `json:"email_address"`
+}
+
+type osEmails struct {
+	Orders     string `json:"orders"`
+	Dispatches string `json:"dispatches"`
+	Invoices   string `json:"invoices"`
+}
+
+type osAddress struct {
+	CompanyName string `json:"company_name"`
+	ContactName string `json:"contact_name"`
+	Line1       string `json:"line1"`
+	Line2       string `json:"line2"`
+	City        string `json:"city"`
+	State       string `json:"state"`
+	PostalCode  string `json:"postal_code"`
+	Country     string `json:"country"`
+}
+
+type osOrder struct {
+	ID              string        `json:"id"`
+	Number          int           `json:"number"`
+	Created         string        `json:"created"`
+	Status          string        `json:"status"`
+	CustomerID      string        `json:"customer_id"`
+	CompanyName     string        `json:"company_name"`
+	Phone           string        `json:"phone"`
+	EmailAddresses  osEmails      `json:"email_addresses"`
+	DeliveryDate    string        `json:"delivery_date"`
+	Reference       string        `json:"reference"`
+	InternalNote    string        `json:"internal_note"`
+	CustomerPONumber string       `json:"customer_po_number"`
+	CustomerNote    string        `json:"customer_note"`
+	ShippingType    string        `json:"shipping_type"`
+	ShippingAddress *osAddress    `json:"shipping_address"`
+	BillingAddress  *osAddress    `json:"billing_address"`
+	Currency        string        `json:"currency"`
+	NetTotal        float64       `json:"net_total"`
+	GrossTotal      float64       `json:"gross_total"`
+	OrderLines      []osOrderLine `json:"order_lines"`
+}
+
+type osOrderLine struct {
+	ID        string  `json:"id"`
+	SKU       string  `json:"sku"`
+	Name      string  `json:"name"`
+	Options   string  `json:"options"`
+	Shipping  bool    `json:"shipping"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unit_price"`
+	SubTotal  float64 `json:"sub_total"`
+	TaxName   string  `json:"tax_name"`
+	TaxRate   float64 `json:"tax_rate"`
+	TaxAmount float64 `json:"tax_amount"`
+}
+
+type osCustomersResponse struct {
+	Customers []osCustomer `json:"customers"`
+}
+
+type osOrdersResponse struct {
+	Orders []osOrder `json:"orders"`
+}
+
+// Migration report
+
+type migrationReport struct {
+	CustomersCreated int
+	CustomersFound   int
+	AddressesCreated int
+	OrdersCreated    int
+	OrdersSkipped    int
+	LineItemsCreated int
+	Errors           []string
+	Warnings         []string
+}
+
+func (r *migrationReport) addError(format string, args ...any) {
+	r.Errors = append(r.Errors, fmt.Sprintf(format, args...))
+}
+
+func (r *migrationReport) addWarning(format string, args ...any) {
+	r.Warnings = append(r.Warnings, fmt.Sprintf(format, args...))
+}
+
+// API client
+
+type osClient struct {
+	clientID     string
+	clientSecret string
+	token        string
+	tokenExpiry  time.Time
+	httpClient   *http.Client
+}
+
+func newOSClient(clientID, clientSecret string) *osClient {
+	return &osClient{
+		clientID:     clientID,
+		clientSecret: clientSecret,
+		httpClient:   &http.Client{Timeout: 30 * time.Second},
+	}
+}
+
+func (c *osClient) authenticate(ctx context.Context) error {
+	if c.token != "" && time.Now().Before(c.tokenExpiry) {
+		return nil
+	}
+
+	data := url.Values{
+		"client_id":     {c.clientID},
+		"client_secret": {c.clientSecret},
+		"grant_type":    {"client_credentials"},
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		"https://identity.orderspace.com/oauth/token",
+		strings.NewReader(data.Encode()))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("auth request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read auth response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("auth failed (%d): %s", resp.StatusCode, string(body[:min(200, len(body))]))
+	}
+
+	var tok osToken
+	if err := json.Unmarshal(body, &tok); err != nil {
+		return fmt.Errorf("decode token: %w", err)
+	}
+
+	c.token = tok.AccessToken
+	c.tokenExpiry = time.Now().Add(time.Duration(tok.ExpiresIn-60) * time.Second) // refresh 1 min early
+	return nil
+}
+
+func (c *osClient) get(ctx context.Context, path string) ([]byte, error) {
+	if err := c.authenticate(ctx); err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.orderspace.com/v1"+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("GET %s: %w", path, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	if resp.StatusCode == http.StatusTooManyRequests {
+		// Rate limited — wait and retry once
+		time.Sleep(2 * time.Second)
+		return c.get(ctx, path)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GET %s returned %d: %s", path, resp.StatusCode, string(body[:min(200, len(body))]))
+	}
+
+	return body, nil
+}
+
+func (c *osClient) fetchAllCustomers(ctx context.Context) ([]osCustomer, error) {
+	var all []osCustomer
+	startingAfter := ""
+
+	for {
+		path := "/customers?limit=200"
+		if startingAfter != "" {
+			path += "&starting_after=" + startingAfter
+		}
+
+		body, err := c.get(ctx, path)
+		if err != nil {
+			return nil, err
+		}
+
+		var resp osCustomersResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("decode customers: %w", err)
+		}
+
+		if len(resp.Customers) == 0 {
+			break
+		}
+
+		all = append(all, resp.Customers...)
+		if len(resp.Customers) < 200 {
+			break
+		}
+		startingAfter = resp.Customers[len(resp.Customers)-1].ID
+	}
+	return all, nil
+}
+
+func (c *osClient) fetchAllOrders(ctx context.Context) ([]osOrder, error) {
+	var all []osOrder
+	startingAfter := ""
+
+	for {
+		path := "/orders?limit=200"
+		if startingAfter != "" {
+			path += "&starting_after=" + startingAfter
+		}
+
+		body, err := c.get(ctx, path)
+		if err != nil {
+			return nil, err
+		}
+
+		var resp osOrdersResponse
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("decode orders: %w", err)
+		}
+
+		if len(resp.Orders) == 0 {
+			break
+		}
+
+		all = append(all, resp.Orders...)
+		if len(resp.Orders) < 200 {
+			break
+		}
+		startingAfter = resp.Orders[len(resp.Orders)-1].ID
+	}
+	return all, nil
+}
+
+func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
+	dryRun := flag.Bool("dry-run", false, "Validate and report without importing")
+	customersOnly := flag.Bool("customers-only", false, "Import only customers, skip orders")
+	flag.Parse()
+
+	_ = godotenv.Load()
+
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	clientID := os.Getenv("ORDERSPACE_CLIENT_ID")
+	clientSecret := os.Getenv("ORDERSPACE_CLIENT_SECRET")
+	dbURL := os.Getenv("DATABASE_URL")
+
+	if clientID == "" || clientSecret == "" {
+		return fmt.Errorf("ORDERSPACE_CLIENT_ID and ORDERSPACE_CLIENT_SECRET are required")
+	}
+	if dbURL == "" {
+		return fmt.Errorf("DATABASE_URL is required")
+	}
+
+	ctx := context.Background()
+	client := newOSClient(clientID, clientSecret)
+
+	// Fetch customers
+	logger.Info("fetching OrderSpace customers...")
+	customers, err := client.fetchAllCustomers(ctx)
+	if err != nil {
+		return fmt.Errorf("fetch customers: %w", err)
+	}
+	logger.Info("fetched customers", "count", len(customers))
+
+	// Fetch orders
+	var orders []osOrder
+	if !*customersOnly {
+		logger.Info("fetching OrderSpace orders...")
+		orders, err = client.fetchAllOrders(ctx)
+		if err != nil {
+			return fmt.Errorf("fetch orders: %w", err)
+		}
+		logger.Info("fetched orders", "count", len(orders))
+	}
+
+	// Connect to database
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		return fmt.Errorf("connect to database: %w", err)
+	}
+	defer pool.Close()
+
+	report := &migrationReport{}
+
+	if *dryRun {
+		logger.Info("=== DRY RUN MODE ===")
+		dryRunValidation(customers, orders, report, logger)
+	} else {
+		importData(ctx, pool, customers, orders, *customersOnly, report, logger)
+	}
+
+	printReport(report, logger)
+	return nil
+}
+
+func dryRunValidation(customers []osCustomer, orders []osOrder, report *migrationReport, logger *slog.Logger) {
+	// Analyze customers
+	statusCounts := make(map[string]int)
+	noBuyers := 0
+	noAddresses := 0
+
+	for _, c := range customers {
+		statusCounts[c.Status]++
+
+		if len(c.Buyers) == 0 {
+			noBuyers++
+			report.addWarning("customer %s (%s): no buyers (contacts)", c.ID, c.CompanyName)
+		}
+
+		if len(c.Addresses) == 0 {
+			noAddresses++
+			report.addWarning("customer %s (%s): no addresses", c.ID, c.CompanyName)
+		}
+
+		// Check for email
+		email := primaryEmail(c)
+		if email == "" {
+			report.addError("customer %s (%s): no email address found", c.ID, c.CompanyName)
+		}
+	}
+
+	logger.Info("customer status breakdown")
+	for status, count := range statusCounts {
+		logger.Info("  status", "status", status, "count", count)
+	}
+	logger.Info("customers without buyers", "count", noBuyers)
+	logger.Info("customers without addresses", "count", noAddresses)
+
+	// Analyze orders
+	if len(orders) > 0 {
+		orderStatusCounts := make(map[string]int)
+		customerOrderCounts := make(map[string]int)
+
+		for _, o := range orders {
+			orderStatusCounts[o.Status]++
+			customerOrderCounts[o.CustomerID]++
+		}
+
+		logger.Info("order status breakdown")
+		for status, count := range orderStatusCounts {
+			logger.Info("  status", "status", status, "count", count)
+		}
+		logger.Info("customers with orders", "count", len(customerOrderCounts))
+
+		// Check for orders with unknown customers
+		customerIDs := make(map[string]bool)
+		for _, c := range customers {
+			customerIDs[c.ID] = true
+		}
+		for _, o := range orders {
+			if !customerIDs[o.CustomerID] {
+				report.addWarning("order %s (#%d): customer %s not in customer list", o.ID, o.Number, o.CustomerID)
+			}
+		}
+	}
+}
+
+func importData(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	customers []osCustomer,
+	orders []osOrder,
+	customersOnly bool,
+	report *migrationReport,
+	logger *slog.Logger,
+) {
+	customerStore := store.NewCustomerStore()
+	orderStore := store.NewOrderStore()
+
+	// Map OrderSpace customer ID → Hiri customer ID
+	osToHiri := make(map[string]uuid.UUID)
+
+	// Import customers
+	for _, osCust := range customers {
+		email := primaryEmail(osCust)
+		if email == "" {
+			report.addError("customer %s (%s): no email, skipping", osCust.ID, osCust.CompanyName)
+			continue
+		}
+
+		err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			// Check if customer already exists by email
+			existing, err := customerStore.GetByEmail(ctx, tx, email)
+			if err == nil {
+				osToHiri[osCust.ID] = existing.ID
+				report.CustomersFound++
+				logger.Info("customer exists", "email", email, "os_id", osCust.ID)
+				return nil
+			}
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("lookup customer %s: %w", email, err)
+			}
+
+			// Parse name from first buyer
+			firstName, lastName := parseBuyerName(osCust)
+
+			customer, err := customerStore.Create(ctx, tx, store.CreateCustomerParams{
+				Email:     email,
+				FirstName: firstName,
+				LastName:  lastName,
+				Phone:     strPtr(osCust.Phone),
+			})
+			if err != nil {
+				return fmt.Errorf("create customer %s: %w", email, err)
+			}
+
+			// Set wholesale fields via direct SQL (no typed store methods for these)
+			wholesaleStatus := mapOSStatus(osCust.Status)
+			_, err = tx.Exec(ctx,
+				`UPDATE customers SET account_type = $1, wholesale_status = $2, company_name = $3 WHERE id = $4`,
+				string(domain.AccountTypeWholesale), string(wholesaleStatus), strPtr(osCust.CompanyName), customer.ID,
+			)
+			if err != nil {
+				return fmt.Errorf("set wholesale fields: %w", err)
+			}
+			if wholesaleStatus == domain.WholesaleStatusApproved {
+				_, _ = tx.Exec(ctx, `UPDATE customers SET approved_at = NOW() WHERE id = $1`, customer.ID)
+			}
+
+			if osCust.TaxNumber != "" {
+				if err := customerStore.UpdateTaxExempt(ctx, tx, customer.ID, true, &osCust.TaxNumber); err != nil {
+					return fmt.Errorf("set tax exempt: %w", err)
+				}
+			}
+
+			// Create addresses
+			for i, addr := range osCust.Addresses {
+				contactFirst, contactLast := splitName(addr.ContactName)
+				_, err := customerStore.CreateAddress(ctx, tx, store.CreateAddressParams{
+					CustomerID: &customer.ID,
+					FirstName:  contactFirst,
+					LastName:   contactLast,
+					Company:    strPtr(addr.CompanyName),
+					Line1:      addr.Line1,
+					Line2:      strPtr(addr.Line2),
+					City:       addr.City,
+					State:      addr.State,
+					PostalCode: addr.PostalCode,
+					CountryCode: mapCountryCode(addr.Country),
+					IsDefault:  i == 0,
+				})
+				if err != nil {
+					return fmt.Errorf("create address: %w", err)
+				}
+				report.AddressesCreated++
+			}
+
+			osToHiri[osCust.ID] = customer.ID
+			report.CustomersCreated++
+			logger.Info("imported customer",
+				"email", email,
+				"company", osCust.CompanyName,
+				"os_id", osCust.ID,
+				"status", wholesaleStatus,
+			)
+			return nil
+		})
+		if err != nil {
+			report.addError("customer %s (%s): %v", osCust.ID, osCust.CompanyName, err)
+		}
+	}
+
+	if customersOnly {
+		return
+	}
+
+	// Import orders
+	for _, osOrd := range orders {
+		hiriCustomerID, ok := osToHiri[osOrd.CustomerID]
+		if !ok {
+			report.addError("order %s (#%d): customer %s not imported, skipping", osOrd.ID, osOrd.Number, osOrd.CustomerID)
+			report.OrdersSkipped++
+			continue
+		}
+
+		err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			// Get customer's default address for shipping/billing
+			addresses, err := customerStore.ListAddresses(ctx, tx, hiriCustomerID)
+			if err != nil || len(addresses) == 0 {
+				return fmt.Errorf("no addresses for customer: %w", err)
+			}
+			defaultAddr := addresses[0]
+
+			// Create shipping address from order if present, otherwise use default
+			shippingAddrID := defaultAddr.ID
+			if osOrd.ShippingAddress != nil && osOrd.ShippingAddress.Line1 != "" {
+				contactFirst, contactLast := splitName(osOrd.ShippingAddress.ContactName)
+				addr, err := customerStore.CreateAddress(ctx, tx, store.CreateAddressParams{
+					CustomerID:  &hiriCustomerID,
+					FirstName:   contactFirst,
+					LastName:    contactLast,
+					Company:     strPtr(osOrd.ShippingAddress.CompanyName),
+					Line1:       osOrd.ShippingAddress.Line1,
+					Line2:       strPtr(osOrd.ShippingAddress.Line2),
+					City:        osOrd.ShippingAddress.City,
+					State:       osOrd.ShippingAddress.State,
+					PostalCode:  osOrd.ShippingAddress.PostalCode,
+					CountryCode: mapCountryCode(osOrd.ShippingAddress.Country),
+					IsDefault:   false,
+				})
+				if err != nil {
+					return fmt.Errorf("create shipping address: %w", err)
+				}
+				shippingAddrID = addr.ID
+				report.AddressesCreated++
+			}
+
+			// Calculate totals in cents
+			subtotalCents := dollarsTocents(osOrd.NetTotal)
+			totalCents := dollarsTocents(osOrd.GrossTotal)
+			taxCents := totalCents - subtotalCents
+			var shippingCents int
+
+			// Extract shipping from line items
+			var productLines []osOrderLine
+			for _, li := range osOrd.OrderLines {
+				if li.Shipping {
+					shippingCents += dollarsTocents(li.SubTotal)
+				} else {
+					productLines = append(productLines, li)
+				}
+			}
+
+			placedAt := parseISO(osOrd.Created)
+			if placedAt.IsZero() {
+				placedAt = time.Now()
+			}
+
+			orderNumber := fmt.Sprintf("OS-%d", osOrd.Number)
+			var poNumber *string
+			if osOrd.CustomerPONumber != "" {
+				poNumber = &osOrd.CustomerPONumber
+			}
+
+			var deliveryDate *time.Time
+			if osOrd.DeliveryDate != "" {
+				t := parseISO(osOrd.DeliveryDate)
+				if !t.IsZero() {
+					deliveryDate = &t
+				}
+			}
+
+			var internalNote *string
+			if osOrd.InternalNote != "" {
+				internalNote = &osOrd.InternalNote
+			}
+
+			shippingMethod := domain.ShippingMethodShipped
+
+			order, err := orderStore.CreateOrder(ctx, tx, store.CreateOrderParams{
+				Number:                orderNumber,
+				CustomerID:            &hiriCustomerID,
+				Status:                mapOSOrderStatus(osOrd.Status),
+				PaymentStatus:         domain.PaymentStatusCaptured,
+				FulfillmentStatus:     mapOSFulfillmentStatus(osOrd.Status),
+				CurrencyCode:          strings.ToUpper(osOrd.Currency),
+				Subtotal:              subtotalCents,
+				ShippingTotal:         shippingCents,
+				TaxTotal:              taxCents,
+				Total:                 totalCents,
+				ShippingAddressID:     shippingAddrID,
+				BillingAddressID:      defaultAddr.ID,
+				ShippingMethod:        &shippingMethod,
+				RequestedDeliveryDate: deliveryDate,
+				Notes:                 internalNote,
+				Metadata: map[string]any{
+					"orderspace_id":        osOrd.ID,
+					"orderspace_number":    osOrd.Number,
+					"orderspace_reference": osOrd.Reference,
+					"imported_from":        "orderspace",
+				},
+				PlacedAt: placedAt,
+			})
+			if err != nil {
+				return fmt.Errorf("create order: %w", err)
+			}
+
+			// Set customer PO number if present
+			if poNumber != nil {
+				_, _ = tx.Exec(ctx, `UPDATE orders SET customer_po_number = $1 WHERE id = $2`, *poNumber, order.ID)
+			}
+
+			// Create line items — try to match by SKU
+			for _, li := range productLines {
+				variantID := uuid.Nil
+				if li.SKU != "" {
+					err := tx.QueryRow(ctx, `SELECT id FROM variants WHERE sku = $1`, li.SKU).Scan(&variantID)
+					if err != nil {
+						report.addWarning("order %s line %s: SKU %q not found in catalog", osOrd.ID, li.ID, li.SKU)
+					}
+				}
+
+				if variantID == uuid.Nil {
+					// Can't create line item without a variant — store in metadata
+					report.addWarning("order %s line %s: no variant for %q (SKU: %s), skipped line item", osOrd.ID, li.ID, li.Name, li.SKU)
+					continue
+				}
+
+				lineTaxCents := dollarsTocents(li.TaxAmount)
+
+				_, err := orderStore.CreateLineItem(ctx, tx, store.CreateLineItemParams{
+					OrderID:       order.ID,
+					VariantID:     variantID,
+					Quantity:      li.Quantity,
+					UnitPrice:     dollarsTocents(li.UnitPrice),
+					Subtotal:      dollarsTocents(li.SubTotal),
+					TaxTotal:      lineTaxCents,
+					Total:         dollarsTocents(li.SubTotal) + lineTaxCents,
+					Metadata: map[string]any{
+						"orderspace_line_id": li.ID,
+						"orderspace_sku":     li.SKU,
+						"orderspace_name":    li.Name,
+						"orderspace_options": li.Options,
+					},
+				})
+				if err != nil {
+					return fmt.Errorf("create line item %s: %w", li.ID, err)
+				}
+				report.LineItemsCreated++
+			}
+
+			report.OrdersCreated++
+			logger.Info("imported order",
+				"os_number", osOrd.Number,
+				"hiri_number", orderNumber,
+				"status", osOrd.Status,
+				"total", osOrd.GrossTotal,
+			)
+			return nil
+		})
+		if err != nil {
+			report.addError("order %s (#%d): %v", osOrd.ID, osOrd.Number, err)
+			report.OrdersSkipped++
+		}
+	}
+}
+
+// Helper functions
+
+func primaryEmail(c osCustomer) string {
+	// Prefer first buyer email, fall back to orders email
+	for _, b := range c.Buyers {
+		if b.EmailAddress != "" {
+			return strings.ToLower(strings.TrimSpace(b.EmailAddress))
+		}
+	}
+	if c.EmailAddresses.Orders != "" {
+		return strings.ToLower(strings.TrimSpace(c.EmailAddresses.Orders))
+	}
+	return ""
+}
+
+func parseBuyerName(c osCustomer) (string, string) {
+	if len(c.Buyers) > 0 && c.Buyers[0].Name != "" {
+		return splitName(c.Buyers[0].Name)
+	}
+	// Fall back to company name as last name
+	return "", c.CompanyName
+}
+
+func splitName(full string) (string, string) {
+	full = strings.TrimSpace(full)
+	if full == "" {
+		return "", ""
+	}
+	parts := strings.SplitN(full, " ", 2)
+	if len(parts) == 1 {
+		return parts[0], ""
+	}
+	return parts[0], parts[1]
+}
+
+func mapOSStatus(status string) domain.WholesaleStatus {
+	switch status {
+	case "active":
+		return domain.WholesaleStatusApproved
+	case "new":
+		return domain.WholesaleStatusPending
+	case "closed":
+		return domain.WholesaleStatusSuspended
+	default:
+		return domain.WholesaleStatusPending
+	}
+}
+
+func mapOSOrderStatus(status string) domain.OrderStatus {
+	switch status {
+	case "new", "preorder":
+		return domain.OrderStatusPending
+	case "invoiced", "released":
+		return domain.OrderStatusConfirmed
+	case "part_fulfilled":
+		return domain.OrderStatusProcessing
+	case "fulfilled":
+		return domain.OrderStatusComplete
+	case "cancelled":
+		return domain.OrderStatusCancelled
+	default:
+		return domain.OrderStatusComplete
+	}
+}
+
+func mapOSFulfillmentStatus(status string) domain.FulfillmentStatus {
+	switch status {
+	case "new", "invoiced", "released", "preorder":
+		return domain.FulfillmentStatusUnfulfilled
+	case "part_fulfilled":
+		return domain.FulfillmentStatusPartiallyFulfilled
+	case "fulfilled":
+		return domain.FulfillmentStatusFulfilled
+	default:
+		return domain.FulfillmentStatusFulfilled
+	}
+}
+
+func mapCountryCode(country string) string {
+	// OrderSpace may send full names or codes
+	if len(country) == 2 {
+		return strings.ToUpper(country)
+	}
+	// Common mappings
+	switch strings.ToLower(country) {
+	case "united states", "usa", "us":
+		return "US"
+	case "canada":
+		return "CA"
+	case "united kingdom", "uk", "gb":
+		return "GB"
+	default:
+		return country
+	}
+}
+
+func dollarsTocents(dollars float64) int {
+	return int(dollars*100 + 0.5) // round to nearest cent
+}
+
+func parseISO(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	for _, layout := range []string{
+		time.RFC3339,
+		"2006-01-02T15:04:05Z",
+		"2006-01-02T15:04:05",
+		"2006-01-02",
+	} {
+		t, err := time.Parse(layout, s)
+		if err == nil {
+			return t
+		}
+	}
+	return time.Time{}
+}
+
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func printReport(report *migrationReport, logger *slog.Logger) {
+	fmt.Println()
+	fmt.Println("=== OrderSpace Migration Report ===")
+	fmt.Printf("Customers created:  %d\n", report.CustomersCreated)
+	fmt.Printf("Customers found:    %d\n", report.CustomersFound)
+	fmt.Printf("Addresses created:  %d\n", report.AddressesCreated)
+	fmt.Printf("Orders created:     %d\n", report.OrdersCreated)
+	fmt.Printf("Orders skipped:     %d\n", report.OrdersSkipped)
+	fmt.Printf("Line items created: %d\n", report.LineItemsCreated)
+
+	if len(report.Warnings) > 0 {
+		fmt.Printf("\nWarnings (%d):\n", len(report.Warnings))
+		for _, w := range report.Warnings {
+			fmt.Printf("  WARN: %s\n", w)
+		}
+	}
+
+	if len(report.Errors) > 0 {
+		fmt.Printf("\nErrors (%d):\n", len(report.Errors))
+		for _, e := range report.Errors {
+			fmt.Printf("  ERROR: %s\n", e)
+		}
+	}
+
+	if len(report.Errors) == 0 {
+		fmt.Println("\nMigration completed successfully.")
+	} else {
+		fmt.Printf("\nMigration completed with %d errors.\n", len(report.Errors))
+	}
+}

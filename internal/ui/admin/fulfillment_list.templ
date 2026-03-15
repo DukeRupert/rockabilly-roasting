@@ -82,16 +82,16 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Fulfillment</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Placed</th>
-							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+							<th scope="col" class="hidden relative py-3.5 pl-3 pr-4 sm:table-cell sm:pr-6">
 								<span class="sr-only">View</span>
 							</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, o := range props.Orders {
-							<tr>
+							<tr class="row-link">
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="font-medium text-rr-heading hover:text-rr-red">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
 										{ o.Number }
 									</a>
 								</td>
@@ -101,7 +101,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
 									{ o.PlacedAt.Format("Jan 2, 2006") }
 								</td>
-								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+								<td class="hidden whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:table-cell sm:pr-6">
 									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="text-rr-red hover:text-rr-red-lt">
 										View<span class="sr-only">, { o.Number }</span>
 									</a>

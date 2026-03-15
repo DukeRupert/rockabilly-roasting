@@ -175,9 +175,9 @@ templ DashboardContent(props DashboardProps) {
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, o := range props.RecentOrders {
-							<tr>
+							<tr class="row-link">
 								<td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="font-medium text-rr-heading hover:text-rr-red">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
 										{ o.Number }
 									</a>
 								</td>

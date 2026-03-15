@@ -67,9 +67,9 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, sub := range props.Subscriptions {
-							<tr class="hover:bg-rr-raised">
+							<tr class="row-link">
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", sub.ID.String())) } class="text-rr-red hover:text-rr-red-lt">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", sub.ID.String())) } class="row-link-target text-rr-red hover:text-rr-red-lt">
 										{ sub.ID.String()[:8] }...
 									</a>
 								</td>

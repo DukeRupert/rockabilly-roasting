@@ -78,16 +78,16 @@ templ CustomerListContent(props CustomerListProps) {
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Email</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Status</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Joined</th>
-							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+							<th scope="col" class="hidden relative py-3.5 pl-3 pr-4 sm:table-cell sm:pr-6">
 								<span class="sr-only">View</span>
 							</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, c := range props.Customers {
-							<tr>
+							<tr class="row-link">
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="font-medium text-rr-heading hover:text-rr-red">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
 										{ c.FirstName } { c.LastName }
 									</a>
 								</td>
@@ -107,7 +107,7 @@ templ CustomerListContent(props CustomerListProps) {
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
 									{ c.CreatedAt.Format("Jan 2, 2006") }
 								</td>
-								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+								<td class="hidden whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:table-cell sm:pr-6">
 									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
 										View<span class="sr-only">, { c.FirstName } { c.LastName }</span>
 									</a>

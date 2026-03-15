@@ -213,6 +213,22 @@ templ Admin(props AdminProps) {
 					outline-offset: -1px;
 				}
 				.btn-confirm:hover { background: #DFF0E4; }
+
+				/* ── Clickable table rows ── */
+				.row-link {
+					position: relative;
+					cursor: pointer;
+				}
+				.row-link:hover { background: var(--color-rr-raised); }
+				.row-link .row-link-target::after {
+					content: '';
+					position: absolute;
+					inset: 0;
+				}
+				/* Keep other interactive elements above the overlay */
+				.row-link a:not(.row-link-target),
+				.row-link button,
+				.row-link form { position: relative; z-index: 1; }
 			</style>
 		</head>
 		<body class="h-full overflow-x-hidden" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">

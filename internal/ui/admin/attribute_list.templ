@@ -71,9 +71,7 @@ templ AttributeSetListContent(props AttributeSetListProps) {
 								for _, key := range set.Keys {
 									<span class="inline-flex items-center rounded-sm bg-rr-raised px-2 py-0.5 text-xs font-medium text-rr-body">
 										{ key.Name }
-										if key.ValueType == domain.AttributeValueTypeMulti {
-											<span class="ml-1 text-rr-muted">(multi)</span>
-										}
+										<span class="ml-1 text-rr-muted">({ string(key.ValueType) })</span>
 									</span>
 								}
 							</div>

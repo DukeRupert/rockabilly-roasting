@@ -231,11 +231,21 @@ func (d *Deps) handleAdminAttributeKeyCreate(w http.ResponseWriter, r *http.Requ
 	}
 
 	valueType := domain.AttributeValueType(r.FormValue("value_type"))
-	if valueType != domain.AttributeValueTypeSingle && valueType != domain.AttributeValueTypeMulti {
-		valueType = domain.AttributeValueTypeSingle
+	if !isValidValueType(valueType) {
+		valueType = domain.AttributeValueTypeText
 	}
 
 	position, _ := strconv.Atoi(r.FormValue("position"))
+
+	var allowedValues []string
+	if raw := strings.TrimSpace(r.FormValue("allowed_values")); raw != "" {
+		for _, v := range strings.Split(raw, ",") {
+			v = strings.TrimSpace(v)
+			if v != "" {
+				allowedValues = append(allowedValues, v)
+			}
+		}
+	}
 
 	params := store.CreateAttributeKeyParams{
 		AttributeSetID: setID,
@@ -245,6 +255,7 @@ func (d *Deps) handleAdminAttributeKeyCreate(w http.ResponseWriter, r *http.Requ
 		Position:       position,
 		Filterable:     r.FormValue("filterable") == "true",
 		Sortable:       r.FormValue("sortable") == "true",
+		AllowedValues:  allowedValues,
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -287,20 +298,31 @@ func (d *Deps) handleAdminAttributeKeyUpdate(w http.ResponseWriter, r *http.Requ
 	}
 
 	valueType := domain.AttributeValueType(r.FormValue("value_type"))
-	if valueType != domain.AttributeValueTypeSingle && valueType != domain.AttributeValueTypeMulti {
-		valueType = domain.AttributeValueTypeSingle
+	if !isValidValueType(valueType) {
+		valueType = domain.AttributeValueTypeText
 	}
 
 	position, _ := strconv.Atoi(r.FormValue("position"))
 
+	var allowedValues []string
+	if raw := strings.TrimSpace(r.FormValue("allowed_values")); raw != "" {
+		for _, v := range strings.Split(raw, ",") {
+			v = strings.TrimSpace(v)
+			if v != "" {
+				allowedValues = append(allowedValues, v)
+			}
+		}
+	}
+
 	params := store.UpdateAttributeKeyParams{
-		ID:         keyID,
-		Name:       r.FormValue("name"),
-		Slug:       slug,
-		ValueType:  valueType,
-		Position:   position,
-		Filterable: r.FormValue("filterable") == "true",
-		Sortable:   r.FormValue("sortable") == "true",
+		ID:            keyID,
+		Name:          r.FormValue("name"),
+		Slug:          slug,
+		ValueType:     valueType,
+		Position:      position,
+		Filterable:    r.FormValue("filterable") == "true",
+		Sortable:      r.FormValue("sortable") == "true",
+		AllowedValues: allowedValues,
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -431,9 +453,21 @@ func (d *Deps) handleAdminProductAttributeSave(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Parse attribute values from form.
-	// Single values: attr_{keyID} = "value"
-	// Multi values: attr_{keyID} = "tag1, tag2, tag3"
+	// Collect all boolean key IDs first so we can default absent checkboxes to "false".
+	booleanKeys := make(map[uuid.UUID]bool)
+	for key := range r.Form {
+		if !strings.HasPrefix(key, "vt_") {
+			continue
+		}
+		if r.FormValue(key) == string(domain.AttributeValueTypeBoolean) {
+			keyIDStr := strings.TrimPrefix(key, "vt_")
+			if kid, err := uuid.Parse(keyIDStr); err == nil {
+				booleanKeys[kid] = true
+			}
+		}
+	}
+
+	// Parse attribute values from form by value type.
 	values := make(map[uuid.UUID]store.AttributeValueInput)
 	for key, formValues := range r.Form {
 		if !strings.HasPrefix(key, "attr_") || len(formValues) == 0 {
@@ -445,17 +479,15 @@ func (d *Deps) handleAdminProductAttributeSave(w http.ResponseWriter, r *http.Re
 			continue
 		}
 
-		raw := strings.TrimSpace(formValues[0])
-		if raw == "" {
-			continue
-		}
-
-		// Check value type from the form
 		vtKey := "vt_" + keyIDStr
 		valueType := r.FormValue(vtKey)
 
-		if valueType == "multi" {
-			// Split comma-separated values
+		switch domain.AttributeValueType(valueType) {
+		case domain.AttributeValueTypeMultiText:
+			raw := strings.TrimSpace(formValues[0])
+			if raw == "" {
+				continue
+			}
 			parts := strings.Split(raw, ",")
 			var cleaned []string
 			for _, p := range parts {
@@ -467,9 +499,37 @@ func (d *Deps) handleAdminProductAttributeSave(w http.ResponseWriter, r *http.Re
 			if len(cleaned) > 0 {
 				values[keyID] = store.AttributeValueInput{Values: cleaned}
 			}
-		} else {
+		case domain.AttributeValueTypeMultiEnum:
+			// Multiple checkbox values come as separate form entries
+			var cleaned []string
+			for _, v := range formValues {
+				v = strings.TrimSpace(v)
+				if v != "" {
+					cleaned = append(cleaned, v)
+				}
+			}
+			if len(cleaned) > 0 {
+				values[keyID] = store.AttributeValueInput{Values: cleaned}
+			}
+		case domain.AttributeValueTypeBoolean:
+			// Checkbox present = "true"
+			val := "true"
+			values[keyID] = store.AttributeValueInput{Value: &val}
+			delete(booleanKeys, keyID) // mark as handled
+		default:
+			// text, enum: single value
+			raw := strings.TrimSpace(formValues[0])
+			if raw == "" {
+				continue
+			}
 			values[keyID] = store.AttributeValueInput{Value: &raw}
 		}
+	}
+
+	// Default absent boolean checkboxes to "false"
+	for kid := range booleanKeys {
+		val := "false"
+		values[kid] = store.AttributeValueInput{Value: &val}
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -540,4 +600,17 @@ func (d *Deps) renderAttributesPanel(w http.ResponseWriter, r *http.Request, pro
 		AllSets:      allSets,
 		Values:       attrValues,
 	}).Render(ctx, w) //nolint:errcheck
+}
+
+// isValidValueType checks if a value type is one of the known types.
+func isValidValueType(vt domain.AttributeValueType) bool {
+	switch vt {
+	case domain.AttributeValueTypeText,
+		domain.AttributeValueTypeEnum,
+		domain.AttributeValueTypeMultiText,
+		domain.AttributeValueTypeMultiEnum,
+		domain.AttributeValueTypeBoolean:
+		return true
+	}
+	return false
 }

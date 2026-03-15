@@ -19,8 +19,8 @@ RETURNING *;
 DELETE FROM attribute_sets WHERE id = $1;
 
 -- name: CreateAttributeKey :one
-INSERT INTO attribute_keys (id, attribute_set_id, name, slug, value_type, position, filterable, sortable)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO attribute_keys (id, attribute_set_id, name, slug, value_type, position, filterable, sortable, allowed_values)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 RETURNING *;
 
 -- name: GetAttributeKeyByID :one
@@ -33,7 +33,7 @@ ORDER BY position;
 
 -- name: UpdateAttributeKey :one
 UPDATE attribute_keys
-SET name = $2, slug = $3, value_type = $4, position = $5, filterable = $6, sortable = $7
+SET name = $2, slug = $3, value_type = $4, position = $5, filterable = $6, sortable = $7, allowed_values = $8
 WHERE id = $1
 RETURNING *;
 

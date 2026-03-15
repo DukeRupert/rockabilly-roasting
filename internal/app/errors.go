@@ -99,8 +99,10 @@ var (
 	ErrMOQViolation         = errors.New("minimum order quantity not met")
 
 	// Attribute errors
-	ErrAttributeSetNotFound = errors.New("attribute set not found")
-	ErrAttributeKeyNotFound = errors.New("attribute key not found")
+	ErrAttributeSetNotFound          = errors.New("attribute set not found")
+	ErrAttributeKeyNotFound          = errors.New("attribute key not found")
+	ErrAttributeValueNotAllowed      = errors.New("attribute value is not in the allowed list")
+	ErrAttributeAllowedValuesRequired = errors.New("allowed values are required for enum types")
 
 	// QuickBooks errors
 	ErrQBNotConnected = errors.New("quickbooks is not connected")

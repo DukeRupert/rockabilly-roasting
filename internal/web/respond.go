@@ -98,7 +98,9 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrInvoiceNotPayable),
 		errors.Is(err, app.ErrInvoiceNotSendable),
 		errors.Is(err, app.ErrInvoiceNotVoidable),
-		errors.Is(err, app.ErrLastAddress):
+		errors.Is(err, app.ErrLastAddress),
+		errors.Is(err, app.ErrAttributeValueNotAllowed),
+		errors.Is(err, app.ErrAttributeAllowedValuesRequired):
 		return http.StatusUnprocessableEntity, err.Error()
 
 	default:

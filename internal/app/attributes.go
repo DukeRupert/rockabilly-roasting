@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -124,6 +125,9 @@ func (s *AttributeService) DeleteAttributeSet(ctx context.Context, tx pgx.Tx, id
 
 // CreateAttributeKey creates a new attribute key within a set.
 func (s *AttributeService) CreateAttributeKey(ctx context.Context, tx pgx.Tx, p store.CreateAttributeKeyParams) (*domain.AttributeKey, error) {
+	if err := validateAllowedValues(p.ValueType, p.AllowedValues); err != nil {
+		return nil, err
+	}
 	key, err := s.attributes.CreateAttributeKey(ctx, tx, p)
 	if err != nil {
 		return nil, fmt.Errorf("create attribute key: %w", err)
@@ -154,6 +158,9 @@ func (s *AttributeService) ListAttributeKeys(ctx context.Context, tx pgx.Tx, set
 
 // UpdateAttributeKey updates an attribute key.
 func (s *AttributeService) UpdateAttributeKey(ctx context.Context, tx pgx.Tx, p store.UpdateAttributeKeyParams) (*domain.AttributeKey, error) {
+	if err := validateAllowedValues(p.ValueType, p.AllowedValues); err != nil {
+		return nil, err
+	}
 	key, err := s.attributes.UpdateAttributeKey(ctx, tx, p)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -203,6 +210,17 @@ func (s *AttributeService) ListProductAttributeSets(ctx context.Context, tx pgx.
 
 // SaveProductAttributes saves all attribute values for a product (bulk upsert) and records an audit entry.
 func (s *AttributeService) SaveProductAttributes(ctx context.Context, tx pgx.Tx, productID uuid.UUID, values map[uuid.UUID]store.AttributeValueInput, actor Actor) error {
+	// Validate values against their keys
+	for keyID, input := range values {
+		key, err := s.attributes.GetAttributeKeyByID(ctx, tx, keyID)
+		if err != nil {
+			return fmt.Errorf("get attribute key for validation: %w", err)
+		}
+		if err := validateAttributeValue(key, input); err != nil {
+			return err
+		}
+	}
+
 	// Delete existing values and re-insert to handle removals
 	if err := s.attributes.DeleteProductAttributeValuesByProduct(ctx, tx, productID); err != nil {
 		return fmt.Errorf("clear product attributes: %w", err)
@@ -236,4 +254,38 @@ func (s *AttributeService) ListProductAttributeValues(ctx context.Context, tx pg
 		return nil, fmt.Errorf("list product attribute values: %w", err)
 	}
 	return vals, nil
+}
+
+// validateAllowedValues ensures enum types have allowed values and other types do not.
+func validateAllowedValues(vt domain.AttributeValueType, allowed []string) error {
+	isEnum := vt == domain.AttributeValueTypeEnum || vt == domain.AttributeValueTypeMultiEnum
+	if isEnum && len(allowed) == 0 {
+		return ErrAttributeAllowedValuesRequired
+	}
+	return nil
+}
+
+// validateAttributeValue checks that a value input is valid for the given key.
+func validateAttributeValue(key *domain.AttributeKey, input store.AttributeValueInput) error {
+	switch key.ValueType {
+	case domain.AttributeValueTypeBoolean:
+		if input.Value != nil && *input.Value != "true" && *input.Value != "false" {
+			return fmt.Errorf("%w: boolean must be true or false", ErrAttributeValueNotAllowed)
+		}
+	case domain.AttributeValueTypeEnum:
+		if input.Value != nil && len(key.AllowedValues) > 0 {
+			if !slices.Contains(key.AllowedValues, *input.Value) {
+				return fmt.Errorf("%w: %q is not allowed for %s", ErrAttributeValueNotAllowed, *input.Value, key.Name)
+			}
+		}
+	case domain.AttributeValueTypeMultiEnum:
+		if len(key.AllowedValues) > 0 {
+			for _, v := range input.Values {
+				if !slices.Contains(key.AllowedValues, v) {
+					return fmt.Errorf("%w: %q is not allowed for %s", ErrAttributeValueNotAllowed, v, key.Name)
+				}
+			}
+		}
+	}
+	return nil
 }

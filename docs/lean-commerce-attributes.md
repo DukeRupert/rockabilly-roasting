@@ -13,38 +13,39 @@ Example for a coffee tenant:
 ```
 Attribute Set: "Coffee Profile"
   Keys:
-    - Origin        (single)
-    - Process       (single)
-    - Roast Level   (single)
-    - Tasting Notes (multi)
-    - Region        (single)
+    - Origin        (text)
+    - Process       (enum: washed, natural, honey)
+    - Roast Level   (enum: light, medium-light, medium, medium-dark, dark)
+    - Tasting Notes (multi_text)
+    - Brew Methods  (multi_enum: espresso, drip, pour-over, french-press, cold-brew)
+    - Seasonal      (boolean)
 
 Product: "Yirgacheffe Natural"
   Origin:        Ethiopia
   Process:       Natural
   Roast Level:   Medium-Light
   Tasting Notes: Blueberry, Jasmine, Dark Chocolate
-  Region:        Yirgacheffe
+  Brew Methods:  Pour-Over, Drip
+  Seasonal:      true
 ```
 
 ---
 
 ## Schema
 
-Migration: `024_product_attributes`
+Migration: `024_product_attributes` (initial), `034_attribute_value_types` (expanded types)
 
 ```sql
-CREATE TYPE attribute_value_type AS ENUM ('single', 'multi');
+CREATE TYPE attribute_value_type AS ENUM ('text', 'multi_text', 'enum', 'multi_enum', 'boolean');
 
--- Named groups of attribute keys, scoped to tenant
+-- Named groups of attribute keys
 CREATE TABLE attribute_sets (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     name        text NOT NULL,            -- "Coffee Profile"
     slug        text NOT NULL,            -- "coffee-profile"
     position    int  NOT NULL DEFAULT 0,  -- display order in admin
     created_at  timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT uq_attribute_set_slug UNIQUE (tenant_id, slug)
+    CONSTRAINT uq_attribute_set_slug UNIQUE (slug)
 );
 
 -- Individual attributes within a set
@@ -53,10 +54,11 @@ CREATE TABLE attribute_keys (
     attribute_set_id uuid NOT NULL REFERENCES attribute_sets(id) ON DELETE CASCADE,
     name             text NOT NULL,                        -- "Tasting Notes"
     slug             text NOT NULL,                        -- "tasting-notes"
-    value_type       attribute_value_type NOT NULL DEFAULT 'single',
+    value_type       attribute_value_type NOT NULL DEFAULT 'text',
     position         int  NOT NULL DEFAULT 0,              -- display order within set
     filterable       bool NOT NULL DEFAULT false,          -- include in faceted search sidebar
     sortable         bool NOT NULL DEFAULT false,          -- allow storefront sort by this key
+    allowed_values   jsonb,                                -- predefined choices for enum/multi_enum
     CONSTRAINT uq_attribute_key_slug UNIQUE (attribute_set_id, slug)
 );
 
@@ -72,8 +74,8 @@ CREATE TABLE product_attribute_values (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id       uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     attribute_key_id uuid NOT NULL REFERENCES attribute_keys(id) ON DELETE CASCADE,
-    value            text,   -- single: "Washed"
-    values           jsonb,  -- multi:  ["Blueberry", "Dark Chocolate"]
+    value            text,   -- text/enum/boolean: "Washed", "true"
+    values           jsonb,  -- multi_text/multi_enum: ["Blueberry", "Dark Chocolate"]
     CONSTRAINT uq_product_attribute UNIQUE (product_id, attribute_key_id)
 );
 
@@ -83,19 +85,27 @@ CREATE INDEX idx_attr_values_key        ON product_attribute_values (attribute_k
 CREATE INDEX idx_attr_values_multi      ON product_attribute_values USING gin (values)
     WHERE values IS NOT NULL;
 CREATE INDEX idx_attr_keys_set          ON attribute_keys (attribute_set_id, position);
-CREATE INDEX idx_attr_sets_tenant       ON attribute_sets (tenant_id, position);
 ```
 
-### Value type semantics
+### Value types
 
-All values are strings. `value_type` controls storage shape and UI rendering only — no numeric casting, no range logic.
+All values are strings. `value_type` controls storage shape, admin UI input, and server-side validation.
 
-| `value_type` | Column used | Example |
-|---|---|---|
-| `single` | `value text` | `"Washed"` |
-| `multi` | `values jsonb` | `["Blueberry", "Dark Chocolate"]` |
+| `value_type` | Column used | Admin UI | Example |
+|---|---|---|---|
+| `text` | `value text` | `<input type="text">` | `"Ethiopia"` |
+| `enum` | `value text` | `<select>` from `allowed_values` | `"washed"` |
+| `multi_text` | `values jsonb` | `<input type="text">` (comma-separated) | `["Blueberry", "Dark Chocolate"]` |
+| `multi_enum` | `values jsonb` | Checkboxes from `allowed_values` | `["espresso", "pour-over"]` |
+| `boolean` | `value text` | `<input type="checkbox">` | `"true"` or `"false"` |
 
 A row will have either `value` or `values` populated, never both. No constraint enforces this — the application layer is responsible.
+
+### `allowed_values` column
+
+`attribute_keys.allowed_values` stores a JSON array of strings: `["light", "medium", "dark"]`. Required for `enum` and `multi_enum` types. Ignored for other types.
+
+Server-side validation rejects values not in this list. This prevents typos from breaking storefront rendering and filtering.
 
 ---
 
@@ -107,13 +117,15 @@ A row will have either `value` or `values` populated, never both. No constraint 
 type AttributeValueType string
 
 const (
-    AttributeValueTypeSingle AttributeValueType = "single"
-    AttributeValueTypeMulti  AttributeValueType = "multi"
+    AttributeValueTypeText      AttributeValueType = "text"
+    AttributeValueTypeEnum      AttributeValueType = "enum"
+    AttributeValueTypeMultiText AttributeValueType = "multi_text"
+    AttributeValueTypeMultiEnum AttributeValueType = "multi_enum"
+    AttributeValueTypeBoolean   AttributeValueType = "boolean"
 )
 
 type AttributeSet struct {
     ID       uuid.UUID
-    TenantID uuid.UUID
     Name     string
     Slug     string
     Position int
@@ -129,29 +141,47 @@ type AttributeKey struct {
     Position       int
     Filterable     bool
     Sortable       bool
+    AllowedValues  []string // predefined choices for enum/multi_enum
 }
+
+// IsMultiType returns true for value types that store multiple values.
+func (k AttributeKey) IsMultiType() bool
+
+// IsEnumType returns true for value types that constrain values to AllowedValues.
+func (k AttributeKey) IsEnumType() bool
 
 type ProductAttributeValue struct {
     KeyID     uuid.UUID
     KeyName   string
     KeySlug   string
     ValueType AttributeValueType
-    Value     *string  // single
-    Values    []string // multi
+    Value     *string  // text/enum/boolean
+    Values    []string // multi_text/multi_enum
 }
 
 // DisplayValue returns a display-ready string for use in templates.
-// Callers do not need to know the underlying value type.
-func (v ProductAttributeValue) DisplayValue() string {
-    if len(v.Values) > 0 {
-        return strings.Join(v.Values, ", ")
-    }
-    if v.Value != nil {
-        return *v.Value
-    }
-    return ""
-}
+// Boolean → "Yes"/"No", multi → comma-joined, single → raw value.
+func (v ProductAttributeValue) DisplayValue() string
+
+// BoolValue returns true if the stored value is "true".
+func (v ProductAttributeValue) BoolValue() bool
 ```
+
+---
+
+## Validation
+
+### Key creation/update
+
+- `enum` and `multi_enum` types **require** `AllowedValues` — `ErrAttributeAllowedValuesRequired` if missing.
+- Other types ignore `AllowedValues`.
+
+### Product attribute save
+
+- `enum`: value must be in `AllowedValues` — `ErrAttributeValueNotAllowed` if not.
+- `multi_enum`: every value must be in `AllowedValues`.
+- `boolean`: value must be `"true"` or `"false"`.
+- `text` and `multi_text`: no constraint.
 
 ---
 
@@ -174,7 +204,7 @@ WHERE pav.product_id = $1
 ORDER BY aset.position, ak.position;
 ```
 
-### Faceted filter — single value match
+### Faceted filter — single value match (text/enum)
 
 ```sql
 SELECT DISTINCT p.id
@@ -186,7 +216,7 @@ WHERE ak.slug       = 'process'
   AND pav.value     = 'Washed';
 ```
 
-### Faceted filter — multi value contains
+### Faceted filter — multi value contains (multi_text/multi_enum)
 
 ```sql
 SELECT DISTINCT p.id
@@ -209,7 +239,7 @@ SELECT
 FROM product_attribute_values pav
 JOIN attribute_keys ak ON ak.id = pav.attribute_key_id
 WHERE ak.filterable      = true
-  AND ak.value_type      = 'single'
+  AND ak.value_type      IN ('text', 'enum')
   AND ak.attribute_set_id = $1
   AND pav.value IS NOT NULL
 GROUP BY ak.name, ak.slug, pav.value
@@ -228,7 +258,7 @@ FROM product_attribute_values pav
 JOIN attribute_keys ak         ON ak.id = pav.attribute_key_id
 CROSS JOIN jsonb_array_elements_text(pav.values) AS elem(value)
 WHERE ak.filterable       = true
-  AND ak.value_type       = 'multi'
+  AND ak.value_type       IN ('multi_text', 'multi_enum')
   AND ak.attribute_set_id = $1
   AND pav.values IS NOT NULL
 GROUP BY ak.name, ak.slug, elem.value
@@ -244,25 +274,31 @@ Three surfaces, all staff-only:
 **`/admin/attributes`** — attribute sets list
 - Create / edit / delete sets
 - Reorder sets (position)
+- Key badges show value type for each key
 
 **`/admin/attributes/{id}`** — attribute set editor
 - Add / edit / delete keys within the set
+- Set `value_type` (text, enum, multi_text, multi_enum, boolean) per key
+- Set `allowed_values` (comma-separated input, required for enum types)
 - Set `filterable` and `sortable` flags per key
-- Set `value_type` (single vs multi) per key
 - Reorder keys (position)
+- Key table shows type badge + allowed value pills for enum types
 
-**`/admin/products/{id}` — existing product editor, gains "Attributes" tab**
+**`/admin/products/{id}` — existing product editor, gains "Attributes" panel**
 - Assign / remove attribute sets from the product
-- For each assigned set, render input per key:
-  - `single` → standard text input
-  - `multi` → tag input (Alpine.js, comma-separated or enter-to-add)
+- For each assigned set, render input per key by value type:
+  - `text` → standard text input
+  - `enum` → `<select>` dropdown with options from `allowed_values`
+  - `multi_text` → text input with comma-separated hint
+  - `multi_enum` → checkboxes for each `allowed_values` entry
+  - `boolean` → single checkbox (absent = `"false"`)
 - Save all values in a single `POST`
 
 ---
 
 ## Storefront UI
 
-**Product detail page** — render attribute values as a structured block below the description. Template receives `[]ProductAttributeValue` ordered by `aset.position, ak.position`. `DisplayValue()` handles both single and multi rendering. Multi values typically rendered as a pill/tag list rather than comma-separated prose.
+**Product detail page** — render attribute values as a structured block below the description. Template receives `[]ProductAttributeValue` ordered by `aset.position, ak.position`. `DisplayValue()` handles all five types. Multi values typically rendered as a pill/tag list rather than comma-separated prose. Booleans render as "Yes"/"No".
 
 **Facet sidebar** — rendered from the facet queries above. Each filterable key becomes a checkbox group. Active filters appended to URL as query params: `?process=Washed&tasting-notes=Blueberry`. Multiple values for the same key are OR'd; multiple keys are AND'd.
 
@@ -287,16 +323,18 @@ AuditProductAttributesUpdated = "product.attributes_updated"
 
 ```
 domain/attributes.go          — AttributeSet, AttributeKey, ProductAttributeValue types
-store/attributes.go           — sqlc queries: ListByProduct, ListFacetValues, UpsertValues
-app/attributes.go             — AttributeService: Create, Update, Delete, AssignToProduct
-web/ui/components/attributes/ — templ components: AttributeBlock, FacetSidebar, TagInput
-web/handlers/admin/attributes.go — admin CRUD handlers
+store/attributes.go           — sqlc queries + hand-written ListProductAttributeValues
+app/attributes.go             — AttributeService: Create, Update, Delete, Validate, AssignToProduct
+web/admin_attributes.go       — admin CRUD handlers
+ui/admin/attribute_list.templ  — attribute sets list page
+ui/admin/attribute_edit.templ  — attribute set editor with key management
+ui/admin/attribute_panel.templ — product edit attribute panel (5-type rendering)
 ```
 
 ---
 
 ## What this is not
 
-- **Not variants** — attributes do not generate SKUs or affect inventory. A `multi` tasting notes value of `["Blueberry", "Dark Chocolate"]` is one product, not two.
+- **Not variants** — attributes do not generate SKUs or affect inventory. A `multi_text` tasting notes value of `["Blueberry", "Dark Chocolate"]` is one product, not two.
 - **Not product description** — attributes are structured and queryable. Free-form prose belongs in `products.description`.
 - **Not pricing metadata** — no attribute affects price. Pricing is handled by variants and wholesale price lists.

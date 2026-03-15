@@ -28,9 +28,9 @@ func (q *Queries) AssignAttributeSetToProduct(ctx context.Context, arg AssignAtt
 }
 
 const createAttributeKey = `-- name: CreateAttributeKey :one
-INSERT INTO attribute_keys (id, attribute_set_id, name, slug, value_type, position, filterable, sortable)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, attribute_set_id, name, slug, value_type, position, filterable, sortable
+INSERT INTO attribute_keys (id, attribute_set_id, name, slug, value_type, position, filterable, sortable, allowed_values)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, attribute_set_id, name, slug, value_type, position, filterable, sortable, allowed_values
 `
 
 type CreateAttributeKeyParams struct {
@@ -42,6 +42,7 @@ type CreateAttributeKeyParams struct {
 	Position       int32              `json:"position"`
 	Filterable     bool               `json:"filterable"`
 	Sortable       bool               `json:"sortable"`
+	AllowedValues  []byte             `json:"allowed_values"`
 }
 
 func (q *Queries) CreateAttributeKey(ctx context.Context, arg CreateAttributeKeyParams) (AttributeKey, error) {
@@ -54,6 +55,7 @@ func (q *Queries) CreateAttributeKey(ctx context.Context, arg CreateAttributeKey
 		arg.Position,
 		arg.Filterable,
 		arg.Sortable,
+		arg.AllowedValues,
 	)
 	var i AttributeKey
 	err := row.Scan(
@@ -65,6 +67,7 @@ func (q *Queries) CreateAttributeKey(ctx context.Context, arg CreateAttributeKey
 		&i.Position,
 		&i.Filterable,
 		&i.Sortable,
+		&i.AllowedValues,
 	)
 	return i, err
 }
@@ -137,7 +140,7 @@ func (q *Queries) DeleteProductAttributeValuesByProduct(ctx context.Context, pro
 }
 
 const getAttributeKeyByID = `-- name: GetAttributeKeyByID :one
-SELECT id, attribute_set_id, name, slug, value_type, position, filterable, sortable FROM attribute_keys WHERE id = $1
+SELECT id, attribute_set_id, name, slug, value_type, position, filterable, sortable, allowed_values FROM attribute_keys WHERE id = $1
 `
 
 func (q *Queries) GetAttributeKeyByID(ctx context.Context, id uuid.UUID) (AttributeKey, error) {
@@ -152,6 +155,7 @@ func (q *Queries) GetAttributeKeyByID(ctx context.Context, id uuid.UUID) (Attrib
 		&i.Position,
 		&i.Filterable,
 		&i.Sortable,
+		&i.AllowedValues,
 	)
 	return i, err
 }
@@ -174,7 +178,7 @@ func (q *Queries) GetAttributeSetByID(ctx context.Context, id uuid.UUID) (Attrib
 }
 
 const listAttributeKeysBySet = `-- name: ListAttributeKeysBySet :many
-SELECT id, attribute_set_id, name, slug, value_type, position, filterable, sortable FROM attribute_keys
+SELECT id, attribute_set_id, name, slug, value_type, position, filterable, sortable, allowed_values FROM attribute_keys
 WHERE attribute_set_id = $1
 ORDER BY position
 `
@@ -197,6 +201,7 @@ func (q *Queries) ListAttributeKeysBySet(ctx context.Context, attributeSetID uui
 			&i.Position,
 			&i.Filterable,
 			&i.Sortable,
+			&i.AllowedValues,
 		); err != nil {
 			return nil, err
 		}
@@ -289,19 +294,20 @@ func (q *Queries) RemoveAttributeSetFromProduct(ctx context.Context, arg RemoveA
 
 const updateAttributeKey = `-- name: UpdateAttributeKey :one
 UPDATE attribute_keys
-SET name = $2, slug = $3, value_type = $4, position = $5, filterable = $6, sortable = $7
+SET name = $2, slug = $3, value_type = $4, position = $5, filterable = $6, sortable = $7, allowed_values = $8
 WHERE id = $1
-RETURNING id, attribute_set_id, name, slug, value_type, position, filterable, sortable
+RETURNING id, attribute_set_id, name, slug, value_type, position, filterable, sortable, allowed_values
 `
 
 type UpdateAttributeKeyParams struct {
-	ID         uuid.UUID          `json:"id"`
-	Name       string             `json:"name"`
-	Slug       string             `json:"slug"`
-	ValueType  AttributeValueType `json:"value_type"`
-	Position   int32              `json:"position"`
-	Filterable bool               `json:"filterable"`
-	Sortable   bool               `json:"sortable"`
+	ID            uuid.UUID          `json:"id"`
+	Name          string             `json:"name"`
+	Slug          string             `json:"slug"`
+	ValueType     AttributeValueType `json:"value_type"`
+	Position      int32              `json:"position"`
+	Filterable    bool               `json:"filterable"`
+	Sortable      bool               `json:"sortable"`
+	AllowedValues []byte             `json:"allowed_values"`
 }
 
 func (q *Queries) UpdateAttributeKey(ctx context.Context, arg UpdateAttributeKeyParams) (AttributeKey, error) {
@@ -313,6 +319,7 @@ func (q *Queries) UpdateAttributeKey(ctx context.Context, arg UpdateAttributeKey
 		arg.Position,
 		arg.Filterable,
 		arg.Sortable,
+		arg.AllowedValues,
 	)
 	var i AttributeKey
 	err := row.Scan(
@@ -324,6 +331,7 @@ func (q *Queries) UpdateAttributeKey(ctx context.Context, arg UpdateAttributeKey
 		&i.Position,
 		&i.Filterable,
 		&i.Sortable,
+		&i.AllowedValues,
 	)
 	return i, err
 }

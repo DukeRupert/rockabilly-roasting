@@ -106,6 +106,7 @@ type CreateAttributeKeyParams struct {
 	Position       int
 	Filterable     bool
 	Sortable       bool
+	AllowedValues  []string
 }
 
 // CreateAttributeKey inserts a new attribute key and returns it.
@@ -119,6 +120,7 @@ func (s *AttributeStore) CreateAttributeKey(ctx context.Context, tx pgx.Tx, p Cr
 		Position:       int32(p.Position),
 		Filterable:     p.Filterable,
 		Sortable:       p.Sortable,
+		AllowedValues:  marshalAllowedValues(p.AllowedValues),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert attribute key: %w", err)
@@ -150,25 +152,27 @@ func (s *AttributeStore) ListAttributeKeysBySet(ctx context.Context, tx pgx.Tx, 
 
 // UpdateAttributeKeyParams holds the fields to update an attribute key.
 type UpdateAttributeKeyParams struct {
-	ID         uuid.UUID
-	Name       string
-	Slug       string
-	ValueType  domain.AttributeValueType
-	Position   int
-	Filterable bool
-	Sortable   bool
+	ID            uuid.UUID
+	Name          string
+	Slug          string
+	ValueType     domain.AttributeValueType
+	Position      int
+	Filterable    bool
+	Sortable      bool
+	AllowedValues []string
 }
 
 // UpdateAttributeKey updates an attribute key and returns it.
 func (s *AttributeStore) UpdateAttributeKey(ctx context.Context, tx pgx.Tx, p UpdateAttributeKeyParams) (*domain.AttributeKey, error) {
 	row, err := sqlcgen.New(tx).UpdateAttributeKey(ctx, sqlcgen.UpdateAttributeKeyParams{
-		ID:         p.ID,
-		Name:       p.Name,
-		Slug:       p.Slug,
-		ValueType:  sqlcgen.AttributeValueType(p.ValueType),
-		Position:   int32(p.Position),
-		Filterable: p.Filterable,
-		Sortable:   p.Sortable,
+		ID:            p.ID,
+		Name:          p.Name,
+		Slug:          p.Slug,
+		ValueType:     sqlcgen.AttributeValueType(p.ValueType),
+		Position:      int32(p.Position),
+		Filterable:    p.Filterable,
+		Sortable:      p.Sortable,
+		AllowedValues: marshalAllowedValues(p.AllowedValues),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update attribute key: %w", err)
@@ -313,6 +317,10 @@ func attributeSetFromRow(r sqlcgen.AttributeSet) *domain.AttributeSet {
 }
 
 func attributeKeyFromRow(r sqlcgen.AttributeKey) *domain.AttributeKey {
+	var allowed []string
+	if len(r.AllowedValues) > 0 {
+		_ = json.Unmarshal(r.AllowedValues, &allowed)
+	}
 	return &domain.AttributeKey{
 		ID:             r.ID,
 		AttributeSetID: r.AttributeSetID,
@@ -322,5 +330,15 @@ func attributeKeyFromRow(r sqlcgen.AttributeKey) *domain.AttributeKey {
 		Position:       int(r.Position),
 		Filterable:     r.Filterable,
 		Sortable:       r.Sortable,
+		AllowedValues:  allowed,
 	}
+}
+
+// marshalAllowedValues converts a string slice to JSON for storage, returning nil if empty.
+func marshalAllowedValues(vals []string) []byte {
+	if len(vals) == 0 {
+		return nil
+	}
+	b, _ := json.Marshal(vals)
+	return b
 }

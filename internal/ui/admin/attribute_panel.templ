@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/domain"
+	"slices"
 )
 
 type AttributesPanelProps struct {
@@ -13,7 +14,7 @@ type AttributesPanelProps struct {
 	Values       []domain.ProductAttributeValue
 }
 
-// valueForKey looks up the current value for a given attribute key.
+// valueForKey looks up the current single value for a given attribute key.
 func valueForKey(vals []domain.ProductAttributeValue, keyID uuid.UUID) string {
 	for _, v := range vals {
 		if v.KeyID == keyID {
@@ -23,14 +24,29 @@ func valueForKey(vals []domain.ProductAttributeValue, keyID uuid.UUID) string {
 	return ""
 }
 
-// valueTypeForKey returns the value type for an attribute key.
-func valueTypeForKey(vals []domain.ProductAttributeValue, keyID uuid.UUID) domain.AttributeValueType {
+// valuesForKey returns the multi-value slice for a given attribute key.
+func valuesForKey(vals []domain.ProductAttributeValue, keyID uuid.UUID) []string {
 	for _, v := range vals {
 		if v.KeyID == keyID {
-			return v.ValueType
+			return v.Values
 		}
 	}
-	return domain.AttributeValueTypeSingle
+	return nil
+}
+
+// containsValue checks if a value is in a slice.
+func containsValue(vals []string, v string) bool {
+	return slices.Contains(vals, v)
+}
+
+// boolValueForKey returns true if the stored value for a key is "true".
+func boolValueForKey(vals []domain.ProductAttributeValue, keyID uuid.UUID) bool {
+	for _, v := range vals {
+		if v.KeyID == keyID {
+			return v.BoolValue()
+		}
+	}
+	return false
 }
 
 // isSetAssigned checks if a set is already assigned to the product.
@@ -84,28 +100,91 @@ templ AttributesPanel(props AttributesPanelProps) {
 						<div class="px-4 py-4 sm:px-6 space-y-4">
 							for _, key := range set.Keys {
 								<div>
-									<label class="block text-sm/6 font-medium text-rr-heading">{ key.Name }</label>
 									<input type="hidden" name={ fmt.Sprintf("vt_%s", key.ID) } value={ string(key.ValueType) }/>
-									if key.ValueType == domain.AttributeValueTypeMulti {
-										<div class="mt-1">
-											<input
-												type="text"
-												name={ fmt.Sprintf("attr_%s", key.ID) }
-												value={ valueForKey(props.Values, key.ID) }
-												placeholder="Comma-separated values"
-												class={ inputClasses(false) }
-											/>
-											<p class="mt-1 text-xs text-rr-muted">Separate multiple values with commas.</p>
-										</div>
-									} else {
-										<div class="mt-1">
-											<input
-												type="text"
-												name={ fmt.Sprintf("attr_%s", key.ID) }
-												value={ valueForKey(props.Values, key.ID) }
-												class={ inputClasses(false) }
-											/>
-										</div>
+									switch key.ValueType {
+										case domain.AttributeValueTypeText:
+											<label class="block text-sm/6 font-medium text-rr-heading">{ key.Name }</label>
+											<div class="mt-1">
+												<input
+													type="text"
+													name={ fmt.Sprintf("attr_%s", key.ID) }
+													value={ valueForKey(props.Values, key.ID) }
+													class={ inputClasses(false) }
+												/>
+											</div>
+										case domain.AttributeValueTypeEnum:
+											<label class="block text-sm/6 font-medium text-rr-heading">{ key.Name }</label>
+											<div class="mt-1">
+												<select name={ fmt.Sprintf("attr_%s", key.ID) } class={ inputClasses(false) }>
+													<option value="">-- Select --</option>
+													for _, opt := range key.AllowedValues {
+														if opt == valueForKey(props.Values, key.ID) {
+															<option value={ opt } selected>{ opt }</option>
+														} else {
+															<option value={ opt }>{ opt }</option>
+														}
+													}
+												</select>
+											</div>
+										case domain.AttributeValueTypeMultiText:
+											<label class="block text-sm/6 font-medium text-rr-heading">{ key.Name }</label>
+											<div class="mt-1">
+												<input
+													type="text"
+													name={ fmt.Sprintf("attr_%s", key.ID) }
+													value={ valueForKey(props.Values, key.ID) }
+													placeholder="Comma-separated values"
+													class={ inputClasses(false) }
+												/>
+												<p class="mt-1 text-xs text-rr-muted">Separate multiple values with commas.</p>
+											</div>
+										case domain.AttributeValueTypeMultiEnum:
+											<fieldset>
+												<legend class="block text-sm/6 font-medium text-rr-heading">{ key.Name }</legend>
+												<div class="mt-1 flex flex-wrap gap-3">
+													for _, opt := range key.AllowedValues {
+														<label class="flex items-center gap-1.5">
+															if containsValue(valuesForKey(props.Values, key.ID), opt) {
+																<input
+																	type="checkbox"
+																	name={ fmt.Sprintf("attr_%s", key.ID) }
+																	value={ opt }
+																	checked
+																	class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"
+																/>
+															} else {
+																<input
+																	type="checkbox"
+																	name={ fmt.Sprintf("attr_%s", key.ID) }
+																	value={ opt }
+																	class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"
+																/>
+															}
+															<span class="text-sm text-rr-heading">{ opt }</span>
+														</label>
+													}
+												</div>
+											</fieldset>
+										case domain.AttributeValueTypeBoolean:
+											<label class="flex items-center gap-2">
+												if boolValueForKey(props.Values, key.ID) {
+													<input
+														type="checkbox"
+														name={ fmt.Sprintf("attr_%s", key.ID) }
+														value="true"
+														checked
+														class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"
+													/>
+												} else {
+													<input
+														type="checkbox"
+														name={ fmt.Sprintf("attr_%s", key.ID) }
+														value="true"
+														class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"
+													/>
+												}
+												<span class="text-sm font-medium text-rr-heading">{ key.Name }</span>
+											</label>
 									}
 								</div>
 							}

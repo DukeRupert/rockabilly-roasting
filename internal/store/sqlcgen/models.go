@@ -17,8 +17,11 @@ import (
 type AttributeValueType string
 
 const (
-	AttributeValueTypeSingle AttributeValueType = "single"
-	AttributeValueTypeMulti  AttributeValueType = "multi"
+	AttributeValueTypeText      AttributeValueType = "text"
+	AttributeValueTypeMultiText AttributeValueType = "multi_text"
+	AttributeValueTypeEnum      AttributeValueType = "enum"
+	AttributeValueTypeMultiEnum AttributeValueType = "multi_enum"
+	AttributeValueTypeBoolean   AttributeValueType = "boolean"
 )
 
 func (e *AttributeValueType) Scan(src interface{}) error {
@@ -90,6 +93,7 @@ type AttributeKey struct {
 	Position       int32              `json:"position"`
 	Filterable     bool               `json:"filterable"`
 	Sortable       bool               `json:"sortable"`
+	AllowedValues  []byte             `json:"allowed_values"`
 }
 
 type AttributeSet struct {

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strings"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -12,6 +13,28 @@ type AttributeSetEditProps struct {
 	Flash     string
 	StaffName string
 	StaffRole string
+}
+
+templ attributeTypeBadge(key domain.AttributeKey) {
+	switch key.ValueType {
+		case domain.AttributeValueTypeText:
+			<span class="badge badge-neutral">text</span>
+		case domain.AttributeValueTypeEnum:
+			<span class="badge badge-blue">enum</span>
+		case domain.AttributeValueTypeMultiText:
+			<span class="badge badge-blue">multi text</span>
+		case domain.AttributeValueTypeMultiEnum:
+			<span class="badge badge-blue">multi enum</span>
+		case domain.AttributeValueTypeBoolean:
+			<span class="badge badge-neutral">boolean</span>
+	}
+	if len(key.AllowedValues) > 0 {
+		<div class="mt-1 flex flex-wrap gap-1">
+			for _, v := range key.AllowedValues {
+				<span class="inline-flex items-center rounded bg-rr-raised px-1.5 py-0.5 text-xs text-rr-muted">{ v }</span>
+			}
+		</div>
+	}
 }
 
 templ AttributeSetEditContent(props AttributeSetEditProps) {
@@ -102,12 +125,8 @@ templ AttributeSetEditContent(props AttributeSetEditProps) {
 									<span class="font-medium text-rr-heading">{ key.Name }</span>
 									<span class="ml-1 text-rr-muted">({ key.Slug })</span>
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
-									if key.ValueType == domain.AttributeValueTypeMulti {
-										<span class="badge badge-blue">multi</span>
-									} else {
-										<span class="badge badge-neutral">single</span>
-									}
+								<td class="px-3 py-4 text-sm text-rr-muted">
+									@attributeTypeBadge(key)
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
 									if key.Filterable {
@@ -148,42 +167,56 @@ templ AttributeSetEditContent(props AttributeSetEditProps) {
 				<form
 					method="post"
 					action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/keys", props.Set.ID)) }
-					class="flex items-end gap-3 flex-wrap"
+					class="space-y-4"
 				>
-					<div class="flex-1 min-w-[150px]">
-						<label for="key_name" class="block text-sm/6 font-medium text-rr-heading">Name</label>
+					<div class="flex items-end gap-3 flex-wrap">
+						<div class="flex-1 min-w-[150px]">
+							<label for="key_name" class="block text-sm/6 font-medium text-rr-heading">Name</label>
+							<div class="mt-2">
+								<input type="text" id="key_name" name="name" placeholder="e.g. Tasting Notes" required class={ inputClasses(false) }/>
+							</div>
+						</div>
+						<div class="w-36">
+							<label for="key_type" class="block text-sm/6 font-medium text-rr-heading">Type</label>
+							<div class="mt-2">
+								<select id="key_type" name="value_type" class={ inputClasses(false) }>
+									<option value="text">Text</option>
+									<option value="enum">Enum</option>
+									<option value="multi_text">Multi Text</option>
+									<option value="multi_enum">Multi Enum</option>
+									<option value="boolean">Boolean</option>
+								</select>
+							</div>
+						</div>
+						<div class="w-20">
+							<label for="key_position" class="block text-sm/6 font-medium text-rr-heading">Order</label>
+							<div class="mt-2">
+								<input type="number" id="key_position" name="position" value="0" class={ inputClasses(false) }/>
+							</div>
+						</div>
+						<div class="flex items-center gap-4 pb-1.5">
+							<div class="flex items-center gap-1.5">
+								<input type="checkbox" id="key_filterable" name="filterable" value="true" class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
+								<label for="key_filterable" class="text-sm text-rr-heading">Filterable</label>
+							</div>
+							<div class="flex items-center gap-1.5">
+								<input type="checkbox" id="key_sortable" name="sortable" value="true" class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
+								<label for="key_sortable" class="text-sm text-rr-heading">Sortable</label>
+							</div>
+						</div>
+					</div>
+					<div>
+						<label for="key_allowed_values" class="block text-sm/6 font-medium text-rr-heading">Allowed values</label>
 						<div class="mt-2">
-							<input type="text" id="key_name" name="name" placeholder="e.g. Tasting Notes" required class={ inputClasses(false) }/>
+							<input type="text" id="key_allowed_values" name="allowed_values" placeholder="e.g. light, medium, dark" class={ inputClasses(false) }/>
 						</div>
+						<p class="mt-1 text-xs text-rr-muted">Comma-separated. Required for enum and multi enum types.</p>
 					</div>
-					<div class="w-32">
-						<label for="key_type" class="block text-sm/6 font-medium text-rr-heading">Type</label>
-						<div class="mt-2">
-							<select id="key_type" name="value_type" class={ inputClasses(false) }>
-								<option value="single">Single</option>
-								<option value="multi">Multi</option>
-							</select>
-						</div>
+					<div>
+						<button type="submit" class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+							Add key
+						</button>
 					</div>
-					<div class="w-20">
-						<label for="key_position" class="block text-sm/6 font-medium text-rr-heading">Order</label>
-						<div class="mt-2">
-							<input type="number" id="key_position" name="position" value="0" class={ inputClasses(false) }/>
-						</div>
-					</div>
-					<div class="flex items-center gap-4 pb-1.5">
-						<div class="flex items-center gap-1.5">
-							<input type="checkbox" id="key_filterable" name="filterable" value="true" class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
-							<label for="key_filterable" class="text-sm text-rr-heading">Filterable</label>
-						</div>
-						<div class="flex items-center gap-1.5">
-							<input type="checkbox" id="key_sortable" name="sortable" value="true" class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
-							<label for="key_sortable" class="text-sm text-rr-heading">Sortable</label>
-						</div>
-					</div>
-					<button type="submit" class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
-						Add key
-					</button>
 				</form>
 			</div>
 		</div>
@@ -206,6 +239,11 @@ templ AttributeSetEditContent(props AttributeSetEditProps) {
 			</form>
 		</div>
 	</div>
+}
+
+// allowedValuesDisplay returns allowed values as a comma-separated string for editing.
+func allowedValuesDisplay(key domain.AttributeKey) string {
+	return strings.Join(key.AllowedValues, ", ")
 }
 
 templ AttributeSetEdit(props AttributeSetEditProps) {

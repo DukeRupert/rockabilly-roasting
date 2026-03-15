@@ -307,7 +307,7 @@ templ Admin(props AdminProps) {
 									<ul role="list" class="-mx-2 space-y-0.5">
 										for _, item := range group.Items {
 											<li>
-												<a href={ templ.SafeURL(item.Href) } class={ navItemClasses(props.ActivePath == item.Href) }>
+												<a href={ templ.SafeURL(item.Href) } title={ item.Label } class={ navItemClasses(props.ActivePath == item.Href) }>
 													@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
 													<span data-sidebar-label class="transition-opacity duration-200">{ item.Label }</span>
 												</a>
@@ -320,7 +320,7 @@ templ Admin(props AdminProps) {
 								<p data-sidebar-label class="label-font text-rr-brick mt-5 mb-1 px-2 transition-opacity duration-200" style="font-size:0.6rem;">SETTINGS</p>
 								<ul role="list" class="-mx-2 space-y-0.5">
 									<li>
-										<a href="/admin/settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
+										<a href="/admin/settings" title="Settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
 											@icon.Settings(icon.Props{Class: navIconColor(props.ActivePath == "/admin/settings")})
 											<span data-sidebar-label class="transition-opacity duration-200">Settings</span>
 										</a>

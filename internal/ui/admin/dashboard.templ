@@ -61,10 +61,11 @@ templ DashboardContent(props DashboardProps) {
 			</div>
 		</div>
 	</div>
+	<div class="flame-stripe mt-8 opacity-40"></div>
 	<!-- Needs attention -->
 	if props.hasActions() {
-		<div class="mt-10">
-			<h2 class="text-sm font-semibold text-rr-heading">Needs attention</h2>
+		<div class="mt-8">
+			<h2 class="label-font text-rr-muted">Needs attention</h2>
 			<div class="mt-3 divide-y divide-rr-border rounded-sm bg-rr-surface ring-1 ring-rr-border">
 				<!-- Orders to fulfill -->
 				for _, o := range props.ToFulfill {
@@ -131,8 +132,8 @@ templ DashboardContent(props DashboardProps) {
 			</div>
 		</div>
 	} else {
-		<div class="mt-10">
-			<h2 class="text-sm font-semibold text-rr-heading">Needs attention</h2>
+		<div class="mt-8">
+			<h2 class="label-font text-rr-muted">Needs attention</h2>
 			<div class="mt-3 rounded-sm border-2 border-dashed border-rr-border py-8 text-center">
 				<svg class="mx-auto size-8 text-rr-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
@@ -144,7 +145,7 @@ templ DashboardContent(props DashboardProps) {
 	<!-- Recent orders -->
 	<div class="mt-10">
 		<div class="flex items-baseline justify-between">
-			<h2 class="text-sm font-semibold text-rr-heading">Recent orders</h2>
+			<h2 class="label-font text-rr-muted">Recent orders</h2>
 			<a href="/admin/orders" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">View all</a>
 		</div>
 		if len(props.RecentOrders) == 0 {

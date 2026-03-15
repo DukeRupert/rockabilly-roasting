@@ -19,6 +19,7 @@ type OrderShowProps struct {
 	Adjustments     []domain.Adjustment
 	Customer        *domain.Customer
 	ShippingAddress *domain.Address
+	Flash           string
 	StaffName       string
 	StaffRole       string
 }
@@ -86,6 +87,9 @@ func stepLabelClasses(current int, step int) string {
 }
 
 templ OrderShowContent(props OrderShowProps) {
+	if props.Flash != "" {
+		@flashToast(props.Flash)
+	}
 	<!-- Header -->
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>

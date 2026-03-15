@@ -6,11 +6,17 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
+type EnrichedSubOrder struct {
+	domain.SubscriptionOrder
+	OrderNumber string
+}
+
 type SubscriptionShowProps struct {
 	Subscription *domain.Subscription
 	Plan         *domain.SubscriptionPlan
 	Customer     *domain.Customer
-	Orders       []domain.SubscriptionOrder
+	Orders       []EnrichedSubOrder
+	Flash        string
 	StaffName    string
 	StaffRole    string
 }
@@ -30,11 +36,14 @@ func canCancel(status domain.SubscriptionStatus) bool {
 }
 
 templ SubscriptionShowContent(props SubscriptionShowProps) {
+	if props.Flash != "" {
+		@flashToast(props.Flash)
+	}
 	<!-- Header -->
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-base/7 font-semibold text-rr-heading">Subscription { props.Subscription.ID.String()[:8] }...</h1>
+				<h1 class="text-base/7 font-semibold text-rr-heading">{ props.Plan.Name } — { props.Customer.FirstName } { props.Customer.LastName }</h1>
 				@SubscriptionStatusBadge(props.Subscription.Status)
 			</div>
 			<p class="mt-1 text-sm text-rr-muted">Created { props.Subscription.CreatedAt.Format("January 2, 2006 at 3:04 PM") }</p>
@@ -140,7 +149,11 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 										href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", so.OrderID.String())) }
 										class="font-medium text-rr-red hover:text-rr-red-lt"
 									>
-										{ so.OrderID.String()[:8] }...
+										if so.OrderNumber != "" {
+											{ so.OrderNumber }
+										} else {
+											{ so.OrderID.String()[:8] }...
+										}
 									</a>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
@@ -160,7 +173,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 
 templ SubscriptionShow(props SubscriptionShowProps) {
 	@layouts.Admin(layouts.AdminProps{
-		Title:      fmt.Sprintf("Subscription %s", props.Subscription.ID.String()[:8]),
+		Title:      fmt.Sprintf("%s — %s %s", props.Plan.Name, props.Customer.FirstName, props.Customer.LastName),
 		ActivePath: "/admin/subscriptions",
 		StaffName:  props.StaffName,
 		StaffRole:  props.StaffRole,

@@ -168,6 +168,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		Adjustments:     adjustments,
 		Customer:        customer,
 		ShippingAddress: shippingAddress,
+		Flash:           r.URL.Query().Get("flash"),
 		StaffName:       name,
 		StaffRole:       role,
 	}
@@ -197,7 +198,7 @@ func (d *Deps) handleAdminOrderCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Order+cancelled", http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminOrderRefund(w http.ResponseWriter, r *http.Request) {
@@ -218,7 +219,7 @@ func (d *Deps) handleAdminOrderRefund(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Order+refunded", http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminOrderFulfill(w http.ResponseWriter, r *http.Request) {
@@ -239,7 +240,7 @@ func (d *Deps) handleAdminOrderFulfill(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Order+fulfilled", http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminOrderShip(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +261,7 @@ func (d *Deps) handleAdminOrderShip(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/admin/orders/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Order+marked+as+shipped", http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Request) {

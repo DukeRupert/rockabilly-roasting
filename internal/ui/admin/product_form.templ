@@ -67,12 +67,12 @@ func inputClasses(hasErr bool) string {
 
 templ ProductForm(props ProductFormProps) {
 	<form method="post" action={ templ.SafeURL(props.Action) }>
-		<div class="space-y-12">
+		<div class="space-y-8">
 			<!-- General section -->
-			<div class="border-b border-rr-border pb-12">
+			<div class="border-b border-rr-border pb-8">
 				<h2 class="text-base/7 font-semibold text-rr-heading">General</h2>
 				<p class="mt-1 text-sm/6 text-rr-muted">Basic product information.</p>
-				<div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+				<div class="mt-8 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
 					<!-- Title -->
 					<div class="sm:col-span-4">
 						<label for="title" class="block text-sm/6 font-medium text-rr-heading">Title</label>
@@ -150,10 +150,10 @@ templ ProductForm(props ProductFormProps) {
 				</div>
 			</div>
 			<!-- Availability section -->
-			<div class="border-b border-rr-border pb-12">
+			<div class="border-b border-rr-border pb-8">
 				<h2 class="text-base/7 font-semibold text-rr-heading">Availability</h2>
 				<p class="mt-1 text-sm/6 text-rr-muted">Control when this product is available for purchase.</p>
-				<div class="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+				<div class="mt-8 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
 					<div class="sm:col-span-3">
 						<label for="available_on" class="block text-sm/6 font-medium text-rr-heading">Available on</label>
 						<div class="mt-2">

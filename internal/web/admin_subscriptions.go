@@ -83,7 +83,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 	var sub *domain.Subscription
 	var plan *domain.SubscriptionPlan
 	var customer *domain.Customer
-	var orders []domain.SubscriptionOrder
+	var enrichedOrders []admin.EnrichedSubOrder
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -99,8 +99,18 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		if txErr != nil {
 			return txErr
 		}
-		orders, txErr = d.SubscriptionService.ListSubscriptionOrders(ctx, tx, id)
-		return txErr
+		subOrders, txErr := d.SubscriptionService.ListSubscriptionOrders(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		enrichedOrders = make([]admin.EnrichedSubOrder, len(subOrders))
+		for i, so := range subOrders {
+			enrichedOrders[i] = admin.EnrichedSubOrder{SubscriptionOrder: so}
+			if order, oErr := d.OrderService.GetOrder(ctx, tx, so.OrderID); oErr == nil {
+				enrichedOrders[i].OrderNumber = order.Number
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		if errors.Is(err, app.ErrSubscriptionNotFound) {
@@ -116,7 +126,8 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		Subscription: sub,
 		Plan:         plan,
 		Customer:     customer,
-		Orders:       orders,
+		Orders:       enrichedOrders,
+		Flash:        r.URL.Query().Get("flash"),
 		StaffName:    name,
 		StaffRole:    role,
 	}
@@ -146,7 +157,7 @@ func (d *Deps) handleAdminSubscriptionPause(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+paused", http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Request) {
@@ -167,7 +178,7 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+resumed", http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Request) {
@@ -188,5 +199,5 @@ func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+cancelled", http.StatusSeeOther)
 }

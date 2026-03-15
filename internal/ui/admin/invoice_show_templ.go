@@ -55,14 +55,14 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Header --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><div class=\"flex items-center gap-3\"><h1 class=\"text-base/7 font-semibold text-rr-heading\">Invoice ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Header --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><div class=\"flex items-center gap-3\"><h1 class=\"text-lg font-bold text-rr-heading\">Invoice ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Invoice.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/invoice_show.templ`, Line: 34, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/invoice_show.templ`, Line: 34, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {

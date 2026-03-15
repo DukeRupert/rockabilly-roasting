@@ -42,7 +42,7 @@ func AttributeSetListContent(props AttributeSetListProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-base/7 font-semibold text-rr-heading\">Attribute Sets</h1><p class=\"mt-2 text-sm text-rr-muted\">Define groups of attributes like \"Coffee Profile\" to attach to products.</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-lg font-bold text-rr-heading\">Attribute Sets</h1><p class=\"mt-2 text-sm text-rr-muted\">Define groups of attributes like \"Coffee Profile\" to attach to products.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

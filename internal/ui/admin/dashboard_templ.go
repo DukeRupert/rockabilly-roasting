@@ -60,7 +60,7 @@ func DashboardContent(props DashboardProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Stat strip --><div class=\"flex items-baseline gap-2\"><h1 class=\"text-base/7 font-semibold text-rr-heading\">Dashboard</h1><span class=\"text-sm text-rr-muted\">&middot; today</span></div><div class=\"mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-5\"><div><p class=\"text-2xl font-bold tabular-nums text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Stat strip --><div class=\"flex items-baseline gap-2\"><h1 class=\"text-lg font-bold text-rr-heading\">Dashboard</h1><span class=\"text-sm text-rr-muted\">&middot; today</span></div><div class=\"mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-5\"><div><p class=\"text-2xl font-bold tabular-nums text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

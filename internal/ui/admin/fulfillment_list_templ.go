@@ -74,7 +74,7 @@ func FulfillmentListContent(props FulfillmentListProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-base/7 font-semibold text-rr-heading\">Fulfillment</h1><p class=\"mt-1 text-sm text-rr-muted\">Pack and ship orders</p></div></div><!-- Tab filters --><div class=\"mt-6\"><nav class=\"flex gap-0 border-b border-rr-border -mb-px overflow-x-auto\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-lg font-bold text-rr-heading\">Fulfillment</h1><p class=\"mt-1 text-sm text-rr-muted\">Pack and ship orders</p></div></div><!-- Tab filters --><div class=\"mt-6\"><nav class=\"flex gap-0 border-b border-rr-border -mb-px overflow-x-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

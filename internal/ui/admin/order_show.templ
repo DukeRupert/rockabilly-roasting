@@ -94,7 +94,7 @@ templ OrderShowContent(props OrderShowProps) {
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-base/7 font-semibold text-rr-heading">Order { props.Order.Number }</h1>
+				<h1 class="text-lg font-bold text-rr-heading">Order { props.Order.Number }</h1>
 				if props.Order.Status == domain.OrderStatusCancelled {
 					@OrderStatusBadge(props.Order.Status)
 				}

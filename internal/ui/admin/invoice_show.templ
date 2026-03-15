@@ -31,7 +31,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-base/7 font-semibold text-rr-heading">Invoice { props.Invoice.Number }</h1>
+				<h1 class="text-lg font-bold text-rr-heading">Invoice { props.Invoice.Number }</h1>
 				@InvoiceStatusBadge(props.Invoice.Status)
 			</div>
 			<p class="mt-1 text-sm text-rr-muted">

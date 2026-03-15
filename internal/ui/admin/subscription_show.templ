@@ -43,7 +43,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-base/7 font-semibold text-rr-heading">{ props.Plan.Name } — { props.Customer.FirstName } { props.Customer.LastName }</h1>
+				<h1 class="text-lg font-bold text-rr-heading">{ props.Plan.Name } — { props.Customer.FirstName } { props.Customer.LastName }</h1>
 				@SubscriptionStatusBadge(props.Subscription.Status)
 			</div>
 			<p class="mt-1 text-sm text-rr-muted">Created { props.Subscription.CreatedAt.Format("January 2, 2006 at 3:04 PM") }</p>

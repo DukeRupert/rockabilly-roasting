@@ -36,7 +36,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-base/7 font-semibold text-rr-heading">{ props.Customer.FirstName } { props.Customer.LastName }</h1>
+				<h1 class="text-lg font-bold text-rr-heading">{ props.Customer.FirstName } { props.Customer.LastName }</h1>
 				if props.Customer.AccountType == domain.AccountTypeWholesale {
 					<span class="badge badge-indigo">B2B</span>
 				} else {

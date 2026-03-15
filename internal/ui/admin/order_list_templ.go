@@ -89,7 +89,7 @@ func OrderListContent(props OrderListProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-base/7 font-semibold text-rr-heading\">Orders</h1><p class=\"mt-1 text-sm text-rr-muted\">View and manage customer orders</p></div></div><!-- Search + Filters --><div class=\"mt-6 space-y-4\"><!-- Search --><div class=\"max-w-sm\"><input type=\"search\" name=\"q\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-lg font-bold text-rr-heading\">Orders</h1><p class=\"mt-1 text-sm text-rr-muted\">View and manage customer orders</p></div></div><!-- Search + Filters --><div class=\"mt-6 space-y-4\"><!-- Search --><div class=\"max-w-sm\"><input type=\"search\" name=\"q\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

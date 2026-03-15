@@ -54,7 +54,7 @@ func GroupPricingContent(props GroupPricingProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-base/7 font-semibold text-rr-heading\">Group Pricing</h1><p class=\"mt-1 text-sm text-rr-muted\">Set base and group-specific prices for all variants. ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-lg font-bold text-rr-heading\">Group Pricing</h1><p class=\"mt-1 text-sm text-rr-muted\">Set base and group-specific prices for all variants. ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

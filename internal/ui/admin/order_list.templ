@@ -55,9 +55,9 @@ func orderTabHref(status, search string) string {
 
 func orderTabClass(active bool) string {
 	if active {
-		return "border-b-2 border-rr-red px-3 py-2 text-sm font-semibold text-rr-heading"
+		return "shrink-0 whitespace-nowrap border-b-2 border-rr-red px-3 py-2 text-sm font-semibold text-rr-heading"
 	}
-	return "border-b-2 border-transparent px-3 py-2 text-sm font-medium text-rr-muted hover:text-rr-heading hover:border-rr-border transition-colors"
+	return "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-rr-muted hover:text-rr-heading hover:border-rr-border transition-colors"
 }
 
 templ OrderListContent(props OrderListProps) {
@@ -87,7 +87,7 @@ templ OrderListContent(props OrderListProps) {
 			<input type="hidden" name="status" value={ props.StatusFilter }/>
 		</div>
 		<!-- Tab filters -->
-		<nav class="flex gap-0 border-b border-rr-border -mb-px">
+		<nav class="flex gap-0 border-b border-rr-border -mb-px overflow-x-auto">
 			<a href={ templ.SafeURL(orderTabHref("", props.Search)) } class={ orderTabClass(props.StatusFilter == "") }>All</a>
 			<a href={ templ.SafeURL(orderTabHref("pending", props.Search)) } class={ orderTabClass(props.StatusFilter == "pending") }>Pending</a>
 			<a href={ templ.SafeURL(orderTabHref("confirmed", props.Search)) } class={ orderTabClass(props.StatusFilter == "confirmed") }>Confirmed</a>

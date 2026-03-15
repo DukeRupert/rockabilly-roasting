@@ -63,9 +63,9 @@ func orderTabHref(status, search string) string {
 
 func orderTabClass(active bool) string {
 	if active {
-		return "border-b-2 border-rr-red px-3 py-2 text-sm font-semibold text-rr-heading"
+		return "shrink-0 whitespace-nowrap border-b-2 border-rr-red px-3 py-2 text-sm font-semibold text-rr-heading"
 	}
-	return "border-b-2 border-transparent px-3 py-2 text-sm font-medium text-rr-muted hover:text-rr-heading hover:border-rr-border transition-colors"
+	return "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-rr-muted hover:text-rr-heading hover:border-rr-border transition-colors"
 }
 
 func OrderListContent(props OrderListProps) templ.Component {
@@ -128,7 +128,7 @@ func OrderListContent(props OrderListProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"></div><!-- Tab filters --><nav class=\"flex gap-0 border-b border-rr-border -mb-px\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\"></div><!-- Tab filters --><nav class=\"flex gap-0 border-b border-rr-border -mb-px overflow-x-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

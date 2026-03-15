@@ -18,20 +18,55 @@ type navItem struct {
 	IconFn func(...icon.Props) templ.Component
 }
 
-func adminNavItems() []navItem {
-	return []navItem{
-		{Label: "Dashboard", Href: "/admin", IconFn: icon.LayoutDashboard},
-		{Label: "Orders", Href: "/admin/orders", IconFn: icon.ShoppingCart},
-		{Label: "Customers", Href: "/admin/customers", IconFn: icon.Users},
-		{Label: "Catalog", Href: "/admin/catalog", IconFn: icon.Package},
-		{Label: "Attributes", Href: "/admin/attributes", IconFn: icon.SlidersHorizontal},
-		{Label: "Plans", Href: "/admin/plans", IconFn: icon.ClipboardList},
-		{Label: "Subscriptions", Href: "/admin/subscriptions", IconFn: icon.Repeat},
-		{Label: "Fulfillment", Href: "/admin/fulfillment", IconFn: icon.Truck},
-		{Label: "Discounts", Href: "/admin/discounts", IconFn: icon.Tag},
-		{Label: "Groups", Href: "/admin/groups", IconFn: icon.Group},
-		{Label: "Wholesale", Href: "/admin/wholesale", IconFn: icon.Building},
-		{Label: "Audit Log", Href: "/admin/audit", IconFn: icon.ScrollText},
+type navGroup struct {
+	Label string // empty for ungrouped items (e.g. Dashboard)
+	Items []navItem
+}
+
+func adminNavGroups() []navGroup {
+	return []navGroup{
+		{
+			Label: "",
+			Items: []navItem{
+				{Label: "Dashboard", Href: "/admin", IconFn: icon.LayoutDashboard},
+			},
+		},
+		{
+			Label: "ORDERS",
+			Items: []navItem{
+				{Label: "Orders", Href: "/admin/orders", IconFn: icon.ShoppingCart},
+				{Label: "Fulfillment", Href: "/admin/fulfillment", IconFn: icon.Truck},
+			},
+		},
+		{
+			Label: "CATALOG",
+			Items: []navItem{
+				{Label: "Products", Href: "/admin/catalog", IconFn: icon.Package},
+				{Label: "Attributes", Href: "/admin/attributes", IconFn: icon.SlidersHorizontal},
+			},
+		},
+		{
+			Label: "CUSTOMERS",
+			Items: []navItem{
+				{Label: "Customers", Href: "/admin/customers", IconFn: icon.Users},
+				{Label: "Groups", Href: "/admin/groups", IconFn: icon.Group},
+				{Label: "Wholesale", Href: "/admin/wholesale", IconFn: icon.Building},
+			},
+		},
+		{
+			Label: "SUBSCRIPTIONS",
+			Items: []navItem{
+				{Label: "Plans", Href: "/admin/plans", IconFn: icon.ClipboardList},
+				{Label: "Subscriptions", Href: "/admin/subscriptions", IconFn: icon.Repeat},
+			},
+		},
+		{
+			Label: "SYSTEM",
+			Items: []navItem{
+				{Label: "Discounts", Href: "/admin/discounts", IconFn: icon.Tag},
+				{Label: "Audit Log", Href: "/admin/audit", IconFn: icon.ScrollText},
+			},
+		},
 	}
 }
 
@@ -150,17 +185,27 @@ templ Admin(props AdminProps) {
 								@adminLogo()
 							</div>
 							<nav class="flex flex-1 flex-col">
-								<ul role="list" class="flex flex-1 flex-col gap-y-7">
-									<li>
-										<ul role="list" class="-mx-2 space-y-1">
-											for _, item := range adminNavItems() {
-												<li>
-													<a href={ templ.SafeURL(item.Href) } class={ navItemClasses(props.ActivePath == item.Href) }>
-														@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
-														{ item.Label }
-													</a>
-												</li>
+								<ul role="list" class="flex flex-1 flex-col gap-y-1">
+									for _, group := range adminNavGroups() {
+										<li>
+											if group.Label != "" {
+												<p class="label-font text-rr-brick mt-5 mb-1 px-2" style="font-size:0.6rem;">{ group.Label }</p>
 											}
+											<ul role="list" class="-mx-2 space-y-0.5">
+												for _, item := range group.Items {
+													<li>
+														<a href={ templ.SafeURL(item.Href) } class={ navItemClasses(props.ActivePath == item.Href) }>
+															@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
+															{ item.Label }
+														</a>
+													</li>
+												}
+											</ul>
+										</li>
+									}
+									<li>
+										<p class="label-font text-rr-brick mt-5 mb-1 px-2" style="font-size:0.6rem;">SETTINGS</p>
+										<ul role="list" class="-mx-2 space-y-0.5">
 											<li>
 												<a href="/admin/settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
 													@icon.Settings(icon.Props{Class: navIconColor(props.ActivePath == "/admin/settings")})
@@ -185,17 +230,27 @@ templ Admin(props AdminProps) {
 						@adminSidebarToggle()
 					</div>
 					<nav class="flex flex-1 flex-col">
-						<ul role="list" class="flex flex-1 flex-col gap-y-7">
-							<li>
-								<ul role="list" class="-mx-2 space-y-1">
-									for _, item := range adminNavItems() {
-										<li>
-											<a href={ templ.SafeURL(item.Href) } class={ navItemClasses(props.ActivePath == item.Href) }>
-												@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
-												<span data-sidebar-label class="transition-opacity duration-200">{ item.Label }</span>
-											</a>
-										</li>
+						<ul role="list" class="flex flex-1 flex-col gap-y-1">
+							for _, group := range adminNavGroups() {
+								<li>
+									if group.Label != "" {
+										<p data-sidebar-label class="label-font text-rr-brick mt-5 mb-1 px-2 transition-opacity duration-200" style="font-size:0.6rem;">{ group.Label }</p>
 									}
+									<ul role="list" class="-mx-2 space-y-0.5">
+										for _, item := range group.Items {
+											<li>
+												<a href={ templ.SafeURL(item.Href) } class={ navItemClasses(props.ActivePath == item.Href) }>
+													@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
+													<span data-sidebar-label class="transition-opacity duration-200">{ item.Label }</span>
+												</a>
+											</li>
+										}
+									</ul>
+								</li>
+							}
+							<li>
+								<p data-sidebar-label class="label-font text-rr-brick mt-5 mb-1 px-2 transition-opacity duration-200" style="font-size:0.6rem;">SETTINGS</p>
+								<ul role="list" class="-mx-2 space-y-0.5">
 									<li>
 										<a href="/admin/settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
 											@icon.Settings(icon.Props{Class: navIconColor(props.ActivePath == "/admin/settings")})

@@ -4,15 +4,45 @@ import (
 	"fmt"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"net/url"
 )
 
 type FulfillmentListProps struct {
-	Orders []domain.Order
-	Filter string
-	Page   int
-	HasMore   bool
-	StaffName string
-	StaffRole string
+	Orders     []domain.Order
+	Filter     string
+	TotalCount int
+	Page       int
+	PerPage    int
+	HasMore    bool
+	StaffName  string
+	StaffRole  string
+}
+
+func (p FulfillmentListProps) showingStart() int {
+	if p.TotalCount == 0 {
+		return 0
+	}
+	return (p.Page-1)*p.PerPage + 1
+}
+
+func (p FulfillmentListProps) showingEnd() int {
+	end := p.Page * p.PerPage
+	if end > p.TotalCount {
+		return p.TotalCount
+	}
+	return end
+}
+
+func fulfillmentTabHref(filter string) string {
+	if filter == "" || filter == "needs_action" {
+		return "/admin/fulfillment"
+	}
+	return "/admin/fulfillment?filter=" + url.QueryEscape(filter)
+}
+
+func fulfillmentTabClass(current, tab string) string {
+	active := current == tab || (tab == "needs_action" && (current == "" || current == "needs_action"))
+	return orderTabClass(active)
 }
 
 templ FulfillmentListContent(props FulfillmentListProps) {
@@ -23,29 +53,19 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 			<p class="mt-1 text-sm text-rr-muted">Pack and ship orders</p>
 		</div>
 	</div>
-	<!-- Filters -->
-	<form method="get" action="/admin/fulfillment" class="mt-6 flex items-center gap-3">
-		<div class="grid grid-cols-1">
-			<select
-				name="filter"
-				onchange="this.form.submit()"
-				class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-			>
-				<option value="needs_action" selected?={ props.Filter == "" || props.Filter == "needs_action" }>Needs Action</option>
-				<option value="unfulfilled" selected?={ props.Filter == "unfulfilled" }>Unfulfilled</option>
-				<option value="partially_fulfilled" selected?={ props.Filter == "partially_fulfilled" }>Partially Fulfilled</option>
-				<option value="ready_to_ship" selected?={ props.Filter == "ready_to_ship" }>Ready to Ship</option>
-				<option value="shipped" selected?={ props.Filter == "shipped" }>Shipped</option>
-				<option value="delivered" selected?={ props.Filter == "delivered" }>Delivered</option>
-				<option value="all" selected?={ props.Filter == "all" }>All</option>
-			</select>
-			<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
-				<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
-			</svg>
-		</div>
-	</form>
-	<!-- Fulfillment table -->
+	<!-- Tab filters -->
 	<div class="mt-6">
+		<nav class="flex gap-0 border-b border-rr-border -mb-px overflow-x-auto">
+			<a href={ templ.SafeURL(fulfillmentTabHref("needs_action")) } class={ fulfillmentTabClass(props.Filter, "needs_action") }>Needs Action</a>
+			<a href={ templ.SafeURL(fulfillmentTabHref("unfulfilled")) } class={ fulfillmentTabClass(props.Filter, "unfulfilled") }>Unfulfilled</a>
+			<a href={ templ.SafeURL(fulfillmentTabHref("ready_to_ship")) } class={ fulfillmentTabClass(props.Filter, "ready_to_ship") }>Ready to Ship</a>
+			<a href={ templ.SafeURL(fulfillmentTabHref("shipped")) } class={ fulfillmentTabClass(props.Filter, "shipped") }>Shipped</a>
+			<a href={ templ.SafeURL(fulfillmentTabHref("delivered")) } class={ fulfillmentTabClass(props.Filter, "delivered") }>Delivered</a>
+			<a href={ templ.SafeURL(fulfillmentTabHref("all")) } class={ fulfillmentTabClass(props.Filter, "all") }>All</a>
+		</nav>
+	</div>
+	<!-- Fulfillment table -->
+	<div class="mt-4">
 		if len(props.Orders) == 0 {
 			<div class="rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
 				<svg class="mx-auto size-12 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
@@ -103,6 +123,11 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 						</a>
 					}
 				</div>
+				if props.TotalCount > 0 {
+					<p class="text-sm text-rr-muted">
+						<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingStart()) }</span>–<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingEnd()) }</span> of <span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.TotalCount) }</span>
+					</p>
+				}
 				<div class="-mt-px flex w-0 flex-1 justify-end">
 					if props.HasMore {
 						<a

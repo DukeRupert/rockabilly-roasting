@@ -38,6 +38,7 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 
 	statusFilter := r.URL.Query().Get("status")
 	taxonFilter := r.URL.Query().Get("taxon")
+	search := r.URL.Query().Get("q")
 	pageStr := r.URL.Query().Get("page")
 
 	page := 1
@@ -47,6 +48,7 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 
 	perPage := 25
 	filter := store.ProductFilter{
+		Search: search,
 		Limit:  perPage + 1, // fetch one extra to detect "has more"
 		Offset: (page - 1) * perPage,
 	}
@@ -63,10 +65,15 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 
 	var products []domain.Product
 	var taxons []domain.Taxon
+	var totalCount int
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		products, txErr = d.CatalogService.ListProducts(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+		totalCount, txErr = d.CatalogService.CountProducts(ctx, tx, filter)
 		if txErr != nil {
 			return txErr
 		}
@@ -95,6 +102,8 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 		TaxonMap:     taxonMap,
 		StatusFilter: statusFilter,
 		TaxonFilter:  taxonFilter,
+		Search:       search,
+		TotalCount:   totalCount,
 		Page:         page,
 		PerPage:      perPage,
 		HasMore:      hasMore,

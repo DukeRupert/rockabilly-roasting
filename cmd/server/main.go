@@ -345,9 +345,8 @@ func run() error {
 	go func() {
 		logger.Info("server starting", "addr", addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			errCh <- err
+			errCh <- fmt.Errorf("http server: %w", err)
 		}
-		close(errCh)
 	}()
 
 	select {

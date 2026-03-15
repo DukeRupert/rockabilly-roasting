@@ -70,6 +70,7 @@ type CustomerFilter struct {
 	CustomerGroupID *uuid.UUID
 	AccountType     *domain.AccountType
 	WholesaleStatus *domain.WholesaleStatus
+	Search          string // ILIKE on name or email
 	Limit           int
 	Offset          int
 }
@@ -101,6 +102,11 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	if f.WholesaleStatus != nil {
 		query += fmt.Sprintf(" AND wholesale_status = $%d", argN)
 		args = append(args, string(*f.WholesaleStatus))
+		argN++
+	}
+	if f.Search != "" {
+		query += fmt.Sprintf(" AND (first_name || ' ' || last_name ILIKE $%d OR email ILIKE $%d)", argN, argN)
+		args = append(args, "%"+f.Search+"%")
 		argN++
 	}
 
@@ -160,6 +166,40 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 		customers = append(customers, c)
 	}
 	return customers, rows.Err()
+}
+
+// CountCustomers returns the number of customers matching the given filter.
+func (s *CustomerStore) CountCustomers(ctx context.Context, tx pgx.Tx, f CustomerFilter) (int, error) {
+	query := `SELECT COUNT(*) FROM customers WHERE true`
+	args := []any{}
+	argN := 1
+
+	if f.CustomerGroupID != nil {
+		query += fmt.Sprintf(" AND customer_group_id = $%d", argN)
+		args = append(args, *f.CustomerGroupID)
+		argN++
+	}
+	if f.AccountType != nil {
+		query += fmt.Sprintf(" AND account_type = $%d", argN)
+		args = append(args, string(*f.AccountType))
+		argN++
+	}
+	if f.WholesaleStatus != nil {
+		query += fmt.Sprintf(" AND wholesale_status = $%d", argN)
+		args = append(args, string(*f.WholesaleStatus))
+		argN++
+	}
+	if f.Search != "" {
+		query += fmt.Sprintf(" AND (first_name || ' ' || last_name ILIKE $%d OR email ILIKE $%d)", argN, argN)
+		args = append(args, "%"+f.Search+"%")
+		argN++ //nolint:ineffassign
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count customers: %w", err)
+	}
+	return count, nil
 }
 
 // UpdateName sets a customer's first and last name.

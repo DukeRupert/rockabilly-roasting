@@ -181,6 +181,7 @@ type OrderFilter struct {
 	CustomerID           *uuid.UUID
 	PlacedFrom           *time.Time
 	PlacedTo             *time.Time
+	Search               string // ILIKE on order number or customer name/email
 	Limit                int
 	Offset               int
 }
@@ -232,6 +233,11 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	if f.PlacedTo != nil {
 		query += fmt.Sprintf(" AND placed_at <= $%d", argN)
 		args = append(args, *f.PlacedTo)
+		argN++
+	}
+	if f.Search != "" {
+		query += fmt.Sprintf(" AND (number ILIKE $%d OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.first_name || ' ' || c.last_name ILIKE $%d OR c.email ILIKE $%d)))", argN, argN, argN)
+		args = append(args, "%"+f.Search+"%")
 		argN++
 	}
 
@@ -334,6 +340,11 @@ func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) 
 	if f.PlacedTo != nil {
 		query += fmt.Sprintf(" AND placed_at <= $%d", argN)
 		args = append(args, *f.PlacedTo)
+		argN++
+	}
+	if f.Search != "" {
+		query += fmt.Sprintf(" AND (number ILIKE $%d OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.first_name || ' ' || c.last_name ILIKE $%d OR c.email ILIKE $%d)))", argN, argN, argN)
+		args = append(args, "%"+f.Search+"%")
 		argN++ //nolint:ineffassign
 	}
 

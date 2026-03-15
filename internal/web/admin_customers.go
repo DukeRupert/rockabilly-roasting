@@ -16,6 +16,7 @@ import (
 func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	search := r.URL.Query().Get("q")
 	pageStr := r.URL.Query().Get("page")
 
 	page := 1
@@ -25,15 +26,21 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 
 	perPage := 25
 	filter := store.CustomerFilter{
+		Search: search,
 		Limit:  perPage + 1,
 		Offset: (page - 1) * perPage,
 	}
 
 	var customers []domain.Customer
+	var totalCount int
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		customers, txErr = d.CustomerService.ListCustomers(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+		totalCount, txErr = d.CustomerService.CountCustomers(ctx, tx, filter)
 		return txErr
 	})
 	if err != nil {
@@ -48,12 +55,14 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.CustomerListProps{
-		Customers: customers,
-		Page:      page,
-		PerPage:   perPage,
-		HasMore:   hasMore,
-		StaffName: name,
-		StaffRole: role,
+		Customers:  customers,
+		Search:     search,
+		TotalCount: totalCount,
+		Page:       page,
+		PerPage:    perPage,
+		HasMore:    hasMore,
+		StaffName:  name,
+		StaffRole:  role,
 	}
 
 	if IsHTMX(r) {

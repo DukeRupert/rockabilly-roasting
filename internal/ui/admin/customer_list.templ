@@ -4,15 +4,33 @@ import (
 	"fmt"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"net/url"
 )
 
 type CustomerListProps struct {
-	Customers []domain.Customer
-	Page      int
-	PerPage   int
-	HasMore   bool
-	StaffName string
-	StaffRole string
+	Customers  []domain.Customer
+	Search     string
+	TotalCount int
+	Page       int
+	PerPage    int
+	HasMore    bool
+	StaffName  string
+	StaffRole  string
+}
+
+func (p CustomerListProps) showingStart() int {
+	if p.TotalCount == 0 {
+		return 0
+	}
+	return (p.Page-1)*p.PerPage + 1
+}
+
+func (p CustomerListProps) showingEnd() int {
+	end := p.Page * p.PerPage
+	if end > p.TotalCount {
+		return p.TotalCount
+	}
+	return end
 }
 
 templ CustomerListContent(props CustomerListProps) {
@@ -23,6 +41,20 @@ templ CustomerListContent(props CustomerListProps) {
 			<p class="mt-1 text-sm text-rr-muted">Manage your customer accounts</p>
 		</div>
 	</div>
+	<!-- Search -->
+	<div class="mt-6 max-w-sm">
+		<input
+			type="search"
+			name="q"
+			value={ props.Search }
+			placeholder="Search by name or email..."
+			hx-get="/admin/customers"
+			hx-trigger="input changed delay:300ms, search"
+			hx-target="#main-content"
+			hx-push-url="true"
+			class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+		/>
+	</div>
 	<!-- Customer table -->
 	<div class="mt-6">
 		if len(props.Customers) == 0 {
@@ -31,7 +63,11 @@ templ CustomerListContent(props CustomerListProps) {
 					<path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"></path>
 				</svg>
 				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No customers</h3>
-				<p class="mt-1 text-sm text-rr-muted">Customers will appear here once they register or place an order.</p>
+				if props.Search != "" {
+					<p class="mt-1 text-sm text-rr-muted">No customers match "{ props.Search }". Try a different search.</p>
+				} else {
+					<p class="mt-1 text-sm text-rr-muted">Customers will appear here once they register or place an order.</p>
+				}
 			</div>
 		} else {
 			<div class="overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
@@ -61,10 +97,10 @@ templ CustomerListContent(props CustomerListProps) {
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm sm:table-cell">
 									<div class="flex items-center gap-2">
 										if c.EmailVerified {
-											<span class="inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">verified</span>
+											<span class="badge badge-green">verified</span>
 										}
 										if c.AccountType == "wholesale" {
-											<span class="inline-flex items-center rounded-sm bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">wholesale</span>
+											<span class="badge badge-slate">wholesale</span>
 										}
 									</div>
 								</td>
@@ -86,17 +122,22 @@ templ CustomerListContent(props CustomerListProps) {
 				<div class="-mt-px flex w-0 flex-1">
 					if props.Page > 1 {
 						<a
-							href={ templ.SafeURL(fmt.Sprintf("/admin/customers?page=%d", props.Page-1)) }
+							href={ templ.SafeURL(customerPageHref(props.Page-1, props.Search)) }
 							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
 						>
 							Previous
 						</a>
 					}
 				</div>
+				if props.TotalCount > 0 {
+					<p class="text-sm text-rr-muted">
+						<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingStart()) }</span>–<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingEnd()) }</span> of <span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.TotalCount) }</span>
+					</p>
+				}
 				<div class="-mt-px flex w-0 flex-1 justify-end">
 					if props.HasMore {
 						<a
-							href={ templ.SafeURL(fmt.Sprintf("/admin/customers?page=%d", props.Page+1)) }
+							href={ templ.SafeURL(customerPageHref(props.Page+1, props.Search)) }
 							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
 						>
 							Next
@@ -117,4 +158,13 @@ templ CustomerList(props CustomerListProps) {
 	}) {
 		@CustomerListContent(props)
 	}
+}
+
+func customerPageHref(page int, search string) string {
+	v := url.Values{}
+	v.Set("page", fmt.Sprintf("%d", page))
+	if search != "" {
+		v.Set("q", search)
+	}
+	return "/admin/customers?" + v.Encode()
 }

@@ -50,10 +50,15 @@ func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request
 	}
 
 	var orders []domain.Order
+	var totalCount int
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		orders, txErr = d.OrderService.ListOrders(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+		totalCount, txErr = d.OrderService.CountOrders(ctx, tx, filter)
 		return txErr
 	})
 	if err != nil {
@@ -68,12 +73,14 @@ func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request
 
 	name, role := staffNameRole(r)
 	props := admin.FulfillmentListProps{
-		Orders:    orders,
-		Filter:    filterParam,
-		Page:      page,
-		HasMore:   hasMore,
-		StaffName: name,
-		StaffRole: role,
+		Orders:     orders,
+		Filter:     filterParam,
+		TotalCount: totalCount,
+		Page:       page,
+		PerPage:    perPage,
+		HasMore:    hasMore,
+		StaffName:  name,
+		StaffRole:  role,
 	}
 
 	if IsHTMX(r) {

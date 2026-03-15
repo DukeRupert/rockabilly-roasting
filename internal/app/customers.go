@@ -197,6 +197,15 @@ func (s *CustomerService) ListCustomers(ctx context.Context, tx pgx.Tx, f store.
 	return customers, nil
 }
 
+// CountCustomers returns the number of customers matching the given filter.
+func (s *CustomerService) CountCustomers(ctx context.Context, tx pgx.Tx, f store.CustomerFilter) (int, error) {
+	count, err := s.customers.CountCustomers(ctx, tx, f)
+	if err != nil {
+		return 0, fmt.Errorf("count customers: %w", err)
+	}
+	return count, nil
+}
+
 // --- Address methods ---
 
 // CreateAddress creates a new address and records an audit entry.

@@ -18,6 +18,7 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	statusFilter := r.URL.Query().Get("status")
+	search := r.URL.Query().Get("q")
 	pageStr := r.URL.Query().Get("page")
 
 	page := 1
@@ -27,6 +28,7 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 
 	perPage := 25
 	filter := store.OrderFilter{
+		Search: search,
 		Limit:  perPage + 1,
 		Offset: (page - 1) * perPage,
 	}
@@ -37,10 +39,15 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var orders []domain.Order
+	var totalCount int
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		orders, txErr = d.OrderService.ListOrders(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+		totalCount, txErr = d.OrderService.CountOrders(ctx, tx, filter)
 		return txErr
 	})
 	if err != nil {
@@ -57,6 +64,8 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 	props := admin.OrderListProps{
 		Orders:       orders,
 		StatusFilter: statusFilter,
+		Search:       search,
+		TotalCount:   totalCount,
 		Page:         page,
 		PerPage:      perPage,
 		HasMore:      hasMore,

@@ -37,26 +37,28 @@ templ DashboardContent(props DashboardProps) {
 		<h1 class="text-lg font-bold text-rr-heading">Dashboard</h1>
 		<span class="text-sm text-rr-muted">&middot; today</span>
 	</div>
-	<div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-5">
-		<div>
-			<p class="text-2xl font-bold tabular-nums text-rr-heading">{ formatCents(props.TodayRevenue) }</p>
-			<p class="text-xs font-medium text-rr-muted mt-0.5">revenue</p>
-		</div>
-		<div>
-			<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.TodayOrderCount) }</p>
-			<p class="text-xs font-medium text-rr-muted mt-0.5">orders</p>
-		</div>
-		<div>
-			<p class={ "text-2xl font-bold tabular-nums", urgentCount(props.ToFulfillCount) }>{ fmt.Sprintf("%d", props.ToFulfillCount) }</p>
-			<p class="text-xs font-medium text-rr-muted mt-0.5">to pack</p>
-		</div>
-		<div>
-			<p class={ "text-2xl font-bold tabular-nums", urgentCount(props.ToShipCount) }>{ fmt.Sprintf("%d", props.ToShipCount) }</p>
-			<p class="text-xs font-medium text-rr-muted mt-0.5">to ship</p>
-		</div>
-		<div class="hidden lg:block">
-			<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.ActiveSubCount) }</p>
-			<p class="text-xs font-medium text-rr-muted mt-0.5">active subs</p>
+	<div class="mt-6 rounded-sm bg-rr-surface px-6 py-4 ring-1 ring-rr-border">
+		<div class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-5">
+			<div>
+				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ formatCents(props.TodayRevenue) }</p>
+				<p class="label-font text-rr-muted mt-1">revenue</p>
+			</div>
+			<div>
+				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.TodayOrderCount) }</p>
+				<p class="label-font text-rr-muted mt-1">orders</p>
+			</div>
+			<div>
+				<p class={ "text-2xl font-bold tabular-nums", urgentCount(props.ToFulfillCount) }>{ fmt.Sprintf("%d", props.ToFulfillCount) }</p>
+				<p class="label-font text-rr-muted mt-1">to pack</p>
+			</div>
+			<div>
+				<p class={ "text-2xl font-bold tabular-nums", urgentCount(props.ToShipCount) }>{ fmt.Sprintf("%d", props.ToShipCount) }</p>
+				<p class="label-font text-rr-muted mt-1">to ship</p>
+			</div>
+			<div class="hidden lg:block">
+				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.ActiveSubCount) }</p>
+				<p class="label-font text-rr-muted mt-1">active subs</p>
+			</div>
 		</div>
 	</div>
 	<!-- Needs attention -->

@@ -38,12 +38,12 @@ func HomeContent(props HomePageProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Hero --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 -mt-8\"><div class=\"relative overflow-hidden bg-rr-void\"><div class=\"texture-dots absolute inset-0\"></div><div class=\"texture-grid absolute inset-0\"></div><div class=\"window-glow absolute inset-0\"></div><div class=\"relative mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36 text-center\"><p class=\"label-font text-rr-amber text-xs mb-4\" style=\"letter-spacing: 0.35em;\">KENNEWICK, WA &middot; EST. 2014</p><div class=\"mt-4\"><h1 class=\"font-display leading-none text-rr-red\" style=\"font-size: clamp(4rem, 12vw, 8.5rem); letter-spacing: 0.05em;\">ROCKABILLY</h1><div class=\"flex items-center justify-center -mt-1\"><div class=\"flex-1 h-px\" style=\"background: linear-gradient(to right, transparent, #E8921A);\"></div><span class=\"font-display text-rr-amber px-5\" style=\"font-size: clamp(0.85rem, 2.2vw, 1.5rem); letter-spacing: 0.4em;\">ROASTING CO.</span><div class=\"flex-1 h-px\" style=\"background: linear-gradient(to left, transparent, #E8921A);\"></div></div></div><p class=\"mt-6 font-body text-lg text-rr-muted max-w-lg mx-auto leading-relaxed\">Small-batch specialty coffee with bold flavor and a rebellious spirit. From our roaster to your cup.</p><div class=\"mt-8 flex flex-wrap justify-center gap-4\"><a href=\"/catalog\" class=\"btn label-font px-8 py-3.5 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors\">SHOP COFFEE</a> <a href=\"/subscriptions\" class=\"btn label-font px-8 py-3.5 rounded-sm text-rr-heading text-sm border-2 border-rr-border hover:border-rr-amber transition-colors\">THE DAILY GRIND</a></div></div><div class=\"flame-stripe\"></div></div></section><!-- Featured roasts -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Hero --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 -mt-8\"><div class=\"relative overflow-hidden bg-rr-void\"><div class=\"texture-dots absolute inset-0\"></div><div class=\"texture-grid absolute inset-0\"></div><div class=\"window-glow absolute inset-0\"></div><div class=\"relative mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36 text-center\"><p class=\"label-font text-rr-amber text-xs mb-4\" style=\"letter-spacing: 0.35em;\">KENNEWICK, WA &middot; EST. 2014</p><div class=\"mt-4\"><h1 class=\"font-display leading-none text-rr-red\" style=\"font-size: clamp(4rem, 12vw, 8.5rem); letter-spacing: 0.05em;\">ROCKABILLY</h1><div class=\"flex items-center justify-center -mt-1\"><div class=\"flex-1 h-px\" style=\"background: linear-gradient(to right, transparent, #E8921A);\"></div><span class=\"font-display text-rr-amber px-5\" style=\"font-size: clamp(0.85rem, 2.2vw, 1.5rem); letter-spacing: 0.4em;\">ROASTING CO.</span><div class=\"flex-1 h-px\" style=\"background: linear-gradient(to left, transparent, #E8921A);\"></div></div></div><p class=\"mt-6 font-body text-lg text-rr-muted max-w-lg mx-auto leading-relaxed\">Small-batch specialty coffee with bold flavor and a rebellious spirit. From our roaster to your cup.</p><div class=\"mt-8 flex flex-wrap justify-center gap-4\"><a href=\"/catalog\" class=\"btn label-font px-8 py-3.5 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors\">SHOP COFFEE</a> <a href=\"/subscriptions\" class=\"btn label-font px-8 py-3.5 rounded-sm text-rr-heading text-sm border-2 border-rr-border hover:border-rr-amber transition-colors\">THE DAILY GRIND</a></div></div><div class=\"flame-stripe\"></div></div></section><!-- Featured roasts — full-width warm section -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(props.FeaturedProducts) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<section class=\"mt-16\"><div class=\"flex items-baseline justify-between mb-8\"><div><h2 class=\"font-display text-3xl tracking-widest text-rr-heading\">POPULAR ROASTS</h2><p class=\"mt-1 font-body text-sm text-rr-muted\">Our most-loved coffees, roasted to perfection.</p></div><a href=\"/catalog\" class=\"hidden sm:inline-block label-font text-rr-amber text-xs hover:text-rr-amber-lt transition-colors\">VIEW ALL &rarr;</a></div><div class=\"grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<section class=\"-mx-4 sm:-mx-6 lg:-mx-8\"><div class=\"relative bg-rr-surface/50\"><div class=\"window-glow absolute inset-0 opacity-50\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20\"><div class=\"flex items-baseline justify-between mb-8\"><div><h2 class=\"font-display text-3xl tracking-widest text-rr-heading\">POPULAR ROASTS</h2><p class=\"mt-1 font-body text-sm text-rr-muted\">Our most-loved coffees, roasted to perfection.</p></div><a href=\"/catalog\" class=\"hidden sm:inline-block label-font text-rr-amber text-xs hover:text-rr-amber-lt transition-colors\">VIEW ALL &rarr;</a></div><div class=\"grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -53,12 +53,12 @@ func HomeContent(props HomePageProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div class=\"mt-6 text-center sm:hidden\"><a href=\"/catalog\" class=\"label-font text-rr-amber text-xs hover:text-rr-amber-lt transition-colors\">VIEW ALL &rarr;</a></div></section>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div class=\"mt-6 text-center sm:hidden\"><a href=\"/catalog\" class=\"label-font text-rr-amber text-xs hover:text-rr-amber-lt transition-colors\">VIEW ALL &rarr;</a></div></div></div></section>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Subscribe CTA --><section class=\"mt-20\"><div class=\"relative overflow-hidden rounded-sm bg-rr-surface border border-rr-border\"><div class=\"texture-dots absolute inset-0 opacity-40\"></div><div class=\"relative px-6 py-12 sm:px-12 sm:py-16 lg:flex lg:items-center lg:justify-between lg:px-16\"><div><h2 class=\"font-display text-3xl tracking-widest text-rr-heading sm:text-4xl\">NEVER RUN OUT</h2><p class=\"mt-2 font-body text-rr-muted max-w-xl\">Subscribe and get fresh coffee delivered on your schedule. Save up to 10% on every bag and modify or cancel anytime.</p></div><div class=\"mt-6 lg:mt-0 lg:flex-shrink-0\"><a href=\"/subscriptions\" class=\"btn label-font px-8 py-3.5 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors\">JOIN THE DAILY GRIND</a></div></div></div></section><!-- Testimonials --><section class=\"mt-20 mb-8\"><h2 class=\"font-display text-3xl tracking-widest text-rr-heading text-center mb-10\">WHAT PEOPLE ARE SAYING</h2><div class=\"grid grid-cols-1 gap-6 sm:grid-cols-3\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Subscribe CTA --><section class=\"mt-20\"><div class=\"relative overflow-hidden rounded-sm bg-rr-surface border border-rr-border\"><div class=\"texture-dots absolute inset-0 opacity-40\"></div><div class=\"relative px-6 py-12 sm:px-12 sm:py-16 lg:flex lg:items-center lg:justify-between lg:px-16\"><div><h2 class=\"font-display text-3xl tracking-widest text-rr-heading sm:text-4xl\">NEVER RUN OUT</h2><p class=\"mt-2 font-body text-rr-muted max-w-xl\">Subscribe and get fresh coffee delivered on your schedule. Save up to 10% on every bag and modify or cancel anytime.</p></div><div class=\"mt-6 lg:mt-0 lg:flex-shrink-0\"><a href=\"/subscriptions\" class=\"btn label-font px-8 py-3.5 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors\">JOIN THE DAILY GRIND</a></div></div></div></section><!-- Testimonials — full-width textured section, flush to footer --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 mt-20 -mb-8\"><div class=\"relative bg-rr-void\"><div class=\"texture-dots absolute inset-0 opacity-60\"></div><div class=\"texture-grid absolute inset-0\"></div><div class=\"flame-stripe\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20\"><h2 class=\"font-display text-3xl tracking-widest text-rr-heading text-center mb-10\">WHAT PEOPLE ARE SAYING</h2><div class=\"grid grid-cols-1 gap-6 sm:grid-cols-3\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -74,7 +74,7 @@ func HomeContent(props HomePageProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div></div></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -103,14 +103,14 @@ func testimonial(name, quote string) templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"rounded-sm bg-rr-surface border border-rr-border p-6\"><svg class=\"size-6 text-rr-amber mb-3\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M11.3 2.7c-.4-.7-1.4-.7-1.8 0L6.6 7.5l-5.3.8c-.8.1-1.1 1.1-.5 1.6l3.8 3.7-.9 5.3c-.1.8.7 1.4 1.4 1l4.7-2.5 4.7 2.5c.7.4 1.5-.2 1.4-1l-.9-5.3 3.8-3.7c.6-.6.3-1.5-.5-1.6l-5.3-.8L11.3 2.7z\"></path></svg><p class=\"font-serif text-rr-body italic leading-relaxed mb-4\">\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"rounded-sm bg-rr-surface border border-rr-border p-6\"><!-- Quotation mark instead of star (avoids confusion with star ratings) --><svg class=\"size-6 text-rr-amber mb-3\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M4.583 17.321C3.553 16.227 3 15 3 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311C9.591 11.69 11 13.166 11 15c0 1.933-1.567 3.5-3.5 3.5-1.198 0-2.327-.564-2.917-1.179zm10 0C13.553 16.227 13 15 13 13.011c0-3.5 2.457-6.637 6.03-8.188l.893 1.378c-3.335 1.804-3.987 4.145-4.247 5.621.537-.278 1.24-.375 1.929-.311C19.591 11.69 21 13.166 21 15c0 1.933-1.567 3.5-3.5 3.5-1.198 0-2.327-.564-2.917-1.179z\"></path></svg><p class=\"font-serif text-rr-body italic leading-relaxed mb-4\">\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(quote)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 105, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 118, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -123,7 +123,7 @@ func testimonial(name, quote string) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 106, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 119, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {

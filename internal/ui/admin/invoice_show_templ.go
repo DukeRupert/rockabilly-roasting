@@ -158,7 +158,7 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"><button type=\"submit\" class=\"badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer\" onclick=\"return confirm('Void this invoice? This cannot be undone.')\">Void Invoice</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Void this invoice? This cannot be undone.')\">Void Invoice</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

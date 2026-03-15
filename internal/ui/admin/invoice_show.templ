@@ -66,7 +66,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/invoices/%s/void", props.Invoice.ID.String())) }>
 				<button
 					type="submit"
-					class="badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer"
+					class="btn-danger"
 					onclick="return confirm('Void this invoice? This cannot be undone.')"
 				>
 					Void Invoice

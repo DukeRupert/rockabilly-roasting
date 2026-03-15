@@ -290,7 +290,7 @@ func productDetailsTab(props ProductEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" onsubmit=\"return confirm('Are you sure you want to delete this product?')\"><button type=\"submit\" class=\"badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer\">Delete</button></form></div></div></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" onsubmit=\"return confirm('Are you sure you want to delete this product?')\"><button type=\"submit\" class=\"btn-danger\">Delete</button></form></div></div></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

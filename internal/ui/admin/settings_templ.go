@@ -33,9 +33,9 @@ type SettingsProps struct {
 
 func qbConnectionBadgeClasses(connected bool) string {
 	if connected {
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-green"
 	}
-	return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+	return "badge badge-grey"
 }
 
 func refreshTokenDaysRemaining(expiresAt *time.Time) int {
@@ -233,7 +233,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</dl></div><div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex items-center gap-3\"><a href=\"/admin/settings/integrations/quickbooks/connect\" class=\"inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised\">Reconnect</a><form method=\"post\" action=\"/admin/settings/integrations/quickbooks/disconnect\"><button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-red-600 shadow-xs ring-1 ring-inset ring-rr-border hover:bg-red-50\" onclick=\"return confirm('Disconnect QuickBooks? This will stop all automated B2B invoicing until you reconnect.')\">Disconnect</button></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</dl></div><div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex items-center gap-3\"><a href=\"/admin/settings/integrations/quickbooks/connect\" class=\"inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised\">Reconnect</a><form method=\"post\" action=\"/admin/settings/integrations/quickbooks/disconnect\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Disconnect QuickBooks? This will stop all automated B2B invoicing until you reconnect.')\">Disconnect</button></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

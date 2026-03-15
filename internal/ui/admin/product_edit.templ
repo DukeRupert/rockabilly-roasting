@@ -197,7 +197,7 @@ templ productDetailsTab(props ProductEditProps) {
 							</form>
 						}
 						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/delete", props.Product.ID)) } onsubmit="return confirm('Are you sure you want to delete this product?')">
-							<button type="submit" class="badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer">
+							<button type="submit" class="btn-danger">
 								Delete
 							</button>
 						</form>

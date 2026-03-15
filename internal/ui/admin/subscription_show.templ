@@ -47,20 +47,14 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 	<div class="mt-6 flex gap-3">
 		if canPause(props.Subscription.Status) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/pause", props.Subscription.ID.String())) }>
-				<button
-					type="submit"
-					class="badge badge-amber px-3 py-2 text-sm font-semibold cursor-pointer"
-				>
+				<button type="submit" class="btn-secondary">
 					Pause
 				</button>
 			</form>
 		}
 		if canResume(props.Subscription.Status) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/resume", props.Subscription.ID.String())) }>
-				<button
-					type="submit"
-					class="badge badge-green px-3 py-2 text-sm font-semibold cursor-pointer"
-				>
+				<button type="submit" class="btn-confirm">
 					Resume
 				</button>
 			</form>
@@ -69,7 +63,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/cancel", props.Subscription.ID.String())) }>
 				<button
 					type="submit"
-					class="badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer"
+					class="btn-danger"
 					onclick="return confirm('Are you sure you want to cancel this subscription?')"
 				>
 					Cancel Subscription

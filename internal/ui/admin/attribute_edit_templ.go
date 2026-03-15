@@ -398,7 +398,7 @@ func AttributeSetEditContent(props AttributeSetEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" onsubmit=\"return confirm('Are you sure you want to delete this attribute set?')\"><button type=\"submit\" class=\"badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer\">Delete set</button></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" onsubmit=\"return confirm('Are you sure you want to delete this attribute set?')\"><button type=\"submit\" class=\"btn-danger\">Delete set</button></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

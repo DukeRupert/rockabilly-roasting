@@ -456,7 +456,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\"><button type=\"submit\" class=\"badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer\" onclick=\"return confirm('Are you sure you want to cancel this order?')\">Cancel Order</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Are you sure you want to cancel this order?')\">Cancel Order</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -475,7 +475,7 @@ func OrderShowContent(props OrderShowProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\"><button type=\"submit\" class=\"badge badge-amber px-3 py-2 text-sm font-semibold cursor-pointer\" onclick=\"return confirm('Are you sure you want to refund this order?')\">Refund Order</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Are you sure you want to refund this order?')\">Refund Order</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

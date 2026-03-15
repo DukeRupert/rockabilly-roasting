@@ -200,7 +200,7 @@ templ AttributeSetEditContent(props AttributeSetEditProps) {
 				action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/delete", props.Set.ID)) }
 				onsubmit="return confirm('Are you sure you want to delete this attribute set?')"
 			>
-				<button type="submit" class="badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer">
+				<button type="submit" class="btn-danger">
 					Delete set
 				</button>
 			</form>

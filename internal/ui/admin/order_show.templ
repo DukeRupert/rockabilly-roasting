@@ -196,7 +196,7 @@ templ OrderShowContent(props OrderShowProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/cancel", props.Order.ID.String())) }>
 				<button
 					type="submit"
-					class="badge badge-red px-3 py-2 text-sm font-semibold cursor-pointer"
+					class="btn-danger"
 					onclick="return confirm('Are you sure you want to cancel this order?')"
 				>
 					Cancel Order
@@ -207,7 +207,7 @@ templ OrderShowContent(props OrderShowProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/refund", props.Order.ID.String())) }>
 				<button
 					type="submit"
-					class="badge badge-amber px-3 py-2 text-sm font-semibold cursor-pointer"
+					class="btn-danger"
 					onclick="return confirm('Are you sure you want to refund this order?')"
 				>
 					Refund Order

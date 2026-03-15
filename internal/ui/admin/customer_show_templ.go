@@ -91,12 +91,12 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.Customer.AccountType == domain.AccountTypeWholesale {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<span class=\"inline-flex items-center rounded-sm bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20\">B2B</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<span class=\"badge badge-indigo\">B2B</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<span class=\"inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border\">B2C</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<span class=\"badge badge-neutral\">B2C</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -155,7 +155,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if *props.Customer.WholesaleStatus == domain.WholesaleStatusPending {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<span class=\"isolate inline-flex rounded-sm shadow-xs\"><form method=\"post\" action=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"flex gap-2\"><form method=\"post\" action=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -168,7 +168,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><button type=\"submit\" class=\"relative inline-flex items-center rounded-l-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-green-700 ring-1 ring-inset ring-rr-border hover:bg-green-50 focus:z-10\">Approve</button></form><form method=\"post\" action=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><button type=\"submit\" class=\"btn-confirm\">Approve</button></form><form method=\"post\" action=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -181,7 +181,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\"><button type=\"submit\" class=\"relative -ml-px inline-flex items-center rounded-r-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-inset ring-rr-border hover:bg-red-50 focus:z-10\" onclick=\"return confirm('Decline this application?')\">Decline</button></form></span> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Decline this application?')\">Decline</button></form></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -200,7 +200,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\"><button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-red-700 ring-1 ring-inset ring-rr-border hover:bg-red-50 focus:z-10\" onclick=\"return confirm('Suspend this wholesale account?')\">Suspend</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Suspend this wholesale account?')\">Suspend</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -215,12 +215,12 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.Customer.EmailVerified {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<span class=\"inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20\">yes</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<span class=\"badge badge-green\">yes</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<span class=\"inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20\">no</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<span class=\"badge badge-amber\">no</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -434,7 +434,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for _, g := range props.MemberGroups {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<span class=\"inline-flex items-center gap-x-1.5 rounded-sm bg-indigo-50 px-2.5 py-1.5 text-sm font-medium text-indigo-700 ring-1 ring-inset ring-indigo-600/20\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<span class=\"badge badge-indigo\" style=\"padding:0.35rem 0.6rem;font-size:0.75rem;\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -460,7 +460,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" class=\"inline\"><button type=\"submit\" class=\"-mr-0.5 ml-1 inline-flex size-4 items-center justify-center rounded-sm text-indigo-700 hover:bg-indigo-200 hover:text-indigo-900\" title=\"Remove from group\"><svg class=\"size-3\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path d=\"M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z\"></path></svg></button></form></span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" class=\"inline\"><button type=\"submit\" class=\"-mr-0.5 ml-1 inline-flex size-4 items-center justify-center rounded-sm hover:opacity-60\" title=\"Remove from group\"><svg class=\"size-3\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path d=\"M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z\"></path></svg></button></form></span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -697,7 +697,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				if addr.IsDefault {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "<p class=\"mt-2\"><span class=\"inline-flex items-center rounded-sm bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20\">default</span></p>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "<p class=\"mt-2\"><span class=\"badge badge-blue\">default</span></p>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

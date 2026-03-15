@@ -267,7 +267,7 @@ func WholesaleListContent(props WholesaleListProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<span class=\"isolate inline-flex rounded-sm shadow-xs\"><form method=\"post\" action=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<div class=\"inline-flex gap-2\"><form method=\"post\" action=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -280,7 +280,7 @@ func WholesaleListContent(props WholesaleListProps) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\"><button type=\"submit\" class=\"badge badge-green relative inline-flex items-center rounded-l-sm px-3 py-2 text-sm font-semibold cursor-pointer\">Approve</button></form><form method=\"post\" action=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\"><button type=\"submit\" class=\"btn-confirm\">Approve</button></form><form method=\"post\" action=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -293,7 +293,7 @@ func WholesaleListContent(props WholesaleListProps) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\"><button type=\"submit\" class=\"badge badge-red relative -ml-px inline-flex items-center rounded-r-sm px-3 py-2 text-sm font-semibold cursor-pointer\" onclick=\"return confirm('Decline this application?')\">Decline</button></form></span> ")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Decline this application?')\">Decline</button></form></div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -312,7 +312,7 @@ func WholesaleListContent(props WholesaleListProps) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\"><button type=\"submit\" class=\"badge badge-red relative inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold cursor-pointer\" onclick=\"return confirm('Suspend this wholesale account?')\">Suspend</button></form>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Suspend this wholesale account?')\">Suspend</button></form>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -331,7 +331,7 @@ func WholesaleListContent(props WholesaleListProps) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\"><button type=\"submit\" class=\"badge badge-green relative inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold cursor-pointer\" onclick=\"return confirm('Reactivate this wholesale account? A new setup email will be sent.')\">Reactivate</button></form>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\"><button type=\"submit\" class=\"btn-confirm\" onclick=\"return confirm('Reactivate this wholesale account? A new setup email will be sent.')\">Reactivate</button></form>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

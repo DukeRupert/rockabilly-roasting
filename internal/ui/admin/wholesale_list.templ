@@ -108,23 +108,23 @@ templ WholesaleListContent(props WholesaleListProps) {
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 									<div class="flex items-center justify-end gap-3">
 										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
-											<span class="isolate inline-flex rounded-sm shadow-xs">
+											<div class="inline-flex gap-2">
 												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)) }>
-													<button type="submit" class="badge badge-green relative inline-flex items-center rounded-l-sm px-3 py-2 text-sm font-semibold cursor-pointer">Approve</button>
+													<button type="submit" class="btn-confirm">Approve</button>
 												</form>
 												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
-													<button type="submit" class="badge badge-red relative -ml-px inline-flex items-center rounded-r-sm px-3 py-2 text-sm font-semibold cursor-pointer" onclick="return confirm('Decline this application?')">Decline</button>
+													<button type="submit" class="btn-danger" onclick="return confirm('Decline this application?')">Decline</button>
 												</form>
-											</span>
+											</div>
 										}
 										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
 											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
-												<button type="submit" class="badge badge-red relative inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold cursor-pointer" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
+												<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
 											</form>
 										}
 										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
 											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
-												<button type="submit" class="badge badge-green relative inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold cursor-pointer" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
+												<button type="submit" class="btn-confirm" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
 											</form>
 										}
 										<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">

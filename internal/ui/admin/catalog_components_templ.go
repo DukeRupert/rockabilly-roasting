@@ -13,11 +13,11 @@ import "github.com/dukerupert/hiri/internal/domain"
 func statusBadgeClasses(status domain.ProductStatus) string {
 	switch status {
 	case domain.ProductStatusActive:
-		return "inline-flex items-center rounded-sm bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20"
+		return "badge badge-green"
 	case domain.ProductStatusArchived:
-		return "inline-flex items-center rounded-sm bg-rr-raised px-2 py-1 text-xs font-medium text-rr-muted ring-1 ring-inset ring-rr-border"
+		return "badge badge-grey"
 	default:
-		return "inline-flex items-center rounded-sm bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-600/20"
+		return "badge badge-amber"
 	}
 }
 

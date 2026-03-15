@@ -36,6 +36,7 @@ type ProductDetailProps struct {
 	CurrencyCode      string
 	CartCount         int
 	SubscriptionPlans []domain.SubscriptionPlan
+	Coffee            *CoffeeAttrs // nil if not a coffee product
 }
 
 templ ProductContent(props ProductDetailProps) {
@@ -53,10 +54,34 @@ templ ProductContent(props ProductDetailProps) {
 			<!-- LEFT: Product info + actions (above the fold) -->
 			<div class="lg:max-w-lg">
 				<h1 class="font-display text-4xl tracking-widest text-rr-heading sm:text-5xl">{ props.Product.Title }</h1>
+				<!-- Origin + roast level (above price for prestige signal) -->
+				if props.Coffee != nil && (originLine(props.Coffee) != "" || validRoastLevel(props.Coffee.RoastLevel)) {
+					<div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+						if originLine(props.Coffee) != "" {
+							<span class="label-font text-rr-muted text-xs">{ originLine(props.Coffee) }</span>
+						}
+						if validRoastLevel(props.Coffee.RoastLevel) {
+							<div class="flex items-center gap-1.5">
+								@roastDots(props.Coffee.RoastLevel, "large")
+								<span class="label-font text-rr-faint text-xs">{ roastLevelLabel(props.Coffee.RoastLevel) }</span>
+							</div>
+						}
+					</div>
+				}
 				<!-- Price — big and bold -->
 				if props.DefaultPrice != nil {
 					<div class="mt-3" id="price-display">
 						<span class="font-heading text-3xl text-rr-heading" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
+					</div>
+				}
+				<!-- Tasting notes as tag pills -->
+				if props.Coffee != nil && len(props.Coffee.TastingNotes) > 0 {
+					<div class="mt-3 flex flex-wrap gap-1.5">
+						for _, note := range props.Coffee.TastingNotes {
+							<span class="label-font px-2 py-0.5 rounded-sm text-rr-amber border border-rr-amber/30 bg-rr-amber/5 text-[0.6rem]">
+								{ note }
+							</span>
+						}
 					</div>
 				}
 				<!-- Description -->
@@ -252,12 +277,99 @@ templ ProductContent(props ProductDetailProps) {
 			</div>
 		</div>
 	</div>
+	<!-- Tasting profile — full-width section below product layout -->
+	if props.Coffee != nil && hasTastingProfile(props.Coffee) {
+		@tastingProfile(props.Coffee)
+	}
 	if len(props.Options) > 0 && len(props.VariantMap) > 0 {
 		@optionSelectionScript(props.VariantMap)
 	}
 	if len(props.SubscriptionPlans) > 0 && len(props.Variants) > 0 {
 		@purchaseModeScript()
 	}
+}
+
+templ tastingProfile(attrs *CoffeeAttrs) {
+	<section class="mt-12 pt-10 border-t border-rr-border">
+		<h2 class="font-display text-2xl tracking-widest text-rr-heading mb-6">TASTING PROFILE</h2>
+		<!-- Adapt grid: two columns if both sides have data, single column otherwise -->
+		<div class={ "grid grid-cols-1 gap-8", templ.KV("lg:grid-cols-2", hasFlavorScales(attrs) && hasProfileDetails(attrs)) }>
+			if hasFlavorScales(attrs) {
+				<div class="space-y-5">
+					if attrs.Body != "" {
+						@flavorScale("Body", attrs.Body)
+					}
+					if attrs.Acidity != "" {
+						@flavorScale("Acidity", attrs.Acidity)
+					}
+					if attrs.Sweetness != "" {
+						@flavorScale("Sweetness", attrs.Sweetness)
+					}
+				</div>
+			}
+			if hasProfileDetails(attrs) {
+				<div class="space-y-5">
+					if attrs.Process != "" {
+						<div>
+							<p class="label-font text-rr-faint text-xs mb-1">PROCESS</p>
+							<p class="font-body text-sm text-rr-heading capitalize">{ attrs.Process }</p>
+						</div>
+					}
+					if attrs.Finish != "" {
+						<div>
+							<p class="label-font text-rr-faint text-xs mb-1">FINISH</p>
+							<p class="font-serif text-sm text-rr-body italic">{ attrs.Finish }</p>
+						</div>
+					}
+					if len(attrs.BrewMethods) > 0 {
+						<div>
+							<p class="label-font text-rr-faint text-xs mb-2">BEST BREWED AS</p>
+							<div class="flex flex-wrap gap-1.5">
+								for _, method := range attrs.BrewMethods {
+									<span class="label-font px-2.5 py-1 rounded-sm text-rr-muted border border-rr-border bg-rr-surface text-[0.6rem]">
+										{ formatBrewMethod(method) }
+									</span>
+								}
+							</div>
+						</div>
+					}
+					if len(attrs.Certifications) > 0 || attrs.IsSeasonal {
+						<div class="flex flex-wrap gap-1.5">
+							for _, cert := range attrs.Certifications {
+								<span class="label-font px-2 py-0.5 rounded-sm text-rr-teal border border-rr-teal/30 bg-rr-teal/5 text-[0.6rem]">
+									{ formatCertification(cert) }
+								</span>
+							}
+							if attrs.IsSeasonal {
+								<span class="label-font px-2 py-0.5 rounded-sm text-rr-amber border border-rr-amber/30 bg-rr-amber/5 text-[0.6rem]">
+									SEASONAL
+								</span>
+							}
+						</div>
+					}
+				</div>
+			}
+		</div>
+	</section>
+}
+
+// flavorScale renders a labeled 3-dot scale (low / medium / high).
+templ flavorScale(label string, value string) {
+	<div class="flex items-center justify-between">
+		<p class="label-font text-rr-faint text-xs w-24">{ label }</p>
+		<div class="flex items-center gap-4 flex-1">
+			<div class="flex items-center gap-1.5">
+				for i := 1; i <= 3; i++ {
+					if i <= scaleLevel(value) {
+						<span class="size-2.5 rounded-full bg-rr-amber"></span>
+					} else {
+						<span class="size-2.5 rounded-full bg-rr-border"></span>
+					}
+				}
+			</div>
+			<span class="font-body text-xs text-rr-muted capitalize">{ value }</span>
+		</div>
+	</div>
 }
 
 func defaultVariantID(variants []VariantWithPrice) string {

@@ -13,6 +13,7 @@ type ProductCard struct {
 	ThumbnailURL string
 	BasePrice    *int
 	CurrencyCode string
+	Coffee       *CoffeeAttrs // nil if not a coffee product or attributes not populated
 }
 
 type CatalogPageProps struct {
@@ -169,6 +170,17 @@ templ productCard(card ProductCard) {
 					</div>
 				</div>
 			}
+			<!-- Badges: seasonal, decaf -->
+			if card.Coffee != nil && card.Coffee.IsSeasonal {
+				<div class="absolute top-2 left-2">
+					<span class="label-font px-1.5 py-0.5 rounded-sm text-white bg-rr-amber text-[0.55rem]">SEASONAL</span>
+				</div>
+			}
+			if card.Coffee != nil && card.Coffee.IsDecaf {
+				<div class="absolute top-2 right-2">
+					<span class="label-font px-1.5 py-0.5 rounded-sm text-white bg-rr-teal text-[0.55rem]">DECAF</span>
+				</div>
+			}
 		</div>
 		<!-- Product info — tight padding -->
 		<div class="p-3">
@@ -176,8 +188,61 @@ templ productCard(card ProductCard) {
 			if card.BasePrice != nil {
 				<p class="mt-1 font-heading text-rr-heading text-lg">{ formatCents(*card.BasePrice) }</p>
 			}
+			<!-- Coffee hints: roast dots + tasting notes -->
+			if card.Coffee != nil && validRoastLevel(card.Coffee.RoastLevel) {
+				<div class="mt-1.5 flex items-center gap-2">
+					@roastDots(card.Coffee.RoastLevel, "small")
+					if len(card.Coffee.TastingNotes) > 0 {
+						<span class="font-body text-[0.65rem] text-rr-faint leading-tight truncate">{ cardTastingNotes(card.Coffee.TastingNotes, 3) }</span>
+					}
+				</div>
+			} else if card.Coffee != nil && len(card.Coffee.TastingNotes) > 0 {
+				<p class="mt-1.5 font-body text-[0.65rem] text-rr-faint leading-tight truncate">{ cardTastingNotes(card.Coffee.TastingNotes, 3) }</p>
+			}
 		</div>
 	</a>
+}
+
+// roastDots renders 5 heat-indicator dots for roast level.
+// size: "small" (cards) or "large" (detail page).
+templ roastDots(level string, size string) {
+	<div class={ "flex items-center gap-0.5 flex-shrink-0", templ.KV("gap-1", size == "large") } title={ roastLevelLabel(level) }>
+		for i := 1; i <= 5; i++ {
+			if i <= roastLevelIndex(level) {
+				<span class={ roastDotFilled(i, size) }></span>
+			} else {
+				<span class={ roastDotEmpty(size) }></span>
+			}
+		}
+	</div>
+}
+
+func roastDotFilled(position int, size string) string {
+	// Graduate color from amber (light roast) to red (dark roast)
+	var color string
+	switch {
+	case position <= 1:
+		color = "bg-rr-amber"
+	case position == 2:
+		color = "bg-rr-amber"
+	case position == 3:
+		color = "bg-rr-brick"
+	case position == 4:
+		color = "bg-rr-red"
+	default:
+		color = "bg-rr-red-dark"
+	}
+	if size == "large" {
+		return "size-2.5 rounded-full " + color
+	}
+	return "size-1.5 rounded-full " + color
+}
+
+func roastDotEmpty(size string) string {
+	if size == "large" {
+		return "size-2.5 rounded-full bg-rr-border"
+	}
+	return "size-1.5 rounded-full bg-rr-border"
 }
 
 templ CatalogPage(props CatalogPageProps) {

@@ -19,6 +19,7 @@ type SubscriptionProductCard struct {
 	ThumbnailURL string
 	BasePrice    *int
 	MaxDiscount  int
+	Coffee       *CoffeeAttrs
 }
 
 type SubscriptionsPageProps struct {
@@ -60,7 +61,7 @@ func SubscriptionsContent(props SubscriptionsPageProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d%%", props.maxDiscount()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 42, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 43, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -83,7 +84,7 @@ func SubscriptionsContent(props SubscriptionsPageProps) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d%%", props.maxDiscount()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 71, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 72, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -112,7 +113,7 @@ func SubscriptionsContent(props SubscriptionsPageProps) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(subscriptionIntervalLabel(plan.Interval, plan.IntervalCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 100, Col: 130}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 101, Col: 130}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -130,7 +131,7 @@ func SubscriptionsContent(props SubscriptionsPageProps) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("SAVE %d%%", plan.DiscountPct))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 103, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 104, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -212,7 +213,7 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 		var templ_7745c5c3_Var7 templ.SafeURL
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/catalog/" + card.Product.Slug + "?mode=subscribe"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 151, Col: 77}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 152, Col: 77}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -230,7 +231,7 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(card.ThumbnailURL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 156, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 157, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -243,7 +244,7 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(card.Product.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 157, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 158, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -261,7 +262,7 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(card.Product.Title)[0:1]))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 166, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 167, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -284,7 +285,7 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("SAVE %d%%", card.MaxDiscount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 175, Col: 50}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 176, Col: 50}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -302,7 +303,7 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(card.Product.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 182, Col: 131}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 183, Col: 131}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -320,7 +321,7 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(*card.BasePrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 185, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 186, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -333,7 +334,7 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(discountedPrice(*card.BasePrice, card.MaxDiscount)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 186, Col: 118}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 187, Col: 118}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -351,7 +352,7 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(*card.BasePrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 188, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 189, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -362,7 +363,44 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div></div></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div><!-- Coffee hints: roast dots + tasting notes -->")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if card.Coffee != nil && validRoastLevel(card.Coffee.RoastLevel) {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<div class=\"mt-1.5 flex items-center gap-2\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = roastDots(card.Coffee.RoastLevel, "small").Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if len(card.Coffee.TastingNotes) > 0 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<span class=\"font-body text-[0.65rem] text-rr-faint leading-tight truncate\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var16 string
+				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(cardTastingNotes(card.Coffee.TastingNotes, 3))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 197, Col: 129}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</span>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</div></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -396,12 +434,12 @@ func SubscriptionsPage(props SubscriptionsPageProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var16 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var16 == nil {
-			templ_7745c5c3_Var16 = templ.NopComponent
+		templ_7745c5c3_Var17 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var17 == nil {
+			templ_7745c5c3_Var17 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var17 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var18 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -423,7 +461,7 @@ func SubscriptionsPage(props SubscriptionsPageProps) templ.Component {
 			Title:       "The Daily Grind",
 			Description: "Join The Daily Grind — subscribe to your favorite coffee and save on every delivery",
 			CartCount:   props.CartCount,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var17), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var18), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

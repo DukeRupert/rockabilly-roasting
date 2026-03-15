@@ -10,11 +10,58 @@ import (
 	"github.com/magefile/mage/sh"
 )
 
-var Default = Build
+var Default = Dev
+
+// Dev generates templates + CSS, builds the server, and runs it.
+func Dev() error {
+	if err := Templ(); err != nil {
+		return err
+	}
+	if err := CSS(); err != nil {
+		return err
+	}
+	if err := Build(); err != nil {
+		return err
+	}
+	return sh.RunV("./server")
+}
 
 // Build compiles the server binary.
 func Build() error {
 	return sh.RunV("go", "build", "./cmd/server")
+}
+
+// Templ generates templ templates.
+func Templ() error {
+	return sh.RunV("templ", "generate")
+}
+
+// CSS compiles Tailwind CSS (minified).
+func CSS() error {
+	return sh.RunV("npx", "@tailwindcss/cli",
+		"-i", "internal/ui/assets/css/input.css",
+		"-o", "internal/ui/assets/css/output.css",
+		"--minify",
+	)
+}
+
+// Watch runs Tailwind CSS in watch mode.
+func Watch() error {
+	return sh.RunV("npx", "@tailwindcss/cli",
+		"-i", "internal/ui/assets/css/input.css",
+		"-o", "internal/ui/assets/css/output.css",
+		"--watch",
+	)
+}
+
+// Checkout builds the Svelte checkout bundle.
+func Checkout() error {
+	return sh.RunV("npm", "run", "build", "--prefix", "ui/checkout")
+}
+
+// Seed creates an admin staff user. Set SEED_EMAIL, SEED_PASSWORD, and optionally SEED_NAME.
+func Seed() error {
+	return sh.RunV("go", "run", "./cmd/seed")
 }
 
 // Test runs all tests.
@@ -84,62 +131,11 @@ func (DB) Create(name string) error {
 	return gooseCmd("create", name, "sql")
 }
 
-// Dev namespace groups development tool commands.
-type Dev mg.Namespace
-
-// Templ generates templ templates.
-func (Dev) Templ() error {
-	return sh.RunV("templ", "generate")
-}
-
-// CSS compiles Tailwind CSS.
-func (Dev) CSS() error {
-	return sh.RunV("npx", "@tailwindcss/cli",
-		"-i", "internal/ui/assets/css/input.css",
-		"-o", "internal/ui/assets/css/output.css",
-		"--minify",
-	)
-}
-
-// Watch runs Tailwind CSS in watch mode.
-func (Dev) Watch() error {
-	return sh.RunV("npx", "@tailwindcss/cli",
-		"-i", "internal/ui/assets/css/input.css",
-		"-o", "internal/ui/assets/css/output.css",
-		"--watch",
-	)
-}
-
-// Checkout builds the Svelte checkout bundle.
-func (Dev) Checkout() error {
-	return sh.RunV("npm", "run", "build", "--prefix", "ui/checkout")
-}
-
-// Run generates templates and CSS, builds the server, and runs it.
-func (Dev) Run() error {
-	d := Dev{}
-	if err := d.Templ(); err != nil {
-		return err
-	}
-	if err := d.CSS(); err != nil {
-		return err
-	}
-	if err := Build(); err != nil {
-		return err
-	}
-	return sh.RunV("./server")
-}
-
-// Seed creates an admin staff user. Set SEED_EMAIL, SEED_PASSWORD, and optionally SEED_NAME.
-func (Dev) Seed() error {
-	return sh.RunV("go", "run", "./cmd/seed")
-}
-
-// Migrate imports WooCommerce subscriptions into Hiri.
+// WCMigrate imports WooCommerce subscriptions into Hiri.
 // Set WC_CONSUMER_KEY, WC_CONSUMER_SECRET, and DATABASE_URL.
 // Use --dry-run to validate without importing.
 // Use --mapping=path/to/mapping.json for variant ID mapping.
-func (Dev) Migrate(args ...string) error {
+func WCMigrate(args ...string) error {
 	cmdArgs := []string{"run", "./cmd/migrate"}
 	cmdArgs = append(cmdArgs, args...)
 	return sh.RunV("go", cmdArgs...)

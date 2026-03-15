@@ -294,6 +294,85 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	return orders, rows.Err()
 }
 
+// CountOrders returns the number of orders matching the given filter.
+func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (int, error) {
+	query := `SELECT COUNT(*) FROM orders WHERE true`
+	args := []any{}
+	argN := 1
+
+	if f.Status != nil {
+		query += fmt.Sprintf(" AND status = $%d", argN)
+		args = append(args, string(*f.Status))
+		argN++
+	}
+	if len(f.FulfillmentStatuses) > 0 {
+		query += " AND fulfillment_status IN ("
+		for i, s := range f.FulfillmentStatuses {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, string(s))
+			argN++
+		}
+		query += ")"
+	} else if f.FulfillmentStatus != nil {
+		query += fmt.Sprintf(" AND fulfillment_status = $%d", argN)
+		args = append(args, string(*f.FulfillmentStatus))
+		argN++
+	}
+	if f.CustomerID != nil {
+		query += fmt.Sprintf(" AND customer_id = $%d", argN)
+		args = append(args, *f.CustomerID)
+		argN++
+	}
+	if f.PlacedFrom != nil {
+		query += fmt.Sprintf(" AND placed_at >= $%d", argN)
+		args = append(args, *f.PlacedFrom)
+		argN++
+	}
+	if f.PlacedTo != nil {
+		query += fmt.Sprintf(" AND placed_at <= $%d", argN)
+		args = append(args, *f.PlacedTo)
+		argN++ //nolint:ineffassign
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count orders: %w", err)
+	}
+	return count, nil
+}
+
+// SumOrderRevenue returns the total revenue (in cents) for orders matching the filter.
+func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilter) (int, error) {
+	query := `SELECT COALESCE(SUM(total), 0) FROM orders WHERE true`
+	args := []any{}
+	argN := 1
+
+	if f.Status != nil {
+		query += fmt.Sprintf(" AND status = $%d", argN)
+		args = append(args, string(*f.Status))
+		argN++
+	}
+	if f.PlacedFrom != nil {
+		query += fmt.Sprintf(" AND placed_at >= $%d", argN)
+		args = append(args, *f.PlacedFrom)
+		argN++
+	}
+	if f.PlacedTo != nil {
+		query += fmt.Sprintf(" AND placed_at <= $%d", argN)
+		args = append(args, *f.PlacedTo)
+		argN++ //nolint:ineffassign
+	}
+
+	var total int32
+	if err := tx.QueryRow(ctx, query, args...).Scan(&total); err != nil {
+		return 0, fmt.Errorf("sum order revenue: %w", err)
+	}
+	return int(total), nil
+}
+
 // --- QuickBooks sync methods ---
 
 // SetQBInvoice stores the QB invoice ID and number on an order.

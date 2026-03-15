@@ -258,6 +258,19 @@ func (s *SubscriptionStore) ListDueForRenewal(ctx context.Context, tx pgx.Tx) ([
 	return subs, nil
 }
 
+// CountByStatus returns the number of subscriptions with the given status.
+func (s *SubscriptionStore) CountByStatus(ctx context.Context, tx pgx.Tx, status domain.SubscriptionStatus) (int, error) {
+	var count int
+	err := tx.QueryRow(ctx,
+		`SELECT COUNT(*) FROM subscriptions WHERE status = $1`,
+		string(status),
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count subscriptions by status: %w", err)
+	}
+	return count, nil
+}
+
 // SubscriptionFilter holds optional filters for listing subscriptions.
 type SubscriptionFilter struct {
 	Status *domain.SubscriptionStatus

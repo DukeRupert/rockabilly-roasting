@@ -77,6 +77,15 @@ func (s *SubscriptionService) ListSubscriptions(ctx context.Context, tx pgx.Tx, 
 	return subs, nil
 }
 
+// CountSubscriptionsByStatus returns the number of subscriptions with the given status.
+func (s *SubscriptionService) CountSubscriptionsByStatus(ctx context.Context, tx pgx.Tx, status domain.SubscriptionStatus) (int, error) {
+	count, err := s.subscriptions.CountByStatus(ctx, tx, status)
+	if err != nil {
+		return 0, fmt.Errorf("count subscriptions by status: %w", err)
+	}
+	return count, nil
+}
+
 // ListPlans returns all subscription plans.
 func (s *SubscriptionService) ListPlans(ctx context.Context, tx pgx.Tx) ([]domain.SubscriptionPlan, error) {
 	plans, err := s.subscriptions.ListPlans(ctx, tx)

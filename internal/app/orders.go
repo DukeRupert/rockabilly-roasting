@@ -76,6 +76,24 @@ func (s *OrderService) ListOrders(ctx context.Context, tx pgx.Tx, f store.OrderF
 	return orders, nil
 }
 
+// CountOrders returns the number of orders matching the given filter.
+func (s *OrderService) CountOrders(ctx context.Context, tx pgx.Tx, f store.OrderFilter) (int, error) {
+	count, err := s.orders.CountOrders(ctx, tx, f)
+	if err != nil {
+		return 0, fmt.Errorf("count orders: %w", err)
+	}
+	return count, nil
+}
+
+// SumOrderRevenue returns the total revenue (in cents) for orders matching the filter.
+func (s *OrderService) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f store.OrderFilter) (int, error) {
+	total, err := s.orders.SumOrderRevenue(ctx, tx, f)
+	if err != nil {
+		return 0, fmt.Errorf("sum order revenue: %w", err)
+	}
+	return total, nil
+}
+
 // ListLineItems returns all line items for an order.
 func (s *OrderService) ListLineItems(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) ([]domain.LineItem, error) {
 	items, err := s.orders.ListLineItems(ctx, tx, orderID)

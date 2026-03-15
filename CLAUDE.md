@@ -22,8 +22,8 @@ Hiri is a green-field single-merchant ecommerce platform written in Go. It deplo
 docker compose up -d          # Postgres 17 on localhost:5433
 cp .env.example .env          # fill in API keys
 mage db:migrate               # run migrations
-mage dev:seed                 # create admin user (set SEED_EMAIL, SEED_PASSWORD, SEED_NAME)
-mage dev:run                  # generate templ + CSS, build, and run server
+mage seed                     # create admin user (set SEED_EMAIL, SEED_PASSWORD, SEED_NAME)
+mage dev                      # generate templ + CSS, build, and run server
 ```
 
 ## Build & Run Commands
@@ -31,7 +31,14 @@ mage dev:run                  # generate templ + CSS, build, and run server
 This project uses [Mage](https://magefile.org/) as a Go-native task runner. Install with `go install github.com/magefile/mage@latest`. Targets are defined in `magefiles/mage.go`.
 
 ```bash
-mage              # build server (default target)
+mage              # default: generate + build + run (same as mage dev)
+mage dev          # generate templ + CSS, build, and run server
+mage build        # compile server binary only
+mage templ        # generate templ templates
+mage css          # compile Tailwind CSS (minified)
+mage watch        # run Tailwind CSS in watch mode
+mage checkout     # build Svelte checkout bundle
+mage seed         # create admin staff user (set SEED_EMAIL, SEED_PASSWORD, SEED_NAME)
 mage test         # run all tests
 mage testVerbose  # run tests with verbose output
 mage lint         # run static analysis (go vet)
@@ -44,14 +51,6 @@ mage db:migrate   # run pending migrations
 mage db:rollback  # roll back last migration
 mage db:status    # show migration status
 mage db:create <name>  # create new migration file
-
-# Development tools
-mage dev:run      # generate templ + CSS, build, and run server
-mage dev:templ    # generate templ templates
-mage dev:css      # compile Tailwind CSS (minified)
-mage dev:watch    # run Tailwind CSS in watch mode
-mage dev:checkout # build Svelte checkout bundle
-mage dev:seed     # create admin staff user (set SEED_EMAIL, SEED_PASSWORD, SEED_NAME)
 
 # Run a single test (use go test directly)
 go test ./internal/app/ -run TestOrderRefund
@@ -168,3 +167,33 @@ Detailed specifications live in `docs/`:
 - `lean-commerce-tax.md` — tax calculation via Stripe Tax
 - `lean-commerce-shipping.md` — shipping label and rate workflows
 - `UI_DIRECTION.md` — design system, color palette, component specs
+
+## Design Context
+
+### Users
+- **Retail customers:** Coffee drinkers browsing and buying online — one-time purchases and subscriptions. They arrive from search, social, or word-of-mouth. Context is casual (phone on the couch, quick desktop order at work). Job: find good coffee, buy it fast, maybe subscribe.
+- **Wholesale customers (B2B):** Cafes, restaurants, and offices placing bulk orders through a dedicated portal. Context is task-oriented — they know what they want and reorder regularly. Job: restock efficiently, manage account.
+- **Staff (admin panel):** Small team managing catalog, orders, fulfillment, and subscriptions. The admin panel uses "Hiri" branding and a separate light-mode design — it is not customer-facing.
+
+### Brand Personality
+**Warm. Knowledgeable. Unpretentious.**
+
+The rockabilly aesthetic is texture, not costume — it shows up in product names (Chop Top, Bike Blend), visual treatment (flame stripes, Edison-bulb glow), and sharp typographic choices, not in overwrought copy. Craft comes first, cool comes second. The interface should feel like walking into the shop: confident, specific, unhurried.
+
+Emotional goals: trust, quiet confidence, warmth without gushing. Never fake urgency, never over-sell. See `docs/rockabilly-brand-voice.md` for the full voice guide.
+
+### Aesthetic Direction
+- **Theme:** Dark-mode storefront only (dusk charcoal surfaces, warm amber accents, neon-glow shadows). Admin stays light.
+- **Typography:** Bebas Neue (display/hero, ALL CAPS), Boogaloo (product titles/prices), Playfair Display (pull quotes), Barlow (everything else — body, labels, UI).
+- **Color semantics:** Red = primary action (buy). Teal = subscription/recurring. Amber = featured/highlight/warmth. Never swap these.
+- **Textures:** Halftone dots, crosshatch grid overlays at low opacity. Edison-bulb radial glow on hero sections.
+- **Shapes:** `rounded-sm` everywhere. Hard ink-drop shadows (letterpress feel). Flame-stripe gradient dividers.
+- **Motion:** Subtle — card lift on hover (3px), amber underline slide on nav links, marquee ticker for promos, button press translateY. No gratuitous animation.
+- **Anti-references:** Generic SaaS gradients, emoji-heavy copy, "artisanal journey" language, anything that could belong to any other coffee brand.
+
+### Design Principles
+1. **Substance over style** — Lead with the product (origin, roast, flavor). Visual personality supports the coffee, never competes with it.
+2. **Specificity builds trust** — Use real names, real details, real delivery days. Never use filler copy or placeholder enthusiasm.
+3. **Fast and focused** — Pages load fast, layouts are scannable, actions are obvious. One primary CTA per view. Don't make the customer think.
+4. **Consistent visual language** — Color semantics, type roles, spacing, and component patterns stay locked. Every page should feel like the same shop.
+5. **Accessible by default** — WCAG 2.1 AA compliance. Sufficient contrast on dark surfaces, keyboard-navigable, semantic HTML, screen-reader-friendly.

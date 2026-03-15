@@ -178,9 +178,9 @@ templ Admin(props AdminProps) {
 					</div>
 				</div>
 			</div>
-			<!-- Desktop sidebar -->
-			<div id="desktop-sidebar" class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-16 lg:flex-col transition-all duration-300">
-				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface border-r border-rr-border px-2 pb-4 transition-all duration-300">
+			<!-- Desktop sidebar (expanded by default for desktop-first use) -->
+			<div id="desktop-sidebar" class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300">
+				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface border-r border-rr-border px-6 pb-4 transition-all duration-300">
 					<div class="flex h-16 shrink-0 items-center">
 						@adminSidebarToggle()
 					</div>
@@ -192,14 +192,14 @@ templ Admin(props AdminProps) {
 										<li>
 											<a href={ templ.SafeURL(item.Href) } class={ navItemClasses(props.ActivePath == item.Href) }>
 												@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
-												<span data-sidebar-label class="hidden opacity-0 transition-opacity duration-200">{ item.Label }</span>
+												<span data-sidebar-label class="transition-opacity duration-200">{ item.Label }</span>
 											</a>
 										</li>
 									}
 									<li>
 										<a href="/admin/settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
 											@icon.Settings(icon.Props{Class: navIconColor(props.ActivePath == "/admin/settings")})
-											<span data-sidebar-label class="hidden opacity-0 transition-opacity duration-200">Settings</span>
+											<span data-sidebar-label class="transition-opacity duration-200">Settings</span>
 										</a>
 									</li>
 								</ul>
@@ -209,7 +209,7 @@ templ Admin(props AdminProps) {
 				</div>
 			</div>
 			<!-- Main content area -->
-			<div id="main-content-wrapper" class="lg:pl-16 transition-all duration-300 overflow-x-hidden">
+			<div id="main-content-wrapper" class="lg:pl-72 transition-all duration-300 overflow-x-hidden">
 				<!-- Top bar -->
 				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 shadow-xs sm:gap-x-6 sm:px-6 lg:px-8">
 					<button type="button" id="mobile-menu-btn" class="-m-2.5 p-2.5 text-rr-body lg:hidden">
@@ -302,10 +302,10 @@ templ Admin(props AdminProps) {
 				}
 
 				(function() {
-					// Restore sidebar state from localStorage
+					// Restore sidebar state from localStorage (default: expanded)
 					var collapsed = localStorage.getItem('sidebar-collapsed');
-					if (collapsed === 'false') {
-						toggleSidebar(); // expand from default collapsed
+					if (collapsed === 'true') {
+						toggleSidebar(); // collapse from default expanded
 					}
 
 					// Mobile sidebar
@@ -415,14 +415,14 @@ templ adminLogo() {
 templ adminSidebarToggle() {
 	<button type="button" onclick="toggleSidebar()" class="group flex w-full gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors">
 		<!-- Menu icon: shown when collapsed -->
-		<svg id="sidebar-menu-icon" class="size-6 shrink-0 text-rr-muted group-hover:text-rr-red" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+		<svg id="sidebar-menu-icon" class="hidden size-6 shrink-0 text-rr-muted group-hover:text-rr-red" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
 		</svg>
-		<!-- Logo mark: shown when expanded -->
-		<div id="sidebar-logo-icon" class="hidden shrink-0 bg-white rounded-lg p-0.5">
+		<!-- Logo mark: shown when expanded (default) -->
+		<div id="sidebar-logo-icon" class="shrink-0 bg-white rounded-lg p-0.5">
 			<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="size-5"/>
 		</div>
-		<span data-sidebar-label class="hidden opacity-0 text-lg font-semibold tracking-tight text-rr-heading transition-opacity duration-200">Rockabilly</span>
+		<span data-sidebar-label class="text-lg font-semibold tracking-tight text-rr-heading transition-opacity duration-200">Rockabilly</span>
 	</button>
 }
 
@@ -432,11 +432,11 @@ templ adminUserFooter(props AdminProps) {
 			<span class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-rr-red">
 				<span class="text-sm font-medium text-white">{ staffInitials(props.StaffName) }</span>
 			</span>
-			<span data-sidebar-label class="hidden opacity-0 flex-1 text-left transition-opacity duration-200">
+			<span data-sidebar-label class="flex-1 text-left transition-opacity duration-200">
 				<span class="block text-sm font-semibold text-rr-heading">{ props.StaffName }</span>
 				<span class="block text-xs text-rr-muted">{ props.StaffRole }</span>
 			</span>
-			<svg data-sidebar-label class="hidden opacity-0 size-5 text-rr-muted transition-opacity duration-200" viewBox="0 0 20 20" fill="currentColor">
+			<svg data-sidebar-label class="size-5 text-rr-muted transition-opacity duration-200" viewBox="0 0 20 20" fill="currentColor">
 				<path fill-rule="evenodd" d="M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z" clip-rule="evenodd"></path>
 			</svg>
 		</button>

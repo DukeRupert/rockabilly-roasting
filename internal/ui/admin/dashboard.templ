@@ -1,32 +1,214 @@
 package admin
 
-import "github.com/dukerupert/hiri/internal/ui/layouts"
+import (
+	"fmt"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
 
-templ DashboardContent() {
-	<div class="sm:flex sm:items-center">
-		<div class="sm:flex-auto">
-			<h1 class="text-base/7 font-semibold text-rr-heading">Dashboard</h1>
-			<p class="mt-1 text-sm text-rr-muted">Welcome to the Hiri admin panel</p>
+type DashboardProps struct {
+	// Stats
+	TodayOrderCount    int
+	TodayRevenue       int
+	ToFulfillCount     int
+	ToShipCount        int
+	ActiveSubCount     int
+	PastDueSubCount    int
+	PendingWholesale   int
+
+	// Action queue: orders needing work
+	ToFulfill []domain.Order
+	ToShip    []domain.Order
+
+	// Recent orders
+	RecentOrders []domain.Order
+
+	StaffName string
+	StaffRole string
+}
+
+func (p DashboardProps) hasActions() bool {
+	return len(p.ToFulfill) > 0 || len(p.ToShip) > 0 || p.PendingWholesale > 0 || p.PastDueSubCount > 0
+}
+
+templ DashboardContent(props DashboardProps) {
+	<!-- Stat strip -->
+	<div class="flex items-baseline gap-2">
+		<h1 class="text-base/7 font-semibold text-rr-heading">Dashboard</h1>
+		<span class="text-sm text-rr-muted">&middot; today</span>
+	</div>
+	<div class="mt-6 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-5">
+		<div>
+			<p class="text-2xl font-bold tabular-nums text-rr-heading">{ formatCents(props.TodayRevenue) }</p>
+			<p class="text-xs font-medium text-rr-muted mt-0.5">revenue</p>
+		</div>
+		<div>
+			<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.TodayOrderCount) }</p>
+			<p class="text-xs font-medium text-rr-muted mt-0.5">orders</p>
+		</div>
+		<div>
+			<p class={ "text-2xl font-bold tabular-nums", urgentCount(props.ToFulfillCount) }>{ fmt.Sprintf("%d", props.ToFulfillCount) }</p>
+			<p class="text-xs font-medium text-rr-muted mt-0.5">to pack</p>
+		</div>
+		<div>
+			<p class={ "text-2xl font-bold tabular-nums", urgentCount(props.ToShipCount) }>{ fmt.Sprintf("%d", props.ToShipCount) }</p>
+			<p class="text-xs font-medium text-rr-muted mt-0.5">to ship</p>
+		</div>
+		<div class="hidden lg:block">
+			<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.ActiveSubCount) }</p>
+			<p class="text-xs font-medium text-rr-muted mt-0.5">active subs</p>
 		</div>
 	</div>
-	<!-- Dev testing -->
-	<div class="mt-8 rounded-sm border border-rr-amber/30 bg-rr-amber/5 p-4">
-		<h2 class="text-sm font-semibold text-rr-amber-dark">Dev Testing</h2>
-		<div class="mt-2 flex gap-3">
-			<a href="/admin/dev/error" class="inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
-				Trigger Server Error
-			</a>
+	<!-- Needs attention -->
+	if props.hasActions() {
+		<div class="mt-10">
+			<h2 class="text-sm font-semibold text-rr-heading">Needs attention</h2>
+			<div class="mt-3 divide-y divide-rr-border rounded-sm bg-rr-surface ring-1 ring-rr-border">
+				<!-- Orders to fulfill -->
+				for _, o := range props.ToFulfill {
+					<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
+						<div class="flex items-center gap-3 min-w-0">
+							<span class="inline-block size-2 rounded-full bg-rr-red shrink-0" title="Needs fulfillment"></span>
+							<span class="text-sm font-medium text-rr-heading truncate">{ o.Number }</span>
+							<span class="text-sm text-rr-muted hidden sm:inline">{ formatCents(o.Total) }</span>
+						</div>
+						<div class="flex items-center gap-3 shrink-0">
+							<span class="label-font text-rr-red" style="font-size:0.6rem;">FULFILL</span>
+							<svg class="size-4 text-rr-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
+							</svg>
+						</div>
+					</a>
+				}
+				<!-- Orders to ship -->
+				for _, o := range props.ToShip {
+					<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
+						<div class="flex items-center gap-3 min-w-0">
+							<span class="inline-block size-2 rounded-full bg-rr-teal shrink-0" title="Ready to ship"></span>
+							<span class="text-sm font-medium text-rr-heading truncate">{ o.Number }</span>
+							<span class="text-sm text-rr-muted hidden sm:inline">{ formatCents(o.Total) }</span>
+						</div>
+						<div class="flex items-center gap-3 shrink-0">
+							<span class="label-font text-rr-teal" style="font-size:0.6rem;">SHIP</span>
+							<svg class="size-4 text-rr-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
+							</svg>
+						</div>
+					</a>
+				}
+				<!-- Pending wholesale -->
+				if props.PendingWholesale > 0 {
+					<a href="/admin/wholesale" class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
+						<div class="flex items-center gap-3 min-w-0">
+							<span class="inline-block size-2 rounded-full bg-rr-amber shrink-0" title="Wholesale applications"></span>
+							<span class="text-sm font-medium text-rr-heading">{ fmt.Sprintf("%d wholesale application", props.PendingWholesale) }{ pluralS(props.PendingWholesale) }</span>
+						</div>
+						<div class="flex items-center gap-3 shrink-0">
+							<span class="label-font text-rr-amber" style="font-size:0.6rem;">REVIEW</span>
+							<svg class="size-4 text-rr-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
+							</svg>
+						</div>
+					</a>
+				}
+				<!-- Past-due subscriptions -->
+				if props.PastDueSubCount > 0 {
+					<a href="/admin/subscriptions" class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
+						<div class="flex items-center gap-3 min-w-0">
+							<span class="inline-block size-2 rounded-full bg-rr-red shrink-0" title="Past due subscriptions"></span>
+							<span class="text-sm font-medium text-rr-heading">{ fmt.Sprintf("%d past-due subscription", props.PastDueSubCount) }{ pluralS(props.PastDueSubCount) }</span>
+						</div>
+						<div class="flex items-center gap-3 shrink-0">
+							<span class="label-font text-rr-red" style="font-size:0.6rem;">REVIEW</span>
+							<svg class="size-4 text-rr-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
+							</svg>
+						</div>
+					</a>
+				}
+			</div>
 		</div>
+	} else {
+		<div class="mt-10">
+			<h2 class="text-sm font-semibold text-rr-heading">Needs attention</h2>
+			<div class="mt-3 rounded-sm border-2 border-dashed border-rr-border py-8 text-center">
+				<p class="text-sm font-medium text-rr-muted">All caught up. No actions needed right now.</p>
+			</div>
+		</div>
+	}
+	<!-- Recent orders -->
+	<div class="mt-10">
+		<div class="flex items-baseline justify-between">
+			<h2 class="text-sm font-semibold text-rr-heading">Recent orders</h2>
+			<a href="/admin/orders" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">View all</a>
+		</div>
+		if len(props.RecentOrders) == 0 {
+			<div class="mt-3 rounded-sm border-2 border-dashed border-rr-border py-8 text-center">
+				<p class="text-sm text-rr-muted">No orders yet.</p>
+			</div>
+		} else {
+			<div class="mt-3 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
+							<th scope="col" class="px-3 py-3 text-left text-sm font-semibold text-rr-heading">Status</th>
+							<th scope="col" class="px-3 py-3 text-left text-sm font-semibold text-rr-heading">Fulfillment</th>
+							<th scope="col" class="px-3 py-3 text-right text-sm font-semibold text-rr-heading">Total</th>
+							<th scope="col" class="hidden px-3 py-3 text-left text-sm font-semibold text-rr-heading sm:table-cell">Date</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, o := range props.RecentOrders {
+							<tr>
+								<td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm sm:pl-6">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="font-medium text-rr-heading hover:text-rr-red">
+										{ o.Number }
+									</a>
+								</td>
+								<td class="whitespace-nowrap px-3 py-3 text-sm">
+									@OrderStatusBadge(o.Status)
+								</td>
+								<td class="whitespace-nowrap px-3 py-3 text-sm">
+									@FulfillmentStatusBadge(o.FulfillmentStatus)
+								</td>
+								<td class="whitespace-nowrap px-3 py-3 text-sm text-rr-heading text-right tabular-nums">
+									{ formatCents(o.Total) }
+								</td>
+								<td class="hidden whitespace-nowrap px-3 py-3 text-sm text-rr-muted sm:table-cell">
+									{ o.PlacedAt.Format("Jan 2, 3:04 PM") }
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
 	</div>
 }
 
-templ Dashboard(staffName, staffRole string) {
+templ Dashboard(props DashboardProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Dashboard",
 		ActivePath: "/admin",
-		StaffName:  staffName,
-		StaffRole:  staffRole,
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
 	}) {
-		@DashboardContent()
+		@DashboardContent(props)
 	}
+}
+
+// urgentCount highlights the number in red when > 0.
+func urgentCount(n int) string {
+	if n > 0 {
+		return "text-rr-red"
+	}
+	return "text-rr-heading"
+}
+
+func pluralS(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
 }

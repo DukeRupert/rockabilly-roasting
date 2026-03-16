@@ -191,16 +191,22 @@ templ productCard(card ProductCard) {
 			if card.BasePrice != nil {
 				<p class="mt-1 font-heading text-rr-heading text-lg">{ formatCents(*card.BasePrice) }</p>
 			}
-			<!-- Coffee hints: roast dots + tasting notes -->
-			if card.Coffee != nil && validRoastLevel(card.Coffee.RoastLevel) {
-				<div class="mt-1.5 flex items-center gap-2">
-					@roastDots(card.Coffee.RoastLevel, "small")
-					if len(card.Coffee.TastingNotes) > 0 {
-						<span class="font-body text-[0.65rem] text-rr-faint leading-tight truncate">{ cardTastingNotes(card.Coffee.TastingNotes, 3) }</span>
-					}
-				</div>
-			} else if card.Coffee != nil && len(card.Coffee.TastingNotes) > 0 {
-				<p class="mt-1.5 font-body text-[0.65rem] text-rr-faint leading-tight truncate">{ cardTastingNotes(card.Coffee.TastingNotes, 3) }</p>
+			<!-- Coffee attributes: roast scale + tasting note pills -->
+			if card.Coffee != nil {
+				if validRoastLevel(card.Coffee.RoastLevel) {
+					<div class="mt-2">
+						@roastDots(card.Coffee.RoastLevel, "small")
+					</div>
+				}
+				if len(card.Coffee.TastingNotes) > 0 {
+					<div class="mt-1.5 flex flex-wrap gap-1">
+						for _, note := range cardTastingNotesList(card.Coffee.TastingNotes, 3) {
+							<span class="label-font px-1.5 py-0.5 rounded-sm text-rr-amber/80 border border-rr-amber/20 bg-rr-amber/5 text-[0.6rem]">
+								{ note }
+							</span>
+						}
+					</div>
+				}
 			}
 		</div>
 	</a>
@@ -210,6 +216,7 @@ templ productCard(card ProductCard) {
 // size: "small" (cards) or "large" (detail page).
 templ roastDots(level string, size string) {
 	<div class={ "flex items-center gap-0.5 flex-shrink-0", templ.KV("gap-1", size == "large") } role="img" aria-label={ roastLevelLabel(level) + " roast" }>
+		<span class={ roastEndLabel(size) } aria-hidden="true">LIGHT</span>
 		for i := 1; i <= 5; i++ {
 			if i <= roastLevelIndex(level) {
 				<span class={ roastDotFilled(i, size) }></span>
@@ -217,6 +224,7 @@ templ roastDots(level string, size string) {
 				<span class={ roastDotEmpty(size) }></span>
 			}
 		}
+		<span class={ roastEndLabel(size) } aria-hidden="true">DARK</span>
 	</div>
 }
 

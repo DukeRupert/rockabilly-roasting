@@ -189,14 +189,22 @@ templ subscriptionProductCard(card SubscriptionProductCard) {
 					<span class="font-heading text-rr-heading text-lg">{ formatCents(*card.BasePrice) }</span>
 				}
 			</div>
-			<!-- Coffee hints: roast dots + tasting notes -->
-			if card.Coffee != nil && validRoastLevel(card.Coffee.RoastLevel) {
-				<div class="mt-1.5 flex items-center gap-2">
-					@roastDots(card.Coffee.RoastLevel, "small")
-					if len(card.Coffee.TastingNotes) > 0 {
-						<span class="font-body text-[0.65rem] text-rr-faint leading-tight truncate">{ cardTastingNotes(card.Coffee.TastingNotes, 3) }</span>
-					}
-				</div>
+			<!-- Coffee attributes: roast scale + tasting note pills -->
+			if card.Coffee != nil {
+				if validRoastLevel(card.Coffee.RoastLevel) {
+					<div class="mt-2">
+						@roastDots(card.Coffee.RoastLevel, "small")
+					</div>
+				}
+				if len(card.Coffee.TastingNotes) > 0 {
+					<div class="mt-1.5 flex flex-wrap gap-1">
+						for _, note := range cardTastingNotesList(card.Coffee.TastingNotes, 3) {
+							<span class="label-font px-1.5 py-0.5 rounded-sm text-rr-amber/80 border border-rr-amber/20 bg-rr-amber/5 text-[0.6rem]">
+								{ note }
+							</span>
+						}
+					</div>
+				}
 			}
 		</div>
 	</a>

@@ -68,6 +68,12 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
+
+			attrVals, attrErr := d.AttributeService.ListProductAttributeValues(ctx, tx, p.ID)
+			if attrErr != nil {
+				return attrErr
+			}
+			cards[i].Coffee = buildCoffeeAttrs(attrVals)
 		}
 		return nil
 	})
@@ -161,7 +167,7 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 		totalPages = 1
 	}
 
-	// Build product cards with thumbnails and prices.
+	// Build product cards with thumbnails, prices, and coffee attributes.
 	cards := make([]storefront.ProductCard, len(products))
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		for i, p := range products {
@@ -197,6 +203,13 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
+
+			// Get coffee attributes.
+			attrVals, attrErr := d.AttributeService.ListProductAttributeValues(ctx, tx, p.ID)
+			if attrErr != nil {
+				return attrErr
+			}
+			cards[i].Coffee = buildCoffeeAttrs(attrVals)
 		}
 		return nil
 	})
@@ -292,6 +305,12 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 					break
 				}
 			}
+
+			attrVals, attrErr := d.AttributeService.ListProductAttributeValues(ctx, tx, p.ID)
+			if attrErr != nil {
+				return attrErr
+			}
+			cards[i].Coffee = buildCoffeeAttrs(attrVals)
 		}
 		return nil
 	})
@@ -478,6 +497,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	var variantMap map[string]storefront.VariantOptionEntry
 	var defaultPrice *int
 	var plans []domain.SubscriptionPlan
+	var coffeeAttrs *storefront.CoffeeAttrs
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -563,6 +583,13 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Get coffee attributes.
+		attrVals, attrErr := d.AttributeService.ListProductAttributeValues(ctx, tx, product.ID)
+		if attrErr != nil {
+			return attrErr
+		}
+		coffeeAttrs = buildCoffeeAttrs(attrVals)
+
 		return nil
 	})
 	if err != nil {
@@ -581,6 +608,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		CurrencyCode:      "USD",
 		CartCount:         d.cartItemCountFromCookie(r),
 		SubscriptionPlans: plans,
+		Coffee:            coffeeAttrs,
 	}
 
 	if IsHTMX(r) {
@@ -662,4 +690,87 @@ func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `<url><loc>%s</loc><changefreq>%s</changefreq><priority>%s</priority></url>`, u.Loc, u.ChangeFreq, u.Priority)
 	}
 	fmt.Fprint(w, `</urlset>`)
+}
+
+// buildCoffeeAttrs converts product attribute values into a CoffeeAttrs for template rendering.
+// Returns nil if no coffee-related attributes are found.
+func buildCoffeeAttrs(vals []domain.ProductAttributeValue) *storefront.CoffeeAttrs {
+	if len(vals) == 0 {
+		return nil
+	}
+	attrs := &storefront.CoffeeAttrs{}
+	found := false
+	for _, v := range vals {
+		switch v.KeySlug {
+		case "roast-level":
+			if v.Value != nil {
+				attrs.RoastLevel = *v.Value
+				found = true
+			}
+		case "process":
+			if v.Value != nil {
+				attrs.Process = *v.Value
+				found = true
+			}
+		case "origin-type":
+			if v.Value != nil {
+				attrs.OriginType = *v.Value
+				found = true
+			}
+		case "regions":
+			if len(v.Values) > 0 {
+				attrs.Regions = v.Values
+				found = true
+			}
+		case "tasting-notes":
+			if len(v.Values) > 0 {
+				attrs.TastingNotes = v.Values
+				found = true
+			}
+		case "body":
+			if v.Value != nil {
+				attrs.Body = *v.Value
+				found = true
+			}
+		case "acidity":
+			if v.Value != nil {
+				attrs.Acidity = *v.Value
+				found = true
+			}
+		case "sweetness":
+			if v.Value != nil {
+				attrs.Sweetness = *v.Value
+				found = true
+			}
+		case "finish":
+			if v.Value != nil {
+				attrs.Finish = *v.Value
+				found = true
+			}
+		case "brew-methods":
+			if len(v.Values) > 0 {
+				attrs.BrewMethods = v.Values
+				found = true
+			}
+		case "caffeine-level":
+			if v.Value != nil && *v.Value == "decaf" {
+				attrs.IsDecaf = true
+				found = true
+			}
+		case "seasonal":
+			if v.BoolValue() {
+				attrs.IsSeasonal = true
+				found = true
+			}
+		case "certifications":
+			if len(v.Values) > 0 {
+				attrs.Certifications = v.Values
+				found = true
+			}
+		}
+	}
+	if !found {
+		return nil
+	}
+	return attrs
 }

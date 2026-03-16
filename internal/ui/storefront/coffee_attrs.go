@@ -168,3 +168,26 @@ func cardTastingNotes(notes []string, n int) string {
 	}
 	return strings.Join(titled, ", ")
 }
+
+// cardTastingNotesList returns at most n tasting notes with title case as a slice.
+func cardTastingNotesList(notes []string, n int) []string {
+	if len(notes) == 0 {
+		return nil
+	}
+	if n > len(notes) {
+		n = len(notes)
+	}
+	titled := make([]string, n)
+	for i := 0; i < n; i++ {
+		titled[i] = strings.Title(notes[i]) //nolint:staticcheck
+	}
+	return titled
+}
+
+// roastEndLabel returns CSS classes for the LIGHT/DARK labels on roast dot scales.
+func roastEndLabel(size string) string {
+	if size == "large" {
+		return "label-font text-[0.55rem] text-rr-faint leading-none"
+	}
+	return "label-font text-[0.5rem] text-rr-faint leading-none"
+}

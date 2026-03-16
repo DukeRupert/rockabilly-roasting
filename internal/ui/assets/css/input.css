@@ -175,6 +175,16 @@ html {
 	animation: badge-pulse 2.2s ease-in-out infinite;
 }
 
+/* Search input: swap icon for spinner during htmx request */
+#catalog-search-form .search-spinner { display: none !important; }
+#catalog-search-form .search-icon { display: block; }
+#catalog-search-form.htmx-request .search-icon { display: none !important; }
+#catalog-search-form.htmx-request .search-spinner { display: block !important; animation: spin 0.7s linear infinite; }
+@keyframes spin {
+	from { transform: translateY(-50%) rotate(0deg); }
+	to { transform: translateY(-50%) rotate(360deg); }
+}
+
 /* Roast level filter dots */
 @keyframes roast-glow {
 	0%, 100% { box-shadow: 0 0 0 0 rgba(232, 146, 26, 0.4); }

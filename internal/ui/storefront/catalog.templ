@@ -170,9 +170,15 @@ templ CatalogContent(props CatalogPageProps) {
 				}
 				<div class="relative">
 					<label for="catalog-search" class="sr-only">Search roasts</label>
-					<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rr-amber" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+					<!-- Search icon (hidden during request) -->
+					<svg class="search-icon absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rr-amber" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
 						<circle cx="11" cy="11" r="8"></circle>
 						<path d="m21 21-4.35-4.35"></path>
+					</svg>
+					<!-- Spinner (shown during request) -->
+					<svg class="search-spinner absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rr-amber" aria-hidden="true" fill="none" viewBox="0 0 24 24">
+						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
 					</svg>
 					<input
 						type="search"

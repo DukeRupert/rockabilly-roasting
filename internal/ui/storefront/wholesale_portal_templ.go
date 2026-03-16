@@ -273,7 +273,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				if variant.InStock {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<span class=\"inline-flex items-center rounded-sm bg-green-400/10 px-2 py-0.5 text-xs font-medium text-green-400\">In Stock</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<span class=\"inline-flex items-center rounded-sm bg-rr-teal/10 px-2 py-0.5 text-xs font-medium text-rr-teal-lt\">In Stock</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

@@ -103,11 +103,15 @@ templ Storefront(props StorefrontProps) {
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 			<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Boogaloo&family=Playfair+Display:ital,wght@0,700;1,400;1,700&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
-			<script src="/static/js/htmx.min.js"></script>
+			<script defer src="/static/js/htmx.min.js"></script>
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 			<style>[x-cloak] { display: none !important; }</style>
 		</head>
 		<body class="h-full font-body text-rr-body bg-rr-bg" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">
+			<!-- Skip navigation -->
+			<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:rounded-sm focus:bg-rr-red focus:px-4 focus:py-2 focus:text-white focus:text-sm focus:font-medium">
+				Skip to main content
+			</a>
 			<!-- Promo ticker (disabled — uncomment class to re-enable) -->
 			<div class="hidden overflow-hidden bg-rr-amber-dark">
 				<div class="marquee-inner py-1.5">
@@ -174,7 +178,7 @@ templ Storefront(props StorefrontProps) {
 								Sign In
 							</a>
 							<!-- Mobile menu button -->
-							<button type="button" id="sf-mobile-menu-btn" class="sm:hidden -m-2.5 p-2.5 text-rr-muted">
+							<button type="button" id="sf-mobile-menu-btn" class="sm:hidden -m-2.5 p-2.5 text-rr-muted" aria-expanded="false" aria-controls="sf-mobile-menu">
 								<span class="sr-only">Open menu</span>
 								<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
@@ -259,7 +263,8 @@ templ Storefront(props StorefrontProps) {
 							<p class="label-font text-rr-muted mb-3 text-xs">STAY IN THE LOOP</p>
 							<p class="font-body text-rr-muted text-xs mb-4">Sign up for roast drops and deals.</p>
 							<form class="flex gap-x-2">
-								<input type="email" placeholder="name@example.com" class="rr-input min-w-0 flex-auto rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2 text-sm font-body text-rr-heading placeholder:text-rr-border"/>
+								<label for="newsletter-email" class="sr-only">Email address</label>
+								<input type="email" id="newsletter-email" placeholder="name@example.com" class="rr-input min-w-0 flex-auto rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2 text-sm font-body text-rr-heading placeholder:text-rr-border"/>
 								<button type="submit" class="btn flex-none rounded-sm bg-rr-red px-3.5 py-2 text-sm text-white label-font hover:bg-rr-red-lt transition-colors">
 									JOIN
 								</button>
@@ -316,7 +321,8 @@ templ Storefront(props StorefrontProps) {
 					var menu = document.getElementById('sf-mobile-menu');
 					if (btn && menu) {
 						btn.addEventListener('click', function() {
-							menu.classList.toggle('hidden');
+							var expanded = menu.classList.toggle('hidden') === false;
+							btn.setAttribute('aria-expanded', String(expanded));
 						});
 					}
 

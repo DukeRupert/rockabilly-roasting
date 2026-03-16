@@ -70,7 +70,7 @@ templ ProductContent(props ProductDetailProps) {
 				}
 				<!-- Price — big and bold -->
 				if props.DefaultPrice != nil {
-					<div class="mt-3" id="price-display">
+					<div class="mt-3" id="price-display" aria-live="polite" aria-atomic="true">
 						<span class="font-heading text-3xl text-rr-heading" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
 					</div>
 				}
@@ -92,21 +92,22 @@ templ ProductContent(props ProductDetailProps) {
 				if len(props.Options) > 0 {
 					<div class="mt-6 space-y-5">
 						for _, opt := range props.Options {
-							<div>
-								<label class="label-font text-rr-muted mb-2 block">{ opt.Option.Name }</label>
-								<div class="flex flex-wrap gap-2" data-option-id={ opt.Option.ID.String() }>
+							<fieldset>
+								<legend class="label-font text-rr-muted mb-2 block">{ opt.Option.Name }</legend>
+								<div class="flex flex-wrap gap-2" data-option-id={ opt.Option.ID.String() } role="radiogroup" aria-label={ opt.Option.Name }>
 									for i, val := range opt.Values {
 										<button
 											type="button"
 											class={ "option-pill " + optionPillClasses(i == 0) }
 											data-option-id={ opt.Option.ID.String() }
 											data-value-id={ val.ID.String() }
+											aria-pressed={ templ.EscapeString(fmt.Sprintf("%t", i == 0)) }
 										>
 											{ val.Value }
 										</button>
 									}
 								</div>
-							</div>
+							</fieldset>
 						}
 					</div>
 				}
@@ -115,9 +116,12 @@ templ ProductContent(props ProductDetailProps) {
 					<div class="mt-6" id="purchase-section">
 						if len(props.SubscriptionPlans) > 0 {
 							<!-- Mode toggle — two bold tabs -->
-							<div class="grid grid-cols-2 gap-3" id="purchase-mode-toggle">
+							<div class="grid grid-cols-2 gap-3" id="purchase-mode-toggle" role="tablist" aria-label="Purchase type">
 								<button
 									type="button"
+									role="tab"
+									aria-selected="true"
+									aria-controls="onetime-form"
 									data-mode="onetime"
 									class="purchase-mode-btn relative rounded-sm border-2 border-rr-amber bg-rr-amber/5 p-3 text-left transition-colors"
 								>
@@ -125,6 +129,9 @@ templ ProductContent(props ProductDetailProps) {
 								</button>
 								<button
 									type="button"
+									role="tab"
+									aria-selected="false"
+									aria-controls="subscribe-form"
 									data-mode="subscribe"
 									class="purchase-mode-btn relative rounded-sm border-2 border-rr-border bg-rr-surface p-3 text-left transition-colors"
 								>
@@ -169,7 +176,7 @@ templ ProductContent(props ProductDetailProps) {
 							</div>
 						}
 						<!-- One-time purchase form — BOLD CTA -->
-						<div id="onetime-form" class="mt-5">
+						<div id="onetime-form" role="tabpanel" class="mt-5">
 							<form
 								method="post"
 								action="/cart/add"
@@ -188,7 +195,7 @@ templ ProductContent(props ProductDetailProps) {
 						</div>
 						<!-- Subscribe form (hidden by default) -->
 						if len(props.SubscriptionPlans) > 0 {
-							<div id="subscribe-form" class="hidden mt-5">
+							<div id="subscribe-form" role="tabpanel" class="hidden mt-5">
 								<!-- Quantity selector -->
 								<div class="mb-4">
 									<label for="subscribe-quantity" class="label-font text-rr-muted mb-2 block">QUANTITY</label>
@@ -231,7 +238,7 @@ templ ProductContent(props ProductDetailProps) {
 				}
 				<!-- In stock indicator -->
 				<div class="mt-4 flex items-center gap-2">
-					<svg class="size-4 text-rr-amber" viewBox="0 0 20 20" fill="currentColor">
+					<svg class="size-4 text-rr-amber" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
 						<path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd"></path>
 					</svg>
 					<p class="font-body text-sm text-rr-muted">In stock and ready to ship</p>
@@ -252,13 +259,13 @@ templ ProductContent(props ProductDetailProps) {
 					if len(props.Media) > 1 {
 						<div class="mt-3 grid grid-cols-4 gap-3">
 							for _, m := range props.Media {
-								<div class="aspect-square overflow-hidden rounded-sm bg-rr-bg border border-rr-border cursor-pointer hover:border-rr-amber transition-colors">
+								<button type="button" class="aspect-square overflow-hidden rounded-sm bg-rr-bg border border-rr-border cursor-pointer hover:border-rr-amber focus:border-rr-amber focus:ring-1 focus:ring-rr-amber transition-colors" aria-label={ "View " + m.AltText }>
 									<img
 										src={ props.MediaConfig.ProductImageURL(m.R2Key, media.VariantThumbnail) }
-										alt={ m.AltText }
+										alt=""
 										class="h-full w-full object-cover object-center"
 									/>
-								</div>
+								</button>
 							}
 						</div>
 					}
@@ -442,8 +449,10 @@ templ optionSelectionScript(variantMap map[string]VariantOptionEntry) {
 					// Deselect siblings, select this one
 					document.querySelectorAll('.option-pill[data-option-id="' + optionId + '"]').forEach(function(b) {
 						b.className = inactiveCls;
+						b.setAttribute('aria-pressed', 'false');
 					});
 					btn.className = activeCls;
+					btn.setAttribute('aria-pressed', 'true');
 					// Resolve variant from all selected options
 					resolveVariant();
 				});
@@ -499,7 +508,9 @@ templ purchaseModeScript() {
 					mode = btn.dataset.mode;
 					// Update tab styles
 					document.querySelectorAll('.purchase-mode-btn').forEach(function(b) {
-						if (b.dataset.mode === mode) {
+						var isActive = b.dataset.mode === mode;
+						b.setAttribute('aria-selected', String(isActive));
+						if (isActive) {
 							b.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-amber bg-rr-amber/5 p-3 text-left transition-colors';
 						} else {
 							b.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-border bg-rr-surface p-3 text-left transition-colors';

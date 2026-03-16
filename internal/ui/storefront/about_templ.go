@@ -42,7 +42,7 @@ func AboutContent(props AboutProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.ContactSuccess {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"rounded-lg border border-green-700/50 bg-green-900/20 p-6 text-center\"><p class=\"font-body text-green-400 font-semibold mb-1\">Message sent!</p><p class=\"font-body text-sm text-rr-muted\">We'll get back to you as soon as we can.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"rounded-lg border border-rr-teal/50 bg-rr-teal/10 p-6 text-center\"><p class=\"font-body text-rr-teal-lt font-semibold mb-1\">Message sent!</p><p class=\"font-body text-sm text-rr-muted\">We'll get back to you as soon as we can.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

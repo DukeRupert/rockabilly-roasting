@@ -345,7 +345,7 @@ func AccountSettingsContent(props AccountSettingsProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if props.Success != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"mb-6 rounded-sm bg-green-400/10 border border-green-400/20 px-4 py-3 text-sm font-body text-green-400\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"mb-6 rounded-sm bg-rr-teal/10 border border-rr-teal/20 px-4 py-3 text-sm font-body text-rr-teal-lt\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -709,7 +709,7 @@ func orderStatusBadge(status domain.OrderStatus, fulfillment domain.FulfillmentS
 		}
 		ctx = templ.ClearChildren(ctx)
 		if fulfillment == domain.FulfillmentStatusDelivered {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-green-400 bg-green-400/10 ring-1 ring-inset ring-green-400/20\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<span class=\"inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-rr-teal-lt bg-rr-teal/10 ring-1 ring-inset ring-rr-teal/20\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -727,7 +727,7 @@ func orderStatusBadge(status domain.OrderStatus, fulfillment domain.FulfillmentS
 				return templ_7745c5c3_Err
 			}
 		} else if fulfillment == domain.FulfillmentStatusShipped {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<span class=\"inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-blue-400 bg-blue-400/10 ring-1 ring-inset ring-blue-400/20\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<span class=\"inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-rr-amber bg-rr-amber/10 ring-1 ring-inset ring-rr-amber/20\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1213,7 +1213,7 @@ type AccountSubscriptionsProps struct {
 func subscriptionStatusBadgeClass(status domain.SubscriptionStatus) string {
 	switch status {
 	case domain.SubscriptionStatusActive:
-		return "bg-green-400/10 text-green-400 ring-green-400/20"
+		return "bg-rr-teal/10 text-rr-teal-lt ring-rr-teal/20"
 	case domain.SubscriptionStatusPaused:
 		return "bg-rr-amber/10 text-rr-amber ring-rr-amber/20"
 	case domain.SubscriptionStatusCancelled:

@@ -66,16 +66,18 @@ templ CatalogContent(props CatalogPageProps) {
 					<input type="hidden" name="category" value={ props.ActiveTaxon }/>
 				}
 				<div class="relative">
-					<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rr-amber" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+					<label for="catalog-search" class="sr-only">Search roasts</label>
+					<svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rr-amber" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
 						<circle cx="11" cy="11" r="8"></circle>
 						<path d="m21 21-4.35-4.35"></path>
 					</svg>
 					<input
 						type="search"
+						id="catalog-search"
 						name="q"
 						value={ props.Search }
 						placeholder="Search roasts..."
-						class="rr-input w-56 rounded-sm border border-rr-border bg-rr-bg font-body text-sm text-rr-heading pl-10 pr-4 py-2 placeholder:text-rr-border"
+						class="rr-input w-full sm:w-56 rounded-sm border border-rr-border bg-rr-bg font-body text-sm text-rr-heading pl-10 pr-4 py-2 placeholder:text-rr-border"
 					/>
 				</div>
 			</form>
@@ -124,12 +126,13 @@ templ CatalogContent(props CatalogPageProps) {
 				}
 				for _, p := range pageRange(props.Page, props.TotalPages) {
 					if p == props.Page {
-						<span class="label-font text-white w-8 h-8 rounded-sm text-xs flex items-center justify-center bg-rr-red">
+						<span class="label-font text-white w-8 h-8 rounded-sm text-xs flex items-center justify-center bg-rr-red" aria-current="page">
 							{ fmt.Sprintf("%d", p) }
 						</span>
 					} else {
 						<a
 							href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, p)) }
+							aria-label={ fmt.Sprintf("Page %d", p) }
 							class="btn label-font text-rr-muted border border-rr-border w-8 h-8 rounded-sm text-xs flex items-center justify-center bg-rr-bg hover:border-rr-amber transition-colors"
 						>
 							{ fmt.Sprintf("%d", p) }
@@ -206,7 +209,7 @@ templ productCard(card ProductCard) {
 // roastDots renders 5 heat-indicator dots for roast level.
 // size: "small" (cards) or "large" (detail page).
 templ roastDots(level string, size string) {
-	<div class={ "flex items-center gap-0.5 flex-shrink-0", templ.KV("gap-1", size == "large") } title={ roastLevelLabel(level) }>
+	<div class={ "flex items-center gap-0.5 flex-shrink-0", templ.KV("gap-1", size == "large") } role="img" aria-label={ roastLevelLabel(level) + " roast" }>
 		for i := 1; i <= 5; i++ {
 			if i <= roastLevelIndex(level) {
 				<span class={ roastDotFilled(i, size) }></span>

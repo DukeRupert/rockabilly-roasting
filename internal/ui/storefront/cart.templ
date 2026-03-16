@@ -32,6 +32,7 @@ templ CartContent(props CartPageProps) {
 			</div>
 		} else {
 			<div id="cart-items">
+				<div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead>
 						<tr>
@@ -71,6 +72,7 @@ templ CartContent(props CartPageProps) {
 											name="quantity"
 											value={ fmt.Sprintf("%d", item.Quantity) }
 											min="1"
+											aria-label={ "Quantity for " + item.ProductTitle }
 											class="w-16 rounded-sm border border-rr-border bg-rr-bg py-1 px-2 text-sm font-body text-rr-heading focus:border-rr-amber focus:ring-1 focus:ring-rr-amber"
 										/>
 										<button type="submit" class="text-xs font-medium text-rr-red hover:text-rr-red-lt">
@@ -90,7 +92,7 @@ templ CartContent(props CartPageProps) {
 										hx-swap="innerHTML"
 									>
 										<input type="hidden" name="item_id" value={ item.ItemID.String() }/>
-										<button type="submit" class="text-rr-red hover:text-rr-red-lt text-sm font-medium">
+										<button type="submit" class="text-rr-red hover:text-rr-red-lt text-sm font-medium" aria-label={ "Remove " + item.ProductTitle + " from cart" }>
 											Remove
 										</button>
 									</form>
@@ -99,6 +101,7 @@ templ CartContent(props CartPageProps) {
 						}
 					</tbody>
 				</table>
+				</div>
 				<!-- Subtotal -->
 				<div class="mt-8 border-t border-rr-border pt-6">
 					<div class="flex justify-between text-base font-medium text-rr-heading">

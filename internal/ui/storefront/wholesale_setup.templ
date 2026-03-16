@@ -16,21 +16,21 @@ templ WholesaleSetupContent(props WholesaleSetupProps) {
 					<svg class="mx-auto size-16 text-rr-red" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
 					</svg>
-					<h2 class="mt-4 text-2xl/9 font-bold tracking-tight text-gray-900">Password Set</h2>
-					<p class="mt-2 text-sm/6 text-gray-500">Your password has been set. You can now sign in to your wholesale account.</p>
+					<h2 class="mt-4 text-2xl/9 font-bold tracking-tight text-rr-heading">Password Set</h2>
+					<p class="mt-2 text-sm/6 text-rr-muted">Your password has been set. You can now sign in to your wholesale account.</p>
 					<div class="mt-8">
-						<a href="/wholesale/login" class="rounded-md bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+						<a href="/wholesale/login" class="btn inline-block rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
 							Sign in
 						</a>
 					</div>
 				</div>
 			} else {
-				<h2 class="text-center text-2xl/9 font-bold tracking-tight text-gray-900">Set Your Password</h2>
-				<p class="mt-2 text-center text-sm/6 text-gray-500">
+				<h2 class="text-center text-2xl/9 font-bold tracking-tight text-rr-heading">Set Your Password</h2>
+				<p class="mt-2 text-center text-sm/6 text-rr-muted">
 					Create a password for your wholesale account.
 				</p>
 				<div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
-					<div class="bg-rr-surface px-6 py-12 shadow-sm sm:rounded-lg sm:px-12">
+					<div class="bg-rr-surface px-6 py-12 shadow-sm sm:rounded-sm sm:px-12">
 						if props.Error != "" {
 							<div class="mb-6 rounded-sm bg-rr-red/10 border border-rr-red/20 p-3">
 								<p class="text-sm/6 font-body text-rr-red-lt">{ props.Error }</p>
@@ -39,7 +39,7 @@ templ WholesaleSetupContent(props WholesaleSetupProps) {
 						<form method="post" action="/wholesale/setup" class="space-y-6">
 							<input type="hidden" name="token" value={ props.Token }/>
 							<div>
-								<label for="password" class="block text-sm/6 font-medium text-gray-900">Password</label>
+								<label for="password" class="block text-sm/6 font-medium text-rr-body">Password</label>
 								<div class="mt-2">
 									<input
 										type="password"
@@ -48,12 +48,12 @@ templ WholesaleSetupContent(props WholesaleSetupProps) {
 										required
 										minlength="8"
 										autocomplete="new-password"
-										class="block w-full rounded-md bg-rr-surface px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6"
+										class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6"
 									/>
 								</div>
 							</div>
 							<div>
-								<label for="password_confirm" class="block text-sm/6 font-medium text-gray-900">Confirm password</label>
+								<label for="password_confirm" class="block text-sm/6 font-medium text-rr-body">Confirm password</label>
 								<div class="mt-2">
 									<input
 										type="password"
@@ -62,14 +62,14 @@ templ WholesaleSetupContent(props WholesaleSetupProps) {
 										required
 										minlength="8"
 										autocomplete="new-password"
-										class="block w-full rounded-md bg-rr-surface px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6"
+										class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6"
 									/>
 								</div>
 							</div>
 							<div>
 								<button
 									type="submit"
-									class="flex w-full justify-center rounded-md bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
+									class="btn flex w-full justify-center rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
 								>
 									Set Password
 								</button>

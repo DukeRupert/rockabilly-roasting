@@ -38,7 +38,7 @@ func AccountLoginContent(props AccountLoginProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><h2 class=\"text-center text-2xl/9 font-bold tracking-tight text-gray-900\">Sign in to your account</h2><p class=\"mt-2 text-center text-sm/6 text-gray-500\">Enter your email and we'll send you a sign-in link.</p></div><div class=\"mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]\"><div class=\"bg-rr-surface px-6 py-12 shadow-sm sm:rounded-lg sm:px-12\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><h2 class=\"text-center text-2xl/9 font-bold tracking-tight text-rr-heading\">Sign in to your account</h2><p class=\"mt-2 text-center text-sm/6 text-rr-muted\">Enter your email and we'll send you a sign-in link.</p></div><div class=\"mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]\"><div class=\"bg-rr-surface px-6 py-12 shadow-sm sm:rounded-sm sm:px-12\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -103,7 +103,7 @@ func AccountLoginContent(props AccountLoginProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div><label for=\"email\" class=\"block text-sm/6 font-medium text-gray-900\">Email address</label><div class=\"mt-2\"><input type=\"email\" name=\"email\" id=\"email\" required autocomplete=\"email\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div><label for=\"email\" class=\"block text-sm/6 font-medium text-rr-body\">Email address</label><div class=\"mt-2\"><input type=\"email\" name=\"email\" id=\"email\" required autocomplete=\"email\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -116,7 +116,7 @@ func AccountLoginContent(props AccountLoginProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" placeholder=\"you@example.com\" class=\"block w-full rounded-md bg-rr-surface px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6\"></div></div><div><button type=\"submit\" class=\"flex w-full justify-center rounded-md bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Send sign-in link</button></div></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" placeholder=\"you@example.com\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div><div><button type=\"submit\" class=\"btn flex w-full justify-center rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Send sign-in link</button></div></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -199,7 +199,7 @@ func MagicLinkExpiredContent() templ.Component {
 			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md text-center\"><svg class=\"mx-auto size-16 text-amber-500\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg><h2 class=\"mt-4 text-2xl/9 font-bold tracking-tight text-gray-900\">Link Expired</h2><p class=\"mt-2 text-sm/6 text-gray-500\">This sign-in link has expired or has already been used. Please request a new one.</p><div class=\"mt-8\"><a href=\"/account/login\" class=\"text-sm/6 font-semibold text-rr-red hover:text-rr-red-lt\">&larr; Request new link</a></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md text-center\"><svg class=\"mx-auto size-16 text-rr-amber\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg><h2 class=\"mt-4 text-2xl/9 font-bold tracking-tight text-rr-heading\">Link Expired</h2><p class=\"mt-2 text-sm/6 text-rr-muted\">This sign-in link has expired or has already been used. Please request a new one.</p><div class=\"mt-8\"><a href=\"/account/login\" class=\"text-sm/6 font-semibold text-rr-red hover:text-rr-red-lt\">&larr; Request new link</a></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

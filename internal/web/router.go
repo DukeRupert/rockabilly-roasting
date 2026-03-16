@@ -309,6 +309,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/attributes/{id}", deps.handleAdminAttributeSetUpdate)
 	adminMux.HandleFunc("POST /admin/attributes/{id}/delete", deps.handleAdminAttributeSetDelete)
 	adminMux.HandleFunc("POST /admin/attributes/{id}/keys", deps.handleAdminAttributeKeyCreate)
+	adminMux.HandleFunc("GET /admin/attributes/{id}/keys/{keyID}", deps.handleAdminAttributeKeyEdit)
 	adminMux.HandleFunc("POST /admin/attributes/{id}/keys/{keyID}", deps.handleAdminAttributeKeyUpdate)
 	adminMux.HandleFunc("POST /admin/attributes/{id}/keys/{keyID}/delete", deps.handleAdminAttributeKeyDelete)
 

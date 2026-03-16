@@ -143,6 +143,10 @@ templ AttributeSetEditContent(props AttributeSetEditProps) {
 									}
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/keys/%s", props.Set.ID, key.ID)) }
+										class="text-rr-body hover:text-rr-heading mr-3"
+									>Edit</a>
 									<form
 										method="post"
 										action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/keys/%s/delete", props.Set.ID, key.ID)) }

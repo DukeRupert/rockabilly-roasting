@@ -92,5 +92,8 @@ const (
 	AuditAttributeSetCreated      = "attribute_set.created"
 	AuditAttributeSetUpdated      = "attribute_set.updated"
 	AuditAttributeSetDeleted      = "attribute_set.deleted"
+	AuditAttributeKeyCreated      = "attribute_key.created"
+	AuditAttributeKeyUpdated      = "attribute_key.updated"
+	AuditAttributeKeyDeleted      = "attribute_key.deleted"
 	AuditProductAttributesUpdated = "product.attributes_updated"
 )

@@ -123,8 +123,8 @@ func (s *AttributeService) DeleteAttributeSet(ctx context.Context, tx pgx.Tx, id
 
 // --- Attribute Keys ---
 
-// CreateAttributeKey creates a new attribute key within a set.
-func (s *AttributeService) CreateAttributeKey(ctx context.Context, tx pgx.Tx, p store.CreateAttributeKeyParams) (*domain.AttributeKey, error) {
+// CreateAttributeKey creates a new attribute key within a set and records an audit entry.
+func (s *AttributeService) CreateAttributeKey(ctx context.Context, tx pgx.Tx, p store.CreateAttributeKeyParams, actor Actor) (*domain.AttributeKey, error) {
 	if err := validateAllowedValues(p.ValueType, p.AllowedValues); err != nil {
 		return nil, err
 	}
@@ -132,6 +132,19 @@ func (s *AttributeService) CreateAttributeKey(ctx context.Context, tx pgx.Tx, p 
 	if err != nil {
 		return nil, fmt.Errorf("create attribute key: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditAttributeKeyCreated,
+		ResourceType: "attribute_key",
+		ResourceID:   key.ID,
+		After:        key,
+	}); err != nil {
+		return nil, fmt.Errorf("audit attribute key created: %w", err)
+	}
+
 	return key, nil
 }
 
@@ -156,8 +169,8 @@ func (s *AttributeService) ListAttributeKeys(ctx context.Context, tx pgx.Tx, set
 	return keys, nil
 }
 
-// UpdateAttributeKey updates an attribute key.
-func (s *AttributeService) UpdateAttributeKey(ctx context.Context, tx pgx.Tx, p store.UpdateAttributeKeyParams) (*domain.AttributeKey, error) {
+// UpdateAttributeKey updates an attribute key and records an audit entry.
+func (s *AttributeService) UpdateAttributeKey(ctx context.Context, tx pgx.Tx, p store.UpdateAttributeKeyParams, actor Actor) (*domain.AttributeKey, error) {
 	if err := validateAllowedValues(p.ValueType, p.AllowedValues); err != nil {
 		return nil, err
 	}
@@ -168,14 +181,39 @@ func (s *AttributeService) UpdateAttributeKey(ctx context.Context, tx pgx.Tx, p 
 		}
 		return nil, fmt.Errorf("update attribute key: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditAttributeKeyUpdated,
+		ResourceType: "attribute_key",
+		ResourceID:   key.ID,
+		After:        key,
+	}); err != nil {
+		return nil, fmt.Errorf("audit attribute key updated: %w", err)
+	}
+
 	return key, nil
 }
 
-// DeleteAttributeKey removes an attribute key.
-func (s *AttributeService) DeleteAttributeKey(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+// DeleteAttributeKey removes an attribute key and records an audit entry.
+func (s *AttributeService) DeleteAttributeKey(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
 	if err := s.attributes.DeleteAttributeKey(ctx, tx, id); err != nil {
 		return fmt.Errorf("delete attribute key: %w", err)
 	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditAttributeKeyDeleted,
+		ResourceType: "attribute_key",
+		ResourceID:   id,
+	}); err != nil {
+		return fmt.Errorf("audit attribute key deleted: %w", err)
+	}
+
 	return nil
 }
 

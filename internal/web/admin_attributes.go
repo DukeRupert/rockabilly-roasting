@@ -259,7 +259,7 @@ func (d *Deps) handleAdminAttributeKeyCreate(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.AttributeService.CreateAttributeKey(ctx, tx, params)
+		_, txErr := d.AttributeService.CreateAttributeKey(ctx, tx, params, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -268,6 +268,61 @@ func (d *Deps) handleAdminAttributeKeyCreate(w http.ResponseWriter, r *http.Requ
 	}
 
 	http.Redirect(w, r, fmt.Sprintf("/admin/attributes/%s?flash=Key+added", setID), http.StatusSeeOther)
+}
+
+// --- Edit Attribute Key ---
+
+func (d *Deps) handleAdminAttributeKeyEdit(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	setID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	keyID, err := uuid.Parse(r.PathValue("keyID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var set *domain.AttributeSet
+	var key *domain.AttributeKey
+	var keys []domain.AttributeKey
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		set, txErr = d.AttributeService.GetAttributeSet(ctx, tx, setID)
+		if txErr != nil {
+			return txErr
+		}
+		key, txErr = d.AttributeService.GetAttributeKey(ctx, tx, keyID)
+		if txErr != nil {
+			return txErr
+		}
+		keys, txErr = d.AttributeService.ListAttributeKeys(ctx, tx, setID)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	name, role := staffNameRole(r)
+	props := admin.AttributeKeyEditProps{
+		Set:       set,
+		Key:       key,
+		KeyCount:  len(keys),
+		Flash:     r.URL.Query().Get("flash"),
+		StaffName: name,
+		StaffRole: role,
+	}
+	if IsHTMX(r) {
+		admin.AttributeKeyEditContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.AttributeKeyEdit(props).Render(ctx, w) //nolint:errcheck
 }
 
 // --- Update Attribute Key ---
@@ -326,7 +381,7 @@ func (d *Deps) handleAdminAttributeKeyUpdate(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.AttributeService.UpdateAttributeKey(ctx, tx, params)
+		_, txErr := d.AttributeService.UpdateAttributeKey(ctx, tx, params, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -334,7 +389,7 @@ func (d *Deps) handleAdminAttributeKeyUpdate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/admin/attributes/%s?flash=Key+updated", setID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/admin/attributes/%s/keys/%s?flash=Key+updated", setID, keyID), http.StatusSeeOther)
 }
 
 // --- Delete Attribute Key ---
@@ -355,7 +410,7 @@ func (d *Deps) handleAdminAttributeKeyDelete(w http.ResponseWriter, r *http.Requ
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.AttributeService.DeleteAttributeKey(ctx, tx, keyID)
+		return d.AttributeService.DeleteAttributeKey(ctx, tx, keyID, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)

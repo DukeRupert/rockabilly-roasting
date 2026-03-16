@@ -280,6 +280,7 @@ templ CatalogResults(props CatalogPageProps) {
 							hx-target="#catalog-results"
 							hx-swap="innerHTML"
 							hx-push-url="true"
+							aria-label="Previous page"
 							class="btn label-font text-rr-muted border border-rr-border px-3 py-2 rounded-sm text-xs bg-rr-bg"
 						>
 							&lsaquo;
@@ -311,6 +312,7 @@ templ CatalogResults(props CatalogPageProps) {
 							hx-target="#catalog-results"
 							hx-swap="innerHTML"
 							hx-push-url="true"
+							aria-label="Next page"
 							class="btn label-font text-rr-muted border border-rr-border px-3 py-2 rounded-sm text-xs bg-rr-bg"
 						>
 							&rsaquo;
@@ -691,12 +693,51 @@ templ mobileDrawerScript() {
 				var closeBtn = document.getElementById('mobile-filter-close');
 				var closeBottomBtn = document.getElementById('mobile-filter-close-bottom');
 				var backdrop = document.getElementById('mobile-filter-backdrop');
-				function openDrawer() { if (drawer) drawer.classList.remove('hidden'); }
-				function closeDrawer() { if (drawer) drawer.classList.add('hidden'); }
+				var previousFocus = null;
+
+				function openDrawer() {
+					if (!drawer) return;
+					previousFocus = document.activeElement;
+					drawer.classList.remove('hidden');
+					// Focus first interactive element inside the drawer
+					var first = drawer.querySelector('button, a, input, [tabindex]');
+					if (first) first.focus();
+				}
+				function closeDrawer() {
+					if (!drawer) return;
+					drawer.classList.add('hidden');
+					if (previousFocus) previousFocus.focus();
+				}
+
 				if (openBtn) openBtn.addEventListener('click', openDrawer);
 				if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
 				if (closeBottomBtn) closeBottomBtn.addEventListener('click', closeDrawer);
 				if (backdrop) backdrop.addEventListener('click', closeDrawer);
+
+				// Escape key closes drawer
+				document.addEventListener('keydown', function(e) {
+					if (e.key === 'Escape' && drawer && !drawer.classList.contains('hidden')) {
+						closeDrawer();
+					}
+				});
+
+				// Trap focus inside drawer when open
+				if (drawer) {
+					drawer.addEventListener('keydown', function(e) {
+						if (e.key !== 'Tab') return;
+						var focusable = drawer.querySelectorAll('a, button, input, [tabindex]:not([tabindex="-1"])');
+						if (focusable.length === 0) return;
+						var first = focusable[0];
+						var last = focusable[focusable.length - 1];
+						if (e.shiftKey && document.activeElement === first) {
+							e.preventDefault();
+							last.focus();
+						} else if (!e.shiftKey && document.activeElement === last) {
+							e.preventDefault();
+							first.focus();
+						}
+					});
+				}
 			}
 			initDrawer();
 			// Re-initialize after htmx swaps the catalog-results container.

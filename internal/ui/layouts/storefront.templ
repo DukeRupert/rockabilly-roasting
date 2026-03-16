@@ -212,7 +212,7 @@ templ Storefront(props StorefrontProps) {
 				</div>
 			</main>
 			<!-- Toast live region -->
-			<div id="toast-container" aria-live="assertive"></div>
+			<div id="toast-container" aria-live="polite"></div>
 			<!-- Footer -->
 			<div class="flame-stripe"></div>
 			<footer class="bg-rr-raised">
@@ -254,17 +254,17 @@ templ Storefront(props StorefrontProps) {
 								<p>Sunday: Closed</p>
 							</div>
 							<div class="flex gap-4 mt-4">
-								<a href="#" class="label-font text-rr-muted hover:text-rr-heading text-xs transition-colors">FACEBOOK</a>
-								<a href="#" class="label-font text-rr-muted hover:text-rr-heading text-xs transition-colors">INSTAGRAM</a>
+								<a href="https://www.facebook.com/rockabillyroasting/" class="label-font text-rr-muted hover:text-rr-heading text-xs transition-colors" rel="noopener noreferrer">FACEBOOK</a>
+								<a href="https://www.instagram.com/rockabillyroasting/" class="label-font text-rr-muted hover:text-rr-heading text-xs transition-colors" rel="noopener noreferrer">INSTAGRAM</a>
 							</div>
 						</div>
 						<!-- Newsletter -->
 						<div>
 							<p class="label-font text-rr-muted mb-3 text-xs">STAY IN THE LOOP</p>
 							<p class="font-body text-rr-muted text-xs mb-4">Sign up for roast drops and deals.</p>
-							<form class="flex gap-x-2">
+							<form method="post" action="/newsletter/subscribe" class="flex gap-x-2">
 								<label for="newsletter-email" class="sr-only">Email address</label>
-								<input type="email" id="newsletter-email" placeholder="name@example.com" class="rr-input min-w-0 flex-auto rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2 text-sm font-body text-rr-heading placeholder:text-rr-border"/>
+								<input type="email" id="newsletter-email" name="email" required placeholder="name@example.com" class="rr-input min-w-0 flex-auto rounded-sm border border-rr-border bg-rr-bg px-3.5 py-2 text-sm font-body text-rr-heading placeholder:text-rr-border"/>
 								<button type="submit" class="btn flex-none rounded-sm bg-rr-red px-3.5 py-2 text-sm text-white label-font hover:bg-rr-red-lt transition-colors">
 									JOIN
 								</button>
@@ -312,7 +312,7 @@ templ Storefront(props StorefrontProps) {
 							}
 						}, { passive: true });
 						btt.addEventListener('click', function() {
-							window.scrollTo({ top: 0, behavior: 'smooth' });
+							window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 						});
 					}
 

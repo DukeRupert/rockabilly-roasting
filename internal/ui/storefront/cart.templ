@@ -75,7 +75,7 @@ templ CartContent(props CartPageProps) {
 											aria-label={ "Quantity for " + item.ProductTitle }
 											class="w-16 rounded-sm border border-rr-border bg-rr-bg py-1 px-2 text-sm font-body text-rr-heading focus:border-rr-amber focus:ring-1 focus:ring-rr-amber"
 										/>
-										<button type="submit" class="text-xs font-medium text-rr-red hover:text-rr-red-lt">
+										<button type="submit" class="text-xs font-medium text-rr-red hover:text-rr-red-lt" aria-label={ "Update quantity for " + item.ProductTitle }>
 											Update
 										</button>
 									</form>

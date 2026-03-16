@@ -104,7 +104,15 @@ templ CatalogContent(props CatalogPageProps) {
 		<!-- Product grid — compact BRCC-style layout -->
 		if len(props.Products) == 0 {
 			<div class="text-center py-16">
-				<p class="font-body text-rr-muted">No products found.</p>
+				<svg class="mx-auto size-10 text-rr-faint mb-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path>
+				</svg>
+				<p class="font-body text-rr-muted">No products match your search.</p>
+				if props.ActiveTaxon != "" || props.Search != "" {
+					<a href="/catalog" class="btn label-font inline-block mt-4 px-6 py-2.5 rounded-sm text-white text-sm bg-rr-red hover:bg-rr-red-lt transition-colors">
+						BROWSE ALL COFFEE
+					</a>
+				}
 			</div>
 		} else {
 			<div class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -155,11 +163,11 @@ templ CatalogContent(props CatalogPageProps) {
 templ productCard(card ProductCard) {
 	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug) } class="product-card group rounded-sm overflow-hidden border border-rr-border bg-rr-surface">
 		<!-- Compact image — 3:4 aspect ratio instead of square -->
-		<div class="aspect-3/4 w-full overflow-hidden bg-rr-bg relative">
+		<div class={ "aspect-3/4 w-full overflow-hidden bg-rr-bg relative", placeholderTint(card.Coffee) }>
 			if card.ThumbnailURL != "" {
 				<img
 					src={ card.ThumbnailURL }
-					alt={ card.Product.Title }
+					alt={ cardAltText(card.Product.Title, card.Coffee) }
 					class="h-full w-full object-cover object-center group-hover:opacity-80 transition-opacity"
 					loading="lazy"
 				/>

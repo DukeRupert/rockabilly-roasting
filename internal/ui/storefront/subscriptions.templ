@@ -151,11 +151,11 @@ templ SubscriptionsContent(props SubscriptionsPageProps) {
 templ subscriptionProductCard(card SubscriptionProductCard) {
 	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug + "?mode=subscribe") } class="product-card group rounded-sm overflow-hidden border border-rr-border bg-rr-surface">
 		<!-- Image — 3:4 ratio matching catalog cards -->
-		<div class="aspect-3/4 w-full overflow-hidden bg-rr-bg relative">
+		<div class={ "aspect-3/4 w-full overflow-hidden bg-rr-bg relative", placeholderTint(card.Coffee) }>
 			if card.ThumbnailURL != "" {
 				<img
 					src={ card.ThumbnailURL }
-					alt={ card.Product.Title }
+					alt={ cardAltText(card.Product.Title, card.Coffee) }
 					class="h-full w-full object-cover object-center group-hover:opacity-80 transition-opacity"
 					loading="lazy"
 				/>

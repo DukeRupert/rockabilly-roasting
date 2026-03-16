@@ -191,3 +191,44 @@ func roastEndLabel(size string) string {
 	}
 	return "label-font text-[0.5rem] text-rr-faint leading-none"
 }
+
+// cardAltText returns enriched alt text for product card images.
+// e.g. "Chop Top — Dark Roast, Berry & Dark Chocolate"
+func cardAltText(title string, attrs *CoffeeAttrs) string {
+	if attrs == nil {
+		return title
+	}
+	var parts []string
+	if validRoastLevel(attrs.RoastLevel) {
+		parts = append(parts, roastLevelLabel(attrs.RoastLevel)+" Roast")
+	}
+	if len(attrs.TastingNotes) > 0 {
+		parts = append(parts, cardTastingNotes(attrs.TastingNotes, 3))
+	}
+	if len(parts) == 0 {
+		return title
+	}
+	return title + " — " + strings.Join(parts, ", ")
+}
+
+// placeholderTint returns a CSS class for tinting the image placeholder
+// background based on roast level, so missing-image cards still look distinct.
+func placeholderTint(attrs *CoffeeAttrs) string {
+	if attrs == nil || !validRoastLevel(attrs.RoastLevel) {
+		return ""
+	}
+	switch roastLevelIndex(attrs.RoastLevel) {
+	case 1:
+		return "bg-rr-amber/5"
+	case 2:
+		return "bg-rr-amber/10"
+	case 3:
+		return "bg-rr-amber/15"
+	case 4:
+		return "bg-rr-red/10"
+	case 5:
+		return "bg-rr-red/15"
+	default:
+		return ""
+	}
+}

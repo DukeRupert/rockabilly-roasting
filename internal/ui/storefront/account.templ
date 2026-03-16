@@ -96,7 +96,7 @@ type AccountSettingsProps struct {
 templ AccountSettingsContent(props AccountSettingsProps) {
 	@accountLayout("/account/settings") {
 		<div class="max-w-lg">
-			<h1 class="text-2xl font-semibold text-rr-heading mb-6">Account Settings</h1>
+			<h1 class="font-display text-2xl tracking-widest text-rr-heading mb-6">Account Settings</h1>
 			if props.Success != "" {
 				<div class="mb-6 rounded-sm bg-rr-teal/10 border border-rr-teal/20 px-4 py-3 text-sm font-body text-rr-teal-lt">
 					{ props.Success }
@@ -151,7 +151,7 @@ type AccountOrdersProps struct {
 
 templ AccountOrdersContent(props AccountOrdersProps) {
 	@accountLayout("/account/orders") {
-		<h1 class="text-2xl font-semibold text-rr-heading mb-6">Orders</h1>
+		<h1 class="font-display text-2xl tracking-widest text-rr-heading mb-6">Orders</h1>
 		if len(props.Orders) == 0 {
 			<div class="text-center py-12">
 				<svg class="mx-auto size-12 text-rr-faint" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"></path></svg>
@@ -251,7 +251,7 @@ templ AccountOrderShowContent(props AccountOrderShowProps) {
 				<a href="/account/orders" class="text-sm text-rr-red hover:underline">&larr; Back to orders</a>
 			</div>
 			<div class="flex items-center gap-4 mb-6">
-				<h1 class="text-2xl font-semibold text-rr-heading">{ props.Order.Number }</h1>
+				<h1 class="font-display text-2xl tracking-widest text-rr-heading">{ props.Order.Number }</h1>
 				<span class="text-sm text-rr-muted">{ formatDate(props.Order.PlacedAt) }</span>
 				@orderStatusBadge(props.Order.Status, props.Order.FulfillmentStatus)
 			</div>
@@ -383,7 +383,7 @@ func intervalLabel(interval domain.SubscriptionInterval) string {
 
 templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 	@accountLayout("/account/subscriptions") {
-		<h1 class="text-2xl font-semibold text-rr-heading mb-6">Subscriptions</h1>
+		<h1 class="font-display text-2xl tracking-widest text-rr-heading mb-6">Subscriptions</h1>
 		if len(props.Subscriptions) == 0 {
 			<div class="text-center py-12">
 				<svg class="mx-auto size-12 text-rr-faint" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182"></path></svg>
@@ -476,7 +476,7 @@ type AccountAddressesProps struct {
 templ AccountAddressesContent(props AccountAddressesProps) {
 	@accountLayout("/account/addresses") {
 		<div class="flex items-center justify-between mb-6">
-			<h1 class="text-2xl font-semibold text-rr-heading">Addresses</h1>
+			<h1 class="font-display text-2xl tracking-widest text-rr-heading">Addresses</h1>
 			<button type="button" x-data x-on:click="$dispatch('toggle-add-address')"
 				class="btn rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
 				+ Add address

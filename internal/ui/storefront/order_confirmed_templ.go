@@ -36,7 +36,7 @@ func OrderConfirmedContent(props OrderConfirmedProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mx-auto max-w-lg text-center py-12\"><div class=\"mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rr-teal/15 mb-6\"><svg class=\"h-8 w-8 text-rr-teal-lt\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 12.75l6 6 9-13.5\"></path></svg></div><h1 class=\"text-2xl font-bold text-rr-heading mb-2\">Thank you for your order!</h1><p class=\"text-rr-body mb-1\">Your order has been confirmed.</p><p class=\"text-lg font-semibold text-rr-red mb-8\">Order ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mx-auto max-w-lg text-center py-12\"><div class=\"mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rr-teal/15 mb-6\"><svg class=\"h-8 w-8 text-rr-teal-lt\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 12.75l6 6 9-13.5\"></path></svg></div><h1 class=\"font-display text-2xl tracking-widest text-rr-heading mb-2\">THANK YOU FOR YOUR ORDER</h1><p class=\"text-rr-body mb-1\">Your order has been confirmed.</p><p class=\"text-lg font-semibold text-rr-red mb-8\">Order ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -49,7 +49,7 @@ func OrderConfirmedContent(props OrderConfirmedProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</p><p class=\"text-sm text-rr-muted mb-6\">We'll send a confirmation email with your order details shortly.</p><a href=\"/catalog\" class=\"inline-block rounded-md bg-rr-red px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-rr-red-lt\">Continue shopping</a></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</p><p class=\"text-sm text-rr-muted mb-6\">We'll send a confirmation email with your order details shortly.</p><a href=\"/catalog\" class=\"btn inline-block rounded-sm bg-rr-red px-6 py-3 label-font text-sm text-white glow-red hover:bg-rr-red-lt transition-colors\">Continue shopping</a></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -332,7 +332,7 @@ func AccountSettingsContent(props AccountSettingsProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"max-w-lg\"><h1 class=\"text-2xl font-semibold text-rr-heading mb-6\">Account Settings</h1>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"max-w-lg\"><h1 class=\"font-display text-2xl tracking-widest text-rr-heading mb-6\">Account Settings</h1>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -514,7 +514,7 @@ func AccountOrdersContent(props AccountOrdersProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<h1 class=\"text-2xl font-semibold text-rr-heading mb-6\">Orders</h1>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<h1 class=\"font-display text-2xl tracking-widest text-rr-heading mb-6\">Orders</h1>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -820,14 +820,14 @@ func AccountOrderShowContent(props AccountOrderShowProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div><div class=\"mb-6\"><a href=\"/account/orders\" class=\"text-sm text-rr-red hover:underline\">&larr; Back to orders</a></div><div class=\"flex items-center gap-4 mb-6\"><h1 class=\"text-2xl font-semibold text-rr-heading\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div><div class=\"mb-6\"><a href=\"/account/orders\" class=\"text-sm text-rr-red hover:underline\">&larr; Back to orders</a></div><div class=\"flex items-center gap-4 mb-6\"><h1 class=\"font-display text-2xl tracking-widest text-rr-heading\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var43 string
 			templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.Number)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 254, Col: 75}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 254, Col: 90}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 			if templ_7745c5c3_Err != nil {
@@ -1269,7 +1269,7 @@ func AccountSubscriptionsContent(props AccountSubscriptionsProps) templ.Componen
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<h1 class=\"text-2xl font-semibold text-rr-heading mb-6\">Subscriptions</h1>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<h1 class=\"font-display text-2xl tracking-widest text-rr-heading mb-6\">Subscriptions</h1>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1568,7 +1568,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "<div class=\"flex items-center justify-between mb-6\"><h1 class=\"text-2xl font-semibold text-rr-heading\">Addresses</h1><button type=\"button\" x-data x-on:click=\"$dispatch('toggle-add-address')\" class=\"btn rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt\">+ Add address</button></div><!-- Add address form (hidden by default) --> <div x-data=\"{ open: false }\" x-on:toggle-add-address.window=\"open = !open\"><div x-show=\"open\" x-cloak class=\"mb-6 rounded-sm border border-rr-border p-4\"><h3 class=\"text-sm font-semibold text-rr-heading mb-3\">New address</h3>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "<div class=\"flex items-center justify-between mb-6\"><h1 class=\"font-display text-2xl tracking-widest text-rr-heading\">Addresses</h1><button type=\"button\" x-data x-on:click=\"$dispatch('toggle-add-address')\" class=\"btn rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt\">+ Add address</button></div><!-- Add address form (hidden by default) --> <div x-data=\"{ open: false }\" x-on:toggle-add-address.window=\"open = !open\"><div x-show=\"open\" x-cloak class=\"mb-6 rounded-sm border border-rr-border p-4\"><h3 class=\"text-sm font-semibold text-rr-heading mb-3\">New address</h3>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

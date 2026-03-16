@@ -53,7 +53,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"wholesale-checkout\" class=\"mx-auto max-w-3xl space-y-6\"><div><h1 class=\"text-2xl font-bold text-rr-heading\">Review Order</h1><p class=\"mt-1 text-sm text-rr-muted\">Review your wholesale order before submitting.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"wholesale-checkout\" class=\"mx-auto max-w-3xl space-y-6\"><div><h1 class=\"font-display text-2xl tracking-widest text-rr-heading\">REVIEW ORDER</h1><p class=\"mt-1 text-sm text-rr-muted\">Review your wholesale order before submitting.</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -77,12 +77,12 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 			}
 		}
 		if len(props.Items) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"rounded-lg border border-rr-border bg-rr-surface p-12 text-center\"><p class=\"text-sm text-rr-muted\">Your order is empty.</p><a href=\"/wholesale/portal\" class=\"mt-4 inline-block text-sm font-semibold text-rr-red hover:text-rr-red-lt\">&larr; Back to Quick Order</a></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"rounded-sm border border-rr-border bg-rr-surface p-12 text-center\"><p class=\"text-sm text-rr-muted\">Your order is empty.</p><a href=\"/wholesale/portal\" class=\"mt-4 inline-block text-sm font-semibold text-rr-red hover:text-rr-red-lt\">&larr; Back to Quick Order</a></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"rounded-lg border border-rr-border bg-rr-surface overflow-hidden\"><table class=\"min-w-full divide-y divide-rr-border\"><thead><tr class=\"bg-rr-bg text-left text-xs font-medium uppercase tracking-wider text-rr-muted\"><th class=\"px-4 py-3\">Product</th><th class=\"px-4 py-3\">SKU</th><th class=\"px-4 py-3 text-right\">Unit Price</th><th class=\"px-4 py-3 text-center\">Qty</th><th class=\"px-4 py-3 text-right\">Total</th><th class=\"px-4 py-3 w-10\"></th></tr></thead> <tbody class=\"divide-y divide-rr-border\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"rounded-sm border border-rr-border bg-rr-surface overflow-hidden\"><table class=\"min-w-full divide-y divide-rr-border\"><thead><tr class=\"bg-rr-bg text-left text-xs font-medium uppercase tracking-wider text-rr-muted\"><th class=\"px-4 py-3\">Product</th><th class=\"px-4 py-3\">SKU</th><th class=\"px-4 py-3 text-right\">Unit Price</th><th class=\"px-4 py-3 text-center\">Qty</th><th class=\"px-4 py-3 text-right\">Total</th><th class=\"px-4 py-3 w-10\"></th></tr></thead> <tbody class=\"divide-y divide-rr-border\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -139,7 +139,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" min=\"1\" class=\"w-16 rounded-md border-rr-border px-2 py-1 text-center text-sm shadow-sm focus:border-rr-amber focus:ring-rr-amber\" hx-post=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" min=\"1\" class=\"rr-input w-16 rounded-sm border border-rr-border bg-rr-bg px-2 py-1 text-center text-sm text-rr-heading focus:outline-none\" hx-post=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -196,7 +196,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</td><td></td></tr></tfoot></table></div><form method=\"post\" action=\"/wholesale/checkout/confirm\" class=\"space-y-4\"><div class=\"rounded-lg border border-rr-border bg-rr-surface p-6 space-y-4\"><div><label for=\"po_number\" class=\"block text-sm font-medium text-rr-heading\">PO Number (optional)</label> <input type=\"text\" name=\"po_number\" id=\"po_number\" placeholder=\"Enter your purchase order number\" class=\"mt-1 block w-full rounded-md border-rr-border px-3 py-2 shadow-sm focus:border-rr-amber focus:ring-rr-amber sm:text-sm\"></div><div><label for=\"notes\" class=\"block text-sm font-medium text-rr-heading\">Order Notes (optional)</label> <textarea name=\"notes\" id=\"notes\" rows=\"3\" placeholder=\"Any special instructions for this order\" class=\"mt-1 block w-full rounded-md border-rr-border px-3 py-2 shadow-sm focus:border-rr-amber focus:ring-rr-amber sm:text-sm\"></textarea></div></div><div class=\"flex items-center justify-between\"><a href=\"/wholesale/portal\" class=\"text-sm font-semibold text-rr-red hover:text-rr-red-lt\">&larr; Back to Quick Order</a> <button type=\"submit\" class=\"inline-flex items-center rounded-md bg-rr-red px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Place Order</button></div><p class=\"text-xs text-rr-muted text-center\">An invoice will be sent after your order is confirmed. No payment is collected now.</p></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</td><td></td></tr></tfoot></table></div><form method=\"post\" action=\"/wholesale/checkout/confirm\" class=\"space-y-4\"><div class=\"rounded-sm border border-rr-border bg-rr-surface p-6 space-y-4\"><div><label for=\"po_number\" class=\"block text-sm font-medium text-rr-heading\">PO Number (optional)</label> <input type=\"text\" name=\"po_number\" id=\"po_number\" placeholder=\"Enter your purchase order number\" class=\"rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm\"></div><div><label for=\"notes\" class=\"block text-sm font-medium text-rr-heading\">Order Notes (optional)</label> <textarea name=\"notes\" id=\"notes\" rows=\"3\" placeholder=\"Any special instructions for this order\" class=\"rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm\"></textarea></div></div><div class=\"flex items-center justify-between\"><a href=\"/wholesale/portal\" class=\"text-sm font-semibold text-rr-red hover:text-rr-red-lt\">&larr; Back to Quick Order</a> <button type=\"submit\" class=\"btn inline-flex items-center rounded-sm bg-rr-red px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Place Order</button></div><p class=\"text-xs text-rr-muted text-center\">An invoice will be sent after your order is confirmed. No payment is collected now.</p></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

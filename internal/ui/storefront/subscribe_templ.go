@@ -45,7 +45,7 @@ func SubscribeContent(props SubscribePageProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mx-auto max-w-lg\"><h1 class=\"text-2xl font-bold text-rr-heading\">Subscribe</h1><p class=\"mt-2 text-sm text-rr-muted\">Set up a recurring delivery for this plan.</p><!-- Plan summary --><div class=\"mt-6 rounded-lg border border-rr-border bg-rr-surface p-4\"><div class=\"flex items-center justify-between\"><div><p class=\"font-medium text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mx-auto max-w-lg\"><h1 class=\"text-2xl font-bold text-rr-heading\">Subscribe</h1><p class=\"mt-2 text-sm text-rr-muted\">Set up a recurring delivery for this plan.</p><!-- Plan summary --><div class=\"mt-6 rounded-sm border border-rr-border bg-rr-surface p-4\"><div class=\"flex items-center justify-between\"><div><p class=\"font-medium text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

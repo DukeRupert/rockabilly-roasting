@@ -37,25 +37,25 @@ func AboutContent(props AboutProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mx-auto max-w-3xl py-16\"><div class=\"text-center mb-16\"><h1 class=\"font-display text-4xl text-rr-heading tracking-wide mb-4\">ABOUT US</h1><div class=\"w-16 h-1 bg-rr-red mx-auto mb-8 rounded-full\"></div><p class=\"font-body text-lg text-rr-muted leading-relaxed mb-6\">Small-batch specialty coffee with bold flavor and a rebellious spirit.</p><p class=\"font-body text-base text-rr-muted leading-relaxed mb-10\">More information coming soon. In the meantime, stop by the cafe or give us a call.</p><div class=\"rounded-lg border border-rr-border bg-rr-surface p-8 inline-block\"><p class=\"label-font text-rr-muted text-xs mb-3\">VISIT US</p><p class=\"font-body text-rr-body text-sm\">101 W. Kennewick Ave.</p><p class=\"font-body text-rr-body text-sm\">Kennewick, WA</p><p class=\"font-body text-rr-muted text-sm mt-2\">509-585-2320</p><p class=\"font-body text-rr-muted text-sm\">info@rockabillyroasting.com</p></div></div><!-- Contact Form --><div class=\"border-t border-rr-border pt-16\"><h2 class=\"font-display text-2xl text-rr-heading tracking-wide text-center mb-2\">GET IN TOUCH</h2><p class=\"font-body text-sm text-rr-muted text-center mb-8\">Questions, feedback, or wholesale inquiries — we'd love to hear from you.</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mx-auto max-w-3xl py-16\"><div class=\"text-center mb-16\"><h1 class=\"font-display text-4xl text-rr-heading tracking-wide mb-4\">ABOUT US</h1><div class=\"w-16 h-1 bg-rr-red mx-auto mb-8 rounded-full\"></div><p class=\"font-body text-lg text-rr-muted leading-relaxed mb-6\">Small-batch specialty coffee with bold flavor and a rebellious spirit.</p><p class=\"font-body text-base text-rr-muted leading-relaxed mb-10\">More information coming soon. In the meantime, stop by the cafe or give us a call.</p><div class=\"rounded-sm border border-rr-border bg-rr-surface p-8 inline-block\"><p class=\"label-font text-rr-muted text-xs mb-3\">VISIT US</p><p class=\"font-body text-rr-body text-sm\">101 W. Kennewick Ave.</p><p class=\"font-body text-rr-body text-sm\">Kennewick, WA</p><p class=\"font-body text-rr-muted text-sm mt-2\">509-585-2320</p><p class=\"font-body text-rr-muted text-sm\">info@rockabillyroasting.com</p></div></div><!-- Contact Form --><div class=\"border-t border-rr-border pt-16\"><h2 class=\"font-display text-2xl text-rr-heading tracking-wide text-center mb-2\">GET IN TOUCH</h2><p class=\"font-body text-sm text-rr-muted text-center mb-8\">Questions, feedback, or wholesale inquiries — we'd love to hear from you.</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.ContactSuccess {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"rounded-lg border border-rr-teal/50 bg-rr-teal/10 p-6 text-center\"><p class=\"font-body text-rr-teal-lt font-semibold mb-1\">Message sent!</p><p class=\"font-body text-sm text-rr-muted\">We'll get back to you as soon as we can.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"rounded-sm border border-rr-teal/50 bg-rr-teal/10 p-6 text-center\"><p class=\"font-body text-rr-teal-lt font-semibold mb-1\">Message sent!</p><p class=\"font-body text-sm text-rr-muted\">We'll get back to you as soon as we can.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
 			if props.ContactError != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"rounded-lg border border-red-700/50 bg-red-900/20 p-4 mb-6 text-center\"><p class=\"font-body text-red-400 text-sm\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"rounded-sm border border-rr-red/30 bg-rr-red/10 p-4 mb-6 text-center\"><p class=\"font-body text-rr-red-lt text-sm\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.ContactError)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/about.templ`, Line: 42, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/about.templ`, Line: 42, Col: 70}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {

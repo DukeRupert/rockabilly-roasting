@@ -36,7 +36,7 @@ func WholesaleLoginContent(props WholesaleLoginProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><h2 class=\"text-center text-2xl/9 font-bold tracking-tight text-rr-heading\">Wholesale Sign In</h2><p class=\"mt-2 text-center text-sm/6 text-rr-muted\">Sign in to your wholesale account to place orders.</p></div><div class=\"mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]\"><div class=\"bg-rr-surface px-6 py-12 shadow-sm sm:rounded-sm sm:px-12\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><h2 class=\"text-center font-display text-2xl tracking-widest text-rr-heading\">WHOLESALE SIGN IN</h2><p class=\"mt-2 text-center text-sm/6 text-rr-muted\">Sign in to your wholesale account to place orders.</p></div><div class=\"mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]\"><div class=\"bg-rr-surface px-6 py-12 shadow-sm sm:rounded-sm sm:px-12\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

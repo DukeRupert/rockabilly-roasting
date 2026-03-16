@@ -19,7 +19,7 @@ templ AboutContent(props AboutProps) {
 			<p class="font-body text-base text-rr-muted leading-relaxed mb-10">
 				More information coming soon. In the meantime, stop by the cafe or give us a call.
 			</p>
-			<div class="rounded-lg border border-rr-border bg-rr-surface p-8 inline-block">
+			<div class="rounded-sm border border-rr-border bg-rr-surface p-8 inline-block">
 				<p class="label-font text-rr-muted text-xs mb-3">VISIT US</p>
 				<p class="font-body text-rr-body text-sm">101 W. Kennewick Ave.</p>
 				<p class="font-body text-rr-body text-sm">Kennewick, WA</p>
@@ -32,14 +32,14 @@ templ AboutContent(props AboutProps) {
 			<h2 class="font-display text-2xl text-rr-heading tracking-wide text-center mb-2">GET IN TOUCH</h2>
 			<p class="font-body text-sm text-rr-muted text-center mb-8">Questions, feedback, or wholesale inquiries — we'd love to hear from you.</p>
 			if props.ContactSuccess {
-				<div class="rounded-lg border border-rr-teal/50 bg-rr-teal/10 p-6 text-center">
+				<div class="rounded-sm border border-rr-teal/50 bg-rr-teal/10 p-6 text-center">
 					<p class="font-body text-rr-teal-lt font-semibold mb-1">Message sent!</p>
 					<p class="font-body text-sm text-rr-muted">We'll get back to you as soon as we can.</p>
 				</div>
 			} else {
 				if props.ContactError != "" {
-					<div class="rounded-lg border border-red-700/50 bg-red-900/20 p-4 mb-6 text-center">
-						<p class="font-body text-red-400 text-sm">{ props.ContactError }</p>
+					<div class="rounded-sm border border-rr-red/30 bg-rr-red/10 p-4 mb-6 text-center">
+						<p class="font-body text-rr-red-lt text-sm">{ props.ContactError }</p>
 					</div>
 				}
 				<form method="POST" action="/about/contact" class="space-y-5">

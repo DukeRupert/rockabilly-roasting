@@ -14,7 +14,7 @@ templ OrderConfirmedContent(props OrderConfirmedProps) {
 				<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"></path>
 			</svg>
 		</div>
-		<h1 class="text-2xl font-bold text-rr-heading mb-2">Thank you for your order!</h1>
+		<h1 class="font-display text-2xl tracking-widest text-rr-heading mb-2">THANK YOU FOR YOUR ORDER</h1>
 		<p class="text-rr-body mb-1">Your order has been confirmed.</p>
 		<p class="text-lg font-semibold text-rr-red mb-8">
 			Order { props.OrderNumber }
@@ -24,7 +24,7 @@ templ OrderConfirmedContent(props OrderConfirmedProps) {
 		</p>
 		<a
 			href="/catalog"
-			class="inline-block rounded-md bg-rr-red px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+			class="btn inline-block rounded-sm bg-rr-red px-6 py-3 label-font text-sm text-white glow-red hover:bg-rr-red-lt transition-colors"
 		>
 			Continue shopping
 		</a>

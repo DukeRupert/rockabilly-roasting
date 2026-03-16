@@ -278,7 +278,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</li></ul></nav></div></div></div></div><!-- Desktop sidebar (expanded by default for desktop-first use) --><div id=\"desktop-sidebar\" class=\"hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300\"><div id=\"desktop-sidebar-inner\" class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface border-r border-rr-border px-6 pb-4 transition-all duration-300\"><div class=\"flex h-16 shrink-0 items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</li></ul></nav></div></div></div></div><!-- Desktop sidebar (expanded by default for desktop-first use) --><div id=\"desktop-sidebar\" class=\"hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300\"><div id=\"desktop-sidebar-inner\" class=\"flex grow flex-col gap-y-5 bg-rr-surface border-r border-rr-border px-6 pb-4 transition-all duration-300\"><div class=\"flex h-16 shrink-0 items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

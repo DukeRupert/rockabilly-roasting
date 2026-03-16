@@ -32,7 +32,7 @@ func (p StorefrontProps) fullTitle() string {
 
 templ Storefront(props StorefrontProps) {
 	<!DOCTYPE html>
-	<html lang="en" class="h-full bg-rr-bg">
+	<html lang="en" class="bg-rr-bg">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -107,7 +107,7 @@ templ Storefront(props StorefrontProps) {
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 			<style>[x-cloak] { display: none !important; }</style>
 		</head>
-		<body class="h-full font-body text-rr-body bg-rr-bg" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">
+		<body class="min-h-screen font-body text-rr-body bg-rr-bg" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">
 			<!-- Skip navigation -->
 			<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:rounded-sm focus:bg-rr-red focus:px-4 focus:py-2 focus:text-white focus:text-sm focus:font-medium">
 				Skip to main content

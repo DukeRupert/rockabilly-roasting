@@ -168,6 +168,10 @@ func (d *Deps) handleAccountLoginPage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.AccountLoginProps{
 		Next: r.URL.Query().Get("next"),
 	}
+	if IsHTMX(r) {
+		storefront.AccountLoginContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
 	storefront.AccountLoginPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
@@ -178,6 +182,10 @@ func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request)
 
 	if email == "" {
 		props := storefront.AccountLoginProps{Error: "Please enter your email address.", Next: next}
+		if IsHTMX(r) {
+			storefront.AccountLoginContent(props).Render(ctx, w) //nolint:errcheck
+			return
+		}
 		storefront.AccountLoginPage(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
@@ -213,6 +221,10 @@ func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request)
 	}
 
 	props := storefront.AccountLoginProps{Success: successMsg}
+	if IsHTMX(r) {
+		storefront.AccountLoginContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
 	storefront.AccountLoginPage(props).Render(ctx, w) //nolint:errcheck
 }
 

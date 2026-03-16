@@ -150,9 +150,23 @@ templ CatalogContent(props CatalogPageProps) {
 				<p class="mt-1 font-body text-sm text-rr-muted">Browse our collection</p>
 			</div>
 			<!-- Search -->
-			<form action="/catalog" method="get">
+			<form
+				id="catalog-search-form"
+				action="/catalog"
+				method="get"
+				hx-get="/catalog"
+				hx-trigger="input changed delay:1s from:#catalog-search, search from:#catalog-search, submit"
+				hx-target="#main-content"
+				hx-swap="innerHTML"
+				hx-push-url="true"
+			>
 				if props.ActiveTaxon != "" {
-					<input type="hidden" name="category" value={ props.ActiveTaxon }/>
+					<input type="hidden" name="category" value={ props.ActiveTaxon } data-search-filter/>
+				}
+				for slug, vals := range props.ActiveFilters {
+					if len(vals) > 0 {
+						<input type="hidden" name={ slug } value={ strings.Join(vals, ",") } data-search-filter/>
+					}
 				}
 				<div class="relative">
 					<label for="catalog-search" class="sr-only">Search roasts</label>
@@ -170,6 +184,20 @@ templ CatalogContent(props CatalogPageProps) {
 					/>
 				</div>
 			</form>
+			<script>
+				document.getElementById('catalog-search-form').addEventListener('htmx:configRequest', function(evt) {
+					var q = (evt.detail.parameters['q'] || '').trim();
+					if (q === '') {
+						// Clear all filters and category when search is emptied.
+						var keys = Object.keys(evt.detail.parameters);
+						for (var i = 0; i < keys.length; i++) {
+							if (keys[i] !== 'q') {
+								delete evt.detail.parameters[keys[i]];
+							}
+						}
+					}
+				});
+			</script>
 		</div>
 		<!-- Category filter pills -->
 		if len(props.Taxons) > 0 {

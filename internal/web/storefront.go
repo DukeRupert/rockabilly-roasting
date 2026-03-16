@@ -274,13 +274,16 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build catalog filter list for the filter bar UI.
-	catalogFilters := make([]storefront.CatalogFilter, 0, len(filterableKeys))
-	for _, key := range filterableKeys {
-		catalogFilters = append(catalogFilters, storefront.CatalogFilter{
-			Key:          key,
-			ActiveValues: activeFilters[key.Slug],
-		})
+	// Build catalog filter list for the sidebar UI (top 3 only).
+	catalogFilterSlugs := []string{"roast-level", "regions", "is-decaf"}
+	catalogFilters := make([]storefront.CatalogFilter, 0, len(catalogFilterSlugs))
+	for _, slug := range catalogFilterSlugs {
+		if key, ok := filterableBySlug[slug]; ok {
+			catalogFilters = append(catalogFilters, storefront.CatalogFilter{
+				Key:          key,
+				ActiveValues: activeFilters[key.Slug],
+			})
+		}
 	}
 
 	props := storefront.CatalogPageProps{
@@ -296,6 +299,11 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if IsHTMX(r) {
+		if r.Header.Get("HX-Target") == "catalog-results" {
+			// Filter click: swap just the sidebar + grid area.
+			storefront.CatalogResults(props).Render(ctx, w) //nolint:errcheck
+			return
+		}
 		storefront.CatalogContent(props).Render(ctx, w) //nolint:errcheck
 		return
 	}

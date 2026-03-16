@@ -298,6 +298,41 @@ func (s *AttributeStore) ListProductAttributeValues(ctx context.Context, tx pgx.
 	return result, rows.Err()
 }
 
+// ListFilterableAttributeKeys returns all attribute keys with filterable=true,
+// ordered by position. Used to render the storefront filter UI and validate filter params.
+func (s *AttributeStore) ListFilterableAttributeKeys(ctx context.Context, tx pgx.Tx) ([]domain.AttributeKey, error) {
+	query := `SELECT ak.id, ak.attribute_set_id, ak.name, ak.slug, ak.value_type,
+	                 ak.position, ak.filterable, ak.sortable, ak.allowed_values
+	          FROM attribute_keys ak
+	          WHERE ak.filterable = true
+	          ORDER BY ak.position`
+
+	rows, err := tx.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list filterable attribute keys: %w", err)
+	}
+	defer rows.Close()
+
+	var keys []domain.AttributeKey
+	for rows.Next() {
+		var k domain.AttributeKey
+		var valueType string
+		var allowedJSON []byte
+		if err := rows.Scan(&k.ID, &k.AttributeSetID, &k.Name, &k.Slug, &valueType,
+			&k.Position, &k.Filterable, &k.Sortable, &allowedJSON); err != nil {
+			return nil, fmt.Errorf("scan filterable attribute key: %w", err)
+		}
+		k.ValueType = domain.AttributeValueType(valueType)
+		if len(allowedJSON) > 0 {
+			if err := json.Unmarshal(allowedJSON, &k.AllowedValues); err != nil {
+				return nil, fmt.Errorf("unmarshal allowed values: %w", err)
+			}
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}
+
 // AttributeValueInput holds a single or multi value for saving.
 type AttributeValueInput struct {
 	Value  *string  // for single-value keys

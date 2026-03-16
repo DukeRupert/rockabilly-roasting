@@ -116,6 +116,62 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 	activeStatus := domain.ProductStatusActive
 	filter.Status = &activeStatus
 
+	// Load filterable attribute keys for filter UI and param validation.
+	var filterableKeys []domain.AttributeKey
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		filterableKeys, txErr = d.AttributeService.ListFilterableKeys(ctx, tx)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	// Parse attribute filter params from URL.
+	activeFilters := make(map[string][]string)
+	filterableBySlug := make(map[string]domain.AttributeKey, len(filterableKeys))
+	for _, key := range filterableKeys {
+		filterableBySlug[key.Slug] = key
+	}
+	for slug, key := range filterableBySlug {
+		raw := r.URL.Query().Get(slug)
+		if raw == "" {
+			continue
+		}
+		values := strings.Split(raw, ",")
+		// Validate values against allowed list (for enum types).
+		var valid []string
+		for _, v := range values {
+			v = strings.TrimSpace(v)
+			if v == "" {
+				continue
+			}
+			if key.IsEnumType() && len(key.AllowedValues) > 0 {
+				for _, allowed := range key.AllowedValues {
+					if v == allowed {
+						valid = append(valid, v)
+						break
+					}
+				}
+			} else {
+				// boolean or text types — accept as-is
+				valid = append(valid, v)
+			}
+		}
+		if len(valid) == 0 {
+			continue
+		}
+		activeFilters[slug] = valid
+		af := store.AttributeFilter{KeySlug: slug}
+		if key.IsMultiType() {
+			af.Values = valid
+		} else {
+			af.Value = valid[0]
+		}
+		filter.Attributes = append(filter.Attributes, af)
+	}
+
 	// If filtering by category, resolve the taxon.
 	if categorySlug != "" {
 		var taxon *domain.Taxon
@@ -141,7 +197,7 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 	var taxons []domain.Taxon
 	var totalCount int
 
-	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		products, txErr = d.CatalogService.ListProducts(ctx, tx, filter)
 		if txErr != nil {
@@ -218,14 +274,25 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Build catalog filter list for the filter bar UI.
+	catalogFilters := make([]storefront.CatalogFilter, 0, len(filterableKeys))
+	for _, key := range filterableKeys {
+		catalogFilters = append(catalogFilters, storefront.CatalogFilter{
+			Key:          key,
+			ActiveValues: activeFilters[key.Slug],
+		})
+	}
+
 	props := storefront.CatalogPageProps{
-		Products:    cards,
-		Taxons:      taxons,
-		ActiveTaxon: categorySlug,
-		Search:      search,
-		Page:        page,
-		TotalPages:  totalPages,
-		CartCount:   d.cartItemCountFromCookie(r),
+		Products:      cards,
+		Taxons:        taxons,
+		ActiveTaxon:   categorySlug,
+		Search:        search,
+		Filters:       catalogFilters,
+		ActiveFilters: activeFilters,
+		Page:          page,
+		TotalPages:    totalPages,
+		CartCount:     d.cartItemCountFromCookie(r),
 	}
 
 	if IsHTMX(r) {

@@ -294,6 +294,15 @@ func (s *AttributeService) ListProductAttributeValues(ctx context.Context, tx pg
 	return vals, nil
 }
 
+// ListFilterableKeys returns all attribute keys marked as filterable, for rendering the storefront filter UI.
+func (s *AttributeService) ListFilterableKeys(ctx context.Context, tx pgx.Tx) ([]domain.AttributeKey, error) {
+	keys, err := s.attributes.ListFilterableAttributeKeys(ctx, tx)
+	if err != nil {
+		return nil, fmt.Errorf("list filterable keys: %w", err)
+	}
+	return keys, nil
+}
+
 // validateAllowedValues ensures enum types have allowed values and other types do not.
 func validateAllowedValues(vt domain.AttributeValueType, allowed []string) error {
 	isEnum := vt == domain.AttributeValueTypeEnum || vt == domain.AttributeValueTypeMultiEnum

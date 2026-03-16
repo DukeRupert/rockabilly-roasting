@@ -102,6 +102,35 @@ func scaleLevel(val string) int {
 	}
 }
 
+// formatFilterValue returns a human-readable label for an attribute filter value slug.
+// Handles hyphenated slugs and special cases.
+func formatFilterValue(value string) string {
+	switch strings.ToLower(value) {
+	case "single-origin":
+		return "Single Origin"
+	case "medium-light":
+		return "Medium Light"
+	case "medium-dark":
+		return "Medium Dark"
+	case "pour-over":
+		return "Pour-Over"
+	case "french-press":
+		return "French Press"
+	case "cold-brew":
+		return "Cold Brew"
+	case "fair-trade":
+		return "Fair Trade"
+	case "rainforest-alliance":
+		return "Rainforest Alliance"
+	case "true":
+		return "Yes"
+	case "false":
+		return "No"
+	default:
+		return strings.Title(strings.ReplaceAll(value, "-", " ")) //nolint:staticcheck
+	}
+}
+
 // formatBrewMethod returns a display label for a brew method slug.
 func formatBrewMethod(method string) string {
 	switch strings.ToLower(method) {

@@ -208,53 +208,61 @@ type VisibilityContext struct {
 }
 
 // ProductFilter holds optional filters for listing products.
+// AttributeFilter represents a single facet filter on a product attribute.
+// For enum/boolean: Value is set.
+// For multi_enum: Values is set (OR logic — matches products with ANY of the values).
+type AttributeFilter struct {
+	KeySlug string
+	Value   string   // for enum/boolean
+	Values  []string // for multi_enum (OR)
+}
+
 type ProductFilter struct {
 	Status       *domain.ProductStatus
 	TaxonID      *uuid.UUID
 	Subscribable *bool
 	Visibility   *VisibilityContext
 	Search       string // ILIKE search on title and description
+	Attributes   []AttributeFilter
 	Limit        int
 	Offset       int
 }
 
-// ListProducts returns products matching the given filter (hand-written for dynamic WHERE).
-func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFilter) ([]domain.Product, error) {
-	query := `SELECT id, slug, title, description, status, product_type_id, taxon_id,
-	                 subscribable, visibility, tax_exempt, metadata, available_on, discontinue_on,
-	                 created_at, updated_at
-	          FROM products WHERE true`
+// productFilterWhere builds the shared WHERE clause for product listing and counting.
+// Returns the clause fragment (starting with " AND ...") and the positional args.
+func productFilterWhere(f ProductFilter) (string, []any, int) {
+	where := ""
 	args := []any{}
 	argN := 1
 
 	if f.Status != nil {
-		query += fmt.Sprintf(" AND status = $%d", argN)
+		where += fmt.Sprintf(" AND status = $%d", argN)
 		args = append(args, string(*f.Status))
 		argN++
 	}
 	if f.TaxonID != nil {
-		query += fmt.Sprintf(" AND taxon_id = $%d", argN)
+		where += fmt.Sprintf(" AND taxon_id = $%d", argN)
 		args = append(args, *f.TaxonID)
 		argN++
 	}
 	if f.Subscribable != nil {
-		query += fmt.Sprintf(" AND subscribable = $%d", argN)
+		where += fmt.Sprintf(" AND subscribable = $%d", argN)
 		args = append(args, *f.Subscribable)
 		argN++
 	}
 	if f.Search != "" {
-		query += fmt.Sprintf(" AND (title ILIKE $%d OR description ILIKE $%d)", argN, argN)
+		where += fmt.Sprintf(" AND (title ILIKE $%d OR description ILIKE $%d)", argN, argN)
 		args = append(args, "%"+f.Search+"%")
 		argN++
 	}
 	if f.Visibility != nil {
 		vis := f.Visibility
 		if !vis.IsWholesale {
-			query += " AND visibility = 'public'"
+			where += " AND visibility = 'public'"
 		} else if len(vis.GroupIDs) == 0 {
-			query += " AND visibility IN ('public', 'wholesale')"
+			where += " AND visibility IN ('public', 'wholesale')"
 		} else {
-			query += fmt.Sprintf(` AND (
+			where += fmt.Sprintf(` AND (
 				visibility IN ('public', 'wholesale')
 				OR (visibility = 'restricted' AND EXISTS (
 					SELECT 1 FROM product_group_visibility pgv
@@ -266,6 +274,43 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 			argN++
 		}
 	}
+	for _, af := range f.Attributes {
+		if len(af.Values) > 0 {
+			// multi_enum: match products that have ANY of the given values
+			where += fmt.Sprintf(` AND EXISTS (
+				SELECT 1 FROM product_attribute_values pav
+				JOIN attribute_keys ak ON ak.id = pav.attribute_key_id
+				WHERE pav.product_id = products.id
+				AND ak.slug = $%d
+				AND pav.values ?| $%d
+			)`, argN, argN+1)
+			args = append(args, af.KeySlug, af.Values)
+			argN += 2
+		} else if af.Value != "" {
+			// enum/boolean: exact match on single value
+			where += fmt.Sprintf(` AND EXISTS (
+				SELECT 1 FROM product_attribute_values pav
+				JOIN attribute_keys ak ON ak.id = pav.attribute_key_id
+				WHERE pav.product_id = products.id
+				AND ak.slug = $%d
+				AND pav.value = $%d
+			)`, argN, argN+1)
+			args = append(args, af.KeySlug, af.Value)
+			argN += 2
+		}
+	}
+
+	return where, args, argN
+}
+
+// ListProducts returns products matching the given filter (hand-written for dynamic WHERE).
+func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFilter) ([]domain.Product, error) {
+	where, args, argN := productFilterWhere(f)
+
+	query := `SELECT id, slug, title, description, status, product_type_id, taxon_id,
+	                 subscribable, visibility, tax_exempt, metadata, available_on, discontinue_on,
+	                 created_at, updated_at
+	          FROM products WHERE true` + where
 
 	query += " ORDER BY created_at DESC"
 
@@ -317,49 +362,8 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 
 // CountProducts returns the total number of products matching the filter (for pagination).
 func (s *CatalogStore) CountProducts(ctx context.Context, tx pgx.Tx, f ProductFilter) (int, error) {
-	query := `SELECT COUNT(*) FROM products WHERE true`
-	args := []any{}
-	argN := 1
-
-	if f.Status != nil {
-		query += fmt.Sprintf(" AND status = $%d", argN)
-		args = append(args, string(*f.Status))
-		argN++
-	}
-	if f.TaxonID != nil {
-		query += fmt.Sprintf(" AND taxon_id = $%d", argN)
-		args = append(args, *f.TaxonID)
-		argN++
-	}
-	if f.Subscribable != nil {
-		query += fmt.Sprintf(" AND subscribable = $%d", argN)
-		args = append(args, *f.Subscribable)
-		argN++
-	}
-	if f.Search != "" {
-		query += fmt.Sprintf(" AND (title ILIKE $%d OR description ILIKE $%d)", argN, argN)
-		args = append(args, "%"+f.Search+"%")
-		argN++
-	}
-	if f.Visibility != nil {
-		vis := f.Visibility
-		if !vis.IsWholesale {
-			query += " AND visibility = 'public'"
-		} else if len(vis.GroupIDs) == 0 {
-			query += " AND visibility IN ('public', 'wholesale')"
-		} else {
-			query += fmt.Sprintf(` AND (
-				visibility IN ('public', 'wholesale')
-				OR (visibility = 'restricted' AND EXISTS (
-					SELECT 1 FROM product_group_visibility pgv
-					WHERE pgv.product_id = products.id
-					AND pgv.customer_group_id = ANY($%d)
-				))
-			)`, argN)
-			args = append(args, vis.GroupIDs)
-			argN++
-		}
-	}
+	where, args, _ := productFilterWhere(f)
+	query := `SELECT COUNT(*) FROM products WHERE true` + where
 
 	var count int
 	if err := tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {

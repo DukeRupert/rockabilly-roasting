@@ -3,6 +3,7 @@ package storefront
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
@@ -16,14 +17,32 @@ type ProductCard struct {
 	Coffee       *CoffeeAttrs // nil if not a coffee product or attributes not populated
 }
 
+// CatalogFilter represents a filterable attribute with its allowed values and current selection.
+type CatalogFilter struct {
+	Key          domain.AttributeKey
+	ActiveValues []string // currently selected values from URL
+}
+
 type CatalogPageProps struct {
-	Products    []ProductCard
-	Taxons      []domain.Taxon
-	ActiveTaxon string
-	Search      string
-	Page        int
-	TotalPages  int
-	CartCount   int
+	Products      []ProductCard
+	Taxons        []domain.Taxon
+	ActiveTaxon   string
+	Search        string
+	Filters       []CatalogFilter       // filterable attributes for the filter bar
+	ActiveFilters map[string][]string    // slug -> active values, for URL building
+	Page          int
+	TotalPages    int
+	CartCount     int
+}
+
+// hasActiveFilters returns true if any attribute filters are selected.
+func (p CatalogPageProps) hasActiveFilters() bool {
+	for _, vals := range p.ActiveFilters {
+		if len(vals) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func categoryPillClasses(active bool) string {
@@ -33,14 +52,19 @@ func categoryPillClasses(active bool) string {
 	return "label-font inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-rr-muted hover:border-rr-amber hover:text-rr-heading transition-colors"
 }
 
-// catalogURL builds a /catalog URL preserving the given query params.
-func catalogURL(category, search string, page int) string {
+// catalogURL builds a /catalog URL preserving category, search, page, and attribute filters.
+func catalogURL(category, search string, page int, filters map[string][]string) string {
 	v := url.Values{}
 	if category != "" {
 		v.Set("category", category)
 	}
 	if search != "" {
 		v.Set("q", search)
+	}
+	for slug, vals := range filters {
+		if len(vals) > 0 {
+			v.Set(slug, strings.Join(vals, ","))
+		}
 	}
 	if page > 1 {
 		v.Set("page", fmt.Sprintf("%d", page))
@@ -50,6 +74,55 @@ func catalogURL(category, search string, page int) string {
 		return "/catalog?" + q
 	}
 	return "/catalog"
+}
+
+// filterToggleURL returns a catalog URL with the given filter value toggled on/off.
+func filterToggleURL(category, search string, filters map[string][]string, slug, value string) string {
+	updated := make(map[string][]string, len(filters))
+	for k, vals := range filters {
+		updated[k] = append([]string(nil), vals...)
+	}
+	// Toggle: remove if present, add if absent.
+	existing := updated[slug]
+	found := false
+	for i, v := range existing {
+		if v == value {
+			updated[slug] = append(existing[:i], existing[i+1:]...)
+			found = true
+			break
+		}
+	}
+	if !found {
+		updated[slug] = append(existing, value)
+	}
+	// Reset to page 1 when changing filters.
+	return catalogURL(category, search, 1, updated)
+}
+
+// filterRemoveURL returns a catalog URL with a specific filter value removed.
+func filterRemoveURL(category, search string, filters map[string][]string, slug, value string) string {
+	updated := make(map[string][]string, len(filters))
+	for k, vals := range filters {
+		updated[k] = append([]string(nil), vals...)
+	}
+	existing := updated[slug]
+	for i, v := range existing {
+		if v == value {
+			updated[slug] = append(existing[:i], existing[i+1:]...)
+			break
+		}
+	}
+	return catalogURL(category, search, 1, updated)
+}
+
+// isFilterActive returns true if the given value is active for the given filter slug.
+func isFilterActive(filters map[string][]string, slug, value string) bool {
+	for _, v := range filters[slug] {
+		if v == value {
+			return true
+		}
+	}
+	return false
 }
 
 templ CatalogContent(props CatalogPageProps) {
@@ -86,14 +159,14 @@ templ CatalogContent(props CatalogPageProps) {
 		if len(props.Taxons) > 0 {
 			<div class="mb-6 flex flex-wrap gap-2">
 				<a
-					href={ templ.SafeURL(catalogURL("", props.Search, 1)) }
+					href={ templ.SafeURL(catalogURL("", props.Search, 1, props.ActiveFilters)) }
 					class={ categoryPillClasses(props.ActiveTaxon == "") }
 				>
 					ALL
 				</a>
 				for _, taxon := range props.Taxons {
 					<a
-						href={ templ.SafeURL(catalogURL(taxon.Slug, props.Search, 1)) }
+						href={ templ.SafeURL(catalogURL(taxon.Slug, props.Search, 1, props.ActiveFilters)) }
 						class={ categoryPillClasses(props.ActiveTaxon == taxon.Slug) }
 					>
 						{ taxon.Name }
@@ -101,14 +174,22 @@ templ CatalogContent(props CatalogPageProps) {
 				}
 			</div>
 		}
+		<!-- Attribute filters -->
+		if len(props.Filters) > 0 {
+			@catalogFilterBar(props)
+		}
+		<!-- Active filter tags -->
+		if props.hasActiveFilters() {
+			@activeFilterTags(props)
+		}
 		<!-- Product grid — compact BRCC-style layout -->
 		if len(props.Products) == 0 {
 			<div class="text-center py-16">
 				<svg class="mx-auto size-10 text-rr-faint mb-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"></path>
 				</svg>
-				<p class="font-body text-rr-muted">No products match your search.</p>
-				if props.ActiveTaxon != "" || props.Search != "" {
+				<p class="font-body text-rr-muted">No products match your filters.</p>
+				if props.ActiveTaxon != "" || props.Search != "" || props.hasActiveFilters() {
 					<a href="/catalog" class="btn label-font inline-block mt-4 px-6 py-2.5 rounded-sm text-white text-sm bg-rr-red hover:bg-rr-red-lt transition-colors">
 						BROWSE ALL COFFEE
 					</a>
@@ -126,7 +207,7 @@ templ CatalogContent(props CatalogPageProps) {
 			<nav class="mt-10 flex items-center justify-center gap-1.5" aria-label="Pagination">
 				if props.Page > 1 {
 					<a
-						href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, props.Page-1)) }
+						href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, props.Page-1, props.ActiveFilters)) }
 						class="btn label-font text-rr-muted border border-rr-border px-3 py-2 rounded-sm text-xs bg-rr-bg"
 					>
 						&lsaquo;
@@ -139,7 +220,7 @@ templ CatalogContent(props CatalogPageProps) {
 						</span>
 					} else {
 						<a
-							href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, p)) }
+							href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, p, props.ActiveFilters)) }
 							aria-label={ fmt.Sprintf("Page %d", p) }
 							class="btn label-font text-rr-muted border border-rr-border w-8 h-8 rounded-sm text-xs flex items-center justify-center bg-rr-bg hover:border-rr-amber transition-colors"
 						>
@@ -149,7 +230,7 @@ templ CatalogContent(props CatalogPageProps) {
 				}
 				if props.Page < props.TotalPages {
 					<a
-						href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, props.Page+1)) }
+						href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, props.Page+1, props.ActiveFilters)) }
 						class="btn label-font text-rr-muted border border-rr-border px-3 py-2 rounded-sm text-xs bg-rr-bg"
 					>
 						&rsaquo;
@@ -262,6 +343,254 @@ func roastDotEmpty(size string) string {
 		return "size-2.5 rounded-full bg-rr-border"
 	}
 	return "size-1.5 rounded-full bg-rr-border"
+}
+
+// catalogFilterBar renders the desktop horizontal filter bar and mobile filter button.
+templ catalogFilterBar(props CatalogPageProps) {
+	<!-- Desktop filter bar -->
+	<div class="hidden sm:flex flex-wrap items-center gap-2 mb-6">
+		<span class="label-font text-rr-faint text-xs mr-1">FILTER</span>
+		for _, f := range props.Filters {
+			if len(f.Key.AllowedValues) > 0 || f.Key.ValueType == "boolean" {
+				<div class="relative" data-filter-group={ f.Key.Slug }>
+					<button
+						type="button"
+						class={ filterButtonClasses(len(f.ActiveValues) > 0) }
+						data-filter-toggle={ f.Key.Slug }
+						aria-expanded="false"
+					>
+						{ f.Key.Name }
+						if len(f.ActiveValues) > 0 {
+							<span class="ml-1 size-4 inline-flex items-center justify-center rounded-full bg-rr-amber text-rr-void text-[0.5rem] font-bold">
+								{ fmt.Sprintf("%d", len(f.ActiveValues)) }
+							</span>
+						}
+						<svg class="ml-1 size-3 text-current" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"></path>
+						</svg>
+					</button>
+					<div class="absolute top-full left-0 z-30 mt-1 hidden min-w-48 rounded-sm border border-rr-border bg-rr-surface shadow-lg" data-filter-panel={ f.Key.Slug }>
+						<div class="p-3 space-y-1">
+							if f.Key.ValueType == "boolean" {
+								<a
+									href={ templ.SafeURL(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, "true")) }
+									class={ filterOptionClasses(isFilterActive(props.ActiveFilters, f.Key.Slug, "true")) }
+								>
+									<span class={ filterCheckbox(isFilterActive(props.ActiveFilters, f.Key.Slug, "true")) }></span>
+									Yes
+								</a>
+							} else {
+								for _, val := range f.Key.AllowedValues {
+									<a
+										href={ templ.SafeURL(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val)) }
+										class={ filterOptionClasses(isFilterActive(props.ActiveFilters, f.Key.Slug, val)) }
+									>
+										<span class={ filterCheckbox(isFilterActive(props.ActiveFilters, f.Key.Slug, val)) }></span>
+										{ formatFilterValue(val) }
+									</a>
+								}
+							}
+						</div>
+					</div>
+				</div>
+			}
+		}
+		if props.hasActiveFilters() {
+			<a
+				href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, 1, nil)) }
+				class="label-font text-xs text-rr-muted hover:text-rr-heading transition-colors ml-2"
+			>
+				CLEAR ALL
+			</a>
+		}
+	</div>
+	<!-- Mobile filter button -->
+	<div class="sm:hidden mb-4">
+		<button
+			type="button"
+			id="mobile-filter-open"
+			class={ filterButtonClasses(props.hasActiveFilters()) }
+		>
+			<svg class="size-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"></path>
+			</svg>
+			FILTERS
+			if props.hasActiveFilters() {
+				<span class="ml-1.5 size-5 inline-flex items-center justify-center rounded-full bg-rr-amber text-rr-void text-[0.55rem] font-bold">
+					{ fmt.Sprintf("%d", countActiveFilters(props.ActiveFilters)) }
+				</span>
+			}
+		</button>
+	</div>
+	<!-- Mobile filter drawer -->
+	<div id="mobile-filter-drawer" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog">
+		<div id="mobile-filter-backdrop" class="absolute inset-0 bg-black/60"></div>
+		<div class="absolute bottom-0 left-0 right-0 max-h-[75vh] overflow-y-auto rounded-t-sm border-t border-rr-border bg-rr-surface">
+			<div class="sticky top-0 flex items-center justify-between border-b border-rr-border bg-rr-surface px-4 py-3 z-10">
+				<span class="label-font text-rr-heading text-sm">FILTERS</span>
+				<button type="button" id="mobile-filter-close" class="label-font text-rr-muted text-xs hover:text-rr-heading transition-colors">
+					CLOSE
+				</button>
+			</div>
+			<div class="px-4 py-3 space-y-3">
+				for _, f := range props.Filters {
+					if len(f.Key.AllowedValues) > 0 || f.Key.ValueType == "boolean" {
+						<details class="group">
+							<summary class="flex items-center justify-between cursor-pointer py-2">
+								<span class="label-font text-rr-heading text-xs">
+									{ f.Key.Name }
+									if len(f.ActiveValues) > 0 {
+										<span class="ml-1 text-rr-amber">({ fmt.Sprintf("%d", len(f.ActiveValues)) })</span>
+									}
+								</span>
+								<svg class="size-3 text-rr-muted transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"></path>
+								</svg>
+							</summary>
+							<div class="pb-2 space-y-1">
+								if f.Key.ValueType == "boolean" {
+									<a
+										href={ templ.SafeURL(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, "true")) }
+										class={ filterOptionClasses(isFilterActive(props.ActiveFilters, f.Key.Slug, "true")) }
+									>
+										<span class={ filterCheckbox(isFilterActive(props.ActiveFilters, f.Key.Slug, "true")) }></span>
+										Yes
+									</a>
+								} else {
+									for _, val := range f.Key.AllowedValues {
+										<a
+											href={ templ.SafeURL(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val)) }
+											class={ filterOptionClasses(isFilterActive(props.ActiveFilters, f.Key.Slug, val)) }
+										>
+											<span class={ filterCheckbox(isFilterActive(props.ActiveFilters, f.Key.Slug, val)) }></span>
+											{ formatFilterValue(val) }
+										</a>
+									}
+								}
+							</div>
+						</details>
+					}
+				}
+			</div>
+			<div class="sticky bottom-0 border-t border-rr-border bg-rr-surface px-4 py-3 flex gap-3">
+				if props.hasActiveFilters() {
+					<a
+						href={ templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, 1, nil)) }
+						class="btn flex-1 text-center label-font text-xs rounded-sm border border-rr-border px-4 py-2.5 text-rr-muted hover:text-rr-heading transition-colors"
+					>
+						CLEAR ALL
+					</a>
+				}
+				<button type="button" id="mobile-filter-apply" class="btn flex-1 label-font text-xs rounded-sm bg-rr-red px-4 py-2.5 text-white hover:bg-rr-red-lt transition-colors">
+					SHOW RESULTS
+				</button>
+			</div>
+		</div>
+	</div>
+	@filterScript()
+}
+
+// activeFilterTags renders removable tag pills for each active filter value.
+templ activeFilterTags(props CatalogPageProps) {
+	<div class="mb-6 flex flex-wrap items-center gap-1.5">
+		for _, f := range props.Filters {
+			for _, val := range f.ActiveValues {
+				<a
+					href={ templ.SafeURL(filterRemoveURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val)) }
+					class="inline-flex items-center gap-1 label-font px-2 py-0.5 rounded-sm text-rr-amber border border-rr-amber/30 bg-rr-amber/5 text-[0.6rem] hover:bg-rr-amber/10 transition-colors"
+				>
+					{ f.Key.Name }: { formatFilterValue(val) }
+					<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"></path>
+					</svg>
+				</a>
+			}
+		}
+	</div>
+}
+
+// filterScript handles desktop dropdown toggle and mobile drawer open/close.
+templ filterScript() {
+	<script>
+		(function() {
+			// Desktop: toggle filter panels, close others
+			document.querySelectorAll('[data-filter-toggle]').forEach(function(btn) {
+				btn.addEventListener('click', function(e) {
+					e.stopPropagation();
+					var slug = btn.dataset.filterToggle;
+					var panel = document.querySelector('[data-filter-panel="' + slug + '"]');
+					var isOpen = !panel.classList.contains('hidden');
+					// Close all panels
+					document.querySelectorAll('[data-filter-panel]').forEach(function(p) {
+						p.classList.add('hidden');
+					});
+					document.querySelectorAll('[data-filter-toggle]').forEach(function(b) {
+						b.setAttribute('aria-expanded', 'false');
+					});
+					// Toggle the clicked one
+					if (!isOpen) {
+						panel.classList.remove('hidden');
+						btn.setAttribute('aria-expanded', 'true');
+					}
+				});
+			});
+			// Close panels on outside click
+			document.addEventListener('click', function() {
+				document.querySelectorAll('[data-filter-panel]').forEach(function(p) {
+					p.classList.add('hidden');
+				});
+				document.querySelectorAll('[data-filter-toggle]').forEach(function(b) {
+					b.setAttribute('aria-expanded', 'false');
+				});
+			});
+			// Prevent panel clicks from closing
+			document.querySelectorAll('[data-filter-panel]').forEach(function(p) {
+				p.addEventListener('click', function(e) { e.stopPropagation(); });
+			});
+
+			// Mobile drawer
+			var drawer = document.getElementById('mobile-filter-drawer');
+			var openBtn = document.getElementById('mobile-filter-open');
+			var closeBtn = document.getElementById('mobile-filter-close');
+			var applyBtn = document.getElementById('mobile-filter-apply');
+			var backdrop = document.getElementById('mobile-filter-backdrop');
+			function openDrawer() { if (drawer) drawer.classList.remove('hidden'); }
+			function closeDrawer() { if (drawer) drawer.classList.add('hidden'); }
+			if (openBtn) openBtn.addEventListener('click', openDrawer);
+			if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+			if (applyBtn) applyBtn.addEventListener('click', closeDrawer);
+			if (backdrop) backdrop.addEventListener('click', closeDrawer);
+		})();
+	</script>
+}
+
+func filterButtonClasses(active bool) string {
+	if active {
+		return "label-font inline-flex items-center rounded-sm border border-rr-amber bg-rr-amber/5 px-3 py-1.5 text-rr-amber text-xs transition-colors"
+	}
+	return "label-font inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-rr-muted text-xs hover:border-rr-amber hover:text-rr-heading transition-colors"
+}
+
+func filterOptionClasses(active bool) string {
+	if active {
+		return "flex items-center gap-2 rounded-sm px-2 py-1.5 font-body text-sm text-rr-heading bg-rr-amber/5 transition-colors"
+	}
+	return "flex items-center gap-2 rounded-sm px-2 py-1.5 font-body text-sm text-rr-muted hover:text-rr-heading hover:bg-rr-bg transition-colors"
+}
+
+func filterCheckbox(checked bool) string {
+	if checked {
+		return "size-3.5 rounded-sm border border-rr-amber bg-rr-amber inline-flex items-center justify-center text-rr-void text-[0.5rem] flex-shrink-0"
+	}
+	return "size-3.5 rounded-sm border border-rr-border bg-rr-bg inline-flex items-center justify-center flex-shrink-0"
+}
+
+func countActiveFilters(filters map[string][]string) int {
+	n := 0
+	for _, vals := range filters {
+		n += len(vals)
+	}
+	return n
 }
 
 templ CatalogPage(props CatalogPageProps) {

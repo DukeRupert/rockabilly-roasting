@@ -1,0 +1,96 @@
+package admin
+
+import (
+	"github.com/dukerupert/hiri/internal/platform/help"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type AdminHelpIndexProps struct {
+	StaffName string
+	Articles  []help.Article
+}
+
+type AdminHelpArticleProps struct {
+	StaffName   string
+	Article     help.Article
+	Articles    []help.Article
+	CurrentSlug string
+}
+
+templ AdminHelpIndexContent(props AdminHelpIndexProps) {
+	<div class="mx-auto max-w-3xl py-8 px-4">
+		<h1 class="text-2xl font-semibold text-foreground mb-2">Help &amp; Documentation</h1>
+		<p class="text-sm text-muted-foreground mb-8">Guides for managing your store.</p>
+		<nav class="space-y-1">
+			for _, art := range props.Articles {
+				<a
+					href={ templ.SafeURL("/admin/help/" + art.Slug) }
+					class="block rounded-sm border border-border bg-card px-4 py-3 text-sm text-card-foreground hover:bg-accent transition-colors"
+				>
+					{ art.Title }
+				</a>
+			}
+		</nav>
+	</div>
+}
+
+templ AdminHelpIndex(props AdminHelpIndexProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Help",
+		ActivePath: "/admin/help",
+		StaffName:  props.StaffName,
+	}) {
+		@AdminHelpIndexContent(props)
+	}
+}
+
+templ adminHelpSidebar(articles []help.Article, currentSlug string) {
+	<nav class="space-y-0.5">
+		<a
+			href="/admin/help"
+			class="block rounded-sm px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-2"
+		>
+			&larr; All Topics
+		</a>
+		for _, art := range articles {
+			if art.Slug == currentSlug {
+				<a
+					href={ templ.SafeURL("/admin/help/" + art.Slug) }
+					class="block rounded-sm bg-accent px-3 py-1.5 text-sm text-foreground"
+				>
+					{ art.Title }
+				</a>
+			} else {
+				<a
+					href={ templ.SafeURL("/admin/help/" + art.Slug) }
+					class="block rounded-sm px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+				>
+					{ art.Title }
+				</a>
+			}
+		}
+	</nav>
+}
+
+templ AdminHelpArticleContent(props AdminHelpArticleProps) {
+	<div class="mx-auto max-w-5xl py-8 px-4">
+		<div class="flex flex-col lg:flex-row gap-8">
+			<aside class="lg:w-56 shrink-0">
+				@adminHelpSidebar(props.Articles, props.CurrentSlug)
+			</aside>
+			<article class="min-w-0 flex-1 help-prose help-prose-light">
+				@templ.Raw(string(props.Article.HTML))
+			</article>
+		</div>
+	</div>
+}
+
+templ AdminHelpArticle(props AdminHelpArticleProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      props.Article.Title + " - Help",
+		ActivePath: "/admin/help",
+		StaffName:  props.StaffName,
+	}) {
+		@AdminHelpArticleContent(props)
+	}
+}

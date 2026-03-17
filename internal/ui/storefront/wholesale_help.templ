@@ -1,0 +1,96 @@
+package storefront
+
+import (
+	"github.com/dukerupert/hiri/internal/platform/help"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type WholesaleHelpIndexProps struct {
+	CartCount int
+	Articles  []help.Article
+}
+
+type WholesaleHelpArticleProps struct {
+	CartCount   int
+	Article     help.Article
+	Articles    []help.Article
+	CurrentSlug string
+}
+
+templ WholesaleHelpIndexContent(props WholesaleHelpIndexProps) {
+	<div class="mx-auto max-w-3xl py-8">
+		<h1 class="font-display text-3xl text-rr-heading tracking-wide mb-2">WHOLESALE HELP</h1>
+		<p class="font-body text-sm text-rr-muted mb-8">Guides for wholesale customers.</p>
+		<nav class="space-y-1">
+			for _, art := range props.Articles {
+				<a
+					href={ templ.SafeURL("/wholesale/help/" + art.Slug) }
+					class="block rounded-sm border border-rr-border bg-rr-surface px-4 py-3 font-body text-sm text-rr-body hover:bg-rr-raised hover:text-rr-heading transition-colors"
+				>
+					{ art.Title }
+				</a>
+			}
+		</nav>
+	</div>
+}
+
+templ WholesaleHelpIndexPage(props WholesaleHelpIndexProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Wholesale Help",
+		Description: "Help and guides for wholesale customers.",
+		CartCount:   props.CartCount,
+	}) {
+		@WholesaleHelpIndexContent(props)
+	}
+}
+
+templ wholesaleHelpSidebar(articles []help.Article, currentSlug string) {
+	<nav class="space-y-0.5">
+		<a
+			href="/wholesale/help"
+			class="block rounded-sm px-3 py-1.5 font-body text-xs text-rr-muted hover:text-rr-heading transition-colors mb-2"
+		>
+			&larr; All Topics
+		</a>
+		for _, art := range articles {
+			if art.Slug == currentSlug {
+				<a
+					href={ templ.SafeURL("/wholesale/help/" + art.Slug) }
+					class="block rounded-sm bg-rr-raised px-3 py-1.5 font-body text-sm text-rr-heading"
+				>
+					{ art.Title }
+				</a>
+			} else {
+				<a
+					href={ templ.SafeURL("/wholesale/help/" + art.Slug) }
+					class="block rounded-sm px-3 py-1.5 font-body text-sm text-rr-muted hover:text-rr-heading hover:bg-rr-raised/50 transition-colors"
+				>
+					{ art.Title }
+				</a>
+			}
+		}
+	</nav>
+}
+
+templ WholesaleHelpArticleContent(props WholesaleHelpArticleProps) {
+	<div class="mx-auto max-w-5xl py-8">
+		<div class="flex flex-col lg:flex-row gap-8">
+			<aside class="lg:w-56 shrink-0">
+				@wholesaleHelpSidebar(props.Articles, props.CurrentSlug)
+			</aside>
+			<article class="min-w-0 flex-1 help-prose help-prose-dark">
+				@templ.Raw(string(props.Article.HTML))
+			</article>
+		</div>
+	</div>
+}
+
+templ WholesaleHelpArticlePage(props WholesaleHelpArticleProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       props.Article.Title + " - Wholesale Help",
+		Description: "Wholesale Help: " + props.Article.Title,
+		CartCount:   props.CartCount,
+	}) {
+		@WholesaleHelpArticleContent(props)
+	}
+}

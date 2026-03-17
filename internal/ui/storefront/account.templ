@@ -58,6 +58,9 @@ templ accountLayout(activePath string) {
 				<a href="/account/orders" class={ mobileNavClass("/account/orders", activePath) }>Orders</a>
 				<a href="/account/subscriptions" class={ mobileNavClass("/account/subscriptions", activePath) }>Subscriptions</a>
 				<a href="/account/addresses" class={ mobileNavClass("/account/addresses", activePath) }>Addresses</a>
+				<form method="POST" action="/account/logout" class="ml-auto">
+					<button type="submit" class={ "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-rr-body hover:bg-rr-bg" }>Sign Out</button>
+				</form>
 			</div>
 		</div>
 		<!-- Desktop: sidebar + content; Mobile: content only -->
@@ -347,6 +350,23 @@ type AccountSubscriptionsProps struct {
 	CartCount     int
 }
 
+func subscriptionStatusLabel(status domain.SubscriptionStatus) string {
+	switch status {
+	case domain.SubscriptionStatusActive:
+		return "Active"
+	case domain.SubscriptionStatusPaused:
+		return "Paused"
+	case domain.SubscriptionStatusCancelled:
+		return "Cancelled"
+	case domain.SubscriptionStatusPastDue:
+		return "Past Due"
+	case domain.SubscriptionStatusExpired:
+		return "Expired"
+	default:
+		return string(status)
+	}
+}
+
 func subscriptionStatusBadgeClass(status domain.SubscriptionStatus) string {
 	switch status {
 	case domain.SubscriptionStatusActive:
@@ -407,7 +427,7 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 								}
 							</div>
 							<span class={ "inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium ring-1 ring-inset " + subscriptionStatusBadgeClass(sub.Status) }>
-								{ string(sub.Status) }
+								{ subscriptionStatusLabel(sub.Status) }
 							</span>
 						</div>
 						if sub.Status == domain.SubscriptionStatusActive {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/email"
+	"github.com/dukerupert/hiri/internal/platform/help"
 	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
@@ -57,6 +58,7 @@ type Deps struct {
 	QBWebhookVerifierToken  string
 	QBOAuthHMACKey          []byte
 	QBHTTPClient            *http.Client
+	HelpRegistry            *help.Registry
 	RateLimiter             *ratelimit.Limiter
 	SecureCookies           bool
 	BaseURL                 string // public site URL, e.g. "https://rockabillyroasting.com"
@@ -109,6 +111,8 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /privacy", deps.handlePrivacyPage)
 	mux.HandleFunc("GET /terms", deps.handleTermsPage)
 	mux.HandleFunc("GET /shipping", deps.handleShippingPage)
+	mux.HandleFunc("GET /help", deps.handleHelpIndex)
+	mux.HandleFunc("GET /help/{slug}", deps.handleHelpArticle)
 
 	// Cart routes
 	mux.HandleFunc("POST /cart/add", deps.handleCartAdd)
@@ -191,6 +195,8 @@ func NewRouter(deps *Deps) http.Handler {
 	wholesaleMux.HandleFunc("POST /wholesale/checkout/confirm", deps.handleWholesaleCheckoutConfirm)
 	wholesaleMux.HandleFunc("POST /wholesale/cart/update", deps.handleWholesaleCartUpdate)
 	wholesaleMux.HandleFunc("POST /wholesale/cart/remove", deps.handleWholesaleCartRemove)
+	wholesaleMux.HandleFunc("GET /wholesale/help", deps.handleWholesaleHelpIndex)
+	wholesaleMux.HandleFunc("GET /wholesale/help/{slug}", deps.handleWholesaleHelpArticle)
 	mux.Handle("GET /wholesale/portal", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("GET /wholesale/portal/", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("POST /wholesale/portal/{path...}", deps.requireApprovedWholesale(wholesaleMux))
@@ -198,6 +204,8 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("GET /wholesale/checkout/", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("POST /wholesale/checkout/{path...}", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("POST /wholesale/cart/{path...}", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/help", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/help/{slug}", deps.requireApprovedWholesale(wholesaleMux))
 
 	// Staff auth routes (no session required)
 	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {
@@ -326,6 +334,10 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin audit log
 	adminMux.HandleFunc("GET /admin/audit", deps.handleAdminAuditList)
+
+	// Admin help
+	adminMux.HandleFunc("GET /admin/help", deps.handleAdminHelpIndex)
+	adminMux.HandleFunc("GET /admin/help/{slug}", deps.handleAdminHelpArticle)
 
 	// Staff logout (requires session)
 	adminMux.HandleFunc("POST /auth/staff/logout", deps.handleStaffLogout)

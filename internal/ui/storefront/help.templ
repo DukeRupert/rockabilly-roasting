@@ -1,0 +1,98 @@
+package storefront
+
+import (
+	"github.com/dukerupert/hiri/internal/platform/help"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type HelpIndexProps struct {
+	CartCount int
+	Articles  []help.Article
+}
+
+type HelpArticleProps struct {
+	CartCount   int
+	Article     help.Article
+	Articles    []help.Article
+	CurrentSlug string
+}
+
+templ HelpIndexContent(props HelpIndexProps) {
+	<div class="mx-auto max-w-3xl py-8">
+		<h1 class="font-display text-3xl text-rr-heading tracking-wide mb-2">HELP CENTER</h1>
+		<p class="font-body text-sm text-rr-muted mb-8">Everything you need to know about shopping with Rockabilly Roasting Co.</p>
+		<nav class="space-y-1">
+			for _, art := range props.Articles {
+				<a
+					href={ templ.SafeURL("/help/" + art.Slug) }
+					class="block rounded-sm border border-rr-border bg-rr-surface px-4 py-3 font-body text-sm text-rr-body hover:bg-rr-raised hover:text-rr-heading transition-colors"
+				>
+					{ art.Title }
+				</a>
+			}
+		</nav>
+	</div>
+}
+
+templ HelpIndexPage(props HelpIndexProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Help Center",
+		Description: "Help and guides for Rockabilly Roasting Co.",
+		CartCount:   props.CartCount,
+	}) {
+		@HelpIndexContent(props)
+	}
+}
+
+templ helpSidebar(articles []help.Article, currentSlug string) {
+	<nav class="space-y-0.5">
+		<a
+			href="/help"
+			class="block rounded-sm px-3 py-1.5 font-body text-xs text-rr-muted hover:text-rr-heading transition-colors mb-2"
+		>
+			&larr; All Topics
+		</a>
+		for _, art := range articles {
+			if art.Slug == currentSlug {
+				<a
+					href={ templ.SafeURL("/help/" + art.Slug) }
+					class="block rounded-sm bg-rr-raised px-3 py-1.5 font-body text-sm text-rr-heading"
+				>
+					{ art.Title }
+				</a>
+			} else {
+				<a
+					href={ templ.SafeURL("/help/" + art.Slug) }
+					class="block rounded-sm px-3 py-1.5 font-body text-sm text-rr-muted hover:text-rr-heading hover:bg-rr-raised/50 transition-colors"
+				>
+					{ art.Title }
+				</a>
+			}
+		}
+	</nav>
+}
+
+templ HelpArticleContent(props HelpArticleProps) {
+	<div class="mx-auto max-w-5xl py-8">
+		<div class="flex flex-col lg:flex-row gap-8">
+			<!-- Sidebar -->
+			<aside class="lg:w-56 shrink-0">
+				@helpSidebar(props.Articles, props.CurrentSlug)
+			</aside>
+			<!-- Article -->
+			<article class="min-w-0 flex-1 help-prose help-prose-dark">
+				@templ.Raw(string(props.Article.HTML))
+			</article>
+		</div>
+	</div>
+}
+
+templ HelpArticlePage(props HelpArticleProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       props.Article.Title + " - Help",
+		Description: "Help: " + props.Article.Title,
+		CartCount:   props.CartCount,
+	}) {
+		@HelpArticleContent(props)
+	}
+}

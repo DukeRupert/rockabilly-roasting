@@ -19,6 +19,7 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivermigrate"
 
+	"github.com/dukerupert/hiri/docs"
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/jobs"
@@ -26,6 +27,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/media"
+	"github.com/dukerupert/hiri/internal/platform/help"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
@@ -262,6 +264,13 @@ func run() error {
 	metrics.CollectRiverMetrics(ctx, metricsReg, pool, 15*time.Second)
 	metrics.CollectSubscriptionMetrics(ctx, metricsReg, pool, 60*time.Second)
 
+	// Help documentation
+	helpRegistry, err := help.New(docs.GuideFS)
+	if err != nil {
+		return fmt.Errorf("create help registry: %w", err)
+	}
+	logger.Info("help articles loaded")
+
 	// Router
 	deps := &web.Deps{
 		Pool:                pool,
@@ -297,6 +306,7 @@ func run() error {
 		QBWebhookVerifierToken: qbWebhookVerifier,
 		QBOAuthHMACKey:         qbOAuthHMACKey,
 		QBHTTPClient:           &http.Client{Timeout: 30 * time.Second},
+		HelpRegistry:           helpRegistry,
 		RateLimiter:            rateLimiter,
 		SecureCookies:          os.Getenv("INSECURE_COOKIES") != "true",
 		BaseURL:                baseURL,

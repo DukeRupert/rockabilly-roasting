@@ -12,6 +12,7 @@ const (
 
 	// Product/pricing actions
 	AuditProductCreated      = "product.created"
+	AuditProductCloned       = "product.cloned"
 	AuditProductUpdated      = "product.updated"
 	AuditProductArchived     = "product.archived"
 	AuditProductDeleted      = "product.deleted"

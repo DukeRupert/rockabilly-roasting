@@ -178,6 +178,139 @@ func (s *CatalogService) CountProducts(ctx context.Context, tx pgx.Tx, f store.P
 	return count, nil
 }
 
+// CloneProduct deep-copies a product including its options, option values,
+// variants, variant-option links, and prices. The clone gets a "Copy of" title,
+// a "-copy" slug suffix, draft status, and "-copy" SKU suffixes. Media is not cloned.
+func (s *CatalogService) CloneProduct(ctx context.Context, tx pgx.Tx, sourceID uuid.UUID, pricing *PricingService, actor Actor) (*domain.Product, error) {
+	// 1. Fetch source product
+	source, err := s.catalog.GetProductByID(ctx, tx, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("get source product: %w", err)
+	}
+
+	// 2. Create new product as draft
+	newProduct, err := s.catalog.CreateProduct(ctx, tx, store.CreateProductParams{
+		Slug:          source.Slug + "-copy",
+		Title:         "Copy of " + source.Title,
+		Description:   source.Description,
+		Status:        domain.ProductStatusDraft,
+		ProductTypeID: source.ProductTypeID,
+		TaxonID:       source.TaxonID,
+		Metadata:      source.Metadata,
+		AvailableOn:   source.AvailableOn,
+		DiscontinueOn: source.DiscontinueOn,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create cloned product: %w", err)
+	}
+
+	// 3. Clone options and option values, building old→new ID map
+	optionValueMap := make(map[uuid.UUID]uuid.UUID) // old option value ID → new
+	sourceOptions, err := s.catalog.ListProductOptions(ctx, tx, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("list source options: %w", err)
+	}
+	for _, opt := range sourceOptions {
+		newOpt, err := s.catalog.CreateProductOption(ctx, tx, newProduct.ID, opt.Name, opt.Position)
+		if err != nil {
+			return nil, fmt.Errorf("clone option %q: %w", opt.Name, err)
+		}
+		vals, err := s.catalog.ListProductOptionValues(ctx, tx, opt.ID)
+		if err != nil {
+			return nil, fmt.Errorf("list option values: %w", err)
+		}
+		for _, v := range vals {
+			newVal, err := s.catalog.CreateProductOptionValue(ctx, tx, newOpt.ID, v.Value, v.Position)
+			if err != nil {
+				return nil, fmt.Errorf("clone option value %q: %w", v.Value, err)
+			}
+			optionValueMap[v.ID] = newVal.ID
+		}
+	}
+
+	// 4. Clone variants, their option value links, and prices
+	sourceVariants, err := s.catalog.ListVariantsByProduct(ctx, tx, sourceID)
+	if err != nil {
+		return nil, fmt.Errorf("list source variants: %w", err)
+	}
+
+	// Pre-fetch prices for all source variants
+	var basePrices map[uuid.UUID]int
+	var groupPrices map[uuid.UUID]map[uuid.UUID]int
+	if pricing != nil {
+		basePrices, err = pricing.ListBasePricesByProduct(ctx, tx, sourceID, "USD")
+		if err != nil {
+			return nil, fmt.Errorf("list source base prices: %w", err)
+		}
+		groupPrices, err = pricing.ListGroupPricesByProduct(ctx, tx, sourceID, "USD")
+		if err != nil {
+			return nil, fmt.Errorf("list source group prices: %w", err)
+		}
+	}
+
+	for _, v := range sourceVariants {
+		newVariant, err := s.catalog.CreateVariant(ctx, tx, store.CreateVariantParams{
+			ProductID:   newProduct.ID,
+			SKU:         v.SKU + "-copy",
+			Barcode:     v.Barcode,
+			Position:    v.Position,
+			IsDefault:   v.IsDefault,
+			WeightGrams: v.WeightGrams,
+			Metadata:    v.Metadata,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("clone variant %s: %w", v.SKU, err)
+		}
+
+		// Link option values
+		vovs, err := s.catalog.ListVariantOptionValues(ctx, tx, v.ID)
+		if err != nil {
+			return nil, fmt.Errorf("list variant option values: %w", err)
+		}
+		for _, vov := range vovs {
+			newValID, ok := optionValueMap[vov.ProductOptionValueID]
+			if !ok {
+				continue
+			}
+			if err := s.catalog.CreateVariantOptionValue(ctx, tx, newVariant.ID, newValID); err != nil {
+				return nil, fmt.Errorf("clone variant option value: %w", err)
+			}
+		}
+
+		// Clone prices
+		if pricing != nil {
+			if cents, ok := basePrices[v.ID]; ok {
+				if _, err := pricing.SetBasePrice(ctx, tx, newVariant.ID, cents, "USD"); err != nil {
+					return nil, fmt.Errorf("clone base price: %w", err)
+				}
+			}
+			if gp, ok := groupPrices[v.ID]; ok {
+				for groupID, cents := range gp {
+					if _, err := pricing.SetGroupPrice(ctx, tx, newVariant.ID, groupID, cents, "USD"); err != nil {
+						return nil, fmt.Errorf("clone group price: %w", err)
+					}
+				}
+			}
+		}
+	}
+
+	// 5. Audit
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditProductCloned,
+		ResourceType: "product",
+		ResourceID:   newProduct.ID,
+		After:        newProduct,
+		Metadata:     map[string]any{"source_product_id": sourceID.String()},
+	}); err != nil {
+		return nil, fmt.Errorf("audit product cloned: %w", err)
+	}
+
+	return newProduct, nil
+}
+
 // DeleteProduct removes a product by ID and records an audit entry.
 func (s *CatalogService) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
 	if err := s.catalog.DeleteProduct(ctx, tx, id); err != nil {

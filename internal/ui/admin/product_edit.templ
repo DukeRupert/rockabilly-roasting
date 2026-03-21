@@ -47,7 +47,15 @@ templ ProductEditContent(props ProductEditProps) {
 		<div class="sm:flex-auto">
 			<h1 class="text-lg font-bold text-rr-heading">{ props.Product.Title }</h1>
 		</div>
-		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none flex gap-2">
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/clone", props.Product.ID)) }>
+				<button
+					type="submit"
+					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
+				>
+					Clone
+				</button>
+			</form>
 			<a
 				href="/admin/catalog"
 				class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"

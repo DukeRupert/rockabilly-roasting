@@ -531,6 +531,29 @@ func (d *Deps) handleAdminProductSubscribableUpdate(w http.ResponseWriter, r *ht
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Subscription+setting+updated", id), http.StatusSeeOther)
 }
 
+func (d *Deps) handleAdminProductClone(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var cloned *domain.Product
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		cloned, txErr = d.CatalogService.CloneProduct(ctx, tx, id, d.PricingService, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Product+cloned", cloned.ID), http.StatusSeeOther)
+}
+
 func (d *Deps) handleAdminProductDelete(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

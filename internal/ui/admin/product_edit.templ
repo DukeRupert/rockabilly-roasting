@@ -39,6 +39,14 @@ type ProductEditProps struct {
 	AssignedSets   []domain.AttributeSet
 	AllSets        []domain.AttributeSet
 	AttributeValues []domain.ProductAttributeValue
+	ActiveTab      string // "details", "attributes", "media", "variants", "pricing"
+}
+
+func tabClasses(active bool) string {
+	if active {
+		return "border-b-2 border-rr-red px-1 py-4 text-sm font-medium whitespace-nowrap text-rr-red"
+	}
+	return "border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-rr-muted hover:border-rr-border hover:text-rr-body"
 }
 
 templ ProductEditContent(props ProductEditProps) {
@@ -78,16 +86,31 @@ templ ProductEditContent(props ProductEditProps) {
 			</div>
 		</div>
 	}
-	<!-- Tabs -->
-	<div class="mt-6" id="product-tabs">
+	<!-- Tabs + content (swapped as a unit by htmx tab clicks) -->
+	@ProductEditTabPanel(props)
+	@ImageUploaderScript()
+}
+
+// ProductEditTabPanel renders the tab bar + active tab content as a unit for htmx swaps.
+templ ProductEditTabPanel(props ProductEditProps) {
+	<div id="product-tabs" class="mt-6">
 		<!-- Mobile dropdown -->
 		<div class="grid grid-cols-1 sm:hidden">
-			<select aria-label="Select a tab" data-tab-select class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-2 pr-8 pl-3 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red">
-				<option value="details" selected>Details</option>
-				<option value="attributes">Attributes</option>
-				<option value="media">Media</option>
-				<option value="variants">Variants</option>
-				<option value="pricing">Pricing</option>
+			<select
+				aria-label="Select a tab"
+				hx-get={ fmt.Sprintf("/admin/catalog/%s", props.Product.ID) }
+				hx-target="#product-tabs"
+				hx-swap="outerHTML"
+				hx-push-url="true"
+				hx-trigger="change"
+				name="tab"
+				class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-2 pr-8 pl-3 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+			>
+				<option value="details" selected?={ props.ActiveTab == "" || props.ActiveTab == "details" }>Details</option>
+				<option value="attributes" selected?={ props.ActiveTab == "attributes" }>Attributes</option>
+				<option value="media" selected?={ props.ActiveTab == "media" }>Media</option>
+				<option value="variants" selected?={ props.ActiveTab == "variants" }>Variants</option>
+				<option value="pricing" selected?={ props.ActiveTab == "pricing" }>Pricing</option>
 			</select>
 			<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end fill-rr-muted">
 				<path d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd"></path>
@@ -97,58 +120,43 @@ templ ProductEditContent(props ProductEditProps) {
 		<div class="hidden sm:block">
 			<div class="border-b border-rr-border">
 				<nav aria-label="Tabs" class="-mb-px flex space-x-8">
-					<button type="button" data-tab="details" class="border-b-2 border-rr-red px-1 py-4 text-sm font-medium whitespace-nowrap text-rr-red">Details</button>
-					<button type="button" data-tab="attributes" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-rr-muted hover:border-rr-border hover:text-rr-body">Attributes</button>
-					<button type="button" data-tab="media" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-rr-muted hover:border-rr-border hover:text-rr-body">Media</button>
-					<button type="button" data-tab="variants" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-rr-muted hover:border-rr-border hover:text-rr-body">Variants</button>
-					<button type="button" data-tab="pricing" class="border-b-2 border-transparent px-1 py-4 text-sm font-medium whitespace-nowrap text-rr-muted hover:border-rr-border hover:text-rr-body">Pricing</button>
+					for _, tab := range []struct{ Name, Label string }{
+						{"details", "Details"},
+						{"attributes", "Attributes"},
+						{"media", "Media"},
+						{"variants", "Variants"},
+						{"pricing", "Pricing"},
+					} {
+						<button
+							type="button"
+							hx-get={ fmt.Sprintf("/admin/catalog/%s?tab=%s", props.Product.ID, tab.Name) }
+							hx-target="#product-tabs"
+							hx-swap="outerHTML"
+							hx-push-url="true"
+							class={ tabClasses(props.ActiveTab == tab.Name || (props.ActiveTab == "" && tab.Name == "details")) }
+						>
+							{ tab.Label }
+						</button>
+					}
 				</nav>
 			</div>
 		</div>
-	</div>
-	<!-- Tab panels -->
-	<div class="mt-6">
-		<div data-tab-panel="details">
-			@productDetailsTab(props)
-		</div>
-		<div data-tab-panel="attributes" class="hidden">
-			@productAttributesTab(props)
-		</div>
-		<div data-tab-panel="media" class="hidden">
-			@productMediaTab(props)
-		</div>
-		<div data-tab-panel="variants" class="hidden">
-			@productVariantsTab(props)
-		</div>
-		<div data-tab-panel="pricing" class="hidden">
-			@productPricingTab(props)
-		</div>
-	</div>
-	<script>
-		(function() {
-			var activeClass = 'border-rr-red text-rr-red';
-			var inactiveClass = 'border-transparent text-rr-muted hover:border-rr-border hover:text-rr-body';
-
-			function switchTab(name) {
-				document.querySelectorAll('[data-tab-panel]').forEach(function(p) {
-					p.classList.toggle('hidden', p.dataset.tabPanel !== name);
-				});
-				document.querySelectorAll('[data-tab]').forEach(function(b) {
-					var active = b.dataset.tab === name;
-					b.className = 'border-b-2 px-1 py-4 text-sm font-medium whitespace-nowrap ' + (active ? activeClass : inactiveClass);
-				});
-				var sel = document.querySelector('[data-tab-select]');
-				if (sel) sel.value = name;
+		<!-- Active tab content -->
+		<div class="mt-6">
+			switch props.ActiveTab {
+				case "attributes":
+					@productAttributesTab(props)
+				case "media":
+					@productMediaTab(props)
+				case "variants":
+					@productVariantsTab(props)
+				case "pricing":
+					@productPricingTab(props)
+				default:
+					@productDetailsTab(props)
 			}
-
-			document.querySelectorAll('[data-tab]').forEach(function(b) {
-				b.addEventListener('click', function() { switchTab(this.dataset.tab); });
-			});
-			var sel = document.querySelector('[data-tab-select]');
-			if (sel) sel.addEventListener('change', function() { switchTab(this.value); });
-		})();
-	</script>
-	@ImageUploaderScript()
+		</div>
+	</div>
 }
 
 // --- Details Tab ---
@@ -249,7 +257,7 @@ templ productVariantsTab(props ProductEditProps) {
 // --- Pricing Tab ---
 
 templ productPricingTab(props ProductEditProps) {
-	<div class="space-y-4">
+	<div id="pricing-panel" class="space-y-4">
 		<p class="text-sm text-rr-muted">
 			Set base and group-specific prices for this product's variants.
 			if len(props.Groups) == 0 {
@@ -267,6 +275,29 @@ templ productPricingTab(props ProductEditProps) {
 			<!-- Group Prices -->
 			for _, g := range props.Groups {
 				@productPricingCard(g.Name+" Prices", &g, props)
+			}
+		}
+	</div>
+}
+
+// PricingPanel renders the pricing tab content as a standalone partial for htmx swaps.
+templ PricingPanel(product *domain.Product, variants []VariantWithOptions, groups []domain.CustomerGroup) {
+	<div id="pricing-panel" class="space-y-4">
+		<p class="text-sm text-rr-muted">
+			Set base and group-specific prices for this product's variants.
+			if len(groups) == 0 {
+				<a href="/admin/groups" class="text-rr-red hover:text-rr-red-lt">Create customer groups</a> to enable group pricing.
+			}
+		</p>
+		if len(variants) == 0 {
+			<div class="rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
+				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No variants</h3>
+				<p class="mt-1 text-sm text-rr-muted">Add variants on the Variants tab first.</p>
+			</div>
+		} else {
+			@productPricingCard("Base Prices", nil, ProductEditProps{Product: product, Variants: variants, Groups: groups})
+			for _, g := range groups {
+				@productPricingCard(g.Name+" Prices", &g, ProductEditProps{Product: product, Variants: variants, Groups: groups})
 			}
 		}
 	</div>
@@ -303,7 +334,7 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 									method="post"
 									action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID)) }
 									hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID) }
-									hx-target="#variants-panel"
+									hx-target="#pricing-panel"
 									hx-swap="outerHTML"
 									hx-trigger="change from:find input"
 									class="flex items-center gap-1"
@@ -326,7 +357,7 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 									method="post"
 									action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/group-price", props.Product.ID, vwo.Variant.ID)) }
 									hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/group-price", props.Product.ID, vwo.Variant.ID) }
-									hx-target="#variants-panel"
+									hx-target="#pricing-panel"
 									hx-swap="outerHTML"
 									hx-trigger="change from:find input[name=price]"
 									class="flex items-center gap-1"

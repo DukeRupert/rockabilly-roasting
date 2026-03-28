@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"net/http"
@@ -237,6 +238,16 @@ func (d *Deps) handleAdminProductCreate(w http.ResponseWriter, r *http.Request) 
 
 // --- Edit Product ---
 
+// productTab returns the validated tab name from the query string.
+func productTab(r *http.Request) string {
+	switch r.URL.Query().Get("tab") {
+	case "details", "attributes", "media", "variants", "pricing":
+		return r.URL.Query().Get("tab")
+	default:
+		return "details"
+	}
+}
+
 func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -245,6 +256,8 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+
+	tab := productTab(r)
 
 	var product *domain.Product
 	var taxons []domain.Taxon
@@ -255,103 +268,73 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var assignedSets []domain.AttributeSet
 	var allSets []domain.AttributeSet
 	var attrValues []domain.ProductAttributeValue
+	var taxonName string
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
+
+		// Always load the product (needed for page header and tab bar)
 		product, txErr = d.CatalogService.GetProduct(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
-		taxons, txErr = d.CatalogService.ListRootTaxons(ctx, tx)
-		if txErr != nil {
-			return txErr
-		}
-		mediaList, txErr = d.CatalogService.ListProductMedia(ctx, tx, id)
-		if txErr != nil {
-			return txErr
-		}
 
-		// Load options + values
-		opts, txErr := d.CatalogService.ListProductOptions(ctx, tx, id)
-		if txErr != nil {
+		// Load tab-specific data
+		switch tab {
+		case "details":
+			taxons, txErr = d.CatalogService.ListRootTaxons(ctx, tx)
 			return txErr
-		}
-		for _, opt := range opts {
-			vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
-			if vErr != nil {
-				return vErr
+
+		case "media":
+			mediaList, txErr = d.CatalogService.ListProductMedia(ctx, tx, id)
+			return txErr
+
+		case "attributes":
+			assignedSets, txErr = d.AttributeService.ListProductAttributeSets(ctx, tx, id)
+			if txErr != nil {
+				return txErr
 			}
-			options = append(options, admin.OptionWithValues{
-				Option: opt,
-				Values: vals,
-			})
-		}
-
-		// Load variants with their option value names
-		rawVariants, txErr := d.CatalogService.ListVariants(ctx, tx, id)
-		if txErr != nil {
-			return txErr
-		}
-
-		// Load prices for all variants at once
-		priceMap, txErr := d.PricingService.ListBasePricesByProduct(ctx, tx, id, "USD")
-		if txErr != nil {
-			return txErr
-		}
-
-		// Load group prices
-		groupPriceMap, txErr := d.PricingService.ListGroupPricesByProduct(ctx, tx, id, "USD")
-		if txErr != nil {
-			return txErr
-		}
-
-		for _, v := range rawVariants {
-			vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
-			if vErr != nil {
-				return vErr
+			for i := range assignedSets {
+				keys, kErr := d.AttributeService.ListAttributeKeys(ctx, tx, assignedSets[i].ID)
+				if kErr != nil {
+					return kErr
+				}
+				assignedSets[i].Keys = keys
 			}
-			vwo := admin.VariantWithOptions{
-				Variant:      v,
-				OptionValues: sortedOptionValueNames(vov, options),
-				GroupPrices:  groupPriceMap[v.ID],
+			allSets, txErr = d.AttributeService.ListAttributeSets(ctx, tx)
+			if txErr != nil {
+				return txErr
 			}
-			if cents, ok := priceMap[v.ID]; ok {
-				vwo.PriceCents = &cents
-			}
-			variants = append(variants, vwo)
-		}
+			attrValues, txErr = d.AttributeService.ListProductAttributeValues(ctx, tx, id)
+			return txErr
 
-		// Load customer groups
-		groups, txErr = d.CustomerGroupStore.List(ctx, tx)
-		if txErr != nil {
-			return txErr
-		}
-
-		// Load product attributes
-		assignedSets, txErr = d.AttributeService.ListProductAttributeSets(ctx, tx, id)
-		if txErr != nil {
-			return txErr
-		}
-		for i := range assignedSets {
-			keys, kErr := d.AttributeService.ListAttributeKeys(ctx, tx, assignedSets[i].ID)
-			if kErr != nil {
-				return kErr
+		case "variants":
+			options, txErr = d.loadProductOptions(ctx, tx, id)
+			if txErr != nil {
+				return txErr
 			}
-			assignedSets[i].Keys = keys
-		}
-		allSets, txErr = d.AttributeService.ListAttributeSets(ctx, tx)
-		if txErr != nil {
+			taxons, txErr = d.CatalogService.ListRootTaxons(ctx, tx)
+			if txErr != nil {
+				return txErr
+			}
+			variants, groups, txErr = d.loadVariantsWithPrices(ctx, tx, id, options)
+			return txErr
+
+		case "pricing":
+			options, txErr = d.loadProductOptions(ctx, tx, id)
+			if txErr != nil {
+				return txErr
+			}
+			variants, groups, txErr = d.loadVariantsWithPrices(ctx, tx, id, options)
 			return txErr
 		}
-		attrValues, txErr = d.AttributeService.ListProductAttributeValues(ctx, tx, id)
-		return txErr
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
 		return
 	}
 
-	var taxonName string
 	for _, t := range taxons {
 		if t.ID == product.TaxonID {
 			taxonName = t.Name
@@ -375,12 +358,83 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		AssignedSets:    assignedSets,
 		AllSets:         allSets,
 		AttributeValues: attrValues,
+		ActiveTab:       tab,
 	}
+
+	// Tab switch via htmx: return just the tab panel
+	if IsHTMX(r) && r.Header.Get("HX-Target") == "product-tabs" {
+		admin.ProductEditTabPanel(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	// Sidebar navigation via hx-boost: return page content
 	if IsHTMX(r) {
 		admin.ProductEditContent(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
+	// Direct URL: return full page
 	admin.ProductEdit(props).Render(ctx, w) //nolint:errcheck
+}
+
+// loadProductOptions loads options with their values for a product.
+func (d *Deps) loadProductOptions(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]admin.OptionWithValues, error) {
+	opts, err := d.CatalogService.ListProductOptions(ctx, tx, productID)
+	if err != nil {
+		return nil, err
+	}
+	var options []admin.OptionWithValues
+	for _, opt := range opts {
+		vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
+		if vErr != nil {
+			return nil, vErr
+		}
+		options = append(options, admin.OptionWithValues{
+			Option: opt,
+			Values: vals,
+		})
+	}
+	return options, nil
+}
+
+// loadVariantsWithPrices loads variants with base and group prices.
+func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID uuid.UUID, options []admin.OptionWithValues) ([]admin.VariantWithOptions, []domain.CustomerGroup, error) {
+	rawVariants, err := d.CatalogService.ListVariants(ctx, tx, productID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	priceMap, err := d.PricingService.ListBasePricesByProduct(ctx, tx, productID, "USD")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	groupPriceMap, err := d.PricingService.ListGroupPricesByProduct(ctx, tx, productID, "USD")
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var variants []admin.VariantWithOptions
+	for _, v := range rawVariants {
+		vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
+		if vErr != nil {
+			return nil, nil, vErr
+		}
+		vwo := admin.VariantWithOptions{
+			Variant:      v,
+			OptionValues: sortedOptionValueNames(vov, options),
+			GroupPrices:  groupPriceMap[v.ID],
+		}
+		if cents, ok := priceMap[v.ID]; ok {
+			vwo.PriceCents = &cents
+		}
+		variants = append(variants, vwo)
+	}
+
+	groups, err := d.CustomerGroupStore.List(ctx, tx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return variants, groups, nil
 }
 
 func (d *Deps) handleAdminProductUpdate(w http.ResponseWriter, r *http.Request) {
@@ -761,6 +815,11 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 	})
 	if err != nil {
 		Error(w, r, err)
+		return
+	}
+	// Check which panel the htmx request targets
+	if IsHTMX(r) && r.Header.Get("HX-Target") == "pricing-panel" {
+		admin.PricingPanel(product, variants, groups).Render(ctx, w) //nolint:errcheck
 		return
 	}
 	admin.VariantsPanel(product, variants, options, taxonName, groups, nil).Render(ctx, w) //nolint:errcheck

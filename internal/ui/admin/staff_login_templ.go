@@ -8,7 +8,9 @@ package admin
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func StaffLoginPage(errMsg string) templ.Component {
+// StaffLoginForm renders just the form with error message and preserved email.
+// Used as an htmx partial on failed login attempts.
+func StaffLoginForm(errMsg string, email string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -29,7 +31,7 @@ func StaffLoginPage(errMsg string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Staff Login — Rockabilly Roasting</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap\" rel=\"stylesheet\"><style>\n\t\t\t\t/* Login uses the brand dark palette — no overrides */\n\t\t\t\t.login-brand {\n\t\t\t\t\tbackground:\n\t\t\t\t\t\t/* Halftone dot texture */\n\t\t\t\t\t\tradial-gradient(circle, rgba(232, 146, 26, 0.08) 1px, transparent 1px),\n\t\t\t\t\t\t/* Edison-bulb radial glow */\n\t\t\t\t\t\tradial-gradient(ellipse at 50% 55%, rgba(232, 146, 26, 0.14) 0%, rgba(232, 146, 26, 0.04) 45%, transparent 70%),\n\t\t\t\t\t\t/* Base */\n\t\t\t\t\t\t#0E0F10;\n\t\t\t\t\tbackground-size: 18px 18px, 100% 100%, 100% 100%;\n\t\t\t\t}\n\t\t\t\t.login-form-panel {\n\t\t\t\t\tbackground:\n\t\t\t\t\t\t/* Subtle crosshatch */\n\t\t\t\t\t\trepeating-linear-gradient(45deg, transparent, transparent 4px, rgba(168, 184, 192, 0.03) 4px, rgba(168, 184, 192, 0.03) 5px),\n\t\t\t\t\t\trepeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(168, 184, 192, 0.03) 4px, rgba(168, 184, 192, 0.03) 5px),\n\t\t\t\t\t\t#161A1E;\n\t\t\t\t}\n\t\t\t\t/* Flame stripe */\n\t\t\t\t.flame-stripe-login {\n\t\t\t\t\theight: 3px;\n\t\t\t\t\tbackground: linear-gradient(90deg, #7A1210, #B82018, #E8921A, #B82018, #7A1210);\n\t\t\t\t}\n\t\t\t\t/* Input focus glow */\n\t\t\t\t.login-input:focus {\n\t\t\t\t\toutline: none;\n\t\t\t\t\tborder-color: #E8921A;\n\t\t\t\t\tbox-shadow: 0 0 0 3px rgba(232, 146, 26, 0.2), 0 0 16px rgba(232, 146, 26, 0.08);\n\t\t\t\t}\n\t\t\t\t/* Button glow on hover */\n\t\t\t\t.login-btn:hover {\n\t\t\t\t\tbox-shadow: 0 0 24px rgba(184, 32, 24, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);\n\t\t\t\t}\n\t\t\t\t.login-btn:active {\n\t\t\t\t\ttransform: translateY(2px);\n\t\t\t\t\tbox-shadow: none;\n\t\t\t\t}\n\t\t\t\t/* Logo entrance */\n\t\t\t\t@keyframes logo-settle {\n\t\t\t\t\tfrom { opacity: 0; transform: translateY(-12px); }\n\t\t\t\t\tto { opacity: 1; transform: translateY(0); }\n\t\t\t\t}\n\t\t\t\t@keyframes form-rise {\n\t\t\t\t\tfrom { opacity: 0; transform: translateY(16px); }\n\t\t\t\t\tto { opacity: 1; transform: translateY(0); }\n\t\t\t\t}\n\t\t\t\t.animate-logo { animation: logo-settle 0.6s ease-out both; }\n\t\t\t\t.animate-form { animation: form-rise 0.5s ease-out 0.2s both; }\n\t\t\t\t@media (prefers-reduced-motion: reduce) {\n\t\t\t\t\t.animate-logo, .animate-form { animation: none; opacity: 1; }\n\t\t\t\t}\n\t\t\t</style></head><body class=\"h-full bg-rr-void\"><div class=\"flex min-h-full\"><!-- Brand Panel (hidden on small screens, visible lg+) --><div class=\"login-brand hidden lg:flex lg:w-1/2 flex-col items-center justify-center relative overflow-hidden\"><!-- Decorative flame stripe at top --><div class=\"flame-stripe-login absolute top-0 left-0 right-0\"></div><div class=\"animate-logo flex flex-col items-center gap-8 px-12\"><img src=\"/static/logo-white.svg\" alt=\"Rockabilly Roasting Co.\" class=\"w-56 h-auto drop-shadow-[0_0_40px_rgba(232,146,26,0.2)]\"><div class=\"text-center\"><p class=\"text-rr-amber tracking-[0.35em] text-xs font-semibold uppercase\" style=\"font-family: 'Barlow', sans-serif;\">Staff Portal</p></div></div><!-- Decorative flame stripe at bottom --><div class=\"flame-stripe-login absolute bottom-0 left-0 right-0\"></div></div><!-- Form Panel --><div class=\"login-form-panel flex w-full lg:w-1/2 flex-col justify-center px-6 py-12 sm:px-12\"><div class=\"animate-form mx-auto w-full max-w-sm\"><!-- Mobile logo (hidden lg+) --><div class=\"lg:hidden flex flex-col items-center mb-10\"><img src=\"/static/logo-white.svg\" alt=\"Rockabilly Roasting Co.\" class=\"w-40 h-auto mb-4 drop-shadow-[0_0_24px_rgba(232,146,26,0.15)]\"><div class=\"flame-stripe-login w-full mt-4\"></div></div><div class=\"mb-8\"><h1 class=\"text-3xl tracking-wide text-rr-heading\" style=\"font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.08em;\">Sign In</h1><p class=\"mt-1 text-sm text-rr-muted\" style=\"font-family: 'Barlow', sans-serif;\">Enter your credentials to continue.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"login-form\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -41,7 +43,7 @@ func StaffLoginPage(errMsg string) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(errMsg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/staff_login.templ`, Line: 122, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/staff_login.templ`, Line: 9, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -52,7 +54,57 @@ func StaffLoginPage(errMsg string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"post\" action=\"/auth/staff/login\" class=\"space-y-5\"><div><label for=\"email\" class=\"block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2\" style=\"font-family: 'Barlow', sans-serif;\">Email</label> <input id=\"email\" name=\"email\" type=\"email\" autocomplete=\"email\" required placeholder=\"you@rockabillyroasting.com\" class=\"login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150\" style=\"font-family: 'Barlow', sans-serif;\"></div><div><label for=\"password\" class=\"block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2\" style=\"font-family: 'Barlow', sans-serif;\">Password</label> <input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" required class=\"login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150\" style=\"font-family: 'Barlow', sans-serif;\"></div><div class=\"pt-2\"><button type=\"submit\" class=\"login-btn flex w-full justify-center rounded-sm bg-rr-red px-4 py-3 text-sm font-bold uppercase tracking-[0.12em] text-white shadow-lg transition-all duration-150 hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-amber\" style=\"font-family: 'Barlow', sans-serif;\">Sign In</button></div></form><p class=\"mt-8 text-center text-xs text-rr-faint\" style=\"font-family: 'Barlow', sans-serif;\">Rockabilly Roasting Co. — Kennewick, WA</p></div></div></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"post\" action=\"/auth/staff/login\" hx-post=\"/auth/staff/login\" hx-target=\"#login-form\" hx-swap=\"outerHTML\" class=\"space-y-5\"><div><label for=\"email\" class=\"block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2\" style=\"font-family: 'Barlow', sans-serif;\">Email</label> <input id=\"email\" name=\"email\" type=\"email\" autocomplete=\"email\" required value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var3 string
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(email)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/staff_login.templ`, Line: 34, Col: 18}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" placeholder=\"you@rockabillyroasting.com\" class=\"login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150\" style=\"font-family: 'Barlow', sans-serif;\"></div><div><label for=\"password\" class=\"block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2\" style=\"font-family: 'Barlow', sans-serif;\">Password</label> <input id=\"password\" name=\"password\" type=\"password\" autocomplete=\"current-password\" required class=\"login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150\" style=\"font-family: 'Barlow', sans-serif;\"></div><div class=\"pt-2\"><button type=\"submit\" class=\"login-btn flex w-full justify-center rounded-sm bg-rr-red px-4 py-3 text-sm font-bold uppercase tracking-[0.12em] text-white shadow-lg transition-all duration-150 hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-amber\" style=\"font-family: 'Barlow', sans-serif;\">Sign In</button></div></form></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func StaffLoginPage(errMsg string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<!doctype html><html lang=\"en\" class=\"h-full\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Staff Login — Rockabilly Roasting</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap\" rel=\"stylesheet\"><script src=\"/static/js/htmx.min.js\"></script><style>\n\t\t\t\t/* Login uses the brand dark palette — no overrides */\n\t\t\t\t.login-brand {\n\t\t\t\t\tbackground:\n\t\t\t\t\t\t/* Halftone dot texture */\n\t\t\t\t\t\tradial-gradient(circle, rgba(232, 146, 26, 0.08) 1px, transparent 1px),\n\t\t\t\t\t\t/* Edison-bulb radial glow */\n\t\t\t\t\t\tradial-gradient(ellipse at 50% 55%, rgba(232, 146, 26, 0.14) 0%, rgba(232, 146, 26, 0.04) 45%, transparent 70%),\n\t\t\t\t\t\t/* Base */\n\t\t\t\t\t\t#0E0F10;\n\t\t\t\t\tbackground-size: 18px 18px, 100% 100%, 100% 100%;\n\t\t\t\t}\n\t\t\t\t.login-form-panel {\n\t\t\t\t\tbackground:\n\t\t\t\t\t\t/* Subtle crosshatch */\n\t\t\t\t\t\trepeating-linear-gradient(45deg, transparent, transparent 4px, rgba(168, 184, 192, 0.03) 4px, rgba(168, 184, 192, 0.03) 5px),\n\t\t\t\t\t\trepeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(168, 184, 192, 0.03) 4px, rgba(168, 184, 192, 0.03) 5px),\n\t\t\t\t\t\t#161A1E;\n\t\t\t\t}\n\t\t\t\t/* Flame stripe */\n\t\t\t\t.flame-stripe-login {\n\t\t\t\t\theight: 3px;\n\t\t\t\t\tbackground: linear-gradient(90deg, #7A1210, #B82018, #E8921A, #B82018, #7A1210);\n\t\t\t\t}\n\t\t\t\t/* Input focus glow */\n\t\t\t\t.login-input:focus {\n\t\t\t\t\toutline: none;\n\t\t\t\t\tborder-color: #E8921A;\n\t\t\t\t\tbox-shadow: 0 0 0 3px rgba(232, 146, 26, 0.2), 0 0 16px rgba(232, 146, 26, 0.08);\n\t\t\t\t}\n\t\t\t\t/* Button glow on hover */\n\t\t\t\t.login-btn:hover {\n\t\t\t\t\tbox-shadow: 0 0 24px rgba(184, 32, 24, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);\n\t\t\t\t}\n\t\t\t\t.login-btn:active {\n\t\t\t\t\ttransform: translateY(2px);\n\t\t\t\t\tbox-shadow: none;\n\t\t\t\t}\n\t\t\t\t/* Logo entrance */\n\t\t\t\t@keyframes logo-settle {\n\t\t\t\t\tfrom { opacity: 0; transform: translateY(-12px); }\n\t\t\t\t\tto { opacity: 1; transform: translateY(0); }\n\t\t\t\t}\n\t\t\t\t@keyframes form-rise {\n\t\t\t\t\tfrom { opacity: 0; transform: translateY(16px); }\n\t\t\t\t\tto { opacity: 1; transform: translateY(0); }\n\t\t\t\t}\n\t\t\t\t.animate-logo { animation: logo-settle 0.6s ease-out both; }\n\t\t\t\t.animate-form { animation: form-rise 0.5s ease-out 0.2s both; }\n\t\t\t\t@media (prefers-reduced-motion: reduce) {\n\t\t\t\t\t.animate-logo, .animate-form { animation: none; opacity: 1; }\n\t\t\t\t}\n\t\t\t</style></head><body class=\"h-full bg-rr-void\"><div class=\"flex min-h-full\"><!-- Brand Panel (hidden on small screens, visible lg+) --><div class=\"login-brand hidden lg:flex lg:w-1/2 flex-col items-center justify-center relative overflow-hidden\"><!-- Decorative flame stripe at top --><div class=\"flame-stripe-login absolute top-0 left-0 right-0\"></div><div class=\"animate-logo flex flex-col items-center gap-8 px-12\"><img src=\"/static/logo-white.svg\" alt=\"Rockabilly Roasting Co.\" class=\"w-56 h-auto drop-shadow-[0_0_40px_rgba(232,146,26,0.2)]\"><div class=\"text-center\"><p class=\"text-rr-amber tracking-[0.35em] text-xs font-semibold uppercase\" style=\"font-family: 'Barlow', sans-serif;\">Staff Portal</p></div></div><!-- Decorative flame stripe at bottom --><div class=\"flame-stripe-login absolute bottom-0 left-0 right-0\"></div></div><!-- Form Panel --><div class=\"login-form-panel flex w-full lg:w-1/2 flex-col justify-center px-6 py-12 sm:px-12\"><div class=\"animate-form mx-auto w-full max-w-sm\"><!-- Mobile logo (hidden lg+) --><div class=\"lg:hidden flex flex-col items-center mb-10\"><img src=\"/static/logo-white.svg\" alt=\"Rockabilly Roasting Co.\" class=\"w-40 h-auto mb-4 drop-shadow-[0_0_24px_rgba(232,146,26,0.15)]\"><div class=\"flame-stripe-login w-full mt-4\"></div></div><div class=\"mb-8\"><h1 class=\"text-3xl tracking-wide text-rr-heading\" style=\"font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.08em;\">Sign In</h1><p class=\"mt-1 text-sm text-rr-muted\" style=\"font-family: 'Barlow', sans-serif;\">Enter your credentials to continue.</p></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = StaffLoginForm(errMsg, "").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p class=\"mt-8 text-center text-xs text-rr-faint\" style=\"font-family: 'Barlow', sans-serif;\">Rockabilly Roasting Co. — Kennewick, WA</p></div></div></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -1,5 +1,73 @@
 package admin
 
+// StaffLoginForm renders just the form with error message and preserved email.
+// Used as an htmx partial on failed login attempts.
+templ StaffLoginForm(errMsg string, email string) {
+	<div id="login-form">
+		if errMsg != "" {
+			<div class="mb-5 rounded-sm border border-rr-red/30 bg-rr-red/10 px-4 py-3">
+				<p class="text-sm text-red-400" style="font-family: 'Barlow', sans-serif;">{ errMsg }</p>
+			</div>
+		}
+		<form
+			method="post"
+			action="/auth/staff/login"
+			hx-post="/auth/staff/login"
+			hx-target="#login-form"
+			hx-swap="outerHTML"
+			class="space-y-5"
+		>
+			<div>
+				<label
+					for="email"
+					class="block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2"
+					style="font-family: 'Barlow', sans-serif;"
+				>
+					Email
+				</label>
+				<input
+					id="email"
+					name="email"
+					type="email"
+					autocomplete="email"
+					required
+					value={ email }
+					placeholder="you@rockabillyroasting.com"
+					class="login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150"
+					style="font-family: 'Barlow', sans-serif;"
+				/>
+			</div>
+			<div>
+				<label
+					for="password"
+					class="block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2"
+					style="font-family: 'Barlow', sans-serif;"
+				>
+					Password
+				</label>
+				<input
+					id="password"
+					name="password"
+					type="password"
+					autocomplete="current-password"
+					required
+					class="login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150"
+					style="font-family: 'Barlow', sans-serif;"
+				/>
+			</div>
+			<div class="pt-2">
+				<button
+					type="submit"
+					class="login-btn flex w-full justify-center rounded-sm bg-rr-red px-4 py-3 text-sm font-bold uppercase tracking-[0.12em] text-white shadow-lg transition-all duration-150 hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-amber"
+					style="font-family: 'Barlow', sans-serif;"
+				>
+					Sign In
+				</button>
+			</div>
+		</form>
+	</div>
+}
+
 templ StaffLoginPage(errMsg string) {
 	<!DOCTYPE html>
 	<html lang="en" class="h-full">
@@ -11,6 +79,7 @@ templ StaffLoginPage(errMsg string) {
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 			<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+			<script src="/static/js/htmx.min.js"></script>
 			<style>
 				/* Login uses the brand dark palette — no overrides */
 				.login-brand {
@@ -117,60 +186,7 @@ templ StaffLoginPage(errMsg string) {
 							</p>
 						</div>
 
-						if errMsg != "" {
-							<div class="mb-5 rounded-sm border border-rr-red/30 bg-rr-red/10 px-4 py-3">
-								<p class="text-sm text-red-400" style="font-family: 'Barlow', sans-serif;">{ errMsg }</p>
-							</div>
-						}
-
-						<form method="post" action="/auth/staff/login" class="space-y-5">
-							<div>
-								<label
-									for="email"
-									class="block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2"
-									style="font-family: 'Barlow', sans-serif;"
-								>
-									Email
-								</label>
-								<input
-									id="email"
-									name="email"
-									type="email"
-									autocomplete="email"
-									required
-									placeholder="you@rockabillyroasting.com"
-									class="login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150"
-									style="font-family: 'Barlow', sans-serif;"
-								/>
-							</div>
-							<div>
-								<label
-									for="password"
-									class="block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2"
-									style="font-family: 'Barlow', sans-serif;"
-								>
-									Password
-								</label>
-								<input
-									id="password"
-									name="password"
-									type="password"
-									autocomplete="current-password"
-									required
-									class="login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150"
-									style="font-family: 'Barlow', sans-serif;"
-								/>
-							</div>
-							<div class="pt-2">
-								<button
-									type="submit"
-									class="login-btn flex w-full justify-center rounded-sm bg-rr-red px-4 py-3 text-sm font-bold uppercase tracking-[0.12em] text-white shadow-lg transition-all duration-150 hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-amber"
-									style="font-family: 'Barlow', sans-serif;"
-								>
-									Sign In
-								</button>
-							</div>
-						</form>
+						@StaffLoginForm(errMsg, "")
 
 						<p class="mt-8 text-center text-xs text-rr-faint" style="font-family: 'Barlow', sans-serif;">
 							Rockabilly Roasting Co. — Kennewick, WA

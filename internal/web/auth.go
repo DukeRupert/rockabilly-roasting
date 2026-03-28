@@ -100,7 +100,7 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 
 	if email == "" || password == "" {
-		admin.StaffLoginPage("Email and password are required.").Render(r.Context(), w) //nolint:errcheck
+		d.renderStaffLoginError(w, r, "Email and password are required.", email)
 		return
 	}
 
@@ -115,7 +115,7 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 		return txErr
 	})
 	if err != nil {
-		admin.StaffLoginPage("Invalid email or password.").Render(r.Context(), w) //nolint:errcheck
+		d.renderStaffLoginError(w, r, "Invalid email or password.", email)
 		return
 	}
 
@@ -134,6 +134,14 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	http.Redirect(w, r, "/admin/orders", http.StatusSeeOther)
+}
+
+func (d *Deps) renderStaffLoginError(w http.ResponseWriter, r *http.Request, errMsg, email string) {
+	if IsHTMX(r) {
+		admin.StaffLoginForm(errMsg, email).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	admin.StaffLoginPage(errMsg).Render(r.Context(), w) //nolint:errcheck
 }
 
 func (d *Deps) handleStaffLogout(w http.ResponseWriter, r *http.Request) {

@@ -88,7 +88,6 @@ templ ProductEditContent(props ProductEditProps) {
 	}
 	<!-- Tabs + content (swapped as a unit by htmx tab clicks) -->
 	@ProductEditTabPanel(props)
-	@ImageUploaderScript()
 }
 
 // ProductEditTabPanel renders the tab bar + active tab content as a unit for htmx swaps.
@@ -232,6 +231,7 @@ templ productMediaTab(props ProductEditProps) {
 		Media:       props.Media,
 		MediaConfig: props.MediaConfig,
 	})
+	@ImageUploaderScript()
 }
 
 // --- Attributes Tab ---

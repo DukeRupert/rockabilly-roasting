@@ -124,8 +124,9 @@ templ MediaGallery(props MediaGalleryProps) {
 // imageUploaderScript outputs the Alpine.js component for direct-to-R2 upload.
 templ ImageUploaderScript() {
 	<script>
-		document.addEventListener('alpine:init', () => {
-			Alpine.data('imageUploader', (productId) => ({
+		// Register directly — Alpine is already initialized when this arrives via htmx.
+		// Re-registration with the same name is safe (Alpine overwrites silently).
+		Alpine.data('imageUploader', (productId) => ({
 				uploading: false,
 				dragging: false,
 				progress: '',
@@ -207,6 +208,5 @@ templ ImageUploaderScript() {
 					}
 				},
 			}));
-		});
 	</script>
 }

@@ -176,20 +176,78 @@ templ ProductContent(props ProductDetailProps) {
 							</div>
 						}
 						<!-- One-time purchase form — BOLD CTA -->
-						<div id="onetime-form" role="tabpanel" class="mt-5">
+						<div
+							id="onetime-form"
+							role="tabpanel"
+							class="mt-5"
+							x-data="{
+								state: 'idle',
+								_t: 0,
+								_spinTimer: null,
+								submit() {
+									this._t = Date.now();
+									this._spinTimer = setTimeout(() => { if (this.state === 'pending') this.state = 'sending' }, 250);
+									this.state = 'pending';
+								},
+								done(ok) {
+									clearTimeout(this._spinTimer);
+									if (!ok) { this.state = 'idle'; return; }
+									const elapsed = Date.now() - this._t;
+									const delay = this.state === 'sending' ? Math.max(0, 600 - elapsed) : 0;
+									setTimeout(() => {
+										this.state = 'added';
+										setTimeout(() => this.state = 'idle', 2000);
+									}, delay);
+								}
+							}"
+						>
 							<form
 								method="post"
 								action="/cart/add"
 								hx-post="/cart/add"
 								hx-swap="none"
+								@htmx:before-request.camel="submit()"
+								@htmx:after-request.camel="done($event.detail.successful)"
 							>
 								<input type="hidden" name="variant_id" id="selected-variant-id" value={ defaultVariantID(props.Variants) }/>
 								<input type="hidden" name="quantity" value="1"/>
 								<button
 									type="submit"
-									class="btn w-full rounded-sm bg-rr-red px-6 py-4 label-font text-white text-sm glow-red hover:bg-rr-red-lt transition-colors"
+									class="btn w-full rounded-sm px-6 py-4 label-font text-white text-sm transition-all duration-300 ease-out"
+									:class="state === 'added' ? 'bg-rr-amber glow-amber scale-[1.02]' : 'bg-rr-red glow-red hover:bg-rr-red-lt'"
+									:disabled="state !== 'idle'"
 								>
-									ADD TO CART
+									<!-- Idle / Pending (pending is invisible — button just looks disabled) -->
+									<span x-show="state === 'idle' || state === 'pending'">ADD TO CART</span>
+									<!-- Sending (only if request takes > 250ms) -->
+									<span
+										x-show="state === 'sending'"
+										x-cloak
+										x-transition:enter="transition ease-out duration-200"
+										x-transition:enter-start="opacity-0"
+										x-transition:enter-end="opacity-100"
+										class="inline-flex items-center gap-2"
+									>
+										<svg class="size-4 animate-spin" fill="none" viewBox="0 0 24 24">
+											<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+										</svg>
+										ADDING...
+									</span>
+									<!-- Added -->
+									<span
+										x-show="state === 'added'"
+										x-cloak
+										x-transition:enter="transition ease-out duration-300"
+										x-transition:enter-start="opacity-0 scale-95"
+										x-transition:enter-end="opacity-100 scale-100"
+										class="inline-flex items-center gap-1.5"
+									>
+										<svg class="size-4 cart-checkmark" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path>
+										</svg>
+										ADDED!
+									</span>
 								</button>
 							</form>
 						</div>

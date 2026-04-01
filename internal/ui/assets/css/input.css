@@ -208,6 +208,17 @@ html {
 .glow-teal { box-shadow: 0 0 18px rgba(10, 120, 112, 0.35); }
 .glow-amber { box-shadow: 0 0 24px rgba(232, 146, 26, 0.25); }
 
+/* Cart add checkmark — SVG stroke draw */
+@keyframes checkmark-draw {
+	from { stroke-dashoffset: 30; }
+	to { stroke-dashoffset: 0; }
+}
+.cart-checkmark path {
+	stroke-dasharray: 30;
+	stroke-dashoffset: 30;
+	animation: checkmark-draw 0.35s ease-out 0.15s forwards;
+}
+
 /* Button press effect */
 .btn {
 	transition: transform 80ms ease, box-shadow 80ms ease, background 120ms ease;
@@ -295,6 +306,10 @@ html {
 	}
 	.badge-pulse {
 		animation: none;
+	}
+	.cart-checkmark path {
+		animation: none;
+		stroke-dashoffset: 0;
 	}
 	.product-card {
 		transition: none;

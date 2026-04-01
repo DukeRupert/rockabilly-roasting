@@ -524,20 +524,20 @@ func ProductContent(props ProductDetailProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<!-- One-time purchase form — BOLD CTA --><div id=\"onetime-form\" role=\"tabpanel\" class=\"mt-5\"><form method=\"post\" action=\"/cart/add\" hx-post=\"/cart/add\" hx-swap=\"none\"><input type=\"hidden\" name=\"variant_id\" id=\"selected-variant-id\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<!-- One-time purchase form — BOLD CTA --><div id=\"onetime-form\" role=\"tabpanel\" class=\"mt-5\" x-data=\"{\n\t\t\t\t\t\t\t\tstate: 'idle',\n\t\t\t\t\t\t\t\t_t: 0,\n\t\t\t\t\t\t\t\t_spinTimer: null,\n\t\t\t\t\t\t\t\tsubmit() {\n\t\t\t\t\t\t\t\t\tthis._t = Date.now();\n\t\t\t\t\t\t\t\t\tthis._spinTimer = setTimeout(() => { if (this.state === 'pending') this.state = 'sending' }, 250);\n\t\t\t\t\t\t\t\t\tthis.state = 'pending';\n\t\t\t\t\t\t\t\t},\n\t\t\t\t\t\t\t\tdone(ok) {\n\t\t\t\t\t\t\t\t\tclearTimeout(this._spinTimer);\n\t\t\t\t\t\t\t\t\tif (!ok) { this.state = 'idle'; return; }\n\t\t\t\t\t\t\t\t\tconst elapsed = Date.now() - this._t;\n\t\t\t\t\t\t\t\t\tconst delay = this.state === 'sending' ? Math.max(0, 600 - elapsed) : 0;\n\t\t\t\t\t\t\t\t\tsetTimeout(() => {\n\t\t\t\t\t\t\t\t\t\tthis.state = 'added';\n\t\t\t\t\t\t\t\t\t\tsetTimeout(() => this.state = 'idle', 2000);\n\t\t\t\t\t\t\t\t\t}, delay);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\"><form method=\"post\" action=\"/cart/add\" hx-post=\"/cart/add\" hx-swap=\"none\" @htmx:before-request.camel=\"submit()\" @htmx:after-request.camel=\"done($event.detail.successful)\"><input type=\"hidden\" name=\"variant_id\" id=\"selected-variant-id\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(defaultVariantID(props.Variants))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 186, Col: 112}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 212, Col: 112}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\"> <input type=\"hidden\" name=\"quantity\" value=\"1\"> <button type=\"submit\" class=\"btn w-full rounded-sm bg-rr-red px-6 py-4 label-font text-white text-sm glow-red hover:bg-rr-red-lt transition-colors\">ADD TO CART</button></form></div><!-- Subscribe form (hidden by default) -->")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\"> <input type=\"hidden\" name=\"quantity\" value=\"1\"> <button type=\"submit\" class=\"btn w-full rounded-sm px-6 py-4 label-font text-white text-sm transition-all duration-300 ease-out\" :class=\"state === 'added' ? 'bg-rr-amber glow-amber scale-[1.02]' : 'bg-rr-red glow-red hover:bg-rr-red-lt'\" :disabled=\"state !== 'idle'\"><!-- Idle / Pending (pending is invisible — button just looks disabled) --><span x-show=\"state === 'idle' || state === 'pending'\">ADD TO CART</span><!-- Sending (only if request takes > 250ms) --><span x-show=\"state === 'sending'\" x-cloak x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0\" x-transition:enter-end=\"opacity-100\" class=\"inline-flex items-center gap-2\"><svg class=\"size-4 animate-spin\" fill=\"none\" viewBox=\"0 0 24 24\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"3\"></circle> <path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z\"></path></svg> ADDING...</span><!-- Added --><span x-show=\"state === 'added'\" x-cloak x-transition:enter=\"transition ease-out duration-300\" x-transition:enter-start=\"opacity-0 scale-95\" x-transition:enter-end=\"opacity-100 scale-100\" class=\"inline-flex items-center gap-1.5\"><svg class=\"size-4 cart-checkmark\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"m4.5 12.75 6 6 9-13.5\"></path></svg> ADDED!</span></button></form></div><!-- Subscribe form (hidden by default) -->")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -564,7 +564,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantHero))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 254, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 312, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -577,7 +577,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(props.Media[0].AltText)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 255, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 313, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -620,7 +620,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 					var templ_7745c5c3_Var32 string
 					templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs("View " + m.AltText)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 268, Col: 41}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 326, Col: 41}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 					if templ_7745c5c3_Err != nil {
@@ -633,7 +633,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 					var templ_7745c5c3_Var33 string
 					templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(props.MediaConfig.ProductImageURL(m.R2Key, media.VariantHero))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 269, Col: 86}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 327, Col: 86}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 					if templ_7745c5c3_Err != nil {
@@ -646,7 +646,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 					var templ_7745c5c3_Var34 string
 					templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(m.AltText)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 270, Col: 29}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 328, Col: 29}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 					if templ_7745c5c3_Err != nil {
@@ -659,7 +659,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 					var templ_7745c5c3_Var35 string
 					templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(props.MediaConfig.ProductImageURL(m.R2Key, media.VariantThumbnail))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 274, Col: 82}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 332, Col: 82}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 					if templ_7745c5c3_Err != nil {
@@ -683,7 +683,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(props.Product.Title)[0:2]))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 288, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 346, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -808,7 +808,7 @@ func tastingProfile(attrs *CoffeeAttrs) templ.Component {
 				var templ_7745c5c3_Var40 string
 				templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(attrs.Process)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 332, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 390, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 				if templ_7745c5c3_Err != nil {
@@ -827,7 +827,7 @@ func tastingProfile(attrs *CoffeeAttrs) templ.Component {
 				var templ_7745c5c3_Var41 string
 				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(attrs.Finish)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 338, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 396, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 				if templ_7745c5c3_Err != nil {
@@ -851,7 +851,7 @@ func tastingProfile(attrs *CoffeeAttrs) templ.Component {
 					var templ_7745c5c3_Var42 string
 					templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(formatBrewMethod(method))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 347, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 405, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 					if templ_7745c5c3_Err != nil {
@@ -880,7 +880,7 @@ func tastingProfile(attrs *CoffeeAttrs) templ.Component {
 					var templ_7745c5c3_Var43 string
 					templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(formatCertification(cert))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 357, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 415, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 					if templ_7745c5c3_Err != nil {
@@ -944,7 +944,7 @@ func flavorScale(label string, value string) templ.Component {
 		var templ_7745c5c3_Var45 string
 		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 376, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 434, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 		if templ_7745c5c3_Err != nil {
@@ -974,7 +974,7 @@ func flavorScale(label string, value string) templ.Component {
 		var templ_7745c5c3_Var46 string
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 387, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 445, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
@@ -1071,7 +1071,7 @@ func optionSelectionScript(variantMap map[string]VariantOptionEntry) templ.Compo
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(variantMapJSON(variantMap))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 448, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 506, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {

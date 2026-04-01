@@ -273,6 +273,10 @@ func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", redirectTo)
+		return
+	}
 	http.Redirect(w, r, redirectTo, http.StatusSeeOther)
 }
 
@@ -299,6 +303,10 @@ func (d *Deps) handleAccountLogout(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", "/")
+		return
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -383,6 +391,10 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 			redirect = next
 		}
 	}
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", redirect)
+		return
+	}
 	http.Redirect(w, r, redirect, http.StatusSeeOther)
 }
 
@@ -409,5 +421,9 @@ func (d *Deps) handleWholesaleLogout(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", "/")
+		return
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

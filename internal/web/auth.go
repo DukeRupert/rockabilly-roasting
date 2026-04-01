@@ -133,6 +133,10 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 		Secure:   d.SecureCookies,
 	})
 
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", "/admin/orders")
+		return
+	}
 	http.Redirect(w, r, "/admin/orders", http.StatusSeeOther)
 }
 
@@ -167,5 +171,9 @@ func (d *Deps) handleStaffLogout(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 	})
 
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", "/auth/staff/login")
+		return
+	}
 	http.Redirect(w, r, "/auth/staff/login", http.StatusSeeOther)
 }

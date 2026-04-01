@@ -557,14 +557,14 @@ func ProductContent(props ProductDetailProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if len(props.Media) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<!-- Main image — contained, not dominant --> <div class=\"aspect-square w-full overflow-hidden rounded-sm bg-rr-bg border border-rr-border\"><img src=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<!-- Main image — contained, not dominant --> <div class=\"aspect-square w-full overflow-hidden rounded-sm bg-rr-bg border border-rr-border\"><img id=\"main-product-image\" src=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantHero))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 253, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 254, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -577,7 +577,7 @@ func ProductContent(props ProductDetailProps) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(props.Media[0].AltText)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 254, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 255, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -592,63 +592,109 @@ func ProductContent(props ProductDetailProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				for _, m := range props.Media {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<button type=\"button\" class=\"aspect-square overflow-hidden rounded-sm bg-rr-bg border border-rr-border cursor-pointer hover:border-rr-amber focus:border-rr-amber focus:ring-1 focus:ring-rr-amber transition-colors\" aria-label=\"")
+				for i, m := range props.Media {
+					var templ_7745c5c3_Var30 = []any{"aspect-square overflow-hidden rounded-sm bg-rr-bg border cursor-pointer hover:border-rr-amber focus:border-rr-amber focus:ring-1 focus:ring-rr-amber transition-colors",
+						templ.KV("border-rr-amber", i == 0),
+						templ.KV("border-rr-border", i != 0)}
+					templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var30...)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var30 string
-					templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs("View " + m.AltText)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 262, Col: 254}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\"><img src=\"")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<button type=\"button\" class=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var31 string
-					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(props.MediaConfig.ProductImageURL(m.R2Key, media.VariantThumbnail))
+					templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var30).String())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 264, Col: 82}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 1, Col: 0}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" alt=\"\" class=\"h-full w-full object-cover object-center\"></button>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\" aria-label=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var32 string
+					templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs("View " + m.AltText)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 268, Col: 41}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" data-hero-src=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var33 string
+					templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(props.MediaConfig.ProductImageURL(m.R2Key, media.VariantHero))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 269, Col: 86}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "\" data-alt=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var34 string
+					templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(m.AltText)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 270, Col: 29}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "\" onclick=\"document.getElementById('main-product-image').src=this.dataset.heroSrc;document.getElementById('main-product-image').alt=this.dataset.alt;this.parentElement.querySelectorAll('button').forEach(b=>b.classList.replace('border-rr-amber','border-rr-border'));this.classList.replace('border-rr-border','border-rr-amber')\"><img src=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var35 string
+					templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(props.MediaConfig.ProductImageURL(m.R2Key, media.VariantThumbnail))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 274, Col: 82}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "\" alt=\"\" class=\"h-full w-full object-cover object-center\"></button>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<div class=\"aspect-square w-full overflow-hidden rounded-sm bg-rr-bg border border-rr-border relative\"><div class=\"texture-dots absolute inset-0\"></div><div class=\"flex h-full w-full items-center justify-center relative\"><div class=\"w-24 h-24 rounded-full border-2 border-rr-border bg-rr-surface flex items-center justify-center\"><span class=\"font-display text-rr-muted text-2xl tracking-widest\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<div class=\"aspect-square w-full overflow-hidden rounded-sm bg-rr-bg border border-rr-border relative\"><div class=\"texture-dots absolute inset-0\"></div><div class=\"flex h-full w-full items-center justify-center relative\"><div class=\"w-24 h-24 rounded-full border-2 border-rr-border bg-rr-surface flex items-center justify-center\"><span class=\"font-display text-rr-muted text-2xl tracking-widest\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var32 string
-			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(props.Product.Title)[0:2]))
+			var templ_7745c5c3_Var36 string
+			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(props.Product.Title)[0:2]))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 278, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 288, Col: 51}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</span></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "</span></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "</div></div></div><!-- Tasting profile — full-width section below product layout -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</div></div></div><!-- Tasting profile — full-width section below product layout -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -690,39 +736,39 @@ func tastingProfile(attrs *CoffeeAttrs) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var33 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var33 == nil {
-			templ_7745c5c3_Var33 = templ.NopComponent
+		templ_7745c5c3_Var37 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var37 == nil {
+			templ_7745c5c3_Var37 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<section class=\"mt-12 pt-10 border-t border-rr-border\"><h2 class=\"font-display text-2xl tracking-widest text-rr-heading mb-6\">TASTING PROFILE</h2><!-- Adapt grid: two columns if both sides have data, single column otherwise -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<section class=\"mt-12 pt-10 border-t border-rr-border\"><h2 class=\"font-display text-2xl tracking-widest text-rr-heading mb-6\">TASTING PROFILE</h2><!-- Adapt grid: two columns if both sides have data, single column otherwise -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var34 = []any{"grid grid-cols-1 gap-8", templ.KV("lg:grid-cols-2", hasFlavorScales(attrs) && hasProfileDetails(attrs))}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var34...)
+		var templ_7745c5c3_Var38 = []any{"grid grid-cols-1 gap-8", templ.KV("lg:grid-cols-2", hasFlavorScales(attrs) && hasProfileDetails(attrs))}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var38...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<div class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "<div class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var35 string
-		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var34).String())
+		var templ_7745c5c3_Var39 string
+		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var38).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if hasFlavorScales(attrs) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<div class=\"space-y-5\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "<div class=\"space-y-5\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -744,124 +790,124 @@ func tastingProfile(attrs *CoffeeAttrs) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if hasProfileDetails(attrs) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "<div class=\"space-y-5\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "<div class=\"space-y-5\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if attrs.Process != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "<div><p class=\"label-font text-rr-faint text-xs mb-1\">PROCESS</p><p class=\"font-body text-sm text-rr-heading capitalize\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<div><p class=\"label-font text-rr-faint text-xs mb-1\">PROCESS</p><p class=\"font-body text-sm text-rr-heading capitalize\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var36 string
-				templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(attrs.Process)
+				var templ_7745c5c3_Var40 string
+				templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(attrs.Process)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 322, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 332, Col: 78}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "</p></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "</p></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if attrs.Finish != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "<div><p class=\"label-font text-rr-faint text-xs mb-1\">FINISH</p><p class=\"font-serif text-sm text-rr-body italic\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "<div><p class=\"label-font text-rr-faint text-xs mb-1\">FINISH</p><p class=\"font-serif text-sm text-rr-body italic\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var37 string
-				templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(attrs.Finish)
+				var templ_7745c5c3_Var41 string
+				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(attrs.Finish)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 328, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 338, Col: 71}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "</p></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "</p></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if len(attrs.BrewMethods) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "<div><p class=\"label-font text-rr-faint text-xs mb-2\">BEST BREWED AS</p><div class=\"flex flex-wrap gap-1.5\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "<div><p class=\"label-font text-rr-faint text-xs mb-2\">BEST BREWED AS</p><div class=\"flex flex-wrap gap-1.5\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				for _, method := range attrs.BrewMethods {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "<span class=\"label-font px-2.5 py-1 rounded-sm text-rr-muted border border-rr-border bg-rr-surface text-[0.6rem]\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "<span class=\"label-font px-2.5 py-1 rounded-sm text-rr-muted border border-rr-border bg-rr-surface text-[0.6rem]\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var38 string
-					templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(formatBrewMethod(method))
+					var templ_7745c5c3_Var42 string
+					templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(formatBrewMethod(method))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 337, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 347, Col: 36}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "</div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "</div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if len(attrs.Certifications) > 0 || attrs.IsSeasonal {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "<div class=\"flex flex-wrap gap-1.5\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<div class=\"flex flex-wrap gap-1.5\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				for _, cert := range attrs.Certifications {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "<span class=\"label-font px-2 py-0.5 rounded-sm text-rr-teal border border-rr-teal/30 bg-rr-teal/5 text-[0.6rem]\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "<span class=\"label-font px-2 py-0.5 rounded-sm text-rr-teal border border-rr-teal/30 bg-rr-teal/5 text-[0.6rem]\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					var templ_7745c5c3_Var39 string
-					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(formatCertification(cert))
+					var templ_7745c5c3_Var43 string
+					templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(formatCertification(cert))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 347, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 357, Col: 36}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "</span> ")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "</span> ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
 				if attrs.IsSeasonal {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<span class=\"label-font px-2 py-0.5 rounded-sm text-rr-amber border border-rr-amber/30 bg-rr-amber/5 text-[0.6rem]\">SEASONAL</span>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "<span class=\"label-font px-2 py-0.5 rounded-sm text-rr-amber border border-rr-amber/30 bg-rr-amber/5 text-[0.6rem]\">SEASONAL</span>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "</div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "</div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -886,55 +932,55 @@ func flavorScale(label string, value string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var40 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var40 == nil {
-			templ_7745c5c3_Var40 = templ.NopComponent
+		templ_7745c5c3_Var44 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var44 == nil {
+			templ_7745c5c3_Var44 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "<div class=\"flex items-center justify-between\"><p class=\"label-font text-rr-faint text-xs w-24\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "<div class=\"flex items-center justify-between\"><p class=\"label-font text-rr-faint text-xs w-24\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var41 string
-		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(label)
+		var templ_7745c5c3_Var45 string
+		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 366, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 376, Col: 58}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</p><div class=\"flex items-center gap-4 flex-1\"><div class=\"flex items-center gap-1.5\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "</p><div class=\"flex items-center gap-4 flex-1\"><div class=\"flex items-center gap-1.5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for i := 1; i <= 3; i++ {
 			if i <= scaleLevel(value) {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "<span class=\"size-2.5 rounded-full bg-rr-amber\"></span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, "<span class=\"size-2.5 rounded-full bg-rr-amber\"></span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "<span class=\"size-2.5 rounded-full bg-rr-border\"></span>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "<span class=\"size-2.5 rounded-full bg-rr-border\"></span>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "</div><span class=\"font-body text-xs text-rr-muted capitalize\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "</div><span class=\"font-body text-xs text-rr-muted capitalize\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var42 string
-		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(value)
+		var templ_7745c5c3_Var46 string
+		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 377, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 387, Col: 67}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, "</span></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "</span></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1013,25 +1059,25 @@ func optionSelectionScript(variantMap map[string]VariantOptionEntry) templ.Compo
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var43 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var43 == nil {
-			templ_7745c5c3_Var43 = templ.NopComponent
+		templ_7745c5c3_Var47 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var47 == nil {
+			templ_7745c5c3_Var47 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "<script data-variant-map=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, "<script data-variant-map=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var44 string
-		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(variantMapJSON(variantMap))
+		var templ_7745c5c3_Var48 string
+		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(variantMapJSON(variantMap))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 438, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/product.templ`, Line: 448, Col: 54}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "\">\n\t\t(function() {\n\t\t\tvar scriptEl = document.querySelector('script[data-variant-map]');\n\t\t\tvar variantMap = JSON.parse(scriptEl.dataset.variantMap);\n\t\t\tvar activeCls = 'option-pill label-font border-2 border-rr-amber bg-rr-amber/5 px-4 py-2 rounded-sm text-rr-amber';\n\t\t\tvar inactiveCls = 'option-pill label-font border border-rr-border px-4 py-2 rounded-sm text-rr-muted hover:border-rr-amber hover:text-rr-heading transition-colors';\n\n\t\t\t// Handle option pill clicks\n\t\t\tdocument.querySelectorAll('.option-pill').forEach(function(btn) {\n\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\tvar optionId = btn.dataset.optionId;\n\t\t\t\t\t// Deselect siblings, select this one\n\t\t\t\t\tdocument.querySelectorAll('.option-pill[data-option-id=\"' + optionId + '\"]').forEach(function(b) {\n\t\t\t\t\t\tb.className = inactiveCls;\n\t\t\t\t\t\tb.setAttribute('aria-pressed', 'false');\n\t\t\t\t\t});\n\t\t\t\t\tbtn.className = activeCls;\n\t\t\t\t\tbtn.setAttribute('aria-pressed', 'true');\n\t\t\t\t\t// Resolve variant from all selected options\n\t\t\t\t\tresolveVariant();\n\t\t\t\t});\n\t\t\t});\n\n\t\t\tfunction resolveVariant() {\n\t\t\t\t// Gather selected value IDs across all option groups\n\t\t\t\tvar selected = [];\n\t\t\t\tdocument.querySelectorAll('div[data-option-id]').forEach(function(group) {\n\t\t\t\t\tvar active = group.querySelector('.option-pill.border-rr-amber');\n\t\t\t\t\tif (active) selected.push(active.dataset.valueId);\n\t\t\t\t});\n\t\t\t\tif (selected.length === 0) return;\n\t\t\t\t// Find variant that matches all selected option values\n\t\t\t\tfor (var vid in variantMap) {\n\t\t\t\t\tvar entry = variantMap[vid];\n\t\t\t\t\tvar ids = entry.optionValueIDs;\n\t\t\t\t\tif (ids.length === selected.length && selected.every(function(s) { return ids.indexOf(s) !== -1; })) {\n\t\t\t\t\t\t// Update hidden input\n\t\t\t\t\t\tvar input = document.getElementById('selected-variant-id');\n\t\t\t\t\t\tif (input) input.value = vid;\n\t\t\t\t\t\t// Update price display\n\t\t\t\t\t\tif (entry.price !== null) {\n\t\t\t\t\t\t\tvar display = document.getElementById('price-display');\n\t\t\t\t\t\t\tif (display) {\n\t\t\t\t\t\t\t\tdisplay.innerHTML = '<span class=\"font-heading text-3xl text-rr-heading\" data-base-price=\"' + entry.price + '\">' + formatCents(entry.price) + '</span>';\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction formatCents(cents) {\n\t\t\t\treturn '$' + (cents / 100).toFixed(2);\n\t\t\t}\n\t\t})();\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, "\">\n\t\t(function() {\n\t\t\tvar scriptEl = document.querySelector('script[data-variant-map]');\n\t\t\tvar variantMap = JSON.parse(scriptEl.dataset.variantMap);\n\t\t\tvar activeCls = 'option-pill label-font border-2 border-rr-amber bg-rr-amber/5 px-4 py-2 rounded-sm text-rr-amber';\n\t\t\tvar inactiveCls = 'option-pill label-font border border-rr-border px-4 py-2 rounded-sm text-rr-muted hover:border-rr-amber hover:text-rr-heading transition-colors';\n\n\t\t\t// Handle option pill clicks\n\t\t\tdocument.querySelectorAll('.option-pill').forEach(function(btn) {\n\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\tvar optionId = btn.dataset.optionId;\n\t\t\t\t\t// Deselect siblings, select this one\n\t\t\t\t\tdocument.querySelectorAll('.option-pill[data-option-id=\"' + optionId + '\"]').forEach(function(b) {\n\t\t\t\t\t\tb.className = inactiveCls;\n\t\t\t\t\t\tb.setAttribute('aria-pressed', 'false');\n\t\t\t\t\t});\n\t\t\t\t\tbtn.className = activeCls;\n\t\t\t\t\tbtn.setAttribute('aria-pressed', 'true');\n\t\t\t\t\t// Resolve variant from all selected options\n\t\t\t\t\tresolveVariant();\n\t\t\t\t});\n\t\t\t});\n\n\t\t\tfunction resolveVariant() {\n\t\t\t\t// Gather selected value IDs across all option groups\n\t\t\t\tvar selected = [];\n\t\t\t\tdocument.querySelectorAll('div[data-option-id]').forEach(function(group) {\n\t\t\t\t\tvar active = group.querySelector('.option-pill.border-rr-amber');\n\t\t\t\t\tif (active) selected.push(active.dataset.valueId);\n\t\t\t\t});\n\t\t\t\tif (selected.length === 0) return;\n\t\t\t\t// Find variant that matches all selected option values\n\t\t\t\tfor (var vid in variantMap) {\n\t\t\t\t\tvar entry = variantMap[vid];\n\t\t\t\t\tvar ids = entry.optionValueIDs;\n\t\t\t\t\tif (ids.length === selected.length && selected.every(function(s) { return ids.indexOf(s) !== -1; })) {\n\t\t\t\t\t\t// Update hidden input\n\t\t\t\t\t\tvar input = document.getElementById('selected-variant-id');\n\t\t\t\t\t\tif (input) input.value = vid;\n\t\t\t\t\t\t// Update price display\n\t\t\t\t\t\tif (entry.price !== null) {\n\t\t\t\t\t\t\tvar display = document.getElementById('price-display');\n\t\t\t\t\t\t\tif (display) {\n\t\t\t\t\t\t\t\tdisplay.innerHTML = '<span class=\"font-heading text-3xl text-rr-heading\" data-base-price=\"' + entry.price + '\">' + formatCents(entry.price) + '</span>';\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tbreak;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction formatCents(cents) {\n\t\t\t\treturn '$' + (cents / 100).toFixed(2);\n\t\t\t}\n\t\t})();\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1055,12 +1101,12 @@ func purchaseModeScript() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var45 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var45 == nil {
-			templ_7745c5c3_Var45 = templ.NopComponent
+		templ_7745c5c3_Var49 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var49 == nil {
+			templ_7745c5c3_Var49 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "<script>\n\t\t(function() {\n\t\t\tvar mode = 'onetime';\n\t\t\tvar variantID = document.getElementById('selected-variant-id');\n\t\t\tvar qtyInput = document.getElementById('subscribe-quantity');\n\t\t\tvar qtyMinus = document.getElementById('subscribe-qty-minus');\n\t\t\tvar qtyPlus = document.getElementById('subscribe-qty-plus');\n\n\t\t\t// Mode toggle\n\t\t\tdocument.querySelectorAll('.purchase-mode-btn').forEach(function(btn) {\n\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\tmode = btn.dataset.mode;\n\t\t\t\t\t// Update tab styles\n\t\t\t\t\tdocument.querySelectorAll('.purchase-mode-btn').forEach(function(b) {\n\t\t\t\t\t\tvar isActive = b.dataset.mode === mode;\n\t\t\t\t\t\tb.setAttribute('aria-selected', String(isActive));\n\t\t\t\t\t\tif (isActive) {\n\t\t\t\t\t\t\tb.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-amber bg-rr-amber/5 p-3 text-left transition-colors';\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tb.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-border bg-rr-surface p-3 text-left transition-colors';\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\t// Toggle form visibility\n\t\t\t\t\tvar onetimeForm = document.getElementById('onetime-form');\n\t\t\t\t\tvar subscribeForm = document.getElementById('subscribe-form');\n\t\t\t\t\tvar subscribeOptions = document.getElementById('subscribe-options');\n\t\t\t\t\tif (mode === 'subscribe') {\n\t\t\t\t\t\tonetimeForm.classList.add('hidden');\n\t\t\t\t\t\tsubscribeForm.classList.remove('hidden');\n\t\t\t\t\t\tsubscribeOptions.classList.remove('hidden');\n\t\t\t\t\t\tupdatePrice();\n\t\t\t\t\t} else {\n\t\t\t\t\t\tonetimeForm.classList.remove('hidden');\n\t\t\t\t\t\tsubscribeForm.classList.add('hidden');\n\t\t\t\t\t\tsubscribeOptions.classList.add('hidden');\n\t\t\t\t\t\tresetPrice();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t});\n\n\t\t\t// Quantity controls\n\t\t\tif (qtyMinus && qtyPlus && qtyInput) {\n\t\t\t\tqtyMinus.addEventListener('click', function() {\n\t\t\t\t\tvar val = parseInt(qtyInput.value, 10) || 1;\n\t\t\t\t\tif (val > 1) {\n\t\t\t\t\t\tqtyInput.value = val - 1;\n\t\t\t\t\t\tonQuantityChange();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t\tqtyPlus.addEventListener('click', function() {\n\t\t\t\t\tvar val = parseInt(qtyInput.value, 10) || 1;\n\t\t\t\t\tif (val < 10) {\n\t\t\t\t\t\tqtyInput.value = val + 1;\n\t\t\t\t\t\tonQuantityChange();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t\tqtyInput.addEventListener('change', function() {\n\t\t\t\t\tvar val = parseInt(qtyInput.value, 10);\n\t\t\t\t\tif (isNaN(val) || val < 1) qtyInput.value = 1;\n\t\t\t\t\telse if (val > 10) qtyInput.value = 10;\n\t\t\t\t\tonQuantityChange();\n\t\t\t\t});\n\t\t\t\tqtyInput.addEventListener('input', function() {\n\t\t\t\t\tvar val = parseInt(qtyInput.value, 10);\n\t\t\t\t\tif (!isNaN(val) && val >= 1 && val <= 10) {\n\t\t\t\t\t\tonQuantityChange();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction onQuantityChange() {\n\t\t\t\tupdateQtyButtons();\n\t\t\t\tvar checked = document.querySelector('.subscribe-frequency-option input:checked');\n\t\t\t\tif (checked) {\n\t\t\t\t\tvar label = checked.closest('.subscribe-frequency-option');\n\t\t\t\t\tupdateSubscribeLink(label.dataset.planId);\n\t\t\t\t}\n\t\t\t\tif (mode === 'subscribe') updatePrice();\n\t\t\t}\n\n\t\t\tfunction updateQtyButtons() {\n\t\t\t\tvar val = parseInt(qtyInput.value, 10) || 1;\n\t\t\t\tif (qtyMinus) qtyMinus.disabled = val <= 1;\n\t\t\t\tif (qtyPlus) qtyPlus.disabled = val >= 10;\n\t\t\t}\n\n\t\t\t// Frequency selection\n\t\t\tdocument.querySelectorAll('.subscribe-frequency-option').forEach(function(label) {\n\t\t\t\tvar radio = label.querySelector('input[type=\"radio\"]');\n\t\t\t\tradio.addEventListener('change', function() {\n\t\t\t\t\t// Update selected styles\n\t\t\t\t\tdocument.querySelectorAll('.subscribe-frequency-option').forEach(function(l) {\n\t\t\t\t\t\tl.classList.remove('border-rr-amber', 'bg-rr-amber/5');\n\t\t\t\t\t\tl.classList.add('border-rr-border');\n\t\t\t\t\t});\n\t\t\t\t\tlabel.classList.remove('border-rr-border');\n\t\t\t\t\tlabel.classList.add('border-rr-amber', 'bg-rr-amber/5');\n\t\t\t\t\t// Update subscribe link\n\t\t\t\t\tupdateSubscribeLink(label.dataset.planId);\n\t\t\t\t\tupdatePrice();\n\t\t\t\t});\n\t\t\t});\n\n\t\t\tfunction getQuantity() {\n\t\t\t\treturn parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;\n\t\t\t}\n\n\t\t\tvar selectedPlanId = '';\n\t\t\tfunction updateSubscribeLink(planId) {\n\t\t\t\tselectedPlanId = planId;\n\t\t\t}\n\n\t\t\t// Navigate on subscribe button click\n\t\t\tvar subscribeBtn = document.getElementById('subscribe-action');\n\t\t\tif (subscribeBtn) {\n\t\t\t\tsubscribeBtn.addEventListener('click', function() {\n\t\t\t\t\tvar vid = variantID ? variantID.value : '';\n\t\t\t\t\tvar qty = getQuantity();\n\t\t\t\t\tvar pid = selectedPlanId;\n\t\t\t\t\tif (!pid) {\n\t\t\t\t\t\tvar checked = document.querySelector('.subscribe-frequency-option input:checked');\n\t\t\t\t\t\tif (checked) pid = checked.closest('.subscribe-frequency-option').dataset.planId;\n\t\t\t\t\t}\n\t\t\t\t\tif (pid) window.location.href = '/subscribe?plan_id=' + pid + '&variant_id=' + vid + '&quantity=' + qty;\n\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction updatePrice() {\n\t\t\t\tvar priceEl = document.querySelector('[data-base-price]');\n\t\t\t\tif (!priceEl) return;\n\t\t\t\tvar baseCents = parseInt(priceEl.dataset.basePrice, 10);\n\t\t\t\tvar qty = getQuantity();\n\t\t\t\tvar checked = document.querySelector('.subscribe-frequency-option input:checked');\n\t\t\t\tif (!checked) return;\n\t\t\t\tvar label = checked.closest('.subscribe-frequency-option');\n\t\t\t\tvar discount = parseInt(label.dataset.discount, 10) || 0;\n\t\t\t\tvar unitCents = Math.round(baseCents * (100 - discount) / 100);\n\t\t\t\tvar totalCents = unitCents * qty;\n\t\t\t\tvar display = document.getElementById('price-display');\n\t\t\t\tvar qtyPrefix = qty > 1 ? qty + ' × ' : '';\n\t\t\t\tif (discount > 0) {\n\t\t\t\t\tdisplay.innerHTML = '<span class=\"font-heading text-xl text-rr-muted line-through\">' + formatCents(baseCents) + '</span>' +\n\t\t\t\t\t\t' <span class=\"font-heading text-3xl text-rr-amber\">' + qtyPrefix + formatCents(totalCents) + '</span>';\n\t\t\t\t} else {\n\t\t\t\t\tdisplay.innerHTML = '<span class=\"font-heading text-3xl text-rr-heading\">' + qtyPrefix + formatCents(totalCents) + '</span>';\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction resetPrice() {\n\t\t\t\tvar priceEl = document.querySelector('[data-base-price]');\n\t\t\t\tif (!priceEl) return;\n\t\t\t\tvar baseCents = parseInt(priceEl.dataset.basePrice, 10);\n\t\t\t\tvar display = document.getElementById('price-display');\n\t\t\t\tdisplay.innerHTML = '<span class=\"font-heading text-3xl text-rr-heading\" data-base-price=\"' + baseCents + '\">' + formatCents(baseCents) + '</span>';\n\t\t\t}\n\n\t\t\tfunction formatCents(cents) {\n\t\t\t\treturn '$' + (cents / 100).toFixed(2);\n\t\t\t}\n\n\t\t\t// Auto-activate subscribe mode if ?mode=subscribe is present\n\t\t\tvar params = new URLSearchParams(window.location.search);\n\t\t\tif (params.get('mode') === 'subscribe') {\n\t\t\t\tvar subscribeTab = document.querySelector('.purchase-mode-btn[data-mode=\"subscribe\"]');\n\t\t\t\tif (subscribeTab) subscribeTab.click();\n\t\t\t}\n\n\t\t\t// Initialize button states\n\t\t\tupdateQtyButtons();\n\t\t})();\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, "<script>\n\t\t(function() {\n\t\t\tvar mode = 'onetime';\n\t\t\tvar variantID = document.getElementById('selected-variant-id');\n\t\t\tvar qtyInput = document.getElementById('subscribe-quantity');\n\t\t\tvar qtyMinus = document.getElementById('subscribe-qty-minus');\n\t\t\tvar qtyPlus = document.getElementById('subscribe-qty-plus');\n\n\t\t\t// Mode toggle\n\t\t\tdocument.querySelectorAll('.purchase-mode-btn').forEach(function(btn) {\n\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\tmode = btn.dataset.mode;\n\t\t\t\t\t// Update tab styles\n\t\t\t\t\tdocument.querySelectorAll('.purchase-mode-btn').forEach(function(b) {\n\t\t\t\t\t\tvar isActive = b.dataset.mode === mode;\n\t\t\t\t\t\tb.setAttribute('aria-selected', String(isActive));\n\t\t\t\t\t\tif (isActive) {\n\t\t\t\t\t\t\tb.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-amber bg-rr-amber/5 p-3 text-left transition-colors';\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\tb.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-border bg-rr-surface p-3 text-left transition-colors';\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\t// Toggle form visibility\n\t\t\t\t\tvar onetimeForm = document.getElementById('onetime-form');\n\t\t\t\t\tvar subscribeForm = document.getElementById('subscribe-form');\n\t\t\t\t\tvar subscribeOptions = document.getElementById('subscribe-options');\n\t\t\t\t\tif (mode === 'subscribe') {\n\t\t\t\t\t\tonetimeForm.classList.add('hidden');\n\t\t\t\t\t\tsubscribeForm.classList.remove('hidden');\n\t\t\t\t\t\tsubscribeOptions.classList.remove('hidden');\n\t\t\t\t\t\tupdatePrice();\n\t\t\t\t\t} else {\n\t\t\t\t\t\tonetimeForm.classList.remove('hidden');\n\t\t\t\t\t\tsubscribeForm.classList.add('hidden');\n\t\t\t\t\t\tsubscribeOptions.classList.add('hidden');\n\t\t\t\t\t\tresetPrice();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t});\n\n\t\t\t// Quantity controls\n\t\t\tif (qtyMinus && qtyPlus && qtyInput) {\n\t\t\t\tqtyMinus.addEventListener('click', function() {\n\t\t\t\t\tvar val = parseInt(qtyInput.value, 10) || 1;\n\t\t\t\t\tif (val > 1) {\n\t\t\t\t\t\tqtyInput.value = val - 1;\n\t\t\t\t\t\tonQuantityChange();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t\tqtyPlus.addEventListener('click', function() {\n\t\t\t\t\tvar val = parseInt(qtyInput.value, 10) || 1;\n\t\t\t\t\tif (val < 10) {\n\t\t\t\t\t\tqtyInput.value = val + 1;\n\t\t\t\t\t\tonQuantityChange();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t\tqtyInput.addEventListener('change', function() {\n\t\t\t\t\tvar val = parseInt(qtyInput.value, 10);\n\t\t\t\t\tif (isNaN(val) || val < 1) qtyInput.value = 1;\n\t\t\t\t\telse if (val > 10) qtyInput.value = 10;\n\t\t\t\t\tonQuantityChange();\n\t\t\t\t});\n\t\t\t\tqtyInput.addEventListener('input', function() {\n\t\t\t\t\tvar val = parseInt(qtyInput.value, 10);\n\t\t\t\t\tif (!isNaN(val) && val >= 1 && val <= 10) {\n\t\t\t\t\t\tonQuantityChange();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction onQuantityChange() {\n\t\t\t\tupdateQtyButtons();\n\t\t\t\tvar checked = document.querySelector('.subscribe-frequency-option input:checked');\n\t\t\t\tif (checked) {\n\t\t\t\t\tvar label = checked.closest('.subscribe-frequency-option');\n\t\t\t\t\tupdateSubscribeLink(label.dataset.planId);\n\t\t\t\t}\n\t\t\t\tif (mode === 'subscribe') updatePrice();\n\t\t\t}\n\n\t\t\tfunction updateQtyButtons() {\n\t\t\t\tvar val = parseInt(qtyInput.value, 10) || 1;\n\t\t\t\tif (qtyMinus) qtyMinus.disabled = val <= 1;\n\t\t\t\tif (qtyPlus) qtyPlus.disabled = val >= 10;\n\t\t\t}\n\n\t\t\t// Frequency selection\n\t\t\tdocument.querySelectorAll('.subscribe-frequency-option').forEach(function(label) {\n\t\t\t\tvar radio = label.querySelector('input[type=\"radio\"]');\n\t\t\t\tradio.addEventListener('change', function() {\n\t\t\t\t\t// Update selected styles\n\t\t\t\t\tdocument.querySelectorAll('.subscribe-frequency-option').forEach(function(l) {\n\t\t\t\t\t\tl.classList.remove('border-rr-amber', 'bg-rr-amber/5');\n\t\t\t\t\t\tl.classList.add('border-rr-border');\n\t\t\t\t\t});\n\t\t\t\t\tlabel.classList.remove('border-rr-border');\n\t\t\t\t\tlabel.classList.add('border-rr-amber', 'bg-rr-amber/5');\n\t\t\t\t\t// Update subscribe link\n\t\t\t\t\tupdateSubscribeLink(label.dataset.planId);\n\t\t\t\t\tupdatePrice();\n\t\t\t\t});\n\t\t\t});\n\n\t\t\tfunction getQuantity() {\n\t\t\t\treturn parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;\n\t\t\t}\n\n\t\t\tvar selectedPlanId = '';\n\t\t\tfunction updateSubscribeLink(planId) {\n\t\t\t\tselectedPlanId = planId;\n\t\t\t}\n\n\t\t\t// Navigate on subscribe button click\n\t\t\tvar subscribeBtn = document.getElementById('subscribe-action');\n\t\t\tif (subscribeBtn) {\n\t\t\t\tsubscribeBtn.addEventListener('click', function() {\n\t\t\t\t\tvar vid = variantID ? variantID.value : '';\n\t\t\t\t\tvar qty = getQuantity();\n\t\t\t\t\tvar pid = selectedPlanId;\n\t\t\t\t\tif (!pid) {\n\t\t\t\t\t\tvar checked = document.querySelector('.subscribe-frequency-option input:checked');\n\t\t\t\t\t\tif (checked) pid = checked.closest('.subscribe-frequency-option').dataset.planId;\n\t\t\t\t\t}\n\t\t\t\t\tif (pid) window.location.href = '/subscribe?plan_id=' + pid + '&variant_id=' + vid + '&quantity=' + qty;\n\t\t\t\t});\n\t\t\t}\n\n\t\t\tfunction updatePrice() {\n\t\t\t\tvar priceEl = document.querySelector('[data-base-price]');\n\t\t\t\tif (!priceEl) return;\n\t\t\t\tvar baseCents = parseInt(priceEl.dataset.basePrice, 10);\n\t\t\t\tvar qty = getQuantity();\n\t\t\t\tvar checked = document.querySelector('.subscribe-frequency-option input:checked');\n\t\t\t\tif (!checked) return;\n\t\t\t\tvar label = checked.closest('.subscribe-frequency-option');\n\t\t\t\tvar discount = parseInt(label.dataset.discount, 10) || 0;\n\t\t\t\tvar unitCents = Math.round(baseCents * (100 - discount) / 100);\n\t\t\t\tvar totalCents = unitCents * qty;\n\t\t\t\tvar display = document.getElementById('price-display');\n\t\t\t\tvar qtyPrefix = qty > 1 ? qty + ' × ' : '';\n\t\t\t\tif (discount > 0) {\n\t\t\t\t\tdisplay.innerHTML = '<span class=\"font-heading text-xl text-rr-muted line-through\">' + formatCents(baseCents) + '</span>' +\n\t\t\t\t\t\t' <span class=\"font-heading text-3xl text-rr-amber\">' + qtyPrefix + formatCents(totalCents) + '</span>';\n\t\t\t\t} else {\n\t\t\t\t\tdisplay.innerHTML = '<span class=\"font-heading text-3xl text-rr-heading\">' + qtyPrefix + formatCents(totalCents) + '</span>';\n\t\t\t\t}\n\t\t\t}\n\n\t\t\tfunction resetPrice() {\n\t\t\t\tvar priceEl = document.querySelector('[data-base-price]');\n\t\t\t\tif (!priceEl) return;\n\t\t\t\tvar baseCents = parseInt(priceEl.dataset.basePrice, 10);\n\t\t\t\tvar display = document.getElementById('price-display');\n\t\t\t\tdisplay.innerHTML = '<span class=\"font-heading text-3xl text-rr-heading\" data-base-price=\"' + baseCents + '\">' + formatCents(baseCents) + '</span>';\n\t\t\t}\n\n\t\t\tfunction formatCents(cents) {\n\t\t\t\treturn '$' + (cents / 100).toFixed(2);\n\t\t\t}\n\n\t\t\t// Auto-activate subscribe mode if ?mode=subscribe is present\n\t\t\tvar params = new URLSearchParams(window.location.search);\n\t\t\tif (params.get('mode') === 'subscribe') {\n\t\t\t\tvar subscribeTab = document.querySelector('.purchase-mode-btn[data-mode=\"subscribe\"]');\n\t\t\t\tif (subscribeTab) subscribeTab.click();\n\t\t\t}\n\n\t\t\t// Initialize button states\n\t\t\tupdateQtyButtons();\n\t\t})();\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1116,12 +1162,12 @@ func ProductPage(props ProductDetailProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var46 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var46 == nil {
-			templ_7745c5c3_Var46 = templ.NopComponent
+		templ_7745c5c3_Var50 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var50 == nil {
+			templ_7745c5c3_Var50 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var47 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var51 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -1137,7 +1183,7 @@ func ProductPage(props ProductDetailProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, " ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1151,7 +1197,7 @@ func ProductPage(props ProductDetailProps) templ.Component {
 			Title:       props.Product.Title,
 			Description: props.Product.Description,
 			CartCount:   props.CartCount,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var47), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var51), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

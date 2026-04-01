@@ -404,6 +404,13 @@ func (s *CatalogService) UpdateVariant(ctx context.Context, tx pgx.Tx, id uuid.U
 		}
 	}
 
+	// If setting as default, clear existing defaults first.
+	if p.IsDefault {
+		if err := s.catalog.ClearDefaultVariants(ctx, tx, existing.ProductID); err != nil {
+			return nil, fmt.Errorf("clear default variants: %w", err)
+		}
+	}
+
 	p.ID = id
 	variant, err := s.catalog.UpdateVariant(ctx, tx, p)
 	if err != nil {

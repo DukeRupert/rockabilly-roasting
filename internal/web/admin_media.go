@@ -132,6 +132,55 @@ func (d *Deps) handleAdminProductImageDelete(w http.ResponseWriter, r *http.Requ
 	d.renderMediaGallery(w, r, productID)
 }
 
+// handleAdminProductImageSetPrimary moves an image to position 0 (primary) and shifts others.
+//
+// POST /admin/catalog/{id}/images/{imageID}/primary
+func (d *Deps) handleAdminProductImageSetPrimary(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	productID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	imageID, err := uuid.Parse(r.PathValue("imageID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		media, txErr := d.CatalogService.ListProductMedia(ctx, tx, productID)
+		if txErr != nil {
+			return txErr
+		}
+
+		// Build new order: target image first, then the rest in existing order.
+		pos := 0
+		if txErr := d.CatalogService.UpdateProductMediaPosition(ctx, tx, imageID, pos); txErr != nil {
+			return txErr
+		}
+		pos++
+		for _, m := range media {
+			if m.ID == imageID {
+				continue
+			}
+			if txErr := d.CatalogService.UpdateProductMediaPosition(ctx, tx, m.ID, pos); txErr != nil {
+				return txErr
+			}
+			pos++
+		}
+		return nil
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	d.renderMediaGallery(w, r, productID)
+}
+
 // handleAdminProductImageReorder updates the position of all images for a product.
 //
 // POST /admin/catalog/{id}/images/reorder

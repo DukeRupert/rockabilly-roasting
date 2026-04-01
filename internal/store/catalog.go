@@ -445,6 +445,14 @@ type UpdateVariantParams struct {
 	Metadata    map[string]any
 }
 
+// ClearDefaultVariants clears the is_default flag on all variants for a product.
+func (s *CatalogStore) ClearDefaultVariants(ctx context.Context, tx pgx.Tx, productID uuid.UUID) error {
+	if err := sqlcgen.New(tx).ClearDefaultVariants(ctx, productID); err != nil {
+		return fmt.Errorf("clear default variants: %w", err)
+	}
+	return nil
+}
+
 // UpdateVariant updates a variant and returns it.
 func (s *CatalogStore) UpdateVariant(ctx context.Context, tx pgx.Tx, p UpdateVariantParams) (*domain.Variant, error) {
 	row, err := sqlcgen.New(tx).UpdateVariant(ctx, sqlcgen.UpdateVariantParams{

@@ -13,6 +13,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearDefaultVariants = `-- name: ClearDefaultVariants :exec
+UPDATE variants SET is_default = false WHERE product_id = $1 AND is_default = true
+`
+
+func (q *Queries) ClearDefaultVariants(ctx context.Context, productID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, clearDefaultVariants, productID)
+	return err
+}
+
 const createProduct = `-- name: CreateProduct :one
 INSERT INTO products (id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)

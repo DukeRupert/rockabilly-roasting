@@ -248,6 +248,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/images/upload-url", deps.handleAdminImageUploadURL)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/images", deps.handleAdminProductImageCreate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/images/{imageID}/delete", deps.handleAdminProductImageDelete)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/images/{imageID}/primary", deps.handleAdminProductImageSetPrimary)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/images/reorder", deps.handleAdminProductImageReorder)
 
 	// Admin orders

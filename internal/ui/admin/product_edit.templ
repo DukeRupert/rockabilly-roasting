@@ -554,7 +554,21 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 										<span class="text-rr-border">&mdash;</span>
 									}
 								</td>
-								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-3">
+									if !vwo.Variant.IsDefault {
+										<form
+											method="post"
+											action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s", product.ID, vwo.Variant.ID)) }
+											hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s", product.ID, vwo.Variant.ID) }
+											hx-target="#variants-panel"
+											hx-swap="outerHTML"
+											class="inline"
+										>
+											<input type="hidden" name="sku" value={ vwo.Variant.SKU }/>
+											<input type="hidden" name="is_default" value="true"/>
+											<button type="submit" class="text-rr-muted hover:text-rr-heading">Set default</button>
+										</form>
+									}
 									<form
 										method="post"
 										action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", product.ID, vwo.Variant.ID)) }

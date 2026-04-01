@@ -53,6 +53,9 @@ SELECT * FROM variants
 WHERE product_id = $1
 ORDER BY position;
 
+-- name: ClearDefaultVariants :exec
+UPDATE variants SET is_default = false WHERE product_id = $1 AND is_default = true;
+
 -- name: UpdateVariant :one
 UPDATE variants
 SET sku = $2, barcode = $3, position = $4, is_default = $5, weight_grams = $6,

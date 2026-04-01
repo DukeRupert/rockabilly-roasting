@@ -17,6 +17,7 @@ type Querier interface {
 	AssignAttributeSetToProduct(ctx context.Context, arg AssignAttributeSetToProductParams) error
 	CancelSubscription(ctx context.Context, id uuid.UUID) error
 	ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error
+	ClearDefaultVariants(ctx context.Context, productID uuid.UUID) error
 	CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error)
 	CountWholesaleByStatus(ctx context.Context, wholesaleStatus *string) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)

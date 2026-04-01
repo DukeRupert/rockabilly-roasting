@@ -181,34 +181,4 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 	})
 }
 
-// imageUploaderScript outputs the Alpine.js component for direct-to-R2 upload.
-func ImageUploaderScript() templ.Component {
-	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
-		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
-		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
-			return templ_7745c5c3_CtxErr
-		}
-		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
-		if !templ_7745c5c3_IsBuffer {
-			defer func() {
-				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err == nil {
-					templ_7745c5c3_Err = templ_7745c5c3_BufErr
-				}
-			}()
-		}
-		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var9 == nil {
-			templ_7745c5c3_Var9 = templ.NopComponent
-		}
-		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<script>\n\t\t// Register directly — Alpine is already initialized when this arrives via htmx.\n\t\t// Re-registration with the same name is safe (Alpine overwrites silently).\n\t\tAlpine.data('imageUploader', (productId) => ({\n\t\t\t\tuploading: false,\n\t\t\t\tdragging: false,\n\t\t\t\tprogress: '',\n\t\t\t\terror: '',\n\n\t\t\t\thandleDrop(event) {\n\t\t\t\t\tconst files = event.dataTransfer.files;\n\t\t\t\t\tif (files.length) {\n\t\t\t\t\t\tthis.$refs.fileInput.files = files;\n\t\t\t\t\t\tthis.handleFiles({ target: { files, value: '' } });\n\t\t\t\t\t}\n\t\t\t\t},\n\n\t\t\t\tasync handleFiles(event) {\n\t\t\t\t\tconst files = event.target.files;\n\t\t\t\t\tif (!files.length) return;\n\n\t\t\t\t\tthis.uploading = true;\n\t\t\t\t\tthis.error = '';\n\n\t\t\t\t\tfor (let i = 0; i < files.length; i++) {\n\t\t\t\t\t\tthis.progress = (i + 1) + ' of ' + files.length;\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tawait this.uploadFile(files[i], i);\n\t\t\t\t\t\t} catch (err) {\n\t\t\t\t\t\t\tthis.error = 'Upload failed: ' + err.message;\n\t\t\t\t\t\t\tbreak;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tthis.uploading = false;\n\t\t\t\t\tthis.progress = '';\n\t\t\t\t\tif (event.target.value !== undefined) {\n\t\t\t\t\t\tevent.target.value = '';\n\t\t\t\t\t}\n\t\t\t\t},\n\n\t\t\t\tasync uploadFile(file, position) {\n\t\t\t\t\t// Step 1: Get presigned R2 upload URL from our server.\n\t\t\t\t\tconst urlForm = new FormData();\n\t\t\t\t\turlForm.append('content_type', file.type || 'image/jpeg');\n\t\t\t\t\tconst urlResp = await fetch('/admin/images/upload-url', {\n\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\theaders: { 'X-Requested-With': 'XMLHttpRequest' },\n\t\t\t\t\t\tbody: urlForm,\n\t\t\t\t\t});\n\t\t\t\t\tif (!urlResp.ok) throw new Error('Failed to get upload URL');\n\t\t\t\t\tconst { upload_url, r2_key } = await urlResp.json();\n\n\t\t\t\t\t// Step 2: Upload directly to R2 via presigned PUT.\n\t\t\t\t\tconst r2Resp = await fetch(upload_url, {\n\t\t\t\t\t\tmethod: 'PUT',\n\t\t\t\t\t\theaders: { 'Content-Type': file.type || 'image/jpeg' },\n\t\t\t\t\t\tbody: file,\n\t\t\t\t\t});\n\t\t\t\t\tif (!r2Resp.ok) throw new Error('Failed to upload to R2');\n\n\t\t\t\t\t// Step 3: Persist the R2 key in our database.\n\t\t\t\t\tconst persistForm = new FormData();\n\t\t\t\t\tpersistForm.append('r2_key', r2_key);\n\t\t\t\t\tpersistForm.append('alt_text', file.name.replace(/\\.[^.]+$/, ''));\n\t\t\t\t\tpersistForm.append('position', position.toString());\n\n\t\t\t\t\tconst persistResp = await fetch('/admin/catalog/' + productId + '/images', {\n\t\t\t\t\t\tmethod: 'POST',\n\t\t\t\t\t\theaders: {\n\t\t\t\t\t\t\t'HX-Request': 'true',\n\t\t\t\t\t\t},\n\t\t\t\t\t\tbody: persistForm,\n\t\t\t\t\t});\n\t\t\t\t\tif (!persistResp.ok) throw new Error('Failed to save image');\n\n\t\t\t\t\t// Step 4: Swap in the updated gallery.\n\t\t\t\t\tconst html = await persistResp.text();\n\t\t\t\t\tconst gallery = document.getElementById('media-gallery');\n\t\t\t\t\tif (gallery) {\n\t\t\t\t\t\tgallery.outerHTML = html;\n\t\t\t\t\t\thtmx.process(document.getElementById('media-gallery'));\n\t\t\t\t\t}\n\t\t\t\t},\n\t\t\t}));\n\t</script>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		return nil
-	})
-}
-
 var _ = templruntime.GeneratedTemplate

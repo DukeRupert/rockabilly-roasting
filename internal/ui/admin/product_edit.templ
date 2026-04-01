@@ -86,23 +86,14 @@ templ ProductEditContent(props ProductEditProps) {
 			</div>
 		</div>
 	}
-	<!-- Tabs + content (swapped as a unit by htmx tab clicks) -->
-	@ProductEditTabPanel(props)
-}
-
-// ProductEditTabPanel renders the tab bar + active tab content as a unit for htmx swaps.
-templ ProductEditTabPanel(props ProductEditProps) {
-	<div id="product-tabs" class="mt-6">
+	<!-- Tabs -->
+	<div class="mt-6">
 		<!-- Mobile dropdown -->
 		<div class="grid grid-cols-1 sm:hidden">
 			<select
 				aria-label="Select a tab"
-				hx-get={ fmt.Sprintf("/admin/catalog/%s", props.Product.ID) }
-				hx-target="#product-tabs"
-				hx-swap="outerHTML"
-				hx-push-url="true"
-				hx-trigger="change"
-				name="tab"
+				x-data
+				@change={ fmt.Sprintf("window.location.href = '/admin/catalog/%s?tab=' + $event.target.value", props.Product.ID) }
 				class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-2 pr-8 pl-3 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 			>
 				<option value="details" selected?={ props.ActiveTab == "" || props.ActiveTab == "details" }>Details</option>
@@ -126,35 +117,31 @@ templ ProductEditTabPanel(props ProductEditProps) {
 						{"variants", "Variants"},
 						{"pricing", "Pricing"},
 					} {
-						<button
-							type="button"
-							hx-get={ fmt.Sprintf("/admin/catalog/%s?tab=%s", props.Product.ID, tab.Name) }
-							hx-target="#product-tabs"
-							hx-swap="outerHTML"
-							hx-push-url="true"
+						<a
+							href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s?tab=%s", props.Product.ID, tab.Name)) }
 							class={ tabClasses(props.ActiveTab == tab.Name || (props.ActiveTab == "" && tab.Name == "details")) }
 						>
 							{ tab.Label }
-						</button>
+						</a>
 					}
 				</nav>
 			</div>
 		</div>
-		<!-- Active tab content -->
-		<div class="mt-6">
-			switch props.ActiveTab {
-				case "attributes":
-					@productAttributesTab(props)
-				case "media":
-					@productMediaTab(props)
-				case "variants":
-					@productVariantsTab(props)
-				case "pricing":
-					@productPricingTab(props)
-				default:
-					@productDetailsTab(props)
-			}
-		</div>
+	</div>
+	<!-- Active tab content -->
+	<div class="mt-6">
+		switch props.ActiveTab {
+			case "attributes":
+				@productAttributesTab(props)
+			case "media":
+				@productMediaTab(props)
+			case "variants":
+				@productVariantsTab(props)
+			case "pricing":
+				@productPricingTab(props)
+			default:
+				@productDetailsTab(props)
+		}
 	</div>
 }
 
@@ -231,7 +218,6 @@ templ productMediaTab(props ProductEditProps) {
 		Media:       props.Media,
 		MediaConfig: props.MediaConfig,
 	})
-	@ImageUploaderScript()
 }
 
 // --- Attributes Tab ---

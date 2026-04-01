@@ -361,12 +361,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		ActiveTab:       tab,
 	}
 
-	// Tab switch via htmx: return just the tab panel
-	if IsHTMX(r) && r.Header.Get("HX-Target") == "product-tabs" {
-		admin.ProductEditTabPanel(props).Render(ctx, w) //nolint:errcheck
-		return
-	}
-	// Sidebar navigation via hx-boost: return page content
+	// htmx request (sidebar nav or tab click via hx-boost): return page content
 	if IsHTMX(r) {
 		admin.ProductEditContent(props).Render(ctx, w) //nolint:errcheck
 		return

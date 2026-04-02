@@ -9,13 +9,39 @@ type AboutProps struct {
 }
 
 templ AboutContent(props AboutProps) {
-	<div class="mx-auto max-w-3xl py-16">
+	<!-- Brand Hero -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 -mt-8 mb-16">
+		<div class="relative overflow-hidden bg-rr-void">
+			<img
+				src="/static/rockabilly_cafe.webp"
+				alt=""
+				class="absolute inset-0 h-full w-full object-cover object-center opacity-30"
+			/>
+			<div class="absolute inset-0 bg-rr-void/50"></div>
+			<div class="texture-dots absolute inset-0"></div>
+			<div class="texture-grid absolute inset-0"></div>
+			<div class="window-glow absolute inset-0"></div>
+			<div class="relative mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36 text-center">
+				<p class="label-font text-rr-amber text-xs mb-4" style="letter-spacing: 0.35em;">KENNEWICK, WA &middot; EST. 2014</p>
+				<div class="mt-4">
+					<h1 class="font-display leading-none text-rr-red" style="font-size: clamp(4rem, 12vw, 8.5rem); letter-spacing: 0.05em;">
+						ROCKABILLY
+					</h1>
+					<div class="flex items-center justify-center -mt-1">
+						<div class="flex-1 h-px" style="background: linear-gradient(to right, transparent, var(--color-rr-amber));"></div>
+						<span class="font-display text-rr-amber px-5" style="font-size: clamp(0.85rem, 2.2vw, 1.5rem); letter-spacing: 0.4em;">ROASTING CO.</span>
+						<div class="flex-1 h-px" style="background: linear-gradient(to left, transparent, var(--color-rr-amber));"></div>
+					</div>
+				</div>
+				<p class="mt-6 font-body text-lg text-rr-muted max-w-lg mx-auto leading-relaxed">
+					Small-batch specialty coffee with bold flavor and a rebellious spirit. From our roaster to your cup.
+				</p>
+			</div>
+			<div class="flame-stripe"></div>
+		</div>
+	</section>
+	<div class="mx-auto max-w-3xl">
 		<div class="text-center mb-16">
-			<h1 class="font-display text-4xl text-rr-heading tracking-wide mb-4">ABOUT US</h1>
-			<div class="w-16 h-1 bg-rr-red mx-auto mb-8 rounded-full"></div>
-			<p class="font-body text-lg text-rr-muted leading-relaxed mb-6">
-				Small-batch specialty coffee with bold flavor and a rebellious spirit.
-			</p>
 			<p class="font-body text-base text-rr-muted leading-relaxed mb-10">
 				More information coming soon. In the meantime, stop by the cafe or give us a call.
 			</p>

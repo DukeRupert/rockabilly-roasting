@@ -22,17 +22,16 @@ import (
 func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Fetch up to 4 active products for the featured section.
+	// Fetch up to 5 active products: 1 for the featured banner + 4 for the grid.
 	activeStatus := domain.ProductStatusActive
 	filter := store.ProductFilter{
-		Limit:  4,
+		Limit:  5,
 		Offset: 0,
 		Status: &activeStatus,
 	}
 
 	var products []domain.Product
 	var cards []storefront.ProductCard
-
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		products, txErr = d.CatalogService.ListProducts(ctx, tx, filter)
@@ -83,8 +82,12 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.HomePageProps{
-		FeaturedProducts: cards,
-		CartCount:        d.cartItemCountFromCookie(r),
+		CartCount: d.cartItemCountFromCookie(r),
+	}
+	if len(cards) > 0 {
+		props.FeaturedProduct = &cards[0]
+		props.HeroImageURL = "https://cdn.rockabillyroasting.shop/cdn-cgi/image/width=800,height=800,fit=contain/products/5d5a0076-0442-4317-8b6b-6ccaa63d6567"
+		props.FeaturedProducts = cards // show all products in the grid, including the featured one
 	}
 
 	if IsHTMX(r) {

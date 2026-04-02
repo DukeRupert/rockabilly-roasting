@@ -131,7 +131,7 @@ templ Storefront(props StorefrontProps) {
 			</div>
 			<!-- Header -->
 			<header class="sticky top-0 z-40 bg-rr-raised border-b border-rr-border">
-				<nav class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+				<nav class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">
 					<div class="flex h-16 items-center justify-between">
 						<!-- Logo -->
 						<div class="flex items-center">
@@ -139,26 +139,51 @@ templ Storefront(props StorefrontProps) {
 								<div class="flex-shrink-0 bg-white rounded-sm p-1">
 									<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-8 w-auto"/>
 								</div>
-								<div>
+								<div class="hidden sm:block">
 									<p class="font-display text-rr-heading text-lg leading-none tracking-widest">ROCKABILLY</p>
 									<p class="label-font text-rr-amber text-[0.55rem]" style="letter-spacing:0.3em;">ROASTING CO.</p>
 								</div>
 							</a>
 						</div>
 						<!-- Desktop nav -->
-						<div class="hidden sm:flex sm:items-center sm:gap-x-7">
-							<a href="/catalog" class="nav-link font-body text-sm font-semibold text-rr-heading">Shop</a>
+						<div class="hidden sm:flex sm:items-center sm:gap-x-6">
+							<a href="/catalog" class="btn label-font px-4 py-1.5 rounded-sm text-white text-xs bg-rr-red hover:bg-rr-red-lt transition-colors">SHOP</a>
 							<a href="/subscriptions" class="nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors">The Daily Grind</a>
-							<a href="/wholesale" class="nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors">Wholesale</a>
 							<a href="/about" class="nav-link font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors">About</a>
 						</div>
-						<!-- Cart + Sign In + mobile menu -->
-						<div class="flex items-center gap-x-3">
+						<!-- Cart + Account + mobile menu -->
+						<div class="flex items-center gap-x-2">
+							<!-- Account icon (cafe racer) -->
+							<a href="/account/login" class="hidden sm:block relative group p-2.5 text-rr-muted hover:text-rr-heading transition-colors">
+								<span class="sr-only">Sign In</span>
+								<svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+									<!-- Wheels -->
+									<circle cx="5" cy="17" r="3.5"></circle>
+									<circle cx="19" cy="17" r="3.5"></circle>
+									<!-- Engine block -->
+									<rect x="9" y="12" width="4" height="4" rx="0.5"></rect>
+									<!-- Frame: seat to front wheel -->
+									<path d="M8.5 17L9 14l3-5h3l1 3"></path>
+									<!-- Rear fender -->
+									<path d="M8.5 17l-2-3"></path>
+									<!-- Seat -->
+									<path d="M8 9h4"></path>
+									<!-- Handlebars -->
+									<path d="M15 9l2-3"></path>
+									<!-- Exhaust -->
+									<path d="M13 16h3.5"></path>
+									<!-- Front fork -->
+									<path d="M16 12l3 5"></path>
+								</svg>
+								<span class="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-1 rounded-sm bg-rr-void text-white text-[10px] font-body whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+									My Account
+								</span>
+							</a>
 							<!-- Cart icon -->
 							<div class="relative">
-								<a href={ templ.SafeURL(props.cartURL()) } class="block p-2 text-rr-muted hover:text-rr-heading transition-colors">
+								<a href={ templ.SafeURL(props.cartURL()) } class="block p-2.5 text-rr-muted hover:text-rr-heading transition-colors">
 									<span class="sr-only">Cart</span>
-									<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+									<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 										<path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
 									</svg>
 								</a>
@@ -170,18 +195,16 @@ templ Storefront(props StorefrontProps) {
 									<span id="cart-badge" class="absolute -top-0.5 -right-0.5"></span>
 								}
 							</div>
-							<!-- Sign In -->
-							<a href="/account/login" class="hidden sm:flex items-center gap-1.5 font-body text-sm font-semibold text-rr-muted hover:text-rr-heading transition-colors">
-								<svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"></path>
-								</svg>
-								Sign In
-							</a>
 							<!-- Mobile menu button -->
 							<button type="button" id="sf-mobile-menu-btn" class="sm:hidden -m-2.5 p-2.5 text-rr-muted" aria-expanded="false" aria-controls="sf-mobile-menu">
 								<span class="sr-only">Open menu</span>
-								<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<!-- Hamburger icon -->
+								<svg id="sf-menu-icon-open" class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
+								</svg>
+								<!-- Close icon -->
+								<svg id="sf-menu-icon-close" class="size-6 hidden" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
 								</svg>
 							</button>
 						</div>
@@ -189,10 +212,9 @@ templ Storefront(props StorefrontProps) {
 				</nav>
 				<!-- Mobile menu -->
 				<div id="sf-mobile-menu" class="hidden sm:hidden border-t border-rr-border">
-					<div class="space-y-1 px-4 py-3 bg-rr-bg">
+					<div class="space-y-1 px-4 py-3 bg-rr-raised">
 						<a href="/catalog" class="block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-heading hover:bg-rr-surface">Shop</a>
 						<a href="/subscriptions" class="block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading">The Daily Grind</a>
-						<a href="/wholesale" class="block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading">Wholesale</a>
 						<a href="/about" class="block rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading">About</a>
 						<div class="border-t border-rr-border mt-2 pt-2">
 							<a href="/account/login" class="flex items-center gap-2 rounded-sm px-3 py-2 font-body text-sm font-semibold text-rr-muted hover:bg-rr-surface hover:text-rr-heading">
@@ -320,10 +342,16 @@ templ Storefront(props StorefrontProps) {
 					// Mobile menu toggle
 					var btn = document.getElementById('sf-mobile-menu-btn');
 					var menu = document.getElementById('sf-mobile-menu');
+					var iconOpen = document.getElementById('sf-menu-icon-open');
+					var iconClose = document.getElementById('sf-menu-icon-close');
 					if (btn && menu) {
 						btn.addEventListener('click', function() {
 							var expanded = menu.classList.toggle('hidden') === false;
 							btn.setAttribute('aria-expanded', String(expanded));
+							if (iconOpen && iconClose) {
+								iconOpen.classList.toggle('hidden', expanded);
+								iconClose.classList.toggle('hidden', !expanded);
+							}
 						});
 					}
 

@@ -601,7 +601,6 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 					hx-target="#variants-panel"
 					hx-swap="outerHTML"
 					class="flex items-end gap-3 flex-wrap"
-					data-taxon-name={ taxonName }
 					data-product-title={ product.Title }
 				>
 					for _, opt := range options {
@@ -668,8 +667,6 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 							var sku = form.querySelector('#variant_sku');
 							if (sku.dataset.edited) return;
 							var parts = [];
-							var taxon = form.dataset.taxonName;
-							if (taxon) parts.push(abbrev(taxon));
 							parts.push(abbrev(form.dataset.productTitle));
 							form.querySelectorAll('.js-option-select').forEach(function(sel) {
 								if (sel.selectedIndex > 0) {

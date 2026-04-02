@@ -81,6 +81,26 @@ type wcMeta struct {
 
 // Mapping configuration
 
+// variantMapEntry holds either a single UUID (for simple mappings) or
+// a grind→UUID map (for variations where grind-type meta determines the Hiri variant).
+type variantMapEntry struct {
+	Default  uuid.UUID            // used when no grind-type meta or simple mapping
+	ByGrind  map[string]uuid.UUID // grind-type value → Hiri variant UUID
+}
+
+// resolve picks the correct Hiri variant UUID given the line item's grind-type meta.
+func (e variantMapEntry) resolve(grindType string) (uuid.UUID, bool) {
+	if len(e.ByGrind) > 0 && grindType != "" {
+		if id, ok := e.ByGrind[grindType]; ok {
+			return id, true
+		}
+	}
+	if e.Default != uuid.Nil {
+		return e.Default, true
+	}
+	return uuid.Nil, false
+}
+
 type variantMapping struct {
 	WCVariationID int
 	HiriVariantID uuid.UUID
@@ -286,7 +306,7 @@ func fetchSubscriptions(ctx context.Context, baseURL, key, secret, status string
 	return all, nil
 }
 
-func loadVariantMapping(path string) (map[int]uuid.UUID, error) {
+func loadVariantMapping(path string) (map[int]variantMapEntry, error) {
 	if path == "" {
 		return nil, nil
 	}
@@ -294,22 +314,49 @@ func loadVariantMapping(path string) (map[int]uuid.UUID, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Expected format: {"242": "uuid-string", "244": "uuid-string", ...}
-	var raw map[string]string
+	// Supports two formats per entry:
+	//   Simple:  "242": "uuid-string"
+	//   By grind: "294": {"Whole Bean": "uuid", "Drip Ground": "uuid"}
+	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("parse mapping JSON: %w", err)
 	}
-	result := make(map[int]uuid.UUID, len(raw))
+	result := make(map[int]variantMapEntry, len(raw))
 	for k, v := range raw {
 		var wcID int
 		if _, err := fmt.Sscanf(k, "%d", &wcID); err != nil {
 			return nil, fmt.Errorf("invalid WC variation ID %q: %w", k, err)
 		}
-		uid, err := uuid.Parse(v)
-		if err != nil {
-			return nil, fmt.Errorf("invalid UUID for WC variation %s: %w", k, err)
+
+		// Try simple string first.
+		var simple string
+		if err := json.Unmarshal(v, &simple); err == nil {
+			uid, err := uuid.Parse(simple)
+			if err != nil {
+				return nil, fmt.Errorf("invalid UUID for WC variation %s: %w", k, err)
+			}
+			result[wcID] = variantMapEntry{Default: uid}
+			continue
 		}
-		result[wcID] = uid
+
+		// Try grind map.
+		var grindMap map[string]string
+		if err := json.Unmarshal(v, &grindMap); err != nil {
+			return nil, fmt.Errorf("WC variation %s: expected UUID string or grind map, got: %s", k, string(v))
+		}
+		entry := variantMapEntry{ByGrind: make(map[string]uuid.UUID, len(grindMap))}
+		for grind, uidStr := range grindMap {
+			uid, err := uuid.Parse(uidStr)
+			if err != nil {
+				return nil, fmt.Errorf("invalid UUID for WC variation %s grind %q: %w", k, grind, err)
+			}
+			if grind == "default" {
+				entry.Default = uid
+			} else {
+				entry.ByGrind[grind] = uid
+			}
+		}
+		result[wcID] = entry
 	}
 	return result, nil
 }
@@ -467,6 +514,18 @@ func getStripeSourceID(meta ...[]wcMeta) string {
 	}, meta...)
 }
 
+// lineItemGrindType extracts the grind-type meta from a WC line item.
+func lineItemGrindType(li wcLineItem) string {
+	for _, m := range li.Meta {
+		if m.Key == "grind-type" {
+			if s, ok := m.Value.(string); ok {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
 func strPtr(s string) *string {
 	if s == "" {
 		return nil
@@ -475,7 +534,7 @@ func strPtr(s string) *string {
 }
 
 // dryRunValidation checks all mappings without touching the database.
-func dryRunValidation(ctx context.Context, subs []wcSubscription, variantMap map[int]uuid.UUID, planMap map[string]uuid.UUID, wcBaseURL, wcKey, wcSecret string, report *migrationReport, logger *slog.Logger) {
+func dryRunValidation(ctx context.Context, subs []wcSubscription, variantMap map[int]variantMapEntry, planMap map[string]uuid.UUID, wcBaseURL, wcKey, wcSecret string, report *migrationReport, logger *slog.Logger) {
 	customerEmails := make(map[string]int)   // email → WC customer ID
 	variantIDs := make(map[int]string)        // WC variation ID → product name
 	missingVariants := make(map[int]string)   // unmapped variation IDs
@@ -501,8 +560,15 @@ func dryRunValidation(ctx context.Context, subs []wcSubscription, variantMap map
 		for _, li := range sub.LineItems {
 			variantIDs[li.VariationID] = li.Name
 			if variantMap != nil {
-				if _, ok := variantMap[li.VariationID]; !ok {
+				entry, ok := variantMap[li.VariationID]
+				if !ok {
 					missingVariants[li.VariationID] = li.Name
+				} else if _, resolved := entry.resolve(lineItemGrindType(li)); !resolved {
+					grind := lineItemGrindType(li)
+					if grind == "" {
+						grind = "(no grind-type)"
+					}
+					report.addError("WC variation %d (%s) grind %q has no Hiri mapping", li.VariationID, li.Name, grind)
 				}
 			}
 		}
@@ -570,7 +636,7 @@ func importSubscriptions(
 	cs *store.CustomerStore,
 	ss *store.SubscriptionStore,
 	subs []wcSubscription,
-	variantMap map[int]uuid.UUID,
+	variantMap map[int]variantMapEntry,
 	planMap map[string]uuid.UUID,
 	wcBaseURL, wcKey, wcSecret string,
 	report *migrationReport,
@@ -617,7 +683,12 @@ func importSubscriptions(
 
 		// Process each line item as a separate subscription (handles multi-item subs)
 		for liIdx, li := range sub.LineItems {
-			hiriVariantID, ok := variantMap[li.VariationID]
+			entry, entryOK := variantMap[li.VariationID]
+			var hiriVariantID uuid.UUID
+			var ok bool
+			if entryOK {
+				hiriVariantID, ok = entry.resolve(lineItemGrindType(li))
+			}
 			if !ok {
 				report.addError("sub %d item %d: no variant mapping for WC variation %d (%s), skipping",
 					sub.ID, liIdx, li.VariationID, li.Name)

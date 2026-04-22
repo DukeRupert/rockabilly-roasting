@@ -17,6 +17,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/dukerupert/hiri/internal/domain"
 )
 
 const (
@@ -28,8 +30,8 @@ const (
 
 // CredentialStore is the interface for persisting QB OAuth tokens.
 type CredentialStore interface {
-	GetByTenantID(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID) (*Credentials, error)
-	Upsert(ctx context.Context, tx pgx.Tx, creds *Credentials) error
+	GetByTenantID(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID) (*domain.QBCredentials, error)
+	Upsert(ctx context.Context, tx pgx.Tx, creds *domain.QBCredentials) error
 	Delete(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID) error
 }
 
@@ -73,7 +75,7 @@ func NewQBClient(config ClientConfig, tenantID uuid.UUID, credStore CredentialSt
 // ValidToken returns a valid access token, refreshing if needed.
 // Acquires a DB-level advisory lock to prevent concurrent refresh races.
 func (c *QBClient) ValidToken(ctx context.Context) (string, string, error) {
-	var creds *Credentials
+	var creds *domain.QBCredentials
 	var err error
 
 	// Read current credentials
@@ -117,7 +119,7 @@ func (c *QBClient) ValidToken(ctx context.Context) (string, string, error) {
 }
 
 // refreshTokenWithLock refreshes the access token while holding an advisory lock.
-func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *Credentials) (*Credentials, error) {
+func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *domain.QBCredentials) (*domain.QBCredentials, error) {
 	tx, err := c.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin refresh tx: %w", err)

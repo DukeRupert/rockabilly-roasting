@@ -111,9 +111,9 @@ func (s *CustomerService) CreateRetail(ctx context.Context, tx pgx.Tx, email, fi
 	return c, nil
 }
 
-// GetAddressByID returns an address by ID (no customer scoping).
-func (s *CustomerService) GetAddressByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Address, error) {
-	addr, err := s.customers.GetAddressByID(ctx, tx, id)
+// GetAddressByIDAsStaff returns an address by ID (no customer scoping).
+func (s *CustomerService) GetAddressByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Address, error) {
+	addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrAddressNotFound
@@ -204,6 +204,82 @@ func (s *CustomerService) CountCustomers(ctx context.Context, tx pgx.Tx, f store
 		return 0, fmt.Errorf("count customers: %w", err)
 	}
 	return count, nil
+}
+
+// CountAddresses returns the number of addresses for a customer.
+func (s *CustomerService) CountAddresses(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (int, error) {
+	count, err := s.customers.CountAddresses(ctx, tx, customerID)
+	if err != nil {
+		return 0, fmt.Errorf("count addresses: %w", err)
+	}
+	return count, nil
+}
+
+// LinkStripeCustomerID records the Stripe customer ID on a customer record.
+// This is system-initiated (after a successful payment intent) and is audited
+// with a SystemActor so the linkage is traceable.
+func (s *CustomerService) LinkStripeCustomerID(ctx context.Context, tx pgx.Tx, id uuid.UUID, stripeCustomerID string) error {
+	if _, err := s.customers.UpdateStripeCustomerID(ctx, tx, id, stripeCustomerID); err != nil {
+		return fmt.Errorf("link stripe customer id: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    domain.AuditActorTypeSystem,
+		ActorName:    "stripe_checkout",
+		Action:       audit.AuditCustomerStripeIDLinked,
+		ResourceType: "customer",
+		ResourceID:   id,
+		After:        map[string]any{"stripe_customer_id": stripeCustomerID},
+	}); err != nil {
+		return fmt.Errorf("audit stripe id linked: %w", err)
+	}
+	return nil
+}
+
+// UpdatePaymentTerms sets a customer's NET payment terms (days) and records
+// an audit entry. Pass nil to clear the terms.
+func (s *CustomerService) UpdatePaymentTerms(ctx context.Context, tx pgx.Tx, id uuid.UUID, days *int, actor Actor) error {
+	if err := s.customers.UpdatePaymentTerms(ctx, tx, id, days); err != nil {
+		return fmt.Errorf("update payment terms: %w", err)
+	}
+
+	after := map[string]any{"payment_terms_days": nil}
+	if days != nil {
+		after["payment_terms_days"] = *days
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerPaymentTermsUpdated,
+		ResourceType: "customer",
+		ResourceID:   id,
+		After:        after,
+	}); err != nil {
+		return fmt.Errorf("audit payment terms updated: %w", err)
+	}
+	return nil
+}
+
+// UpdateBillingMethod sets a customer's billing method and records an audit entry.
+func (s *CustomerService) UpdateBillingMethod(ctx context.Context, tx pgx.Tx, id uuid.UUID, method domain.BillingMethod, actor Actor) error {
+	if err := s.customers.UpdateBillingMethod(ctx, tx, id, method); err != nil {
+		return fmt.Errorf("update billing method: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerBillingMethodUpdated,
+		ResourceType: "customer",
+		ResourceID:   id,
+		After:        map[string]any{"billing_method": string(method)},
+	}); err != nil {
+		return fmt.Errorf("audit billing method updated: %w", err)
+	}
+	return nil
 }
 
 // --- Address methods ---

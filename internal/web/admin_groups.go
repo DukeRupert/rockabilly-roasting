@@ -21,7 +21,7 @@ func (d *Deps) handleAdminGroupList(w http.ResponseWriter, r *http.Request) {
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		groups, txErr = d.CustomerGroupStore.List(ctx, tx)
+		groups, txErr = d.CustomerGroupService.List(ctx, tx)
 		return txErr
 	})
 	if err != nil {
@@ -53,7 +53,7 @@ func (d *Deps) handleAdminGroupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CustomerGroupStore.Create(ctx, tx, groupName, nil)
+		_, txErr := d.CustomerGroupService.Create(ctx, tx, groupName, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -74,7 +74,7 @@ func (d *Deps) handleAdminGroupDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CustomerGroupStore.Delete(ctx, tx, id)
+		return d.CustomerGroupService.Delete(ctx, tx, id, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -94,7 +94,7 @@ func (d *Deps) handleAdminGroupPrices(w http.ResponseWriter, r *http.Request) {
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		groups, txErr = d.CustomerGroupStore.List(ctx, tx)
+		groups, txErr = d.CustomerGroupService.List(ctx, tx)
 		if txErr != nil {
 			return txErr
 		}
@@ -301,7 +301,7 @@ func (d *Deps) handleAdminCustomerGroupAdd(w http.ResponseWriter, r *http.Reques
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CustomerGroupStore.AddMember(ctx, tx, customerID, groupID)
+		return d.CustomerGroupService.AddMember(ctx, tx, customerID, groupID, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -328,7 +328,7 @@ func (d *Deps) handleAdminCustomerGroupRemove(w http.ResponseWriter, r *http.Req
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CustomerGroupStore.RemoveMember(ctx, tx, customerID, groupID)
+		return d.CustomerGroupService.RemoveMember(ctx, tx, customerID, groupID, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)

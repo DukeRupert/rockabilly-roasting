@@ -89,7 +89,7 @@ func (w *ProcessQBInvoiceUpdateWorker) work(ctx context.Context, job *river.Job[
 	var order *domain.Order
 	err = store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
-		order, txErr = w.orders.GetOrderByQBInvoiceID(ctx, tx, job.Args.QBInvoiceID)
+		order, txErr = w.orders.GetOrderByQBInvoiceIDAsStaff(ctx, tx, job.Args.QBInvoiceID)
 		return txErr
 	})
 	if err != nil {

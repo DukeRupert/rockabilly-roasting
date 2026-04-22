@@ -41,6 +41,15 @@ const (
 	AuditCustomerAddressAdded        = "customer.address_added"
 	AuditCustomerAddressUpdated      = "customer.address_updated"
 	AuditCustomerAddressDeleted      = "customer.address_deleted"
+	AuditCustomerPaymentTermsUpdated  = "customer.payment_terms_updated"
+	AuditCustomerBillingMethodUpdated = "customer.billing_method_updated"
+	AuditCustomerStripeIDLinked       = "customer.stripe_customer_id_linked"
+
+	// Customer group actions
+	AuditCustomerGroupCreated       = "customer_group.created"
+	AuditCustomerGroupDeleted       = "customer_group.deleted"
+	AuditCustomerGroupMemberAdded   = "customer_group.member_added"
+	AuditCustomerGroupMemberRemoved = "customer_group.member_removed"
 
 	// Customer auth actions
 	AuditCustomerLogin  = "customer.login"
@@ -87,7 +96,18 @@ const (
 	AuditQBCustomerSynced     = "qb.customer_synced"
 	AuditQBInvoiceCreated     = "qb.invoice_created"
 	AuditQBPaymentSynced      = "qb.payment_synced"
+	AuditQBConnected          = "qb.connected"
+	AuditQBDisconnected       = "qb.disconnected"
 	AuditOrderPaymentCaptured = "order.payment_captured"
+
+	// Email actions (audited on successful send)
+	AuditEmailMagicLinkSent                 = "email.magic_link_sent"
+	AuditEmailOrderConfirmed                = "email.order_confirmed"
+	AuditEmailSubscriptionConfirmed         = "email.subscription_confirmed"
+	AuditEmailInvoiceSent                   = "email.invoice_sent"
+	AuditEmailWholesaleApplicationReceived  = "email.wholesale_application_received"
+	AuditEmailWholesaleApproved             = "email.wholesale_approved"
+	AuditEmailWholesaleSuspended            = "email.wholesale_suspended"
 
 	// Attribute actions
 	AuditAttributeSetCreated      = "attribute_set.created"

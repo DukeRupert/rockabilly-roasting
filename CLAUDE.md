@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Hiri is a green-field single-merchant ecommerce platform written in Go. It deploys as a **single binary** — HTTP server and River job workers run in one process. The project is currently in the architecture/design phase with comprehensive design docs in `docs/`.
+Hiri is a single-merchant ecommerce platform written in Go. It deploys as a **single binary** — HTTP server and River job workers run in one process. Implementation is well underway; comprehensive design docs live in `docs/`.
+
+**Naming:** The platform codename is **Hiri** (Go module `github.com/dukerupert/hiri`). The client/storefront brand is **Rockabilly Roasting Co.** — the storefront has been reskinned, but the admin panel still says "Hiri" internally (it's the platform name, not customer-facing).
 
 ## Tech Stack
 
@@ -13,8 +15,8 @@ Hiri is a green-field single-merchant ecommerce platform written in Go. It deplo
 - **Checkout:** Svelte component compiled to JS bundle, embedded via `go:embed`
 - **Metrics:** Prometheus, **Logging:** `log/slog` (JSON), **Errors:** Sentry
 - **Migrations:** Goose + plain SQL in `db/migrations/`
-- **Testing:** `testify/assert` + `uber/mock`
-- **External services:** Stripe (payments + tax), Shippo/EasyPost (shipping), AWS S3 (assets), go-mail (email)
+- **Testing:** `testify` (assert + require) with testcontainers-go for Postgres
+- **External services:** Stripe (payments + tax), EasyPost (shipping), Cloudflare Images (product media), Cloudflare R2 (shipping labels, S3-compatible), Postmark (email via `mrz1836/postmark`)
 
 ## Local Development Setup
 
@@ -51,6 +53,11 @@ mage db:migrate   # run pending migrations
 mage db:rollback  # roll back last migration
 mage db:status    # show migration status
 mage db:create <name>  # create new migration file
+
+# Data-migration / one-off commands (separate main packages under cmd/)
+mage wcMigrate    # WooCommerce subscription importer (cmd/migrate) — supports --dry-run, --mapping=path/to/mapping.json
+go run ./cmd/os-migrate  # Orderspace migration (no mage target)
+go run ./cmd/seed        # same thing mage seed runs
 
 # Run a single test (use go test directly)
 go test ./internal/app/ -run TestOrderRefund
@@ -114,9 +121,9 @@ Customer-facing store methods require `customerID` as a parameter — this is ho
 - Wrap with context: `fmt.Errorf("operation: %w", err)`
 
 ### External Service Calls
-- Always behind an interface in `platform/<concern>/provider.go`
-- **Never inside a database transaction** — call external API first, then write result in its own tx
-- Concrete implementations (`shippo.go`, `easypost.go`) live alongside the interface
+- External services with pluggable implementations (email, payments, shipping, QB OAuth) expose an interface in `platform/<concern>/provider.go`. Concrete implementations (`postmark.go`, `stripe.go`, `easypost.go`) live alongside the interface.
+- Internal platform concerns with a single implementation (`audit`, `metrics`, `sessions`, `media`, `tax`, `logging`, `help`, `ratelimit`, `auth`) expose concrete types directly — no `provider.go` needed. If a second implementation becomes necessary, extract the interface at that point.
+- **Never inside a database transaction** — call external API first, then write result in its own tx. The RenewalService two-phase pattern (read tx → external call → write tx) is the template.
 
 ### Background Jobs
 - Job args: `<Type>Args` implementing `river.JobArgs` with `Kind()` returning snake_case
@@ -166,7 +173,9 @@ Detailed specifications live in `docs/`:
 - `lean-commerce-discounts.md` — discount and coupon system
 - `lean-commerce-tax.md` — tax calculation via Stripe Tax
 - `lean-commerce-shipping.md` — shipping label and rate workflows
-- `UI_DIRECTION.md` — design system, color palette, component specs
+- `lean-commerce-ui-plan.md` — UI plan and component specs
+- `rockabilly-brand-guide-v3.html` — full brand guide (colors, typography, tokens)
+- `rockabilly-brand-voice.md` — voice and copy guidelines
 
 ## Design Context
 

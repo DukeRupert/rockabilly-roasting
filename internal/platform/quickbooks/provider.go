@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/dukerupert/hiri/internal/domain"
 )
 
@@ -31,19 +29,6 @@ type Invoice struct {
 	ID        string  // QB internal invoice ID
 	DocNumber string  // human-readable invoice number
 	Balance   float64 // remaining balance (0 = fully paid)
-}
-
-// Credentials holds the encrypted OAuth2 tokens for a QB connection.
-type Credentials struct {
-	ID               uuid.UUID
-	TenantID         uuid.UUID
-	RealmID          string
-	AccessToken      string // encrypted
-	RefreshToken     string // encrypted
-	AccessExpiresAt  time.Time
-	RefreshExpiresAt time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
 }
 
 // QBCustomer represents a customer record returned from a QBO query.

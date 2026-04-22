@@ -33,8 +33,8 @@ func (s *CartStore) CreateCart(ctx context.Context, tx pgx.Tx, currencyCode stri
 	return cartFromRow(row), nil
 }
 
-// GetCartByID returns a cart by ID.
-func (s *CartStore) GetCartByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Cart, error) {
+// GetCartByIDAsStaff returns a cart by ID.
+func (s *CartStore) GetCartByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Cart, error) {
 	row, err := sqlcgen.New(tx).GetCartByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get cart %s: %w", id, err)

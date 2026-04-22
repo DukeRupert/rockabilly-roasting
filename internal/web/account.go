@@ -135,7 +135,8 @@ func (d *Deps) handleAccountOrderShow(w http.ResponseWriter, r *http.Request) {
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		order, txErr = d.OrderService.GetOrder(ctx, tx, id)
+		// scoping: AsStaff is safe — ownership is enforced immediately below.
+		order, txErr = d.OrderService.GetOrderAsStaff(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
@@ -151,7 +152,8 @@ func (d *Deps) handleAccountOrderShow(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
-		shippingAddr, txErr = d.CustomerService.GetAddressByID(ctx, tx, order.ShippingAddressID)
+		// scoping: address ID is drawn from the already-ownership-checked order.
+		shippingAddr, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
 		if txErr != nil {
 			return txErr
 		}
@@ -422,7 +424,7 @@ func (d *Deps) handleAccountAddressDelete(w http.ResponseWriter, r *http.Request
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		// Don't allow deleting the last address
-		count, txErr := d.CustomerStore.CountAddresses(ctx, tx, customer.ID)
+		count, txErr := d.CustomerService.CountAddresses(ctx, tx, customer.ID)
 		if txErr != nil {
 			return txErr
 		}

@@ -57,8 +57,8 @@ func (s *InvoiceStore) Create(ctx context.Context, tx pgx.Tx, p CreateInvoicePar
 	return invoiceFromRow(row), nil
 }
 
-// GetByID returns an invoice by ID.
-func (s *InvoiceStore) GetByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Invoice, error) {
+// GetByIDAsStaff returns an invoice by ID (staff-only — no customer scoping).
+func (s *InvoiceStore) GetByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Invoice, error) {
 	row, err := sqlcgen.New(tx).GetInvoiceByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get invoice %s: %w", id, err)

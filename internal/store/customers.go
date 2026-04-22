@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -356,8 +357,8 @@ func (s *CustomerStore) GetAddress(ctx context.Context, tx pgx.Tx, id, customerI
 	return addressFromRow(row), nil
 }
 
-// GetAddressByID returns an address by ID (staff-only, no ownership scoping).
-func (s *CustomerStore) GetAddressByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Address, error) {
+// GetAddressByIDAsStaff returns an address by ID (staff-only, no ownership scoping).
+func (s *CustomerStore) GetAddressByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Address, error) {
 	row, err := sqlcgen.New(tx).GetAddressByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get address %s: %w", id, err)
@@ -486,6 +487,81 @@ func (s *CustomerStore) SetQBSyncedAt(ctx context.Context, tx pgx.Tx, id uuid.UU
 	)
 	if err != nil {
 		return fmt.Errorf("set qb synced at: %w", err)
+	}
+	return nil
+}
+
+// --- Wholesale state transitions ---
+
+// SetWholesaleApplicationFields promotes a standard customer to a pending
+// wholesale applicant and records the company details submitted with the application.
+func (s *CustomerStore) SetWholesaleApplicationFields(ctx context.Context, tx pgx.Tx, id uuid.UUID, companyName string, website *string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE customers
+		 SET account_type = 'wholesale', wholesale_status = 'pending',
+		     company_name = $2, website = $3, updated_at = now()
+		 WHERE id = $1`,
+		id, companyName, website,
+	)
+	if err != nil {
+		return fmt.Errorf("set wholesale application fields: %w", err)
+	}
+	return nil
+}
+
+// SetWholesaleApproved transitions a pending wholesale applicant to approved
+// and records who approved them and when.
+func (s *CustomerStore) SetWholesaleApproved(ctx context.Context, tx pgx.Tx, id uuid.UUID, approvedBy *uuid.UUID, approvedAt time.Time) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE customers
+		 SET wholesale_status = 'approved', approved_at = $2, approved_by = $3, updated_at = now()
+		 WHERE id = $1`,
+		id, approvedAt, approvedBy,
+	)
+	if err != nil {
+		return fmt.Errorf("set wholesale approved: %w", err)
+	}
+	return nil
+}
+
+// SetWholesaleNotes updates the wholesale notes field (used for decline reasons or staff commentary).
+func (s *CustomerStore) SetWholesaleNotes(ctx context.Context, tx pgx.Tx, id uuid.UUID, notes string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE customers SET wholesale_notes = $2, updated_at = now() WHERE id = $1`,
+		id, notes,
+	)
+	if err != nil {
+		return fmt.Errorf("set wholesale notes: %w", err)
+	}
+	return nil
+}
+
+// SetWholesaleSuspended suspends an approved wholesale account and records
+// the reason in wholesale_notes.
+func (s *CustomerStore) SetWholesaleSuspended(ctx context.Context, tx pgx.Tx, id uuid.UUID, notes string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE customers
+		 SET wholesale_status = 'suspended', wholesale_notes = $2, updated_at = now()
+		 WHERE id = $1`,
+		id, notes,
+	)
+	if err != nil {
+		return fmt.Errorf("set wholesale suspended: %w", err)
+	}
+	return nil
+}
+
+// SetWholesaleReactivated reactivates a suspended wholesale account and clears
+// the suspension notes.
+func (s *CustomerStore) SetWholesaleReactivated(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE customers
+		 SET wholesale_status = 'approved', wholesale_notes = NULL, updated_at = now()
+		 WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("set wholesale reactivated: %w", err)
 	}
 	return nil
 }

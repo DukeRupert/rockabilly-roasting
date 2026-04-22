@@ -344,8 +344,7 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 
 		// Save Stripe customer ID
 		if customer.StripeCustomerID == nil {
-			_, txErr = d.CustomerStore.UpdateStripeCustomerID(ctx, tx, customer.ID, stripeCustomerID)
-			if txErr != nil {
+			if txErr = d.CustomerService.LinkStripeCustomerID(ctx, tx, customer.ID, stripeCustomerID); txErr != nil {
 				return fmt.Errorf("save stripe customer id: %w", txErr)
 			}
 		}

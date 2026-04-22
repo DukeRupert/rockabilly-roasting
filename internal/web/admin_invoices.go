@@ -28,7 +28,7 @@ func (d *Deps) handleAdminInvoiceShow(w http.ResponseWriter, r *http.Request) {
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		invoice, txErr = d.InvoiceService.GetInvoice(ctx, tx, id)
+		invoice, txErr = d.InvoiceService.GetInvoiceAsStaff(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
@@ -107,7 +107,7 @@ func (d *Deps) handleAdminInvoiceSend(w http.ResponseWriter, r *http.Request) {
 	actor := staffActor(r)
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.InvoiceService.SendInvoice(ctx, tx, id, actor)
+		_, txErr := d.InvoiceService.MarkSent(ctx, tx, id, actor)
 		if txErr != nil {
 			return txErr
 		}

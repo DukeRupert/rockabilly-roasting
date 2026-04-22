@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/dukerupert/hiri/internal/platform/quickbooks"
+	"github.com/dukerupert/hiri/internal/domain"
 )
 
 // QBCredentialStore provides database access for QuickBooks OAuth credentials.
@@ -20,8 +20,8 @@ func NewQBCredentialStore() *QBCredentialStore {
 }
 
 // GetByTenantID returns the QB credentials for a tenant.
-func (s *QBCredentialStore) GetByTenantID(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID) (*quickbooks.Credentials, error) {
-	var c quickbooks.Credentials
+func (s *QBCredentialStore) GetByTenantID(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID) (*domain.QBCredentials, error) {
+	var c domain.QBCredentials
 	err := tx.QueryRow(ctx,
 		`SELECT id, tenant_id, realm_id, access_token, refresh_token,
 		        access_expires_at, refresh_expires_at, created_at, updated_at
@@ -40,7 +40,7 @@ func (s *QBCredentialStore) GetByTenantID(ctx context.Context, tx pgx.Tx, tenant
 }
 
 // Upsert inserts or updates QB credentials for a tenant.
-func (s *QBCredentialStore) Upsert(ctx context.Context, tx pgx.Tx, creds *quickbooks.Credentials) error {
+func (s *QBCredentialStore) Upsert(ctx context.Context, tx pgx.Tx, creds *domain.QBCredentials) error {
 	now := time.Now()
 	if creds.ID == uuid.Nil {
 		creds.ID = uuid.New()

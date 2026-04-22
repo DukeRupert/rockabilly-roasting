@@ -165,8 +165,8 @@ func (s *SubscriptionStore) Create(ctx context.Context, tx pgx.Tx, p CreateSubsc
 	return subscriptionFromRow(row), nil
 }
 
-// GetByID returns a subscription by ID (staff-only).
-func (s *SubscriptionStore) GetByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
+// GetByIDAsStaff returns a subscription by ID (staff-only — no customer scoping).
+func (s *SubscriptionStore) GetByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
 	row, err := sqlcgen.New(tx).GetSubscriptionByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get subscription %s: %w", id, err)

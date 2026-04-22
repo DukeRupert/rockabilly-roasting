@@ -39,11 +39,11 @@ func TestOrderService_GetOrder(t *testing.T) {
 	custID, shipID, billID := orderFixtures(t, tx)
 	order := testutil.CreateOrder(t, tx, custID, shipID, billID)
 
-	got, err := svc.GetOrder(ctx, tx, order.ID)
+	got, err := svc.GetOrderAsStaff(ctx, tx, order.ID)
 	require.NoError(t, err)
 	assert.Equal(t, order.ID, got.ID)
 
-	_, err = svc.GetOrder(ctx, tx, uuid.New())
+	_, err = svc.GetOrderAsStaff(ctx, tx, uuid.New())
 	assert.ErrorIs(t, err, app.ErrOrderNotFound)
 }
 

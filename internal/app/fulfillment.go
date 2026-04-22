@@ -45,7 +45,7 @@ func NewFulfillmentService(
 
 // GetShipment returns a shipment by ID.
 func (s *FulfillmentService) GetShipment(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Shipment, error) {
-	shipment, err := s.shipments.GetShipmentByID(ctx, tx, id)
+	shipment, err := s.shipments.GetShipmentByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get shipment: %w", err)
 	}

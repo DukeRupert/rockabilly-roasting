@@ -65,7 +65,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 
 	err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		var txErr error
-		sub, txErr = s.subscriptions.GetByID(ctx, tx, subscriptionID)
+		sub, txErr = s.subscriptions.GetByIDAsStaff(ctx, tx, subscriptionID)
 		if txErr != nil {
 			return fmt.Errorf("get subscription: %w", txErr)
 		}
@@ -84,7 +84,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			return fmt.Errorf("get customer: %w", txErr)
 		}
 
-		addr, txErr = s.customers.GetAddressByID(ctx, tx, sub.ShippingAddressID)
+		addr, txErr = s.customers.GetAddressByIDAsStaff(ctx, tx, sub.ShippingAddressID)
 		if txErr != nil {
 			return fmt.Errorf("get address: %w", txErr)
 		}
@@ -283,7 +283,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		var addressID uuid.UUID
 
 		for i, subID := range subscriptionIDs {
-			sub, txErr := s.subscriptions.GetByID(ctx, tx, subID)
+			sub, txErr := s.subscriptions.GetByIDAsStaff(ctx, tx, subID)
 			if txErr != nil {
 				return fmt.Errorf("get subscription %s: %w", subID, txErr)
 			}
@@ -336,7 +336,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			return fmt.Errorf("get customer: %w", txErr)
 		}
 
-		addr, txErr = s.customers.GetAddressByID(ctx, tx, addressID)
+		addr, txErr = s.customers.GetAddressByIDAsStaff(ctx, tx, addressID)
 		if txErr != nil {
 			return fmt.Errorf("get address: %w", txErr)
 		}

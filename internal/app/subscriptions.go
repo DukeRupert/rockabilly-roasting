@@ -21,6 +21,9 @@ type SubscriptionService struct {
 	orders        *store.OrderStore
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
+	customers     *store.CustomerStore // populated via WithEmail; required for SendConfirmationEmail
+	catalog       *store.CatalogStore  // populated via WithEmail; required for SendConfirmationEmail
+	email         EmailEnv             // populated via WithEmail; required for SendConfirmationEmail
 }
 
 // NewSubscriptionService creates a new SubscriptionService.
@@ -36,6 +39,15 @@ func NewSubscriptionService(
 		audit:         audit,
 		metrics:       metrics,
 	}
+}
+
+// WithEmail attaches email-send environment and supporting stores. Must be
+// called before SendConfirmationEmail.
+func (s *SubscriptionService) WithEmail(env EmailEnv, customers *store.CustomerStore, catalog *store.CatalogStore) *SubscriptionService {
+	s.email = env
+	s.customers = customers
+	s.catalog = catalog
+	return s
 }
 
 // --- State machine helpers ---
@@ -56,9 +68,9 @@ func canCancelSubscription(status domain.SubscriptionStatus) bool {
 
 // --- Query methods ---
 
-// GetSubscription returns a subscription by ID.
-func (s *SubscriptionService) GetSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
-	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+// GetSubscriptionAsStaff returns a subscription by ID.
+func (s *SubscriptionService) GetSubscriptionAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSubscriptionNotFound
@@ -309,7 +321,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, tx pgx.Tx,
 // PauseSubscription pauses an active subscription. An optional pauseUntil date
 // can be provided for automatic resume scheduling.
 func (s *SubscriptionService) PauseSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, pauseUntil *time.Time, actor Actor) (*domain.Subscription, error) {
-	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSubscriptionNotFound
@@ -348,7 +360,7 @@ func (s *SubscriptionService) PauseSubscription(ctx context.Context, tx pgx.Tx, 
 
 // ResumeSubscription resumes a paused subscription and resets the billing period.
 func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Subscription, error) {
-	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSubscriptionNotFound
@@ -402,7 +414,7 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 
 // CancelSubscription cancels a subscription.
 func (s *SubscriptionService) CancelSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Subscription, error) {
-	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSubscriptionNotFound
@@ -442,7 +454,7 @@ func (s *SubscriptionService) CancelSubscription(ctx context.Context, tx pgx.Tx,
 
 // MarkPastDue transitions an active subscription to past_due after a payment failure.
 func (s *SubscriptionService) MarkPastDue(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
-	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSubscriptionNotFound
@@ -464,7 +476,7 @@ func (s *SubscriptionService) MarkPastDue(ctx context.Context, tx pgx.Tx, id uui
 
 // AdvancePeriod advances the subscription's billing period after a successful renewal.
 func (s *SubscriptionService) AdvancePeriod(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
-	sub, err := s.subscriptions.GetByID(ctx, tx, id)
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSubscriptionNotFound

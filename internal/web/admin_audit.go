@@ -44,7 +44,7 @@ func (d *Deps) handleAdminAuditList(w http.ResponseWriter, r *http.Request) {
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		entries, txErr = d.AuditStore.List(ctx, tx, filter)
+		entries, txErr = d.AuditQueryService.List(ctx, tx, filter)
 		return txErr
 	})
 	if err != nil {

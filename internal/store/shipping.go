@@ -92,8 +92,8 @@ func (s *ShippingStore) CreateShipment(ctx context.Context, tx pgx.Tx, p CreateS
 	return shipmentFromRow(row), nil
 }
 
-// GetShipmentByID returns a shipment by ID.
-func (s *ShippingStore) GetShipmentByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Shipment, error) {
+// GetShipmentByIDAsStaff returns a shipment by ID.
+func (s *ShippingStore) GetShipmentByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Shipment, error) {
 	row, err := sqlcgen.New(tx).GetShipmentByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get shipment %s: %w", id, err)

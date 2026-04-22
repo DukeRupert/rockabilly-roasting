@@ -90,8 +90,8 @@ func (s *OrderStore) CreateOrder(ctx context.Context, tx pgx.Tx, p CreateOrderPa
 	return orderFromRow(row), nil
 }
 
-// GetOrderByID returns an order by ID.
-func (s *OrderStore) GetOrderByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Order, error) {
+// GetOrderByIDAsStaff returns an order by ID.
+func (s *OrderStore) GetOrderByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Order, error) {
 	row, err := sqlcgen.New(tx).GetOrderByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get order %s: %w", id, err)
@@ -99,8 +99,8 @@ func (s *OrderStore) GetOrderByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) 
 	return orderFromRow(row), nil
 }
 
-// GetOrderByNumber returns an order by its number.
-func (s *OrderStore) GetOrderByNumber(ctx context.Context, tx pgx.Tx, number string) (*domain.Order, error) {
+// GetOrderByNumberAsStaff returns an order by its number.
+func (s *OrderStore) GetOrderByNumberAsStaff(ctx context.Context, tx pgx.Tx, number string) (*domain.Order, error) {
 	row, err := sqlcgen.New(tx).GetOrderByNumber(ctx, number)
 	if err != nil {
 		return nil, fmt.Errorf("get order by number: %w", err)
@@ -156,13 +156,25 @@ func (s *OrderStore) UpdateOrderStripePaymentIntentID(ctx context.Context, tx pg
 	return orderFromRow(row), nil
 }
 
-// GetOrderByStripePaymentIntentID returns an order by its Stripe PaymentIntent ID.
-func (s *OrderStore) GetOrderByStripePaymentIntentID(ctx context.Context, tx pgx.Tx, intentID string) (*domain.Order, error) {
+// GetOrderByStripePaymentIntentIDAsStaff returns an order by its Stripe PaymentIntent ID.
+func (s *OrderStore) GetOrderByStripePaymentIntentIDAsStaff(ctx context.Context, tx pgx.Tx, intentID string) (*domain.Order, error) {
 	row, err := sqlcgen.New(tx).GetOrderByStripePaymentIntentID(ctx, &intentID)
 	if err != nil {
 		return nil, fmt.Errorf("get order by stripe payment intent id: %w", err)
 	}
 	return orderFromRow(row), nil
+}
+
+// SetCustomerPONumber sets the customer PO number on a wholesale order.
+func (s *OrderStore) SetCustomerPONumber(ctx context.Context, tx pgx.Tx, id uuid.UUID, poNumber string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE orders SET customer_po_number = $2 WHERE id = $1`,
+		id, poNumber,
+	)
+	if err != nil {
+		return fmt.Errorf("set customer po number: %w", err)
+	}
+	return nil
 }
 
 // DeleteOrder removes an order by ID.
@@ -398,8 +410,8 @@ func (s *OrderStore) SetQBInvoice(ctx context.Context, tx pgx.Tx, id uuid.UUID, 
 	return nil
 }
 
-// GetOrderByQBInvoiceID returns an order by its QB invoice ID.
-func (s *OrderStore) GetOrderByQBInvoiceID(ctx context.Context, tx pgx.Tx, qbInvoiceID string) (*domain.Order, error) {
+// GetOrderByQBInvoiceIDAsStaff returns an order by its QB invoice ID.
+func (s *OrderStore) GetOrderByQBInvoiceIDAsStaff(ctx context.Context, tx pgx.Tx, qbInvoiceID string) (*domain.Order, error) {
 	var o domain.Order
 	var status, paymentStatus, fulfillmentStatus string
 	var shippingMethod *string
@@ -475,8 +487,8 @@ func (s *OrderStore) CreateCart(ctx context.Context, tx pgx.Tx, p CreateCartPara
 	return cartFromRow(row), nil
 }
 
-// GetCartByID returns a cart by ID.
-func (s *OrderStore) GetCartByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Cart, error) {
+// GetCartByIDAsStaff returns a cart by ID.
+func (s *OrderStore) GetCartByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Cart, error) {
 	row, err := sqlcgen.New(tx).GetCartByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get cart %s: %w", id, err)

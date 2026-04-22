@@ -16,9 +16,12 @@ import (
 
 // OrderService contains business logic for orders and carts.
 type OrderService struct {
-	orders  *store.OrderStore
-	audit   *audit.AuditWriter
-	metrics *metrics.Registry
+	orders    *store.OrderStore
+	audit     *audit.AuditWriter
+	metrics   *metrics.Registry
+	customers *store.CustomerStore // populated via WithEmailSupport; required for SendConfirmationEmail
+	catalog   *store.CatalogStore  // populated via WithEmailSupport; required for SendConfirmationEmail
+	email     EmailEnv             // populated via WithEmail; required for SendConfirmationEmail
 }
 
 // NewOrderService creates a new OrderService.
@@ -28,6 +31,16 @@ func NewOrderService(orders *store.OrderStore, audit *audit.AuditWriter, metrics
 		audit:   audit,
 		metrics: metrics,
 	}
+}
+
+// WithEmail attaches email-send environment and the supporting stores required
+// for SendConfirmationEmail. Must be called before SendConfirmationEmail is
+// invoked; safe to call at wiring time.
+func (s *OrderService) WithEmail(env EmailEnv, customers *store.CustomerStore, catalog *store.CatalogStore) *OrderService {
+	s.email = env
+	s.customers = customers
+	s.catalog = catalog
+	return s
 }
 
 // --- State machine helpers ---
@@ -43,9 +56,9 @@ func canRefundOrder(status domain.OrderStatus, paymentStatus domain.PaymentStatu
 
 // --- Query methods ---
 
-// GetOrder returns an order by ID.
-func (s *OrderService) GetOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Order, error) {
-	o, err := s.orders.GetOrderByID(ctx, tx, id)
+// GetOrderAsStaff returns an order by ID.
+func (s *OrderService) GetOrderAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Order, error) {
+	o, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
@@ -55,9 +68,9 @@ func (s *OrderService) GetOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*
 	return o, nil
 }
 
-// GetOrderByNumber returns an order by its number.
-func (s *OrderService) GetOrderByNumber(ctx context.Context, tx pgx.Tx, number string) (*domain.Order, error) {
-	o, err := s.orders.GetOrderByNumber(ctx, tx, number)
+// GetOrderByNumberAsStaff returns an order by its number.
+func (s *OrderService) GetOrderByNumberAsStaff(ctx context.Context, tx pgx.Tx, number string) (*domain.Order, error) {
+	o, err := s.orders.GetOrderByNumberAsStaff(ctx, tx, number)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
@@ -112,9 +125,9 @@ func (s *OrderService) ListAdjustments(ctx context.Context, tx pgx.Tx, orderID u
 	return adjs, nil
 }
 
-// GetOrderByStripePaymentIntentID returns an order by its Stripe PaymentIntent ID.
-func (s *OrderService) GetOrderByStripePaymentIntentID(ctx context.Context, tx pgx.Tx, intentID string) (*domain.Order, error) {
-	o, err := s.orders.GetOrderByStripePaymentIntentID(ctx, tx, intentID)
+// GetOrderByStripePaymentIntentIDAsStaff returns an order by its Stripe PaymentIntent ID.
+func (s *OrderService) GetOrderByStripePaymentIntentIDAsStaff(ctx context.Context, tx pgx.Tx, intentID string) (*domain.Order, error) {
+	o, err := s.orders.GetOrderByStripePaymentIntentIDAsStaff(ctx, tx, intentID)
 	if err != nil {
 		return nil, fmt.Errorf("get order by stripe PI: %w", err)
 	}
@@ -151,7 +164,7 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid
 
 // CancelOrder cancels an order if allowed by the state machine.
 func (s *OrderService) CancelOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
-	order, err := s.orders.GetOrderByID(ctx, tx, id)
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
@@ -186,7 +199,7 @@ func (s *OrderService) CancelOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID,
 // RefundOrder marks an order as refunded if allowed by the state machine.
 // The actual Stripe refund call must happen BEFORE this method is called.
 func (s *OrderService) RefundOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
-	order, err := s.orders.GetOrderByID(ctx, tx, id)
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
@@ -225,7 +238,7 @@ func (s *OrderService) RefundOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID,
 
 // FulfillOrder marks an order as fulfilled and moves it to processing.
 func (s *OrderService) FulfillOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
-	order, err := s.orders.GetOrderByID(ctx, tx, id)
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
@@ -266,7 +279,7 @@ func (s *OrderService) FulfillOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID
 
 // ShipOrder marks an order as shipped and moves it to complete.
 func (s *OrderService) ShipOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
-	order, err := s.orders.GetOrderByID(ctx, tx, id)
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound

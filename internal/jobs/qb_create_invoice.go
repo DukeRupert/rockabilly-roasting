@@ -74,7 +74,7 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	var items []domain.LineItem
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
-		order, txErr = w.orders.GetOrderByID(ctx, tx, job.Args.OrderID)
+		order, txErr = w.orders.GetOrderByIDAsStaff(ctx, tx, job.Args.OrderID)
 		if txErr != nil {
 			return txErr
 		}

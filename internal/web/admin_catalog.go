@@ -424,7 +424,7 @@ func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID 
 		variants = append(variants, vwo)
 	}
 
-	groups, err := d.CustomerGroupStore.List(ctx, tx)
+	groups, err := d.CustomerGroupService.List(ctx, tx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -718,7 +718,7 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 		}
 
 		// Load customer groups
-		groups, txErr = d.CustomerGroupStore.List(ctx, tx)
+		groups, txErr = d.CustomerGroupService.List(ctx, tx)
 		return txErr
 	})
 	if err != nil {
@@ -805,7 +805,7 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 		}
 
 		// Load customer groups
-		groups, txErr = d.CustomerGroupStore.List(ctx, tx)
+		groups, txErr = d.CustomerGroupService.List(ctx, tx)
 		return txErr
 	})
 	if err != nil {

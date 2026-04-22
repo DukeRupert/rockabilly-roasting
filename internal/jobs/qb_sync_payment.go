@@ -73,7 +73,7 @@ func (w *SyncQBPaymentWorker) work(ctx context.Context, job *river.Job[SyncQBPay
 	var order *domain.Order
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
-		order, txErr = w.orders.GetOrderByID(ctx, tx, job.Args.OrderID)
+		order, txErr = w.orders.GetOrderByIDAsStaff(ctx, tx, job.Args.OrderID)
 		return txErr
 	})
 	if err != nil {

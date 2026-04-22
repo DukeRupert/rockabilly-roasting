@@ -16,10 +16,12 @@ import (
 
 // InvoiceService contains business logic for invoice management.
 type InvoiceService struct {
-	invoices *store.InvoiceStore
-	orders   *store.OrderStore
-	audit    *audit.AuditWriter
-	metrics  *metrics.Registry
+	invoices  *store.InvoiceStore
+	orders    *store.OrderStore
+	audit     *audit.AuditWriter
+	metrics   *metrics.Registry
+	customers *store.CustomerStore // populated via WithEmail; required for SendInvoice
+	email     EmailEnv             // populated via WithEmail; required for SendInvoice
 }
 
 // NewInvoiceService creates a new InvoiceService.
@@ -37,6 +39,13 @@ func NewInvoiceService(
 	}
 }
 
+// WithEmail attaches email-send environment. Must be called before SendInvoice.
+func (s *InvoiceService) WithEmail(env EmailEnv, customers *store.CustomerStore) *InvoiceService {
+	s.email = env
+	s.customers = customers
+	return s
+}
+
 // CreateFromOrder creates an invoice from an order's line items.
 func (s *InvoiceService) CreateFromOrder(
 	ctx context.Context,
@@ -46,7 +55,7 @@ func (s *InvoiceService) CreateFromOrder(
 	notes *string,
 	actor Actor,
 ) (*domain.Invoice, error) {
-	order, err := s.orders.GetOrderByID(ctx, tx, orderID)
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrOrderNotFound
@@ -114,9 +123,11 @@ func (s *InvoiceService) CreateFromOrder(
 	return invoice, nil
 }
 
-// SendInvoice marks an invoice as sent and updates the order payment status.
-func (s *InvoiceService) SendInvoice(ctx context.Context, tx pgx.Tx, invoiceID uuid.UUID, actor Actor) (*domain.Invoice, error) {
-	invoice, err := s.invoices.GetByID(ctx, tx, invoiceID)
+// MarkSent transitions an invoice from draft to sent and updates the order's
+// payment status to invoiced. Actual email delivery is handled separately by
+// SendInvoice (called from the InvoiceSend worker).
+func (s *InvoiceService) MarkSent(ctx context.Context, tx pgx.Tx, invoiceID uuid.UUID, actor Actor) (*domain.Invoice, error) {
+	invoice, err := s.invoices.GetByIDAsStaff(ctx, tx, invoiceID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvoiceNotFound
@@ -165,7 +176,7 @@ func (s *InvoiceService) RecordPayment(
 	note *string,
 	actor Actor,
 ) (*domain.Invoice, error) {
-	invoice, err := s.invoices.GetByID(ctx, tx, invoiceID)
+	invoice, err := s.invoices.GetByIDAsStaff(ctx, tx, invoiceID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvoiceNotFound
@@ -226,7 +237,7 @@ func (s *InvoiceService) RecordPayment(
 
 // VoidInvoice marks an invoice as void.
 func (s *InvoiceService) VoidInvoice(ctx context.Context, tx pgx.Tx, invoiceID uuid.UUID, actor Actor) (*domain.Invoice, error) {
-	invoice, err := s.invoices.GetByID(ctx, tx, invoiceID)
+	invoice, err := s.invoices.GetByIDAsStaff(ctx, tx, invoiceID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvoiceNotFound
@@ -264,9 +275,9 @@ func (s *InvoiceService) VoidInvoice(ctx context.Context, tx pgx.Tx, invoiceID u
 	return updated, nil
 }
 
-// GetInvoice returns an invoice by ID.
-func (s *InvoiceService) GetInvoice(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Invoice, error) {
-	invoice, err := s.invoices.GetByID(ctx, tx, id)
+// GetInvoiceAsStaff returns an invoice by ID.
+func (s *InvoiceService) GetInvoiceAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Invoice, error) {
+	invoice, err := s.invoices.GetByIDAsStaff(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvoiceNotFound

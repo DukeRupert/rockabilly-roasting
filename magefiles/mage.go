@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/magefile/mage/mg"
 	"github.com/magefile/mage/sh"
@@ -94,9 +95,66 @@ func Clean() error {
 	return os.Remove("server")
 }
 
-// Check runs lint and tests together (CI-style gate).
+// Check runs lint, scoping check, and tests together (CI-style gate).
 func Check() {
-	mg.Deps(Lint, Test)
+	mg.Deps(Lint, CheckScoping, Test)
+}
+
+// CheckScoping verifies customer-facing handlers don't call staff-only
+// lookup methods (suffixed `AsStaff`) without an immediately preceding
+// `// scoping:` waiver comment.
+//
+// The check is a defense-in-depth against accidental IDOR — staff-only
+// methods bypass customer scoping by design; any customer-facing call site
+// must document why the lookup is safe.
+func CheckScoping() error {
+	customerFacingFiles := []string{
+		"internal/web/account.go",
+		"internal/web/cart.go",
+		"internal/web/checkout.go",
+		"internal/web/customer_auth.go",
+		"internal/web/storefront.go",
+		"internal/web/subscribe.go",
+		"internal/web/wholesale.go",
+	}
+
+	var violations []string
+
+	for _, path := range customerFacingFiles {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			// Missing file is a drift signal; fail loudly so the list is maintained.
+			return fmt.Errorf("scoping check: %s: %w", path, err)
+		}
+		lines := strings.Split(string(data), "\n")
+		for i, line := range lines {
+			if !strings.Contains(line, "AsStaff(") {
+				continue
+			}
+			// Accept a `// scoping:` waiver within the 3 lines above the call.
+			hasWaiver := false
+			for j := i - 1; j >= 0 && j >= i-3; j-- {
+				if strings.Contains(lines[j], "// scoping:") {
+					hasWaiver = true
+					break
+				}
+			}
+			if !hasWaiver {
+				violations = append(violations, fmt.Sprintf(
+					"%s:%d: AsStaff call without `// scoping:` waiver — %s",
+					path, i+1, strings.TrimSpace(line),
+				))
+			}
+		}
+	}
+
+	if len(violations) > 0 {
+		for _, v := range violations {
+			fmt.Fprintln(os.Stderr, v)
+		}
+		return fmt.Errorf("%d scoping violation(s) in customer-facing handlers", len(violations))
+	}
+	return nil
 }
 
 // DB namespace groups database migration commands.

@@ -50,8 +50,8 @@ func (s *FulfillmentStore) CreateFulfillment(ctx context.Context, tx pgx.Tx, p C
 	return fulfillmentFromRow(row), nil
 }
 
-// GetFulfillmentByID returns a fulfillment by ID.
-func (s *FulfillmentStore) GetFulfillmentByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Fulfillment, error) {
+// GetFulfillmentByIDAsStaff returns a fulfillment by ID.
+func (s *FulfillmentStore) GetFulfillmentByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Fulfillment, error) {
 	row, err := sqlcgen.New(tx).GetFulfillmentByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get fulfillment %s: %w", id, err)

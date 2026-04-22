@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/help"
 	"github.com/dukerupert/hiri/internal/platform/media"
@@ -19,52 +20,52 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
-	"github.com/dukerupert/hiri/internal/store"
 	"github.com/riverqueue/river"
 )
 
 // Deps holds all dependencies needed by HTTP handlers.
+//
+// Handlers route through app services (or platform/* for infrastructure concerns).
+// Direct *store.X references are not permitted here — if a handler needs access
+// to data that isn't covered by an existing service, extend the service rather
+// than reaching into the store.
 type Deps struct {
-	Pool                *pgxpool.Pool
-	Logger              *slog.Logger
-	Metrics             *metrics.Registry
-	Sessions            *sessions.Manager
-	OrderService        *app.OrderService
-	CustomerService     *app.CustomerService
-	CatalogService      *app.CatalogService
-	CheckoutService     *app.CheckoutService
-	FulfillmentService  *app.FulfillmentService
-	SubscriptionService *app.SubscriptionService
-	DiscountService     *app.DiscountService
-	AuthService         *app.AuthService
-	PricingService      *app.PricingService
-	CartService         *app.CartService
-	WholesaleService    *app.WholesaleService
-	AttributeService    *app.AttributeService
-	InvoiceService      *app.InvoiceService
-	PaymentProvider     payments.Provider
-	WebhookStore        *store.WebhookStore
-	CustomerStore       *store.CustomerStore
-	AuditStore          *store.AuditStore
-	MagicLinkStore      *store.MagicLinkStore
-	CustomerGroupStore  *store.CustomerGroupStore
-	SettingsStore       *store.SettingsStore
-	RiverClient         *river.Client[pgx.Tx]
-	R2Client            *media.R2Client
-	MediaConfig         *media.Config
-	QBClient                quickbooks.Client
-	QBConfig                quickbooks.ClientConfig
-	QBCredentialStore       *store.QBCredentialStore
-	QBWebhookVerifierToken  string
-	QBOAuthHMACKey          []byte
-	QBHTTPClient            *http.Client
-	HelpRegistry            *help.Registry
-	RateLimiter             *ratelimit.Limiter
-	SecureCookies           bool
-	BaseURL                 string // public site URL, e.g. "https://rockabillyroasting.com"
-	Mailer                  email.Sender
-	EmailFrom               string // sender address for transactional emails
-	StaffEmail              string // staff notification recipient
+	Pool                 *pgxpool.Pool
+	Logger               *slog.Logger
+	Metrics              *metrics.Registry
+	Sessions             *sessions.Manager
+	OrderService         *app.OrderService
+	CustomerService      *app.CustomerService
+	CatalogService       *app.CatalogService
+	CheckoutService      *app.CheckoutService
+	FulfillmentService   *app.FulfillmentService
+	SubscriptionService  *app.SubscriptionService
+	DiscountService      *app.DiscountService
+	AuthService          *app.AuthService
+	PricingService       *app.PricingService
+	CartService          *app.CartService
+	WholesaleService     *app.WholesaleService
+	AttributeService     *app.AttributeService
+	InvoiceService       *app.InvoiceService
+	CustomerGroupService *app.CustomerGroupService
+	AuditQueryService    *app.AuditQueryService
+	WebhookService       *app.WebhookService
+	AuditWriter          *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
+	PaymentProvider      payments.Provider
+	RiverClient          *river.Client[pgx.Tx]
+	R2Client             *media.R2Client
+	MediaConfig          *media.Config
+	QBClient             quickbooks.Client
+	QBOAuthManager       *quickbooks.OAuthManager // nil when QuickBooks is not configured
+	QBWebhookVerifierToken string
+	QBHTTPClient         *http.Client
+	HelpRegistry         *help.Registry
+	RateLimiter          *ratelimit.Limiter
+	SecureCookies        bool
+	BaseURL              string // public site URL, e.g. "https://rockabillyroasting.com"
+	Mailer               email.Sender
+	EmailFrom            string // sender address for transactional emails
+	StaffEmail           string // staff notification recipient
 }
 
 // MetricsMux returns a handler for the internal metrics listener.

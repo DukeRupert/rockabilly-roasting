@@ -52,7 +52,7 @@ func (d *Deps) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	var webhookEvent *domain.WebhookEvent
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		webhookEvent, txErr = d.WebhookStore.Create(ctx, tx, "stripe", event.ID, event.Type, json.RawMessage(event.Data))
+		webhookEvent, txErr = d.WebhookService.PersistEvent(ctx, tx, "stripe", event.ID, event.Type, json.RawMessage(event.Data))
 		return txErr
 	})
 	if err != nil {
@@ -76,7 +76,7 @@ func (d *Deps) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		// Mark as failed but still return 200 to Stripe (prevent retries for known failures)
 		reason := err.Error()
 		_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-			return d.WebhookStore.MarkFailed(ctx, tx, webhookEvent.ID, &reason)
+			return d.WebhookService.MarkFailed(ctx, tx, webhookEvent.ID, reason)
 		})
 		w.WriteHeader(http.StatusOK)
 		return
@@ -86,7 +86,7 @@ func (d *Deps) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Mark as processed
 	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.WebhookStore.MarkProcessed(ctx, tx, webhookEvent.ID)
+		return d.WebhookService.MarkProcessed(ctx, tx, webhookEvent.ID)
 	})
 
 	w.WriteHeader(http.StatusOK)
@@ -122,7 +122,7 @@ func (d *Deps) handlePaymentIntentSucceeded(ctx context.Context, event *payments
 	logger := logging.FromContext(ctx)
 
 	return store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		order, err := d.OrderService.GetOrderByStripePaymentIntentID(ctx, tx, piID)
+		order, err := d.OrderService.GetOrderByStripePaymentIntentIDAsStaff(ctx, tx, piID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				logger.Warn("webhook: no order for PI", "payment_intent_id", piID)
@@ -161,7 +161,7 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 	logger := logging.FromContext(ctx)
 
 	return store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		order, err := d.OrderService.GetOrderByStripePaymentIntentID(ctx, tx, piID)
+		order, err := d.OrderService.GetOrderByStripePaymentIntentIDAsStaff(ctx, tx, piID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				logger.Warn("webhook: no order for failed PI", "payment_intent_id", piID)
@@ -197,7 +197,7 @@ func (d *Deps) handleChargeRefunded(ctx context.Context, event *payments.Webhook
 	logger := logging.FromContext(ctx)
 
 	return store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		order, err := d.OrderService.GetOrderByStripePaymentIntentID(ctx, tx, piID)
+		order, err := d.OrderService.GetOrderByStripePaymentIntentIDAsStaff(ctx, tx, piID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				logger.Warn("webhook: no order for refunded charge", "payment_intent_id", piID)

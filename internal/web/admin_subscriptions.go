@@ -87,7 +87,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		sub, txErr = d.SubscriptionService.GetSubscription(ctx, tx, id)
+		sub, txErr = d.SubscriptionService.GetSubscriptionAsStaff(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
@@ -106,7 +106,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		enrichedOrders = make([]admin.EnrichedSubOrder, len(subOrders))
 		for i, so := range subOrders {
 			enrichedOrders[i] = admin.EnrichedSubOrder{SubscriptionOrder: so}
-			if order, oErr := d.OrderService.GetOrder(ctx, tx, so.OrderID); oErr == nil {
+			if order, oErr := d.OrderService.GetOrderAsStaff(ctx, tx, so.OrderID); oErr == nil {
 				enrichedOrders[i].OrderNumber = order.Number
 			}
 		}

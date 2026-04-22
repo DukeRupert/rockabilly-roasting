@@ -96,11 +96,11 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
-		memberGroups, txErr = d.CustomerGroupStore.ListByCustomer(ctx, tx, id)
+		memberGroups, txErr = d.CustomerGroupService.ListByCustomer(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
-		allGroups, txErr = d.CustomerGroupStore.List(ctx, tx)
+		allGroups, txErr = d.CustomerGroupService.List(ctx, tx)
 		return txErr
 	})
 	if err != nil {
@@ -145,7 +145,7 @@ func (d *Deps) handleAdminCustomerPaymentTerms(w http.ResponseWriter, r *http.Re
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CustomerStore.UpdatePaymentTerms(ctx, tx, id, days)
+		return d.CustomerService.UpdatePaymentTerms(ctx, tx, id, days, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -171,7 +171,7 @@ func (d *Deps) handleAdminCustomerBillingMethod(w http.ResponseWriter, r *http.R
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CustomerStore.UpdateBillingMethod(ctx, tx, id, method)
+		return d.CustomerService.UpdateBillingMethod(ctx, tx, id, method, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)

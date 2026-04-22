@@ -37,6 +37,7 @@ type AuthService struct {
 	sessions   *sessions.Manager
 	audit      *audit.AuditWriter
 	metrics    *metrics.Registry
+	email      EmailEnv // populated via WithEmail; required for SendMagicLink
 }
 
 // NewAuthService creates a new AuthService.
@@ -56,6 +57,13 @@ func NewAuthService(
 		audit:      audit,
 		metrics:    metrics,
 	}
+}
+
+// WithEmail attaches email-send environment. Required before calling Send*
+// methods; safe to call at wiring time in main.
+func (s *AuthService) WithEmail(env EmailEnv) *AuthService {
+	s.email = env
+	return s
 }
 
 // StaffLogin authenticates a staff member and creates a session.

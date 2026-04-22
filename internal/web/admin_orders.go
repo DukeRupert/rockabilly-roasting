@@ -98,7 +98,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		order, txErr = d.OrderService.GetOrder(ctx, tx, id)
+		order, txErr = d.OrderService.GetOrderAsStaff(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
@@ -120,7 +120,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Resolve shipping address.
-		shippingAddress, txErr = d.CustomerService.GetAddressByID(ctx, tx, order.ShippingAddressID)
+		shippingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
 		if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
 			return txErr
 		}
@@ -281,7 +281,7 @@ func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Reques
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		order, txErr = d.OrderService.GetOrder(ctx, tx, id)
+		order, txErr = d.OrderService.GetOrderAsStaff(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
@@ -297,7 +297,7 @@ func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Reques
 			}
 		}
 
-		shippingAddress, txErr = d.CustomerService.GetAddressByID(ctx, tx, order.ShippingAddressID)
+		shippingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
 		if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
 			return txErr
 		}

@@ -94,26 +94,12 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		// Pending wholesale applications
 		wholesaleStatus := domain.WholesaleStatusPending
 		wholesaleType := domain.AccountTypeWholesale
-		pendingCustomers, txErr := d.CustomerStore.List(ctx, tx, store.CustomerFilter{
+		props.PendingWholesale, txErr = d.CustomerService.CountCustomers(ctx, tx, store.CustomerFilter{
 			AccountType:     &wholesaleType,
 			WholesaleStatus: &wholesaleStatus,
-			Limit:           1, // we only need the count
 		})
 		if txErr != nil {
 			return txErr
-		}
-		props.PendingWholesale = len(pendingCustomers)
-		// Re-query with higher limit if any exist, to get actual count
-		if len(pendingCustomers) > 0 {
-			allPending, err := d.CustomerStore.List(ctx, tx, store.CustomerFilter{
-				AccountType:     &wholesaleType,
-				WholesaleStatus: &wholesaleStatus,
-				Limit:           100,
-			})
-			if err != nil {
-				return err
-			}
-			props.PendingWholesale = len(allPending)
 		}
 
 		// Recent orders (last 10)

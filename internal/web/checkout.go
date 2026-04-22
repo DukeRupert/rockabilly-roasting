@@ -507,7 +507,10 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		taxTotal = taxResult.TaxTotal
 		taxLabel = taxResult.Label
 
-		shippingAddr, txErr = d.CustomerService.GetAddressByID(ctx, tx, addressID)
+		// scoping: addressID comes from client-submitted JSON and is not scoped to customerID.
+		// Impact is limited (tax calc + order creation use the address; content is not echoed back
+		// to the client), but worth tightening post-launch. Tracked as follow-up.
+		shippingAddr, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, addressID)
 		if txErr != nil {
 			return fmt.Errorf("get address: %w", txErr)
 		}

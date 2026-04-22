@@ -24,6 +24,8 @@ type WholesaleService struct {
 	carts          *store.CartStore
 	audit          *audit.AuditWriter
 	metrics        *metrics.Registry
+	auth           *AuthService // populated via WithEmail; used to mint setup tokens for SendApprovalEmail
+	email          EmailEnv     // populated via WithEmail; required for Send* methods
 }
 
 // NewWholesaleService creates a new WholesaleService.
@@ -45,6 +47,14 @@ func NewWholesaleService(
 		audit:          audit,
 		metrics:        metrics,
 	}
+}
+
+// WithEmail attaches email-send environment and the AuthService used to mint
+// password-setup tokens. Must be called before any of the Send* methods.
+func (s *WholesaleService) WithEmail(env EmailEnv, auth *AuthService) *WholesaleService {
+	s.email = env
+	s.auth = auth
+	return s
 }
 
 // --- Application management ---
@@ -80,13 +90,8 @@ func (s *WholesaleService) SubmitApplication(ctx context.Context, tx pgx.Tx, p A
 		return nil, fmt.Errorf("create wholesale customer: %w", err)
 	}
 
-	// Set wholesale fields via direct SQL since CreateCustomer uses the standard insert.
-	_, err = tx.Exec(ctx,
-		`UPDATE customers SET account_type = 'wholesale', wholesale_status = 'pending',
-		 company_name = $2, website = $3, updated_at = now() WHERE id = $1`,
-		c.ID, p.CompanyName, p.Website,
-	)
-	if err != nil {
+	// Promote the customer to pending wholesale + record company details.
+	if err := s.customers.SetWholesaleApplicationFields(ctx, tx, c.ID, p.CompanyName, p.Website); err != nil {
 		return nil, fmt.Errorf("set wholesale fields: %w", err)
 	}
 
@@ -116,12 +121,7 @@ func (s *WholesaleService) ApproveApplication(ctx context.Context, tx pgx.Tx, cu
 		return nil, ErrWholesaleNotPending
 	}
 
-	_, err = tx.Exec(ctx,
-		`UPDATE customers SET wholesale_status = 'approved', approved_at = $2, approved_by = $3,
-		 updated_at = now() WHERE id = $1`,
-		customerID, time.Now(), actor.ID,
-	)
-	if err != nil {
+	if err := s.customers.SetWholesaleApproved(ctx, tx, customerID, actor.ID, time.Now()); err != nil {
 		return nil, fmt.Errorf("approve wholesale: %w", err)
 	}
 
@@ -162,11 +162,7 @@ func (s *WholesaleService) DeclineApplication(ctx context.Context, tx pgx.Tx, cu
 		return ErrWholesaleNotPending
 	}
 
-	_, err = tx.Exec(ctx,
-		`UPDATE customers SET wholesale_notes = $2, updated_at = now() WHERE id = $1`,
-		customerID, notes,
-	)
-	if err != nil {
+	if err := s.customers.SetWholesaleNotes(ctx, tx, customerID, notes); err != nil {
 		return fmt.Errorf("update wholesale notes: %w", err)
 	}
 
@@ -202,12 +198,7 @@ func (s *WholesaleService) SuspendAccount(ctx context.Context, tx pgx.Tx, custom
 		return nil, ErrWholesaleNotApproved
 	}
 
-	_, err = tx.Exec(ctx,
-		`UPDATE customers SET wholesale_status = 'suspended', wholesale_notes = $2,
-		 updated_at = now() WHERE id = $1`,
-		customerID, notes,
-	)
-	if err != nil {
+	if err := s.customers.SetWholesaleSuspended(ctx, tx, customerID, notes); err != nil {
 		return nil, fmt.Errorf("suspend wholesale: %w", err)
 	}
 
@@ -249,12 +240,7 @@ func (s *WholesaleService) ReactivateAccount(ctx context.Context, tx pgx.Tx, cus
 		return nil, ErrWholesaleNotApproved
 	}
 
-	_, err = tx.Exec(ctx,
-		`UPDATE customers SET wholesale_status = 'approved', wholesale_notes = NULL,
-		 updated_at = now() WHERE id = $1`,
-		customerID,
-	)
-	if err != nil {
+	if err := s.customers.SetWholesaleReactivated(ctx, tx, customerID); err != nil {
 		return nil, fmt.Errorf("reactivate wholesale: %w", err)
 	}
 
@@ -498,11 +484,7 @@ func (s *WholesaleService) PlaceWholesaleOrder(ctx context.Context, tx pgx.Tx, p
 
 	// Set wholesale-specific fields.
 	if p.CustomerPONumber != nil {
-		_, err = tx.Exec(ctx,
-			`UPDATE orders SET customer_po_number = $2 WHERE id = $1`,
-			order.ID, *p.CustomerPONumber,
-		)
-		if err != nil {
+		if err := s.orders.SetCustomerPONumber(ctx, tx, order.ID, *p.CustomerPONumber); err != nil {
 			return nil, fmt.Errorf("set PO number: %w", err)
 		}
 	}

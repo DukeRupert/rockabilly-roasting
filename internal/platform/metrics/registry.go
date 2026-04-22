@@ -48,6 +48,9 @@ type Registry struct {
 
 	// Rate limiting
 	RateLimitHitsTotal *prometheus.CounterVec
+
+	// Email
+	EmailsSent *prometheus.CounterVec
 }
 
 // NewRegistry creates and registers all application metrics.
@@ -203,6 +206,13 @@ func NewRegistry() *Registry {
 			Name: "rate_limit_hits_total",
 			Help: "Total rate limit hits.",
 		}, []string{"config", "key_type"}),
+
+		// --- Email ---
+
+		EmailsSent: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "emails_sent_total",
+			Help: "Total transactional emails sent.",
+		}, []string{"kind", "status"}),
 	}
 
 	reg.MustRegister(
@@ -238,6 +248,8 @@ func NewRegistry() *Registry {
 		m.StripeWebhooksProcessed,
 		// Rate limiting
 		m.RateLimitHitsTotal,
+		// Email
+		m.EmailsSent,
 	)
 
 	return m

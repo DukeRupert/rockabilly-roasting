@@ -111,10 +111,10 @@ func run() error {
 	// QuickBooks Online integration
 	qbCredStore := store.NewQBCredentialStore()
 	var qbClient quickbooks.Client
-	var qbConfig quickbooks.ClientConfig
+	var qbOAuthManager *quickbooks.OAuthManager
 	qbWebhookVerifier := os.Getenv("QB_WEBHOOK_VERIFIER_TOKEN")
-	// HMAC key for OAuth state cookie signing (derived from webhook verifier or encryption key)
-	var qbOAuthHMACKey []byte
+	secureCookies := os.Getenv("INSECURE_COOKIES") != "true"
+	qbHTTPClient := &http.Client{Timeout: 30 * time.Second}
 	if qbClientID := os.Getenv("QB_CLIENT_ID"); qbClientID != "" {
 		if qbWebhookVerifier == "" {
 			return fmt.Errorf("QB_WEBHOOK_VERIFIER_TOKEN is required when QB_CLIENT_ID is set")
@@ -128,15 +128,20 @@ func run() error {
 		// In a multi-tenant setup this would come from the request context.
 		tenantID := tenantIDFromEnv()
 
-		qbConfig = quickbooks.ClientConfig{
+		qbConfig := quickbooks.ClientConfig{
 			ClientID:      qbClientID,
 			ClientSecret:  os.Getenv("QB_CLIENT_SECRET"),
 			EncryptionKey: qbEncKey,
 			Environment:   os.Getenv("QB_ENVIRONMENT"),
 			RedirectURI:   os.Getenv("QB_REDIRECT_URI"),
 		}
-		qbClient = quickbooks.NewQBClient(qbConfig, tenantID, qbCredStore, pool)
-		qbOAuthHMACKey = qbEncKey // reuse the encryption key for HMAC signing
+		qbConcrete := quickbooks.NewQBClient(qbConfig, tenantID, qbCredStore, pool)
+		qbClient = qbConcrete
+		qbOAuthManager = quickbooks.NewOAuthManager(
+			qbConfig, qbConcrete, qbCredStore, tenantID,
+			qbEncKey, // reuse the encryption key for HMAC signing
+			qbHTTPClient, secureCookies,
+		)
 		logger.Info("quickbooks integration configured", "environment", os.Getenv("QB_ENVIRONMENT"))
 	}
 
@@ -168,38 +173,56 @@ func run() error {
 	settingsStore := store.NewSettingsStore()
 	attributeStore := store.NewAttributeStore()
 	auditStore := store.NewAuditStore()
+	staffStore := store.NewStaffStore()
+	customerGroupStore := store.NewCustomerGroupStore()
+	invoiceStore := store.NewInvoiceStore()
+	magicLinkStore := store.NewMagicLinkStore()
 
-	// Services
-	orderSvc := app.NewOrderService(orderStore, auditWriter, metricsReg)
-	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
+	// Email environment shared by every service that sends transactional email.
+	emailEnv := app.EmailEnv{
+		Mailer:     mailer,
+		Renderer:   emailRenderer,
+		FromAddr:   fromAddr,
+		BaseURL:    baseURL,
+		StoreName:  storeName,
+		StaffEmail: staffEmail,
+	}
+
+	// Services. Those that send email have email-capable variants attached via WithEmail.
 	catalogSvc := app.NewCatalogService(catalogStore, auditWriter, metricsReg)
-	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg)
+	orderSvc := app.NewOrderService(orderStore, auditWriter, metricsReg).
+		WithEmail(emailEnv, customerStore, catalogStore)
+	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
+	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
+		WithEmail(emailEnv, customerStore, catalogStore)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, labelProvider, auditWriter, metricsReg)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, paymentProvider, auditWriter, metricsReg)
 	pricingSvc := app.NewPricingService(pricingStore)
 	cartSvc := app.NewCartService(cartStore, pricingStore)
-	staffStore := store.NewStaffStore()
-	customerGroupStore := store.NewCustomerGroupStore()
-	invoiceStore := store.NewInvoiceStore()
-	magicLinkStore := store.NewMagicLinkStore()
-	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg)
+	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg).
+		WithEmail(emailEnv)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, paymentProvider, auditWriter, metricsReg)
-	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg)
+	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
+		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
-	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg)
+	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg).
+		WithEmail(emailEnv, customerStore)
+	customerGroupSvc := app.NewCustomerGroupService(customerGroupStore, auditWriter, metricsReg)
+	auditQuerySvc := app.NewAuditQueryService(auditStore)
+	webhookSvc := app.NewWebhookService(webhookStore)
 
-	// River job workers
+	// River job workers. Email workers are thin delegators over the services above.
 	workers := river.NewWorkers()
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool, metricsReg))
 	river.AddWorker(workers, jobs.NewBatchRenewalWorker(renewalSvc, pool, metricsReg))
-	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
-	river.AddWorker(workers, jobs.NewInvoiceSendWorker(invoiceStore, orderStore, customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
-	river.AddWorker(workers, jobs.NewWholesaleApplicationNotifyWorker(customerStore, pool, mailer, emailRenderer, fromAddr, staffEmail, baseURL, storeName))
-	river.AddWorker(workers, jobs.NewWholesaleApprovedWorker(customerStore, magicLinkStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
-	river.AddWorker(workers, jobs.NewWholesaleSuspendedWorker(customerStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
-	river.AddWorker(workers, jobs.NewOrderConfirmEmailWorker(orderStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
-	river.AddWorker(workers, jobs.NewSubscriptionConfirmEmailWorker(subscriptionStore, customerStore, catalogStore, pool, mailer, emailRenderer, fromAddr, baseURL, storeName))
+	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(authSvc, pool))
+	river.AddWorker(workers, jobs.NewInvoiceSendWorker(invoiceSvc, pool))
+	river.AddWorker(workers, jobs.NewWholesaleApplicationNotifyWorker(wholesaleSvc, pool))
+	river.AddWorker(workers, jobs.NewWholesaleApprovedWorker(wholesaleSvc, pool))
+	river.AddWorker(workers, jobs.NewWholesaleSuspendedWorker(wholesaleSvc, pool))
+	river.AddWorker(workers, jobs.NewOrderConfirmEmailWorker(orderSvc, pool))
+	river.AddWorker(workers, jobs.NewSubscriptionConfirmEmailWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
 
@@ -273,42 +296,38 @@ func run() error {
 
 	// Router
 	deps := &web.Deps{
-		Pool:                pool,
-		Logger:              logger,
-		Metrics:             metricsReg,
-		Sessions:            sessionMgr,
-		OrderService:        orderSvc,
-		CustomerService:     customerSvc,
-		CatalogService:      catalogSvc,
-		CheckoutService:     checkoutSvc,
-		FulfillmentService:  fulfillmentSvc,
-		SubscriptionService: subscriptionSvc,
-		DiscountService:     discountSvc,
-		AuthService:     authSvc,
-		PricingService:  pricingSvc,
-		CartService:      cartSvc,
-		WholesaleService: wholesaleSvc,
-		AttributeService:    attributeSvc,
-		InvoiceService:   invoiceSvc,
-		PaymentProvider:  paymentProvider,
-		AuditStore:      auditStore,
-		WebhookStore:    webhookStore,
-		CustomerStore:   customerStore,
-		MagicLinkStore:     magicLinkStore,
-		CustomerGroupStore: customerGroupStore,
-		SettingsStore:      settingsStore,
-		RiverClient:        riverClient,
-		R2Client:           r2Client,
-		MediaConfig:        mediaConfig,
+		Pool:                 pool,
+		Logger:               logger,
+		Metrics:              metricsReg,
+		Sessions:             sessionMgr,
+		OrderService:         orderSvc,
+		CustomerService:      customerSvc,
+		CatalogService:       catalogSvc,
+		CheckoutService:      checkoutSvc,
+		FulfillmentService:   fulfillmentSvc,
+		SubscriptionService:  subscriptionSvc,
+		DiscountService:      discountSvc,
+		AuthService:          authSvc,
+		PricingService:       pricingSvc,
+		CartService:          cartSvc,
+		WholesaleService:     wholesaleSvc,
+		AttributeService:     attributeSvc,
+		InvoiceService:       invoiceSvc,
+		CustomerGroupService: customerGroupSvc,
+		AuditQueryService:    auditQuerySvc,
+		WebhookService:       webhookSvc,
+		AuditWriter:          auditWriter,
+		PaymentProvider:      paymentProvider,
+		RiverClient:          riverClient,
+		R2Client:             r2Client,
+		MediaConfig:          mediaConfig,
 		QBClient:               qbClient,
-		QBConfig:               qbConfig,
-		QBCredentialStore:      qbCredStore,
+		QBOAuthManager:         qbOAuthManager,
 		QBWebhookVerifierToken: qbWebhookVerifier,
-		QBOAuthHMACKey:         qbOAuthHMACKey,
-		QBHTTPClient:           &http.Client{Timeout: 30 * time.Second},
+		QBHTTPClient:           qbHTTPClient,
 		HelpRegistry:           helpRegistry,
 		RateLimiter:            rateLimiter,
-		SecureCookies:          os.Getenv("INSECURE_COOKIES") != "true",
+		SecureCookies:          secureCookies,
 		BaseURL:                baseURL,
 		Mailer:                 mailer,
 		EmailFrom:              fromAddr,

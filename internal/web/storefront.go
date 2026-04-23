@@ -86,7 +86,7 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(cards) > 0 {
 		props.FeaturedProduct = &cards[0]
-		props.HeroImageURL = "https://cdn.rockabillyroasting.shop/cdn-cgi/image/width=800,height=800,fit=contain/products/5d5a0076-0442-4317-8b6b-6ccaa63d6567"
+		props.HeroImageURL = "/static/cloud-9-mockup.avif"
 		props.FeaturedProducts = cards // show all products in the grid, including the featured one
 	}
 

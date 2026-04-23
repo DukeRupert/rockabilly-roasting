@@ -89,70 +89,96 @@ templ HomeContent(props HomePageProps) {
 			mq.addEventListener('change', apply);
 		})();
 	</script>
-	<!-- Featured Product Banner -->
+	<!-- Featured Product — paper-and-ink spotlight, inline with nav + hero -->
 	if props.FeaturedProduct != nil {
-		<section class="-mx-4 sm:-mx-6 lg:-mx-8 -mt-8">
-			<a href={ templ.SafeURL("/catalog/" + props.FeaturedProduct.Product.Slug) } class="block relative overflow-hidden" style="background-color: #F27405;">
-				<!-- Topo contour pattern -->
-				<svg class="absolute inset-0 w-full h-full opacity-10 pointer-events-none" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-					<path d="M-50,60 Q100,20 200,70 Q320,125 420,60 Q520,0 650,50 Q760,95 850,40" stroke="#1A0800" stroke-width="2" fill="none"></path>
-					<path d="M-50,115 Q80,75 190,130 Q310,190 410,115 Q510,45 640,105 Q755,160 850,95" stroke="#1A0800" stroke-width="2" fill="none"></path>
-					<path d="M-50,170 Q90,130 200,185 Q300,240 400,170 Q510,100 640,155 Q750,205 850,150" stroke="#1A0800" stroke-width="2" fill="none"></path>
-					<path d="M-50,225 Q100,185 210,240 Q305,295 405,220 Q510,150 645,210 Q748,260 850,200" stroke="#1A0800" stroke-width="2" fill="none"></path>
-					<path d="M-50,280 Q110,240 215,298 Q310,355 415,275 Q515,200 650,265 Q750,318 850,255" stroke="#1A0800" stroke-width="2" fill="none"></path>
-					<path d="M-50,335 Q115,295 220,358 Q318,415 420,330 Q520,248 655,318 Q752,372 850,310" stroke="#1A0800" stroke-width="2" fill="none"></path>
-					<path d="M-50,390 Q118,352 225,415 Q322,472 425,382 Q524,295 658,372 Q754,428 850,365" stroke="#1A0800" stroke-width="2" fill="none"></path>
-					<path d="M-50,445 Q120,408 228,470 Q325,528 428,435 Q526,345 660,425 Q755,482 850,420" stroke="#1A0800" stroke-width="2" fill="none"></path>
-				</svg>
-				<div class="relative z-10 grid grid-cols-1 sm:grid-cols-2 sm:min-h-[500px]">
-					<!-- Product image — shows first on mobile -->
-					<div class="relative overflow-hidden aspect-4/3 sm:aspect-auto sm:order-last">
-						if props.HeroImageURL != "" {
-							<img
-								src={ props.HeroImageURL }
-								alt={ props.FeaturedProduct.Product.Title }
-								class="w-full h-full object-cover object-center"
-							/>
-						} else if props.FeaturedProduct.ThumbnailURL != "" {
-							<img
-								src={ props.FeaturedProduct.ThumbnailURL }
-								alt={ props.FeaturedProduct.Product.Title }
-								class="w-full h-full object-cover object-center"
-							/>
-						}
+		<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper">
+			<!-- Paper grain overlay -->
+			<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+			<div class="relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-20 lg:py-24">
+				<!-- Section header: eyebrow + split headline with script flourish -->
+				<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10 sm:mb-14">
+					<div>
+						<p class="font-oswald text-chrome-deep text-xs" style="letter-spacing:0.24em; text-transform:uppercase; font-weight:600;">
+							This week's roast
+						</p>
+						<h2 class="font-slab text-ink uppercase leading-[0.95] mt-3" style="font-size: clamp(2.25rem, 5.5vw, 4rem); letter-spacing:-0.005em;">
+							Freshly
+							<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">stamped</span>
+							&amp; ready
+						</h2>
 					</div>
-					<!-- Content -->
-					<div class="flex flex-col justify-center px-6 sm:px-12 py-10 sm:py-16">
-						<p class="text-rr-void/60 text-[11px] font-medium tracking-[0.22em] uppercase mb-4">Featured This Month</p>
-						<h1 class="font-display leading-[0.85] text-rr-void tracking-wide -ml-0.5" style="font-size: clamp(3.5rem, 10vw, 6rem);">
-							{ props.FeaturedProduct.Product.Title }
-						</h1>
-						if props.FeaturedProduct.Coffee != nil && len(props.FeaturedProduct.Coffee.Regions) > 0 {
-							<div class="flex items-center gap-3 mt-4 mb-5">
-								<div class="w-6 h-px bg-rr-void/40"></div>
-								<p class="text-rr-void/60 text-[11px] font-medium tracking-[0.18em] uppercase">
+					<a href="/catalog" class="btn font-oswald text-xs text-ink hover:text-rust transition-colors whitespace-nowrap" style="letter-spacing:0.18em; text-transform:uppercase; font-weight:700;">
+						All Coffees <span aria-hidden="true">›</span>
+					</a>
+				</div>
+				<!-- Spotlight card: ink-bordered, stamp shadow, two-column -->
+				<a
+					href={ templ.SafeURL("/catalog/" + props.FeaturedProduct.Product.Slug) }
+					class="btn-stamp block bg-cream-hi border-2 border-ink relative group"
+				>
+					<div class="grid grid-cols-1 md:grid-cols-5 md:min-h-[480px]">
+						<!-- Product image — 3/5 columns on desktop -->
+						<div class="relative overflow-hidden md:col-span-3 aspect-[4/3] md:aspect-auto border-b-2 md:border-b-0 md:border-r-2 border-ink bg-paper-warm">
+							if props.HeroImageURL != "" {
+								<img
+									src={ props.HeroImageURL }
+									alt={ props.FeaturedProduct.Product.Title }
+									class="absolute inset-0 w-full h-full object-cover object-center"
+								/>
+							} else if props.FeaturedProduct.ThumbnailURL != "" {
+								<img
+									src={ props.FeaturedProduct.ThumbnailURL }
+									alt={ props.FeaturedProduct.Product.Title }
+									class="absolute inset-0 w-full h-full object-cover object-center"
+								/>
+							}
+							<!-- "FRESH WEEKLY" stamp, tilted, top-left corner -->
+							<div class="absolute top-4 left-4 pointer-events-none">
+								<span
+									class="inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust"
+									style="letter-spacing:0.18em; text-transform:uppercase; transform:rotate(-6deg); outline:2px solid var(--color-rust); outline-offset:2px;"
+								>
+									Fresh Weekly
+								</span>
+							</div>
+						</div>
+						<!-- Content — 2/5 columns on desktop -->
+						<div class="flex flex-col justify-center p-8 sm:p-10 md:col-span-2">
+							if props.FeaturedProduct.Coffee != nil && len(props.FeaturedProduct.Coffee.Regions) > 0 {
+								<p class="font-oswald text-chrome-deep text-[11px] mb-3" style="letter-spacing:0.2em; text-transform:uppercase; font-weight:600;">
 									{ strings.Join(props.FeaturedProduct.Coffee.Regions, " · ") }
 								</p>
-							</div>
-						}
-						if props.FeaturedProduct.Product.Description != "" {
-							<p class="text-rr-void/70 font-body text-sm leading-relaxed max-w-sm mb-6">
-								{ props.FeaturedProduct.Product.Description }
-							</p>
-						}
-						if props.FeaturedProduct.Coffee != nil && len(props.FeaturedProduct.Coffee.TastingNotes) > 0 {
-							<ul class="flex flex-wrap gap-2">
-								for _, note := range props.FeaturedProduct.Coffee.TastingNotes {
-									<li class="text-[11px] font-medium tracking-[0.08em] uppercase text-rr-void/70 border border-rr-void/20 bg-rr-void/10 px-3 py-1 rounded-sm">
-										{ note }
-									</li>
-								}
-							</ul>
-						}
+							}
+							<h3 class="font-slab text-ink uppercase leading-[0.92]" style="font-size: clamp(2.25rem, 4.5vw, 3.5rem); letter-spacing:-0.005em;">
+								{ props.FeaturedProduct.Product.Title }
+							</h3>
+							if props.FeaturedProduct.Product.Description != "" {
+								<p class="font-oswald text-ink-soft text-base leading-relaxed mt-5">
+									{ props.FeaturedProduct.Product.Description }
+								</p>
+							}
+							if props.FeaturedProduct.Coffee != nil && len(props.FeaturedProduct.Coffee.TastingNotes) > 0 {
+								<ul class="flex flex-wrap gap-2 mt-6">
+									for _, note := range props.FeaturedProduct.Coffee.TastingNotes {
+										<li class="font-oswald font-bold text-[10px] text-ink bg-paper border-2 border-ink px-2.5 py-1 rounded-full" style="letter-spacing:0.14em; text-transform:uppercase;">
+											{ note }
+										</li>
+									}
+								</ul>
+							}
+							<!-- Inline CTA indicator -->
+							<span class="inline-flex items-center gap-2 mt-8 font-oswald font-bold text-sm text-rust group-hover:text-rust-deep transition-colors" style="letter-spacing:0.14em; text-transform:uppercase;">
+								Shop this roast
+								<svg class="size-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+								</svg>
+							</span>
+						</div>
 					</div>
-				</div>
-				<div class="flame-stripe"></div>
-			</a>
+				</a>
+			</div>
+			<!-- Flame-stripe divider bridges back to the dark sections below -->
+			<div class="flame-stripe"></div>
 		</section>
 	}
 	<!-- The Daily Grind — subscription pitch -->

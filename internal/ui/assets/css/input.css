@@ -29,11 +29,42 @@
 	--color-rr-body: #C4D0D8;
 	--color-rr-heading: #D8E4E8;
 
-	/* Font families */
+	/* Font families — legacy (Bebas/Boogaloo/Playfair/Barlow) */
 	--font-display: 'Bebas Neue', sans-serif;
 	--font-heading: 'Boogaloo', sans-serif;
 	--font-serif: 'Playfair Display', serif;
 	--font-body: 'Barlow', sans-serif;
+
+	/* Font families — paper-and-ink system (new) */
+	--font-slab: 'Alfa Slab One', 'Rockwell', Georgia, serif;
+	--font-heritage: 'DM Serif Display', 'Playfair Display', Georgia, serif;
+	--font-oswald: 'Oswald', 'Arial Narrow', sans-serif;
+	--font-script: 'Yellowtail', 'Pacifico', cursive;
+	--font-special: 'Special Elite', 'Courier Prime', ui-monospace, monospace;
+
+	/* Paper-and-ink palette (new) — from Rockabilly Roasting Design System/colors_and_type.css */
+	--color-paper: #F6EFE1;
+	--color-paper-warm: #ECE0C6;
+	--color-paper-deep: #DFD0B0;
+	--color-cream-hi: #FFFBF1;
+	--color-ink: #0E0D0C;
+	--color-ink-soft: #1F1C1A;
+	--color-candle: #F2A03D;
+	--color-candle-deep: #C9731A;
+	--color-candle-soft: #F6C37A;
+	--color-rust: #B4351D;
+	--color-rust-deep: #8A240F;
+	--color-espresso: #3A2416;
+	--color-espresso-deep: #22140B;
+	--color-chrome: #C9C4BC;
+	--color-chrome-deep: #8E887D;
+	--color-sage: #5B6B4F;
+
+	/* Paper-and-ink shadows — hard stamp offsets (no blur) */
+	--shadow-stamp: 4px 4px 0 0 var(--color-ink);
+	--shadow-stamp-sm: 2px 2px 0 0 var(--color-ink);
+	--shadow-stamp-lg: 6px 6px 0 0 var(--color-ink);
+	--shadow-stamp-paper: 4px 4px 0 0 var(--color-paper);
 
 	/* templui semantic colors (reference CSS vars set in :root) */
 	--color-background: var(--background);
@@ -228,6 +259,27 @@ html {
 	box-shadow: none !important;
 }
 
+/* Paper-and-ink stamp press — signature interaction from the design system.
+   Apply alongside a base shadow (e.g. shadow-stamp) and a 2px ink border. */
+.btn-stamp {
+	transition: transform 120ms cubic-bezier(.7,0,.2,1.4), box-shadow 120ms cubic-bezier(.7,0,.2,1.4);
+	box-shadow: var(--shadow-stamp);
+}
+.btn-stamp:hover {
+	transform: translate(-1px, -1px);
+	box-shadow: var(--shadow-stamp-lg);
+}
+.btn-stamp:active {
+	transform: translate(2px, 2px);
+	box-shadow: 0 0 0 0 var(--color-ink) !important;
+}
+
+/* Halftone dot overlay — paper-and-ink variant (paper dots on ink bg) */
+.texture-halftone-paper {
+	background-image: radial-gradient(rgba(246, 239, 225, 0.06) 1.5px, transparent 1.5px);
+	background-size: 14px 14px;
+}
+
 /* Texture overlays */
 .texture-dots {
 	background-image: radial-gradient(circle, rgba(232, 146, 26, 0.12) 1px, transparent 1px);
@@ -325,5 +377,13 @@ html {
 	}
 	.btn:active {
 		transform: none;
+	}
+	.btn-stamp {
+		transition: none;
+	}
+	.btn-stamp:hover,
+	.btn-stamp:active {
+		transform: none;
+		box-shadow: var(--shadow-stamp);
 	}
 }

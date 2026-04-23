@@ -8,3 +8,6 @@ node_modules/
 # Environment / secrets
 .env
 .env.*
+
+# Large design system source media (the web-optimized mp4/webm derivatives live in internal/ui/assets/)
+Rockabilly Roasting Design System/assets/*.mov

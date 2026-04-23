@@ -174,8 +174,8 @@ Detailed specifications live in `docs/`:
 - `lean-commerce-tax.md` — tax calculation via Stripe Tax
 - `lean-commerce-shipping.md` — shipping label and rate workflows
 - `lean-commerce-ui-plan.md` — UI plan and component specs
-- `rockabilly-brand-guide-v3.html` — full brand guide (colors, typography, tokens)
-- `rockabilly-brand-voice.md` — voice and copy guidelines
+
+The brand is defined by the **Rockabilly Roasting Design System/** folder at the repo root (README, `colors_and_type.css`, `assets/`, `preview/`, `ui_kits/website/`, `SKILL.md`). That folder is the source of truth for color, type, shadows, spacing, iconography, and voice — it supersedes the earlier `rockabilly-brand-guide-v3.html` and `rockabilly-brand-voice.md` docs.
 
 ## Design Context
 
@@ -185,24 +185,36 @@ Detailed specifications live in `docs/`:
 - **Staff (admin panel):** Small team managing catalog, orders, fulfillment, and subscriptions. The admin panel uses "Hiri" branding and a separate light-mode design — it is not customer-facing.
 
 ### Brand Personality
-**Warm. Knowledgeable. Unpretentious.**
+**Confident. Warm. Unpretentious.**
 
-The rockabilly aesthetic is texture, not costume — it shows up in product names (Chop Top, Bike Blend), visual treatment (flame stripes, Edison-bulb glow), and sharp typographic choices, not in overwrought copy. Craft comes first, cool comes second. The interface should feel like walking into the shop: confident, specific, unhurried.
+Rockabilly is texture, not costume. It shows up in product names, typographic choices, and the visual language (stamp shadows, bone paper, candle amber) — not in overwrought copy. Craft comes first, cool comes second. The voice is the guy behind the counter who remembers your order: plainspoken, a little swaggering, first-name energy. "We" for the shop, "you" for the customer.
 
-Emotional goals: trust, quiet confidence, warmth without gushing. Never fake urgency, never over-sell. See `docs/rockabilly-brand-voice.md` for the full voice guide.
+**Lean into:** *roasted, small-batch, rebel, classic, fire, spark, kick, brew, ride, iron, grit, honest, straight-up, hand-packed, fresh, the shop, the crew, the roast, the grind.*
+**Avoid:** *artisanal, curated, bespoke, journey, elevated, experience, unlock, ecosystem, synergize, disrupt.*
+
+Emotional goals: trust, quiet confidence, warmth without gushing. Never fake urgency. Exclamation points earned (one per page, tops). Em-dashes liberally. **No emoji, ever** — use unicode stars/dingbats (`★ ✦ ✧ ❖ ◆`) or brand illustrations instead.
 
 ### Aesthetic Direction
-- **Theme:** Dark-mode storefront only (dusk charcoal surfaces, warm amber accents, neon-glow shadows). Admin stays light.
-- **Typography:** Bebas Neue (display/hero, ALL CAPS), Boogaloo (product titles/prices), Playfair Display (pull quotes), Barlow (everything else — body, labels, UI).
-- **Color semantics:** Red = primary action (buy). Teal = subscription/recurring. Amber = featured/highlight/warmth. Never swap these.
-- **Textures:** Halftone dots, crosshatch grid overlays at low opacity. Edison-bulb radial glow on hero sections.
-- **Shapes:** `rounded-sm` everywhere. Hard ink-drop shadows (letterpress feel). Flame-stripe gradient dividers.
-- **Motion:** Subtle — card lift on hover (3px), amber underline slide on nav links, marquee ticker for promos, button press translateY. No gratuitous animation.
-- **Anti-references:** Generic SaaS gradients, emoji-heavy copy, "artisanal journey" language, anything that could belong to any other coffee brand.
+- **Theme — paper and ink.** Storefront and marketing run on warm bone paper (`--paper` `#F6EFE1`), tattoo black strokes (`--ink` `#0E0D0C`), and candle amber accents (`--amber` `#F2A03D`). Never pure `#fff` or `#000`. Admin stays light with its existing Hiri palette.
+- **Color semantics (locked):** `--rust` `#B4351D` = primary CTAs, links, and "open" signs. `--amber` `#F2A03D` = flame / highlight / "NEW · LIMITED · LIVE" callouts. `--ink` / `--paper` = text and surface. Never use neon gradients, pastels, purple, cyan, or "tech blue."
+- **Typography (Google Fonts stand-ins — flag for print/licensed work):**
+  - **Alfa Slab One** — display signage / billboards. ALL CAPS, tracking 0.04–0.08em.
+  - **DM Serif Display** — heritage serif for editorial H1 moments. Never share a headline with the slab display.
+  - **Oswald** — industrial condensed for H2/H3, UI, and body. The workhorse.
+  - **Yellowtail** — brush script *garnish only*, one phrase per surface.
+  - **Special Elite** — typewriter/carbon-paper feel for price tags, mono, captions.
+  - Rules: never stack more than 2 families per composition (plus script as garnish). All-caps needs generous tracking. Body line-height 1.55–1.6.
+- **Shapes — square by default.** `border-radius: 0` for most elements; `2–4px` on buttons/badges; `999px` only for chip tags. The shield/badge curve is reserved for the brand mark.
+- **Borders & rules:** 2–3px solid ink strokes. No 1px hairlines on primary elements. Double rules (outer + inner, 4–6px gap) on menu panels and printed-feel collateral.
+- **Shadows — stamp, not drop.** Hard offset `4px 4px 0 0 var(--ink)` is the signature. No soft blurred drops on primary surfaces (floating menus/modals excepted, at low intensity).
+- **Textures:** Warm paper grain at low opacity (0.04–0.08), halftone dots, pinstripes, diner checkerboard — as accents, not wallpaper. Product photography warm-cast (amber/sepia), never cool/blue. The only acceptable gradient is an amber → rust radial glow behind a logo or centerpiece.
+- **Motion — analog restraint.** The signature interaction is the **stamp**: hover lifts `translate(-1px,-1px)` and grows shadow to `5px 5px`; press collapses to `translate(2px,2px)` with shadow flattening to `0 0`. Fades 200ms linear. Never parallax, never neon pulses, never scroll-tied particles.
+- **Layout:** Wide newspaper-style gutters, not edge-to-edge. Strong grid, but sticker/stamp elements may tilt `-2°` to `-6°` with hard shadows to feel pasted on. Tilts are intentional, never random.
+- **Anti-references:** Generic SaaS gradients, glass-morphism, iOS soft drops, pastel UIs, emoji decoration, "artisanal journey" copy, purple/cyan tech palettes.
 
 ### Design Principles
-1. **Substance over style** — Lead with the product (origin, roast, flavor). Visual personality supports the coffee, never competes with it.
-2. **Specificity builds trust** — Use real names, real details, real delivery days. Never use filler copy or placeholder enthusiasm.
-3. **Fast and focused** — Pages load fast, layouts are scannable, actions are obvious. One primary CTA per view. Don't make the customer think.
-4. **Consistent visual language** — Color semantics, type roles, spacing, and component patterns stay locked. Every page should feel like the same shop.
-5. **Accessible by default** — WCAG 2.1 AA compliance. Sufficient contrast on dark surfaces, keyboard-navigable, semantic HTML, screen-reader-friendly.
+1. **Paper, not white. Ink, not black.** Every surface is warm; every stroke is weighted. Pure `#fff`/`#000` is a bug.
+2. **Stamp the press.** Hard offset shadows and the lift-and-press interaction are load-bearing brand signals. Don't soften them into drop-shadow UIs.
+3. **Substance over style.** Lead with the product — origin, roast, flavor, who roasted it. Rockabilly texture supports the coffee, never competes with it.
+4. **Specificity builds trust.** Real names, real dates, real prices. No placeholder enthusiasm. One primary CTA per view.
+5. **Accessible by default.** WCAG 2.1 AA on paper surfaces (ink-on-bone has ample contrast), keyboard-navigable, semantic HTML, screen-reader-friendly. Stamp interactions respect `prefers-reduced-motion`.

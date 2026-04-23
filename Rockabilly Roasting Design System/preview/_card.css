@@ -1,0 +1,59 @@
+/* Shared styling for Design System preview cards */
+@import url('../colors_and_type.css');
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.card {
+  box-sizing: border-box;
+  width: 700px;
+  padding: 22px 26px;
+  background: var(--paper);
+  position: relative;
+}
+
+.card-dark {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.row { display: flex; gap: 12px; align-items: stretch; }
+.col { display: flex; flex-direction: column; gap: 12px; }
+
+.swatch {
+  flex: 1;
+  min-height: 96px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  border: 2px solid var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+.swatch .hex {
+  font-family: var(--font-mono);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  opacity: 0.85;
+}
+.swatch .name { font-weight: 700; }
+
+.eyebrow-card {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--chrome-deep);
+  margin-bottom: 10px;
+}

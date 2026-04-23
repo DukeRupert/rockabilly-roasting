@@ -1,0 +1,24 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+  .chip { font-family: var(--font-sans); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; padding: 6px 12px; border: 2px solid var(--ink); border-radius: 999px; display:inline-flex; align-items:center; gap:6px; }
+  .tag  { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.02em; padding: 4px 10px; border: 2px solid var(--ink); background: var(--paper); }
+  .stamp { font-family: var(--font-sans); font-weight: 700; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; padding: 8px 14px; border: 2px solid var(--rust); color: var(--rust); transform: rotate(-4deg); display:inline-block; }
+  .stamp-double { padding: 6px 14px; border: 2px solid var(--rust); outline: 2px solid var(--rust); outline-offset: 3px; }
+</style>
+</head><body>
+<div class="card" style="padding:24px 26px;">
+  <div class="eyebrow-card">Badges, tags & stamps</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:14px;">
+    <span class="chip" style="background:var(--amber);color:var(--ink);">★ Small Batch</span>
+    <span class="chip" style="background:var(--rust);color:var(--paper);">Fresh This Week</span>
+    <span class="chip" style="background:var(--paper);color:var(--ink);">Dark Roast</span>
+    <span class="chip" style="background:var(--ink);color:var(--paper);">Decaf</span>
+  </div>
+  <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+    <span class="tag">ROASTED 04.18.26</span>
+    <span class="tag" style="background:var(--paper-warm);">12 OZ · $18.00</span>
+    <span class="stamp stamp-double">Approved</span>
+    <span class="stamp" style="color:var(--ink);border-color:var(--ink);transform:rotate(3deg);">Richland, WA</span>
+  </div>
+</div>
+</body></html>

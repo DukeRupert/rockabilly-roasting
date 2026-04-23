@@ -1,0 +1,260 @@
+/* ============================================================
+   ROCKABILLY ROASTING CO. — Colors & Type
+   Vintage Americana / tattoo-flash / diner signage
+   ============================================================ */
+
+/* -- Google Fonts (substitutions, flagged in README) --------- */
+@import url('https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@400;500;600;700&family=Special+Elite&family=Yellowtail&family=DM+Serif+Display:ital@0;1&display=swap');
+
+:root {
+  /* ------------------------------------------------------------
+     COLOR — core ink & paper
+     ------------------------------------------------------------ */
+  --ink:            #0E0D0C;   /* near-black, tattoo ink */
+  --ink-soft:       #1F1C1A;   /* off-black, card bg on dark */
+  --paper:          #F6EFE1;   /* bone/cream, primary light bg */
+  --paper-warm:     #ECE0C6;   /* aged paper, secondary bg */
+  --paper-deep:     #DFD0B0;   /* deeper cream, inset panels */
+
+  /* ------------------------------------------------------------
+     COLOR — brand primaries
+     ------------------------------------------------------------ */
+  --amber:          #F2A03D;   /* candle flame, primary accent */
+  --amber-deep:     #C9731A;   /* hover / pressed amber */
+  --amber-soft:     #F6C37A;   /* tint, backgrounds */
+
+  --rust:           #B4351D;   /* diner neon red, CTAs & alerts */
+  --rust-deep:      #8A240F;   /* pressed rust */
+
+  --espresso:       #3A2416;   /* coffee bean brown */
+  --espresso-deep:  #22140B;
+
+  /* ------------------------------------------------------------
+     COLOR — supporting
+     ------------------------------------------------------------ */
+  --chrome:         #C9C4BC;   /* chrome-on-paper rules */
+  --chrome-deep:    #8E887D;   /* secondary text on paper */
+  --sage:           #5B6B4F;   /* laurel leaf green (rare) */
+  --cream-hi:       #FFFBF1;   /* highlights, hover on paper */
+
+  /* ------------------------------------------------------------
+     SEMANTIC — foreground / background
+     ------------------------------------------------------------ */
+  --fg-1: var(--ink);           /* primary text on paper */
+  --fg-2: #3A332B;              /* body text, softer */
+  --fg-3: var(--chrome-deep);   /* muted, captions */
+  --fg-inverse: var(--paper);   /* text on dark */
+  --fg-accent: var(--rust);     /* inline accent / links */
+
+  --bg-1: var(--paper);         /* primary surface */
+  --bg-2: var(--paper-warm);    /* secondary surface */
+  --bg-3: var(--paper-deep);    /* deeper inset */
+  --bg-inverse: var(--ink);     /* dark mode / hero */
+  --bg-card: var(--cream-hi);   /* elevated on paper */
+
+  /* ------------------------------------------------------------
+     SEMANTIC — intent
+     ------------------------------------------------------------ */
+  --success: #4A6B3A;
+  --warning: var(--amber);
+  --danger:  var(--rust);
+  --info:    #2C4A5C;
+
+  /* ------------------------------------------------------------
+     BORDER / RULE
+     ------------------------------------------------------------ */
+  --rule:          var(--ink);
+  --rule-soft:     rgba(14,13,12,0.18);
+  --rule-paper:    rgba(14,13,12,0.08);
+
+  /* ------------------------------------------------------------
+     SHADOW — stamp-press, not soft web drop
+     ------------------------------------------------------------ */
+  --shadow-stamp:   4px 4px 0 0 var(--ink);
+  --shadow-stamp-amber: 4px 4px 0 0 var(--amber-deep);
+  --shadow-stamp-sm: 2px 2px 0 0 var(--ink);
+  --shadow-inset:   inset 0 2px 0 rgba(14,13,12,0.12);
+  --shadow-soft:    0 2px 10px rgba(14,13,12,0.10);
+
+  /* ------------------------------------------------------------
+     RADII — mostly square, occasional badge curve
+     ------------------------------------------------------------ */
+  --radius-0: 0px;
+  --radius-1: 2px;
+  --radius-2: 4px;
+  --radius-pill: 999px;
+  --radius-badge: 14px 14px 60% 60% / 14px 14px 30% 30%;  /* shield-ish */
+
+  /* ------------------------------------------------------------
+     SPACING (4px base)
+     ------------------------------------------------------------ */
+  --s-0: 0px;
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+  --s-9: 96px;
+  --s-10: 128px;
+
+  /* ------------------------------------------------------------
+     TYPE FAMILIES
+     ------------------------------------------------------------ */
+  --font-display:  'Alfa Slab One', 'Rockwell', Georgia, serif;         /* big display slab */
+  --font-heritage: 'DM Serif Display', 'Playfair Display', Georgia, serif; /* elegant serif headlines */
+  --font-sans:     'Oswald', 'Bebas Neue', 'Arial Narrow', sans-serif;  /* industrial condensed */
+  --font-script:   'Yellowtail', 'Pacifico', cursive;                   /* flourish / banner */
+  --font-mono:     'Special Elite', 'Courier Prime', ui-monospace, monospace; /* typewriter */
+  --font-body:     'Oswald', system-ui, sans-serif;
+
+  /* ------------------------------------------------------------
+     TYPE SIZES — generous, signage-scale
+     ------------------------------------------------------------ */
+  --fs-display-xl: clamp(64px, 10vw, 140px);
+  --fs-display:    clamp(48px, 6vw, 88px);
+  --fs-h1:         clamp(40px, 4.6vw, 64px);
+  --fs-h2:         clamp(30px, 3.2vw, 44px);
+  --fs-h3:         24px;
+  --fs-h4:         18px;
+  --fs-eyebrow:    13px;
+  --fs-body:       17px;
+  --fs-small:      14px;
+  --fs-caption:    12px;
+}
+
+/* ==============================================================
+   BASE / RESETS
+   ============================================================== */
+html, body {
+  background: var(--bg-1);
+  color: var(--fg-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ==============================================================
+   SEMANTIC TYPE
+   ============================================================== */
+.display-xl,
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 0.95;
+  text-transform: uppercase;
+  color: var(--fg-1);
+}
+.display-xl { font-size: var(--fs-display-xl); }
+.display    { font-size: var(--fs-display); }
+
+.heritage-h,
+h1 {
+  font-family: var(--font-heritage);
+  font-weight: 400;
+  font-size: var(--fs-h1);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--fg-1);
+}
+
+h2 {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: var(--fs-h2);
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-1);
+}
+
+h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--fs-h3);
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+h4 {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: var(--fs-h4);
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+
+.script {
+  font-family: var(--font-script);
+  font-weight: 400;
+  font-style: normal;
+  letter-spacing: 0;
+  line-height: 1;
+  color: var(--rust);
+}
+
+p, .body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--fg-2);
+}
+
+.body-serif {
+  font-family: var(--font-heritage);
+  font-size: var(--fs-body);
+  line-height: 1.6;
+  color: var(--fg-2);
+}
+
+small, .caption {
+  font-family: var(--font-sans);
+  font-size: var(--fs-caption);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+code, kbd, .mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+  letter-spacing: 0.02em;
+  color: var(--fg-1);
+}
+
+a {
+  color: var(--fg-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+a:hover { color: var(--rust-deep); }
+
+/* ==============================================================
+   UTILITY — banner/ribbon text (as in logo)
+   ============================================================== */
+.banner-text {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--paper);
+  background: var(--ink);
+  padding: 6px 18px;
+}

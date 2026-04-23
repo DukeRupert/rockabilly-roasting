@@ -1,0 +1,16 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+  .form-label { font-family: var(--font-sans); font-weight:700; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink); display:block; margin-bottom: 6px; }
+  .input { font-family: var(--font-sans); font-size: 15px; background: var(--cream-hi); border: 2px solid var(--ink); padding: 10px 12px; width: 100%; box-sizing: border-box; box-shadow: inset 0 2px 0 rgba(14,13,12,0.10); }
+  .input::placeholder { color: var(--chrome-deep); }
+</style>
+</head><body>
+<div class="card" style="padding:24px 26px;">
+  <div class="eyebrow-card">Form inputs</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;">
+    <div><label class="form-label">First name</label><input class="input" placeholder="Johnny" value="Johnny"/></div>
+    <div><label class="form-label">Email</label><input class="input" placeholder="you@shop.com"/></div>
+    <div style="grid-column:span 2;"><label class="form-label">Order notes</label><input class="input" placeholder="Grind for pour-over, please."/></div>
+  </div>
+</div>
+</body></html>

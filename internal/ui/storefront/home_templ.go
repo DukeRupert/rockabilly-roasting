@@ -42,7 +42,7 @@ func HomeContent(props HomePageProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Featured Product Banner -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Hero: espresso pull video, full-bleed above-the-fold showstopper --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 -mt-8 relative overflow-hidden bg-ink\"><!-- Video layer --><video id=\"rr-hero-video\" class=\"absolute inset-0 w-full h-full object-cover object-center\" autoplay muted loop playsinline preload=\"metadata\" poster=\"/static/coffee_in_the_back.webp\" aria-hidden=\"true\"><source src=\"/static/rockabilly-hero-1280.webm\" type=\"video/webm\"> <source src=\"/static/rockabilly-hero-1280.mp4\" type=\"video/mp4\"></video><!-- Ink vignette overlay for readable text --><div class=\"absolute inset-0 bg-gradient-to-r from-ink/90 via-ink/60 to-ink/20 pointer-events-none\"></div><!-- Paper halftone dot overlay --><div class=\"absolute inset-0 texture-halftone-paper pointer-events-none\" style=\"mask-image: linear-gradient(180deg, black, transparent 80%); -webkit-mask-image: linear-gradient(180deg, black, transparent 80%);\"></div><!-- Content --><div class=\"relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-24 sm:py-32 lg:py-40 min-h-[78vh] flex items-center\"><div class=\"max-w-2xl\"><p class=\"font-oswald font-semibold text-candle text-xs sm:text-sm mb-5\" style=\"letter-spacing:0.28em; text-transform:uppercase;\">Kennewick, WA · Fresh Weekly</p><h1 class=\"font-slab text-paper uppercase leading-[0.9] tracking-tight\" style=\"font-size: clamp(3rem, 8vw, 6rem); letter-spacing:-0.005em;\">Burn both<br><span class=\"text-candle\">ends.</span><br>Roast the<br>beans.</h1><p class=\"font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-lg\">Small-batch coffee, roasted in Kennewick and poured without fuss. No warehouse, no middleman — beans come in green, leave as coffee, and they don't sit around.</p><div class=\"mt-8 flex flex-wrap items-center gap-4\"><a href=\"/catalog\" class=\"btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shop this week's roast <svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a> <a href=\"/about\" class=\"btn inline-flex items-center gap-2 bg-transparent text-paper border-2 border-paper px-7 py-3.5 font-oswald font-bold text-sm hover:bg-paper hover:text-ink transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Visit the cafe <span aria-hidden=\"true\">›</span></a></div></div></div><!-- Flame-stripe divider at bottom --><div class=\"relative flame-stripe\"></div></section><script>\n\t\t(function() {\n\t\t\tvar v = document.getElementById('rr-hero-video');\n\t\t\tif (!v) return;\n\t\t\tvar mq = window.matchMedia('(prefers-reduced-motion: reduce)');\n\t\t\tfunction apply() {\n\t\t\t\tif (mq.matches) {\n\t\t\t\t\tv.pause();\n\t\t\t\t\tv.removeAttribute('autoplay');\n\t\t\t\t}\n\t\t\t}\n\t\t\tapply();\n\t\t\tmq.addEventListener('change', apply);\n\t\t})();\n\t</script><!-- Featured Product Banner -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -54,7 +54,7 @@ func HomeContent(props HomePageProps) templ.Component {
 			var templ_7745c5c3_Var2 templ.SafeURL
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/catalog/" + props.FeaturedProduct.Product.Slug))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 20, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 95, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -72,7 +72,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.HeroImageURL)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 37, Col: 32}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 112, Col: 32}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -85,7 +85,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.Product.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 38, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 113, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -103,7 +103,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.ThumbnailURL)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 43, Col: 48}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 118, Col: 48}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -116,7 +116,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.Product.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 44, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 119, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -134,7 +134,7 @@ func HomeContent(props HomePageProps) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.Product.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 53, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 128, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -152,7 +152,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(props.FeaturedProduct.Coffee.Regions, " · "))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 59, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 134, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -171,7 +171,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.Product.Description)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 65, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 140, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -195,7 +195,7 @@ func HomeContent(props HomePageProps) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(note)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 72, Col: 16}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 147, Col: 16}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {

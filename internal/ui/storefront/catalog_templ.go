@@ -1009,22 +1009,22 @@ func roastDots(level string, size string) templ.Component {
 	})
 }
 
-// roastDots is only consumed by still-dark pages (subscriptions, product detail);
-// catalog's productCardPaper shows the roast as a text label instead. Keep the
-// rr-* palette here until those pages are reskinned.
+// roastDots palette: candle → rust gradient, chrome-deep empty. Reads on
+// both paper and ink surfaces — consumed by product detail (paper) and
+// subscriptions cards (still dark).
 func roastDotFilled(position int, size string) string {
 	var color string
 	switch {
 	case position <= 1:
-		color = "bg-rr-amber"
+		color = "bg-candle-soft"
 	case position == 2:
-		color = "bg-rr-amber"
+		color = "bg-candle"
 	case position == 3:
-		color = "bg-rr-brick"
+		color = "bg-candle-deep"
 	case position == 4:
-		color = "bg-rr-red"
+		color = "bg-rust"
 	default:
-		color = "bg-rr-red-dark"
+		color = "bg-rust-deep"
 	}
 	if size == "large" {
 		return "size-2.5 rounded-full " + color
@@ -1034,9 +1034,9 @@ func roastDotFilled(position int, size string) string {
 
 func roastDotEmpty(size string) string {
 	if size == "large" {
-		return "size-2.5 rounded-full bg-rr-border"
+		return "size-2.5 rounded-full bg-chrome-deep/40"
 	}
-	return "size-1.5 rounded-full bg-rr-border"
+	return "size-1.5 rounded-full bg-chrome-deep/40"
 }
 
 // catalogSidebar renders the desktop filter sidebar with always-visible sections.

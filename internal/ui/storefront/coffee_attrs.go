@@ -214,11 +214,12 @@ func cardTastingNotesList(notes []string, n int) []string {
 }
 
 // roastEndLabel returns CSS classes for the LIGHT/DARK labels on roast dot scales.
+// chrome-deep reads on both paper and ink surfaces.
 func roastEndLabel(size string) string {
 	if size == "large" {
-		return "label-font text-[0.55rem] text-rr-faint leading-none"
+		return "font-oswald font-bold text-[0.6rem] text-chrome-deep leading-none"
 	}
-	return "label-font text-[0.5rem] text-rr-faint leading-none"
+	return "font-oswald font-bold text-[0.55rem] text-chrome-deep leading-none"
 }
 
 // cardAltText returns enriched alt text for product card images.

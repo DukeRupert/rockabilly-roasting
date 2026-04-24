@@ -40,322 +40,345 @@ type ProductDetailProps struct {
 }
 
 templ ProductContent(props ProductDetailProps) {
-	<div>
-		<!-- Breadcrumb -->
-		<nav class="mb-6">
-			<ol class="flex items-center gap-2 font-body text-sm text-rr-muted">
-				<li><a href="/catalog" class="hover:text-rr-heading transition-colors">Shop</a></li>
-				<li><span class="text-rr-border">&rsaquo;</span></li>
-				<li class="text-rr-heading font-medium">{ props.Product.Title }</li>
-			</ol>
-		</nav>
-		<!-- Product layout: info-first, image-second (BRCC style) -->
-		<div class="lg:grid lg:grid-cols-2 lg:gap-x-12">
-			<!-- LEFT: Product info + actions (above the fold) -->
-			<div class="lg:max-w-lg">
-				<h1 class="font-display text-4xl tracking-widest text-rr-heading sm:text-5xl">{ props.Product.Title }</h1>
-				<!-- Origin + roast level (above price for prestige signal) -->
-				if props.Coffee != nil && (originLine(props.Coffee) != "" || validRoastLevel(props.Coffee.RoastLevel)) {
-					<div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-						if originLine(props.Coffee) != "" {
-							<span class="label-font text-rr-muted text-xs">{ originLine(props.Coffee) }</span>
-						}
-						if validRoastLevel(props.Coffee.RoastLevel) {
-							<div class="flex items-center gap-1.5">
-								@roastDots(props.Coffee.RoastLevel, "large")
-								<span class="label-font text-rr-faint text-xs">{ roastLevelLabel(props.Coffee.RoastLevel) }</span>
-							</div>
-						}
-					</div>
-				}
-				<!-- Price — big and bold -->
-				if props.DefaultPrice != nil {
-					<div class="mt-3" id="price-display" aria-live="polite" aria-atomic="true">
-						<span class="font-heading text-3xl text-rr-heading" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
-					</div>
-				}
-				<!-- Tasting notes as tag pills -->
-				if props.Coffee != nil && len(props.Coffee.TastingNotes) > 0 {
-					<div class="mt-3 flex flex-wrap gap-1.5">
-						for _, note := range props.Coffee.TastingNotes {
-							<span class="label-font px-2 py-0.5 rounded-sm text-rr-amber border border-rr-amber/30 bg-rr-amber/5 text-[0.6rem]">
-								{ note }
-							</span>
-						}
-					</div>
-				}
-				<!-- Description -->
-				if props.Product.Description != "" {
-					<p class="mt-4 font-body text-sm text-rr-muted leading-relaxed">{ props.Product.Description }</p>
-				}
-				<!-- Variant options (grind, size, etc.) as button pills -->
-				if len(props.Options) > 0 {
-					<div class="mt-6 space-y-5">
-						for _, opt := range props.Options {
-							<fieldset>
-								<legend class="label-font text-rr-muted mb-2 block">{ opt.Option.Name }</legend>
-								<div class="flex flex-wrap gap-2" data-option-id={ opt.Option.ID.String() } role="radiogroup" aria-label={ opt.Option.Name }>
-									for i, val := range opt.Values {
-										<button
-											type="button"
-											class={ "option-pill " + optionPillClasses(i == 0) }
-											data-option-id={ opt.Option.ID.String() }
-											data-value-id={ val.ID.String() }
-											aria-pressed={ templ.EscapeString(fmt.Sprintf("%t", i == 0)) }
-										>
-											{ val.Value }
-										</button>
-									}
-								</div>
-							</fieldset>
-						}
-					</div>
-				}
-				if len(props.Variants) > 0 {
-					<!-- Purchase mode selector -->
-					<div class="mt-6" id="purchase-section">
-						if len(props.SubscriptionPlans) > 0 {
-							<!-- Mode toggle — two bold tabs -->
-							<div class="grid grid-cols-2 gap-3" id="purchase-mode-toggle" role="tablist" aria-label="Purchase type">
-								<button
-									type="button"
-									role="tab"
-									aria-selected="true"
-									aria-controls="onetime-form"
-									data-mode="onetime"
-									class="purchase-mode-btn relative rounded-sm border-2 border-rr-amber bg-rr-amber/5 p-3 text-left transition-colors"
+	<!-- Full-bleed paper surface -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
+		<!-- Paper grain overlay -->
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-10 sm:py-14">
+			<!-- Breadcrumb -->
+			<nav class="mb-8">
+				<ol class="flex items-center gap-2 font-oswald font-semibold text-[11px]" style="letter-spacing:0.18em; text-transform:uppercase;">
+					<li><a href="/catalog" class="text-chrome-deep hover:text-rust transition-colors">Shop</a></li>
+					<li><span class="text-chrome-deep" aria-hidden="true">/</span></li>
+					<li class="text-ink">{ props.Product.Title }</li>
+				</ol>
+			</nav>
+			<!-- Product layout: image left on desktop, info right -->
+			<div class="lg:grid lg:grid-cols-2 lg:gap-x-12">
+				<!-- LEFT: Product image -->
+				<div class="order-1 lg:order-none">
+					if len(props.Media) > 0 {
+						<!-- Main image, ink-bordered with stamp shadow -->
+						<div class="relative aspect-square w-full overflow-hidden bg-paper-warm border-2 border-ink shadow-stamp">
+							<img
+								id="main-product-image"
+								src={ props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantHero) }
+								alt={ props.Media[0].AltText }
+								class="absolute inset-0 h-full w-full object-cover object-center"
+							/>
+							<!-- "Fresh Weekly" stamp sticker -->
+							<div class="absolute top-4 left-4 pointer-events-none">
+								<span
+									class="inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust"
+									style="letter-spacing:0.18em; text-transform:uppercase; transform:rotate(-4deg); outline:2px solid var(--color-rust); outline-offset:2px;"
 								>
-									<span class="block label-font text-rr-heading">ONE-TIME</span>
-								</button>
-								<button
-									type="button"
-									role="tab"
-									aria-selected="false"
-									aria-controls="subscribe-form"
-									data-mode="subscribe"
-									class="purchase-mode-btn relative rounded-sm border-2 border-rr-border bg-rr-surface p-3 text-left transition-colors"
-								>
-									<span class="block label-font text-rr-heading">SUBSCRIBE</span>
-									<span class="block font-body text-xs text-rr-amber font-semibold mt-0.5">
-										{ fmt.Sprintf("Save up to %d%%", maxDiscount(props.SubscriptionPlans)) }
-									</span>
-								</button>
+									Fresh Weekly
+								</span>
 							</div>
-							<!-- Subscription frequency options (hidden by default) -->
-							<div id="subscribe-options" class="hidden mt-4">
-								<p class="label-font text-rr-muted mb-2">DELIVERY EVERY</p>
-								<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-									for i, plan := range props.SubscriptionPlans {
-										<label
-											class={ "subscribe-frequency-option flex items-center justify-between rounded-sm border p-3 cursor-pointer transition-colors",
-												templ.KV("border-rr-amber bg-rr-amber/5", i == 0),
-												templ.KV("border-rr-border hover:border-rr-amber", i != 0) }
-											data-plan-id={ plan.ID.String() }
-											data-discount={ fmt.Sprintf("%d", plan.DiscountPct) }
-										>
-											<div class="flex items-center gap-3">
-												<input
-													type="radio"
-													name="plan_id"
-													value={ plan.ID.String() }
-													if i == 0 {
-														checked
-													}
-													class="size-4 border-rr-border text-rr-amber focus:ring-rr-amber"
-												/>
-												<span class="font-body text-sm text-rr-heading">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
-											</div>
-											if plan.DiscountPct > 0 {
-												<span class="label-font px-2 py-0.5 rounded-sm text-rr-amber border border-rr-amber bg-rr-amber/5">
-													{ fmt.Sprintf("SAVE %d%%", plan.DiscountPct) }
-												</span>
-											}
-										</label>
-									}
-								</div>
-							</div>
-						}
-						<!-- One-time purchase form — BOLD CTA -->
-						<div
-							id="onetime-form"
-							role="tabpanel"
-							class="mt-5"
-							x-data="{
-								state: 'idle',
-								_t: 0,
-								_spinTimer: null,
-								submit() {
-									this._t = Date.now();
-									this._spinTimer = setTimeout(() => { if (this.state === 'pending') this.state = 'sending' }, 250);
-									this.state = 'pending';
-								},
-								done(ok) {
-									clearTimeout(this._spinTimer);
-									if (!ok) { this.state = 'idle'; return; }
-									const elapsed = Date.now() - this._t;
-									const delay = this.state === 'sending' ? Math.max(0, 600 - elapsed) : 0;
-									setTimeout(() => {
-										this.state = 'added';
-										setTimeout(() => this.state = 'idle', 2000);
-									}, delay);
-								}
-							}"
-						>
-							<form
-								method="post"
-								action="/cart/add"
-								hx-post="/cart/add"
-								hx-swap="none"
-								@htmx:before-request.camel="submit()"
-								@htmx:after-request.camel="done($event.detail.successful)"
-							>
-								<input type="hidden" name="variant_id" id="selected-variant-id" value={ defaultVariantID(props.Variants) }/>
-								<input type="hidden" name="quantity" value="1"/>
-								<button
-									type="submit"
-									class="btn w-full rounded-sm px-6 py-4 label-font text-white text-sm transition-all duration-300 ease-out"
-									:class="state === 'added' ? 'bg-rr-amber glow-amber scale-[1.02]' : 'bg-rr-red glow-red hover:bg-rr-red-lt'"
-									:disabled="state !== 'idle'"
-								>
-									<!-- Idle / Pending (pending is invisible — button just looks disabled) -->
-									<span x-show="state === 'idle' || state === 'pending'">ADD TO CART</span>
-									<!-- Sending (only if request takes > 250ms) -->
-									<span
-										x-show="state === 'sending'"
-										x-cloak
-										x-transition:enter="transition ease-out duration-200"
-										x-transition:enter-start="opacity-0"
-										x-transition:enter-end="opacity-100"
-										class="inline-flex items-center gap-2"
-									>
-										<svg class="size-4 animate-spin" fill="none" viewBox="0 0 24 24">
-											<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-										</svg>
-										ADDING...
-									</span>
-									<!-- Added -->
-									<span
-										x-show="state === 'added'"
-										x-cloak
-										x-transition:enter="transition ease-out duration-300"
-										x-transition:enter-start="opacity-0 scale-95"
-										x-transition:enter-end="opacity-100 scale-100"
-										class="inline-flex items-center gap-1.5"
-									>
-										<svg class="size-4 cart-checkmark" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-											<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path>
-										</svg>
-										ADDED!
-									</span>
-								</button>
-							</form>
 						</div>
-						<!-- Subscribe form (hidden by default) -->
-						if len(props.SubscriptionPlans) > 0 {
-							<div id="subscribe-form" role="tabpanel" class="hidden mt-5">
-								<!-- Quantity selector -->
-								<div class="mb-4">
-									<label for="subscribe-quantity" class="label-font text-rr-muted mb-2 block">QUANTITY</label>
-									<div class="flex">
-										<button
-											type="button"
-											id="subscribe-qty-minus"
-											class="btn bg-rr-raised border border-rr-border text-rr-heading font-bold px-4 py-2 rounded-l-sm text-lg leading-none border-r-0 transition-colors hover:bg-rr-red hover:text-white"
-										>
-											&minus;
-										</button>
-										<input
-											type="number"
-											id="subscribe-quantity"
-											value="1"
-											min="1"
-											max="10"
-											class="rr-input w-14 border-y border-rr-border text-rr-heading font-body text-sm text-center py-2 bg-rr-bg [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+						<!-- Thumbnails -->
+						if len(props.Media) > 1 {
+							<div class="mt-4 grid grid-cols-4 gap-3">
+								for i, m := range props.Media {
+									<button
+										type="button"
+										class={ "product-thumb aspect-square overflow-hidden bg-paper-warm border-2 cursor-pointer transition-all",
+											templ.KV("border-ink shadow-stamp-sm", i == 0),
+											templ.KV("border-chrome-deep/40 hover:border-ink", i != 0) }
+										aria-label={ "View " + m.AltText }
+										aria-pressed={ fmt.Sprintf("%t", i == 0) }
+										data-hero-src={ props.MediaConfig.ProductImageURL(m.R2Key, media.VariantHero) }
+										data-alt={ m.AltText }
+									>
+										<img
+											src={ props.MediaConfig.ProductImageURL(m.R2Key, media.VariantThumbnail) }
+											alt=""
+											class="h-full w-full object-cover object-center"
 										/>
-										<button
-											type="button"
-											id="subscribe-qty-plus"
-											class="btn bg-rr-raised border border-rr-border text-rr-heading font-bold px-4 py-2 rounded-r-sm text-lg leading-none border-l-0 transition-colors hover:bg-rr-red hover:text-white"
-										>
-											+
-										</button>
-									</div>
-								</div>
-								<button
-									type="button"
-									id="subscribe-action"
-									class="btn block w-full rounded-sm bg-rr-red px-6 py-4 text-center label-font text-white text-sm glow-red hover:bg-rr-red-lt transition-colors"
-								>
-									SUBSCRIBE &amp; SAVE
-								</button>
-								<p class="mt-2 text-center font-body text-xs text-rr-muted">Cancel or modify anytime from your account.</p>
+									</button>
+								}
 							</div>
+							@productThumbScript()
 						}
-					</div>
-				}
-				<!-- In stock indicator -->
-				<div class="mt-4 flex items-center gap-2">
-					<svg class="size-4 text-rr-amber" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
-						<path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd"></path>
-					</svg>
-					<p class="font-body text-sm text-rr-muted">In stock and ready to ship</p>
-				</div>
-			</div>
-			<!-- RIGHT: Product image (secondary, smaller) -->
-			<div class="mt-8 lg:mt-0 lg:row-span-2">
-				if len(props.Media) > 0 {
-					<!-- Main image — contained, not dominant -->
-					<div class="aspect-square w-full overflow-hidden rounded-sm bg-rr-bg border border-rr-border">
-						<img
-							id="main-product-image"
-							src={ props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantHero) }
-							alt={ props.Media[0].AltText }
-							class="h-full w-full object-cover object-center"
-						/>
-					</div>
-					<!-- Thumbnails -->
-					if len(props.Media) > 1 {
-						<div class="mt-3 grid grid-cols-4 gap-3">
-							for i, m := range props.Media {
-								<button
-									type="button"
-									class={ "aspect-square overflow-hidden rounded-sm bg-rr-bg border cursor-pointer hover:border-rr-amber focus:border-rr-amber focus:ring-1 focus:ring-rr-amber transition-colors",
-										templ.KV("border-rr-amber", i == 0),
-										templ.KV("border-rr-border", i != 0) }
-									aria-label={ "View " + m.AltText }
-									data-hero-src={ props.MediaConfig.ProductImageURL(m.R2Key, media.VariantHero) }
-									data-alt={ m.AltText }
-									onclick="document.getElementById('main-product-image').src=this.dataset.heroSrc;document.getElementById('main-product-image').alt=this.dataset.alt;this.parentElement.querySelectorAll('button').forEach(b=>b.classList.replace('border-rr-amber','border-rr-border'));this.classList.replace('border-rr-border','border-rr-amber')"
-								>
-									<img
-										src={ props.MediaConfig.ProductImageURL(m.R2Key, media.VariantThumbnail) }
-										alt=""
-										class="h-full w-full object-cover object-center"
-									/>
-								</button>
-							}
-						</div>
-					}
-				} else {
-					<div class="aspect-square w-full overflow-hidden rounded-sm bg-rr-bg border border-rr-border relative">
-						<div class="texture-dots absolute inset-0"></div>
-						<div class="flex h-full w-full items-center justify-center relative">
-							<div class="w-24 h-24 rounded-full border-2 border-rr-border bg-rr-surface flex items-center justify-center">
-								<span class="font-display text-rr-muted text-2xl tracking-widest">
+					} else {
+						<div class="aspect-square w-full overflow-hidden bg-paper-warm border-2 border-ink shadow-stamp flex items-center justify-center relative">
+							<div class="w-24 h-24 border-2 border-ink bg-paper flex items-center justify-center">
+								<span class="font-slab text-ink text-4xl uppercase leading-none">
 									{ string([]rune(props.Product.Title)[0:2]) }
 								</span>
 							</div>
 						</div>
+					}
+				</div>
+				<!-- RIGHT: Product info + actions -->
+				<div class="mt-8 lg:mt-0 order-2 lg:order-none">
+					<!-- Origin eyebrow -->
+					if props.Coffee != nil && originLine(props.Coffee) != "" {
+						<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+							{ originLine(props.Coffee) }
+						</p>
+					}
+					<!-- Title -->
+					<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(2.25rem, 5vw, 3.5rem); letter-spacing:-0.005em;">
+						{ props.Product.Title }
+					</h1>
+					<!-- Roast scale -->
+					if props.Coffee != nil && validRoastLevel(props.Coffee.RoastLevel) {
+						<div class="mt-5 flex items-center gap-3">
+							@roastDots(props.Coffee.RoastLevel, "large")
+							<span class="font-oswald font-bold text-ink text-xs" style="letter-spacing:0.2em; text-transform:uppercase;">{ roastLevelLabel(props.Coffee.RoastLevel) } roast</span>
+						</div>
+					}
+					<!-- Price tag — ink-bordered, Special Elite typewriter -->
+					if props.DefaultPrice != nil {
+						<div class="mt-6 inline-flex items-center gap-3 border-2 border-ink bg-paper-warm px-5 py-3" id="price-display" aria-live="polite" aria-atomic="true">
+							<span class="font-special text-ink text-2xl sm:text-3xl leading-none" data-base-price={ fmt.Sprintf("%d", *props.DefaultPrice) }>{ formatCents(*props.DefaultPrice) }</span>
+						</div>
+					}
+					<!-- Tasting notes -->
+					if props.Coffee != nil && len(props.Coffee.TastingNotes) > 0 {
+						<ul class="mt-6 flex flex-wrap gap-2">
+							for _, note := range props.Coffee.TastingNotes {
+								<li class="font-oswald font-bold text-[10px] text-ink bg-paper border-2 border-ink px-2.5 py-1 rounded-full" style="letter-spacing:0.14em; text-transform:uppercase;">
+									{ note }
+								</li>
+							}
+						</ul>
+					}
+					<!-- Description -->
+					if props.Product.Description != "" {
+						<p class="mt-6 font-oswald text-ink-soft text-base leading-relaxed max-w-lg">{ props.Product.Description }</p>
+					}
+					<!-- Variant options -->
+					if len(props.Options) > 0 {
+						<div class="mt-8 space-y-6">
+							for _, opt := range props.Options {
+								<fieldset>
+									<legend class="font-oswald font-bold text-ink text-[11px] mb-3 block" style="letter-spacing:0.2em; text-transform:uppercase;">{ opt.Option.Name }</legend>
+									<div class="flex flex-wrap gap-2" data-option-id={ opt.Option.ID.String() } role="radiogroup" aria-label={ opt.Option.Name }>
+										for i, val := range opt.Values {
+											<button
+												type="button"
+												class={ "option-pill " + optionPillClasses(i == 0) }
+												data-option-id={ opt.Option.ID.String() }
+												data-value-id={ val.ID.String() }
+												aria-pressed={ fmt.Sprintf("%t", i == 0) }
+											>
+												{ val.Value }
+											</button>
+										}
+									</div>
+								</fieldset>
+							}
+						</div>
+					}
+					if len(props.Variants) > 0 {
+						<!-- Purchase mode selector -->
+						<div class="mt-8" id="purchase-section">
+							if len(props.SubscriptionPlans) > 0 {
+								<!-- Mode toggle tabs -->
+								<div class="grid grid-cols-2 gap-3" id="purchase-mode-toggle" role="tablist" aria-label="Purchase type">
+									<button
+										type="button"
+										role="tab"
+										aria-selected="true"
+										aria-controls="onetime-form"
+										data-mode="onetime"
+										class="purchase-mode-btn border-2 border-ink bg-paper-warm p-4 text-left transition-all"
+										style="box-shadow: var(--shadow-stamp-sm);"
+									>
+										<span class="block font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.2em; text-transform:uppercase;">One-time</span>
+										<span class="block font-oswald text-chrome-deep text-xs mt-1">Single bag, one-off</span>
+									</button>
+									<button
+										type="button"
+										role="tab"
+										aria-selected="false"
+										aria-controls="subscribe-form"
+										data-mode="subscribe"
+										class="purchase-mode-btn border-2 border-ink bg-cream-hi p-4 text-left transition-all"
+									>
+										<span class="block font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.2em; text-transform:uppercase;">Subscribe</span>
+										<span class="block font-oswald text-rust text-xs font-semibold mt-1">
+											Save up to { fmt.Sprintf("%d%%", maxDiscount(props.SubscriptionPlans)) }
+										</span>
+									</button>
+								</div>
+								<!-- Subscription frequency options (hidden by default) -->
+								<div id="subscribe-options" class="hidden mt-5">
+									<p class="font-oswald font-bold text-ink text-[11px] mb-3" style="letter-spacing:0.2em; text-transform:uppercase;">Delivery every</p>
+									<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+										for i, plan := range props.SubscriptionPlans {
+											<label
+												class={ "subscribe-frequency-option flex items-center justify-between border-2 p-3 cursor-pointer transition-all",
+													templ.KV("border-ink bg-paper-warm", i == 0),
+													templ.KV("border-chrome-deep/40 bg-cream-hi hover:border-ink", i != 0) }
+												data-plan-id={ plan.ID.String() }
+												data-discount={ fmt.Sprintf("%d", plan.DiscountPct) }
+												if i == 0 {
+													style="box-shadow: var(--shadow-stamp-sm);"
+												}
+											>
+												<div class="flex items-center gap-3">
+													<input
+														type="radio"
+														name="plan_id"
+														value={ plan.ID.String() }
+														if i == 0 {
+															checked
+														}
+														class="size-4 accent-rust"
+													/>
+													<span class="font-oswald text-ink text-sm" style="letter-spacing:0.04em;">{ subscriptionIntervalLabel(plan.Interval, plan.IntervalCount) }</span>
+												</div>
+												if plan.DiscountPct > 0 {
+													<span class="font-oswald font-bold text-[10px] text-rust border-2 border-rust bg-paper px-2 py-0.5" style="letter-spacing:0.14em; text-transform:uppercase;">
+														Save { fmt.Sprintf("%d%%", plan.DiscountPct) }
+													</span>
+												}
+											</label>
+										}
+									</div>
+								</div>
+							}
+							<!-- One-time purchase form — stamp CTA -->
+							<div
+								id="onetime-form"
+								role="tabpanel"
+								class="mt-6"
+								x-data="{
+									state: 'idle',
+									_t: 0,
+									_spinTimer: null,
+									submit() {
+										this._t = Date.now();
+										this._spinTimer = setTimeout(() => { if (this.state === 'pending') this.state = 'sending' }, 250);
+										this.state = 'pending';
+									},
+									done(ok) {
+										clearTimeout(this._spinTimer);
+										if (!ok) { this.state = 'idle'; return; }
+										const elapsed = Date.now() - this._t;
+										const delay = this.state === 'sending' ? Math.max(0, 600 - elapsed) : 0;
+										setTimeout(() => {
+											this.state = 'added';
+											setTimeout(() => this.state = 'idle', 2000);
+										}, delay);
+									}
+								}"
+							>
+								<form
+									method="post"
+									action="/cart/add"
+									hx-post="/cart/add"
+									hx-swap="none"
+									@htmx:before-request.camel="submit()"
+									@htmx:after-request.camel="done($event.detail.successful)"
+								>
+									<input type="hidden" name="variant_id" id="selected-variant-id" value={ defaultVariantID(props.Variants) }/>
+									<input type="hidden" name="quantity" value="1"/>
+									<button
+										type="submit"
+										class="btn-stamp w-full border-2 border-ink px-6 py-4 font-oswald font-bold text-sm transition-colors"
+										style="letter-spacing:0.16em; text-transform:uppercase;"
+										:class="state === 'added' ? 'bg-candle text-ink' : 'bg-rust text-paper'"
+										:disabled="state !== 'idle'"
+									>
+										<span x-show="state === 'idle' || state === 'pending'" class="inline-flex items-center justify-center gap-2">
+											Add to cart
+											<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+												<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+											</svg>
+										</span>
+										<span
+											x-show="state === 'sending'"
+											x-cloak
+											x-transition:enter="transition ease-out duration-200"
+											x-transition:enter-start="opacity-0"
+											x-transition:enter-end="opacity-100"
+											class="inline-flex items-center justify-center gap-2"
+										>
+											<svg class="size-4 animate-spin" fill="none" viewBox="0 0 24 24">
+												<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+											</svg>
+											Adding…
+										</span>
+										<span
+											x-show="state === 'added'"
+											x-cloak
+											x-transition:enter="transition ease-out duration-300"
+											x-transition:enter-start="opacity-0 scale-95"
+											x-transition:enter-end="opacity-100 scale-100"
+											class="inline-flex items-center justify-center gap-2"
+										>
+											<svg class="size-4 cart-checkmark" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor">
+												<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path>
+											</svg>
+											Added!
+										</span>
+									</button>
+								</form>
+							</div>
+							<!-- Subscribe form -->
+							if len(props.SubscriptionPlans) > 0 {
+								<div id="subscribe-form" role="tabpanel" class="hidden mt-6">
+									<!-- Quantity selector -->
+									<div class="mb-4">
+										<label for="subscribe-quantity" class="font-oswald font-bold text-ink text-[11px] mb-3 block" style="letter-spacing:0.2em; text-transform:uppercase;">Quantity</label>
+										<div class="inline-flex border-2 border-ink">
+											<button
+												type="button"
+												id="subscribe-qty-minus"
+												class="bg-paper-warm text-ink font-oswald font-bold px-4 py-2.5 text-lg leading-none border-r-2 border-ink hover:bg-ink hover:text-paper transition-colors"
+											>
+												&minus;
+											</button>
+											<input
+												type="number"
+												id="subscribe-quantity"
+												value="1"
+												min="1"
+												max="10"
+												class="w-16 bg-cream-hi text-ink font-special text-center py-2.5 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+											/>
+											<button
+												type="button"
+												id="subscribe-qty-plus"
+												class="bg-paper-warm text-ink font-oswald font-bold px-4 py-2.5 text-lg leading-none border-l-2 border-ink hover:bg-ink hover:text-paper transition-colors"
+											>
+												+
+											</button>
+										</div>
+									</div>
+									<button
+										type="button"
+										id="subscribe-action"
+										class="btn-stamp block w-full bg-rust text-paper border-2 border-ink px-6 py-4 font-oswald font-bold text-sm text-center"
+										style="letter-spacing:0.16em; text-transform:uppercase;"
+									>
+										Subscribe &amp; save
+									</button>
+									<p class="mt-3 text-center font-oswald text-chrome-deep text-xs">Cancel or modify anytime from your account.</p>
+								</div>
+							}
+						</div>
+					}
+					<!-- In stock indicator -->
+					<div class="mt-6 flex items-center gap-2">
+						<svg class="size-4 text-rust" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
+							<path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd"></path>
+						</svg>
+						<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">In stock &middot; roasted fresh &middot; ships within 48 hours</p>
 					</div>
-				}
+				</div>
 			</div>
+			<!-- Tasting profile -->
+			if props.Coffee != nil && hasTastingProfile(props.Coffee) {
+				@tastingProfile(props.Coffee)
+			}
 		</div>
-	</div>
-	<!-- Tasting profile — full-width section below product layout -->
-	if props.Coffee != nil && hasTastingProfile(props.Coffee) {
-		@tastingProfile(props.Coffee)
-	}
+	</section>
 	if len(props.Options) > 0 && len(props.VariantMap) > 0 {
 		@optionSelectionScript(props.VariantMap)
 	}
@@ -365,12 +388,15 @@ templ ProductContent(props ProductDetailProps) {
 }
 
 templ tastingProfile(attrs *CoffeeAttrs) {
-	<section class="mt-12 pt-10 border-t border-rr-border">
-		<h2 class="font-display text-2xl tracking-widest text-rr-heading mb-6">TASTING PROFILE</h2>
-		<!-- Adapt grid: two columns if both sides have data, single column otherwise -->
-		<div class={ "grid grid-cols-1 gap-8", templ.KV("lg:grid-cols-2", hasFlavorScales(attrs) && hasProfileDetails(attrs)) }>
+	<section class="mt-16 pt-10 border-t-2 border-ink">
+		<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">What's in the cup</p>
+		<h2 class="font-slab text-ink uppercase leading-[0.95] mt-2 mb-10" style="font-size: clamp(1.75rem, 3.5vw, 2.5rem); letter-spacing:-0.005em;">
+			Tasting
+			<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">profile.</span>
+		</h2>
+		<div class={ "grid grid-cols-1 gap-10", templ.KV("lg:grid-cols-2", hasFlavorScales(attrs) && hasProfileDetails(attrs)) }>
 			if hasFlavorScales(attrs) {
-				<div class="space-y-5">
+				<div class="border-2 border-ink bg-cream-hi p-6 shadow-stamp space-y-5">
 					if attrs.Body != "" {
 						@flavorScale("Body", attrs.Body)
 					}
@@ -383,25 +409,25 @@ templ tastingProfile(attrs *CoffeeAttrs) {
 				</div>
 			}
 			if hasProfileDetails(attrs) {
-				<div class="space-y-5">
+				<div class="space-y-6">
 					if attrs.Process != "" {
-						<div>
-							<p class="label-font text-rr-faint text-xs mb-1">PROCESS</p>
-							<p class="font-body text-sm text-rr-heading capitalize">{ attrs.Process }</p>
+						<div class="border-b border-ink pb-4">
+							<p class="font-oswald font-bold text-ink text-[11px] mb-1.5" style="letter-spacing:0.2em; text-transform:uppercase;">Process</p>
+							<p class="font-oswald text-ink-soft text-base capitalize">{ attrs.Process }</p>
 						</div>
 					}
 					if attrs.Finish != "" {
-						<div>
-							<p class="label-font text-rr-faint text-xs mb-1">FINISH</p>
-							<p class="font-serif text-sm text-rr-body italic">{ attrs.Finish }</p>
+						<div class="border-b border-ink pb-4">
+							<p class="font-oswald font-bold text-ink text-[11px] mb-1.5" style="letter-spacing:0.2em; text-transform:uppercase;">Finish</p>
+							<p class="font-heritage text-ink-soft text-base italic">{ attrs.Finish }</p>
 						</div>
 					}
 					if len(attrs.BrewMethods) > 0 {
-						<div>
-							<p class="label-font text-rr-faint text-xs mb-2">BEST BREWED AS</p>
+						<div class="border-b border-ink pb-4">
+							<p class="font-oswald font-bold text-ink text-[11px] mb-2.5" style="letter-spacing:0.2em; text-transform:uppercase;">Best brewed as</p>
 							<div class="flex flex-wrap gap-1.5">
 								for _, method := range attrs.BrewMethods {
-									<span class="label-font px-2.5 py-1 rounded-sm text-rr-muted border border-rr-border bg-rr-surface text-[0.6rem]">
+									<span class="font-oswald font-bold text-[10px] text-ink border-2 border-ink bg-paper px-2.5 py-1" style="letter-spacing:0.14em; text-transform:uppercase;">
 										{ formatBrewMethod(method) }
 									</span>
 								}
@@ -411,13 +437,13 @@ templ tastingProfile(attrs *CoffeeAttrs) {
 					if len(attrs.Certifications) > 0 || attrs.IsSeasonal {
 						<div class="flex flex-wrap gap-1.5">
 							for _, cert := range attrs.Certifications {
-								<span class="label-font px-2 py-0.5 rounded-sm text-rr-teal border border-rr-teal/30 bg-rr-teal/5 text-[0.6rem]">
+								<span class="font-oswald font-bold text-[10px] text-ink border-2 border-ink bg-paper px-2.5 py-1 rounded-full" style="letter-spacing:0.14em; text-transform:uppercase;">
 									{ formatCertification(cert) }
 								</span>
 							}
 							if attrs.IsSeasonal {
-								<span class="label-font px-2 py-0.5 rounded-sm text-rr-amber border border-rr-amber/30 bg-rr-amber/5 text-[0.6rem]">
-									SEASONAL
+								<span class="font-oswald font-bold text-[10px] text-ink bg-candle border-2 border-ink px-2.5 py-1" style="letter-spacing:0.14em; text-transform:uppercase;">
+									Seasonal
 								</span>
 							}
 						</div>
@@ -431,20 +457,44 @@ templ tastingProfile(attrs *CoffeeAttrs) {
 // flavorScale renders a labeled 3-dot scale (low / medium / high).
 templ flavorScale(label string, value string) {
 	<div class="flex items-center justify-between">
-		<p class="label-font text-rr-faint text-xs w-24">{ label }</p>
+		<p class="font-oswald font-bold text-ink text-[11px] w-24" style="letter-spacing:0.2em; text-transform:uppercase;">{ label }</p>
 		<div class="flex items-center gap-4 flex-1">
 			<div class="flex items-center gap-1.5">
 				for i := 1; i <= 3; i++ {
 					if i <= scaleLevel(value) {
-						<span class="size-2.5 rounded-full bg-rr-amber"></span>
+						<span class="size-2.5 rounded-full bg-rust border-2 border-ink"></span>
 					} else {
-						<span class="size-2.5 rounded-full bg-rr-border"></span>
+						<span class="size-2.5 rounded-full bg-paper-warm border-2 border-ink/30"></span>
 					}
 				}
 			</div>
-			<span class="font-body text-xs text-rr-muted capitalize">{ value }</span>
+			<span class="font-special text-ink-soft text-sm capitalize">{ value }</span>
 		</div>
 	</div>
+}
+
+// productThumbScript wires up the thumbnail click handler to swap the main image.
+templ productThumbScript() {
+	<script>
+		(function() {
+			var mainImg = document.getElementById('main-product-image');
+			if (!mainImg) return;
+			document.querySelectorAll('.product-thumb').forEach(function(btn) {
+				btn.addEventListener('click', function() {
+					mainImg.src = btn.dataset.heroSrc;
+					mainImg.alt = btn.dataset.alt || '';
+					document.querySelectorAll('.product-thumb').forEach(function(b) {
+						b.classList.remove('border-ink', 'shadow-stamp-sm');
+						b.classList.add('border-chrome-deep/40');
+						b.setAttribute('aria-pressed', 'false');
+					});
+					btn.classList.remove('border-chrome-deep/40');
+					btn.classList.add('border-ink', 'shadow-stamp-sm');
+					btn.setAttribute('aria-pressed', 'true');
+				});
+			});
+		})();
+	</script>
 }
 
 func defaultVariantID(variants []VariantWithPrice) string {
@@ -476,9 +526,9 @@ func variantMapJSON(m map[string]VariantOptionEntry) string {
 
 func optionPillClasses(selected bool) string {
 	if selected {
-		return "label-font border-2 border-rr-amber bg-rr-amber/5 px-4 py-2 rounded-sm text-rr-amber"
+		return "font-oswald font-bold text-[11px] text-paper bg-rust border-2 border-ink px-4 py-2 transition-colors"
 	}
-	return "label-font border border-rr-border px-4 py-2 rounded-sm text-rr-muted hover:border-rr-amber hover:text-rr-heading transition-colors"
+	return "font-oswald font-bold text-[11px] text-ink bg-cream-hi border-2 border-ink px-4 py-2 hover:bg-paper-warm transition-colors"
 }
 
 func subscriptionIntervalLabel(interval domain.SubscriptionInterval, count int) string {
@@ -507,46 +557,40 @@ templ optionSelectionScript(variantMap map[string]VariantOptionEntry) {
 		(function() {
 			var scriptEl = document.querySelector('script[data-variant-map]');
 			var variantMap = JSON.parse(scriptEl.dataset.variantMap);
-			var activeCls = 'option-pill label-font border-2 border-rr-amber bg-rr-amber/5 px-4 py-2 rounded-sm text-rr-amber';
-			var inactiveCls = 'option-pill label-font border border-rr-border px-4 py-2 rounded-sm text-rr-muted hover:border-rr-amber hover:text-rr-heading transition-colors';
+			var activeCls = 'option-pill font-oswald font-bold text-[11px] text-paper bg-rust border-2 border-ink px-4 py-2 transition-colors';
+			var inactiveCls = 'option-pill font-oswald font-bold text-[11px] text-ink bg-cream-hi border-2 border-ink px-4 py-2 hover:bg-paper-warm transition-colors';
 
 			// Handle option pill clicks
 			document.querySelectorAll('.option-pill').forEach(function(btn) {
 				btn.addEventListener('click', function() {
 					var optionId = btn.dataset.optionId;
-					// Deselect siblings, select this one
 					document.querySelectorAll('.option-pill[data-option-id="' + optionId + '"]').forEach(function(b) {
 						b.className = inactiveCls;
 						b.setAttribute('aria-pressed', 'false');
 					});
 					btn.className = activeCls;
 					btn.setAttribute('aria-pressed', 'true');
-					// Resolve variant from all selected options
 					resolveVariant();
 				});
 			});
 
 			function resolveVariant() {
-				// Gather selected value IDs across all option groups
 				var selected = [];
 				document.querySelectorAll('div[data-option-id]').forEach(function(group) {
-					var active = group.querySelector('.option-pill.border-rr-amber');
+					var active = group.querySelector('.option-pill[aria-pressed="true"]');
 					if (active) selected.push(active.dataset.valueId);
 				});
 				if (selected.length === 0) return;
-				// Find variant that matches all selected option values
 				for (var vid in variantMap) {
 					var entry = variantMap[vid];
 					var ids = entry.optionValueIDs;
 					if (ids.length === selected.length && selected.every(function(s) { return ids.indexOf(s) !== -1; })) {
-						// Update hidden input
 						var input = document.getElementById('selected-variant-id');
 						if (input) input.value = vid;
-						// Update price display
 						if (entry.price !== null) {
 							var display = document.getElementById('price-display');
 							if (display) {
-								display.innerHTML = '<span class="font-heading text-3xl text-rr-heading" data-base-price="' + entry.price + '">' + formatCents(entry.price) + '</span>';
+								display.innerHTML = '<span class="font-special text-ink text-2xl sm:text-3xl leading-none" data-base-price="' + entry.price + '">' + formatCents(entry.price) + '</span>';
 							}
 						}
 						break;
@@ -570,21 +614,23 @@ templ purchaseModeScript() {
 			var qtyMinus = document.getElementById('subscribe-qty-minus');
 			var qtyPlus = document.getElementById('subscribe-qty-plus');
 
+			var activeTabCls = 'purchase-mode-btn border-2 border-ink bg-paper-warm p-4 text-left transition-all';
+			var inactiveTabCls = 'purchase-mode-btn border-2 border-ink bg-cream-hi p-4 text-left transition-all';
+
 			// Mode toggle
 			document.querySelectorAll('.purchase-mode-btn').forEach(function(btn) {
 				btn.addEventListener('click', function() {
 					mode = btn.dataset.mode;
-					// Update tab styles
 					document.querySelectorAll('.purchase-mode-btn').forEach(function(b) {
 						var isActive = b.dataset.mode === mode;
 						b.setAttribute('aria-selected', String(isActive));
+						b.className = isActive ? activeTabCls : inactiveTabCls;
 						if (isActive) {
-							b.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-amber bg-rr-amber/5 p-3 text-left transition-colors';
+							b.style.boxShadow = 'var(--shadow-stamp-sm)';
 						} else {
-							b.className = 'purchase-mode-btn relative rounded-sm border-2 border-rr-border bg-rr-surface p-3 text-left transition-colors';
+							b.style.boxShadow = '';
 						}
 					});
-					// Toggle form visibility
 					var onetimeForm = document.getElementById('onetime-form');
 					var subscribeForm = document.getElementById('subscribe-form');
 					var subscribeOptions = document.getElementById('subscribe-options');
@@ -652,14 +698,14 @@ templ purchaseModeScript() {
 			document.querySelectorAll('.subscribe-frequency-option').forEach(function(label) {
 				var radio = label.querySelector('input[type="radio"]');
 				radio.addEventListener('change', function() {
-					// Update selected styles
 					document.querySelectorAll('.subscribe-frequency-option').forEach(function(l) {
-						l.classList.remove('border-rr-amber', 'bg-rr-amber/5');
-						l.classList.add('border-rr-border');
+						l.classList.remove('border-ink', 'bg-paper-warm');
+						l.classList.add('border-chrome-deep/40', 'bg-cream-hi');
+						l.style.boxShadow = '';
 					});
-					label.classList.remove('border-rr-border');
-					label.classList.add('border-rr-amber', 'bg-rr-amber/5');
-					// Update subscribe link
+					label.classList.remove('border-chrome-deep/40', 'bg-cream-hi');
+					label.classList.add('border-ink', 'bg-paper-warm');
+					label.style.boxShadow = 'var(--shadow-stamp-sm)';
 					updateSubscribeLink(label.dataset.planId);
 					updatePrice();
 				});
@@ -674,7 +720,6 @@ templ purchaseModeScript() {
 				selectedPlanId = planId;
 			}
 
-			// Navigate on subscribe button click
 			var subscribeBtn = document.getElementById('subscribe-action');
 			if (subscribeBtn) {
 				subscribeBtn.addEventListener('click', function() {
@@ -703,10 +748,10 @@ templ purchaseModeScript() {
 				var display = document.getElementById('price-display');
 				var qtyPrefix = qty > 1 ? qty + ' × ' : '';
 				if (discount > 0) {
-					display.innerHTML = '<span class="font-heading text-xl text-rr-muted line-through">' + formatCents(baseCents) + '</span>' +
-						' <span class="font-heading text-3xl text-rr-amber">' + qtyPrefix + formatCents(totalCents) + '</span>';
+					display.innerHTML = '<span class="font-special text-chrome-deep text-lg line-through">' + formatCents(baseCents) + '</span>' +
+						' <span class="font-special text-rust text-2xl sm:text-3xl leading-none">' + qtyPrefix + formatCents(totalCents) + '</span>';
 				} else {
-					display.innerHTML = '<span class="font-heading text-3xl text-rr-heading">' + qtyPrefix + formatCents(totalCents) + '</span>';
+					display.innerHTML = '<span class="font-special text-ink text-2xl sm:text-3xl leading-none">' + qtyPrefix + formatCents(totalCents) + '</span>';
 				}
 			}
 
@@ -715,7 +760,7 @@ templ purchaseModeScript() {
 				if (!priceEl) return;
 				var baseCents = parseInt(priceEl.dataset.basePrice, 10);
 				var display = document.getElementById('price-display');
-				display.innerHTML = '<span class="font-heading text-3xl text-rr-heading" data-base-price="' + baseCents + '">' + formatCents(baseCents) + '</span>';
+				display.innerHTML = '<span class="font-special text-ink text-2xl sm:text-3xl leading-none" data-base-price="' + baseCents + '">' + formatCents(baseCents) + '</span>';
 			}
 
 			function formatCents(cents) {
@@ -729,7 +774,6 @@ templ purchaseModeScript() {
 				if (subscribeTab) subscribeTab.click();
 			}
 
-			// Initialize button states
 			updateQtyButtons();
 		})();
 	</script>

@@ -26,10 +26,16 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	// Fetch up to 5 active products for the grid; the hero is whichever one is
 	// flagged is_featured (falling back to the most recent if none is flagged).
 	activeStatus := domain.ProductStatusActive
+	isFeatured := true
 	filter := store.ProductFilter{
 		Limit:  5,
 		Offset: 0,
 		Status: &activeStatus,
+	}
+	featuredFilter := store.ProductFilter{
+		Limit:      1,
+		Status:     &activeStatus,
+		IsFeatured: &isFeatured,
 	}
 
 	var products []domain.Product
@@ -43,13 +49,30 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// The featured product may not be in the top 5 newest — fetch it
+		// directly so the toggle always wins over recency.
+		featured, txErr := d.CatalogService.ListProducts(ctx, tx, featuredFilter)
+		if txErr != nil {
+			return txErr
+		}
+
 		// Pick the hero: prefer the explicitly featured product, else fall back
 		// to the first one returned (newest by created_at).
 		heroIdx = -1
-		for i, p := range products {
-			if p.IsFeatured {
-				heroIdx = i
-				break
+		if len(featured) > 0 {
+			for i, p := range products {
+				if p.ID == featured[0].ID {
+					heroIdx = i
+					break
+				}
+			}
+			if heroIdx == -1 {
+				// Prepend the featured product and trim to keep the grid at 5.
+				products = append([]domain.Product{featured[0]}, products...)
+				if len(products) > filter.Limit {
+					products = products[:filter.Limit]
+				}
+				heroIdx = 0
 			}
 		}
 		if heroIdx == -1 && len(products) > 0 {

@@ -99,43 +99,110 @@
   }
 </script>
 
-<div>
-  <h2 class="font-display text-2xl tracking-widest text-rr-heading mb-6">PAYMENT</h2>
+<section aria-labelledby="payment-heading">
+  <p
+    class="font-oswald text-chrome-deep text-xs font-semibold"
+    style="letter-spacing:0.24em; text-transform:uppercase;"
+  >
+    Step 2
+  </p>
+  <h2
+    id="payment-heading"
+    class="font-slab text-ink uppercase leading-[0.95] mt-2 mb-6"
+    style="font-size: clamp(1.75rem, 3.5vw, 2.25rem); letter-spacing:-0.005em;"
+  >
+    Payment
+  </h2>
 
   {#if error}
-    <div class="mb-4 rounded-sm bg-rr-red/10 p-3 text-sm text-rr-red-lt">{error}</div>
+    <div class="mb-5 border-2 border-rust bg-cream-hi p-3 text-center">
+      <p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">
+        {error}
+      </p>
+    </div>
   {/if}
 
   {#if loading}
     <div class="text-center py-8">
-      <p class="text-rr-muted">Preparing payment...</p>
+      <p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
+        Preparing payment…
+      </p>
     </div>
   {:else}
     <form onsubmit={handleSubmit} class="space-y-6">
-      <div id="stripe-payment-element"></div>
+      <!-- Stripe Payment Element mounts here; theming handled in stripe.ts appearance config -->
+      <div
+        id="stripe-payment-element"
+        class="border-2 border-ink bg-cream-hi p-4 sm:p-5"
+      ></div>
 
-      <div class="flex items-center justify-between gap-4">
+      <div class="flex items-center justify-between gap-4 pt-2">
         <button
           type="button"
           onclick={onBack}
           disabled={processing}
-          class="text-sm font-medium text-rr-amber hover:text-rr-amber-dark"
+          class="inline-flex items-center gap-1.5 font-oswald font-bold text-[11px] text-ink hover:text-rust transition-colors disabled:opacity-50"
+          style="letter-spacing:0.2em; text-transform:uppercase;"
         >
-          &larr; Back
+          <svg
+            class="size-3"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2.5"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"
+            />
+          </svg>
+          Back
         </button>
 
         <button
           type="submit"
           disabled={processing}
-          class="btn rounded-sm bg-rr-red px-6 py-3 label-font text-sm text-white glow-red hover:bg-rr-red-lt disabled:opacity-50 disabled:cursor-not-allowed"
+          class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          style="letter-spacing:0.16em; text-transform:uppercase;"
         >
           {#if processing}
-            Processing...
+            <svg class="size-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="3"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              ></path>
+            </svg>
+            Processing…
           {:else}
             Pay {formatCents(cart.subtotal)}
+            <svg
+              class="size-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke-width="2.5"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
+              />
+            </svg>
           {/if}
         </button>
       </div>
     </form>
   {/if}
-</div>
+</section>

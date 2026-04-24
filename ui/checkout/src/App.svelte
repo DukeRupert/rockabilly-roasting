@@ -53,90 +53,203 @@
     addressId = e.addressId;
     step = 'payment';
   }
-
 </script>
 
-<div class="max-w-2xl mx-auto">
-  <!-- Step indicator -->
-  <nav class="mb-8">
-    <ol class="flex items-center gap-2 text-sm">
-      {#each steps as s, i}
-        {#if i > 0}
-          <li class="text-rr-border">/</li>
-        {/if}
-        <li
-          class={i === currentStepIndex
-            ? 'font-semibold text-rr-red'
-            : i < currentStepIndex
-              ? 'text-rr-heading'
-              : 'text-rr-faint'}
-        >
-          {s.label}
-        </li>
-      {/each}
-    </ol>
-  </nav>
-
-  {#if loading}
-    <div class="text-center py-12">
-      <p class="text-rr-muted">Loading checkout...</p>
-    </div>
-  {:else if error && !cart?.items.length}
-    <div class="text-center py-12">
-      <p class="text-rr-muted mb-4">{error}</p>
-      <a href="/cart" class="text-rr-red hover:text-rr-red-lt font-medium">Return to cart</a
+<!-- Full-bleed paper surface -->
+<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
+  <!-- Paper grain overlay -->
+  <div
+    class="absolute inset-0 opacity-[0.05] pointer-events-none"
+    style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"
+  ></div>
+  <div class="relative mx-auto max-w-6xl px-6 sm:px-10 lg:px-14 py-10 sm:py-14">
+    <!-- Page heading -->
+    <div class="mb-8 sm:mb-10">
+      <p
+        class="font-oswald text-chrome-deep text-xs font-semibold"
+        style="letter-spacing:0.24em; text-transform:uppercase;"
       >
+        Checkout
+      </p>
+      <h1
+        class="font-slab text-ink uppercase leading-[0.92] mt-2"
+        style="font-size: clamp(2.25rem, 5vw, 3.5rem); letter-spacing:-0.005em;"
+      >
+        Seal the
+        <span
+          class="font-script text-rust normal-case inline-block align-baseline"
+          style="font-size:1.1em; letter-spacing:0;">deal.</span
+        >
+      </h1>
     </div>
-  {:else if cart}
-    <div class="lg:grid lg:grid-cols-5 lg:gap-x-8">
-      <!-- Main content -->
-      <div class="lg:col-span-3">
-        {#if step === 'information'}
-          <Information {cart} onComplete={handleAddressComplete} />
-        {:else if step === 'payment'}
-          <Payment
-            {cart}
-            {stripeKey}
-            {customerId}
-            {addressId}
-            onBack={() => (step = 'information')}
-          />
-        {/if}
-      </div>
 
-      <!-- Order summary sidebar -->
-        <div class="mt-8 lg:mt-0 lg:col-span-2">
-          <div class="rounded-sm bg-rr-surface border border-rr-border p-6">
-            <h2 class="font-display text-xl tracking-widest text-rr-heading mb-4">ORDER SUMMARY</h2>
-            <ul class="divide-y divide-rr-border">
+    <!-- Step indicator -->
+    <nav class="mb-10" aria-label="Checkout progress">
+      <ol class="flex items-center gap-3 sm:gap-5">
+        {#each steps as s, i}
+          {#if i > 0}
+            <li class="text-chrome-deep" aria-hidden="true">
+              <svg
+                class="size-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke-width="2.5"
+                stroke="currentColor"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              </svg>
+            </li>
+          {/if}
+          <li class="flex items-center gap-2">
+            {#if i < currentStepIndex}
+              <!-- Completed -->
+              <span
+                class="inline-flex size-6 items-center justify-center border-2 border-ink bg-candle text-ink"
+                aria-hidden="true"
+              >
+                <svg
+                  class="size-3.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke-width="3"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="m4.5 12.75 6 6 9-13.5"
+                  />
+                </svg>
+              </span>
+              <span
+                class="font-oswald font-bold text-ink text-[11px]"
+                style="letter-spacing:0.2em; text-transform:uppercase;">{s.label}</span
+              >
+            {:else if i === currentStepIndex}
+              <!-- Current -->
+              <span
+                class="inline-flex size-6 items-center justify-center border-2 border-ink bg-rust text-paper font-special text-xs"
+                aria-current="step">{i + 1}</span
+              >
+              <span
+                class="font-oswald font-bold text-rust text-[11px]"
+                style="letter-spacing:0.2em; text-transform:uppercase;">{s.label}</span
+              >
+            {:else}
+              <!-- Pending -->
+              <span
+                class="inline-flex size-6 items-center justify-center border-2 border-chrome-deep/40 bg-cream-hi text-chrome-deep font-special text-xs"
+                aria-hidden="true">{i + 1}</span
+              >
+              <span
+                class="font-oswald font-bold text-chrome-deep text-[11px]"
+                style="letter-spacing:0.2em; text-transform:uppercase;">{s.label}</span
+              >
+            {/if}
+          </li>
+        {/each}
+      </ol>
+    </nav>
+
+    {#if loading}
+      <div class="text-center py-16">
+        <p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
+          Loading checkout…
+        </p>
+      </div>
+    {:else if error && !cart?.items.length}
+      <div class="border-2 border-ink bg-cream-hi py-16 px-6 text-center shadow-stamp">
+        <p class="font-oswald text-ink text-base" style="letter-spacing:0.04em;">{error}</p>
+        <a
+          href="/cart"
+          class="btn-stamp inline-flex items-center gap-2 mt-6 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm"
+          style="letter-spacing:0.14em; text-transform:uppercase;"
+        >
+          <svg
+            class="size-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2.5"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          Return to cart
+        </a>
+      </div>
+    {:else if cart}
+      <div class="lg:grid lg:grid-cols-5 lg:gap-x-10">
+        <!-- Main content -->
+        <div class="lg:col-span-3">
+          {#if step === 'information'}
+            <Information {cart} onComplete={handleAddressComplete} />
+          {:else if step === 'payment'}
+            <Payment
+              {cart}
+              {stripeKey}
+              {customerId}
+              {addressId}
+              onBack={() => (step = 'information')}
+            />
+          {/if}
+        </div>
+
+        <!-- Order summary sidebar -->
+        <aside class="mt-10 lg:mt-0 lg:col-span-2">
+          <div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-7 lg:sticky lg:top-24">
+            <p
+              class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink"
+              style="letter-spacing:0.24em; text-transform:uppercase;"
+            >
+              Order summary
+            </p>
+            <ul class="divide-y-2 divide-ink/30">
               {#each cart.items as item}
-                <li class="py-3 flex justify-between text-sm font-body">
-                  <div>
-                    <p class="font-medium text-rr-heading">{item.product_title}</p>
-                    <p class="text-rr-muted">
-                      {item.sku} &times; {item.quantity}
+                <li class="py-3 flex justify-between gap-3">
+                  <div class="min-w-0 flex-1">
+                    <p
+                      class="font-slab text-ink uppercase leading-[1.0] text-sm"
+                      style="letter-spacing:-0.005em;"
+                    >
+                      {item.product_title}
+                    </p>
+                    <p class="font-special text-chrome-deep text-xs mt-1">
+                      {item.sku} · qty {item.quantity}
                     </p>
                   </div>
-                  <p class="font-medium text-rr-heading">{formatCents(item.line_total)}</p>
+                  <p class="font-special text-ink text-sm shrink-0">
+                    {formatCents(item.line_total)}
+                  </p>
                 </li>
               {/each}
             </ul>
-            <div class="mt-4 border-t border-rr-border pt-4">
-              <div class="flex justify-between text-sm">
-                <p class="text-rr-muted">Subtotal</p>
-                <p class="font-medium text-rr-heading">{formatCents(cart.subtotal)}</p>
+            <dl class="mt-4 pt-4 border-t-2 border-ink space-y-2">
+              <div class="flex items-baseline justify-between">
+                <dt class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
+                  Subtotal
+                </dt>
+                <dd class="font-special text-ink text-base">{formatCents(cart.subtotal)}</dd>
               </div>
-              <div class="flex justify-between text-sm mt-1">
-                <p class="text-rr-muted">Shipping</p>
-                <p class="text-rr-muted">Free</p>
+              <div class="flex items-baseline justify-between">
+                <dt class="font-oswald text-chrome-deep text-sm" style="letter-spacing:0.04em;">
+                  Shipping
+                </dt>
+                <dd class="font-special text-chrome-deep text-sm">Free</dd>
               </div>
-              <div class="flex justify-between text-base font-semibold mt-3 pt-3 border-t border-rr-border">
-                <p>Total</p>
-                <p>{formatCents(cart.subtotal)}</p>
-              </div>
+            </dl>
+            <div
+              class="mt-4 pt-3 border-t-2 border-ink flex items-baseline justify-between"
+            >
+              <span
+                class="font-slab text-ink text-lg uppercase"
+                style="letter-spacing:0.02em;">Total</span
+              >
+              <span class="font-special text-ink text-xl">{formatCents(cart.subtotal)}</span>
             </div>
           </div>
-        </div>
-    </div>
-  {/if}
-</div>
+        </aside>
+      </div>
+    {/if}
+  </div>
+</section>

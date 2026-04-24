@@ -264,31 +264,70 @@ templ HomeContent(props HomePageProps) {
 			</div>
 		</section>
 	}
-	<!-- About / Mission + Daily Grind CTA -->
-	<section class="-mx-4 sm:-mx-6 lg:-mx-8">
-		<div class="relative overflow-hidden bg-rr-void">
-			<img
-				src="/static/rockabilly_cafe.webp"
-				alt=""
-				class="absolute inset-0 h-full w-full object-cover object-center opacity-15"
-			/>
-			<div class="absolute inset-0 bg-rr-void/80"></div>
-			<div class="texture-grid absolute inset-0"></div>
-			<div class="relative mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center">
-				<p class="label-font text-rr-amber text-xs mb-4" style="letter-spacing: 0.35em;">KENNEWICK, WA &middot; EST. 2014</p>
-				<h2 class="font-display text-rr-heading leading-tight tracking-wide" style="font-size: clamp(2rem, 6vw, 3.5rem);">
-					COFFEE WITH CHARACTER
-				</h2>
-				<p class="mt-5 font-body text-rr-muted leading-relaxed max-w-xl mx-auto">
-					Rockabilly Roasting Co. is a small-batch roaster in the heart of Kennewick. We source specialty-grade beans from around the world and roast them fresh to order — no sitting on shelves, no shortcuts. Just bold coffee with a rebellious spirit, served from our cafe and shipped to your door.
-				</p>
-				<div class="mt-8 flex flex-wrap justify-center gap-4">
-					<a href="/subscriptions" class="btn label-font px-8 py-3.5 rounded-sm text-white text-sm bg-rr-teal hover:bg-rr-teal-lt transition-colors">
-						JOIN THE DAILY GRIND
-					</a>
-					<a href="/about" class="btn label-font px-8 py-3.5 rounded-sm text-rr-heading text-sm border border-rr-border hover:border-rr-amber transition-colors">
-						LEARN MORE
-					</a>
+	<!-- About / Visit — paper editorial close -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper">
+		<!-- Paper grain overlay -->
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24">
+			<div class="grid md:grid-cols-2 gap-10 lg:gap-16 items-center">
+				<!-- Photo panel — ink-bordered with stamp shadow and tilted stamp sticker -->
+				<div class="relative border-2 border-ink bg-paper-warm shadow-stamp overflow-hidden aspect-[4/5] md:aspect-[3/4]">
+					<img
+						src="/static/rockabilly_cafe.webp"
+						alt="Inside Rockabilly Roasting Co. in Kennewick, WA"
+						class="absolute inset-0 w-full h-full object-cover object-center"
+					/>
+					<!-- Tilted rust "EST. 2014" stamp, bottom-right -->
+					<div class="absolute bottom-5 right-5 pointer-events-none">
+						<span
+							class="inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust"
+							style="letter-spacing:0.2em; text-transform:uppercase; transform:rotate(-4deg); outline:2px solid var(--color-rust); outline-offset:2px;"
+						>
+							Est. 2014
+						</span>
+					</div>
+				</div>
+				<!-- Content -->
+				<div>
+					<p class="font-oswald text-chrome-deep text-xs sm:text-sm font-semibold mb-5" style="letter-spacing:0.3em; text-transform:uppercase;">
+						Kennewick, WA
+					</p>
+					<h2 class="font-slab text-ink uppercase leading-[0.92]" style="font-size: clamp(2.25rem, 5.5vw, 4rem); letter-spacing:-0.005em;">
+						Coffee with
+						<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">character.</span>
+					</h2>
+					<p class="font-oswald text-ink-soft text-base sm:text-lg leading-relaxed mt-6 max-w-md">
+						Small-batch roaster on West Kennewick Ave. Specialty-grade beans from around the world, roasted on the drum in-house, shipped fresh — no shelves, no shortcuts, no middleman. Come by for a pour, or have us send one your way.
+					</p>
+					<!-- Address + hours stripe: ink double-rule -->
+					<div class="mt-8 border-t-2 border-b-2 border-ink py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+						<div class="font-oswald text-sm text-ink" style="letter-spacing:0.08em; text-transform:uppercase;">
+							101 W. Kennewick Ave
+						</div>
+						<div class="font-special text-ink-soft text-sm">
+							6am – 2pm · Mon – Thu
+						</div>
+					</div>
+					<!-- CTAs -->
+					<div class="mt-8 flex flex-wrap gap-4 items-center">
+						<a
+							href="/about"
+							class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm"
+							style="letter-spacing:0.14em; text-transform:uppercase;"
+						>
+							Visit the cafe
+							<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+							</svg>
+						</a>
+						<a
+							href="/catalog"
+							class="btn inline-flex items-center gap-2 bg-transparent text-ink border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm hover:bg-ink hover:text-paper transition-colors"
+							style="letter-spacing:0.14em; text-transform:uppercase;"
+						>
+							Shop coffee
+						</a>
+					</div>
 				</div>
 			</div>
 		</div>

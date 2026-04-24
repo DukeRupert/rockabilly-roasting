@@ -37,6 +37,18 @@ templ Storefront(props StorefrontProps) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<!-- Sentry browser SDK (loader) -->
+			<script src="https://js.sentry-cdn.com/cb637304d0dd18bf6a7b244e18faee0f.min.js" crossorigin="anonymous"></script>
+			<script>
+				Sentry.onLoad(function () {
+					var host = location.hostname;
+					var env = (host === 'localhost' || host === '127.0.0.1') ? 'development' : 'production';
+					Sentry.init({
+						environment: env,
+						tracesSampleRate: 0,
+					});
+				});
+			</script>
 			<!-- Google tag (gtag.js) -->
 			<script async src="https://www.googletagmanager.com/gtag/js?id=G-5L4668EW6X"></script>
 			<script>

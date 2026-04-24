@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -376,6 +377,12 @@ func NewRouter(deps *Deps) http.Handler {
 	handler = loggingMiddleware(handler, deps.Logger, deps.Metrics)
 	handler = ratelimit.GlobalLimit(deps.RateLimiter, ratelimit.GlobalIPLimit, ratelimit.GlobalWindow)(handler)
 	handler = metrics.HTTPMiddleware(deps.Metrics)(handler)
+	// Sentry wraps everything so it can recover panics from any middleware.
+	// No-op when SENTRY_DSN is unset (the hub is a dummy).
+	handler = sentryhttp.New(sentryhttp.Options{
+		Repanic:         true,
+		WaitForDelivery: false,
+	}).Handle(handler)
 
 	return handler
 }

@@ -37,6 +37,56 @@ func New(level slog.Level) *slog.Logger {
 	}))
 }
 
+// NewWithHandlers returns a logger that fans each record out to every handler.
+// Use to compose the JSON stdout handler with extra sinks (e.g. Sentry).
+func NewWithHandlers(handlers ...slog.Handler) *slog.Logger {
+	return slog.New(Fanout(handlers...))
+}
+
+// Fanout returns a slog.Handler that dispatches to all of the given handlers.
+// Handler errors are ignored so one sink going down cannot starve another.
+func Fanout(handlers ...slog.Handler) slog.Handler {
+	return &fanoutHandler{handlers: handlers}
+}
+
+type fanoutHandler struct {
+	handlers []slog.Handler
+}
+
+func (f *fanoutHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	for _, h := range f.handlers {
+		if h.Enabled(ctx, level) {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *fanoutHandler) Handle(ctx context.Context, r slog.Record) error {
+	for _, h := range f.handlers {
+		if h.Enabled(ctx, r.Level) {
+			_ = h.Handle(ctx, r.Clone())
+		}
+	}
+	return nil
+}
+
+func (f *fanoutHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	out := make([]slog.Handler, len(f.handlers))
+	for i, h := range f.handlers {
+		out[i] = h.WithAttrs(attrs)
+	}
+	return &fanoutHandler{handlers: out}
+}
+
+func (f *fanoutHandler) WithGroup(name string) slog.Handler {
+	out := make([]slog.Handler, len(f.handlers))
+	for i, h := range f.handlers {
+		out[i] = h.WithGroup(name)
+	}
+	return &fanoutHandler{handlers: out}
+}
+
 // WithContext stores a logger in the context.
 func WithContext(ctx context.Context, logger *slog.Logger) context.Context {
 	return context.WithValue(ctx, loggerKey, logger)

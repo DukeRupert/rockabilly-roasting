@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	sentrygo "github.com/getsentry/sentry-go"
 	"github.com/google/uuid"
 
 	"github.com/dukerupert/hiri/internal/platform/logging"
@@ -19,6 +20,14 @@ func requestIDMiddleware(next http.Handler) http.Handler {
 		logger := logging.FromContext(ctx).With(slog.String(logging.FieldRequestID, requestID))
 		ctx = logging.WithContext(ctx, logger)
 		w.Header().Set("X-Request-ID", requestID)
+
+		// Tag the Sentry scope for this request. No-op if Sentry isn't initialized.
+		if hub := sentrygo.GetHubFromContext(ctx); hub != nil {
+			hub.Scope().SetTag("request_id", requestID)
+			hub.Scope().SetTag("method", r.Method)
+			hub.Scope().SetTag("path", r.URL.Path)
+		}
+
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

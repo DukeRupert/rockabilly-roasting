@@ -32,6 +32,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
+	hiresentry "github.com/dukerupert/hiri/internal/platform/sentry"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/platform/shipping"
 	"github.com/dukerupert/hiri/internal/store"
@@ -52,9 +53,26 @@ func run() error {
 	// Load .env file if present
 	_ = godotenv.Load()
 
-	// Logger
-	logger := logging.New(slog.LevelInfo)
+	// Sentry — must init before the logger so slog records can be forwarded.
+	sentryEnabled, err := hiresentry.Init(hiresentry.Config{
+		DSN:              os.Getenv("SENTRY_DSN"),
+		Environment:      os.Getenv("SENTRY_ENVIRONMENT"),
+		Release:          os.Getenv("SENTRY_RELEASE"),
+		TracesSampleRate: 0,
+	})
+	if err != nil {
+		return fmt.Errorf("sentry init: %w", err)
+	}
+	if sentryEnabled {
+		defer hiresentry.Flush(2 * time.Second)
+	}
+
+	// Logger — JSON to stdout, plus Sentry fanout when enabled.
+	logger := buildLogger(sentryEnabled)
 	slog.SetDefault(logger)
+	if sentryEnabled {
+		logger.Info("sentry enabled", "environment", os.Getenv("SENTRY_ENVIRONMENT"))
+	}
 
 	// Database
 	dbURL := os.Getenv("DATABASE_URL")
@@ -420,6 +438,18 @@ func base64DecodeKey(encoded string) ([]byte, error) {
 		return nil, fmt.Errorf("encryption key must be 32 bytes, got %d", len(key))
 	}
 	return key, nil
+}
+
+// buildLogger assembles the slog logger. Always writes JSON to stdout; when
+// Sentry is enabled, also forwards records to Sentry via the fanout handler.
+func buildLogger(sentryEnabled bool) *slog.Logger {
+	jsonHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+	if !sentryEnabled {
+		return slog.New(jsonHandler)
+	}
+	return logging.NewWithHandlers(jsonHandler, hiresentry.NewSlogHandler(slog.LevelInfo))
 }
 
 // tenantIDFromEnv returns the tenant ID from TENANT_ID env var, or a fixed UUID for single-tenant.

@@ -260,6 +260,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/orders/{id}/fulfill", deps.handleAdminOrderFulfill)
 	adminMux.HandleFunc("POST /admin/orders/{id}/ship", deps.handleAdminOrderShip)
 	adminMux.HandleFunc("GET /admin/orders/{id}/packing-slip", deps.handleAdminOrderPackingSlip)
+	adminMux.HandleFunc("GET /admin/orders/{id}/invoice", deps.handleAdminOrderInvoice)
 
 	// Admin customers
 	adminMux.HandleFunc("GET /admin/customers", deps.handleAdminCustomerList)

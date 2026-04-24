@@ -345,3 +345,96 @@ func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Reques
 
 	admin.PackingSlip(props).Render(ctx, w) //nolint:errcheck
 }
+
+func (d *Deps) handleAdminOrderInvoice(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var order *domain.Order
+	var lineItems []domain.LineItem
+	var customer *domain.Customer
+	var shippingAddress *domain.Address
+	var billingAddress *domain.Address
+	var enrichedItems []admin.EnrichedLineItem
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		order, txErr = d.OrderService.GetOrderAsStaff(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		lineItems, txErr = d.OrderService.ListLineItems(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+
+		if order.CustomerID != nil {
+			customer, txErr = d.CustomerService.GetCustomer(ctx, tx, *order.CustomerID)
+			if txErr != nil && !errors.Is(txErr, app.ErrCustomerNotFound) {
+				return txErr
+			}
+		}
+
+		shippingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
+		if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
+			return txErr
+		}
+
+		if order.BillingAddressID == order.ShippingAddressID {
+			billingAddress = shippingAddress
+		} else {
+			billingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.BillingAddressID)
+			if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
+				return txErr
+			}
+		}
+
+		enrichedItems = make([]admin.EnrichedLineItem, len(lineItems))
+		for i, li := range lineItems {
+			enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
+
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
+			if vErr != nil {
+				if errors.Is(vErr, app.ErrVariantNotFound) {
+					continue
+				}
+				return vErr
+			}
+			enrichedItems[i].VariantSKU = variant.SKU
+
+			product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+			if pErr != nil {
+				if errors.Is(pErr, app.ErrProductNotFound) {
+					continue
+				}
+				return pErr
+			}
+			enrichedItems[i].ProductTitle = product.Title
+		}
+
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, app.ErrOrderNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		Error(w, r, err)
+		return
+	}
+
+	props := admin.OrderInvoiceProps{
+		Order:           order,
+		LineItems:       enrichedItems,
+		Customer:        customer,
+		ShippingAddress: shippingAddress,
+		BillingAddress:  billingAddress,
+	}
+
+	admin.OrderInvoice(props).Render(ctx, w) //nolint:errcheck
+}

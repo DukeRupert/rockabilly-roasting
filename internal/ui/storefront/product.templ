@@ -854,10 +854,11 @@ templ purchaseModeScript() {
 	</script>
 }
 
-// productJSONLDScript returns a <script type="application/ld+json"> tag with Product structured data.
+// productJSONLDScript returns <script type="application/ld+json"> tags with
+// Product and BreadcrumbList structured data.
 func productJSONLDScript(props ProductDetailProps) string {
 	productURL := props.BaseURL + "/catalog/" + props.Product.Slug
-	ld := map[string]any{
+	product := map[string]any{
 		"@context":    "https://schema.org",
 		"@type":       "Product",
 		"name":        props.Product.Title,
@@ -870,11 +871,11 @@ func productJSONLDScript(props ProductDetailProps) string {
 	}
 
 	if len(props.Media) > 0 && props.MediaConfig != nil {
-		ld["image"] = props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantPublic)
+		product["image"] = props.MediaConfig.ProductImageURL(props.Media[0].R2Key, media.VariantPublic)
 	}
 
 	if props.DefaultPrice != nil {
-		ld["offers"] = map[string]any{
+		product["offers"] = map[string]any{
 			"@type":         "Offer",
 			"price":         fmt.Sprintf("%.2f", float64(*props.DefaultPrice)/100),
 			"priceCurrency": props.CurrencyCode,
@@ -883,8 +884,19 @@ func productJSONLDScript(props ProductDetailProps) string {
 		}
 	}
 
-	b, _ := json.Marshal(ld)
-	return `<script type="application/ld+json">` + string(b) + `</script>`
+	breadcrumb := map[string]any{
+		"@context": "https://schema.org",
+		"@type":    "BreadcrumbList",
+		"itemListElement": []map[string]any{
+			{"@type": "ListItem", "position": 1, "name": "Shop", "item": props.BaseURL + "/catalog"},
+			{"@type": "ListItem", "position": 2, "name": props.Product.Title, "item": productURL},
+		},
+	}
+
+	productJSON, _ := json.Marshal(product)
+	breadcrumbJSON, _ := json.Marshal(breadcrumb)
+	return `<script type="application/ld+json">` + string(productJSON) + `</script>` +
+		`<script type="application/ld+json">` + string(breadcrumbJSON) + `</script>`
 }
 
 templ ProductPage(props ProductDetailProps) {

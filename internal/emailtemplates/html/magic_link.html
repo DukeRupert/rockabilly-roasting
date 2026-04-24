@@ -1,28 +1,55 @@
 {{define "magic_link.html"}}<!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
-<body style="margin:0;padding:0;background-color:#F5F0E6;font-family:Arial,Helvetica,sans-serif;color:#1A1612;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F0E6;padding:24px 0;">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <title>Your sign-in link</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F6EFE1;font-family:'Oswald','Arial Narrow',Arial,sans-serif;color:#0E0D0C;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;">Your sign-in link for {{.StoreName}} — expires in {{.ExpiresIn}}.</div>
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F6EFE1;padding:32px 0;">
 <tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
-  <tr><td style="background-color:#1A1612;padding:24px;text-align:center;">
-    <span style="color:#F5F0E6;font-size:20px;font-weight:bold;">{{.StoreName}}</span>
-  </td></tr>
-  <tr><td style="padding:32px 24px;">
-    <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Your Sign-In Link</h1>
-    <p style="margin:0 0 24px;">Hi{{if .CustomerName}} {{.CustomerName}}{{end}}, click the button below to sign in. This link expires in {{.ExpiresIn}}.</p>
+<table width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px;max-width:560px;background-color:#FFFBF1;border:3px solid #0E0D0C;">
 
-    <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
-      <tr><td style="background-color:#C0271D;border-radius:6px;padding:12px 32px;text-align:center;">
-        <a href="{{.MagicLinkURL}}" style="color:#ffffff;text-decoration:none;font-weight:bold;font-size:16px;">Sign In</a>
+  <!-- Masthead: ink band with banner-text store name -->
+  <tr><td style="background-color:#0E0D0C;padding:20px 32px;text-align:center;">
+    <div style="font-family:'Oswald','Arial Narrow',Arial,sans-serif;font-weight:700;font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#F2A03D;margin-bottom:4px;">Est. Rockabilly &middot; Kennewick WA</div>
+    <div style="font-family:'Alfa Slab One','Rockwell',Georgia,serif;font-weight:400;font-size:28px;letter-spacing:0.04em;text-transform:uppercase;color:#F6EFE1;">{{.StoreName}}</div>
+  </td></tr>
+
+  <!-- Double rule under masthead -->
+  <tr><td style="padding:0;background-color:#FFFBF1;"><div style="height:2px;background-color:#0E0D0C;margin:4px 0 0;"></div><div style="height:1px;background-color:#0E0D0C;margin:3px 0 0;"></div></td></tr>
+
+  <!-- Body -->
+  <tr><td style="padding:40px 40px 16px;">
+    <div style="font-family:'Oswald','Arial Narrow',Arial,sans-serif;font-weight:600;font-size:12px;letter-spacing:0.25em;text-transform:uppercase;color:#3A332B;margin:0 0 12px;">&mdash; Sign in &mdash;</div>
+    <h1 style="margin:0 0 20px;font-family:'Alfa Slab One','Rockwell',Georgia,serif;font-weight:400;font-size:34px;line-height:1.05;letter-spacing:0.01em;text-transform:uppercase;color:#0E0D0C;">Your one-time key.</h1>
+    <p style="margin:0 0 24px;font-family:'Oswald','Arial Narrow',Arial,sans-serif;font-size:17px;line-height:1.6;color:#3A332B;">Hey{{if .CustomerName}} {{.CustomerName}}{{end}} &mdash; tap the stamp below to sign in. One click, no password. The link runs out in <strong style="color:#0E0D0C;">{{.ExpiresIn}}</strong>.</p>
+
+    <!-- Stamp button -->
+    <table cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 32px;">
+      <tr><td style="background-color:#B4351D;border:2px solid #0E0D0C;box-shadow:4px 4px 0 0 #0E0D0C;">
+        <a href="{{.MagicLinkURL}}" style="display:block;padding:14px 36px;font-family:'Oswald','Arial Narrow',Arial,sans-serif;font-weight:700;font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:#F6EFE1;text-decoration:none;">Sign Me In</a>
       </td></tr>
     </table>
 
-    <p style="margin:0 0 8px;font-size:13px;color:#666;">If you didn't request this link, you can safely ignore this email.</p>
-    <p style="margin:0;font-size:13px;color:#666;">Or copy this URL: {{.MagicLinkURL}}</p>
+    <!-- Fallback URL block -->
+    <div style="border-top:2px solid #0E0D0C;padding-top:20px;margin-top:8px;">
+      <div style="font-family:'Oswald','Arial Narrow',Arial,sans-serif;font-weight:600;font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#8E887D;margin:0 0 8px;">Button not working?</div>
+      <p style="margin:0 0 12px;font-family:'Oswald','Arial Narrow',Arial,sans-serif;font-size:14px;line-height:1.5;color:#3A332B;">Copy this link into your browser:</p>
+      <p style="margin:0;font-family:'Special Elite','Courier Prime','Courier New',Courier,monospace;font-size:13px;line-height:1.4;color:#0E0D0C;word-break:break-all;"><a href="{{.MagicLinkURL}}" style="color:#B4351D;text-decoration:underline;">{{.MagicLinkURL}}</a></p>
+    </div>
   </td></tr>
-  <tr><td style="background-color:#F5F0E6;padding:16px 24px;text-align:center;font-size:12px;color:#666;">
-    {{.StoreName}} &middot; <a href="{{.StoreURL}}" style="color:#C0271D;">{{.StoreURL}}</a>
+
+  <!-- Safety note -->
+  <tr><td style="padding:16px 40px 32px;">
+    <p style="margin:0;font-family:'Oswald','Arial Narrow',Arial,sans-serif;font-size:13px;line-height:1.55;color:#8E887D;">Didn't ask for this? Ignore the email &mdash; nobody's getting in without the link.</p>
+  </td></tr>
+
+  <!-- Footer on paper-warm -->
+  <tr><td style="background-color:#ECE0C6;border-top:2px solid #0E0D0C;padding:20px 40px;text-align:center;">
+    <div style="font-family:'Alfa Slab One','Rockwell',Georgia,serif;font-weight:400;font-size:13px;letter-spacing:0.12em;text-transform:uppercase;color:#0E0D0C;margin:0 0 4px;">{{.StoreName}}</div>
+    <div style="font-family:'Special Elite','Courier Prime','Courier New',Courier,monospace;font-size:12px;letter-spacing:0.02em;color:#3A332B;"><a href="{{.StoreURL}}" style="color:#B4351D;text-decoration:underline;">{{.StoreURL}}</a></div>
   </td></tr>
 </table>
 </td></tr>

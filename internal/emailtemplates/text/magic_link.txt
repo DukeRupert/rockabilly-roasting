@@ -1,11 +1,15 @@
-{{define "magic_link.txt"}}Your Sign-In Link
+{{define "magic_link.txt"}}{{.StoreName}}
+==========================================
 
-Hi{{if .CustomerName}} {{.CustomerName}}{{end}}, use the link below to sign in. It expires in {{.ExpiresIn}}.
+YOUR ONE-TIME KEY
+
+Hey{{if .CustomerName}} {{.CustomerName}}{{end}} -- use the link below to sign in. One click, no password. The link runs out in {{.ExpiresIn}}.
 
 {{.MagicLinkURL}}
 
-If you didn't request this link, you can safely ignore this email.
+Didn't ask for this? Ignore the email -- nobody's getting in without the link.
 
+------------------------------------------
 {{.StoreName}}
 {{.StoreURL}}
 {{end}}

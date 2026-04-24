@@ -39,6 +39,8 @@ type ProductDetailProps struct {
 	Coffee            *CoffeeAttrs // nil if not a coffee product
 	PrevProduct       *ProductNav  // nil when catalog has ≤1 active product
 	NextProduct       *ProductNav
+	CanonicalURL      string
+	OGImage           string
 }
 
 // ProductNav carries the minimum data needed for prev/next links at the
@@ -885,9 +887,12 @@ func productJSONLDScript(props ProductDetailProps) string {
 
 templ ProductPage(props ProductDetailProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       props.Product.Title,
-		Description: props.Product.Description,
-		CartCount:   props.CartCount,
+		Title:        props.Product.Title,
+		Description:  props.Product.Description,
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
+		OGImage:      props.OGImage,
+		OGType:       "product",
 	}) {
 		@ProductContent(props)
 		@templ.Raw(productJSONLDScript(props))

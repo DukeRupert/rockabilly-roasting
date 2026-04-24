@@ -11,6 +11,8 @@ type HomePageProps struct {
 	HeroImageURL     string       // larger image for the featured product banner
 	FeaturedProducts []ProductCard
 	CartCount        int
+	CanonicalURL     string
+	OGImage          string
 }
 
 templ HomeContent(props HomePageProps) {
@@ -356,9 +358,11 @@ templ HomeContent(props HomePageProps) {
 
 templ HomePage(props HomePageProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "Fresh Roasted Coffee",
-		Description: "Small-batch specialty coffee roasted fresh to order in Kennewick, WA.",
-		CartCount:   props.CartCount,
+		Title:        "Fresh Roasted Coffee",
+		Description:  "Small-batch specialty coffee roasted fresh to order in Kennewick, WA.",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
+		OGImage:      props.OGImage,
 	}) {
 		@HomeContent(props)
 	}

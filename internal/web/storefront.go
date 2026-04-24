@@ -102,12 +102,16 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.HomePageProps{
-		CartCount: d.cartItemCountFromCookie(r),
+		CartCount:    d.cartItemCountFromCookie(r),
+		CanonicalURL: d.BaseURL + r.URL.Path,
 	}
 	if heroIdx >= 0 && heroIdx < len(cards) {
 		props.FeaturedProduct = &cards[heroIdx]
 		props.HeroImageURL = featuredHeroURL
 		props.FeaturedProducts = cards // show all products in the grid, including the featured one
+		if featuredHeroURL != "" {
+			props.OGImage = featuredHeroURL
+		}
 	}
 
 	if IsHTMX(r) {
@@ -319,6 +323,7 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 		Page:          page,
 		TotalPages:    totalPages,
 		CartCount:     d.cartItemCountFromCookie(r),
+		CanonicalURL:  d.BaseURL + r.URL.Path,
 	}
 
 	if IsHTMX(r) {
@@ -418,9 +423,10 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.SubscriptionsPageProps{
-		Products:  cards,
-		Plans:     plans,
-		CartCount: d.cartItemCountFromCookie(r),
+		Products:     cards,
+		Plans:        plans,
+		CartCount:    d.cartItemCountFromCookie(r),
+		CanonicalURL: d.BaseURL + r.URL.Path,
 	}
 
 	if IsHTMX(r) {
@@ -433,7 +439,8 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 // handlePrivacyPage renders the privacy policy page.
 func (d *Deps) handlePrivacyPage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.PrivacyProps{
-		CartCount: d.cartItemCountFromCookie(r),
+		CartCount:    d.cartItemCountFromCookie(r),
+		CanonicalURL: d.BaseURL + r.URL.Path,
 	}
 	if IsHTMX(r) {
 		storefront.PrivacyContent(props).Render(r.Context(), w) //nolint:errcheck
@@ -445,7 +452,8 @@ func (d *Deps) handlePrivacyPage(w http.ResponseWriter, r *http.Request) {
 // handleTermsPage renders the terms of service page.
 func (d *Deps) handleTermsPage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.TermsProps{
-		CartCount: d.cartItemCountFromCookie(r),
+		CartCount:    d.cartItemCountFromCookie(r),
+		CanonicalURL: d.BaseURL + r.URL.Path,
 	}
 	if IsHTMX(r) {
 		storefront.TermsContent(props).Render(r.Context(), w) //nolint:errcheck
@@ -459,6 +467,7 @@ func (d *Deps) handleAboutPage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.AboutProps{
 		CartCount:      d.cartItemCountFromCookie(r),
 		ContactSuccess: r.URL.Query().Get("sent") == "1",
+		CanonicalURL:   d.BaseURL + r.URL.Path,
 	}
 	if IsHTMX(r) {
 		storefront.AboutContent(props).Render(r.Context(), w) //nolint:errcheck
@@ -548,7 +557,8 @@ func (d *Deps) handleContactSubmit(w http.ResponseWriter, r *http.Request) {
 // handleWholesaleLandingPage renders the wholesale & white label info page.
 func (d *Deps) handleWholesaleLandingPage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.WholesaleProps{
-		CartCount: d.cartItemCountFromCookie(r),
+		CartCount:    d.cartItemCountFromCookie(r),
+		CanonicalURL: d.BaseURL + r.URL.Path,
 	}
 	if IsHTMX(r) {
 		storefront.WholesaleContent(props).Render(r.Context(), w) //nolint:errcheck
@@ -560,7 +570,8 @@ func (d *Deps) handleWholesaleLandingPage(w http.ResponseWriter, r *http.Request
 // handleShippingPage renders the shipping & returns policy page.
 func (d *Deps) handleShippingPage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.ShippingProps{
-		CartCount: d.cartItemCountFromCookie(r),
+		CartCount:    d.cartItemCountFromCookie(r),
+		CanonicalURL: d.BaseURL + r.URL.Path,
 	}
 	if IsHTMX(r) {
 		storefront.ShippingContent(props).Render(r.Context(), w) //nolint:errcheck
@@ -573,7 +584,8 @@ func (d *Deps) handleShippingPage(w http.ResponseWriter, r *http.Request) {
 func (d *Deps) handleNotFoundPage(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 	props := storefront.NotFoundProps{
-		CartCount: d.cartItemCountFromCookie(r),
+		CartCount:    d.cartItemCountFromCookie(r),
+		CanonicalURL: d.BaseURL + r.URL.Path,
 	}
 	if IsHTMX(r) {
 		storefront.NotFoundContent(props).Render(r.Context(), w) //nolint:errcheck
@@ -722,6 +734,10 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ogImage := ""
+	if len(media) > 0 {
+		ogImage = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantHero)
+	}
 	props := storefront.ProductDetailProps{
 		Product:           product,
 		Media:             media,
@@ -736,6 +752,8 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		Coffee:            coffeeAttrs,
 		PrevProduct:       prevNav,
 		NextProduct:       nextNav,
+		CanonicalURL:      d.BaseURL + r.URL.Path,
+		OGImage:           ogImage,
 	}
 
 	if IsHTMX(r) {

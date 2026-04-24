@@ -14,6 +14,7 @@ type AboutProps struct {
 	CartCount      int
 	ContactSuccess bool
 	ContactError   string
+	CanonicalURL   string
 }
 
 func AboutContent(props AboutProps) templ.Component {
@@ -55,7 +56,7 @@ func AboutContent(props AboutProps) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.ContactError)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/about.templ`, Line: 81, Col: 109}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/about.templ`, Line: 82, Col: 109}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -119,9 +120,10 @@ func AboutPage(props AboutProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title:       "About",
-			Description: "About Rockabilly Roasting Co. — small-batch specialty coffee in Kennewick, WA",
-			CartCount:   props.CartCount,
+			Title:        "About",
+			Description:  "About Rockabilly Roasting Co. — small-batch specialty coffee in Kennewick, WA",
+			CartCount:    props.CartCount,
+			CanonicalURL: props.CanonicalURL,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

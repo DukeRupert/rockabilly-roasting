@@ -11,7 +11,8 @@ import templruntime "github.com/a-h/templ/runtime"
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type WholesaleProps struct {
-	CartCount int
+	CartCount    int
+	CanonicalURL string
 }
 
 func WholesaleContent(props WholesaleProps) templ.Component {
@@ -83,9 +84,10 @@ func WholesalePage(props WholesaleProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title:       "Wholesale & White Label",
-			Description: "Wholesale coffee and white label roasting for cafes, restaurants, and brands",
-			CartCount:   props.CartCount,
+			Title:        "Wholesale & White Label",
+			Description:  "Wholesale coffee and white label roasting for cafes, restaurants, and brands",
+			CartCount:    props.CartCount,
+			CanonicalURL: props.CanonicalURL,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

@@ -6,15 +6,17 @@ import (
 )
 
 type HelpIndexProps struct {
-	CartCount int
-	Articles  []help.Article
+	CartCount    int
+	Articles     []help.Article
+	CanonicalURL string
 }
 
 type HelpArticleProps struct {
-	CartCount   int
-	Article     help.Article
-	Articles    []help.Article
-	CurrentSlug string
+	CartCount    int
+	Article      help.Article
+	Articles     []help.Article
+	CurrentSlug  string
+	CanonicalURL string
 }
 
 templ HelpIndexContent(props HelpIndexProps) {
@@ -64,9 +66,10 @@ templ HelpIndexContent(props HelpIndexProps) {
 
 templ HelpIndexPage(props HelpIndexProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "Help Center",
-		Description: "Help and guides for Rockabilly Roasting Co.",
-		CartCount:   props.CartCount,
+		Title:        "Help Center",
+		Description:  "Help and guides for Rockabilly Roasting Co.",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
 	}) {
 		@HelpIndexContent(props)
 	}
@@ -129,9 +132,10 @@ templ HelpArticleContent(props HelpArticleProps) {
 
 templ HelpArticlePage(props HelpArticleProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       props.Article.Title + " - Help",
-		Description: "Help: " + props.Article.Title,
-		CartCount:   props.CartCount,
+		Title:        props.Article.Title + " - Help",
+		Description:  "Help: " + props.Article.Title,
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
 	}) {
 		@HelpArticleContent(props)
 	}

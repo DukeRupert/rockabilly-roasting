@@ -11,7 +11,8 @@ import templruntime "github.com/a-h/templ/runtime"
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type TermsProps struct {
-	CartCount int
+	CartCount    int
+	CanonicalURL string
 }
 
 func TermsContent(props TermsProps) templ.Component {
@@ -315,9 +316,10 @@ func TermsPage(props TermsProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title:       "Terms of Service",
-			Description: "Terms of service for Rockabilly Roasting Co.",
-			CartCount:   props.CartCount,
+			Title:        "Terms of Service",
+			Description:  "Terms of service for Rockabilly Roasting Co.",
+			CartCount:    props.CartCount,
+			CanonicalURL: props.CanonicalURL,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var13), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

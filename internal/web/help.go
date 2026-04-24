@@ -11,8 +11,9 @@ import (
 
 func (d *Deps) handleHelpIndex(w http.ResponseWriter, r *http.Request) {
 	props := storefront.HelpIndexProps{
-		CartCount: d.cartItemCountFromCookie(r),
-		Articles:  d.HelpRegistry.TOC("storefront"),
+		CartCount:    d.cartItemCountFromCookie(r),
+		Articles:     d.HelpRegistry.TOC("storefront"),
+		CanonicalURL: d.BaseURL + r.URL.Path,
 	}
 	if IsHTMX(r) {
 		storefront.HelpIndexContent(props).Render(r.Context(), w) //nolint:errcheck
@@ -29,10 +30,11 @@ func (d *Deps) handleHelpArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	props := storefront.HelpArticleProps{
-		CartCount:   d.cartItemCountFromCookie(r),
-		Article:     article,
-		Articles:    d.HelpRegistry.TOC("storefront"),
-		CurrentSlug: slug,
+		CartCount:    d.cartItemCountFromCookie(r),
+		Article:      article,
+		Articles:     d.HelpRegistry.TOC("storefront"),
+		CurrentSlug:  slug,
+		CanonicalURL: d.BaseURL + r.URL.Path,
 	}
 	if IsHTMX(r) {
 		storefront.HelpArticleContent(props).Render(r.Context(), w) //nolint:errcheck

@@ -3,7 +3,8 @@ package storefront
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type WholesaleProps struct {
-	CartCount int
+	CartCount    int
+	CanonicalURL string
 }
 
 templ WholesaleContent(props WholesaleProps) {
@@ -60,9 +61,10 @@ templ WholesaleContent(props WholesaleProps) {
 
 templ WholesalePage(props WholesaleProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "Wholesale & White Label",
-		Description: "Wholesale coffee and white label roasting for cafes, restaurants, and brands",
-		CartCount:   props.CartCount,
+		Title:        "Wholesale & White Label",
+		Description:  "Wholesale coffee and white label roasting for cafes, restaurants, and brands",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
 	}) {
 		@WholesaleContent(props)
 	}

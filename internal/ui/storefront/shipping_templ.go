@@ -11,7 +11,8 @@ import templruntime "github.com/a-h/templ/runtime"
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type ShippingProps struct {
-	CartCount int
+	CartCount    int
+	CanonicalURL string
 }
 
 func ShippingContent(props ShippingProps) templ.Component {
@@ -205,9 +206,10 @@ func ShippingPage(props ShippingProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title:       "Shipping & Returns",
-			Description: "Shipping rates, delivery times, and return policy for Rockabilly Roasting Co.",
-			CartCount:   props.CartCount,
+			Title:        "Shipping & Returns",
+			Description:  "Shipping rates, delivery times, and return policy for Rockabilly Roasting Co.",
+			CartCount:    props.CartCount,
+			CanonicalURL: props.CanonicalURL,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var8), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

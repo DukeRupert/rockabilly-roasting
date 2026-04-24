@@ -15,9 +15,10 @@ type SubscriptionProductCard struct {
 }
 
 type SubscriptionsPageProps struct {
-	Products  []SubscriptionProductCard
-	Plans     []domain.SubscriptionPlan
-	CartCount int
+	Products     []SubscriptionProductCard
+	Plans        []domain.SubscriptionPlan
+	CartCount    int
+	CanonicalURL string
 }
 
 templ SubscriptionsContent(props SubscriptionsPageProps) {
@@ -238,9 +239,10 @@ func (p SubscriptionsPageProps) maxDiscount() int {
 
 templ SubscriptionsPage(props SubscriptionsPageProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "The Daily Grind",
-		Description: "Join The Daily Grind — subscribe to your favorite coffee and save on every delivery",
-		CartCount:   props.CartCount,
+		Title:        "The Daily Grind",
+		Description:  "Join The Daily Grind — subscribe to your favorite coffee and save on every delivery",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
 	}) {
 		@SubscriptionsContent(props)
 	}

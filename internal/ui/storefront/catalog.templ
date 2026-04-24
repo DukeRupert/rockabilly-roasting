@@ -33,6 +33,7 @@ type CatalogPageProps struct {
 	Page          int
 	TotalPages    int
 	CartCount     int
+	CanonicalURL  string
 }
 
 // hasActiveFilters returns true if any attribute filters are selected.
@@ -881,9 +882,10 @@ func countActiveFilters(filters map[string][]string) int {
 
 templ CatalogPage(props CatalogPageProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "Shop",
-		Description: "Browse our collection of products",
-		CartCount:   props.CartCount,
+		Title:        "Shop",
+		Description:  "Browse our collection of products",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
 	}) {
 		@CatalogContent(props)
 	}

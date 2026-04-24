@@ -11,7 +11,8 @@ import templruntime "github.com/a-h/templ/runtime"
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type NotFoundProps struct {
-	CartCount int
+	CartCount    int
+	CanonicalURL string
 }
 
 func NotFoundContent(props NotFoundProps) templ.Component {
@@ -83,9 +84,10 @@ func NotFoundPage(props NotFoundProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title:       "Page Not Found",
-			Description: "The page you're looking for doesn't exist.",
-			CartCount:   props.CartCount,
+			Title:        "Page Not Found",
+			Description:  "The page you're looking for doesn't exist.",
+			CartCount:    props.CartCount,
+			CanonicalURL: props.CanonicalURL,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

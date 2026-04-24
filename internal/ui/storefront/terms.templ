@@ -3,7 +3,8 @@ package storefront
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type TermsProps struct {
-	CartCount int
+	CartCount    int
+	CanonicalURL string
 }
 
 templ TermsContent(props TermsProps) {
@@ -66,9 +67,10 @@ templ TermsContent(props TermsProps) {
 
 templ TermsPage(props TermsProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "Terms of Service",
-		Description: "Terms of service for Rockabilly Roasting Co.",
-		CartCount:   props.CartCount,
+		Title:        "Terms of Service",
+		Description:  "Terms of service for Rockabilly Roasting Co.",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
 	}) {
 		@TermsContent(props)
 	}

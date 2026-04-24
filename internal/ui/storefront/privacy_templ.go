@@ -11,7 +11,8 @@ import templruntime "github.com/a-h/templ/runtime"
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type PrivacyProps struct {
-	CartCount int
+	CartCount    int
+	CanonicalURL string
 }
 
 func PrivacyContent(props PrivacyProps) templ.Component {
@@ -227,9 +228,10 @@ func PrivacyPage(props PrivacyProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title:       "Privacy Policy",
-			Description: "How Rockabilly Roasting Co. handles your data.",
-			CartCount:   props.CartCount,
+			Title:        "Privacy Policy",
+			Description:  "How Rockabilly Roasting Co. handles your data.",
+			CartCount:    props.CartCount,
+			CanonicalURL: props.CanonicalURL,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

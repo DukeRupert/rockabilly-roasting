@@ -3,7 +3,8 @@ package storefront
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type NotFoundProps struct {
-	CartCount int
+	CartCount    int
+	CanonicalURL string
 }
 
 templ NotFoundContent(props NotFoundProps) {
@@ -58,9 +59,10 @@ templ NotFoundContent(props NotFoundProps) {
 
 templ NotFoundPage(props NotFoundProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "Page Not Found",
-		Description: "The page you're looking for doesn't exist.",
-		CartCount:   props.CartCount,
+		Title:        "Page Not Found",
+		Description:  "The page you're looking for doesn't exist.",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
 	}) {
 		@NotFoundContent(props)
 	}

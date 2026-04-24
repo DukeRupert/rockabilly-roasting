@@ -6,6 +6,7 @@ type AboutProps struct {
 	CartCount      int
 	ContactSuccess bool
 	ContactError   string
+	CanonicalURL   string
 }
 
 templ AboutContent(props AboutProps) {
@@ -157,9 +158,10 @@ templ AboutContent(props AboutProps) {
 
 templ AboutPage(props AboutProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "About",
-		Description: "About Rockabilly Roasting Co. — small-batch specialty coffee in Kennewick, WA",
-		CartCount:   props.CartCount,
+		Title:        "About",
+		Description:  "About Rockabilly Roasting Co. — small-batch specialty coffee in Kennewick, WA",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
 	}) {
 		@AboutContent(props)
 	}

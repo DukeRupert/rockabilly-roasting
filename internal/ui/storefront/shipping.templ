@@ -3,7 +3,8 @@ package storefront
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type ShippingProps struct {
-	CartCount int
+	CartCount    int
+	CanonicalURL string
 }
 
 templ ShippingContent(props ShippingProps) {
@@ -48,9 +49,10 @@ templ ShippingContent(props ShippingProps) {
 
 templ ShippingPage(props ShippingProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:       "Shipping & Returns",
-		Description: "Shipping rates, delivery times, and return policy for Rockabilly Roasting Co.",
-		CartCount:   props.CartCount,
+		Title:        "Shipping & Returns",
+		Description:  "Shipping rates, delivery times, and return policy for Rockabilly Roasting Co.",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
 	}) {
 		@ShippingContent(props)
 	}

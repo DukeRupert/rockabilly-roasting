@@ -23,8 +23,8 @@ import (
 func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Fetch up to 5 active products for the grid; the hero is whichever one is
-	// flagged is_featured (falling back to the most recent if none is flagged).
+	// Fetch up to 5 active products: one becomes the hero banner (is_featured,
+	// falling back to the most recent), the remaining four fill the grid below.
 	activeStatus := domain.ProductStatusActive
 	isFeatured := true
 	filter := store.ProductFilter{
@@ -131,7 +131,10 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	if heroIdx >= 0 && heroIdx < len(cards) {
 		props.FeaturedProduct = &cards[heroIdx]
 		props.HeroImageURL = featuredHeroURL
-		props.FeaturedProducts = cards // show all products in the grid, including the featured one
+		grid := make([]storefront.ProductCard, 0, len(cards)-1)
+		grid = append(grid, cards[:heroIdx]...)
+		grid = append(grid, cards[heroIdx+1:]...)
+		props.FeaturedProducts = grid
 		if featuredHeroURL != "" {
 			props.OGImage = featuredHeroURL
 		}

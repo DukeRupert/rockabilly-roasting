@@ -167,9 +167,14 @@ templ ProductListContent(props ProductListProps) {
 							for _, p := range props.Products {
 								<tr class="row-link">
 									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-										<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
-											{ p.Title }
-										</a>
+										<div class="flex items-center gap-2">
+											<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", p.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
+												{ p.Title }
+											</a>
+											if p.IsFeatured {
+												<span class="badge badge-amber" title="Featured on the home page">Featured</span>
+											}
+										</div>
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm">
 										@StatusBadge(p.Status)

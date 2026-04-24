@@ -1,6 +1,7 @@
 # Build artifacts
 server
 /migrate
+/sentrycheck
 
 # Node
 node_modules/

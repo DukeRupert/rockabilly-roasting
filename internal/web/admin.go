@@ -79,6 +79,31 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		props.ToShip = readyToShip
 		props.ToShipCount = len(readyToShip)
 
+		// Orders on hold (explicit manual-review state)
+		onHoldStatus := domain.OrderStatusOnHold
+		props.OnHold, txErr = d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+			Status: &onHoldStatus,
+			Limit:  10,
+		})
+		if txErr != nil {
+			return txErr
+		}
+		props.OnHoldCount = len(props.OnHold)
+
+		// Failed payments — scan recent orders, cheap at 50-row cap
+		recent, txErr := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{Limit: 50})
+		if txErr != nil {
+			return txErr
+		}
+		for _, o := range recent {
+			if o.PaymentStatus == domain.PaymentStatusFailed &&
+				o.Status != domain.OrderStatusCancelled &&
+				o.Status != domain.OrderStatusRefunded {
+				props.FailedPayments = append(props.FailedPayments, o)
+			}
+		}
+		props.FailedPaymentCount = len(props.FailedPayments)
+
 		// Active subscriptions
 		props.ActiveSubCount, txErr = d.SubscriptionService.CountSubscriptionsByStatus(ctx, tx, domain.SubscriptionStatusActive)
 		if txErr != nil {

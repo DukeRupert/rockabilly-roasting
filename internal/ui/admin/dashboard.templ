@@ -2,21 +2,35 @@ package admin
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
 type DashboardProps struct {
-	// Stats
-	TodayOrderCount    int
-	TodayRevenue       int
-	ToFulfillCount     int
-	ToShipCount        int
-	ActiveSubCount     int
-	PastDueSubCount    int
-	PendingWholesale   int
+	// Today stats
+	TodayOrderCount int
+	TodayRevenue    int
 
-	// Action queue: orders needing work
+	// Queue depth
+	ToFulfillCount int
+	ToShipCount    int
+
+	// Subscriptions
+	ActiveSubCount  int
+	PastDueSubCount int
+
+	// Pending review
+	PendingWholesale int
+
+	// Urgent action queues
+	OnHold             []domain.Order
+	OnHoldCount        int
+	FailedPayments     []domain.Order
+	FailedPaymentCount int
+
+	// Pipeline queues
 	ToFulfill []domain.Order
 	ToShip    []domain.Order
 
@@ -27,18 +41,52 @@ type DashboardProps struct {
 	StaffRole string
 }
 
-func (p DashboardProps) hasActions() bool {
-	return len(p.ToFulfill) > 0 || len(p.ToShip) > 0 || p.PendingWholesale > 0 || p.PastDueSubCount > 0
+func (p DashboardProps) urgentCount() int {
+	return p.PastDueSubCount + p.OnHoldCount + p.FailedPaymentCount
+}
+
+func (p DashboardProps) reviewCount() int {
+	return p.PendingWholesale
+}
+
+func (p DashboardProps) pipelineCount() int {
+	return p.ToFulfillCount + p.ToShipCount
+}
+
+func (p DashboardProps) hasAnyAction() bool {
+	return p.urgentCount() > 0 || p.reviewCount() > 0 || p.pipelineCount() > 0
+}
+
+// ageLabel returns a compact "Nm / Nh / Nd ago" string for a timestamp.
+func ageLabel(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 7*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("Jan 2")
+	}
+}
+
+// ageIsStale flags pipeline items that have lingered too long.
+func ageIsStale(t time.Time) bool {
+	return time.Since(t) > 48*time.Hour
 }
 
 templ DashboardContent(props DashboardProps) {
-	<!-- Page title + stat strip -->
+	<!-- Page title + Today strip -->
 	<div class="flex items-baseline gap-3">
 		<h1 class="admin-page-title">Dashboard</h1>
-		<span class="label-font text-rr-muted">today</span>
 	</div>
 	<div class="mt-6 border-2 border-rr-border bg-rr-surface px-6 py-5">
-		<div class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-5">
+		<p class="label-font text-rr-muted">Today</p>
+		<div class="mt-2 grid grid-cols-3 gap-x-6 gap-y-4">
 			<div>
 				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ formatCents(props.TodayRevenue) }</p>
 				<p class="label-font text-rr-muted mt-1">revenue</p>
@@ -48,99 +96,95 @@ templ DashboardContent(props DashboardProps) {
 				<p class="label-font text-rr-muted mt-1">orders</p>
 			</div>
 			<div>
-				<p class={ "text-2xl font-bold tabular-nums", urgentCount(props.ToFulfillCount) }>{ fmt.Sprintf("%d", props.ToFulfillCount) }</p>
-				<p class="label-font text-rr-muted mt-1">to pack</p>
-			</div>
-			<div>
-				<p class={ "text-2xl font-bold tabular-nums", urgentCount(props.ToShipCount) }>{ fmt.Sprintf("%d", props.ToShipCount) }</p>
-				<p class="label-font text-rr-muted mt-1">to ship</p>
-			</div>
-			<div class="hidden lg:block">
 				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.ActiveSubCount) }</p>
 				<p class="label-font text-rr-muted mt-1">active subs</p>
 			</div>
 		</div>
 	</div>
 	<div class="flame-stripe mt-8"></div>
-	<!-- Needs attention -->
-	if props.hasActions() {
+	if !props.hasAnyAction() {
+		<!-- All caught up -->
 		<div class="mt-8">
-			<h2 class="label-font text-rr-muted">Needs attention</h2>
-			<div class="mt-3 divide-y divide-rr-border border-2 border-rr-border bg-rr-surface">
-				<!-- Orders to fulfill -->
-				for _, o := range props.ToFulfill {
-					<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
-						<div class="flex items-center gap-3 min-w-0">
-							<span class="inline-block size-2 rounded-full bg-rr-red shrink-0" title="Needs fulfillment"></span>
-							<span class="text-sm font-medium text-rr-heading truncate">{ o.Number }</span>
-							<span class="text-sm text-rr-muted hidden sm:inline">{ formatCents(o.Total) }</span>
-						</div>
-						<div class="flex items-center gap-3 shrink-0">
-							<span class="label-font text-rr-red" style="font-size:0.6rem;">FULFILL</span>
-							<svg class="size-4 text-rr-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
-							</svg>
-						</div>
-					</a>
-				}
-				<!-- Orders to ship -->
-				for _, o := range props.ToShip {
-					<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
-						<div class="flex items-center gap-3 min-w-0">
-							<span class="inline-block size-2 rounded-full bg-rr-teal shrink-0" title="Ready to ship"></span>
-							<span class="text-sm font-medium text-rr-heading truncate">{ o.Number }</span>
-							<span class="text-sm text-rr-muted hidden sm:inline">{ formatCents(o.Total) }</span>
-						</div>
-						<div class="flex items-center gap-3 shrink-0">
-							<span class="label-font text-rr-teal" style="font-size:0.6rem;">SHIP</span>
-							<svg class="size-4 text-rr-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
-							</svg>
-						</div>
-					</a>
-				}
-				<!-- Pending wholesale -->
-				if props.PendingWholesale > 0 {
-					<a href="/admin/wholesale" class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
-						<div class="flex items-center gap-3 min-w-0">
-							<span class="inline-block size-2 rounded-full bg-rr-amber shrink-0" title="Wholesale applications"></span>
-							<span class="text-sm font-medium text-rr-heading">{ fmt.Sprintf("%d wholesale application", props.PendingWholesale) }{ pluralS(props.PendingWholesale) }</span>
-						</div>
-						<div class="flex items-center gap-3 shrink-0">
-							<span class="label-font text-rr-amber" style="font-size:0.6rem;">REVIEW</span>
-							<svg class="size-4 text-rr-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
-							</svg>
-						</div>
-					</a>
-				}
-				<!-- Past-due subscriptions -->
-				if props.PastDueSubCount > 0 {
-					<a href="/admin/subscriptions" class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
-						<div class="flex items-center gap-3 min-w-0">
-							<span class="inline-block size-2 rounded-full bg-rr-red shrink-0" title="Past due subscriptions"></span>
-							<span class="text-sm font-medium text-rr-heading">{ fmt.Sprintf("%d past-due subscription", props.PastDueSubCount) }{ pluralS(props.PastDueSubCount) }</span>
-						</div>
-						<div class="flex items-center gap-3 shrink-0">
-							<span class="label-font text-rr-red" style="font-size:0.6rem;">REVIEW</span>
-							<svg class="size-4 text-rr-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
-							</svg>
-						</div>
-					</a>
-				}
+			<div class="border-2 border-dashed border-rr-border py-10 text-center">
+				<svg class="mx-auto size-10 text-rr-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+				</svg>
+				<p class="mt-3 text-sm font-semibold text-rr-heading">All caught up.</p>
+				<p class="mt-1 text-sm text-rr-muted">Nothing needs your attention right now.</p>
 			</div>
 		</div>
 	} else {
-		<div class="mt-8">
-			<h2 class="label-font text-rr-muted">Needs attention</h2>
-			<div class="mt-3 border-2 border-dashed border-rr-border py-8 text-center">
-				<svg class="mx-auto size-8 text-rr-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
-				</svg>
-				<p class="mt-2 text-sm font-medium text-rr-muted">All caught up. No actions needed right now.</p>
+		<!-- Urgent band -->
+		if props.urgentCount() > 0 {
+			<div class="mt-8">
+				@bandHeader("Urgent", props.urgentCount(), "text-rr-red")
+				<div class="mt-3 space-y-3">
+					if props.PastDueSubCount > 0 {
+						@urgentCard(
+							"/admin/subscriptions?status=past_due",
+							fmt.Sprintf("%d past-due subscription%s", props.PastDueSubCount, pluralS(props.PastDueSubCount)),
+							"Payments failing — customer may churn if not contacted.",
+							"Review",
+						)
+					}
+					if props.OnHoldCount > 0 {
+						@urgentGroupLink(
+							fmt.Sprintf("%d order%s on hold", props.OnHoldCount, pluralS(props.OnHoldCount)),
+							"Manual review required before these move forward.",
+							"/admin/orders?status=on_hold",
+						)
+						for _, o := range props.OnHold {
+							@orderLinkRow(o, "On hold", "text-rr-red", true)
+						}
+					}
+					if props.FailedPaymentCount > 0 {
+						@urgentGroupLink(
+							fmt.Sprintf("%d failed payment%s", props.FailedPaymentCount, pluralS(props.FailedPaymentCount)),
+							"Charge did not go through — reach out or retry.",
+							"/admin/orders",
+						)
+						for _, o := range props.FailedPayments {
+							@orderLinkRow(o, "Payment failed", "text-rr-red", true)
+						}
+					}
+				</div>
 			</div>
-		</div>
+		}
+		<!-- Pending review band -->
+		if props.reviewCount() > 0 {
+			<div class={ bandSpacing(props.urgentCount()) }>
+				@bandHeader("Pending review", props.reviewCount(), "text-rr-amber")
+				<div class="mt-3 border-2 border-rr-border bg-rr-surface divide-y divide-rr-border">
+					if props.PendingWholesale > 0 {
+						<a href="/admin/wholesale" class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
+							<div class="flex items-center gap-3 min-w-0">
+								<span class="inline-block size-2 rounded-full bg-rr-amber shrink-0"></span>
+								<div class="min-w-0">
+									<p class="text-sm font-medium text-rr-heading">
+										{ fmt.Sprintf("%d wholesale application", props.PendingWholesale) }{ pluralS(props.PendingWholesale) }
+									</p>
+									<p class="text-xs text-rr-muted mt-0.5">New accounts waiting on approval.</p>
+								</div>
+							</div>
+							<div class="flex items-center gap-3 shrink-0">
+								<span class="label-font text-rr-amber" style="font-size:0.6rem;">Review</span>
+								@chevronRight()
+							</div>
+						</a>
+					}
+				</div>
+			</div>
+		}
+		<!-- Pipeline band -->
+		if props.pipelineCount() > 0 {
+			<div class={ bandSpacing(props.urgentCount() + props.reviewCount()) }>
+				@bandHeader("Pipeline", props.pipelineCount(), "text-rr-heading")
+				<div class="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+					@pipelineGroup("Pack", props.ToFulfillCount, props.ToFulfill, "/admin/orders?fulfillment=unfulfilled", "text-rr-red", "bg-rr-red")
+					@pipelineGroup("Ship", props.ToShipCount, props.ToShip, "/admin/orders?fulfillment=fulfilled", "text-rr-teal", "bg-rr-teal")
+				</div>
+			</div>
+		}
 	}
 	<!-- Recent orders -->
 	<div class="mt-10">
@@ -203,6 +247,143 @@ templ DashboardContent(props DashboardProps) {
 	</div>
 }
 
+// bandHeader renders a labeled band title with a count chip.
+templ bandHeader(label string, count int, accent string) {
+	<div class="flex items-baseline gap-3">
+		<h2 class={ "text-base font-bold tracking-wide uppercase", accent }>{ label }</h2>
+		<span class="inline-block border-2 border-rr-border bg-rr-surface px-2 py-0.5 text-xs font-semibold tabular-nums text-rr-heading">
+			{ fmt.Sprintf("%d", count) }
+		</span>
+	</div>
+}
+
+// urgentCard is a standalone red-stamp card for critical items without a per-item list.
+templ urgentCard(href, title, detail, cta string) {
+	<a
+		href={ templ.SafeURL(href) }
+		class="block border-2 border-rr-border bg-rr-surface p-4 hover:-translate-x-px hover:-translate-y-px transition-transform"
+		style="box-shadow: 4px 4px 0 0 var(--color-rr-red);"
+	>
+		<div class="flex items-start justify-between gap-4">
+			<div class="min-w-0">
+				<p class="text-sm font-bold text-rr-red">{ title }</p>
+				<p class="mt-1 text-xs text-rr-muted">{ detail }</p>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<span class="label-font text-rr-red" style="font-size:0.65rem;">{ cta }</span>
+				@chevronRight()
+			</div>
+		</div>
+	</a>
+}
+
+// urgentGroupLink renders the header row above an urgent order group.
+templ urgentGroupLink(title, detail, href string) {
+	<a
+		href={ templ.SafeURL(href) }
+		class="block border-2 border-rr-border bg-rr-surface p-4 hover:-translate-x-px hover:-translate-y-px transition-transform"
+		style="box-shadow: 4px 4px 0 0 var(--color-rr-red);"
+	>
+		<div class="flex items-start justify-between gap-4">
+			<div class="min-w-0">
+				<p class="text-sm font-bold text-rr-red">{ title }</p>
+				<p class="mt-1 text-xs text-rr-muted">{ detail }</p>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<span class="label-font text-rr-red" style="font-size:0.65rem;">Open list</span>
+				@chevronRight()
+			</div>
+		</div>
+	</a>
+}
+
+// orderLinkRow renders a single order row inside a band.
+templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool) {
+	<a
+		href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) }
+		class={ "flex items-center justify-between gap-4 border-2 px-4 py-2.5 hover:bg-rr-raised transition-colors",
+			templ.KV("border-rr-border bg-rr-surface", urgent),
+			templ.KV("border-rr-border bg-rr-surface", !urgent),
+		}
+	>
+		<div class="flex items-center gap-3 min-w-0">
+			<span class="text-sm font-semibold text-rr-heading">{ o.Number }</span>
+			<span class="hidden sm:inline text-sm text-rr-muted tabular-nums">{ formatCents(o.Total) }</span>
+			if ageIsStale(o.PlacedAt) {
+				<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt) }</span>
+			} else {
+				<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt) }</span>
+			}
+		</div>
+		<div class="flex items-center gap-3 shrink-0">
+			<span class={ "label-font", labelClass }  style="font-size:0.6rem;">{ label }</span>
+			@chevronRight()
+		</div>
+	</a>
+}
+
+// pipelineGroup renders a named queue (Pack / Ship) with a count header and row list.
+templ pipelineGroup(label string, count int, orders []domain.Order, viewAllHref, labelClass, dotClass string) {
+	<div class="border-2 border-rr-border bg-rr-surface">
+		<div class="flex items-baseline justify-between px-4 py-2.5 border-b-2 border-rr-border bg-rr-raised">
+			<div class="flex items-baseline gap-2">
+				<span class={ "inline-block size-2 rounded-full", dotClass }></span>
+				<h3 class="text-sm font-bold uppercase tracking-wide text-rr-heading">{ label } queue</h3>
+				<span class="text-sm font-semibold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", count) }</span>
+			</div>
+			if count > len(orders) {
+				<a href={ templ.SafeURL(viewAllHref) } class="text-xs font-semibold text-rr-red hover:text-rr-red-lt">
+					View all { fmt.Sprintf("%d", count) } &rarr;
+				</a>
+			} else {
+				<a href={ templ.SafeURL(viewAllHref) } class="text-xs font-semibold text-rr-red hover:text-rr-red-lt">
+					View all &rarr;
+				</a>
+			}
+		</div>
+		if len(orders) == 0 {
+			<div class="px-4 py-6 text-center text-sm text-rr-muted">Nothing queued.</div>
+		} else {
+			<div class="divide-y divide-rr-border">
+				for _, o := range orders {
+					<a
+						href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) }
+						class="flex items-center justify-between gap-4 px-4 py-2.5 hover:bg-rr-raised transition-colors"
+					>
+						<div class="flex items-center gap-3 min-w-0">
+							<span class="text-sm font-semibold text-rr-heading">{ o.Number }</span>
+							<span class="hidden sm:inline text-sm text-rr-muted tabular-nums">{ formatCents(o.Total) }</span>
+						</div>
+						<div class="flex items-center gap-2 shrink-0">
+							if ageIsStale(o.PlacedAt) {
+								<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt) }</span>
+							} else {
+								<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt) }</span>
+							}
+							@chevronRight()
+						</div>
+					</a>
+				}
+			</div>
+		}
+	</div>
+}
+
+templ chevronRight() {
+	<svg class="size-4 text-rr-border" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+		<path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"></path>
+	</svg>
+}
+
+// bandSpacing returns tight top spacing for the first band, and larger spacing for
+// subsequent bands so they visually separate.
+func bandSpacing(prevCount int) string {
+	if prevCount == 0 {
+		return "mt-8"
+	}
+	return "mt-10"
+}
+
 templ Dashboard(props DashboardProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      "Dashboard",
@@ -212,14 +393,6 @@ templ Dashboard(props DashboardProps) {
 	}) {
 		@DashboardContent(props)
 	}
-}
-
-// urgentCount highlights the number in red when > 0.
-func urgentCount(n int) string {
-	if n > 0 {
-		return "text-rr-red"
-	}
-	return "text-rr-heading"
 }
 
 func pluralS(n int) string {

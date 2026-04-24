@@ -32,6 +32,7 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 
 	var products []domain.Product
 	var cards []storefront.ProductCard
+	var featuredHeroURL string
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		products, txErr = d.CatalogService.ListProducts(ctx, tx, filter)
@@ -52,6 +53,9 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 			}
 			if len(media) > 0 {
 				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
+				if i == 0 {
+					featuredHeroURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantHero)
+				}
 			}
 
 			variants, varErr := d.CatalogService.ListVariants(ctx, tx, p.ID)
@@ -86,7 +90,7 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(cards) > 0 {
 		props.FeaturedProduct = &cards[0]
-		props.HeroImageURL = "/static/cloud-9-mockup.avif"
+		props.HeroImageURL = featuredHeroURL
 		props.FeaturedProducts = cards // show all products in the grid, including the featured one
 	}
 

@@ -240,26 +240,46 @@ templ HomeContent(props HomePageProps) {
 			</div>
 		</div>
 	</section>
-	<!-- Featured roasts — full-width warm section -->
+	<!-- Popular Roasts — paper-and-ink product grid -->
 	if len(props.FeaturedProducts) > 0 {
-		<section class="-mx-4 sm:-mx-6 lg:-mx-8">
-			<div class="relative bg-rr-surface/50">
-				<div class="window-glow absolute inset-0 opacity-50"></div>
-				<div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
-					<div class="text-center mb-10">
-						<h2 class="font-display text-3xl tracking-widest text-rr-heading">POPULAR ROASTS</h2>
-						<p class="mt-1 font-body text-sm text-rr-muted">Our most-loved coffees, roasted to perfection.</p>
+		<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper-warm">
+			<!-- Paper grain overlay -->
+			<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+			<div class="relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24">
+				<!-- Section header -->
+				<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10 sm:mb-14">
+					<div>
+						<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+							Roasted this week
+						</p>
+						<h2 class="font-slab text-ink uppercase leading-[0.95] mt-3" style="font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing:-0.005em;">
+							The
+							<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">whole</span>
+							lineup
+						</h2>
 					</div>
-					<div class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
-						for _, card := range props.FeaturedProducts {
-							@productCard(card)
-						}
-					</div>
-					<div class="mt-10 text-center">
-						<a href="/catalog" class="btn label-font px-10 py-4 rounded-sm text-white text-sm bg-rr-red hover:bg-rr-red-lt transition-colors">
-							BROWSE ALL COFFEE
-						</a>
-					</div>
+					<p class="font-oswald text-ink-soft text-sm leading-relaxed max-w-xs">
+						Every bag roasted to order. Pick your grind, pick your size, pick your day.
+					</p>
+				</div>
+				<!-- Product grid -->
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
+					for _, card := range props.FeaturedProducts {
+						@productCardPaper(card)
+					}
+				</div>
+				<!-- CTA -->
+				<div class="mt-14 text-center">
+					<a
+						href="/catalog"
+						class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-8 py-4 font-oswald font-bold text-sm"
+						style="letter-spacing:0.14em; text-transform:uppercase;"
+					>
+						Browse all coffee
+						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+						</svg>
+					</a>
 				</div>
 			</div>
 		</section>

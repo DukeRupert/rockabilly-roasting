@@ -328,6 +328,92 @@ templ CatalogResults(props CatalogPageProps) {
 	}
 }
 
+// productCardPaper is the paper-and-ink variant of the product card, used on
+// the home "Popular Roasts" grid. The dark productCard variant still covers
+// the main catalog listing page until it is reskinned.
+templ productCardPaper(card ProductCard) {
+	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug) } class="btn-stamp group block bg-cream-hi border-2 border-ink">
+		<!-- Image panel -->
+		<div class="relative aspect-square bg-paper-warm border-b-2 border-ink overflow-hidden">
+			if card.ThumbnailURL != "" {
+				<img
+					src={ card.ThumbnailURL }
+					alt={ cardAltText(card.Product.Title, card.Coffee) }
+					class="h-full w-full object-cover object-center"
+					loading="lazy"
+				/>
+			} else {
+				<div class="flex h-full w-full items-center justify-center">
+					<div class="w-16 h-16 border-2 border-ink bg-paper flex items-center justify-center">
+						<span class="font-slab text-ink text-2xl leading-none">
+							{ string([]rune(card.Product.Title)[0:1]) }
+						</span>
+					</div>
+				</div>
+			}
+			<!-- Seasonal — amber corner sticker, top-left -->
+			if card.Coffee != nil && card.Coffee.IsSeasonal {
+				<div class="absolute top-2 left-2">
+					<span class="inline-block font-oswald font-bold text-[10px] text-ink bg-candle border-2 border-ink px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
+						Seasonal
+					</span>
+				</div>
+			}
+			<!-- Decaf — ink chip, top-right -->
+			if card.Coffee != nil && card.Coffee.IsDecaf {
+				<div class="absolute top-2 right-2">
+					<span class="inline-block font-oswald font-bold text-[10px] text-paper bg-ink border-2 border-paper px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
+						Decaf
+					</span>
+				</div>
+			}
+		</div>
+		<!-- Content -->
+		<div class="p-4 sm:p-5 flex flex-col gap-2">
+			<!-- Origin tag -->
+			if card.Coffee != nil && len(card.Coffee.Regions) > 0 {
+				<p class="font-oswald text-chrome-deep text-[10px] sm:text-[11px] font-semibold" style="letter-spacing:0.2em; text-transform:uppercase;">
+					{ card.Coffee.Regions[0] }
+				</p>
+			} else if card.Coffee != nil && validRoastLevel(card.Coffee.RoastLevel) {
+				<p class="font-oswald text-chrome-deep text-[10px] sm:text-[11px] font-semibold" style="letter-spacing:0.2em; text-transform:uppercase;">
+					{ roastLevelLabel(card.Coffee.RoastLevel) } roast
+				</p>
+			}
+			<!-- Title -->
+			<h3 class="font-slab text-ink uppercase leading-[0.95] text-xl sm:text-2xl group-hover:text-rust transition-colors" style="letter-spacing:-0.005em;">
+				{ card.Product.Title }
+			</h3>
+			<!-- Tasting notes -->
+			if card.Coffee != nil && len(card.Coffee.TastingNotes) > 0 {
+				<ul class="flex flex-wrap gap-1.5 mt-1">
+					for _, note := range cardTastingNotesList(card.Coffee.TastingNotes, 3) {
+						<li class="font-oswald font-bold text-[9px] sm:text-[10px] text-ink bg-paper border-2 border-ink px-2 py-0.5 rounded-full" style="letter-spacing:0.12em; text-transform:uppercase;">
+							{ note }
+						</li>
+					}
+				</ul>
+			}
+			<!-- Footer row: price + shop indicator, separated by ink double-rule -->
+			<div class="mt-3 pt-3 border-t-2 border-ink flex items-center justify-between">
+				if card.BasePrice != nil {
+					<span class="font-special text-ink text-sm sm:text-base">
+						{ formatCents(*card.BasePrice) } · 12oz
+					</span>
+				} else {
+					<span></span>
+				}
+				<span class="inline-flex items-center gap-1 font-oswald font-bold text-[10px] sm:text-[11px] text-rust group-hover:text-rust-deep transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">
+					Shop
+					<svg class="size-3 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+					</svg>
+				</span>
+			</div>
+		</div>
+	</a>
+}
+
 templ productCard(card ProductCard) {
 	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug) } class="product-card group rounded-sm overflow-hidden border border-rr-border bg-rr-surface">
 		<!-- Compact image — 3:4 aspect ratio instead of square -->

@@ -21,6 +21,7 @@ func (d *Deps) handleAdminSubscriptionList(w http.ResponseWriter, r *http.Reques
 
 	statusFilter := r.URL.Query().Get("status")
 	searchQuery := strings.TrimSpace(r.URL.Query().Get("q"))
+	sortParam := r.URL.Query().Get("sort")
 	pageStr := r.URL.Query().Get("page")
 
 	page := 1
@@ -28,9 +29,18 @@ func (d *Deps) handleAdminSubscriptionList(w http.ResponseWriter, r *http.Reques
 		page = p
 	}
 
+	var sort store.SubscriptionSort
+	switch sortParam {
+	case "next_order_asc", "next_order_desc", "created_asc", "created_desc":
+		sort = store.SubscriptionSort(sortParam)
+	default:
+		sort = store.SubscriptionSortCreatedDesc
+	}
+
 	perPage := 25
 	filter := store.SubscriptionFilter{
 		CustomerQuery: searchQuery,
+		Sort:          sort,
 		Limit:         perPage + 1,
 		Offset:        (page - 1) * perPage,
 	}
@@ -105,6 +115,7 @@ func (d *Deps) handleAdminSubscriptionList(w http.ResponseWriter, r *http.Reques
 		Subscriptions: enriched,
 		StatusFilter:  statusFilter,
 		SearchQuery:   searchQuery,
+		Sort:          string(sort),
 		Page:          page,
 		PerPage:       perPage,
 		HasMore:       hasMore,

@@ -271,10 +271,21 @@ func (s *SubscriptionStore) CountByStatus(ctx context.Context, tx pgx.Tx, status
 	return count, nil
 }
 
+// SubscriptionSort identifies how the list query should order results.
+type SubscriptionSort string
+
+const (
+	SubscriptionSortCreatedDesc   SubscriptionSort = "created_desc"
+	SubscriptionSortCreatedAsc    SubscriptionSort = "created_asc"
+	SubscriptionSortNextOrderAsc  SubscriptionSort = "next_order_asc"
+	SubscriptionSortNextOrderDesc SubscriptionSort = "next_order_desc"
+)
+
 // SubscriptionFilter holds optional filters for listing subscriptions.
 type SubscriptionFilter struct {
 	Status        *domain.SubscriptionStatus
 	CustomerQuery string // free-text match on customer name / email / company
+	Sort          SubscriptionSort
 	Limit         int
 	Offset        int
 }
@@ -306,7 +317,16 @@ func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionF
 		argN++
 	}
 
-	query += " ORDER BY s.created_at DESC"
+	switch f.Sort {
+	case SubscriptionSortCreatedAsc:
+		query += " ORDER BY s.created_at ASC"
+	case SubscriptionSortNextOrderAsc:
+		query += " ORDER BY s.next_order_at ASC"
+	case SubscriptionSortNextOrderDesc:
+		query += " ORDER BY s.next_order_at DESC"
+	default:
+		query += " ORDER BY s.created_at DESC"
+	}
 
 	limit := f.Limit
 	if limit <= 0 {

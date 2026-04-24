@@ -8,16 +8,65 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
-func subscriptionPageURL(page int, status, q string) string {
+func subscriptionListURL(page int, status, q, sort string) string {
 	v := url.Values{}
-	v.Set("page", fmt.Sprintf("%d", page))
+	if page > 1 {
+		v.Set("page", fmt.Sprintf("%d", page))
+	}
 	if status != "" {
 		v.Set("status", status)
 	}
 	if q != "" {
 		v.Set("q", q)
 	}
+	if sort != "" && sort != "created_desc" {
+		v.Set("sort", sort)
+	}
+	if len(v) == 0 {
+		return "/admin/subscriptions"
+	}
 	return "/admin/subscriptions?" + v.Encode()
+}
+
+// subscriptionSortToggle returns the next sort value when a user clicks the
+// header for `col` (one of "next_order", "created"). Clicking the active
+// column flips direction; clicking an inactive column picks the most useful
+// default (ASC for next_order so soonest is on top, DESC for created so
+// newest is on top).
+func subscriptionSortToggle(col, current string) string {
+	switch col {
+	case "next_order":
+		if current == "next_order_asc" {
+			return "next_order_desc"
+		}
+		return "next_order_asc"
+	case "created":
+		if current == "created_desc" || current == "" {
+			return "created_asc"
+		}
+		return "created_desc"
+	}
+	return ""
+}
+
+func subscriptionSortIndicator(col, current string) string {
+	switch col {
+	case "next_order":
+		if current == "next_order_asc" {
+			return "↑"
+		}
+		if current == "next_order_desc" {
+			return "↓"
+		}
+	case "created":
+		if current == "created_asc" {
+			return "↑"
+		}
+		if current == "created_desc" || current == "" {
+			return "↓"
+		}
+	}
+	return ""
 }
 
 type EnrichedSubscription struct {
@@ -31,6 +80,7 @@ type SubscriptionListProps struct {
 	Subscriptions []EnrichedSubscription
 	StatusFilter  string
 	SearchQuery   string
+	Sort          string
 	Page          int
 	PerPage       int
 	HasMore       bool
@@ -48,6 +98,9 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 	</div>
 	<!-- Filters -->
 	<form method="get" action="/admin/subscriptions" class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+		if props.Sort != "" && props.Sort != "created_desc" {
+			<input type="hidden" name="sort" value={ props.Sort }/>
+		}
 		<div class="relative flex-1 sm:max-w-sm">
 			<input
 				type="search"
@@ -100,8 +153,32 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Customer</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Plan</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Next Order</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Created</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">
+								<a
+									href={ templ.SafeURL(subscriptionListURL(1, props.StatusFilter, props.SearchQuery, subscriptionSortToggle("next_order", props.Sort))) }
+									class="inline-flex items-center gap-1 hover:text-rr-red"
+								>
+									Next Order
+									if ind := subscriptionSortIndicator("next_order", props.Sort); ind != "" {
+										<span class="text-rr-red">{ ind }</span>
+									} else {
+										<span class="text-rr-border">↕</span>
+									}
+								</a>
+							</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">
+								<a
+									href={ templ.SafeURL(subscriptionListURL(1, props.StatusFilter, props.SearchQuery, subscriptionSortToggle("created", props.Sort))) }
+									class="inline-flex items-center gap-1 hover:text-rr-red"
+								>
+									Created
+									if ind := subscriptionSortIndicator("created", props.Sort); ind != "" {
+										<span class="text-rr-red">{ ind }</span>
+									} else {
+										<span class="text-rr-border">↕</span>
+									}
+								</a>
+							</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
@@ -144,7 +221,7 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 				<div class="-mt-px flex w-0 flex-1">
 					if props.Page > 1 {
 						<a
-							href={ templ.SafeURL(subscriptionPageURL(props.Page-1, props.StatusFilter, props.SearchQuery)) }
+							href={ templ.SafeURL(subscriptionListURL(props.Page-1, props.StatusFilter, props.SearchQuery, props.Sort)) }
 							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 						>
 							Previous
@@ -154,7 +231,7 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 				<div class="-mt-px flex w-0 flex-1 justify-end">
 					if props.HasMore {
 						<a
-							href={ templ.SafeURL(subscriptionPageURL(props.Page+1, props.StatusFilter, props.SearchQuery)) }
+							href={ templ.SafeURL(subscriptionListURL(props.Page+1, props.StatusFilter, props.SearchQuery, props.Sort)) }
 							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 						>
 							Next

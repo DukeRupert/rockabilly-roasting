@@ -5,8 +5,8 @@ package admin
 templ StaffLoginForm(errMsg string, email string) {
 	<div id="login-form">
 		if errMsg != "" {
-			<div class="mb-5 rounded-sm border border-rr-red/30 bg-rr-red/10 px-4 py-3">
-				<p class="text-sm text-red-400" style="font-family: 'Barlow', sans-serif;">{ errMsg }</p>
+			<div class="mb-5 border-2 border-rust bg-paper p-3 text-center">
+				<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">{ errMsg }</p>
 			</div>
 		}
 		<form
@@ -20,8 +20,8 @@ templ StaffLoginForm(errMsg string, email string) {
 			<div>
 				<label
 					for="email"
-					class="block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2"
-					style="font-family: 'Barlow', sans-serif;"
+					class="font-oswald font-bold text-ink text-[11px] mb-2 block"
+					style="letter-spacing:0.2em; text-transform:uppercase;"
 				>
 					Email
 				</label>
@@ -33,15 +33,15 @@ templ StaffLoginForm(errMsg string, email string) {
 					required
 					value={ email }
 					placeholder="you@rockabillyroasting.com"
-					class="login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150"
-					style="font-family: 'Barlow', sans-serif;"
+					class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-base text-ink placeholder:text-chrome-deep focus:outline-none"
+					style="letter-spacing:0.04em;"
 				/>
 			</div>
 			<div>
 				<label
 					for="password"
-					class="block text-xs font-bold uppercase tracking-[0.18em] text-rr-muted mb-2"
-					style="font-family: 'Barlow', sans-serif;"
+					class="font-oswald font-bold text-ink text-[11px] mb-2 block"
+					style="letter-spacing:0.2em; text-transform:uppercase;"
 				>
 					Password
 				</label>
@@ -51,17 +51,20 @@ templ StaffLoginForm(errMsg string, email string) {
 					type="password"
 					autocomplete="current-password"
 					required
-					class="login-input block w-full rounded-sm border border-rr-border bg-rr-surface px-4 py-3 text-sm text-rr-heading placeholder:text-rr-faint transition-colors duration-150"
-					style="font-family: 'Barlow', sans-serif;"
+					class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-base text-ink placeholder:text-chrome-deep focus:outline-none"
+					style="letter-spacing:0.04em;"
 				/>
 			</div>
 			<div class="pt-2">
 				<button
 					type="submit"
-					class="login-btn flex w-full justify-center rounded-sm bg-rr-red px-4 py-3 text-sm font-bold uppercase tracking-[0.12em] text-white shadow-lg transition-all duration-150 hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-amber"
-					style="font-family: 'Barlow', sans-serif;"
+					class="btn-stamp w-full inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm"
+					style="letter-spacing:0.16em; text-transform:uppercase;"
 				>
-					Sign In
+					Sign Me In
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+					</svg>
 				</button>
 			</div>
 		</form>
@@ -78,118 +81,125 @@ templ StaffLoginPage(errMsg string) {
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-			<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+			<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@400;500;600;700&family=Special+Elite&family=Yellowtail&display=swap" rel="stylesheet"/>
 			<script src="/static/js/htmx.min.js"></script>
 			<style>
-				/* Login uses the brand dark palette — no overrides */
+				/* Ink poster panel: candle-amber radial glow on deep ink */
 				.login-brand {
 					background:
-						/* Halftone dot texture */
-						radial-gradient(circle, rgba(232, 146, 26, 0.08) 1px, transparent 1px),
-						/* Edison-bulb radial glow */
-						radial-gradient(ellipse at 50% 55%, rgba(232, 146, 26, 0.14) 0%, rgba(232, 146, 26, 0.04) 45%, transparent 70%),
-						/* Base */
-						#0E0F10;
-					background-size: 18px 18px, 100% 100%, 100% 100%;
+						radial-gradient(ellipse at 50% 55%, rgba(242, 160, 61, 0.22) 0%, rgba(242, 160, 61, 0.04) 45%, transparent 72%),
+						#0E0D0C;
 				}
+				/* Paper panel: subtle halftone grain */
 				.login-form-panel {
-					background:
-						/* Subtle crosshatch */
-						repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(168, 184, 192, 0.03) 4px, rgba(168, 184, 192, 0.03) 5px),
-						repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(168, 184, 192, 0.03) 4px, rgba(168, 184, 192, 0.03) 5px),
-						#161A1E;
+					background-color: #F6EFE1;
+					background-image: radial-gradient(circle, rgba(14, 13, 12, 0.06) 1px, transparent 1px);
+					background-size: 4px 4px;
 				}
-				/* Flame stripe */
+				/* Flame-stripe divider (rust → amber → rust) */
 				.flame-stripe-login {
 					height: 3px;
-					background: linear-gradient(90deg, #7A1210, #B82018, #E8921A, #B82018, #7A1210);
+					background: linear-gradient(90deg, #8A240F, #B4351D, #F2A03D, #B4351D, #8A240F);
 				}
-				/* Input focus glow */
-				.login-input:focus {
-					outline: none;
-					border-color: #E8921A;
-					box-shadow: 0 0 0 3px rgba(232, 146, 26, 0.2), 0 0 16px rgba(232, 146, 26, 0.08);
-				}
-				/* Button glow on hover */
-				.login-btn:hover {
-					box-shadow: 0 0 24px rgba(184, 32, 24, 0.5), 0 4px 12px rgba(0, 0, 0, 0.4);
-				}
-				.login-btn:active {
-					transform: translateY(2px);
-					box-shadow: none;
-				}
-				/* Logo entrance */
+				/* Entrance animations */
 				@keyframes logo-settle {
-					from { opacity: 0; transform: translateY(-12px); }
+					from { opacity: 0; transform: translateY(-10px); }
 					to { opacity: 1; transform: translateY(0); }
 				}
 				@keyframes form-rise {
-					from { opacity: 0; transform: translateY(16px); }
+					from { opacity: 0; transform: translateY(12px); }
 					to { opacity: 1; transform: translateY(0); }
 				}
-				.animate-logo { animation: logo-settle 0.6s ease-out both; }
-				.animate-form { animation: form-rise 0.5s ease-out 0.2s both; }
+				.animate-logo { animation: logo-settle 0.5s ease-out both; }
+				.animate-form { animation: form-rise 0.45s ease-out 0.15s both; }
 				@media (prefers-reduced-motion: reduce) {
 					.animate-logo, .animate-form { animation: none; opacity: 1; }
 				}
 			</style>
 		</head>
-		<body class="h-full bg-rr-void">
+		<body class="h-full" style="background:#F6EFE1; color:#0E0D0C;">
 			<div class="flex min-h-full">
-				<!-- Brand Panel (hidden on small screens, visible lg+) -->
+				<!-- Brand panel (lg+ only) -->
 				<div class="login-brand hidden lg:flex lg:w-1/2 flex-col items-center justify-center relative overflow-hidden">
-					<!-- Decorative flame stripe at top -->
 					<div class="flame-stripe-login absolute top-0 left-0 right-0"></div>
-
-					<div class="animate-logo flex flex-col items-center gap-8 px-12">
+					<div class="animate-logo flex flex-col items-center gap-4 px-12">
 						<img
-							src="/static/logo-white.svg"
+							src="/static/double-candle.png"
 							alt="Rockabilly Roasting Co."
-							class="w-56 h-auto drop-shadow-[0_0_40px_rgba(232,146,26,0.2)]"
+							width="3300"
+							height="4200"
+							decoding="async"
+							class="w-72 h-auto"
 						/>
 						<div class="text-center">
 							<p
-								class="text-rr-amber tracking-[0.35em] text-xs font-semibold uppercase"
-								style="font-family: 'Barlow', sans-serif;"
+								class="font-oswald text-candle text-[11px] font-semibold"
+								style="letter-spacing:0.32em; text-transform:uppercase;"
 							>
 								Staff Portal
 							</p>
+							<p
+								class="font-script text-paper text-2xl mt-2"
+								style="line-height:1;"
+							>
+								back of house.
+							</p>
 						</div>
 					</div>
-
-					<!-- Decorative flame stripe at bottom -->
 					<div class="flame-stripe-login absolute bottom-0 left-0 right-0"></div>
 				</div>
-
-				<!-- Form Panel -->
-				<div class="login-form-panel flex w-full lg:w-1/2 flex-col justify-center px-6 py-12 sm:px-12">
+				<!-- Form panel -->
+				<div class="login-form-panel flex w-full lg:w-1/2 flex-col justify-center px-6 py-12 sm:px-12 relative">
 					<div class="animate-form mx-auto w-full max-w-sm">
-						<!-- Mobile logo (hidden lg+) -->
-						<div class="lg:hidden flex flex-col items-center mb-10">
+						<!-- Mobile ink badge (hidden lg+) -->
+						<div class="lg:hidden mb-8 -mx-6 sm:-mx-12 px-6 sm:px-12 py-6 text-center relative" style="background:#0E0D0C;">
+							<div class="flame-stripe-login absolute top-0 left-0 right-0"></div>
 							<img
 								src="/static/logo-white.svg"
 								alt="Rockabilly Roasting Co."
-								class="w-40 h-auto mb-4 drop-shadow-[0_0_24px_rgba(232,146,26,0.15)]"
+								class="w-28 h-auto mx-auto mb-2"
 							/>
-							<div class="flame-stripe-login w-full mt-4"></div>
-						</div>
-
-						<div class="mb-8">
-							<h1
-								class="text-3xl tracking-wide text-rr-heading"
-								style="font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.08em;"
+							<p
+								class="font-oswald text-candle text-[10px] font-semibold"
+								style="letter-spacing:0.28em; text-transform:uppercase;"
 							>
-								Sign In
+								Staff Portal
+							</p>
+							<div class="flame-stripe-login absolute bottom-0 left-0 right-0"></div>
+						</div>
+						<!-- Heading -->
+						<div class="text-center mb-8">
+							<p
+								class="font-oswald text-chrome-deep text-xs font-semibold"
+								style="letter-spacing:0.24em; text-transform:uppercase;"
+							>
+								Clock in
+							</p>
+							<h1
+								class="font-slab text-ink uppercase leading-[0.92] mt-2"
+								style="font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;"
+							>
+								Sign
+								<span
+									class="font-script text-rust normal-case inline-block align-baseline"
+									style="font-size:1.1em; letter-spacing:0;"
+								>
+									in.
+								</span>
 							</h1>
-							<p class="mt-1 text-sm text-rr-muted" style="font-family: 'Barlow', sans-serif;">
-								Enter your credentials to continue.
+							<p class="font-oswald text-ink-soft text-sm mt-3 max-w-xs mx-auto leading-relaxed">
+								Crew only. Enter your credentials to continue.
 							</p>
 						</div>
-
-						@StaffLoginForm(errMsg, "")
-
-						<p class="mt-8 text-center text-xs text-rr-faint" style="font-family: 'Barlow', sans-serif;">
-							Rockabilly Roasting Co. — Kennewick, WA
+						<!-- Form card -->
+						<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8">
+							@StaffLoginForm(errMsg, "")
+						</div>
+						<p
+							class="mt-8 text-center font-special text-chrome-deep text-xs"
+							style="letter-spacing:0.04em;"
+						>
+							Rockabilly Roasting Co. &middot; Kennewick, WA
 						</p>
 					</div>
 				</div>

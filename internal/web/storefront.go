@@ -450,6 +450,20 @@ func (d *Deps) handlePrivacyPage(w http.ResponseWriter, r *http.Request) {
 	storefront.PrivacyPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
+// handleNewsletterThanksPage renders the post-signup landing page after a
+// Broadwave subscribe form submission redirects back here.
+func (d *Deps) handleNewsletterThanksPage(w http.ResponseWriter, r *http.Request) {
+	props := storefront.NewsletterThanksProps{
+		CartCount:    d.cartItemCountFromCookie(r),
+		CanonicalURL: d.BaseURL + r.URL.Path,
+	}
+	if IsHTMX(r) {
+		storefront.NewsletterThanksContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.NewsletterThanksPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
 // handleTermsPage renders the terms of service page.
 func (d *Deps) handleTermsPage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.TermsProps{

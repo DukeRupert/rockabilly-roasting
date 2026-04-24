@@ -60,7 +60,13 @@ func taxCalculatorForConfig(cfg *domain.TaxConfig, isWholesale bool) tax.TaxCalc
 	}
 	switch cfg.Mode {
 	case domain.TaxModeFlatRate:
-		return &tax.FlatRateCalculator{Rate: cfg.Rate, Label: cfg.Label}
+		// Single-nexus WA merchant. If a second nexus state is added,
+		// promote Jurisdiction to a store_settings column.
+		return &tax.FlatRateCalculator{
+			Rate:         cfg.Rate,
+			Label:        cfg.Label,
+			Jurisdiction: "WA",
+		}
 	case domain.TaxModeStripeTax:
 		// Stripe Tax not yet implemented — fall back to none.
 		return &tax.NoneCalculator{}
@@ -70,7 +76,9 @@ func taxCalculatorForConfig(cfg *domain.TaxConfig, isWholesale bool) tax.TaxCalc
 }
 
 // CalculateTax computes tax for the given line items using the store's tax configuration.
-func (s *CheckoutService) CalculateTax(ctx context.Context, tx pgx.Tx, items []domain.TaxLineItem, customerExempt, isWholesale bool) (*domain.TaxResult, error) {
+// shippingState is the 2-letter state code of the ship-to address; pass "" if unknown
+// (flat-rate with a Jurisdiction will return zero in that case).
+func (s *CheckoutService) CalculateTax(ctx context.Context, tx pgx.Tx, items []domain.TaxLineItem, customerExempt, isWholesale bool, shippingState string) (*domain.TaxResult, error) {
 	cfg, err := s.settings.GetTaxConfig(ctx, tx)
 	if err != nil {
 		return nil, fmt.Errorf("get tax config: %w", err)
@@ -79,6 +87,7 @@ func (s *CheckoutService) CalculateTax(ctx context.Context, tx pgx.Tx, items []d
 	calculator := taxCalculatorForConfig(cfg, isWholesale)
 	result, err := calculator.Calculate(ctx, tax.TaxOrder{
 		CustomerExempt: customerExempt,
+		ShippingState:  shippingState,
 		LineItems:      items,
 	})
 	if err != nil {

@@ -499,14 +499,6 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return fmt.Errorf("get customer for tax: %w", txErr)
 		}
 
-		isWholesale := customer.AccountType == domain.AccountTypeWholesale
-		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, isWholesale)
-		if txErr != nil {
-			return fmt.Errorf("calculate tax: %w", txErr)
-		}
-		taxTotal = taxResult.TaxTotal
-		taxLabel = taxResult.Label
-
 		// scoping: addressID comes from client-submitted JSON and is not scoped to customerID.
 		// Impact is limited (tax calc + order creation use the address; content is not echoed back
 		// to the client), but worth tightening post-launch. Tracked as follow-up.
@@ -514,6 +506,14 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		if txErr != nil {
 			return fmt.Errorf("get address: %w", txErr)
 		}
+
+		isWholesale := customer.AccountType == domain.AccountTypeWholesale
+		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, isWholesale, shippingAddr.State)
+		if txErr != nil {
+			return fmt.Errorf("calculate tax: %w", txErr)
+		}
+		taxTotal = taxResult.TaxTotal
+		taxLabel = taxResult.Label
 
 		return nil
 	})
@@ -681,7 +681,12 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 		}
 		isWholesale := customer.AccountType == domain.AccountTypeWholesale
 
-		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, isWholesale)
+		shippingAddr, txErr := d.CustomerService.GetAddressByIDAsStaff(ctx, tx, addressID)
+		if txErr != nil {
+			return fmt.Errorf("get address for tax: %w", txErr)
+		}
+
+		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, isWholesale, shippingAddr.State)
 		if txErr != nil {
 			return fmt.Errorf("calculate tax: %w", txErr)
 		}

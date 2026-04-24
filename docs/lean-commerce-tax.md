@@ -4,15 +4,32 @@ Tax calculation supports three modes configured at the store level: flat rate, S
 
 ---
 
+## Current status (Rockabilly Roasting)
+
+**Configured: WA Sales Tax flat-rate 8.8%, ship-to-WA only. Effectively dormant until a taxable SKU is added.**
+
+- Migration `037_enable_wa_sales_tax.sql` sets `store_settings` to `flat_rate` / `0.0880` / `"WA Sales Tax"` and marks every existing product `tax_exempt = true`. Today's catalog is bagged coffee, which falls under WA's food-for-home-consumption exemption — so B2C WA customers still see $0 tax on every current line item.
+- The flat-rate calculator is jurisdiction-gated (`Jurisdiction: "WA"`, hardcoded in `app/checkout.go`): buyers shipping outside WA are never taxed, regardless of product flags.
+- B2B (wholesale) remains exempt unconditionally.
+
+**Migration is not auto-applied on server boot.** Only River's internal migrations run at startup (see `cmd/server/main.go`). Schema migrations require `mage db:migrate` (or `goose up`) against the target database. Until that's run, `store_settings.tax_mode` stays at its previous value (likely `'none'`) and no tax is computed.
+
+**To light it up for real** (when merch or equipment lands):
+1. `mage db:migrate` in prod if not already applied.
+2. For each taxable product: `UPDATE products SET tax_exempt = false WHERE id = ...;` — no admin form field yet.
+3. WA buyers will then see 8.8% on those line items at checkout; out-of-state buyers still won't.
+
+---
+
 ## Tax modes
 
 | Mode | Description | Use case |
 |------|-------------|----------|
-| `flat_rate` | Fixed percentage applied to taxable line items | Single-jurisdiction merchants (e.g., WA-only) |
-| `stripe_tax` | Stripe calculates based on buyer address + product codes | Multi-state / nexus-tracking merchants |
+| `flat_rate` | Fixed percentage applied to taxable line items (optional jurisdiction gate by ship-to state) | Single-jurisdiction merchants (e.g., WA-only) |
+| `stripe_tax` | Stripe calculates based on buyer address + product codes | Multi-state / nexus-tracking merchants (not yet implemented — falls back to `none`) |
 | `none` | No tax calculated | B2B-only merchants, tax-exempt businesses |
 
-**Rockabilly Roasting:** `flat_rate` at 8.75% (WA Sales Tax) for B2C, no tax on B2B.
+**Rockabilly Roasting:** `flat_rate` at 8.8% (WA Sales Tax), gated to ship-to-WA, for B2C; no tax on B2B.
 
 ---
 

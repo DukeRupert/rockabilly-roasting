@@ -274,7 +274,10 @@ templ Storefront(props StorefrontProps) {
 							<p class="font-oswald text-paper-warm text-sm mb-4 leading-relaxed">
 								Roast drops, fresh deals, nothing else. No spam — just the good stuff.
 							</p>
-							<form method="post" action="/newsletter/subscribe" class="flex flex-col gap-2">
+							<form method="post" action="https://broadwave.fireflysoftware.dev/api/subscribe" class="flex flex-col gap-2">
+								<input type="hidden" name="api_key" value="bw_1ae328f598638462f357e01d43adf6d6"/>
+								<input type="hidden" name="list" value="rockabilly-roasting-newsletter"/>
+								<input type="hidden" name="redirect" value="https://rockabillyroasting.com/newsletter/thanks"/>
 								<label for="newsletter-email" class="sr-only">Email address</label>
 								<input
 									type="email"
@@ -285,6 +288,7 @@ templ Storefront(props StorefrontProps) {
 									class="paper-input w-full border-2 border-paper bg-cream-hi px-3 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none"
 									style="letter-spacing:0.04em;"
 								/>
+								<input type="text" name="website" tabindex="-1" autocomplete="off" style="position:absolute; left:-9999px; width:1px; height:1px;" aria-hidden="true"/>
 								<button
 									type="submit"
 									class="btn-stamp-paper w-full bg-rust text-paper border-2 border-paper px-4 py-2.5 font-oswald font-bold text-sm"

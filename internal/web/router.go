@@ -112,6 +112,7 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /privacy", deps.handlePrivacyPage)
 	mux.HandleFunc("GET /terms", deps.handleTermsPage)
 	mux.HandleFunc("GET /shipping", deps.handleShippingPage)
+	mux.HandleFunc("GET /newsletter/thanks", deps.handleNewsletterThanksPage)
 	mux.HandleFunc("GET /help", deps.handleHelpIndex)
 	mux.HandleFunc("GET /help/{slug}", deps.handleHelpArticle)
 

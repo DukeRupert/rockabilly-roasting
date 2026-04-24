@@ -1,0 +1,56 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+type NewsletterThanksProps struct {
+	CartCount    int
+	CanonicalURL string
+}
+
+templ NewsletterThanksContent(props NewsletterThanksProps) {
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-2xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24 text-center">
+			<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+				One more thing
+			</p>
+			<h1 class="font-slab text-ink uppercase leading-[0.92] mt-3" style="font-size: clamp(2.25rem, 6vw, 3.75rem); letter-spacing:-0.005em;">
+				Check your
+				<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.05em; letter-spacing:0;">inbox.</span>
+			</h1>
+			<p class="font-oswald text-ink-soft text-base sm:text-lg mt-6 leading-relaxed">
+				We sent a confirmation link to the address you gave us. Click it to finish signing up — then we'll send you roast drops and the occasional deal. That's it.
+			</p>
+			<p class="font-special text-chrome-deep text-sm mt-5">
+				No link? Peek in spam, or try again.
+			</p>
+			<div class="mt-10 flex flex-wrap items-center justify-center gap-4">
+				<a
+					href="/catalog"
+					class="btn-stamp-paper bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm inline-block"
+					style="letter-spacing:0.16em; text-transform:uppercase;"
+				>
+					Keep shopping
+				</a>
+				<a
+					href="/"
+					class="font-oswald text-ink-soft text-sm underline underline-offset-4 hover:text-rust transition-colors"
+					style="letter-spacing:0.08em;"
+				>
+					Back to the home page
+				</a>
+			</div>
+		</div>
+	</section>
+}
+
+templ NewsletterThanksPage(props NewsletterThanksProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:        "Check your inbox",
+		Description:  "Confirm your email to join the Rockabilly Roasting newsletter.",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
+	}) {
+		@NewsletterThanksContent(props)
+	}
+}

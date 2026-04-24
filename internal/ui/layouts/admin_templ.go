@@ -126,7 +126,7 @@ func Admin(props AdminProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full\" style=\"background:#F9F6F1;\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\" class=\"h-full\" style=\"background:#F6EFE1;\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -139,7 +139,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Rockabilly Roasting Admin</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/static/favicon-32x32.png\"><link rel=\"icon\" type=\"image/png\" sizes=\"16x16\" href=\"/static/favicon-16x16.png\"><link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/static/apple-touch-icon.png\"><link rel=\"manifest\" href=\"/static/site.webmanifest\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/image-uploader.js\"></script><script defer src=\"/static/js/alpine.min.js\"></script><script src=\"/static/js/htmx.min.js\"></script><style>\n\t\t\t\t/* Admin light mode — kraft paper palette from brand guide v3 */\n\t\t\t\t:root {\n\t\t\t\t\t--color-rr-bg: #F9F6F1 !important;      /* warm concrete */\n\t\t\t\t\t--color-rr-surface: #EDE5D8 !important;  /* kraft paper */\n\t\t\t\t\t--color-rr-raised: #E4DAC8 !important;   /* nav, raised */\n\t\t\t\t\t--color-rr-border: #9A8C7C !important;   /* visible borders */\n\t\t\t\t\t--color-rr-muted: #7A6E60 !important;    /* muted text */\n\t\t\t\t\t--color-rr-body: #3A3028 !important;     /* body text */\n\t\t\t\t\t--color-rr-heading: #1C1610 !important;  /* near-black warm */\n\t\t\t\t}\n\t\t\t\tbody { font-family: 'Barlow', sans-serif; }\n\n\t\t\t\t/* ── Admin status badges ── */\n\t\t\t\t.badge {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.35rem;\n\t\t\t\t\tpadding: 0.2rem 0.6rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tborder: 1px solid transparent;\n\t\t\t\t\tfont-family: 'Barlow', sans-serif;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tletter-spacing: 0.14em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tfont-size: 0.65rem;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t\t.badge-dot::before {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\twidth: 5px;\n\t\t\t\t\theight: 5px;\n\t\t\t\t\tborder-radius: 50%;\n\t\t\t\t\tbackground: currentColor;\n\t\t\t\t\tflex-shrink: 0;\n\t\t\t\t}\n\t\t\t\t.badge-green      { background:#DFF0E4; color:#2A6644; border-color:#A8D4B8; }\n\t\t\t\t.badge-green-solid { background:#2A6644; color:#F0FAF4; border-color:#1E4E32; }\n\t\t\t\t.badge-amber      { background:#FBF0D8; color:#7A4E08; border-color:#E8C070; }\n\t\t\t\t.badge-slate      { background:#E4EAF0; color:#2E4A60; border-color:#A8BED0; }\n\t\t\t\t.badge-teal       { background:#D8F0EE; color:#0A5E5C; border-color:#7ACCC8; }\n\t\t\t\t.badge-teal-solid { background:#0A7870; color:#F0FAFA; border-color:#065858; }\n\t\t\t\t.badge-red        { background:#FAE4E4; color:#7A1210; border-color:#E0A8A8; }\n\t\t\t\t.badge-grey       { background:#E8E0D8; color:#5A5048; border-color:#B8ACA0; }\n\t\t\t\t.badge-pastdue    { background:#FCE8D8; color:#7A3010; border-color:#E8B090; }\n\t\t\t\t.badge-partial    { background:#EEF0D8; color:#4A5218; border-color:#C0C888; }\n\t\t\t\t.badge-blue       { background:#DBEAFE; color:#1E40AF; border-color:#93C5FD; }\n\t\t\t\t.badge-indigo     { background:#E0E7FF; color:#3730A3; border-color:#A5B4FC; }\n\t\t\t\t.badge-neutral    { background:#E4DAC8; color:#5A5048; border-color:#B8ACA0; }\n\n\t\t\t\t/* ── Admin action buttons ── */\n\t\t\t\t.btn-secondary {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: var(--color-rr-heading);\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-secondary:hover { background: var(--color-rr-raised); }\n\n\t\t\t\t.btn-danger {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: #7A1210;\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-danger:hover { background: #FAE4E4; }\n\n\t\t\t\t.btn-confirm {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: #2A6644;\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-confirm:hover { background: #DFF0E4; }\n\n\t\t\t\t/* ── Clickable table rows ── */\n\t\t\t\t.row-link {\n\t\t\t\t\tposition: relative;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t}\n\t\t\t\t.row-link:hover { background: var(--color-rr-raised); }\n\t\t\t\t.row-link .row-link-target::after {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tposition: absolute;\n\t\t\t\t\tinset: 0;\n\t\t\t\t}\n\t\t\t\t/* Keep other interactive elements above the overlay */\n\t\t\t\t.row-link a:not(.row-link-target),\n\t\t\t\t.row-link button,\n\t\t\t\t.row-link form { position: relative; z-index: 1; }\n\t\t\t</style></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML show:window:top\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-rr-heading/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border\"><div class=\"flex h-16 shrink-0 items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Rockabilly Roasting Admin</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/static/favicon-32x32.png\"><link rel=\"icon\" type=\"image/png\" sizes=\"16x16\" href=\"/static/favicon-16x16.png\"><link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/static/apple-touch-icon.png\"><link rel=\"manifest\" href=\"/static/site.webmanifest\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@400;500;600;700&family=Special+Elite&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/image-uploader.js\"></script><script defer src=\"/static/js/alpine.min.js\"></script><script src=\"/static/js/htmx.min.js\"></script><style>\n\t\t\t\t/* Admin — paper-and-ink light. Overrides the legacy rr-* tokens so\n\t\t\t\t   existing utility classes (bg-rr-surface, text-rr-heading, etc.) pick\n\t\t\t\t   up the new palette without per-page rewrites. */\n\t\t\t\t:root {\n\t\t\t\t\t--color-rr-bg: #F6EFE1 !important;       /* paper */\n\t\t\t\t\t--color-rr-surface: #FFFBF1 !important;  /* cream-hi elevated */\n\t\t\t\t\t--color-rr-raised: #ECE0C6 !important;   /* paper-warm hover/rows */\n\t\t\t\t\t--color-rr-border: #0E0D0C !important;   /* ink rules */\n\t\t\t\t\t--color-rr-muted: #8E887D !important;    /* chrome-deep captions */\n\t\t\t\t\t--color-rr-body: #3A332B !important;     /* soft ink body */\n\t\t\t\t\t--color-rr-heading: #0E0D0C !important;  /* ink */\n\t\t\t\t\t--color-rr-red: #B4351D !important;      /* rust CTA */\n\t\t\t\t\t--color-rr-red-lt: #D4492D !important;   /* rust hover */\n\t\t\t\t\t--color-rr-red-dark: #8A240F !important; /* rust pressed */\n\t\t\t\t\t--color-rr-amber: #F2A03D !important;    /* candle */\n\t\t\t\t\t--color-rr-brick: #8A4A30 !important;    /* kept for group labels */\n\t\t\t\t}\n\t\t\t\tbody { font-family: 'Oswald', 'Arial Narrow', sans-serif; }\n\t\t\t\t/* Page title utility — Alfa Slab display, matches storefront headlines */\n\t\t\t\t.admin-page-title {\n\t\t\t\t\tfont-family: 'Alfa Slab One', 'Rockwell', Georgia, serif;\n\t\t\t\t\tfont-weight: 400;\n\t\t\t\t\tfont-size: 1.75rem;\n\t\t\t\t\tline-height: 0.95;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.01em;\n\t\t\t\t\tcolor: var(--color-rr-heading);\n\t\t\t\t}\n\n\t\t\t\t/* ── Admin status badges ── */\n\t\t\t\t.badge {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.35rem;\n\t\t\t\t\tpadding: 0.2rem 0.6rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tborder: 1px solid transparent;\n\t\t\t\t\tfont-family: 'Barlow', sans-serif;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tletter-spacing: 0.14em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tfont-size: 0.65rem;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t\t.badge-dot::before {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\twidth: 5px;\n\t\t\t\t\theight: 5px;\n\t\t\t\t\tborder-radius: 50%;\n\t\t\t\t\tbackground: currentColor;\n\t\t\t\t\tflex-shrink: 0;\n\t\t\t\t}\n\t\t\t\t.badge-green      { background:#DFF0E4; color:#2A6644; border-color:#A8D4B8; }\n\t\t\t\t.badge-green-solid { background:#2A6644; color:#F0FAF4; border-color:#1E4E32; }\n\t\t\t\t.badge-amber      { background:#FBF0D8; color:#7A4E08; border-color:#E8C070; }\n\t\t\t\t.badge-slate      { background:#E4EAF0; color:#2E4A60; border-color:#A8BED0; }\n\t\t\t\t.badge-teal       { background:#D8F0EE; color:#0A5E5C; border-color:#7ACCC8; }\n\t\t\t\t.badge-teal-solid { background:#0A7870; color:#F0FAFA; border-color:#065858; }\n\t\t\t\t.badge-red        { background:#FAE4E4; color:#7A1210; border-color:#E0A8A8; }\n\t\t\t\t.badge-grey       { background:#E8E0D8; color:#5A5048; border-color:#B8ACA0; }\n\t\t\t\t.badge-pastdue    { background:#FCE8D8; color:#7A3010; border-color:#E8B090; }\n\t\t\t\t.badge-partial    { background:#EEF0D8; color:#4A5218; border-color:#C0C888; }\n\t\t\t\t.badge-blue       { background:#DBEAFE; color:#1E40AF; border-color:#93C5FD; }\n\t\t\t\t.badge-indigo     { background:#E0E7FF; color:#3730A3; border-color:#A5B4FC; }\n\t\t\t\t.badge-neutral    { background:#E4DAC8; color:#5A5048; border-color:#B8ACA0; }\n\n\t\t\t\t/* ── Admin action buttons ── */\n\t\t\t\t.btn-secondary {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: var(--color-rr-heading);\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-secondary:hover { background: var(--color-rr-raised); }\n\n\t\t\t\t.btn-danger {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: #7A1210;\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-danger:hover { background: #FAE4E4; }\n\n\t\t\t\t.btn-confirm {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: #2A6644;\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-confirm:hover { background: #DFF0E4; }\n\n\t\t\t\t/* ── Clickable table rows ── */\n\t\t\t\t.row-link {\n\t\t\t\t\tposition: relative;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t}\n\t\t\t\t.row-link:hover { background: var(--color-rr-raised); }\n\t\t\t\t.row-link .row-link-target::after {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tposition: absolute;\n\t\t\t\t\tinset: 0;\n\t\t\t\t}\n\t\t\t\t/* Keep other interactive elements above the overlay */\n\t\t\t\t.row-link a:not(.row-link-target),\n\t\t\t\t.row-link button,\n\t\t\t\t.row-link form { position: relative; z-index: 1; }\n\t\t\t</style></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML show:window:top\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-rr-heading/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r-2 border-rr-border\"><div class=\"flex h-16 shrink-0 items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -164,7 +164,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(group.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 263, Col: 102}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 280, Col: 102}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -196,7 +196,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var5 templ.SafeURL
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 268, Col: 48}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 285, Col: 48}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -226,7 +226,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 270, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 287, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -280,7 +280,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</li></ul></nav></div></div></div></div><!-- Desktop sidebar (expanded by default for desktop-first use) --><div id=\"desktop-sidebar\" class=\"hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300\"><div id=\"desktop-sidebar-inner\" class=\"flex grow flex-col gap-y-5 bg-rr-surface border-r border-rr-border px-6 pb-4 transition-all duration-300\"><div class=\"flex h-16 shrink-0 items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</li></ul></nav></div></div></div></div><!-- Desktop sidebar (expanded by default for desktop-first use) --><div id=\"desktop-sidebar\" class=\"hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300\"><div id=\"desktop-sidebar-inner\" class=\"flex grow flex-col gap-y-5 bg-rr-surface border-r-2 border-rr-border px-6 pb-4 transition-all duration-300\"><div class=\"flex h-16 shrink-0 items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -305,7 +305,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(group.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 308, Col: 151}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 325, Col: 151}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -337,7 +337,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var12 templ.SafeURL
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 313, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 330, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -350,7 +350,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 313, Col: 67}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 330, Col: 67}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -384,7 +384,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 315, Col: 90}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 332, Col: 90}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -430,14 +430,14 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<span data-sidebar-label class=\"transition-opacity duration-200\">Settings</span></a></li></ul></li></ul></nav></div></div><!-- Main content area --><div id=\"main-content-wrapper\" class=\"lg:pl-72 transition-all duration-300 overflow-x-hidden\"><!-- Top bar --><div class=\"sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 shadow-xs sm:gap-x-6 sm:px-6 lg:px-8\"><button type=\"button\" id=\"mobile-menu-btn\" class=\"-m-2.5 p-2.5 text-rr-body lg:hidden\"><span class=\"sr-only\">Open sidebar</span> <svg class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg></button><!-- Separator --><div class=\"h-6 w-px bg-rr-border lg:hidden\" aria-hidden=\"true\"></div><div class=\"flex flex-1 gap-x-4 self-stretch lg:gap-x-6\"><div class=\"flex-1\"></div><div class=\"flex items-center gap-x-4 lg:gap-x-6\"><!-- Desktop user dropdown --><div class=\"relative hidden lg:block\" data-dropdown><button type=\"button\" class=\"-m-1.5 flex items-center p-1.5\" data-dropdown-trigger><span class=\"sr-only\">Open user menu</span> <span class=\"inline-flex size-8 items-center justify-center rounded-full bg-rr-red\"><span class=\"text-sm font-medium text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<span data-sidebar-label class=\"transition-opacity duration-200\">Settings</span></a></li></ul></li></ul></nav></div></div><!-- Main content area --><div id=\"main-content-wrapper\" class=\"lg:pl-72 transition-all duration-300 overflow-x-hidden\"><!-- Top bar --><div class=\"sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b-2 border-rr-border bg-rr-surface px-4 sm:gap-x-6 sm:px-6 lg:px-8\"><button type=\"button\" id=\"mobile-menu-btn\" class=\"-m-2.5 p-2.5 text-rr-body lg:hidden\"><span class=\"sr-only\">Open sidebar</span> <svg class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg></button><!-- Separator --><div class=\"h-6 w-px bg-rr-border lg:hidden\" aria-hidden=\"true\"></div><div class=\"flex flex-1 gap-x-4 self-stretch lg:gap-x-6\"><div class=\"flex-1\"></div><div class=\"flex items-center gap-x-4 lg:gap-x-6\"><!-- Desktop user dropdown --><div class=\"relative hidden lg:block\" data-dropdown><button type=\"button\" class=\"-m-1.5 flex items-center p-1.5\" data-dropdown-trigger><span class=\"sr-only\">Open user menu</span> <span class=\"inline-flex size-8 items-center justify-center rounded-full bg-rr-red\"><span class=\"text-sm font-medium text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 357, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 374, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -450,7 +450,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 360, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 377, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -493,7 +493,7 @@ func adminLogo() templ.Component {
 			templ_7745c5c3_Var20 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<a href=\"/admin\" class=\"flex items-center gap-2\"><div class=\"flex-shrink-0 bg-white rounded-lg p-0.5\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-7 w-auto\"></div><span class=\"text-lg font-semibold tracking-tight text-rr-heading\">Rockabilly</span></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<a href=\"/admin\" class=\"flex items-center gap-2\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-7 w-auto flex-shrink-0\"> <span class=\"text-lg tracking-wide text-rr-heading uppercase\" style=\"font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;\">Rockabilly</span></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -522,7 +522,7 @@ func adminSidebarToggle() templ.Component {
 			templ_7745c5c3_Var21 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<button type=\"button\" onclick=\"toggleSidebar()\" class=\"group flex w-full gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors\"><!-- Menu icon: shown when collapsed --><svg id=\"sidebar-menu-icon\" class=\"hidden size-6 shrink-0 text-rr-muted group-hover:text-rr-red\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg><!-- Logo mark: shown when expanded (default) --><div id=\"sidebar-logo-icon\" class=\"shrink-0 bg-white rounded-lg p-0.5\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"size-5\"></div><span data-sidebar-label class=\"text-lg font-semibold tracking-tight text-rr-heading transition-opacity duration-200\">Rockabilly</span></button>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<button type=\"button\" onclick=\"toggleSidebar()\" class=\"group flex w-full items-center gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors\"><!-- Menu icon: shown when collapsed --><svg id=\"sidebar-menu-icon\" class=\"hidden size-6 shrink-0 text-rr-muted group-hover:text-rr-red\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg><!-- Logo mark: shown when expanded (default) --><img id=\"sidebar-logo-icon\" src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"size-6 shrink-0\"> <span data-sidebar-label class=\"text-lg tracking-wide text-rr-heading uppercase transition-opacity duration-200\" style=\"font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;\">Rockabilly</span></button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -558,7 +558,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 559, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 572, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
@@ -571,7 +571,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 562, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 575, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -584,7 +584,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 563, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 576, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {

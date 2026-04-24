@@ -32,12 +32,12 @@ func (p DashboardProps) hasActions() bool {
 }
 
 templ DashboardContent(props DashboardProps) {
-	<!-- Stat strip -->
-	<div class="flex items-baseline gap-2">
-		<h1 class="text-lg font-bold text-rr-heading">Dashboard</h1>
-		<span class="text-sm text-rr-muted">&middot; today</span>
+	<!-- Page title + stat strip -->
+	<div class="flex items-baseline gap-3">
+		<h1 class="admin-page-title">Dashboard</h1>
+		<span class="label-font text-rr-muted">today</span>
 	</div>
-	<div class="mt-6 rounded-sm bg-rr-surface px-6 py-4 ring-1 ring-rr-border">
+	<div class="mt-6 border-2 border-rr-border bg-rr-surface px-6 py-5">
 		<div class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-5">
 			<div>
 				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ formatCents(props.TodayRevenue) }</p>
@@ -61,12 +61,12 @@ templ DashboardContent(props DashboardProps) {
 			</div>
 		</div>
 	</div>
-	<div class="flame-stripe mt-8 opacity-40"></div>
+	<div class="flame-stripe mt-8"></div>
 	<!-- Needs attention -->
 	if props.hasActions() {
 		<div class="mt-8">
 			<h2 class="label-font text-rr-muted">Needs attention</h2>
-			<div class="mt-3 divide-y divide-rr-border rounded-sm bg-rr-surface ring-1 ring-rr-border">
+			<div class="mt-3 divide-y divide-rr-border border-2 border-rr-border bg-rr-surface">
 				<!-- Orders to fulfill -->
 				for _, o := range props.ToFulfill {
 					<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
@@ -134,7 +134,7 @@ templ DashboardContent(props DashboardProps) {
 	} else {
 		<div class="mt-8">
 			<h2 class="label-font text-rr-muted">Needs attention</h2>
-			<div class="mt-3 rounded-sm border-2 border-dashed border-rr-border py-8 text-center">
+			<div class="mt-3 border-2 border-dashed border-rr-border py-8 text-center">
 				<svg class="mx-auto size-8 text-rr-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
 				</svg>
@@ -149,7 +149,7 @@ templ DashboardContent(props DashboardProps) {
 			<a href="/admin/orders" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">View all</a>
 		</div>
 		if len(props.RecentOrders) == 0 {
-			<div class="mt-3 rounded-sm border-2 border-dashed border-rr-border py-8 text-center">
+			<div class="mt-3 border-2 border-dashed border-rr-border py-8 text-center">
 				<svg class="mx-auto size-10 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"></path>
 				</svg>
@@ -163,7 +163,7 @@ templ DashboardContent(props DashboardProps) {
 				</a>
 			</div>
 		} else {
-			<div class="mt-3 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+			<div class="mt-3 overflow-hidden border-2 border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>

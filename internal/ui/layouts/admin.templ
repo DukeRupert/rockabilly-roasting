@@ -99,7 +99,7 @@ func navIconColor(active bool) string {
 
 templ Admin(props AdminProps) {
 	<!DOCTYPE html>
-	<html lang="en" class="h-full" style="background:#F9F6F1;">
+	<html lang="en" class="h-full" style="background:#F6EFE1;">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -111,23 +111,40 @@ templ Admin(props AdminProps) {
 			<link rel="manifest" href="/static/site.webmanifest"/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-			<link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
+			<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@400;500;600;700&family=Special+Elite&display=swap" rel="stylesheet"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<script defer src="/static/js/image-uploader.js"></script>
 			<script defer src="/static/js/alpine.min.js"></script>
 			<script src="/static/js/htmx.min.js"></script>
 			<style>
-				/* Admin light mode — kraft paper palette from brand guide v3 */
+				/* Admin — paper-and-ink light. Overrides the legacy rr-* tokens so
+				   existing utility classes (bg-rr-surface, text-rr-heading, etc.) pick
+				   up the new palette without per-page rewrites. */
 				:root {
-					--color-rr-bg: #F9F6F1 !important;      /* warm concrete */
-					--color-rr-surface: #EDE5D8 !important;  /* kraft paper */
-					--color-rr-raised: #E4DAC8 !important;   /* nav, raised */
-					--color-rr-border: #9A8C7C !important;   /* visible borders */
-					--color-rr-muted: #7A6E60 !important;    /* muted text */
-					--color-rr-body: #3A3028 !important;     /* body text */
-					--color-rr-heading: #1C1610 !important;  /* near-black warm */
+					--color-rr-bg: #F6EFE1 !important;       /* paper */
+					--color-rr-surface: #FFFBF1 !important;  /* cream-hi elevated */
+					--color-rr-raised: #ECE0C6 !important;   /* paper-warm hover/rows */
+					--color-rr-border: #0E0D0C !important;   /* ink rules */
+					--color-rr-muted: #8E887D !important;    /* chrome-deep captions */
+					--color-rr-body: #3A332B !important;     /* soft ink body */
+					--color-rr-heading: #0E0D0C !important;  /* ink */
+					--color-rr-red: #B4351D !important;      /* rust CTA */
+					--color-rr-red-lt: #D4492D !important;   /* rust hover */
+					--color-rr-red-dark: #8A240F !important; /* rust pressed */
+					--color-rr-amber: #F2A03D !important;    /* candle */
+					--color-rr-brick: #8A4A30 !important;    /* kept for group labels */
 				}
-				body { font-family: 'Barlow', sans-serif; }
+				body { font-family: 'Oswald', 'Arial Narrow', sans-serif; }
+				/* Page title utility — Alfa Slab display, matches storefront headlines */
+				.admin-page-title {
+					font-family: 'Alfa Slab One', 'Rockwell', Georgia, serif;
+					font-weight: 400;
+					font-size: 1.75rem;
+					line-height: 0.95;
+					text-transform: uppercase;
+					letter-spacing: 0.01em;
+					color: var(--color-rr-heading);
+				}
 
 				/* ── Admin status badges ── */
 				.badge {
@@ -251,7 +268,7 @@ templ Admin(props AdminProps) {
 							</button>
 						</div>
 						<!-- Mobile sidebar content -->
-						<div class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border">
+						<div class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r-2 border-rr-border">
 							<div class="flex h-16 shrink-0 items-center">
 								@adminLogo()
 							</div>
@@ -296,7 +313,7 @@ templ Admin(props AdminProps) {
 			</div>
 			<!-- Desktop sidebar (expanded by default for desktop-first use) -->
 			<div id="desktop-sidebar" class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300">
-				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 bg-rr-surface border-r border-rr-border px-6 pb-4 transition-all duration-300">
+				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 bg-rr-surface border-r-2 border-rr-border px-6 pb-4 transition-all duration-300">
 					<div class="flex h-16 shrink-0 items-center">
 						@adminSidebarToggle()
 					</div>
@@ -337,7 +354,7 @@ templ Admin(props AdminProps) {
 			<!-- Main content area -->
 			<div id="main-content-wrapper" class="lg:pl-72 transition-all duration-300 overflow-x-hidden">
 				<!-- Top bar -->
-				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 shadow-xs sm:gap-x-6 sm:px-6 lg:px-8">
+				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b-2 border-rr-border bg-rr-surface px-4 sm:gap-x-6 sm:px-6 lg:px-8">
 					<button type="button" id="mobile-menu-btn" class="-m-2.5 p-2.5 text-rr-body lg:hidden">
 						<span class="sr-only">Open sidebar</span>
 						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -531,24 +548,20 @@ templ Admin(props AdminProps) {
 
 templ adminLogo() {
 	<a href="/admin" class="flex items-center gap-2">
-		<div class="flex-shrink-0 bg-white rounded-lg p-0.5">
-			<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-7 w-auto"/>
-		</div>
-		<span class="text-lg font-semibold tracking-tight text-rr-heading">Rockabilly</span>
+		<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-7 w-auto flex-shrink-0"/>
+		<span class="text-lg tracking-wide text-rr-heading uppercase" style="font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;">Rockabilly</span>
 	</a>
 }
 
 templ adminSidebarToggle() {
-	<button type="button" onclick="toggleSidebar()" class="group flex w-full gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors">
+	<button type="button" onclick="toggleSidebar()" class="group flex w-full items-center gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors">
 		<!-- Menu icon: shown when collapsed -->
 		<svg id="sidebar-menu-icon" class="hidden size-6 shrink-0 text-rr-muted group-hover:text-rr-red" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
 		</svg>
 		<!-- Logo mark: shown when expanded (default) -->
-		<div id="sidebar-logo-icon" class="shrink-0 bg-white rounded-lg p-0.5">
-			<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="size-5"/>
-		</div>
-		<span data-sidebar-label class="text-lg font-semibold tracking-tight text-rr-heading transition-opacity duration-200">Rockabilly</span>
+		<img id="sidebar-logo-icon" src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="size-6 shrink-0"/>
+		<span data-sidebar-label class="text-lg tracking-wide text-rr-heading uppercase transition-opacity duration-200" style="font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;">Rockabilly</span>
 	</button>
 }
 

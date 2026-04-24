@@ -60,7 +60,7 @@ func DashboardContent(props DashboardProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Stat strip --><div class=\"flex items-baseline gap-2\"><h1 class=\"text-lg font-bold text-rr-heading\">Dashboard</h1><span class=\"text-sm text-rr-muted\">&middot; today</span></div><div class=\"mt-6 rounded-sm bg-rr-surface px-6 py-4 ring-1 ring-rr-border\"><div class=\"grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-5\"><div><p class=\"text-2xl font-bold tabular-nums text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page title + stat strip --><div class=\"flex items-baseline gap-3\"><h1 class=\"admin-page-title\">Dashboard</h1><span class=\"label-font text-rr-muted\">today</span></div><div class=\"mt-6 border-2 border-rr-border bg-rr-surface px-6 py-5\"><div class=\"grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 lg:grid-cols-5\"><div><p class=\"text-2xl font-bold tabular-nums text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -169,12 +169,12 @@ func DashboardContent(props DashboardProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</p><p class=\"label-font text-rr-muted mt-1\">active subs</p></div></div></div><div class=\"flame-stripe mt-8 opacity-40\"></div><!-- Needs attention -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</p><p class=\"label-font text-rr-muted mt-1\">active subs</p></div></div></div><div class=\"flame-stripe mt-8\"></div><!-- Needs attention -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.hasActions() {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"mt-8\"><h2 class=\"label-font text-rr-muted\">Needs attention</h2><div class=\"mt-3 divide-y divide-rr-border rounded-sm bg-rr-surface ring-1 ring-rr-border\"><!-- Orders to fulfill -->")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"mt-8\"><h2 class=\"label-font text-rr-muted\">Needs attention</h2><div class=\"mt-3 divide-y divide-rr-border border-2 border-rr-border bg-rr-surface\"><!-- Orders to fulfill -->")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -341,7 +341,7 @@ func DashboardContent(props DashboardProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"mt-8\"><h2 class=\"label-font text-rr-muted\">Needs attention</h2><div class=\"mt-3 rounded-sm border-2 border-dashed border-rr-border py-8 text-center\"><svg class=\"mx-auto size-8 text-rr-teal\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg><p class=\"mt-2 text-sm font-medium text-rr-muted\">All caught up. No actions needed right now.</p></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"mt-8\"><h2 class=\"label-font text-rr-muted\">Needs attention</h2><div class=\"mt-3 border-2 border-dashed border-rr-border py-8 text-center\"><svg class=\"mx-auto size-8 text-rr-teal\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg><p class=\"mt-2 text-sm font-medium text-rr-muted\">All caught up. No actions needed right now.</p></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -351,12 +351,12 @@ func DashboardContent(props DashboardProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if len(props.RecentOrders) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"mt-3 rounded-sm border-2 border-dashed border-rr-border py-8 text-center\"><svg class=\"mx-auto size-10 text-rr-border\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"1\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z\"></path></svg><p class=\"mt-2 text-sm font-medium text-rr-heading\">No orders yet</p><p class=\"mt-1 text-sm text-rr-muted\">Orders will appear here once customers start purchasing.</p><a href=\"/\" target=\"_blank\" class=\"mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-rr-red hover:text-rr-red-lt\">View your storefront <svg class=\"size-3.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25\"></path></svg></a></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"mt-3 border-2 border-dashed border-rr-border py-8 text-center\"><svg class=\"mx-auto size-10 text-rr-border\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"1\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z\"></path></svg><p class=\"mt-2 text-sm font-medium text-rr-heading\">No orders yet</p><p class=\"mt-1 text-sm text-rr-muted\">Orders will appear here once customers start purchasing.</p><a href=\"/\" target=\"_blank\" class=\"mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-rr-red hover:text-rr-red-lt\">View your storefront <svg class=\"size-3.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25\"></path></svg></a></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"mt-3 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Order</th><th scope=\"col\" class=\"px-3 py-3 text-left text-sm font-semibold text-rr-heading\">Status</th><th scope=\"col\" class=\"px-3 py-3 text-left text-sm font-semibold text-rr-heading\">Fulfillment</th><th scope=\"col\" class=\"px-3 py-3 text-right text-sm font-semibold text-rr-heading\">Total</th><th scope=\"col\" class=\"hidden px-3 py-3 text-left text-sm font-semibold text-rr-heading sm:table-cell\">Date</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"mt-3 overflow-hidden border-2 border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Order</th><th scope=\"col\" class=\"px-3 py-3 text-left text-sm font-semibold text-rr-heading\">Status</th><th scope=\"col\" class=\"px-3 py-3 text-left text-sm font-semibold text-rr-heading\">Fulfillment</th><th scope=\"col\" class=\"px-3 py-3 text-right text-sm font-semibold text-rr-heading\">Total</th><th scope=\"col\" class=\"hidden px-3 py-3 text-left text-sm font-semibold text-rr-heading sm:table-cell\">Date</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

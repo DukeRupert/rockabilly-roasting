@@ -10,7 +10,17 @@ import (
 
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
+	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 )
+
+// truncate clips a string to n runes with a trailing ellipsis, so a pathological
+// User-Agent or Referer can't blow up a log line.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
+}
 
 // requestIDMiddleware injects a unique request ID into each request context.
 func requestIDMiddleware(next http.Handler) http.Handler {
@@ -55,20 +65,21 @@ func loggingMiddleware(next http.Handler, logger *slog.Logger, _ *metrics.Regist
 		duration := time.Since(start)
 		ctxLogger := logging.FromContext(r.Context())
 
+		attrs := []any{
+			slog.String(logging.FieldMethod, r.Method),
+			slog.String(logging.FieldPath, r.URL.Path),
+			slog.String(logging.FieldQuery, truncate(r.URL.RawQuery, 500)),
+			slog.Int(logging.FieldStatus, rw.statusCode),
+			slog.Float64(logging.FieldDurationMS, float64(duration.Milliseconds())),
+			slog.String(logging.FieldRemoteIP, ratelimit.ClientIP(r)),
+			slog.String(logging.FieldUserAgent, truncate(r.UserAgent(), 200)),
+			slog.String(logging.FieldReferer, truncate(r.Referer(), 200)),
+		}
+
 		if rw.statusCode >= 500 {
-			ctxLogger.Error("request failed",
-				slog.String(logging.FieldMethod, r.Method),
-				slog.String(logging.FieldPath, r.URL.Path),
-				slog.Int(logging.FieldStatus, rw.statusCode),
-				slog.Float64(logging.FieldDurationMS, float64(duration.Milliseconds())),
-			)
+			ctxLogger.Error("request failed", attrs...)
 		} else {
-			logger.Info("request",
-				slog.String(logging.FieldMethod, r.Method),
-				slog.String(logging.FieldPath, r.URL.Path),
-				slog.Int(logging.FieldStatus, rw.statusCode),
-				slog.Float64(logging.FieldDurationMS, float64(duration.Milliseconds())),
-			)
+			logger.Info("request", attrs...)
 		}
 	})
 }

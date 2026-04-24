@@ -188,7 +188,13 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 		filterableBySlug[key.Slug] = key
 	}
 	for slug, key := range filterableBySlug {
-		raw := r.URL.Query().Get(slug)
+		// Read from the public URL param name (e.g. `origin` maps to the
+		// `regions` slug). Fall back to the slug itself so legacy links and
+		// external backlinks (where the slug matched the param) keep working.
+		raw := r.URL.Query().Get(storefront.FilterSlugToParam(slug))
+		if raw == "" && storefront.FilterSlugToParam(slug) != slug {
+			raw = r.URL.Query().Get(slug)
+		}
 		if raw == "" {
 			continue
 		}
@@ -818,7 +824,16 @@ func (d *Deps) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
 		"Disallow: /auth/\n" +
 		"Disallow: /webhooks/\n" +
 		"Disallow: /wholesale/portal\n" +
-		"Disallow: /wholesale/checkout\n\n" +
+		"Disallow: /wholesale/checkout\n" +
+		// Block filter permutations — infinite URL space, no index value.
+		// Crawlers should still index /catalog itself and product detail pages.
+		"Disallow: /catalog?\n\n" +
+		"User-agent: meta-externalagent\n" +
+		"Crawl-delay: 30\n" +
+		"Disallow: /catalog?\n\n" +
+		"User-agent: GPTBot\n" +
+		"Crawl-delay: 30\n" +
+		"Disallow: /catalog?\n\n" +
 		"Sitemap: " + sitemapURL + "\n"
 	w.Write([]byte(body)) //nolint:errcheck
 }

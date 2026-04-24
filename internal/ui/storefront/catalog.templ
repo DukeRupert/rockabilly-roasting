@@ -55,6 +55,26 @@ func categoryPillClasses(active bool) string {
 	return "inline-flex items-center border-2 border-ink bg-paper text-ink px-4 py-1.5 font-oswald font-bold text-[11px] hover:bg-ink hover:text-paper transition-colors"
 }
 
+// FilterSlugToParam translates an internal attribute slug to its public URL
+// query parameter name. The `regions` slug is exposed as `origin` because
+// some HTML parsers (notably Meta's crawler) misinterpret `&reg` as the ®
+// entity and scrape malformed URLs — `&origin` has no such collision.
+func FilterSlugToParam(slug string) string {
+	if slug == "regions" {
+		return "origin"
+	}
+	return slug
+}
+
+// FilterParamToSlug is the inverse of FilterSlugToParam. Also accepts the
+// legacy `regions` param so bookmarks and external links keep working.
+func FilterParamToSlug(param string) string {
+	if param == "origin" {
+		return "regions"
+	}
+	return param
+}
+
 // catalogURL builds a /catalog URL preserving category, search, page, and attribute filters.
 func catalogURL(category, search string, page int, filters map[string][]string) string {
 	v := url.Values{}
@@ -66,7 +86,7 @@ func catalogURL(category, search string, page int, filters map[string][]string) 
 	}
 	for slug, vals := range filters {
 		if len(vals) > 0 {
-			v.Set(slug, strings.Join(vals, ","))
+			v.Set(FilterSlugToParam(slug), strings.Join(vals, ","))
 		}
 	}
 	if page > 1 {

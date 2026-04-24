@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"html"
@@ -580,6 +581,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	var defaultPrice *int
 	var plans []domain.SubscriptionPlan
 	var coffeeAttrs *storefront.CoffeeAttrs
+	var prevNav, nextNav *storefront.ProductNav
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -594,6 +596,32 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		media, txErr = d.CatalogService.ListProductMedia(ctx, tx, product.ID)
 		if txErr != nil {
 			return txErr
+		}
+
+		// Resolve prev/next products using the same ordering as the catalog listing
+		// (created_at DESC). Wraps around at the ends.
+		activeStatus := domain.ProductStatusActive
+		siblings, sibErr := d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{
+			Status: &activeStatus,
+			Limit:  500,
+		})
+		if sibErr != nil {
+			return sibErr
+		}
+		if len(siblings) > 1 {
+			idx := -1
+			for i, p := range siblings {
+				if p.ID == product.ID {
+					idx = i
+					break
+				}
+			}
+			if idx >= 0 {
+				prev := siblings[(idx-1+len(siblings))%len(siblings)]
+				next := siblings[(idx+1)%len(siblings)]
+				prevNav = buildProductNav(ctx, tx, d, prev)
+				nextNav = buildProductNav(ctx, tx, d, next)
+			}
 		}
 
 		// Get variants with prices.
@@ -691,6 +719,8 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		CartCount:         d.cartItemCountFromCookie(r),
 		SubscriptionPlans: plans,
 		Coffee:            coffeeAttrs,
+		PrevProduct:       prevNav,
+		NextProduct:       nextNav,
 	}
 
 	if IsHTMX(r) {
@@ -772,6 +802,21 @@ func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `<url><loc>%s</loc><changefreq>%s</changefreq><priority>%s</priority></url>`, u.Loc, u.ChangeFreq, u.Priority)
 	}
 	fmt.Fprint(w, `</urlset>`)
+}
+
+// buildProductNav returns a ProductNav for the prev/next links on the product
+// detail page. Fetches the product's first media and serves its card variant.
+// Returns nil on any media lookup error since navigation is non-critical chrome.
+func buildProductNav(ctx context.Context, tx pgx.Tx, d *Deps, p domain.Product) *storefront.ProductNav {
+	nav := &storefront.ProductNav{
+		Title: p.Title,
+		Slug:  p.Slug,
+	}
+	media, err := d.CatalogService.ListProductMedia(ctx, tx, p.ID)
+	if err == nil && len(media) > 0 {
+		nav.ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
+	}
+	return nav
 }
 
 // buildCoffeeAttrs converts product attribute values into a CoffeeAttrs for template rendering.

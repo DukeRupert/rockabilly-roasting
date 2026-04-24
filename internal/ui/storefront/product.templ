@@ -37,6 +37,16 @@ type ProductDetailProps struct {
 	CartCount         int
 	SubscriptionPlans []domain.SubscriptionPlan
 	Coffee            *CoffeeAttrs // nil if not a coffee product
+	PrevProduct       *ProductNav  // nil when catalog has ≤1 active product
+	NextProduct       *ProductNav
+}
+
+// ProductNav carries the minimum data needed for prev/next links at the
+// bottom of the product detail page.
+type ProductNav struct {
+	Title        string
+	Slug         string
+	ThumbnailURL string
 }
 
 templ ProductContent(props ProductDetailProps) {
@@ -377,6 +387,10 @@ templ ProductContent(props ProductDetailProps) {
 			if props.Coffee != nil && hasTastingProfile(props.Coffee) {
 				@tastingProfile(props.Coffee)
 			}
+			<!-- Prev / Next navigation -->
+			if props.PrevProduct != nil && props.NextProduct != nil {
+				@productNavPair(props.PrevProduct, props.NextProduct)
+			}
 		</div>
 	</section>
 	if len(props.Options) > 0 && len(props.VariantMap) > 0 {
@@ -452,6 +466,64 @@ templ tastingProfile(attrs *CoffeeAttrs) {
 			}
 		</div>
 	</section>
+}
+
+// productNavPair renders a two-panel "keep browsing" strip with previous and
+// next products, wrapping around at the ends.
+templ productNavPair(prev *ProductNav, next *ProductNav) {
+	<nav class="mt-16 pt-10 border-t-2 border-ink" aria-label="More roasts">
+		<p class="font-oswald text-chrome-deep text-xs font-semibold mb-6" style="letter-spacing:0.24em; text-transform:uppercase;">Keep browsing</p>
+		<div class="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8">
+			@productNavCard(prev, false)
+			@productNavCard(next, true)
+		</div>
+	</nav>
+}
+
+// productNavCard renders one side of the prev/next pair. forward=true means
+// it's the "next" side — label and arrow on the right, image on the left.
+templ productNavCard(nav *ProductNav, forward bool) {
+	<a
+		href={ templ.SafeURL("/catalog/" + nav.Slug) }
+		class={ "btn-stamp group flex items-center gap-4 bg-cream-hi border-2 border-ink p-4", templ.KV("sm:flex-row-reverse sm:text-right", forward) }
+	>
+		<!-- Thumbnail -->
+		<div class="flex-shrink-0 w-20 h-20 sm:w-24 sm:h-24 bg-paper-warm border-2 border-ink overflow-hidden">
+			if nav.ThumbnailURL != "" {
+				<img
+					src={ nav.ThumbnailURL }
+					alt={ nav.Title }
+					class="h-full w-full object-cover object-center"
+					loading="lazy"
+				/>
+			} else {
+				<div class="flex h-full w-full items-center justify-center">
+					<span class="font-slab text-ink text-2xl leading-none uppercase">
+						{ string([]rune(nav.Title)[0:1]) }
+					</span>
+				</div>
+			}
+		</div>
+		<!-- Label + title -->
+		<div class="min-w-0 flex-1">
+			<p class={ "inline-flex items-center gap-1.5 font-oswald font-bold text-rust text-[11px]", templ.KV("sm:flex-row-reverse", forward) } style="letter-spacing:0.2em; text-transform:uppercase;">
+				if !forward {
+					<svg class="size-3 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+					</svg>
+					<span>Previous roast</span>
+				} else {
+					<span>Next roast</span>
+					<svg class="size-3 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+					</svg>
+				}
+			</p>
+			<p class="font-slab text-ink uppercase leading-[1.0] mt-1.5 text-lg sm:text-xl group-hover:text-rust transition-colors truncate" style="letter-spacing:-0.005em;">
+				{ nav.Title }
+			</p>
+		</div>
+	</a>
 }
 
 // flavorScale renders a labeled 3-dot scale (low / medium / high).

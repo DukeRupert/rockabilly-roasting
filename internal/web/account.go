@@ -10,6 +10,7 @@ import (
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/auth"
+	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
@@ -185,23 +186,75 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 	customer, _ := auth.CustomerFromContext(ctx)
 
-	var subs []domain.Subscription
-	plans := map[uuid.UUID]*domain.SubscriptionPlan{}
+	var rows []storefront.AccountSubscriptionRow
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		var txErr error
-		subs, txErr = d.SubscriptionService.ListSubscriptionsByCustomer(ctx, tx, customer.ID)
+		subs, txErr := d.SubscriptionService.ListSubscriptionsByCustomer(ctx, tx, customer.ID)
 		if txErr != nil {
 			return txErr
 		}
+
+		plans := map[uuid.UUID]*domain.SubscriptionPlan{}
+		products := map[uuid.UUID]*domain.Product{}
+		thumbs := map[uuid.UUID]string{}
+
+		rows = make([]storefront.AccountSubscriptionRow, 0, len(subs))
 		for i := range subs {
-			if _, ok := plans[subs[i].PlanID]; !ok {
-				plan, pErr := d.SubscriptionService.GetPlan(ctx, tx, subs[i].PlanID)
+			sub := subs[i]
+			row := storefront.AccountSubscriptionRow{Subscription: sub}
+
+			if plan, ok := plans[sub.PlanID]; ok {
+				row.Plan = plan
+			} else {
+				plan, pErr := d.SubscriptionService.GetPlan(ctx, tx, sub.PlanID)
 				if pErr != nil {
 					return pErr
 				}
-				plans[subs[i].PlanID] = plan
+				plans[sub.PlanID] = plan
+				row.Plan = plan
 			}
+
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, sub.VariantID)
+			if vErr != nil {
+				return vErr
+			}
+			row.Variant = variant
+
+			if product, ok := products[variant.ProductID]; ok {
+				row.Product = product
+			} else {
+				product, prErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+				if prErr != nil {
+					return prErr
+				}
+				products[variant.ProductID] = product
+				row.Product = product
+			}
+
+			if url, ok := thumbs[variant.ProductID]; ok {
+				row.ThumbnailURL = url
+			} else {
+				media, mErr := d.CatalogService.ListProductMedia(ctx, tx, variant.ProductID)
+				if mErr != nil {
+					return mErr
+				}
+				if len(media) > 0 {
+					url := d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
+					thumbs[variant.ProductID] = url
+					row.ThumbnailURL = url
+				}
+			}
+
+			price, prErr := d.PricingService.GetBasePrice(ctx, tx, variant.ID, "USD")
+			if prErr == nil && row.Plan != nil {
+				unit := price.Amount
+				if row.Plan.DiscountPct > 0 {
+					unit = unit - (unit*row.Plan.DiscountPct)/100
+				}
+				row.UnitPrice = &unit
+			}
+
+			rows = append(rows, row)
 		}
 		return nil
 	})
@@ -211,9 +264,8 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 	}
 
 	props := storefront.AccountSubscriptionsProps{
-		Subscriptions: subs,
-		Plans:         plans,
-		CartCount:     d.cartItemCountFromCookie(r),
+		Rows:      rows,
+		CartCount: d.cartItemCountFromCookie(r),
 	}
 
 	if IsHTMX(r) {

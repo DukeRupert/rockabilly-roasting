@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -377,10 +375,18 @@ templ AccountOrderShowPage(props AccountOrderShowProps) {
 
 // --- Subscriptions ---
 
+type AccountSubscriptionRow struct {
+	Subscription domain.Subscription
+	Plan         *domain.SubscriptionPlan
+	Product      *domain.Product
+	Variant      *domain.Variant
+	ThumbnailURL string
+	UnitPrice    *int
+}
+
 type AccountSubscriptionsProps struct {
-	Subscriptions []domain.Subscription
-	Plans         map[uuid.UUID]*domain.SubscriptionPlan
-	CartCount     int
+	Rows      []AccountSubscriptionRow
+	CartCount int
 }
 
 func subscriptionStatusLabel(status domain.SubscriptionStatus) string {
@@ -443,7 +449,7 @@ func intervalLabel(interval domain.SubscriptionInterval) string {
 templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 	@accountLayout("/account/subscriptions") {
 		@accountPageHeading("The daily grind", "Your subscriptions")
-		if len(props.Subscriptions) == 0 {
+		if len(props.Rows) == 0 {
 			<div class="border-2 border-ink bg-cream-hi py-14 px-6 text-center shadow-stamp">
 				<svg class="mx-auto size-10 text-ink mb-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182"></path></svg>
 				<p class="font-slab text-ink text-lg uppercase" style="letter-spacing:0.02em;">No subscriptions</p>
@@ -457,74 +463,146 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 			</div>
 		} else {
 			<div class="space-y-4">
-				for _, sub := range props.Subscriptions {
-					<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
-						<div class="flex items-start justify-between gap-4 mb-4">
-							<div class="min-w-0">
-								if plan, ok := props.Plans[sub.PlanID]; ok {
-									<h3 class="font-slab text-ink uppercase text-lg leading-[1.0]" style="letter-spacing:-0.005em;">{ plan.Name }</h3>
-									<p class="font-oswald text-ink-soft text-sm mt-1.5" style="letter-spacing:0.04em;">
-										{ intervalLabel(plan.Interval) } · Qty { fmt.Sprintf("%d", sub.Quantity) }
-									</p>
-								}
-							</div>
-							@subscriptionStatusBadge(sub.Status)
-						</div>
-						if sub.Status == domain.SubscriptionStatusActive {
-							<p class="font-oswald text-ink-soft text-sm mb-5" style="letter-spacing:0.04em;">
-								Next order: <span class="font-special text-ink">{ formatDate(sub.NextOrderAt) }</span>
-							</p>
-							<div class="flex flex-wrap gap-2" x-data="{ confirming: '' }">
-								<button x-show="confirming !== 'pause'" x-on:click="confirming = 'pause'"
-									class="font-oswald font-bold text-[11px] border-2 border-ink bg-paper text-ink px-4 py-2 hover:bg-paper-warm transition-colors"
-									style="letter-spacing:0.16em; text-transform:uppercase;">
-									Pause
-								</button>
-								<div x-show="confirming === 'pause'" x-cloak class="flex flex-wrap items-center gap-2">
-									<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Pause this subscription?</span>
-									<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/pause") }>
-										<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, pause</button>
-									</form>
-									<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Nope</button>
-								</div>
-								<button x-show="confirming !== 'cancel'" x-on:click="confirming = 'cancel'"
-									class="font-oswald font-bold text-[11px] border-2 border-rust bg-paper text-rust px-4 py-2 hover:bg-rust hover:text-paper transition-colors"
-									style="letter-spacing:0.16em; text-transform:uppercase;">
-									Cancel
-								</button>
-								<div x-show="confirming === 'cancel'" x-cloak class="flex flex-wrap items-center gap-2">
-									<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Cancel this subscription?</span>
-									<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/cancel") }>
-										<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-rust text-paper px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, cancel</button>
-									</form>
-									<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
-								</div>
-							</div>
-						}
-						if sub.Status == domain.SubscriptionStatusPaused {
-							<p class="font-oswald text-ink-soft text-sm mb-5" style="letter-spacing:0.04em;">Paused — no upcoming orders.</p>
-							<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/resume") }>
-								<button type="submit" class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-5 py-2.5 font-oswald font-bold text-[11px]" style="letter-spacing:0.16em; text-transform:uppercase;">
-									Resume
-									<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
-									</svg>
-								</button>
-							</form>
-						}
-						if sub.Status == domain.SubscriptionStatusCancelled {
-							<p class="font-oswald text-chrome-deep text-sm" style="letter-spacing:0.04em;">
-								Cancelled
-								if sub.CancelledAt != nil {
-									on <span class="font-special">{ formatDate(*sub.CancelledAt) }</span>
-								}
-							</p>
-						}
-					</div>
+				for _, row := range props.Rows {
+					@accountSubscriptionCard(row)
 				}
 			</div>
 		}
 	}
+}
+
+templ accountSubscriptionCard(row AccountSubscriptionRow) {
+	{{ sub := row.Subscription }}
+	<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
+		<div class="flex items-start gap-5 mb-5">
+			<!-- Thumbnail -->
+			<div class="shrink-0 w-20 h-20 sm:w-24 sm:h-24 border-2 border-ink bg-paper-warm overflow-hidden">
+				if row.ThumbnailURL != "" {
+					<img src={ row.ThumbnailURL } alt={ subProductTitle(row) } class="h-full w-full object-cover object-center" loading="lazy"/>
+				} else {
+					<div class="flex h-full w-full items-center justify-center">
+						<span class="font-slab text-ink text-xl leading-none">
+							{ subProductInitial(row) }
+						</span>
+					</div>
+				}
+			</div>
+			<!-- Title + meta -->
+			<div class="flex-1 min-w-0">
+				<div class="flex items-start justify-between gap-3">
+					<div class="min-w-0">
+						if row.Product != nil {
+							<a href={ templ.SafeURL("/catalog/" + row.Product.Slug) } class="group inline-block">
+								<h3 class="font-slab text-ink uppercase text-lg sm:text-xl leading-[1.0] group-hover:text-rust transition-colors" style="letter-spacing:-0.005em;">{ row.Product.Title }</h3>
+							</a>
+						} else {
+							<h3 class="font-slab text-ink uppercase text-lg sm:text-xl leading-[1.0]" style="letter-spacing:-0.005em;">Subscription</h3>
+						}
+						if row.Variant != nil && row.Variant.SKU != "" {
+							<p class="font-special text-chrome-deep text-xs mt-1">SKU { row.Variant.SKU }</p>
+						}
+						if row.Plan != nil {
+							<p class="font-oswald text-ink-soft text-sm mt-1.5" style="letter-spacing:0.04em;">
+								<span class="font-bold text-ink">{ intervalLabel(row.Plan.Interval) }</span>
+								· Qty { fmt.Sprintf("%d", sub.Quantity) }
+								if row.UnitPrice != nil {
+									· { formatCents(*row.UnitPrice) } each
+								}
+							</p>
+						} else {
+							<p class="font-oswald text-ink-soft text-sm mt-1.5" style="letter-spacing:0.04em;">
+								Qty { fmt.Sprintf("%d", sub.Quantity) }
+							</p>
+						}
+					</div>
+					@subscriptionStatusBadge(sub.Status)
+				</div>
+			</div>
+		</div>
+		<!-- Next order / status line -->
+		if sub.Status == domain.SubscriptionStatusActive {
+			<div class="mb-5 pt-4 border-t-2 border-ink/20 flex flex-col sm:flex-row sm:items-baseline sm:gap-6 gap-1">
+				<p class="font-oswald font-bold text-candle text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Next order ships</p>
+				<p class="font-special text-ink text-base">{ formatDate(sub.NextOrderAt) }</p>
+			</div>
+		} else if sub.Status == domain.SubscriptionStatusPastDue {
+			<div class="mb-5 pt-4 border-t-2 border-ink/20 flex flex-col sm:flex-row sm:items-baseline sm:gap-6 gap-1">
+				<p class="font-oswald font-bold text-rust text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Payment past due</p>
+				<p class="font-special text-ink text-base">Scheduled { formatDate(sub.NextOrderAt) }</p>
+			</div>
+		} else if sub.Status == domain.SubscriptionStatusPaused {
+			<div class="mb-5 pt-4 border-t-2 border-ink/20">
+				<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
+					Paused — no upcoming orders.
+					if sub.PauseUntil != nil {
+						Resumes <span class="font-special text-ink">{ formatDate(*sub.PauseUntil) }</span>.
+					}
+				</p>
+			</div>
+		} else if sub.Status == domain.SubscriptionStatusCancelled {
+			<div class="mb-1 pt-4 border-t-2 border-ink/20">
+				<p class="font-oswald text-chrome-deep text-sm" style="letter-spacing:0.04em;">
+					Cancelled
+					if sub.CancelledAt != nil {
+						on <span class="font-special">{ formatDate(*sub.CancelledAt) }</span>
+					}
+				</p>
+			</div>
+		}
+		<!-- Actions -->
+		if sub.Status == domain.SubscriptionStatusActive {
+			<div class="flex flex-wrap gap-2" x-data="{ confirming: '' }">
+				<button x-show="confirming !== 'pause'" x-on:click="confirming = 'pause'"
+					class="font-oswald font-bold text-[11px] border-2 border-ink bg-paper text-ink px-4 py-2 hover:bg-paper-warm transition-colors"
+					style="letter-spacing:0.16em; text-transform:uppercase;">
+					Pause
+				</button>
+				<div x-show="confirming === 'pause'" x-cloak class="flex flex-wrap items-center gap-2">
+					<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Pause this subscription?</span>
+					<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/pause") }>
+						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, pause</button>
+					</form>
+					<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Nope</button>
+				</div>
+				<button x-show="confirming !== 'cancel'" x-on:click="confirming = 'cancel'"
+					class="font-oswald font-bold text-[11px] border-2 border-rust bg-paper text-rust px-4 py-2 hover:bg-rust hover:text-paper transition-colors"
+					style="letter-spacing:0.16em; text-transform:uppercase;">
+					Cancel
+				</button>
+				<div x-show="confirming === 'cancel'" x-cloak class="flex flex-wrap items-center gap-2">
+					<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Cancel this subscription?</span>
+					<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/cancel") }>
+						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-rust text-paper px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, cancel</button>
+					</form>
+					<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
+				</div>
+			</div>
+		}
+		if sub.Status == domain.SubscriptionStatusPaused {
+			<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/resume") }>
+				<button type="submit" class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-5 py-2.5 font-oswald font-bold text-[11px]" style="letter-spacing:0.16em; text-transform:uppercase;">
+					Resume
+					<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+					</svg>
+				</button>
+			</form>
+		}
+	</div>
+}
+
+func subProductTitle(row AccountSubscriptionRow) string {
+	if row.Product != nil {
+		return row.Product.Title
+	}
+	return "Subscription"
+}
+
+func subProductInitial(row AccountSubscriptionRow) string {
+	if row.Product != nil && row.Product.Title != "" {
+		return string([]rune(row.Product.Title)[0:1])
+	}
+	return "★"
 }
 
 templ AccountSubscriptionsPage(props AccountSubscriptionsProps) {

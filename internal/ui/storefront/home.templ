@@ -45,7 +45,7 @@ templ HomeContent(props HomePageProps) {
 				</p>
 				<h1 class="font-slab text-paper uppercase leading-[0.9] tracking-tight" style="font-size: clamp(3rem, 8vw, 6rem); letter-spacing:-0.005em;">
 					Burn both<br/>
-					<span class="text-candle">ends.</span><br/>
+					<span class="text-candle candle-flicker">ends.</span><br/>
 					Roast the<br/>beans.
 				</h1>
 				<p class="font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-lg">
@@ -54,11 +54,11 @@ templ HomeContent(props HomePageProps) {
 				<div class="mt-8 flex flex-wrap items-center gap-4">
 					<a
 						href="/catalog"
-						class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm"
+						class="btn-stamp group inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm"
 						style="letter-spacing:0.14em; text-transform:uppercase;"
 					>
 						Shop this week's roast
-						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<svg class="size-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
 						</svg>
 					</a>
@@ -199,7 +199,7 @@ templ HomeContent(props HomePageProps) {
 			</p>
 			<h2 class="font-slab text-paper uppercase leading-[0.9] mt-5" style="font-size: clamp(2.75rem, 7vw, 5rem); letter-spacing:-0.005em;">
 				The Daily
-				<span class="font-script text-candle normal-case inline-block align-baseline" style="font-size:1.05em; letter-spacing:0;">grind.</span>
+				<span class="font-script text-candle candle-flicker normal-case inline-block align-baseline" style="font-size:1.05em; letter-spacing:0;">grind.</span>
 			</h2>
 			<p class="font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-xl mx-auto">
 				Pick the roast. Pick the cadence. We roast it, bag it, and ship it fresh — same day it comes off the drum.
@@ -232,11 +232,11 @@ templ HomeContent(props HomePageProps) {
 			<div class="mt-14 flex flex-col items-center gap-4">
 				<a
 					href="/subscriptions"
-					class="btn-stamp-paper inline-flex items-center gap-2 bg-rust text-paper border-2 border-paper px-8 py-4 font-oswald font-bold text-sm"
+					class="btn-stamp-paper group inline-flex items-center gap-2 bg-rust text-paper border-2 border-paper px-8 py-4 font-oswald font-bold text-sm"
 					style="letter-spacing:0.14em; text-transform:uppercase;"
 				>
 					Join the daily grind
-					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+					<svg class="size-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
 					</svg>
 				</a>
@@ -278,11 +278,11 @@ templ HomeContent(props HomePageProps) {
 				<div class="mt-14 text-center">
 					<a
 						href="/catalog"
-						class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-8 py-4 font-oswald font-bold text-sm"
+						class="btn-stamp group inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-8 py-4 font-oswald font-bold text-sm"
 						style="letter-spacing:0.14em; text-transform:uppercase;"
 					>
 						Browse all coffee
-						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<svg class="size-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
 						</svg>
 					</a>
@@ -341,11 +341,11 @@ templ HomeContent(props HomePageProps) {
 					<div class="mt-8 flex flex-wrap gap-4 items-center">
 						<a
 							href="/about"
-							class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm"
+							class="btn-stamp group inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm"
 							style="letter-spacing:0.14em; text-transform:uppercase;"
 						>
 							Visit the cafe
-							<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+							<svg class="size-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
 							</svg>
 						</a>

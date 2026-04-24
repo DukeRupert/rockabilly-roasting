@@ -223,6 +223,24 @@ html {
 	animation: badge-pulse 2.2s ease-in-out infinite;
 }
 
+/* Candle flicker — subtle organic opacity drift for amber highlight words.
+   Irregular keyframe stops mimic a real flame; period is long enough that
+   the eye reads it as warmth, not motion. */
+@keyframes candle-flicker {
+	0%, 100% { opacity: 1; }
+	7%  { opacity: 0.94; }
+	14% { opacity: 1; }
+	26% { opacity: 0.88; }
+	41% { opacity: 0.97; }
+	58% { opacity: 0.91; }
+	74% { opacity: 1; }
+	85% { opacity: 0.95; }
+}
+.candle-flicker {
+	animation: candle-flicker 5.5s ease-in-out infinite;
+	will-change: opacity;
+}
+
 /* Search input: swap icon for spinner during htmx request */
 #catalog-search-form .search-spinner { display: none !important; }
 #catalog-search-form .search-icon { display: block; }
@@ -413,6 +431,9 @@ html {
 		animation: none;
 	}
 	.badge-pulse {
+		animation: none;
+	}
+	.candle-flicker {
 		animation: none;
 	}
 	.cart-checkmark path {

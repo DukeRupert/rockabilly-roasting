@@ -41,6 +41,14 @@ export interface PaymentIntentResponse {
   client_secret: string;
   amount: number;
   currency: string;
+  subtotal: number;
+  discount_total: number;
+  discount_name?: string;
+  coupon_code?: string;
+  tax_total: number;
+  tax_label?: string;
+  shipping_total: number;
+  shipping_label?: string;
 }
 
 export interface ConfirmRequest {

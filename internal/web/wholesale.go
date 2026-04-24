@@ -419,6 +419,9 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			CustomerID:   customer.ID,
 			Items:        items,
 			CurrencyCode: "USD",
+			// Wholesale is invoiced; shipping is negotiated offline and billed
+			// on the invoice, not calculated at checkout.
+			ShippingCents: 0,
 		}
 		if poNumber != "" {
 			orderParams.CustomerPONumber = &poNumber

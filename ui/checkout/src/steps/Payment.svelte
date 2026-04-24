@@ -2,7 +2,12 @@
   import { onMount, tick } from 'svelte';
   import type { Stripe, StripeElements } from '@stripe/stripe-js';
   import { getStripe, createElements } from '../lib/stripe';
-  import { createPaymentIntent, confirmOrder, type CartResponse } from '../lib/api';
+  import {
+    createPaymentIntent,
+    confirmOrder,
+    type CartResponse,
+    type PaymentIntentResponse,
+  } from '../lib/api';
   import { formatCents } from '../lib/format';
 
   interface Props {
@@ -10,10 +15,13 @@
     stripeKey: string;
     customerId: string;
     addressId: string;
+    totalsLoaded?: (pi: PaymentIntentResponse) => void;
     onBack: () => void;
   }
 
-  let { cart, stripeKey, customerId, addressId, onBack }: Props = $props();
+  let { cart, stripeKey, customerId, addressId, totalsLoaded, onBack }: Props = $props();
+  let resolvedTotal = $state<number | null>(null);
+  let totalAmount = $derived(resolvedTotal ?? cart.subtotal);
 
   let stripe = $state<Stripe | null>(null);
   let elements = $state<StripeElements | null>(null);
@@ -39,6 +47,8 @@
       });
 
       clientSecret = piResponse.client_secret;
+      resolvedTotal = piResponse.amount;
+      totalsLoaded?.(piResponse);
 
       // Ensure DOM is updated before mounting Stripe Element
       loading = false;
@@ -185,7 +195,7 @@
             </svg>
             Processing…
           {:else}
-            Pay {formatCents(cart.subtotal)}
+            Pay {formatCents(totalAmount)}
             <svg
               class="size-4"
               fill="none"

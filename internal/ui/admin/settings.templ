@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strings"
 	"time"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -15,12 +16,43 @@ type QBConnectionStatus struct {
 	LastSyncedAt     *time.Time
 }
 
+// ShippingSettings holds the editable shipping configuration shown on the
+// Settings page.
+type ShippingSettings struct {
+	FlatRateCents         int
+	FreeShippingThreshold *int
+	Currency              string
+	LocalZipCodes         []string
+}
+
 type SettingsProps struct {
 	QB        QBConnectionStatus
 	QBEnabled bool // true if QB_CLIENT_ID is configured
+	Shipping  ShippingSettings
 	Flash     string
 	StaffName string
 	StaffRole string
+}
+
+// centsToDollars formats integer cents as a dollar string with no symbol, e.g.
+// 600 → "6.00". Used to pre-fill number inputs.
+func centsToDollars(cents int) string {
+	return fmt.Sprintf("%.2f", float64(cents)/100)
+}
+
+// centsPtrToDollars formats an optional integer cents pointer. Returns "" when
+// nil so empty-input handling stays natural in the form.
+func centsPtrToDollars(cents *int) string {
+	if cents == nil {
+		return ""
+	}
+	return centsToDollars(*cents)
+}
+
+// zipCodesLine joins a zip list into a comma-separated string for textarea
+// round-tripping.
+func zipCodesLine(zips []string) string {
+	return strings.Join(zips, ", ")
 }
 
 func qbConnectionBadgeClasses(connected bool) string {
@@ -68,6 +100,75 @@ templ SettingsContent(props SettingsProps) {
 			</div>
 		</div>
 	}
+	<!-- Shipping section -->
+	<div class="mt-8">
+		<h2 class="text-sm font-semibold text-rr-heading">Shipping</h2>
+		<p class="mt-1 text-sm text-rr-muted">Flat rate, free-shipping threshold, and local delivery zip codes.</p>
+		<div class="mt-4 overflow-hidden border-2 border-rr-border bg-rr-surface">
+			<form method="post" action="/admin/settings/shipping" class="divide-y divide-rr-border">
+				<div class="px-4 py-5 sm:px-6 grid gap-5 sm:grid-cols-2">
+					<div>
+						<label for="shipping-flat-rate" class="block text-sm font-medium text-rr-heading">
+							Flat rate (USD)
+						</label>
+						<div class="mt-1 flex items-center">
+							<span class="text-rr-muted pr-2">$</span>
+							<input
+								id="shipping-flat-rate"
+								type="number"
+								name="flat_rate"
+								step="0.01"
+								min="0"
+								value={ centsToDollars(props.Shipping.FlatRateCents) }
+								required
+								class="w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+							/>
+						</div>
+						<p class="mt-1 text-xs text-rr-muted">Charged on non-local orders that don't meet the free-shipping threshold.</p>
+					</div>
+					<div>
+						<label for="shipping-threshold" class="block text-sm font-medium text-rr-heading">
+							Free-shipping threshold (USD)
+						</label>
+						<div class="mt-1 flex items-center">
+							<span class="text-rr-muted pr-2">$</span>
+							<input
+								id="shipping-threshold"
+								type="number"
+								name="free_threshold"
+								step="0.01"
+								min="0"
+								value={ centsPtrToDollars(props.Shipping.FreeShippingThreshold) }
+								placeholder="leave blank to disable"
+								class="w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+							/>
+						</div>
+						<p class="mt-1 text-xs text-rr-muted">Orders at or above this subtotal ship free. Blank = no threshold.</p>
+					</div>
+				</div>
+				<div class="px-4 py-5 sm:px-6">
+					<label for="shipping-zips" class="block text-sm font-medium text-rr-heading">
+						Local zip codes
+					</label>
+					<textarea
+						id="shipping-zips"
+						name="local_zip_codes"
+						rows="3"
+						class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+						placeholder="99336, 99337, 99338, …"
+					>{ zipCodesLine(props.Shipping.LocalZipCodes) }</textarea>
+					<p class="mt-1 text-xs text-rr-muted">
+						Comma- or whitespace-separated 5-digit zips. Orders shipping to any of these zips ship free regardless of subtotal.
+					</p>
+				</div>
+				<div class="px-4 py-4 sm:px-6 flex justify-end">
+					<button type="submit" class="inline-flex items-center rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper shadow-xs hover:opacity-90">
+						Save shipping settings
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
 	<!-- Integrations section -->
 	<div class="mt-8">
 		<h2 class="text-sm font-semibold text-rr-heading">Integrations</h2>

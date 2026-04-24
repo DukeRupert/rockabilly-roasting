@@ -492,9 +492,10 @@ type Shipment struct {
 }
 
 type ShippingConfig struct {
-	FlatRateCents         int32  `json:"flat_rate_cents"`
-	FreeShippingThreshold *int32 `json:"free_shipping_threshold"`
-	Currency              string `json:"currency"`
+	FlatRateCents         int32    `json:"flat_rate_cents"`
+	FreeShippingThreshold *int32   `json:"free_shipping_threshold"`
+	Currency              string   `json:"currency"`
+	LocalZipCodes         []string `json:"local_zip_codes"`
 }
 
 type Staff struct {

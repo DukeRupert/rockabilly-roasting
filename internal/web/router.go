@@ -334,6 +334,7 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin settings / integrations
 	adminMux.HandleFunc("GET /admin/settings", deps.handleAdminSettings)
+	adminMux.HandleFunc("POST /admin/settings/shipping", deps.handleAdminShippingSettingsUpdate)
 	adminMux.HandleFunc("GET /admin/settings/integrations/quickbooks/connect", deps.handleAdminQBConnect)
 	adminMux.HandleFunc("GET /admin/settings/integrations/quickbooks/callback", deps.handleAdminQBCallback)
 	adminMux.HandleFunc("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)

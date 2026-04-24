@@ -23,6 +23,7 @@ func newCheckoutService() *app.CheckoutService {
 		store.NewCustomerStore(),
 		store.NewDiscountStore(),
 		store.NewSettingsStore(),
+		store.NewShippingStore(),
 		nil, // payment provider not needed for unit tests
 		audit.NewAuditWriter(),
 		metrics.NewRegistry(),

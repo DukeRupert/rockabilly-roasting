@@ -1,15 +1,31 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
+
+// freeShippingHint returns customer-facing messaging nudging the shopper toward
+// the free-shipping threshold, or "" if no nudge applies (no threshold set, or
+// already above it).
+func freeShippingHint(cfg *domain.ShippingConfig, subtotalCents int) string {
+	if cfg == nil || cfg.FreeShippingThreshold == nil {
+		return ""
+	}
+	remaining := *cfg.FreeShippingThreshold - subtotalCents
+	if remaining <= 0 {
+		return "You've unlocked free shipping."
+	}
+	return fmt.Sprintf("Spend $%.2f more for free shipping.", float64(remaining)/100)
+}
 
 const cartCookieName = "cart_id"
 
@@ -111,6 +127,7 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 
 	var items []storefront.CartItemDisplay
 	var subtotal int
+	var shippingConfig *domain.ShippingConfig
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		cartItems, txErr := d.CartService.ListItems(ctx, tx, *cartID)
@@ -144,6 +161,11 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 				LineTotal:    lineTotal,
 			})
 		}
+
+		shippingConfig, txErr = d.CheckoutService.GetShippingConfig(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
 		return nil
 	})
 	if err != nil {
@@ -158,9 +180,10 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.CartPageProps{
-		Items:     items,
-		Subtotal:  subtotal,
-		CartCount: cartCount,
+		Items:            items,
+		Subtotal:         subtotal,
+		CartCount:        cartCount,
+		FreeShippingHint: freeShippingHint(shippingConfig, subtotal),
 	}
 	if IsHTMX(r) {
 		storefront.CartContent(props).Render(ctx, w) //nolint:errcheck

@@ -128,13 +128,18 @@ func (q *Queries) GetShipmentLabelKey(ctx context.Context, id uuid.UUID) (*strin
 }
 
 const getShippingConfig = `-- name: GetShippingConfig :one
-SELECT flat_rate_cents, free_shipping_threshold, currency FROM shipping_config LIMIT 1
+SELECT flat_rate_cents, free_shipping_threshold, currency, local_zip_codes FROM shipping_config LIMIT 1
 `
 
 func (q *Queries) GetShippingConfig(ctx context.Context) (ShippingConfig, error) {
 	row := q.db.QueryRow(ctx, getShippingConfig)
 	var i ShippingConfig
-	err := row.Scan(&i.FlatRateCents, &i.FreeShippingThreshold, &i.Currency)
+	err := row.Scan(
+		&i.FlatRateCents,
+		&i.FreeShippingThreshold,
+		&i.Currency,
+		&i.LocalZipCodes,
+	)
 	return i, err
 }
 
@@ -299,16 +304,25 @@ func (q *Queries) UpdateShipmentTracking(ctx context.Context, arg UpdateShipment
 
 const updateShippingConfig = `-- name: UpdateShippingConfig :exec
 UPDATE shipping_config
-SET flat_rate_cents = $1, free_shipping_threshold = $2, currency = $3
+SET flat_rate_cents = $1,
+    free_shipping_threshold = $2,
+    currency = $3,
+    local_zip_codes = $4
 `
 
 type UpdateShippingConfigParams struct {
-	FlatRateCents         int32  `json:"flat_rate_cents"`
-	FreeShippingThreshold *int32 `json:"free_shipping_threshold"`
-	Currency              string `json:"currency"`
+	FlatRateCents         int32    `json:"flat_rate_cents"`
+	FreeShippingThreshold *int32   `json:"free_shipping_threshold"`
+	Currency              string   `json:"currency"`
+	LocalZipCodes         []string `json:"local_zip_codes"`
 }
 
 func (q *Queries) UpdateShippingConfig(ctx context.Context, arg UpdateShippingConfigParams) error {
-	_, err := q.db.Exec(ctx, updateShippingConfig, arg.FlatRateCents, arg.FreeShippingThreshold, arg.Currency)
+	_, err := q.db.Exec(ctx, updateShippingConfig,
+		arg.FlatRateCents,
+		arg.FreeShippingThreshold,
+		arg.Currency,
+		arg.LocalZipCodes,
+	)
 	return err
 }

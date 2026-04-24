@@ -2,41 +2,62 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
 
-// handleAdminSettings renders the Settings page with integration status.
+// handleAdminSettings renders the Settings page with integration status and
+// merchant-level config (shipping).
 func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	qbStatus := admin.QBConnectionStatus{}
 	qbEnabled := d.QBOAuthManager != nil
+	var shipping admin.ShippingSettings
 
-	if qbEnabled {
-		_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-			status, err := d.QBOAuthManager.Status(ctx, tx)
-			if err != nil {
-				return nil // treat errors as "not connected"
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		if qbEnabled {
+			if status, qbErr := d.QBOAuthManager.Status(ctx, tx); qbErr == nil {
+				qbStatus.Connected = status.Connected
+				qbStatus.RealmID = status.RealmID
+				qbStatus.RefreshExpiresAt = status.RefreshExpiresAt
 			}
-			qbStatus.Connected = status.Connected
-			qbStatus.RealmID = status.RealmID
-			qbStatus.RefreshExpiresAt = status.RefreshExpiresAt
-			return nil
-		})
+		}
+
+		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if cfgErr != nil {
+			return cfgErr
+		}
+		shipping = admin.ShippingSettings{
+			FlatRateCents:         cfg.FlatRateCents,
+			FreeShippingThreshold: cfg.FreeShippingThreshold,
+			Currency:              cfg.Currency,
+			LocalZipCodes:         cfg.LocalZipCodes,
+		}
+		return nil
+	})
+	if err != nil {
+		slog.Error("admin settings: load", "error", err)
+		Error(w, r, err)
+		return
 	}
 
 	name, role := staffNameRole(r)
 	props := admin.SettingsProps{
 		QB:        qbStatus,
 		QBEnabled: qbEnabled,
+		Shipping:  shipping,
 		Flash:     r.URL.Query().Get("flash"),
 		StaffName: name,
 		StaffRole: role,
@@ -47,6 +68,98 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.Settings(props).Render(ctx, w) //nolint:errcheck
+}
+
+// handleAdminShippingSettingsUpdate persists the edited shipping config and
+// records the audit event inside the same transaction.
+func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	flatRateCents, err := parseDollarsCents(r.FormValue("flat_rate"))
+	if err != nil {
+		http.Redirect(w, r, "/admin/settings?flash=Invalid+flat+rate", http.StatusSeeOther)
+		return
+	}
+	var threshold *int
+	if raw := strings.TrimSpace(r.FormValue("free_threshold")); raw != "" {
+		cents, tErr := parseDollarsCents(raw)
+		if tErr != nil {
+			http.Redirect(w, r, "/admin/settings?flash=Invalid+free-shipping+threshold", http.StatusSeeOther)
+			return
+		}
+		threshold = &cents
+	}
+	zips := parseZipList(r.FormValue("local_zip_codes"))
+
+	cfg := domain.ShippingConfig{
+		FlatRateCents:         flatRateCents,
+		FreeShippingThreshold: threshold,
+		Currency:              "usd",
+		LocalZipCodes:         zips,
+	}
+
+	actor := staffActor(r)
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.CheckoutService.UpdateShippingConfig(ctx, tx, cfg, actor)
+	})
+	if err != nil {
+		slog.Error("admin settings: update shipping", "error", err)
+		http.Redirect(w, r, "/admin/settings?flash=Failed+to+save+shipping+settings", http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/settings?flash=Shipping+settings+saved", http.StatusSeeOther)
+}
+
+// parseDollarsCents converts a dollar amount (e.g. "6.00", "6", "6.5") into
+// integer cents.
+func parseDollarsCents(raw string) (int, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return 0, fmt.Errorf("empty amount")
+	}
+	// Accept values like "6", "6.5", "6.50"
+	dollars, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, err
+	}
+	if dollars < 0 {
+		return 0, fmt.Errorf("negative amount")
+	}
+	return int(dollars*100 + 0.5), nil
+}
+
+// parseZipList splits a free-form user-entered list of zips on any of ",",
+// whitespace, or newlines. Entries are normalized to their 5-digit form;
+// anything not matching a 5-digit prefix is dropped.
+func parseZipList(raw string) []string {
+	fields := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == '\r' || r == '\t' || r == ' '
+	})
+	out := make([]string, 0, len(fields))
+	seen := map[string]bool{}
+	for _, f := range fields {
+		z := strings.TrimSpace(f)
+		if i := strings.Index(z, "-"); i >= 0 {
+			z = z[:i]
+		}
+		if len(z) != 5 {
+			continue
+		}
+		allDigits := true
+		for _, c := range z {
+			if c < '0' || c > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if !allDigits || seen[z] {
+			continue
+		}
+		seen[z] = true
+		out = append(out, z)
+	}
+	return out
 }
 
 // handleAdminQBConnect initiates the OAuth2 flow to connect QuickBooks.

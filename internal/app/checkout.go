@@ -26,6 +26,7 @@ type CheckoutService struct {
 	customers *store.CustomerStore
 	discounts *store.DiscountStore
 	settings  *store.SettingsStore
+	shipping  *store.ShippingStore
 	payments  payments.Provider
 	audit     *audit.AuditWriter
 	metrics   *metrics.Registry
@@ -37,6 +38,7 @@ func NewCheckoutService(
 	customers *store.CustomerStore,
 	discounts *store.DiscountStore,
 	settings *store.SettingsStore,
+	shipping *store.ShippingStore,
 	payments payments.Provider,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
@@ -46,10 +48,59 @@ func NewCheckoutService(
 		customers: customers,
 		discounts: discounts,
 		settings:  settings,
+		shipping:  shipping,
 		payments:  payments,
 		audit:     audit,
 		metrics:   metrics,
 	}
+}
+
+// GetShippingConfig returns the merchant's shipping configuration so callers
+// can render rate, threshold, and local-zone messaging.
+func (s *CheckoutService) GetShippingConfig(ctx context.Context, tx pgx.Tx) (*domain.ShippingConfig, error) {
+	return s.shipping.GetConfig(ctx, tx)
+}
+
+// UpdateShippingConfig persists an edited shipping configuration and records
+// the change in the audit log inside the caller's transaction.
+func (s *CheckoutService) UpdateShippingConfig(ctx context.Context, tx pgx.Tx, cfg domain.ShippingConfig, actor Actor) error {
+	before, err := s.shipping.GetConfig(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("load current shipping config: %w", err)
+	}
+	if err := s.shipping.UpdateConfig(ctx, tx, cfg); err != nil {
+		return err
+	}
+	return s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditShippingConfigUpdated,
+		ResourceType: "shipping_config",
+		ResourceID:   uuid.Nil,
+		After: map[string]any{
+			"flat_rate_cents":         cfg.FlatRateCents,
+			"free_shipping_threshold": cfg.FreeShippingThreshold,
+			"local_zip_codes":         cfg.LocalZipCodes,
+		},
+		Metadata: map[string]any{
+			"before": map[string]any{
+				"flat_rate_cents":         before.FlatRateCents,
+				"free_shipping_threshold": before.FreeShippingThreshold,
+				"local_zip_codes":         before.LocalZipCodes,
+			},
+		},
+	})
+}
+
+// CalculateShipping returns the shipping cost in cents for a given subtotal
+// and destination zip, using the merchant's shipping configuration.
+func (s *CheckoutService) CalculateShipping(ctx context.Context, tx pgx.Tx, subtotalCents int, shipToZip string) (int, *domain.ShippingConfig, error) {
+	cfg, err := s.GetShippingConfig(ctx, tx)
+	if err != nil {
+		return 0, nil, fmt.Errorf("get shipping config: %w", err)
+	}
+	return cfg.Calculate(subtotalCents, shipToZip), cfg, nil
 }
 
 // taxCalculatorForConfig returns the appropriate TaxCalculator for the given config and customer type.

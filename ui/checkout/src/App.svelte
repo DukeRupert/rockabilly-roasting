@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getCart, type CartResponse } from './lib/api';
+  import { getCart, type CartResponse, type PaymentIntentResponse } from './lib/api';
   import Information from './steps/Information.svelte';
   import Payment from './steps/Payment.svelte';
   import { formatCents } from './lib/format';
@@ -21,6 +21,7 @@
   // Checkout state carried between steps
   let customerId = $state('');
   let addressId = $state('');
+  let totals = $state<PaymentIntentResponse | null>(null);
 
   const steps: { key: Step; label: string }[] = [
     { key: 'information', label: 'Information' },
@@ -51,7 +52,12 @@
   function handleAddressComplete(e: { customerId: string; addressId: string }) {
     customerId = e.customerId;
     addressId = e.addressId;
+    totals = null;
     step = 'payment';
+  }
+
+  function handleTotalsLoaded(pi: PaymentIntentResponse) {
+    totals = pi;
   }
 </script>
 
@@ -190,6 +196,7 @@
               {stripeKey}
               {customerId}
               {addressId}
+              totalsLoaded={handleTotalsLoaded}
               onBack={() => (step = 'information')}
             />
           {/if}
@@ -231,12 +238,40 @@
                 </dt>
                 <dd class="font-special text-ink text-base">{formatCents(cart.subtotal)}</dd>
               </div>
+              {#if totals && totals.discount_total > 0}
+                <div class="flex items-baseline justify-between">
+                  <dt class="font-oswald text-rust text-sm" style="letter-spacing:0.04em;">
+                    {totals.discount_name || 'Discount'}
+                  </dt>
+                  <dd class="font-special text-rust text-sm">
+                    −{formatCents(totals.discount_total)}
+                  </dd>
+                </div>
+              {/if}
               <div class="flex items-baseline justify-between">
                 <dt class="font-oswald text-chrome-deep text-sm" style="letter-spacing:0.04em;">
                   Shipping
                 </dt>
-                <dd class="font-special text-chrome-deep text-sm">Free</dd>
+                <dd class="font-special text-chrome-deep text-sm">
+                  {#if !totals}
+                    Calculated next step
+                  {:else if totals.shipping_total === 0}
+                    {totals.shipping_label || 'Free'}
+                  {:else}
+                    {formatCents(totals.shipping_total)}
+                  {/if}
+                </dd>
               </div>
+              {#if totals && totals.tax_total > 0}
+                <div class="flex items-baseline justify-between">
+                  <dt class="font-oswald text-chrome-deep text-sm" style="letter-spacing:0.04em;">
+                    {totals.tax_label || 'Tax'}
+                  </dt>
+                  <dd class="font-special text-chrome-deep text-sm">
+                    {formatCents(totals.tax_total)}
+                  </dd>
+                </div>
+              {/if}
             </dl>
             <div
               class="mt-4 pt-3 border-t-2 border-ink flex items-baseline justify-between"
@@ -245,7 +280,9 @@
                 class="font-slab text-ink text-lg uppercase"
                 style="letter-spacing:0.02em;">Total</span
               >
-              <span class="font-special text-ink text-xl">{formatCents(cart.subtotal)}</span>
+              <span class="font-special text-ink text-xl">
+                {formatCents(totals ? totals.amount : cart.subtotal)}
+              </span>
             </div>
           </div>
         </aside>

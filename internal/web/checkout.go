@@ -89,6 +89,8 @@ type checkoutPaymentIntentResponse struct {
 	CouponCode     string `json:"coupon_code,omitempty"`
 	TaxTotal       int    `json:"tax_total"`
 	TaxLabel       string `json:"tax_label,omitempty"`
+	ShippingTotal  int    `json:"shipping_total"`
+	ShippingLabel  string `json:"shipping_label,omitempty"`
 }
 
 type checkoutConfirmRequest struct {
@@ -434,6 +436,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	var couponCode string
 	var taxTotal int
 	var taxLabel string
+	var shippingTotal int
+	var shippingLabel string
 	var shippingAddr *domain.Address
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -515,6 +519,13 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		taxTotal = taxResult.TaxTotal
 		taxLabel = taxResult.Label
 
+		shipCents, shipCfg, txErr := d.CheckoutService.CalculateShipping(ctx, tx, discountedSubtotal, shippingAddr.PostalCode)
+		if txErr != nil {
+			return fmt.Errorf("calculate shipping: %w", txErr)
+		}
+		shippingTotal = shipCents
+		shippingLabel = shippingDisplayLabel(shipCfg, shipCents, shippingAddr.PostalCode)
+
 		return nil
 	})
 	if err != nil {
@@ -527,7 +538,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	totalCents := subtotal - discountTotal + taxTotal
+	totalCents := subtotal - discountTotal + shippingTotal + taxTotal
 
 	// Create Stripe PaymentIntent (external call — outside transaction)
 	pi, err := d.PaymentProvider.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
@@ -564,7 +575,24 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		CouponCode:    couponCode,
 		TaxTotal:      taxTotal,
 		TaxLabel:      taxLabel,
+		ShippingTotal: shippingTotal,
+		ShippingLabel: shippingLabel,
 	})
+}
+
+// shippingDisplayLabel returns the customer-facing descriptor for a computed
+// shipping line. Returns "" when the default "Shipping" label is sufficient.
+func shippingDisplayLabel(cfg *domain.ShippingConfig, shippingCents int, shipToZip string) string {
+	if cfg == nil {
+		return ""
+	}
+	if shippingCents == 0 {
+		if cfg.IsLocal(shipToZip) {
+			return "Free local delivery"
+		}
+		return "Free shipping"
+	}
+	return ""
 }
 
 // handleCheckoutConfirm finalizes the order after Stripe payment succeeds.
@@ -691,6 +719,11 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 			return fmt.Errorf("calculate tax: %w", txErr)
 		}
 
+		shippingCents, _, txErr := d.CheckoutService.CalculateShipping(ctx, tx, discountedSubtotal, shippingAddr.PostalCode)
+		if txErr != nil {
+			return fmt.Errorf("calculate shipping: %w", txErr)
+		}
+
 		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
 			CustomerID:        customerID,
 			Items:             orderItems,
@@ -698,7 +731,7 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 			BillingAddressID:  addressID,
 			CurrencyCode:      "USD",
 			CouponCode:        couponCode,
-			ShippingCents:     0,
+			ShippingCents:     shippingCents,
 			TaxCents:          taxResult.TaxTotal,
 		}, app.Actor{
 			Type: "customer",

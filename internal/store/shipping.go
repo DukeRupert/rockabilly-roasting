@@ -31,15 +31,21 @@ func (s *ShippingStore) GetConfig(ctx context.Context, tx pgx.Tx) (*domain.Shipp
 		FlatRateCents:         int(row.FlatRateCents),
 		FreeShippingThreshold: int32PtrToIntPtr(row.FreeShippingThreshold),
 		Currency:              row.Currency,
+		LocalZipCodes:         row.LocalZipCodes,
 	}, nil
 }
 
 // UpdateConfig updates the shipping configuration.
-func (s *ShippingStore) UpdateConfig(ctx context.Context, tx pgx.Tx, flatRateCents int, freeShippingThreshold *int, currency string) error {
+func (s *ShippingStore) UpdateConfig(ctx context.Context, tx pgx.Tx, cfg domain.ShippingConfig) error {
+	zips := cfg.LocalZipCodes
+	if zips == nil {
+		zips = []string{}
+	}
 	err := sqlcgen.New(tx).UpdateShippingConfig(ctx, sqlcgen.UpdateShippingConfigParams{
-		FlatRateCents:         int32(flatRateCents),
-		FreeShippingThreshold: intPtrToInt32Ptr(freeShippingThreshold),
-		Currency:              currency,
+		FlatRateCents:         int32(cfg.FlatRateCents),
+		FreeShippingThreshold: intPtrToInt32Ptr(cfg.FreeShippingThreshold),
+		Currency:              cfg.Currency,
+		LocalZipCodes:         zips,
 	})
 	if err != nil {
 		return fmt.Errorf("update shipping config: %w", err)

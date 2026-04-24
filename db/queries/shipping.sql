@@ -3,7 +3,10 @@ SELECT * FROM shipping_config LIMIT 1;
 
 -- name: UpdateShippingConfig :exec
 UPDATE shipping_config
-SET flat_rate_cents = $1, free_shipping_threshold = $2, currency = $3;
+SET flat_rate_cents = $1,
+    free_shipping_threshold = $2,
+    currency = $3,
+    local_zip_codes = $4;
 
 -- name: CreateShipment :one
 INSERT INTO shipments (id, order_id, status, provider, tracking_number, label_url,

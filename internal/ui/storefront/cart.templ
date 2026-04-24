@@ -17,9 +17,10 @@ type CartItemDisplay struct {
 }
 
 type CartPageProps struct {
-	Items     []CartItemDisplay
-	Subtotal  int
-	CartCount int
+	Items              []CartItemDisplay
+	Subtotal           int
+	CartCount          int
+	FreeShippingHint   string // e.g. "Spend $12.00 more for free shipping"; "" if unused
 }
 
 templ CartContent(props CartPageProps) {
@@ -152,6 +153,11 @@ templ CartContent(props CartPageProps) {
 									<dt class="font-oswald text-chrome-deep text-sm" style="letter-spacing:0.04em;">Shipping</dt>
 									<dd class="font-special text-chrome-deep text-sm">At checkout</dd>
 								</div>
+								if props.FreeShippingHint != "" {
+									<p class="font-oswald text-rust text-xs" style="letter-spacing:0.06em;">
+										{ props.FreeShippingHint }
+									</p>
+								}
 								<div class="flex items-baseline justify-between">
 									<dt class="font-oswald text-chrome-deep text-sm" style="letter-spacing:0.04em;">Taxes</dt>
 									<dd class="font-special text-chrome-deep text-sm">At checkout</dd>

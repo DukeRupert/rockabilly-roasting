@@ -42,7 +42,7 @@ func ProductNewContent(props ProductNewProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-lg font-bold text-rr-heading\">New Product</h1><p class=\"mt-1 text-sm text-rr-muted\">Create a new product in your catalog</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/catalog\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised\">Back to products</a></div></div><div class=\"mt-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">New Product</h1><p class=\"mt-1 text-sm text-rr-muted\">Create a new product in your catalog</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/catalog\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised\">Back to products</a></div></div><div class=\"mt-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

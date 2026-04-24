@@ -39,7 +39,7 @@ templ AttributeSetListContent(props AttributeSetListProps) {
 	<div class="mt-8 space-y-4">
 		if len(props.Sets) > 0 {
 			for _, set := range props.Sets {
-				<div class="rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+				<div class="border-2 border-rr-border bg-rr-surface">
 					<div class="px-4 py-4 sm:px-6 flex items-center justify-between">
 						<div>
 							<a href={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s", set.ID)) } class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">
@@ -87,7 +87,7 @@ templ AttributeSetListContent(props AttributeSetListProps) {
 		}
 	</div>
 	<!-- Create form -->
-	<div class="mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+	<div class="mt-8 border-2 border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-rr-heading">Create attribute set</h3>
 		</div>

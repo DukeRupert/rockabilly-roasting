@@ -50,7 +50,7 @@ func refreshTokenUrgencyClasses(days int) string {
 templ SettingsContent(props SettingsProps) {
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
-			<h1 class="text-lg font-bold text-rr-heading">Settings</h1>
+			<h1 class="admin-page-title">Settings</h1>
 			<p class="mt-1 text-sm text-rr-muted">Manage integrations and platform configuration</p>
 		</div>
 	</div>
@@ -74,7 +74,7 @@ templ SettingsContent(props SettingsProps) {
 		<p class="mt-1 text-sm text-rr-muted">Connect external services for billing and payments.</p>
 		<div class="mt-4 space-y-4">
 			<!-- QuickBooks Online -->
-			<div class="overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+			<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">
 				<div class="px-4 py-5 sm:px-6">
 					<div class="flex items-center justify-between">
 						<div class="flex items-center gap-3">
@@ -139,7 +139,7 @@ templ SettingsContent(props SettingsProps) {
 						<div class="flex items-center gap-3">
 							<a
 								href="/admin/settings/integrations/quickbooks/connect"
-								class="inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
+								class="inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border-2 border-rr-border hover:bg-rr-raised"
 							>
 								Reconnect
 							</a>

@@ -60,14 +60,14 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Header --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><div class=\"flex items-center gap-3\"><h1 class=\"text-lg font-bold text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Header --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><div class=\"flex items-center gap-3\"><h1 class=\"admin-page-title\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.FirstName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_show.templ`, Line: 39, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_show.templ`, Line: 39, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -80,7 +80,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.LastName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_show.templ`, Line: 39, Col: 104}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_show.templ`, Line: 39, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -142,7 +142,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.Customer.AccountType == domain.AccountTypeWholesale && props.Customer.WholesaleStatus != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"mt-4 rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><div class=\"sm:flex sm:items-center sm:justify-between\"><div class=\"flex items-center gap-3\"><h3 class=\"text-sm font-medium text-rr-heading\">Wholesale application</h3>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"mt-4 border-2 border-rr-border bg-rr-surface p-4\"><div class=\"sm:flex sm:items-center sm:justify-between\"><div class=\"flex items-center gap-3\"><h3 class=\"text-sm font-medium text-rr-heading\">Wholesale application</h3>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -210,7 +210,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<!-- Info cards --><div class=\"mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3\"><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Email verified</dt><dd class=\"mt-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<!-- Info cards --><div class=\"mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3\"><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Email verified</dt><dd class=\"mt-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -225,7 +225,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</dd></div><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Account type</dt><dd class=\"mt-1 text-sm text-rr-heading capitalize\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</dd></div><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Account type</dt><dd class=\"mt-1 text-sm text-rr-heading capitalize\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -238,7 +238,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</dd></div><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Tax exempt</dt><dd class=\"mt-1 text-sm text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</dd></div><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Tax exempt</dt><dd class=\"mt-1 text-sm text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -272,7 +272,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</dd></div></div><!-- Details --><div class=\"mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"px-4 py-5 sm:px-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Details</h2></div><div class=\"border-t border-rr-border\"><dl class=\"divide-y divide-rr-border\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</dd></div></div><!-- Details --><div class=\"mt-8 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Details</h2></div><div class=\"border-t border-rr-border\"><dl class=\"divide-y divide-rr-border\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -313,7 +313,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.Customer.AccountType == domain.AccountTypeWholesale {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<div class=\"mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"px-4 py-5 sm:px-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Billing Settings</h2></div><div class=\"border-t border-rr-border\"><dl class=\"divide-y divide-rr-border\"><div class=\"px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\"><dt class=\"text-sm font-medium text-rr-muted\">Payment terms</dt><dd class=\"mt-1 sm:col-span-2 sm:mt-0\"><form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<div class=\"mt-8 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Billing Settings</h2></div><div class=\"border-t border-rr-border\"><dl class=\"divide-y divide-rr-border\"><div class=\"px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\"><dt class=\"text-sm font-medium text-rr-muted\">Payment terms</dt><dd class=\"mt-1 sm:col-span-2 sm:mt-0\"><form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -555,7 +555,7 @@ func CustomerShowContent(props CustomerShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for _, addr := range props.Addresses {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "<div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><p class=\"text-sm font-medium text-rr-heading\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "<div class=\"border-2 border-rr-border bg-rr-surface p-4\"><p class=\"text-sm font-medium text-rr-heading\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

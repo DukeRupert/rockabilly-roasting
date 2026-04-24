@@ -55,14 +55,14 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Header --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><div class=\"flex items-center gap-3\"><h1 class=\"text-lg font-bold text-rr-heading\">Invoice ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Header --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><div class=\"flex items-center gap-3\"><h1 class=\"admin-page-title\">Invoice ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Invoice.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/invoice_show.templ`, Line: 34, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/invoice_show.templ`, Line: 34, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -163,7 +163,7 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div><!-- Summary cards --><div class=\"mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4\"><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Subtotal</dt><dd class=\"mt-1 text-lg font-semibold text-rr-heading tabular-nums\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div><!-- Summary cards --><div class=\"mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4\"><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Subtotal</dt><dd class=\"mt-1 text-lg font-semibold text-rr-heading tabular-nums\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -176,7 +176,7 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</dd></div><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Total</dt><dd class=\"mt-1 text-lg font-semibold text-rr-heading tabular-nums\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</dd></div><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Total</dt><dd class=\"mt-1 text-lg font-semibold text-rr-heading tabular-nums\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -189,7 +189,7 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</dd></div><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Paid</dt><dd class=\"mt-1 text-lg font-semibold text-rr-teal tabular-nums\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</dd></div><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Paid</dt><dd class=\"mt-1 text-lg font-semibold text-rr-teal tabular-nums\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -202,7 +202,7 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</dd></div><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Amount Due</dt><dd class=\"mt-1 text-lg font-semibold text-rr-heading tabular-nums\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</dd></div><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Amount Due</dt><dd class=\"mt-1 text-lg font-semibold text-rr-heading tabular-nums\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -220,7 +220,7 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.Invoice.Notes != nil && *props.Invoice.Notes != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"mt-6 rounded-sm bg-rr-raised p-4 ring-1 ring-rr-border\"><p class=\"text-sm text-rr-body\"><span class=\"font-medium\">Notes:</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div class=\"mt-6 border-2 border-rr-border bg-rr-raised p-4\"><p class=\"text-sm text-rr-body\"><span class=\"font-medium\">Notes:</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -248,7 +248,7 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"mt-2 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Description</th><th scope=\"col\" class=\"px-3 py-3.5 text-right text-sm font-semibold text-rr-heading\">Qty</th><th scope=\"col\" class=\"px-3 py-3.5 text-right text-sm font-semibold text-rr-heading\">Unit Price</th><th scope=\"col\" class=\"px-3 py-3.5 text-right text-sm font-semibold text-rr-heading\">Total</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Description</th><th scope=\"col\" class=\"px-3 py-3.5 text-right text-sm font-semibold text-rr-heading\">Qty</th><th scope=\"col\" class=\"px-3 py-3.5 text-right text-sm font-semibold text-rr-heading\">Unit Price</th><th scope=\"col\" class=\"px-3 py-3.5 text-right text-sm font-semibold text-rr-heading\">Total</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -325,7 +325,7 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"mt-2 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Date</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Method</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell\">Reference</th><th scope=\"col\" class=\"px-3 py-3.5 text-right text-sm font-semibold text-rr-heading\">Amount</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<div class=\"mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Date</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Method</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell\">Reference</th><th scope=\"col\" class=\"px-3 py-3.5 text-right text-sm font-semibold text-rr-heading\">Amount</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -404,7 +404,7 @@ func InvoiceShowContent(props InvoiceShowProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if canRecordPayment(props.Invoice) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div class=\"mt-4 rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><h3 class=\"text-sm font-semibold text-rr-heading\">Record Payment</h3><form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div class=\"mt-4 border-2 border-rr-border bg-rr-surface p-4\"><h3 class=\"text-sm font-semibold text-rr-heading\">Record Payment</h3><form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

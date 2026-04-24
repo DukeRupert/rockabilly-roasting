@@ -53,14 +53,14 @@ templ ProductEditContent(props ProductEditProps) {
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
-			<h1 class="text-lg font-bold text-rr-heading">{ props.Product.Title }</h1>
+			<h1 class="admin-page-title">{ props.Product.Title }</h1>
 		</div>
 		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none flex gap-2">
 			if props.Product.Slug != "" {
 				<a
 					href={ templ.SafeURL(fmt.Sprintf("/catalog/%s", props.Product.Slug)) }
 					target="_blank"
-					class="inline-flex items-center gap-1 rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
+					class="inline-flex items-center gap-1 rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 				>
 					View on storefront
 					<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
@@ -71,14 +71,14 @@ templ ProductEditContent(props ProductEditProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/clone", props.Product.ID)) }>
 				<button
 					type="submit"
-					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
+					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 				>
 					Clone
 				</button>
 			</form>
 			<a
 				href="/admin/catalog"
-				class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
+				class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 			>
 				Back to products
 			</a>
@@ -169,7 +169,7 @@ templ productDetailsTab(props ProductEditProps) {
 			Action:  fmt.Sprintf("/admin/catalog/%s", props.Product.ID),
 		})
 		<!-- Settings panel -->
-		<div class="rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface">
 			<div class="px-4 py-5 sm:px-6">
 				<h3 class="text-base/7 font-semibold text-rr-heading">Settings</h3>
 			</div>
@@ -177,7 +177,7 @@ templ productDetailsTab(props ProductEditProps) {
 				@StatusToggle(props.Product)
 				@SubscribableToggle(props.Product)
 				<!-- Destructive actions -->
-				<div class="flex items-center justify-between border-t border-rr-border pt-6">
+				<div class="flex items-center justify-between border-t-2 border-rr-border pt-6">
 					<div>
 						<p class="text-sm font-medium text-rr-heading">
 							if props.Product.Status == domain.ProductStatusArchived {
@@ -198,14 +198,14 @@ templ productDetailsTab(props ProductEditProps) {
 						if props.Product.Status == domain.ProductStatusArchived {
 							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/status", props.Product.ID)) }>
 								<input type="hidden" name="status" value="draft"/>
-								<button type="submit" class="rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised">
+								<button type="submit" class="rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border-2 border-rr-border hover:bg-rr-raised">
 									Unarchive
 								</button>
 							</form>
 						} else {
 							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/status", props.Product.ID)) }>
 								<input type="hidden" name="status" value="archived"/>
-								<button type="submit" class="rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised">
+								<button type="submit" class="rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border-2 border-rr-border hover:bg-rr-raised">
 									Archive
 								</button>
 							</form>
@@ -263,7 +263,7 @@ templ productPricingTab(props ProductEditProps) {
 			}
 		</p>
 		if len(props.Variants) == 0 {
-			<div class="rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
+			<div class="border-2 border-dashed border-rr-border p-12 text-center">
 				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No variants</h3>
 				<p class="mt-1 text-sm text-rr-muted">Add variants on the Variants tab first.</p>
 			</div>
@@ -288,7 +288,7 @@ templ PricingPanel(product *domain.Product, variants []VariantWithOptions, group
 			}
 		</p>
 		if len(variants) == 0 {
-			<div class="rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
+			<div class="border-2 border-dashed border-rr-border p-12 text-center">
 				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No variants</h3>
 				<p class="mt-1 text-sm text-rr-muted">Add variants on the Variants tab first.</p>
 			</div>
@@ -302,7 +302,7 @@ templ PricingPanel(product *domain.Product, variants []VariantWithOptions, group
 }
 
 templ productPricingCard(title string, group *domain.CustomerGroup, props ProductEditProps) {
-	<div class="overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+	<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">
 		<div class="border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6">
 			if group != nil {
 				<h3 class="text-sm font-medium text-rr-teal">{ title }</h3>
@@ -347,7 +347,7 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 										if vwo.PriceCents != nil {
 											value={ priceToDollars(*vwo.PriceCents) }
 										}
-										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading ring-1 ring-inset ring-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
+										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border-2 border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
 								</form>
 							} else {
@@ -371,7 +371,7 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 										if cents, ok := vwo.GroupPrices[group.ID]; ok {
 											value={ priceToDollars(cents) }
 										}
-										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading ring-1 ring-inset ring-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
+										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border-2 border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
 								</form>
 							}
@@ -385,7 +385,7 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 
 // OptionsPanel renders the options section as a standalone partial for htmx swaps.
 templ OptionsPanel(product *domain.Product, options []OptionWithValues) {
-	<div id="options-panel" class="rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+	<div id="options-panel" class="border-2 border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-rr-heading">Options</h3>
 			<p class="mt-1 text-sm text-rr-muted">Define options (e.g. Size, Color) before creating variants.</p>
@@ -438,7 +438,7 @@ templ OptionsPanel(product *domain.Product, options []OptionWithValues) {
 								<div class="flex-1">
 									<input type="text" name="value" placeholder="New value" required class={ inputClasses(false) }/>
 								</div>
-								<button type="submit" class="rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised">
+								<button type="submit" class="rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border-2 border-rr-border hover:bg-rr-raised">
 									Add value
 								</button>
 							</form>
@@ -496,7 +496,7 @@ func priceToDollars(cents int) string {
 
 // VariantsPanel renders the variants section as a standalone partial for htmx swaps.
 templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues, taxonName string, groups []domain.CustomerGroup, attrs templ.Attributes) {
-	<div id="variants-panel" { attrs... } class="rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+	<div id="variants-panel" { attrs... } class="border-2 border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-rr-heading">Variants</h3>
 		</div>

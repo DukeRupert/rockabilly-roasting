@@ -56,7 +56,7 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"media-gallery\" class=\"rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Images</h3><p class=\"mt-1 text-sm text-rr-muted\">Product photos displayed on the storefront. First image is the primary.</p></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"media-gallery\" class=\"border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Images</h3><p class=\"mt-1 text-sm text-rr-muted\">Product photos displayed on the storefront. First image is the primary.</p></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

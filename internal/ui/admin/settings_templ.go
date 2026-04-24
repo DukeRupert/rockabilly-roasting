@@ -76,7 +76,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-lg font-bold text-rr-heading\">Settings</h1><p class=\"mt-1 text-sm text-rr-muted\">Manage integrations and platform configuration</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Settings</h1><p class=\"mt-1 text-sm text-rr-muted\">Manage integrations and platform configuration</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -99,7 +99,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Integrations section --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Integrations</h2><p class=\"mt-1 text-sm text-rr-muted\">Connect external services for billing and payments.</p><div class=\"mt-4 space-y-4\"><!-- QuickBooks Online --><div class=\"overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"px-4 py-5 sm:px-6\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><!-- QB logo placeholder --><div class=\"flex size-10 items-center justify-center rounded-sm bg-green-50 ring-1 ring-green-600/20\"><svg class=\"size-6 text-green-600\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg></div><div><h3 class=\"text-sm font-semibold text-rr-heading\">QuickBooks Online</h3><p class=\"text-sm text-rr-muted\">B2B wholesale invoicing and ACH payment collection</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Integrations section --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Integrations</h2><p class=\"mt-1 text-sm text-rr-muted\">Connect external services for billing and payments.</p><div class=\"mt-4 space-y-4\"><!-- QuickBooks Online --><div class=\"overflow-hidden border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><!-- QB logo placeholder --><div class=\"flex size-10 items-center justify-center rounded-sm bg-green-50 ring-1 ring-green-600/20\"><svg class=\"size-6 text-green-600\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg></div><div><h3 class=\"text-sm font-semibold text-rr-heading\">QuickBooks Online</h3><p class=\"text-sm text-rr-muted\">B2B wholesale invoicing and ACH payment collection</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -233,7 +233,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</dl></div><div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex items-center gap-3\"><a href=\"/admin/settings/integrations/quickbooks/connect\" class=\"inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised\">Reconnect</a><form method=\"post\" action=\"/admin/settings/integrations/quickbooks/disconnect\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Disconnect QuickBooks? This will stop all automated B2B invoicing until you reconnect.')\">Disconnect</button></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</dl></div><div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex items-center gap-3\"><a href=\"/admin/settings/integrations/quickbooks/connect\" class=\"inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border-2 border-rr-border hover:bg-rr-raised\">Reconnect</a><form method=\"post\" action=\"/admin/settings/integrations/quickbooks/disconnect\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Disconnect QuickBooks? This will stop all automated B2B invoicing until you reconnect.')\">Disconnect</button></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

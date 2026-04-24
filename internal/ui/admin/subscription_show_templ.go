@@ -70,14 +70,14 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Header --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><div class=\"flex items-center gap-3\"><h1 class=\"text-lg font-bold text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Header --><div class=\"sm:flex sm:items-center sm:justify-between\"><div><div class=\"flex items-center gap-3\"><h1 class=\"admin-page-title\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Plan.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 46, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 46, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -90,7 +90,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.FirstName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 46, Col: 100}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 46, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -103,7 +103,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.LastName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 46, Col: 128}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 46, Col: 111}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -191,7 +191,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div><!-- Details grid --><div class=\"mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4\"><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Plan</dt><dd class=\"mt-1 text-sm font-semibold text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div><!-- Details grid --><div class=\"mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4\"><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Plan</dt><dd class=\"mt-1 text-sm font-semibold text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -230,7 +230,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, ")</dd></div><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Quantity</dt><dd class=\"mt-1 text-sm font-semibold text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, ")</dd></div><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Quantity</dt><dd class=\"mt-1 text-sm font-semibold text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -243,7 +243,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</dd></div><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Customer</dt><dd class=\"mt-1 text-sm font-semibold text-rr-heading\"><a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</dd></div><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Customer</dt><dd class=\"mt-1 text-sm font-semibold text-rr-heading\"><a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -295,7 +295,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</dd></div><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Current Period</dt><dd class=\"mt-1 text-sm text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</dd></div><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Current Period</dt><dd class=\"mt-1 text-sm text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -321,7 +321,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</dd></div><div class=\"rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border\"><dt class=\"text-sm font-medium text-rr-muted\">Next Order</dt><dd class=\"mt-1 text-sm font-semibold text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</dd></div><div class=\"border-2 border-rr-border bg-rr-surface p-4\"><dt class=\"text-sm font-medium text-rr-muted\">Next Order</dt><dd class=\"mt-1 text-sm font-semibold text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -339,7 +339,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.Subscription.CancelledAt != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"mt-4 rounded-sm bg-rr-raised p-4 ring-1 ring-rr-border\"><p class=\"text-sm text-rr-muted\"><span class=\"font-medium\">Cancelled:</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"mt-4 border-2 border-rr-border bg-rr-raised p-4\"><p class=\"text-sm text-rr-muted\"><span class=\"font-medium\">Cancelled:</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -386,7 +386,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"mt-2 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Order</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Period Start</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Period End</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Order</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Period Start</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Period End</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

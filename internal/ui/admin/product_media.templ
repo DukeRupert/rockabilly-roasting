@@ -28,7 +28,7 @@ func mediaURL(m domain.ProductMedia, cfg *media.Config) string {
 // This is the htmx-swappable partial — used by both the initial page render and
 // after image add/delete operations.
 templ MediaGallery(props MediaGalleryProps) {
-	<div id="media-gallery" class="rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+	<div id="media-gallery" class="border-2 border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-rr-heading">Images</h3>
 			<p class="mt-1 text-sm text-rr-muted">Product photos displayed on the storefront. First image is the primary.</p>

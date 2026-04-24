@@ -43,7 +43,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-lg font-bold text-rr-heading">{ props.Plan.Name } — { props.Customer.FirstName } { props.Customer.LastName }</h1>
+				<h1 class="admin-page-title">{ props.Plan.Name } — { props.Customer.FirstName } { props.Customer.LastName }</h1>
 				@SubscriptionStatusBadge(props.Subscription.Status)
 			</div>
 			<p class="mt-1 text-sm text-rr-muted">Created { props.Subscription.CreatedAt.Format("January 2, 2006 at 3:04 PM") }</p>
@@ -82,16 +82,16 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 	</div>
 	<!-- Details grid -->
 	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Plan</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ props.Plan.Name }</dd>
 			<dd class="text-xs text-rr-muted">{ string(props.Plan.Interval) } (&times;{ fmt.Sprintf("%d", props.Plan.IntervalCount) })</dd>
 		</div>
-		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Quantity</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ fmt.Sprintf("%d", props.Subscription.Quantity) }</dd>
 		</div>
-		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Customer</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">
 				<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())) } class="text-rr-red hover:text-rr-red-lt">
@@ -100,20 +100,20 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			</dd>
 			<dd class="text-xs text-rr-muted">{ props.Customer.Email }</dd>
 		</div>
-		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Current Period</dt>
 			<dd class="mt-1 text-sm text-rr-heading">
 				{ props.Subscription.CurrentPeriodStart.Format("Jan 2") } — { props.Subscription.CurrentPeriodEnd.Format("Jan 2, 2006") }
 			</dd>
 		</div>
-		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Next Order</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ props.Subscription.NextOrderAt.Format("January 2, 2006") }</dd>
 		</div>
 	</div>
 	<!-- Extra status info -->
 	if props.Subscription.CancelledAt != nil {
-		<div class="mt-4 rounded-sm bg-rr-raised p-4 ring-1 ring-rr-border">
+		<div class="mt-4 border-2 border-rr-border bg-rr-raised p-4">
 			<p class="text-sm text-rr-muted">
 				<span class="font-medium">Cancelled:</span> { props.Subscription.CancelledAt.Format("January 2, 2006 at 3:04 PM") }
 			</p>
@@ -132,7 +132,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 		if len(props.Orders) == 0 {
 			<p class="mt-2 text-sm text-rr-muted">No renewal orders yet.</p>
 		} else {
-			<div class="mt-2 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+			<div class="mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>

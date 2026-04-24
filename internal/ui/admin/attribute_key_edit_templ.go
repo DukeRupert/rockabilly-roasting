@@ -44,14 +44,14 @@ func AttributeKeyEditContent(props AttributeKeyEditProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-lg font-bold text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Key.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/attribute_key_edit.templ`, Line: 22, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/attribute_key_edit.templ`, Line: 22, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -96,7 +96,7 @@ func AttributeKeyEditContent(props AttributeKeyEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised\">Back to set</a></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised\">Back to set</a></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -162,7 +162,7 @@ func AttributeKeyEditContent(props AttributeKeyEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><!-- Zone 1: Identity --><div class=\"mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Identity</h3></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6\"><div class=\"flex items-end gap-3 flex-wrap\"><div class=\"flex-1 min-w-[200px]\"><label for=\"key_name\" class=\"block text-sm/6 font-medium text-rr-heading\">Name</label><div class=\"mt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\"><!-- Zone 1: Identity --><div class=\"mt-8 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Identity</h3></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6\"><div class=\"flex items-end gap-3 flex-wrap\"><div class=\"flex-1 min-w-[200px]\"><label for=\"key_name\" class=\"block text-sm/6 font-medium text-rr-heading\">Name</label><div class=\"mt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -280,7 +280,7 @@ func AttributeKeyEditContent(props AttributeKeyEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</p></div></div></div></div><!-- Zone 2: Behavior --><div class=\"mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Behavior</h3></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6 space-y-6\"><!-- Value type tile selector --><div><span class=\"block text-sm/6 font-medium text-rr-heading mb-3\">Value type</span><!-- Hidden input synced to Alpine --><input type=\"hidden\" name=\"value_type\" x-bind:value=\"valueType\"><div class=\"grid grid-cols-2 gap-2 sm:grid-cols-5\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</p></div></div></div></div><!-- Zone 2: Behavior --><div class=\"mt-8 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Behavior</h3></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6 space-y-6\"><!-- Value type tile selector --><div><span class=\"block text-sm/6 font-medium text-rr-heading mb-3\">Value type</span><!-- Hidden input synced to Alpine --><input type=\"hidden\" name=\"value_type\" x-bind:value=\"valueType\"><div class=\"grid grid-cols-2 gap-2 sm:grid-cols-5\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -304,7 +304,7 @@ func AttributeKeyEditContent(props AttributeKeyEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div></div><!-- Type change warning --><div x-show=\"typeChanged\" x-cloak class=\"rounded-sm px-4 py-3 ring-1 ring-rr-amber bg-rr-amber-dark/20\"><div class=\"flex items-start gap-2\"><svg class=\"size-5 text-rr-amber mt-0.5 shrink-0\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z\" clip-rule=\"evenodd\"></path></svg><p class=\"text-sm text-rr-amber-lt\">Changing the value type may invalidate existing product data using this key. <span x-show=\"!isEnum && allowedValues.length > 0\">Allowed values will be cleared.</span></p></div></div><!-- Allowed values tag editor --><div x-show=\"isEnum\" x-cloak><span class=\"block text-sm/6 font-medium text-rr-heading mb-2\">Allowed values</span><!-- Hidden input serializes the array as comma-separated for the form post --><input type=\"hidden\" name=\"allowed_values\" x-bind:value=\"allowedValues.join(', ')\"><div class=\"rounded-sm ring-1 ring-rr-border bg-rr-surface px-3 py-2 min-h-[44px] flex flex-wrap items-center gap-2\"><template x-for=\"(val, i) in allowedValues\" :key=\"i\"><span class=\"inline-flex items-center gap-1 rounded-sm bg-rr-raised px-2 py-1 text-sm text-rr-body ring-1 ring-rr-border\"><span x-text=\"val\"></span> <button type=\"button\" @click=\"removeValue(i)\" class=\"text-rr-muted hover:text-rr-red ml-0.5\" aria-label=\"Remove value\"><svg class=\"size-3.5\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path d=\"M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z\"></path></svg></button></span></template><input type=\"text\" x-model=\"newValue\" @keydown.enter.prevent=\"addValue()\" placeholder=\"Add value...\" class=\"flex-1 min-w-[120px] bg-transparent text-sm text-rr-heading placeholder:text-rr-muted outline-none\"></div><p class=\"mt-1 text-xs text-rr-muted\">Press Enter to add. Required for enum types.</p></div><div x-show=\"!isEnum\" x-cloak><p class=\"text-sm text-rr-muted\">No predefined values for this type.</p></div><!-- Filterable / Sortable toggle switches --><div class=\"space-y-0 divide-y divide-rr-border rounded-sm ring-1 ring-rr-border\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div></div><!-- Type change warning --><div x-show=\"typeChanged\" x-cloak class=\"rounded-sm px-4 py-3 ring-1 ring-rr-amber bg-rr-amber-dark/20\"><div class=\"flex items-start gap-2\"><svg class=\"size-5 text-rr-amber mt-0.5 shrink-0\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z\" clip-rule=\"evenodd\"></path></svg><p class=\"text-sm text-rr-amber-lt\">Changing the value type may invalidate existing product data using this key. <span x-show=\"!isEnum && allowedValues.length > 0\">Allowed values will be cleared.</span></p></div></div><!-- Allowed values tag editor --><div x-show=\"isEnum\" x-cloak><span class=\"block text-sm/6 font-medium text-rr-heading mb-2\">Allowed values</span><!-- Hidden input serializes the array as comma-separated for the form post --><input type=\"hidden\" name=\"allowed_values\" x-bind:value=\"allowedValues.join(', ')\"><div class=\"border-2 border-rr-border bg-rr-surface px-3 py-2 min-h-[44px] flex flex-wrap items-center gap-2\"><template x-for=\"(val, i) in allowedValues\" :key=\"i\"><span class=\"inline-flex items-center gap-1 rounded-sm bg-rr-raised px-2 py-1 text-sm text-rr-body ring-1 ring-rr-border\"><span x-text=\"val\"></span> <button type=\"button\" @click=\"removeValue(i)\" class=\"text-rr-muted hover:text-rr-red ml-0.5\" aria-label=\"Remove value\"><svg class=\"size-3.5\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path d=\"M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z\"></path></svg></button></span></template><input type=\"text\" x-model=\"newValue\" @keydown.enter.prevent=\"addValue()\" placeholder=\"Add value...\" class=\"flex-1 min-w-[120px] bg-transparent text-sm text-rr-heading placeholder:text-rr-muted outline-none\"></div><p class=\"mt-1 text-xs text-rr-muted\">Press Enter to add. Required for enum types.</p></div><div x-show=\"!isEnum\" x-cloak><p class=\"text-sm text-rr-muted\">No predefined values for this type.</p></div><!-- Filterable / Sortable toggle switches --><div class=\"space-y-0 divide-y divide-rr-border border-2 border-rr-border\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -316,7 +316,7 @@ func AttributeKeyEditContent(props AttributeKeyEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div></div></div><!-- Save button --><div class=\"mt-6 flex justify-end\"><button type=\"submit\" class=\"rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Save changes</button></div></form><!-- Zone 3: Danger --><div class=\"mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"px-4 py-5 sm:px-6 flex items-center justify-between\"><div><h3 class=\"text-sm font-medium text-rr-heading\">Delete attribute key</h3><p class=\"mt-0.5 text-sm text-rr-muted\">Product values using this key will be lost.</p></div><form method=\"post\" action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div></div></div><!-- Save button --><div class=\"mt-6 flex justify-end\"><button type=\"submit\" class=\"rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Save changes</button></div></form><!-- Zone 3: Danger --><div class=\"mt-8 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6 flex items-center justify-between\"><div><h3 class=\"text-sm font-medium text-rr-heading\">Delete attribute key</h3><p class=\"mt-0.5 text-sm text-rr-muted\">Product values using this key will be lost.</p></div><form method=\"post\" action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -377,7 +377,7 @@ func typeTile(value, icon, label, desc string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var22 string
-		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("valueType === '%s' ? 'ring-2 ring-rr-amber bg-rr-raised' : 'ring-1 ring-rr-border hover:bg-rr-raised/50'", value))
+		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("valueType === '%s' ? 'ring-2 ring-rr-amber bg-rr-raised' : 'ring-2 ring-rr-border hover:bg-rr-raised/50'", value))
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/attribute_key_edit.templ`, Line: 208, Col: 143}
 		}

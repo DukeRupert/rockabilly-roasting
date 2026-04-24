@@ -54,7 +54,7 @@ func GroupPricingContent(props GroupPricingProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-lg font-bold text-rr-heading\">Group Pricing</h1><p class=\"mt-1 text-sm text-rr-muted\">Set base and group-specific prices for all variants. ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Group Pricing</h1><p class=\"mt-1 text-sm text-rr-muted\">Set base and group-specific prices for all variants. ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -64,12 +64,12 @@ func GroupPricingContent(props GroupPricingProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/groups\" class=\"block rounded-sm bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading shadow-xs ring-1 ring-inset ring-rr-border hover:bg-rr-raised\">Manage groups</a></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/groups\" class=\"block rounded-sm bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading shadow-xs border-2 border-rr-border hover:bg-rr-raised\">Manage groups</a></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(props.Products) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"mt-8 rounded-sm border-2 border-dashed border-rr-border p-12 text-center\"><h3 class=\"mt-2 text-sm font-semibold text-rr-heading\">No products with variants</h3><p class=\"mt-1 text-sm text-rr-muted\">Create products and add variants to start setting prices.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"mt-8 border-2 border-dashed border-rr-border p-12 text-center\"><h3 class=\"mt-2 text-sm font-semibold text-rr-heading\">No products with variants</h3><p class=\"mt-1 text-sm text-rr-muted\">Create products and add variants to start setting prices.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -160,7 +160,7 @@ func pricingCard(title string, groupLabel string, pg ProductPricingGroup, group 
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"overflow-hidden border-2 border-rr-border bg-rr-surface\"><div class=\"border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -296,7 +296,7 @@ func pricingCard(title string, groupLabel string, pg ProductPricingGroup, group 
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, " class=\"w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading ring-1 ring-inset ring-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red\"> <button type=\"submit\" class=\"rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt\">Save</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, " class=\"w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border-2 border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red\"> <button type=\"submit\" class=\"rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt\">Save</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -376,7 +376,7 @@ func pricingCard(title string, groupLabel string, pg ProductPricingGroup, group 
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, " class=\"w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading ring-1 ring-inset ring-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red\"> <button type=\"submit\" class=\"rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt\">Save</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, " class=\"w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border-2 border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red\"> <button type=\"submit\" class=\"rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt\">Save</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

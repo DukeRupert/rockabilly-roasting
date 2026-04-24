@@ -157,7 +157,7 @@ func CategoryListContent(props CategoryListProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div><!-- Create/Edit form --><div><div class=\"rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div><!-- Create/Edit form --><div><div class=\"border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

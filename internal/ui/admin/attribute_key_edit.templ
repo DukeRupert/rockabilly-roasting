@@ -19,7 +19,7 @@ templ AttributeKeyEditContent(props AttributeKeyEditProps) {
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
-			<h1 class="text-lg font-bold text-rr-heading">{ props.Key.Name }</h1>
+			<h1 class="admin-page-title">{ props.Key.Name }</h1>
 			<p class="mt-2 text-sm text-rr-muted">
 				Attribute key in
 				<a href={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s", props.Set.ID)) } class="text-rr-red hover:text-rr-red-lt">{ props.Set.Name }</a>
@@ -28,7 +28,7 @@ templ AttributeKeyEditContent(props AttributeKeyEditProps) {
 		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s", props.Set.ID)) }
-				class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
+				class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 			>
 				Back to set
 			</a>
@@ -72,7 +72,7 @@ templ AttributeKeyEditContent(props AttributeKeyEditProps) {
 		}`, props.Key.ValueType, props.Key.ValueType, allowedValuesJSON(props.Key)) }
 	>
 		<!-- Zone 1: Identity -->
-		<div class="mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+		<div class="mt-8 border-2 border-rr-border bg-rr-surface">
 			<div class="px-4 py-5 sm:px-6">
 				<h3 class="text-base/7 font-semibold text-rr-heading">Identity</h3>
 			</div>
@@ -103,7 +103,7 @@ templ AttributeKeyEditContent(props AttributeKeyEditProps) {
 			</div>
 		</div>
 		<!-- Zone 2: Behavior -->
-		<div class="mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+		<div class="mt-8 border-2 border-rr-border bg-rr-surface">
 			<div class="px-4 py-5 sm:px-6">
 				<h3 class="text-base/7 font-semibold text-rr-heading">Behavior</h3>
 			</div>
@@ -142,7 +142,7 @@ templ AttributeKeyEditContent(props AttributeKeyEditProps) {
 					<span class="block text-sm/6 font-medium text-rr-heading mb-2">Allowed values</span>
 					<!-- Hidden input serializes the array as comma-separated for the form post -->
 					<input type="hidden" name="allowed_values" x-bind:value="allowedValues.join(', ')"/>
-					<div class="rounded-sm ring-1 ring-rr-border bg-rr-surface px-3 py-2 min-h-[44px] flex flex-wrap items-center gap-2">
+					<div class="border-2 border-rr-border bg-rr-surface px-3 py-2 min-h-[44px] flex flex-wrap items-center gap-2">
 						<template x-for="(val, i) in allowedValues" :key="i">
 							<span class="inline-flex items-center gap-1 rounded-sm bg-rr-raised px-2 py-1 text-sm text-rr-body ring-1 ring-rr-border">
 								<span x-text="val"></span>
@@ -167,7 +167,7 @@ templ AttributeKeyEditContent(props AttributeKeyEditProps) {
 					<p class="text-sm text-rr-muted">No predefined values for this type.</p>
 				</div>
 				<!-- Filterable / Sortable toggle switches -->
-				<div class="space-y-0 divide-y divide-rr-border rounded-sm ring-1 ring-rr-border">
+				<div class="space-y-0 divide-y divide-rr-border border-2 border-rr-border">
 					@toggleRow("filterable", "Filterable", "Shows in the storefront filter sidebar", props.Key.Filterable)
 					@toggleRow("sortable", "Sortable", "Available in the storefront sort dropdown", props.Key.Sortable)
 				</div>
@@ -181,7 +181,7 @@ templ AttributeKeyEditContent(props AttributeKeyEditProps) {
 		</div>
 	</form>
 	<!-- Zone 3: Danger -->
-	<div class="mt-8 rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+	<div class="mt-8 border-2 border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6 flex items-center justify-between">
 			<div>
 				<h3 class="text-sm font-medium text-rr-heading">Delete attribute key</h3>
@@ -205,7 +205,7 @@ templ typeTile(value, icon, label, desc string) {
 	<button
 		type="button"
 		@click={ fmt.Sprintf("valueType = '%s'", value) }
-		x-bind:class={ fmt.Sprintf("valueType === '%s' ? 'ring-2 ring-rr-amber bg-rr-raised' : 'ring-1 ring-rr-border hover:bg-rr-raised/50'", value) }
+		x-bind:class={ fmt.Sprintf("valueType === '%s' ? 'ring-2 ring-rr-amber bg-rr-raised' : 'ring-2 ring-rr-border hover:bg-rr-raised/50'", value) }
 		class="rounded-sm px-3 py-3 text-left transition-colors cursor-pointer"
 	>
 		<span class="block text-xs font-semibold text-rr-muted uppercase tracking-wider">{ icon }</span>

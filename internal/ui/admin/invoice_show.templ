@@ -31,7 +31,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
 			<div class="flex items-center gap-3">
-				<h1 class="text-lg font-bold text-rr-heading">Invoice { props.Invoice.Number }</h1>
+				<h1 class="admin-page-title">Invoice { props.Invoice.Number }</h1>
 				@InvoiceStatusBadge(props.Invoice.Status)
 			</div>
 			<p class="mt-1 text-sm text-rr-muted">
@@ -76,26 +76,26 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 	</div>
 	<!-- Summary cards -->
 	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Subtotal</dt>
 			<dd class="mt-1 text-lg font-semibold text-rr-heading tabular-nums">{ formatCents(props.Invoice.Subtotal) }</dd>
 		</div>
-		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Total</dt>
 			<dd class="mt-1 text-lg font-semibold text-rr-heading tabular-nums">{ formatCents(props.Invoice.Total) }</dd>
 		</div>
-		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Paid</dt>
 			<dd class="mt-1 text-lg font-semibold text-rr-teal tabular-nums">{ formatCents(props.Invoice.AmountPaid) }</dd>
 		</div>
-		<div class="rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Amount Due</dt>
 			<dd class="mt-1 text-lg font-semibold text-rr-heading tabular-nums">{ formatCents(props.Invoice.AmountDue) }</dd>
 		</div>
 	</div>
 	<!-- Notes -->
 	if props.Invoice.Notes != nil && *props.Invoice.Notes != "" {
-		<div class="mt-6 rounded-sm bg-rr-raised p-4 ring-1 ring-rr-border">
+		<div class="mt-6 border-2 border-rr-border bg-rr-raised p-4">
 			<p class="text-sm text-rr-body">
 				<span class="font-medium">Notes:</span> { *props.Invoice.Notes }
 			</p>
@@ -107,7 +107,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 		if len(props.Lines) == 0 {
 			<p class="mt-2 text-sm text-rr-muted">No line items.</p>
 		} else {
-			<div class="mt-2 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+			<div class="mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
@@ -145,7 +145,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 		if len(props.Payments) == 0 {
 			<p class="mt-2 text-sm text-rr-muted">No payments recorded.</p>
 		} else {
-			<div class="mt-2 overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+			<div class="mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
@@ -182,7 +182,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 		}
 		<!-- Record payment form -->
 		if canRecordPayment(props.Invoice) {
-			<div class="mt-4 rounded-sm bg-rr-surface p-4 shadow-xs ring-1 ring-rr-border">
+			<div class="mt-4 border-2 border-rr-border bg-rr-surface p-4">
 				<h3 class="text-sm font-semibold text-rr-heading">Record Payment</h3>
 				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/invoices/%s/payment", props.Invoice.ID.String())) } class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
 					<div>

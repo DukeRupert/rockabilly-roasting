@@ -107,7 +107,7 @@ templ Storefront(props StorefrontProps) {
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 			<style>[x-cloak] { display: none !important; }</style>
 		</head>
-		<body class="min-h-screen font-oswald text-ink bg-paper" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">
+		<body class="min-h-screen font-oswald text-ink bg-paper" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML show:window:top">
 			<!-- Skip navigation -->
 			<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-rust focus:text-paper focus:border-2 focus:border-ink focus:px-4 focus:py-2 focus:font-oswald focus:font-bold focus:text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">
 				Skip to main content

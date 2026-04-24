@@ -138,6 +138,16 @@ html {
 	background: linear-gradient(90deg, var(--color-rust-deep), var(--color-rust), var(--color-candle), var(--color-rust), var(--color-rust-deep));
 }
 
+/* iOS Safari auto-zooms form controls with computed font-size < 16px and won't
+   zoom back out. Force textual inputs to 16px at mobile widths to suppress it. */
+@media (max-width: 640px) {
+	input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
+	select,
+	textarea {
+		font-size: 16px !important;
+	}
+}
+
 /* Amber focus ring for inputs */
 .rr-input:focus {
 	outline: none;

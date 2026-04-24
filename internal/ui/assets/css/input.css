@@ -274,6 +274,20 @@ html {
 	box-shadow: 0 0 0 0 var(--color-ink) !important;
 }
 
+/* Inverted stamp — paper-colored hard shadow, for CTAs on ink backgrounds. */
+.btn-stamp-paper {
+	transition: transform 120ms cubic-bezier(.7,0,.2,1.4), box-shadow 120ms cubic-bezier(.7,0,.2,1.4);
+	box-shadow: 4px 4px 0 0 var(--color-paper);
+}
+.btn-stamp-paper:hover {
+	transform: translate(-1px, -1px);
+	box-shadow: 6px 6px 0 0 var(--color-paper);
+}
+.btn-stamp-paper:active {
+	transform: translate(2px, 2px);
+	box-shadow: 0 0 0 0 var(--color-paper) !important;
+}
+
 /* Halftone dot overlay — paper-and-ink variant (paper dots on ink bg) */
 .texture-halftone-paper {
 	background-image: radial-gradient(rgba(246, 239, 225, 0.06) 1.5px, transparent 1.5px);
@@ -385,5 +399,13 @@ html {
 	.btn-stamp:active {
 		transform: none;
 		box-shadow: var(--shadow-stamp);
+	}
+	.btn-stamp-paper {
+		transition: none;
+	}
+	.btn-stamp-paper:hover,
+	.btn-stamp-paper:active {
+		transform: none;
+		box-shadow: 4px 4px 0 0 var(--color-paper);
 	}
 }

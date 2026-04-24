@@ -181,30 +181,62 @@ templ HomeContent(props HomePageProps) {
 			<div class="flame-stripe"></div>
 		</section>
 	}
-	<!-- The Daily Grind — subscription pitch -->
-	<section class="-mx-4 sm:-mx-6 lg:-mx-8">
-		<div class="relative" style="background: linear-gradient(rgba(14,15,16,0.88), rgba(14,15,16,0.88)), url('/static/coffee_in_the_back.webp') center/cover no-repeat; background-color: #0E0F10;">
-			<div class="texture-dots absolute inset-0 opacity-30"></div>
-			<div class="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16 text-center">
-				<p class="label-font text-rr-teal text-xs mb-3" style="letter-spacing: 0.35em;">FRESH ON YOUR SCHEDULE</p>
-				<h2 class="font-display text-rr-heading leading-none tracking-wide" style="font-size: clamp(2.5rem, 7vw, 4.5rem);">
-					THE DAILY GRIND
-				</h2>
-				<p class="mt-4 font-body text-lg text-rr-muted max-w-xl mx-auto leading-relaxed">
-					Your favorite coffee, roasted fresh and delivered on your schedule. Never run out again.
+	<!-- The Daily Grind — subscription pitch (ink-dominant, stamp-pressed) -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-ink overflow-hidden">
+		<!-- Amber radial glow centered -->
+		<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse at center, rgba(242,160,61,0.14) 0%, rgba(242,160,61,0.04) 40%, transparent 70%);"></div>
+		<!-- Paper halftone dot texture -->
+		<div class="absolute inset-0 texture-halftone-paper pointer-events-none" style="mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent);"></div>
+		<div class="relative mx-auto max-w-5xl px-6 sm:px-10 lg:px-14 py-20 sm:py-28 text-center">
+			<p class="font-oswald text-candle text-xs sm:text-sm font-semibold" style="letter-spacing:0.3em; text-transform:uppercase;">
+				Fresh on your schedule
+			</p>
+			<h2 class="font-slab text-paper uppercase leading-[0.9] mt-5" style="font-size: clamp(2.75rem, 7vw, 5rem); letter-spacing:-0.005em;">
+				The Daily
+				<span class="font-script text-candle normal-case inline-block align-baseline" style="font-size:1.05em; letter-spacing:0;">grind.</span>
+			</h2>
+			<p class="font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-xl mx-auto">
+				Pick the roast. Pick the cadence. We roast it, bag it, and ship it fresh — same day it comes off the drum.
+			</p>
+			<!-- Three numbered value props, stamped like a menu -->
+			<ul class="grid sm:grid-cols-3 gap-10 sm:gap-8 mt-14 text-left">
+				<li class="flex items-start gap-4">
+					<span class="font-slab text-candle leading-none flex-shrink-0" style="font-size: 2.5rem;">01</span>
+					<div>
+						<p class="font-oswald font-bold text-paper text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">Roasted the day we ship</p>
+						<p class="font-oswald text-paper-warm text-sm mt-1 leading-snug">Never pulled from a shelf. Never more than a week old.</p>
+					</div>
+				</li>
+				<li class="flex items-start gap-4">
+					<span class="font-slab text-candle leading-none flex-shrink-0" style="font-size: 2.5rem;">02</span>
+					<div>
+						<p class="font-oswald font-bold text-paper text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">10% off every bag</p>
+						<p class="font-oswald text-paper-warm text-sm mt-1 leading-snug">Subscribers never pay full price. Simple as that.</p>
+					</div>
+				</li>
+				<li class="flex items-start gap-4">
+					<span class="font-slab text-candle leading-none flex-shrink-0" style="font-size: 2.5rem;">03</span>
+					<div>
+						<p class="font-oswald font-bold text-paper text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">Skip, swap, or quit</p>
+						<p class="font-oswald text-paper-warm text-sm mt-1 leading-snug">Change anything, anytime. No call, no hassle, no hold music.</p>
+					</div>
+				</li>
+			</ul>
+			<!-- CTA + reassurance microcopy -->
+			<div class="mt-14 flex flex-col items-center gap-4">
+				<a
+					href="/subscriptions"
+					class="btn-stamp-paper inline-flex items-center gap-2 bg-rust text-paper border-2 border-paper px-8 py-4 font-oswald font-bold text-sm"
+					style="letter-spacing:0.14em; text-transform:uppercase;"
+				>
+					Join the daily grind
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+					</svg>
+				</a>
+				<p class="font-oswald text-chrome-deep text-xs" style="letter-spacing:0.18em; text-transform:uppercase;">
+					No membership fee · Cancel in two clicks
 				</p>
-				<p class="mt-6 font-display text-rr-heading tracking-widest text-lg sm:text-xl">
-					ALWAYS FRESH
-					<span class="text-rr-teal mx-3">&middot;</span>
-					SAVE 10%
-					<span class="text-rr-teal mx-3">&middot;</span>
-					CANCEL ANYTIME
-				</p>
-				<div class="mt-8">
-					<a href="/subscriptions" class="btn label-font px-10 py-4 rounded-sm text-white text-sm bg-rr-teal hover:bg-rr-teal-lt transition-colors">
-						JOIN THE DAILY GRIND
-					</a>
-				</div>
 			</div>
 		</div>
 	</section>

@@ -58,7 +58,11 @@ templ Storefront(props StorefrontProps) {
 			}
 			<meta property="og:site_name" content="Rockabilly Roasting Co."/>
 			<!-- Twitter Card -->
-			<meta name="twitter:card" content="summary"/>
+			if props.OGImage != "" {
+				<meta name="twitter:card" content="summary_large_image"/>
+			} else {
+				<meta name="twitter:card" content="summary"/>
+			}
 			<meta name="twitter:title" content={ props.fullTitle() }/>
 			if props.Description != "" {
 				<meta name="twitter:description" content={ props.Description }/>

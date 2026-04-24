@@ -10,6 +10,7 @@ type StorefrontProps struct {
 	CanonicalURL string // full URL, e.g. "https://rockabillyroasting.com/about"
 	OGImage      string // full URL to share image; falls back to logo
 	OGType       string // "website", "product", etc.; defaults to "website"
+	PreloadImage string // <link rel=preload as=image> — set for LCP asset on above-the-fold images
 }
 
 func (p StorefrontProps) cartURL() string {
@@ -104,6 +105,9 @@ templ Storefront(props StorefrontProps) {
 				]
 			}
 			</script>
+			if props.PreloadImage != "" {
+				<link rel="preload" as="image" href={ props.PreloadImage } fetchpriority="high"/>
+			}
 			<link rel="icon" type="image/svg+xml" href="/static/rockabilly-logo.svg"/>
 			<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png"/>
 			<link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png"/>

@@ -295,6 +295,7 @@ func HomePage(props HomePageProps) templ.Component {
 			CartCount:    props.CartCount,
 			CanonicalURL: props.CanonicalURL,
 			OGImage:      props.OGImage,
+			PreloadImage: "/static/coffee_in_the_back.webp",
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var12), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

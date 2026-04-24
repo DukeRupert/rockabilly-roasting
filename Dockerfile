@@ -53,7 +53,8 @@ RUN templ generate
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server && \
     CGO_ENABLED=0 GOOS=linux go build -o /app/seed ./cmd/seed && \
     CGO_ENABLED=0 GOOS=linux go build -o /app/migrate ./cmd/migrate && \
-    CGO_ENABLED=0 GOOS=linux go build -o /app/os-migrate ./cmd/os-migrate
+    CGO_ENABLED=0 GOOS=linux go build -o /app/os-migrate ./cmd/os-migrate && \
+    CGO_ENABLED=0 GOOS=linux go build -o /app/sentrycheck ./cmd/sentrycheck
 
 # Stage 3: Minimal runtime
 FROM alpine:3.21
@@ -67,6 +68,7 @@ COPY --from=builder /app/server ./server
 COPY --from=builder /app/seed ./seed
 COPY --from=builder /app/migrate ./migrate
 COPY --from=builder /app/os-migrate ./os-migrate
+COPY --from=builder /app/sentrycheck ./sentrycheck
 COPY --from=builder /go/bin/goose /usr/local/bin/goose
 
 # Copy static assets

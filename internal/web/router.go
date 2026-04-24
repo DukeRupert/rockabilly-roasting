@@ -372,6 +372,7 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Apply middleware stack (outermost runs first)
 	var handler http.Handler = mux
+	handler = deps.optionalCustomerSession(handler)
 	handler = maxBodySizeMiddleware(handler, 1<<20) // 1 MB limit, excludes /webhooks/
 	handler = requestIDMiddleware(handler)
 	handler = loggingMiddleware(handler, deps.Logger, deps.Metrics)

@@ -1,6 +1,10 @@
 package layouts
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/dukerupert/hiri/internal/platform/auth"
+)
 
 type StorefrontProps struct {
 	Title        string
@@ -175,9 +179,20 @@ templ Storefront(props StorefrontProps) {
 						<!-- Cart + Account + mobile menu -->
 						<div class="flex items-center gap-x-3">
 							<!-- Account link (desktop only) -->
-							<a href="/account/login" class="hidden sm:inline-block font-oswald text-xs font-bold text-paper hover:text-candle transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">
-								Log In
-							</a>
+							if _, ok := auth.CustomerFromContext(ctx); ok {
+								<a href="/account" class="hidden sm:inline-block font-oswald text-xs font-bold text-paper hover:text-candle transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">
+									Account
+								</a>
+								<form method="post" action="/account/logout" class="hidden sm:inline-block">
+									<button type="submit" class="font-oswald text-xs font-bold text-paper hover:text-candle transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">
+										Log Out
+									</button>
+								</form>
+							} else {
+								<a href="/account/login" class="hidden sm:inline-block font-oswald text-xs font-bold text-paper hover:text-candle transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">
+									Log In
+								</a>
+							}
 							<!-- Cart — amber chip with paper double-rule on ink -->
 							<a
 								href={ templ.SafeURL(props.cartURL()) }
@@ -216,7 +231,14 @@ templ Storefront(props StorefrontProps) {
 						<a href="/subscriptions" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Daily Grind</a>
 						<a href="/about" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Story</a>
 						<div class="border-t border-ink-soft mt-2 pt-2">
-							<a href="/account/login" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Log In</a>
+							if _, ok := auth.CustomerFromContext(ctx); ok {
+								<a href="/account" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Account</a>
+								<form method="post" action="/account/logout">
+									<button type="submit" class="block w-full text-left px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Log Out</button>
+								</form>
+							} else {
+								<a href="/account/login" class="block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle" style="letter-spacing:0.14em; text-transform:uppercase;">Log In</a>
+							}
 						</div>
 					</div>
 				</div>
@@ -259,7 +281,11 @@ templ Storefront(props StorefrontProps) {
 								<li><a href="/catalog" class="font-oswald text-paper text-sm hover:text-candle transition-colors">Coffee</a></li>
 								<li><a href="/subscriptions" class="font-oswald text-paper text-sm hover:text-candle transition-colors">The Daily Grind</a></li>
 								<li><a href="/wholesale" class="font-oswald text-paper text-sm hover:text-candle transition-colors">Wholesale</a></li>
-								<li><a href="/account/login" class="font-oswald text-paper text-sm hover:text-candle transition-colors">My Account</a></li>
+								if _, ok := auth.CustomerFromContext(ctx); ok {
+									<li><a href="/account" class="font-oswald text-paper text-sm hover:text-candle transition-colors">My Account</a></li>
+								} else {
+									<li><a href="/account/login" class="font-oswald text-paper text-sm hover:text-candle transition-colors">My Account</a></li>
+								}
 							</ul>
 						</div>
 						<!-- Cafe hours -->

@@ -63,6 +63,51 @@ func (d *Deps) requireCustomerSession(next http.Handler) http.Handler {
 	})
 }
 
+// optionalCustomerSession loads the customer into context if a valid session
+// cookie is present, but never blocks or redirects. Use this on public
+// storefront routes so layouts can reflect logged-in state. Stale or invalid
+// cookies are cleared so we don't keep re-validating them on every request.
+func (d *Deps) optionalCustomerSession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(customerCookieName)
+		if err != nil || cookie.Value == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		var sess *domain.Session
+		var customer *domain.Customer
+
+		err = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
+			var txErr error
+			sess, txErr = d.AuthService.ValidateSession(r.Context(), tx, cookie.Value)
+			if txErr != nil {
+				return txErr
+			}
+			if sess.ActorType != domain.SessionActorTypeCustomer {
+				return nil
+			}
+			customer, txErr = d.AuthService.GetCustomerByID(r.Context(), tx, sess.ActorID)
+			return txErr
+		})
+
+		if err != nil || sess == nil || customer == nil {
+			http.SetCookie(w, &http.Cookie{
+				Name:     customerCookieName,
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HttpOnly: true,
+			})
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		ctx := auth.WithCustomer(r.Context(), customer)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // requireRetailCustomer validates that the request has an authenticated retail customer.
 // Unauthenticated requests redirect to /account/login with a ?next= return URL.
 // Wholesale customers are redirected to /wholesale/portal.
@@ -261,7 +306,10 @@ func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) 
 		Path:     "/",
 		MaxAge:   int(app.MagicLinkSessionDuration.Seconds()),
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		// Lax (not Strict) so the cookie attaches on the redirect that follows
+		// the cross-site click from the email — Strict would drop the cookie on
+		// the immediate hop to /account and bounce the user back to login.
+		SameSite: http.SameSiteLaxMode,
 		Secure:   d.SecureCookies,
 	})
 

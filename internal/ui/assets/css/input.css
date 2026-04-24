@@ -145,6 +145,13 @@ html {
 	box-shadow: 0 0 0 2px rgba(232, 146, 26, 0.2);
 }
 
+/* Rust focus ring for paper-surface inputs */
+.paper-input:focus {
+	outline: none;
+	border-color: var(--color-rust);
+	box-shadow: 0 0 0 2px rgba(180, 53, 29, 0.2);
+}
+
 /* Label font utility — Barlow bold uppercase */
 .label-font {
 	font-family: 'Barlow', sans-serif;

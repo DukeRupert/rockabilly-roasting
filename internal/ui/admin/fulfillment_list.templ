@@ -49,13 +49,13 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
-			<h1 class="text-lg font-bold text-rr-heading">Fulfillment</h1>
+			<h1 class="admin-page-title">Fulfillment</h1>
 			<p class="mt-1 text-sm text-rr-muted">Pack and ship orders</p>
 		</div>
 	</div>
 	<!-- Tab filters -->
 	<div class="mt-6">
-		<nav class="flex gap-0 border-b border-rr-border -mb-px overflow-x-auto">
+		<nav class="flex gap-0 border-b-2 border-rr-border -mb-px overflow-x-auto">
 			<a href={ templ.SafeURL(fulfillmentTabHref("needs_action")) } class={ fulfillmentTabClass(props.Filter, "needs_action") }>Needs Action</a>
 			<a href={ templ.SafeURL(fulfillmentTabHref("unfulfilled")) } class={ fulfillmentTabClass(props.Filter, "unfulfilled") }>Unfulfilled</a>
 			<a href={ templ.SafeURL(fulfillmentTabHref("ready_to_ship")) } class={ fulfillmentTabClass(props.Filter, "ready_to_ship") }>Ready to Ship</a>
@@ -67,7 +67,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 	<!-- Fulfillment table -->
 	<div class="mt-4">
 		if len(props.Orders) == 0 {
-			<div class="rounded-sm border-2 border-dashed border-rr-border p-12 text-center">
+			<div class="border-2 border-dashed border-rr-border p-12 text-center">
 				<svg class="mx-auto size-12 text-rr-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
 				</svg>
@@ -75,7 +75,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 				<p class="mt-1 text-sm text-rr-muted">No orders need fulfillment right now.</p>
 			</div>
 		} else {
-			<div class="overflow-hidden rounded-sm bg-rr-surface shadow-xs ring-1 ring-rr-border">
+			<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
@@ -112,12 +112,12 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 				</table>
 			</div>
 			<!-- Pagination -->
-			<nav class="flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
+			<nav class="flex items-center justify-between border-t-2 border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
 				<div class="-mt-px flex w-0 flex-1">
 					if props.Page > 1 {
 						<a
 							href={ templ.SafeURL(fmt.Sprintf("/admin/fulfillment?page=%d&filter=%s", props.Page-1, props.Filter)) }
-							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
+							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 						>
 							Previous
 						</a>
@@ -132,7 +132,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 					if props.HasMore {
 						<a
 							href={ templ.SafeURL(fmt.Sprintf("/admin/fulfillment?page=%d&filter=%s", props.Page+1, props.Filter)) }
-							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading ring-1 ring-inset ring-rr-border hover:bg-rr-raised"
+							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 						>
 							Next
 						</a>

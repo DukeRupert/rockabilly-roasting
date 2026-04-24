@@ -42,7 +42,7 @@ func AttributeSetListContent(props AttributeSetListProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"text-lg font-bold text-rr-heading\">Attribute Sets</h1><p class=\"mt-2 text-sm text-rr-muted\">Define groups of attributes like \"Coffee Profile\" to attach to products.</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Attribute Sets</h1><p class=\"mt-2 text-sm text-rr-muted\">Define groups of attributes like \"Coffee Profile\" to attach to products.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -211,7 +211,7 @@ func AttributeSetListContent(props AttributeSetListProps) templ.Component {
 				}
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"rounded-sm border-2 border-dashed border-rr-border p-12 text-center\"><h3 class=\"mt-2 text-sm font-semibold text-rr-heading\">No attribute sets</h3><p class=\"mt-1 text-sm text-rr-muted\">Create your first attribute set to start defining product attributes.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"border-2 border-dashed border-rr-border p-12 text-center\"><h3 class=\"mt-2 text-sm font-semibold text-rr-heading\">No attribute sets</h3><p class=\"mt-1 text-sm text-rr-muted\">Create your first attribute set to start defining product attributes.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

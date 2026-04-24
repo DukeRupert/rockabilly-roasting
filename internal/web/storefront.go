@@ -754,6 +754,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		NextProduct:       nextNav,
 		CanonicalURL:      d.BaseURL + r.URL.Path,
 		OGImage:           ogImage,
+		BaseURL:           d.BaseURL,
 	}
 
 	if IsHTMX(r) {

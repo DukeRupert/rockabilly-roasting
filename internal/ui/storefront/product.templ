@@ -41,6 +41,7 @@ type ProductDetailProps struct {
 	NextProduct       *ProductNav
 	CanonicalURL      string
 	OGImage           string
+	BaseURL           string // e.g. "https://rockabillyroasting.com" — for JSON-LD absolute URLs
 }
 
 // ProductNav carries the minimum data needed for prev/next links at the
@@ -855,12 +856,13 @@ templ purchaseModeScript() {
 
 // productJSONLDScript returns a <script type="application/ld+json"> tag with Product structured data.
 func productJSONLDScript(props ProductDetailProps) string {
+	productURL := props.BaseURL + "/catalog/" + props.Product.Slug
 	ld := map[string]any{
 		"@context":    "https://schema.org",
 		"@type":       "Product",
 		"name":        props.Product.Title,
 		"description": props.Product.Description,
-		"url":         "https://rockabillyroasting.com/catalog/" + props.Product.Slug,
+		"url":         productURL,
 		"brand": map[string]any{
 			"@type": "Brand",
 			"name":  "Rockabilly Roasting Co.",
@@ -877,7 +879,7 @@ func productJSONLDScript(props ProductDetailProps) string {
 			"price":         fmt.Sprintf("%.2f", float64(*props.DefaultPrice)/100),
 			"priceCurrency": props.CurrencyCode,
 			"availability":  "https://schema.org/InStock",
-			"url":           "https://rockabillyroasting.com/catalog/" + props.Product.Slug,
+			"url":           productURL,
 		}
 	}
 

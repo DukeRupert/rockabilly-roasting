@@ -32,7 +32,7 @@ func (p StorefrontProps) fullTitle() string {
 
 templ Storefront(props StorefrontProps) {
 	<!DOCTYPE html>
-	<html lang="en" class="bg-rr-bg">
+	<html lang="en" class="bg-paper">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -107,28 +107,11 @@ templ Storefront(props StorefrontProps) {
 			<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 			<style>[x-cloak] { display: none !important; }</style>
 		</head>
-		<body class="min-h-screen font-body text-rr-body bg-rr-bg" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">
+		<body class="min-h-screen font-oswald text-ink bg-paper" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML">
 			<!-- Skip navigation -->
-			<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:rounded-sm focus:bg-rr-red focus:px-4 focus:py-2 focus:text-white focus:text-sm focus:font-medium">
+			<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-2 focus:left-2 focus:bg-rust focus:text-paper focus:border-2 focus:border-ink focus:px-4 focus:py-2 focus:font-oswald focus:font-bold focus:text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">
 				Skip to main content
 			</a>
-			<!-- Promo ticker (disabled — uncomment class to re-enable) -->
-			<div class="hidden overflow-hidden bg-rr-amber-dark">
-				<div class="marquee-inner py-1.5">
-					<span class="label-font text-white px-8 text-xs">FREE SHIPPING ON ORDERS OVER $40</span>
-					<span class="px-5 text-white/40">&loz;</span>
-					<span class="label-font text-white px-8 text-xs">SUBSCRIBE &amp; SAVE 10%</span>
-					<span class="px-5 text-white/40">&loz;</span>
-					<span class="label-font text-white px-8 text-xs">ROASTED FRESH TO ORDER</span>
-					<span class="px-5 text-white/40">&loz;</span>
-					<span class="label-font text-white px-8 text-xs">FREE SHIPPING ON ORDERS OVER $40</span>
-					<span class="px-5 text-white/40">&loz;</span>
-					<span class="label-font text-white px-8 text-xs">SUBSCRIBE &amp; SAVE 10%</span>
-					<span class="px-5 text-white/40">&loz;</span>
-					<span class="label-font text-white px-8 text-xs">ROASTED FRESH TO ORDER</span>
-					<span class="px-5 text-white/40">&loz;</span>
-				</div>
-			</div>
 			<!-- Header -->
 			<header class="sticky top-0 z-40 bg-ink border-b-2 border-ink-soft">
 				<nav class="mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8">

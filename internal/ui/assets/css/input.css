@@ -347,6 +347,31 @@ html {
 .help-prose-dark hr { border: none; border-top: 1px solid var(--color-rr-border); margin: 1.5rem 0; }
 .help-prose-dark > *:first-child { margin-top: 0; }
 
+/* Help article prose — paper-and-ink (storefront) */
+.help-prose-paper h1 { font-family: 'Alfa Slab One', Rockwell, Georgia, serif; font-size: 2rem; line-height: 0.95; color: var(--color-ink); text-transform: uppercase; letter-spacing: -0.005em; margin-bottom: 1rem; margin-top: 2rem; }
+.help-prose-paper h2 { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 1.125rem; color: var(--color-ink); letter-spacing: 0.22em; text-transform: uppercase; margin-bottom: 0.75rem; margin-top: 2rem; padding-bottom: 0.25rem; border-bottom: 2px solid var(--color-ink); }
+.help-prose-paper h3 { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-weight: 700; font-size: 1rem; color: var(--color-ink); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 0.5rem; margin-top: 1.5rem; }
+.help-prose-paper h4 { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-weight: 600; font-size: 0.9375rem; color: var(--color-ink); margin-bottom: 0.375rem; margin-top: 1.25rem; }
+.help-prose-paper p { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 1rem; color: var(--color-ink-soft); line-height: 1.7; margin-bottom: 1rem; }
+.help-prose-paper ul, .help-prose-paper ol { font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 1rem; color: var(--color-ink-soft); line-height: 1.7; margin-bottom: 1rem; padding-left: 1.5rem; }
+.help-prose-paper ul { list-style-type: disc; }
+.help-prose-paper ol { list-style-type: decimal; }
+.help-prose-paper li { margin-bottom: 0.375rem; }
+.help-prose-paper li > ul, .help-prose-paper li > ol { margin-top: 0.375rem; margin-bottom: 0; }
+.help-prose-paper a { color: var(--color-rust); text-decoration: underline; text-underline-offset: 2px; }
+.help-prose-paper a:hover { color: var(--color-rust-deep); }
+.help-prose-paper strong { color: var(--color-ink); font-weight: 700; }
+.help-prose-paper code { font-family: 'Special Elite', 'Courier Prime', ui-monospace, monospace; font-size: 0.875rem; background: var(--color-cream-hi); color: var(--color-ink); padding: 0.125rem 0.375rem; border: 1px solid var(--color-ink); }
+.help-prose-paper pre { font-family: 'Special Elite', 'Courier Prime', ui-monospace, monospace; background: var(--color-cream-hi); border: 2px solid var(--color-ink); padding: 0.75rem 1rem; overflow-x: auto; margin-bottom: 1rem; box-shadow: var(--shadow-stamp-sm); }
+.help-prose-paper pre code { background: none; border: none; padding: 0; color: var(--color-ink); }
+.help-prose-paper table { width: 100%; border-collapse: collapse; font-family: 'Oswald', 'Arial Narrow', sans-serif; font-size: 0.9375rem; margin-bottom: 1rem; }
+.help-prose-paper th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 2px solid var(--color-ink); color: var(--color-ink); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.8125rem; }
+.help-prose-paper td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--color-ink); color: var(--color-ink-soft); }
+.help-prose-paper tr:last-child td { border-bottom: none; }
+.help-prose-paper blockquote { border-left: 3px solid var(--color-rust); padding-left: 1rem; margin: 1.25rem 0; color: var(--color-ink-soft); font-family: 'DM Serif Display', 'Playfair Display', Georgia, serif; font-style: italic; }
+.help-prose-paper hr { border: none; border-top: 2px solid var(--color-ink); margin: 2rem 0; }
+.help-prose-paper > *:first-child { margin-top: 0; }
+
 /* Help article prose — light mode (admin) */
 .help-prose-light h1 { font-size: 1.75rem; font-weight: 700; color: var(--foreground); margin-bottom: 0.75rem; margin-top: 2rem; }
 .help-prose-light h2 { font-size: 1.25rem; font-weight: 700; color: var(--foreground); margin-bottom: 0.5rem; margin-top: 1.75rem; border-bottom: 1px solid var(--border); padding-bottom: 0.25rem; }

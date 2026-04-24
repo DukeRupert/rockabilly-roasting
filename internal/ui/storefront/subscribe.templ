@@ -17,39 +17,58 @@ type SubscribePageProps struct {
 }
 
 templ SubscribeContent(props SubscribePageProps) {
-	<div class="mx-auto max-w-lg">
-		<h1 class="text-2xl font-bold text-rr-heading">Subscribe</h1>
-		<p class="mt-2 text-sm text-rr-muted">Set up a recurring delivery for this plan.</p>
-		<!-- Plan summary -->
-		<div class="mt-6 rounded-sm border border-rr-border bg-rr-surface p-4">
-			<div class="flex items-center justify-between">
-				<div>
-					<p class="font-medium text-rr-heading">{ props.Plan.Name }</p>
-					<p class="text-sm text-rr-muted">
-						{ subscriptionIntervalLabel(props.Plan.Interval, props.Plan.IntervalCount) }
+	<!-- Full-bleed paper surface -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
+		<!-- Paper grain overlay -->
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-xl px-6 sm:px-10 lg:px-14 py-10 sm:py-14">
+			<!-- Page heading -->
+			<div class="mb-8">
+				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+					The Daily Grind
+				</p>
+				<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing:-0.005em;">
+					Set up the
+					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">routine.</span>
+				</h1>
+				<p class="font-oswald text-ink-soft text-base mt-4 max-w-md leading-relaxed">
+					Recurring delivery for this plan — skip, swap, or cancel anytime from your account.
+				</p>
+			</div>
+			<!-- Plan summary card -->
+			<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
+				<p class="font-oswald font-bold text-candle text-[11px] mb-3 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Your plan</p>
+				<div class="flex items-center justify-between gap-4">
+					<div class="min-w-0">
+						<p class="font-slab text-ink uppercase text-lg leading-[1.0]" style="letter-spacing:-0.005em;">
+							{ props.Plan.Name }
+						</p>
+						<p class="font-oswald text-ink-soft text-sm mt-1.5" style="letter-spacing:0.04em;">
+							Delivery { subscriptionIntervalLabel(props.Plan.Interval, props.Plan.IntervalCount) }
+						</p>
+					</div>
+					<p class="font-special text-ink text-xl sm:text-2xl shrink-0">
+						if props.Quantity > 1 {
+							{ fmt.Sprintf("%d × ", props.Quantity) }
+						}
+						{ formatCents(props.Price) }
 					</p>
 				</div>
-				<p class="text-lg font-semibold text-rr-red">
-				if props.Quantity > 1 {
-					{ fmt.Sprintf("%d × ", props.Quantity) }
-				}
-				{ formatCents(props.Price) }
-			</p>
 			</div>
+			<!-- Subscribe form (Svelte mounts here) -->
+			<div
+				id="subscribe-app"
+				data-plan-id={ props.Plan.ID.String() }
+				data-variant-id={ props.VariantID.String() }
+				data-quantity={ fmt.Sprintf("%d", props.Quantity) }
+				data-plan-name={ props.Plan.Name }
+				data-price={ fmt.Sprintf("%d", props.Price) }
+				data-interval={ string(props.Plan.Interval) }
+				data-stripe-key={ props.StripeKey }
+			></div>
+			<script type="module" src="/static/checkout/subscribe.js"></script>
 		</div>
-		<!-- Subscribe form (Stripe Elements) -->
-		<div
-			id="subscribe-app"
-			data-plan-id={ props.Plan.ID.String() }
-			data-variant-id={ props.VariantID.String() }
-			data-quantity={ fmt.Sprintf("%d", props.Quantity) }
-			data-plan-name={ props.Plan.Name }
-			data-price={ fmt.Sprintf("%d", props.Price) }
-			data-interval={ string(props.Plan.Interval) }
-			data-stripe-key={ props.StripeKey }
-		></div>
-		<script type="module" src="/static/checkout/subscribe.js"></script>
-	</div>
+	</section>
 }
 
 templ SubscribePage(props SubscribePageProps) {

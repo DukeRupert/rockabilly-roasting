@@ -13,36 +13,39 @@ import (
 // --- Shared account layout ---
 
 func accountNavClass(path, active string) string {
-	base := "flex items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors"
+	base := "flex items-center gap-3 border-l-2 px-3 py-2.5 font-oswald text-sm transition-colors"
 	if path == active {
-		return base + " bg-rr-red/10 text-rr-red"
+		return base + " border-rust bg-cream-hi text-rust font-bold"
 	}
-	return base + " text-rr-body hover:bg-rr-bg hover:text-rr-heading"
+	return base + " border-transparent text-ink-soft hover:border-ink hover:bg-cream-hi hover:text-ink"
 }
 
 templ accountNav(activePath string) {
-	<nav class="w-44 shrink-0 space-y-1">
-		<a href="/account/settings" class={ accountNavClass("/account/settings", activePath) }>
-			<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-			Settings
-		</a>
-		<a href="/account/orders" class={ accountNavClass("/account/orders", activePath) }>
-			<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"></path></svg>
-			Orders
-		</a>
-		<a href="/account/subscriptions" class={ accountNavClass("/account/subscriptions", activePath) }>
-			<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182"></path></svg>
-			Subscriptions
-		</a>
-		<a href="/account/addresses" class={ accountNavClass("/account/addresses", activePath) }>
-			<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"></path></svg>
-			Addresses
-		</a>
-		<div class="pt-4 mt-4 border-t border-rr-border">
+	<nav class="w-48 shrink-0" aria-label="Account sections">
+		<p class="font-oswald font-bold text-candle text-[11px] mb-3 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">My account</p>
+		<div class="space-y-0.5">
+			<a href="/account/settings" class={ accountNavClass("/account/settings", activePath) } style="letter-spacing:0.04em;">
+				<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+				Settings
+			</a>
+			<a href="/account/orders" class={ accountNavClass("/account/orders", activePath) } style="letter-spacing:0.04em;">
+				<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"></path></svg>
+				Orders
+			</a>
+			<a href="/account/subscriptions" class={ accountNavClass("/account/subscriptions", activePath) } style="letter-spacing:0.04em;">
+				<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182"></path></svg>
+				Subscriptions
+			</a>
+			<a href="/account/addresses" class={ accountNavClass("/account/addresses", activePath) } style="letter-spacing:0.04em;">
+				<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"></path></svg>
+				Addresses
+			</a>
+		</div>
+		<div class="mt-4 pt-4 border-t-2 border-ink">
 			<form method="POST" action="/account/logout">
-				<button type="submit" class="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium text-rr-body hover:bg-rr-bg hover:text-rr-heading transition-colors">
-					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"></path></svg>
-					Sign Out
+				<button type="submit" class="flex w-full items-center gap-3 px-3 py-2.5 font-oswald text-sm text-ink-soft hover:text-rust transition-colors" style="letter-spacing:0.04em;">
+					<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9"></path></svg>
+					Sign out
 				</button>
 			</form>
 		</div>
@@ -50,41 +53,60 @@ templ accountNav(activePath string) {
 }
 
 templ accountLayout(activePath string) {
-	<div>
-		<!-- Mobile nav (horizontal pills) -->
-		<div class="sm:hidden">
-			<div class="flex gap-2 overflow-x-auto border-b border-rr-border pb-2 mb-6">
-				<a href="/account/settings" class={ mobileNavClass("/account/settings", activePath) }>Settings</a>
-				<a href="/account/orders" class={ mobileNavClass("/account/orders", activePath) }>Orders</a>
-				<a href="/account/subscriptions" class={ mobileNavClass("/account/subscriptions", activePath) }>Subscriptions</a>
-				<a href="/account/addresses" class={ mobileNavClass("/account/addresses", activePath) }>Addresses</a>
-				<form method="POST" action="/account/logout" class="ml-auto">
-					<button type="submit" class={ "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-rr-body hover:bg-rr-bg" }>Sign Out</button>
-				</form>
+	<!-- Full-bleed paper surface -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
+		<!-- Paper grain overlay -->
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-6xl px-6 sm:px-10 lg:px-14 py-10 sm:py-14">
+			<!-- Mobile nav (horizontal pills) -->
+			<div class="sm:hidden mb-8">
+				<div class="flex gap-2 overflow-x-auto pb-3 border-b-2 border-ink">
+					<a href="/account/settings" class={ mobileNavClass("/account/settings", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Settings</a>
+					<a href="/account/orders" class={ mobileNavClass("/account/orders", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Orders</a>
+					<a href="/account/subscriptions" class={ mobileNavClass("/account/subscriptions", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Subs</a>
+					<a href="/account/addresses" class={ mobileNavClass("/account/addresses", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Addresses</a>
+					<form method="POST" action="/account/logout" class="ml-auto shrink-0">
+						<button type="submit" class="whitespace-nowrap font-oswald font-bold text-[11px] border-2 border-ink bg-paper text-ink px-3 py-1.5 hover:bg-ink hover:text-paper transition-colors" style="letter-spacing:0.14em; text-transform:uppercase;">
+							Sign out
+						</button>
+					</form>
+				</div>
+			</div>
+			<!-- Desktop: sidebar + content; Mobile: content only -->
+			<div class="sm:flex sm:gap-10">
+				<div class="hidden sm:block sm:sticky sm:top-24 sm:self-start">
+					@accountNav(activePath)
+				</div>
+				<div class="flex-1 min-w-0">
+					{ children... }
+				</div>
 			</div>
 		</div>
-		<!-- Desktop: sidebar + content; Mobile: content only -->
-		<div class="sm:flex sm:gap-8">
-			<div class="hidden sm:block">
-				@accountNav(activePath)
-			</div>
-			<div class="flex-1 min-w-0">
-				{ children... }
-			</div>
-		</div>
-	</div>
+	</section>
 }
 
 func mobileNavClass(path, active string) string {
-	base := "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium"
+	base := "whitespace-nowrap font-oswald font-bold text-[11px] border-2 border-ink px-3 py-1.5 transition-colors"
 	if path == active {
-		return base + " bg-rr-red text-white"
+		return base + " bg-rust text-paper"
 	}
-	return base + " text-rr-body hover:bg-rr-bg"
+	return base + " bg-paper text-ink hover:bg-paper-warm"
 }
 
 func formatDate(t time.Time) string {
 	return t.Format("Jan 2, 2006")
+}
+
+// accountPageHeading renders the eyebrow + Alfa Slab title pattern used on each account sub-page.
+templ accountPageHeading(eyebrow, title string) {
+	<div class="mb-8">
+		<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+			{ eyebrow }
+		</p>
+		<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(1.75rem, 4vw, 2.5rem); letter-spacing:-0.005em;">
+			{ title }
+		</h1>
+	</div>
 }
 
 // --- Account Settings ---
@@ -99,38 +121,38 @@ type AccountSettingsProps struct {
 templ AccountSettingsContent(props AccountSettingsProps) {
 	@accountLayout("/account/settings") {
 		<div class="max-w-lg">
-			<h1 class="font-display text-2xl tracking-widest text-rr-heading mb-6">Account Settings</h1>
+			@accountPageHeading("My account", "Your details")
 			if props.Success != "" {
-				<div class="mb-6 rounded-sm bg-rr-teal/10 border border-rr-teal/20 px-4 py-3 text-sm font-body text-rr-teal-lt">
-					{ props.Success }
+				<div class="mb-6 border-2 border-ink bg-candle/20 px-4 py-3">
+					<p class="font-oswald text-ink text-sm" style="letter-spacing:0.04em;">{ props.Success }</p>
 				</div>
 			}
 			if props.Error != "" {
-				<div class="mb-6 rounded-sm bg-rr-red/10 border border-rr-red/20 px-4 py-3 text-sm font-body text-rr-red-lt">
-					{ props.Error }
+				<div class="mb-6 border-2 border-rust bg-cream-hi px-4 py-3">
+					<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">{ props.Error }</p>
 				</div>
 			}
-			<form method="POST" action="/account/settings" class="space-y-4">
+			<form method="POST" action="/account/settings" class="space-y-5">
 				<div class="grid grid-cols-2 gap-4">
 					<div>
-						<label for="first_name" class="block text-sm font-medium text-rr-body mb-1">First name</label>
-						<input type="text" id="first_name" name="first_name" value={ props.Customer.FirstName }
-							class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-sm text-rr-heading focus:outline-none" required/>
+						<label for="first_name" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">First name</label>
+						<input type="text" id="first_name" name="first_name" value={ props.Customer.FirstName } required
+							class="paper-input w-full border-2 border-ink bg-cream-hi px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 					</div>
 					<div>
-						<label for="last_name" class="block text-sm font-medium text-rr-body mb-1">Last name</label>
-						<input type="text" id="last_name" name="last_name" value={ props.Customer.LastName }
-							class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-sm text-rr-heading focus:outline-none" required/>
+						<label for="last_name" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Last name</label>
+						<input type="text" id="last_name" name="last_name" value={ props.Customer.LastName } required
+							class="paper-input w-full border-2 border-ink bg-cream-hi px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 					</div>
 				</div>
 				<div>
-					<label for="email" class="block text-sm font-medium text-rr-body mb-1">Email</label>
-					<input type="email" id="email" name="email" value={ props.Customer.Email }
-						class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-sm text-rr-heading focus:outline-none" required/>
-					<p class="mt-1 text-xs text-rr-muted">Your sign-in link will be sent to this address.</p>
+					<label for="email" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Email</label>
+					<input type="email" id="email" name="email" value={ props.Customer.Email } required
+						class="paper-input w-full border-2 border-ink bg-cream-hi px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
+					<p class="mt-2 font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">Your sign-in link will be sent to this address.</p>
 				</div>
 				<div class="pt-2">
-					<button type="submit" class="btn rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
+					<button type="submit" class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
 						Save changes
 					</button>
 				</div>
@@ -154,30 +176,31 @@ type AccountOrdersProps struct {
 
 templ AccountOrdersContent(props AccountOrdersProps) {
 	@accountLayout("/account/orders") {
-		<h1 class="font-display text-2xl tracking-widest text-rr-heading mb-6">Orders</h1>
+		@accountPageHeading("Past purchases", "Your orders")
 		if len(props.Orders) == 0 {
-			<div class="text-center py-12">
-				<svg class="mx-auto size-12 text-rr-faint" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"></path></svg>
-				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No orders yet</h3>
-				<p class="mt-1 text-sm text-rr-muted">Time to change that.</p>
-				<div class="mt-6">
-					<a href="/catalog" class="btn inline-block rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
-						Browse products
-					</a>
-				</div>
+			<div class="border-2 border-ink bg-cream-hi py-14 px-6 text-center shadow-stamp">
+				<svg class="mx-auto size-10 text-ink mb-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"></path></svg>
+				<p class="font-slab text-ink text-lg uppercase" style="letter-spacing:0.02em;">No orders yet</p>
+				<p class="font-oswald text-ink-soft text-sm mt-1" style="letter-spacing:0.04em;">Time to change that.</p>
+				<a href="/catalog" class="btn-stamp inline-flex items-center gap-2 mt-6 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">
+					Browse coffee
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+					</svg>
+				</a>
 			</div>
 		} else {
 			<div class="space-y-3">
 				for _, order := range props.Orders {
 					<a href={ templ.SafeURL("/account/orders/" + order.ID.String()) }
-						class="block rounded-sm border border-rr-border p-4 hover:border-rr-red/50 hover:bg-rr-bg transition-colors">
-						<div class="flex items-center justify-between">
-							<div class="flex items-center gap-4">
-								<span class="font-medium text-rr-heading">{ order.Number }</span>
-								<span class="text-sm text-rr-muted">{ formatDate(order.PlacedAt) }</span>
+						class="btn-stamp group block border-2 border-ink bg-cream-hi p-4 sm:p-5">
+						<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+							<div class="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4 min-w-0">
+								<span class="font-slab text-ink uppercase text-base sm:text-lg group-hover:text-rust transition-colors" style="letter-spacing:-0.005em;">{ order.Number }</span>
+								<span class="font-special text-chrome-deep text-sm">{ formatDate(order.PlacedAt) }</span>
 							</div>
-							<div class="flex items-center gap-4">
-								<span class="text-sm font-medium text-rr-heading">{ formatCents(order.Total) }</span>
+							<div class="flex items-center gap-3 sm:gap-4">
+								<span class="font-special text-ink text-base">{ formatCents(order.Total) }</span>
 								@orderStatusBadge(order.Status, order.FulfillmentStatus)
 							</div>
 						</div>
@@ -219,19 +242,19 @@ func orderStatusLabel(status domain.OrderStatus, fulfillment domain.FulfillmentS
 
 templ orderStatusBadge(status domain.OrderStatus, fulfillment domain.FulfillmentStatus) {
 	if fulfillment == domain.FulfillmentStatusDelivered {
-		<span class="inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-rr-teal-lt bg-rr-teal/10 ring-1 ring-inset ring-rr-teal/20">
+		<span class="inline-flex items-center font-oswald font-bold text-[10px] text-ink bg-candle border-2 border-ink px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
 			{ orderStatusLabel(status, fulfillment) }
 		</span>
 	} else if fulfillment == domain.FulfillmentStatusShipped {
-		<span class="inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-rr-amber bg-rr-amber/10 ring-1 ring-inset ring-rr-amber/20">
+		<span class="inline-flex items-center font-oswald font-bold text-[10px] text-ink bg-candle-soft border-2 border-ink px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
 			{ orderStatusLabel(status, fulfillment) }
 		</span>
 	} else if status == domain.OrderStatusCancelled || status == domain.OrderStatusRefunded {
-		<span class="inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-rr-muted bg-rr-surface ring-1 ring-inset ring-rr-border">
+		<span class="inline-flex items-center font-oswald font-bold text-[10px] text-chrome-deep bg-paper border-2 border-chrome-deep px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
 			{ orderStatusLabel(status, fulfillment) }
 		</span>
 	} else {
-		<span class="inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium text-rr-amber bg-rr-amber/10 ring-1 ring-inset ring-rr-amber/20">
+		<span class="inline-flex items-center font-oswald font-bold text-[10px] text-ink bg-paper border-2 border-ink px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
 			{ orderStatusLabel(status, fulfillment) }
 		</span>
 	}
@@ -251,64 +274,73 @@ templ AccountOrderShowContent(props AccountOrderShowProps) {
 	@accountLayout("/account/orders") {
 		<div>
 			<div class="mb-6">
-				<a href="/account/orders" class="text-sm text-rr-red hover:underline">&larr; Back to orders</a>
+				<a href="/account/orders" class="inline-flex items-center gap-1.5 font-oswald font-bold text-[11px] text-chrome-deep hover:text-rust transition-colors" style="letter-spacing:0.2em; text-transform:uppercase;">
+					<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+					</svg>
+					Back to orders
+				</a>
 			</div>
-			<div class="flex items-center gap-4 mb-6">
-				<h1 class="font-display text-2xl tracking-widest text-rr-heading">{ props.Order.Number }</h1>
-				<span class="text-sm text-rr-muted">{ formatDate(props.Order.PlacedAt) }</span>
+			<div class="flex flex-wrap items-baseline gap-3 sm:gap-4 mb-8">
+				<h1 class="font-slab text-ink uppercase leading-[0.92]" style="font-size: clamp(1.75rem, 4vw, 2.5rem); letter-spacing:-0.005em;">{ props.Order.Number }</h1>
+				<span class="font-special text-chrome-deep text-base">{ formatDate(props.Order.PlacedAt) }</span>
 				@orderStatusBadge(props.Order.Status, props.Order.FulfillmentStatus)
 			</div>
-			<!-- Line items -->
-			<div class="rounded-sm border border-rr-border overflow-hidden mb-6">
-				<table class="min-w-full divide-y divide-rr-border">
-					<thead class="bg-rr-bg">
+			<!-- Line items — receipt treatment -->
+			<div class="border-2 border-ink bg-cream-hi overflow-hidden mb-8 shadow-stamp">
+				<div class="border-b-2 border-ink px-4 sm:px-5 py-2.5 flex items-center justify-between bg-paper-warm">
+					<span class="font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.2em; text-transform:uppercase;">Items</span>
+					<span class="font-special text-chrome-deep text-xs">receipt #{ props.Order.Number }</span>
+				</div>
+				<table class="min-w-full">
+					<thead class="border-b-2 border-ink">
 						<tr>
-							<th class="px-4 py-3 text-left text-xs font-medium text-rr-muted uppercase">Item</th>
-							<th class="px-4 py-3 text-right text-xs font-medium text-rr-muted uppercase">Qty</th>
-							<th class="px-4 py-3 text-right text-xs font-medium text-rr-muted uppercase">Price</th>
-							<th class="px-4 py-3 text-right text-xs font-medium text-rr-muted uppercase">Total</th>
+							<th class="px-4 sm:px-5 py-2.5 text-left font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.2em; text-transform:uppercase;">Item</th>
+							<th class="px-3 py-2.5 text-right font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.2em; text-transform:uppercase;">Qty</th>
+							<th class="px-3 py-2.5 text-right font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.2em; text-transform:uppercase;">Price</th>
+							<th class="px-4 sm:px-5 py-2.5 text-right font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.2em; text-transform:uppercase;">Total</th>
 						</tr>
 					</thead>
-					<tbody class="divide-y divide-rr-border">
+					<tbody class="divide-y-2 divide-ink/30">
 						for _, item := range props.LineItems {
 							<tr>
-								<td class="px-4 py-3 text-sm text-rr-heading">{ item.VariantID.String()[:8] }...</td>
-								<td class="px-4 py-3 text-sm text-rr-heading text-right">{ fmt.Sprintf("%d", item.Quantity) }</td>
-								<td class="px-4 py-3 text-sm text-rr-heading text-right">{ formatCents(item.UnitPrice) }</td>
-								<td class="px-4 py-3 text-sm text-rr-heading text-right">{ formatCents(item.Total) }</td>
+								<td class="px-4 sm:px-5 py-3 font-oswald text-ink text-sm" style="letter-spacing:0.02em;">{ item.VariantID.String()[:8] }…</td>
+								<td class="px-3 py-3 font-special text-ink text-sm text-right">{ fmt.Sprintf("%d", item.Quantity) }</td>
+								<td class="px-3 py-3 font-special text-ink-soft text-sm text-right">{ formatCents(item.UnitPrice) }</td>
+								<td class="px-4 sm:px-5 py-3 font-special text-ink text-sm text-right">{ formatCents(item.Total) }</td>
 							</tr>
 						}
 					</tbody>
-					<tfoot class="bg-rr-bg">
+					<tfoot class="border-t-2 border-ink bg-paper-warm">
 						<tr>
-							<td colspan="3" class="px-4 py-2 text-sm text-rr-body text-right">Subtotal</td>
-							<td class="px-4 py-2 text-sm text-rr-heading text-right">{ formatCents(props.Order.Subtotal) }</td>
+							<td colspan="3" class="px-4 sm:px-5 py-2 font-oswald text-ink-soft text-sm text-right" style="letter-spacing:0.04em;">Subtotal</td>
+							<td class="px-4 sm:px-5 py-2 font-special text-ink text-sm text-right">{ formatCents(props.Order.Subtotal) }</td>
 						</tr>
 						if props.Order.ShippingTotal > 0 {
 							<tr>
-								<td colspan="3" class="px-4 py-2 text-sm text-rr-body text-right">Shipping</td>
-								<td class="px-4 py-2 text-sm text-rr-heading text-right">{ formatCents(props.Order.ShippingTotal) }</td>
+								<td colspan="3" class="px-4 sm:px-5 py-2 font-oswald text-ink-soft text-sm text-right" style="letter-spacing:0.04em;">Shipping</td>
+								<td class="px-4 sm:px-5 py-2 font-special text-ink text-sm text-right">{ formatCents(props.Order.ShippingTotal) }</td>
 							</tr>
 						}
 						if props.Order.TaxTotal > 0 {
 							<tr>
-								<td colspan="3" class="px-4 py-2 text-sm text-rr-body text-right">Tax</td>
-								<td class="px-4 py-2 text-sm text-rr-heading text-right">{ formatCents(props.Order.TaxTotal) }</td>
+								<td colspan="3" class="px-4 sm:px-5 py-2 font-oswald text-ink-soft text-sm text-right" style="letter-spacing:0.04em;">Tax</td>
+								<td class="px-4 sm:px-5 py-2 font-special text-ink text-sm text-right">{ formatCents(props.Order.TaxTotal) }</td>
 							</tr>
 						}
-						<tr class="border-t border-rr-border">
-							<td colspan="3" class="px-4 py-3 text-sm font-semibold text-rr-heading text-right">Total</td>
-							<td class="px-4 py-3 text-sm font-semibold text-rr-heading text-right">{ formatCents(props.Order.Total) }</td>
+						<tr class="border-t-2 border-ink">
+							<td colspan="3" class="px-4 sm:px-5 py-3 font-slab text-ink uppercase text-base text-right" style="letter-spacing:0.02em;">Total</td>
+							<td class="px-4 sm:px-5 py-3 font-special text-ink text-lg text-right">{ formatCents(props.Order.Total) }</td>
 						</tr>
 					</tfoot>
 				</table>
 			</div>
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
 				<!-- Shipping address -->
 				if props.Address != nil {
-					<div class="rounded-sm border border-rr-border p-4">
-						<h3 class="text-sm font-semibold text-rr-heading mb-2">Shipped to</h3>
-						<p class="text-sm text-rr-body">
+					<div class="border-2 border-ink bg-cream-hi p-5">
+						<p class="font-oswald font-bold text-candle text-[11px] mb-3 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Shipped to</p>
+						<p class="font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
 							{ props.Address.FirstName } { props.Address.LastName }<br/>
 							{ props.Address.Line1 }<br/>
 							if props.Address.Line2 != nil {
@@ -320,15 +352,16 @@ templ AccountOrderShowContent(props AccountOrderShowProps) {
 				}
 				<!-- Tracking -->
 				if len(props.Shipments) > 0 {
-					<div class="rounded-sm border border-rr-border p-4">
-						<h3 class="text-sm font-semibold text-rr-heading mb-2">Tracking</h3>
-						for _, s := range props.Shipments {
-							<div class="text-sm text-rr-body">
-								<span class="font-medium">{ s.CarrierName }</span>
-								<span class="mx-1">&middot;</span>
-								<span class="font-mono text-xs">{ s.TrackingNumber }</span>
-							</div>
-						}
+					<div class="border-2 border-ink bg-cream-hi p-5">
+						<p class="font-oswald font-bold text-candle text-[11px] mb-3 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Tracking</p>
+						<div class="space-y-2">
+							for _, s := range props.Shipments {
+								<div>
+									<p class="font-oswald font-bold text-ink text-sm" style="letter-spacing:0.04em;">{ s.CarrierName }</p>
+									<p class="font-special text-ink-soft text-xs">{ s.TrackingNumber }</p>
+								</div>
+							}
+						</div>
 					</div>
 				}
 			</div>
@@ -359,7 +392,7 @@ func subscriptionStatusLabel(status domain.SubscriptionStatus) string {
 	case domain.SubscriptionStatusCancelled:
 		return "Cancelled"
 	case domain.SubscriptionStatusPastDue:
-		return "Past Due"
+		return "Past due"
 	case domain.SubscriptionStatusExpired:
 		return "Expired"
 	default:
@@ -367,18 +400,24 @@ func subscriptionStatusLabel(status domain.SubscriptionStatus) string {
 	}
 }
 
-func subscriptionStatusBadgeClass(status domain.SubscriptionStatus) string {
+templ subscriptionStatusBadge(status domain.SubscriptionStatus) {
 	switch status {
 	case domain.SubscriptionStatusActive:
-		return "bg-rr-teal/10 text-rr-teal-lt ring-rr-teal/20"
+		<span class="inline-flex items-center font-oswald font-bold text-[10px] text-ink bg-candle border-2 border-ink px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
+			{ subscriptionStatusLabel(status) }
+		</span>
 	case domain.SubscriptionStatusPaused:
-		return "bg-rr-amber/10 text-rr-amber ring-rr-amber/20"
-	case domain.SubscriptionStatusCancelled:
-		return "bg-rr-surface text-rr-muted ring-rr-border"
+		<span class="inline-flex items-center font-oswald font-bold text-[10px] text-ink bg-paper-warm border-2 border-ink px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
+			{ subscriptionStatusLabel(status) }
+		</span>
 	case domain.SubscriptionStatusPastDue:
-		return "bg-rr-red/10 text-rr-red-lt ring-rr-red/20"
+		<span class="inline-flex items-center font-oswald font-bold text-[10px] text-rust bg-paper border-2 border-rust px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
+			{ subscriptionStatusLabel(status) }
+		</span>
 	default:
-		return "bg-rr-surface text-rr-muted ring-rr-border"
+		<span class="inline-flex items-center font-oswald font-bold text-[10px] text-chrome-deep bg-paper border-2 border-chrome-deep px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
+			{ subscriptionStatusLabel(status) }
+		</span>
 	}
 }
 
@@ -403,73 +442,81 @@ func intervalLabel(interval domain.SubscriptionInterval) string {
 
 templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 	@accountLayout("/account/subscriptions") {
-		<h1 class="font-display text-2xl tracking-widest text-rr-heading mb-6">Subscriptions</h1>
+		@accountPageHeading("The daily grind", "Your subscriptions")
 		if len(props.Subscriptions) == 0 {
-			<div class="text-center py-12">
-				<svg class="mx-auto size-12 text-rr-faint" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182"></path></svg>
-				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No subscriptions</h3>
-				<p class="mt-1 text-sm text-rr-muted">Subscribe to your favorites and never run out.</p>
-				<div class="mt-6">
-					<a href="/subscriptions" class="btn inline-block rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
-						View subscription plans
-					</a>
-				</div>
+			<div class="border-2 border-ink bg-cream-hi py-14 px-6 text-center shadow-stamp">
+				<svg class="mx-auto size-10 text-ink mb-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182"></path></svg>
+				<p class="font-slab text-ink text-lg uppercase" style="letter-spacing:0.02em;">No subscriptions</p>
+				<p class="font-oswald text-ink-soft text-sm mt-1 max-w-xs mx-auto" style="letter-spacing:0.04em;">Subscribe to your favorites and never run out.</p>
+				<a href="/subscriptions" class="btn-stamp inline-flex items-center gap-2 mt-6 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">
+					View plans
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+					</svg>
+				</a>
 			</div>
 		} else {
 			<div class="space-y-4">
 				for _, sub := range props.Subscriptions {
-					<div class="rounded-sm border border-rr-border p-5">
-						<div class="flex items-start justify-between mb-3">
-							<div>
+					<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
+						<div class="flex items-start justify-between gap-4 mb-4">
+							<div class="min-w-0">
 								if plan, ok := props.Plans[sub.PlanID]; ok {
-									<h3 class="font-medium text-rr-heading">{ plan.Name }</h3>
-									<p class="text-sm text-rr-muted">{ intervalLabel(plan.Interval) } &middot; Qty { fmt.Sprintf("%d", sub.Quantity) }</p>
+									<h3 class="font-slab text-ink uppercase text-lg leading-[1.0]" style="letter-spacing:-0.005em;">{ plan.Name }</h3>
+									<p class="font-oswald text-ink-soft text-sm mt-1.5" style="letter-spacing:0.04em;">
+										{ intervalLabel(plan.Interval) } · Qty { fmt.Sprintf("%d", sub.Quantity) }
+									</p>
 								}
 							</div>
-							<span class={ "inline-flex items-center rounded-sm px-2 py-1 text-xs font-medium ring-1 ring-inset " + subscriptionStatusBadgeClass(sub.Status) }>
-								{ subscriptionStatusLabel(sub.Status) }
-							</span>
+							@subscriptionStatusBadge(sub.Status)
 						</div>
 						if sub.Status == domain.SubscriptionStatusActive {
-							<p class="text-sm text-rr-body mb-4">
-								Next order: <span class="font-medium">{ formatDate(sub.NextOrderAt) }</span>
+							<p class="font-oswald text-ink-soft text-sm mb-5" style="letter-spacing:0.04em;">
+								Next order: <span class="font-special text-ink">{ formatDate(sub.NextOrderAt) }</span>
 							</p>
-							<div class="flex gap-2" x-data="{ confirming: '' }">
-								<button x-show="confirming !== 'pause'" x-on:click="confirming = 'pause'" class="rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-body hover:bg-rr-bg">
+							<div class="flex flex-wrap gap-2" x-data="{ confirming: '' }">
+								<button x-show="confirming !== 'pause'" x-on:click="confirming = 'pause'"
+									class="font-oswald font-bold text-[11px] border-2 border-ink bg-paper text-ink px-4 py-2 hover:bg-paper-warm transition-colors"
+									style="letter-spacing:0.16em; text-transform:uppercase;">
 									Pause
 								</button>
-								<div x-show="confirming === 'pause'" x-cloak class="flex items-center gap-2">
-									<span class="text-sm text-rr-body">Pause this subscription?</span>
+								<div x-show="confirming === 'pause'" x-cloak class="flex flex-wrap items-center gap-2">
+									<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Pause this subscription?</span>
 									<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/pause") }>
-										<button type="submit" class="btn rounded-sm bg-rr-amber px-3 py-1.5 text-sm font-medium text-white hover:bg-rr-amber-lt">Yes, pause</button>
+										<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, pause</button>
 									</form>
-									<button x-on:click="confirming = ''" class="text-sm text-rr-muted hover:text-rr-body">Cancel</button>
+									<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Nope</button>
 								</div>
-								<button x-show="confirming !== 'cancel'" x-on:click="confirming = 'cancel'" class="btn rounded-sm border border-rr-red px-3 py-1.5 text-sm font-medium text-rr-red hover:bg-rr-red/10">
+								<button x-show="confirming !== 'cancel'" x-on:click="confirming = 'cancel'"
+									class="font-oswald font-bold text-[11px] border-2 border-rust bg-paper text-rust px-4 py-2 hover:bg-rust hover:text-paper transition-colors"
+									style="letter-spacing:0.16em; text-transform:uppercase;">
 									Cancel
 								</button>
-								<div x-show="confirming === 'cancel'" x-cloak class="flex items-center gap-2">
-									<span class="text-sm text-rr-body">Cancel this subscription?</span>
+								<div x-show="confirming === 'cancel'" x-cloak class="flex flex-wrap items-center gap-2">
+									<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Cancel this subscription?</span>
 									<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/cancel") }>
-										<button type="submit" class="btn rounded-sm bg-rr-red px-3 py-1.5 text-sm font-medium text-white hover:bg-rr-red-lt">Yes, cancel</button>
+										<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-rust text-paper px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, cancel</button>
 									</form>
-									<button x-on:click="confirming = ''" class="text-sm text-rr-muted hover:text-rr-body">Never mind</button>
+									<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
 								</div>
 							</div>
 						}
 						if sub.Status == domain.SubscriptionStatusPaused {
-							<p class="text-sm text-rr-body mb-4">Paused &mdash; no upcoming orders.</p>
+							<p class="font-oswald text-ink-soft text-sm mb-5" style="letter-spacing:0.04em;">Paused — no upcoming orders.</p>
 							<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/resume") }>
-								<button type="submit" class="btn rounded-sm bg-rr-red px-3 py-1.5 text-sm font-medium text-white hover:bg-rr-red-lt">
+								<button type="submit" class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-5 py-2.5 font-oswald font-bold text-[11px]" style="letter-spacing:0.16em; text-transform:uppercase;">
 									Resume
+									<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+									</svg>
 								</button>
 							</form>
 						}
 						if sub.Status == domain.SubscriptionStatusCancelled {
-							<p class="text-sm text-rr-muted">
+							<p class="font-oswald text-chrome-deep text-sm" style="letter-spacing:0.04em;">
 								Cancelled
 								if sub.CancelledAt != nil {
-									on { formatDate(*sub.CancelledAt) }
+									on <span class="font-special">{ formatDate(*sub.CancelledAt) }</span>
 								}
 							</p>
 						}
@@ -495,59 +542,73 @@ type AccountAddressesProps struct {
 
 templ AccountAddressesContent(props AccountAddressesProps) {
 	@accountLayout("/account/addresses") {
-		<div class="flex items-center justify-between mb-6">
-			<h1 class="font-display text-2xl tracking-widest text-rr-heading">Addresses</h1>
+		<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+			<div>
+				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+					Ship-to book
+				</p>
+				<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(1.75rem, 4vw, 2.5rem); letter-spacing:-0.005em;">
+					Your addresses
+				</h1>
+			</div>
 			<button type="button" x-data x-on:click="$dispatch('toggle-add-address')"
-				class="btn rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt">
-				+ Add address
+				class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-5 py-2.5 font-oswald font-bold text-[11px] self-start sm:self-auto"
+				style="letter-spacing:0.16em; text-transform:uppercase;">
+				<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+				</svg>
+				Add address
 			</button>
 		</div>
 		<!-- Add address form (hidden by default) -->
 		<div x-data="{ open: false }" x-on:toggle-add-address.window="open = !open">
-			<div x-show="open" x-cloak class="mb-6 rounded-sm border border-rr-border p-4">
-				<h3 class="text-sm font-semibold text-rr-heading mb-3">New address</h3>
+			<div x-show="open" x-cloak class="mb-6 border-2 border-ink bg-cream-hi p-5 sm:p-6 shadow-stamp">
+				<p class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">New address</p>
 				@addressForm("/account/addresses", nil)
 			</div>
 		</div>
 		if len(props.Addresses) == 0 {
-			<p class="text-sm text-rr-muted">No saved addresses yet.</p>
+			<div class="border-2 border-ink bg-cream-hi py-12 px-6 text-center">
+				<p class="font-oswald text-ink text-base" style="letter-spacing:0.04em;">No saved addresses yet.</p>
+				<p class="font-oswald text-chrome-deep text-sm mt-2" style="letter-spacing:0.04em;">Add one above to speed up checkout.</p>
+			</div>
 		} else {
-			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
 				for _, addr := range props.Addresses {
-					<div class="rounded-sm border border-rr-border p-4" x-data="{ editing: false }">
+					<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5" x-data="{ editing: false }">
 						<div x-show="!editing">
-							<div class="flex items-start justify-between mb-2">
-								<div>
-									<span class="font-medium text-rr-heading">{ addr.FirstName } { addr.LastName }</span>
-									if addr.IsDefault {
-										<span class="ml-2 inline-flex items-center rounded-sm bg-rr-red/10 px-2 py-0.5 text-xs font-medium text-rr-red">Default</span>
-									}
-								</div>
+							<div class="flex items-start justify-between gap-3 mb-3">
+								<p class="font-slab text-ink uppercase text-base leading-[1.0]" style="letter-spacing:-0.005em;">{ addr.FirstName } { addr.LastName }</p>
+								if addr.IsDefault {
+									<span class="inline-flex items-center font-oswald font-bold text-[10px] text-ink bg-candle border-2 border-ink px-2 py-0.5 shrink-0" style="letter-spacing:0.16em; text-transform:uppercase;">
+										Default
+									</span>
+								}
 							</div>
-							<p class="text-sm text-rr-body">
+							<p class="font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
 								{ addr.Line1 }<br/>
 								if addr.Line2 != nil {
 									{ *addr.Line2 }<br/>
 								}
 								{ addr.City }, { addr.State } { addr.PostalCode }
 							</p>
-							<div class="mt-3 flex gap-2">
-								<button x-on:click="editing = true" class="text-sm text-rr-red hover:underline">Edit</button>
+							<div class="mt-4 pt-3 border-t border-ink flex flex-wrap gap-4">
+								<button x-on:click="editing = true" class="font-oswald font-bold text-[11px] text-rust hover:text-rust-deep transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">Edit</button>
 								if !addr.IsDefault {
 									<form method="POST" action={ templ.SafeURL("/account/addresses/" + addr.ID.String() + "/default") }>
-										<button type="submit" class="text-sm text-rr-body hover:underline">Set default</button>
+										<button type="submit" class="font-oswald font-bold text-[11px] text-ink hover:text-rust transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">Set default</button>
 									</form>
 									<form method="POST" action={ templ.SafeURL("/account/addresses/" + addr.ID.String() + "/delete") }
 										x-data x-on:submit="if (!confirm('Delete this address?')) $event.preventDefault()">
-										<button type="submit" class="text-sm text-rr-red hover:text-rr-red-lt">Delete</button>
+										<button type="submit" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-rust transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">Delete</button>
 									</form>
 								}
 							</div>
 						</div>
 						<div x-show="editing" x-cloak>
-							<h3 class="text-sm font-semibold text-rr-heading mb-3">Edit address</h3>
+							<p class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Edit address</p>
 							@addressForm("/account/addresses/"+addr.ID.String(), &addr)
-							<button x-on:click="editing = false" class="mt-2 text-sm text-rr-muted hover:underline">Cancel</button>
+							<button x-on:click="editing = false" class="mt-3 font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">Cancel</button>
 						</div>
 					</div>
 				}
@@ -557,54 +618,56 @@ templ AccountAddressesContent(props AccountAddressesProps) {
 }
 
 templ addressForm(action string, addr *domain.Address) {
-	<form method="POST" action={ templ.SafeURL(action) } class="space-y-3">
+	<form method="POST" action={ templ.SafeURL(action) } class="space-y-4">
 		<div class="grid grid-cols-2 gap-3">
 			<div>
-				<label for={ addrInputID(addr, "first_name") } class="block text-xs font-medium text-rr-body mb-1">First name</label>
+				<label for={ addrInputID(addr, "first_name") } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">First name</label>
 				<input type="text" id={ addrInputID(addr, "first_name") } name="first_name" value={ addrField(addr, "first_name") } required
-					class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-sm text-rr-heading focus:outline-none"/>
+					class="paper-input w-full border-2 border-ink bg-paper px-3 py-2 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 			</div>
 			<div>
-				<label for={ addrInputID(addr, "last_name") } class="block text-xs font-medium text-rr-body mb-1">Last name</label>
+				<label for={ addrInputID(addr, "last_name") } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Last name</label>
 				<input type="text" id={ addrInputID(addr, "last_name") } name="last_name" value={ addrField(addr, "last_name") } required
-					class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-sm text-rr-heading focus:outline-none"/>
+					class="paper-input w-full border-2 border-ink bg-paper px-3 py-2 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 			</div>
 		</div>
 		<div>
-			<label for={ addrInputID(addr, "company") } class="block text-xs font-medium text-rr-body mb-1">Company (optional)</label>
+			<label for={ addrInputID(addr, "company") } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Company (optional)</label>
 			<input type="text" id={ addrInputID(addr, "company") } name="company" value={ addrField(addr, "company") }
-				class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-sm text-rr-heading focus:outline-none"/>
+				class="paper-input w-full border-2 border-ink bg-paper px-3 py-2 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 		</div>
 		<div>
-			<label for={ addrInputID(addr, "line1") } class="block text-xs font-medium text-rr-body mb-1">Address</label>
+			<label for={ addrInputID(addr, "line1") } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Address</label>
 			<input type="text" id={ addrInputID(addr, "line1") } name="line1" value={ addrField(addr, "line1") } required
-				class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-sm text-rr-heading focus:outline-none"/>
+				class="paper-input w-full border-2 border-ink bg-paper px-3 py-2 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 		</div>
 		<div>
-			<label for={ addrInputID(addr, "line2") } class="block text-xs font-medium text-rr-body mb-1">Apartment, suite, etc. (optional)</label>
+			<label for={ addrInputID(addr, "line2") } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Apt, suite, etc. (optional)</label>
 			<input type="text" id={ addrInputID(addr, "line2") } name="line2" value={ addrField(addr, "line2") }
-				class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-sm text-rr-heading focus:outline-none"/>
+				class="paper-input w-full border-2 border-ink bg-paper px-3 py-2 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 		</div>
 		<div class="grid grid-cols-3 gap-3">
 			<div>
-				<label for={ addrInputID(addr, "city") } class="block text-xs font-medium text-rr-body mb-1">City</label>
+				<label for={ addrInputID(addr, "city") } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">City</label>
 				<input type="text" id={ addrInputID(addr, "city") } name="city" value={ addrField(addr, "city") } required
-					class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-sm text-rr-heading focus:outline-none"/>
+					class="paper-input w-full border-2 border-ink bg-paper px-3 py-2 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 			</div>
 			<div>
-				<label for={ addrInputID(addr, "state") } class="block text-xs font-medium text-rr-body mb-1">State</label>
+				<label for={ addrInputID(addr, "state") } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">State</label>
 				<input type="text" id={ addrInputID(addr, "state") } name="state" value={ addrField(addr, "state") } required
-					class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-sm text-rr-heading focus:outline-none"/>
+					class="paper-input w-full border-2 border-ink bg-paper px-3 py-2 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 			</div>
 			<div>
-				<label for={ addrInputID(addr, "postal_code") } class="block text-xs font-medium text-rr-body mb-1">ZIP</label>
+				<label for={ addrInputID(addr, "postal_code") } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">ZIP</label>
 				<input type="text" id={ addrInputID(addr, "postal_code") } name="postal_code" value={ addrField(addr, "postal_code") } required
-					class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-sm text-rr-heading focus:outline-none"/>
+					class="paper-input w-full border-2 border-ink bg-paper px-3 py-2 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 			</div>
 		</div>
-		<button type="submit" class="btn rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red-lt">
-			Save
-		</button>
+		<div class="pt-2">
+			<button type="submit" class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-5 py-2.5 font-oswald font-bold text-[11px]" style="letter-spacing:0.16em; text-transform:uppercase;">
+				Save
+			</button>
+		</div>
 	</form>
 }
 

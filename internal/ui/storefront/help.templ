@@ -18,20 +18,48 @@ type HelpArticleProps struct {
 }
 
 templ HelpIndexContent(props HelpIndexProps) {
-	<div class="mx-auto max-w-3xl py-8">
-		<h1 class="font-display text-3xl text-rr-heading tracking-wide mb-2">HELP CENTER</h1>
-		<p class="font-body text-sm text-rr-muted mb-8">Everything you need to know about shopping with Rockabilly Roasting Co.</p>
-		<nav class="space-y-1">
-			for _, art := range props.Articles {
-				<a
-					href={ templ.SafeURL("/help/" + art.Slug) }
-					class="block rounded-sm border border-rr-border bg-rr-surface px-4 py-3 font-body text-sm text-rr-body hover:bg-rr-raised hover:text-rr-heading transition-colors"
-				>
-					{ art.Title }
-				</a>
+	<!-- Full-bleed paper surface -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
+		<!-- Paper grain overlay -->
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-3xl px-6 sm:px-10 lg:px-14 py-12 sm:py-16">
+			<!-- Page heading -->
+			<header class="mb-10">
+				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+					Questions, answered
+				</p>
+				<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing:-0.005em;">
+					Help
+					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">center.</span>
+				</h1>
+				<p class="font-oswald text-ink-soft text-base mt-4 max-w-xl leading-relaxed">
+					Everything you need to know about shopping with Rockabilly Roasting Co. Can't find it here? <a href="/about" class="text-rust hover:text-rust-deep underline underline-offset-2">Drop us a line</a>.
+				</p>
+			</header>
+			<!-- Article list -->
+			if len(props.Articles) == 0 {
+				<div class="border-2 border-ink bg-cream-hi py-12 px-6 text-center shadow-stamp">
+					<p class="font-oswald text-ink text-base" style="letter-spacing:0.04em;">No help articles yet — check back soon.</p>
+				</div>
+			} else {
+				<nav class="space-y-3" aria-label="Help articles">
+					for _, art := range props.Articles {
+						<a
+							href={ templ.SafeURL("/help/" + art.Slug) }
+							class="btn-stamp group flex items-center justify-between gap-4 bg-cream-hi border-2 border-ink px-5 py-4"
+						>
+							<span class="font-slab text-ink uppercase text-base sm:text-lg leading-[1.05] group-hover:text-rust transition-colors" style="letter-spacing:-0.005em;">
+								{ art.Title }
+							</span>
+							<svg class="size-4 text-ink shrink-0 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+							</svg>
+						</a>
+					}
+				</nav>
 			}
-		</nav>
-	</div>
+		</div>
+	</section>
 }
 
 templ HelpIndexPage(props HelpIndexProps) {
@@ -45,25 +73,32 @@ templ HelpIndexPage(props HelpIndexProps) {
 }
 
 templ helpSidebar(articles []help.Article, currentSlug string) {
-	<nav class="space-y-0.5">
+	<nav class="space-y-1" aria-label="Help topics">
 		<a
 			href="/help"
-			class="block rounded-sm px-3 py-1.5 font-body text-xs text-rr-muted hover:text-rr-heading transition-colors mb-2"
+			class="inline-flex items-center gap-1.5 mb-3 font-oswald font-bold text-[11px] text-chrome-deep hover:text-rust transition-colors"
+			style="letter-spacing:0.2em; text-transform:uppercase;"
 		>
-			&larr; All Topics
+			<svg class="size-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+			</svg>
+			All topics
 		</a>
 		for _, art := range articles {
 			if art.Slug == currentSlug {
 				<a
 					href={ templ.SafeURL("/help/" + art.Slug) }
-					class="block rounded-sm bg-rr-raised px-3 py-1.5 font-body text-sm text-rr-heading"
+					class="block border-l-2 border-rust bg-cream-hi px-3 py-2 font-oswald font-bold text-sm text-rust"
+					style="letter-spacing:0.04em;"
+					aria-current="page"
 				>
 					{ art.Title }
 				</a>
 			} else {
 				<a
 					href={ templ.SafeURL("/help/" + art.Slug) }
-					class="block rounded-sm px-3 py-1.5 font-body text-sm text-rr-muted hover:text-rr-heading hover:bg-rr-raised/50 transition-colors"
+					class="block border-l-2 border-transparent px-3 py-2 font-oswald text-sm text-ink-soft hover:border-ink hover:text-ink hover:bg-cream-hi transition-colors"
+					style="letter-spacing:0.04em;"
 				>
 					{ art.Title }
 				</a>
@@ -73,18 +108,23 @@ templ helpSidebar(articles []help.Article, currentSlug string) {
 }
 
 templ HelpArticleContent(props HelpArticleProps) {
-	<div class="mx-auto max-w-5xl py-8">
-		<div class="flex flex-col lg:flex-row gap-8">
-			<!-- Sidebar -->
-			<aside class="lg:w-56 shrink-0">
-				@helpSidebar(props.Articles, props.CurrentSlug)
-			</aside>
-			<!-- Article -->
-			<article class="min-w-0 flex-1 help-prose help-prose-dark">
-				@templ.Raw(string(props.Article.HTML))
-			</article>
+	<!-- Full-bleed paper surface -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
+		<!-- Paper grain overlay -->
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-6xl px-6 sm:px-10 lg:px-14 py-12 sm:py-16">
+			<div class="flex flex-col lg:flex-row gap-10 lg:gap-14">
+				<!-- Sidebar -->
+				<aside class="lg:w-60 shrink-0 lg:sticky lg:top-24 lg:self-start">
+					@helpSidebar(props.Articles, props.CurrentSlug)
+				</aside>
+				<!-- Article -->
+				<article class="min-w-0 flex-1 help-prose help-prose-paper">
+					@templ.Raw(string(props.Article.HTML))
+				</article>
+			</div>
 		</div>
-	</div>
+	</section>
 }
 
 templ HelpArticlePage(props HelpArticleProps) {

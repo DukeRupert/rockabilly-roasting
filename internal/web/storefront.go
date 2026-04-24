@@ -324,6 +324,7 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 		TotalPages:    totalPages,
 		CartCount:     d.cartItemCountFromCookie(r),
 		CanonicalURL:  d.BaseURL + r.URL.Path,
+		BaseURL:       d.BaseURL,
 	}
 
 	if IsHTMX(r) {

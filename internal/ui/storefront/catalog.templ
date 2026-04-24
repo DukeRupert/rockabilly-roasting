@@ -1,6 +1,7 @@
 package storefront
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -34,6 +35,7 @@ type CatalogPageProps struct {
 	TotalPages    int
 	CartCount     int
 	CanonicalURL  string
+	BaseURL       string // e.g. "https://rockabillyroasting.com" — for JSON-LD absolute URLs
 }
 
 // hasActiveFilters returns true if any attribute filters are selected.
@@ -882,6 +884,30 @@ func countActiveFilters(filters map[string][]string) int {
 	return n
 }
 
+// catalogItemListJSONLD renders an ItemList of the products on the current
+// catalog page so search engines understand the grid is a listing.
+func catalogItemListJSONLD(props CatalogPageProps) string {
+	if len(props.Products) == 0 || props.BaseURL == "" {
+		return ""
+	}
+	items := make([]map[string]any, 0, len(props.Products))
+	for i, card := range props.Products {
+		items = append(items, map[string]any{
+			"@type":    "ListItem",
+			"position": i + 1,
+			"url":      props.BaseURL + "/catalog/" + card.Product.Slug,
+			"name":     card.Product.Title,
+		})
+	}
+	ld := map[string]any{
+		"@context":        "https://schema.org",
+		"@type":           "ItemList",
+		"itemListElement": items,
+	}
+	b, _ := json.Marshal(ld)
+	return `<script type="application/ld+json">` + string(b) + `</script>`
+}
+
 templ CatalogPage(props CatalogPageProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
 		Title:        "Shop",
@@ -890,5 +916,6 @@ templ CatalogPage(props CatalogPageProps) {
 		CanonicalURL: props.CanonicalURL,
 	}) {
 		@CatalogContent(props)
+		@templ.Raw(catalogItemListJSONLD(props))
 	}
 }

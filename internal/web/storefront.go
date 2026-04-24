@@ -23,7 +23,8 @@ import (
 func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Fetch up to 5 active products: 1 for the featured banner + 4 for the grid.
+	// Fetch up to 5 active products for the grid; the hero is whichever one is
+	// flagged is_featured (falling back to the most recent if none is flagged).
 	activeStatus := domain.ProductStatusActive
 	filter := store.ProductFilter{
 		Limit:  5,
@@ -33,12 +34,26 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 
 	var products []domain.Product
 	var cards []storefront.ProductCard
+	var heroIdx int
 	var featuredHeroURL string
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		products, txErr = d.CatalogService.ListProducts(ctx, tx, filter)
 		if txErr != nil {
 			return txErr
+		}
+
+		// Pick the hero: prefer the explicitly featured product, else fall back
+		// to the first one returned (newest by created_at).
+		heroIdx = -1
+		for i, p := range products {
+			if p.IsFeatured {
+				heroIdx = i
+				break
+			}
+		}
+		if heroIdx == -1 && len(products) > 0 {
+			heroIdx = 0
 		}
 
 		cards = make([]storefront.ProductCard, len(products))
@@ -54,7 +69,7 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 			}
 			if len(media) > 0 {
 				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
-				if i == 0 {
+				if i == heroIdx {
 					featuredHeroURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantHero)
 				}
 			}
@@ -89,8 +104,8 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	props := storefront.HomePageProps{
 		CartCount: d.cartItemCountFromCookie(r),
 	}
-	if len(cards) > 0 {
-		props.FeaturedProduct = &cards[0]
+	if heroIdx >= 0 && heroIdx < len(cards) {
+		props.FeaturedProduct = &cards[heroIdx]
 		props.HeroImageURL = featuredHeroURL
 		props.FeaturedProducts = cards // show all products in the grid, including the featured one
 	}

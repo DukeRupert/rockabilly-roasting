@@ -160,6 +160,39 @@ func (s *CatalogService) UpdateProductSubscribable(ctx context.Context, tx pgx.T
 	return product, nil
 }
 
+// UpdateProductFeatured sets whether a product is featured on the storefront home page.
+// Only one product can be featured at a time — turning a product on clears the flag
+// on every other product in the same transaction.
+func (s *CatalogService) UpdateProductFeatured(ctx context.Context, tx pgx.Tx, id uuid.UUID, isFeatured bool, actor Actor) (*domain.Product, error) {
+	if isFeatured {
+		if err := s.catalog.ClearOtherFeaturedProducts(ctx, tx, id); err != nil {
+			return nil, err
+		}
+	}
+
+	product, err := s.catalog.UpdateProductFeatured(ctx, tx, id, isFeatured)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrProductNotFound
+		}
+		return nil, fmt.Errorf("update product featured: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditProductUpdated,
+		ResourceType: "product",
+		ResourceID:   product.ID,
+		After:        product,
+	}); err != nil {
+		return nil, fmt.Errorf("audit product featured: %w", err)
+	}
+
+	return product, nil
+}
+
 // ListProducts returns products matching the given filter.
 func (s *CatalogService) ListProducts(ctx context.Context, tx pgx.Tx, f store.ProductFilter) ([]domain.Product, error) {
 	products, err := s.catalog.ListProducts(ctx, tx, f)

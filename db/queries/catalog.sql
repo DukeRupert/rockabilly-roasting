@@ -34,6 +34,17 @@ SET tax_exempt = $2, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateProductFeatured :one
+UPDATE products
+SET is_featured = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: ClearOtherFeaturedProducts :exec
+UPDATE products
+SET is_featured = false, updated_at = now()
+WHERE is_featured = true AND id <> $1;
+
 -- name: DeleteProduct :exec
 DELETE FROM products WHERE id = $1;
 

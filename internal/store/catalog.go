@@ -193,6 +193,27 @@ func (s *CatalogStore) UpdateProductTaxExempt(ctx context.Context, tx pgx.Tx, id
 	return productFromRow(row), nil
 }
 
+// UpdateProductFeatured updates whether a product is featured on the storefront home page.
+func (s *CatalogStore) UpdateProductFeatured(ctx context.Context, tx pgx.Tx, id uuid.UUID, isFeatured bool) (*domain.Product, error) {
+	row, err := sqlcgen.New(tx).UpdateProductFeatured(ctx, sqlcgen.UpdateProductFeaturedParams{
+		ID:         id,
+		IsFeatured: isFeatured,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update product featured: %w", err)
+	}
+	return productFromRow(row), nil
+}
+
+// ClearOtherFeaturedProducts unsets is_featured on every product other than the given ID.
+// Used to enforce the "single featured product" invariant when promoting a new one.
+func (s *CatalogStore) ClearOtherFeaturedProducts(ctx context.Context, tx pgx.Tx, keepID uuid.UUID) error {
+	if err := sqlcgen.New(tx).ClearOtherFeaturedProducts(ctx, keepID); err != nil {
+		return fmt.Errorf("clear other featured products: %w", err)
+	}
+	return nil
+}
+
 // DeleteProduct removes a product by ID.
 func (s *CatalogStore) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if err := sqlcgen.New(tx).DeleteProduct(ctx, id); err != nil {
@@ -221,6 +242,7 @@ type ProductFilter struct {
 	Status       *domain.ProductStatus
 	TaxonID      *uuid.UUID
 	Subscribable *bool
+	IsFeatured   *bool
 	Visibility   *VisibilityContext
 	Search       string // ILIKE search on title and description
 	Attributes   []AttributeFilter
@@ -248,6 +270,11 @@ func productFilterWhere(f ProductFilter) (string, []any, int) {
 	if f.Subscribable != nil {
 		where += fmt.Sprintf(" AND subscribable = $%d", argN)
 		args = append(args, *f.Subscribable)
+		argN++
+	}
+	if f.IsFeatured != nil {
+		where += fmt.Sprintf(" AND is_featured = $%d", argN)
+		args = append(args, *f.IsFeatured)
 		argN++
 	}
 	if f.Search != "" {
@@ -308,7 +335,7 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 	where, args, argN := productFilterWhere(f)
 
 	query := `SELECT id, slug, title, description, status, product_type_id, taxon_id,
-	                 subscribable, visibility, tax_exempt, metadata, available_on, discontinue_on,
+	                 subscribable, visibility, tax_exempt, is_featured, metadata, available_on, discontinue_on,
 	                 created_at, updated_at
 	          FROM products WHERE true` + where
 
@@ -342,7 +369,7 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 		var availableOn, discontinueOn pgtype.Timestamptz
 		if err := rows.Scan(
 			&p.ID, &p.Slug, &p.Title, &p.Description, &status, &productTypeID, &taxonID,
-			&p.Subscribable, &visibility, &p.TaxExempt, &metadata, &availableOn, &discontinueOn, &p.CreatedAt, &p.UpdatedAt,
+			&p.Subscribable, &visibility, &p.TaxExempt, &p.IsFeatured, &metadata, &availableOn, &discontinueOn, &p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan product: %w", err)
 		}
@@ -812,6 +839,7 @@ func productFromRow(r sqlcgen.Product) *domain.Product {
 		Subscribable:  r.Subscribable,
 		Visibility:    domain.ProductVisibility(r.Visibility),
 		TaxExempt:     r.TaxExempt,
+		IsFeatured:    r.IsFeatured,
 		Metadata:      metadataFromJSON(r.Metadata),
 		AvailableOn:   timestampFromPG(r.AvailableOn),
 		DiscontinueOn: timestampFromPG(r.DiscontinueOn),

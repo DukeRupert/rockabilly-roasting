@@ -18,6 +18,7 @@ type Querier interface {
 	CancelSubscription(ctx context.Context, id uuid.UUID) error
 	ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error
 	ClearDefaultVariants(ctx context.Context, productID uuid.UUID) error
+	ClearOtherFeaturedProducts(ctx context.Context, id uuid.UUID) error
 	CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error)
 	CountWholesaleByStatus(ctx context.Context, wholesaleStatus *string) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
@@ -224,6 +225,7 @@ type Querier interface {
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
 	UpdateOrderStripePaymentIntentID(ctx context.Context, arg UpdateOrderStripePaymentIntentIDParams) (Order, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
+	UpdateProductFeatured(ctx context.Context, arg UpdateProductFeaturedParams) (Product, error)
 	UpdateProductMediaPosition(ctx context.Context, arg UpdateProductMediaPositionParams) error
 	UpdateProductStatus(ctx context.Context, arg UpdateProductStatusParams) (Product, error)
 	UpdateProductSubscribable(ctx context.Context, arg UpdateProductSubscribableParams) (Product, error)

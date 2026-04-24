@@ -176,6 +176,7 @@ templ productDetailsTab(props ProductEditProps) {
 			<div class="border-t border-rr-border px-4 py-5 sm:px-6 space-y-6">
 				@StatusToggle(props.Product)
 				@SubscribableToggle(props.Product)
+				@FeaturedToggle(props.Product)
 				<!-- Destructive actions -->
 				<div class="flex items-center justify-between border-t-2 border-rr-border pt-6">
 					<div>
@@ -754,6 +755,35 @@ templ SubscribableToggle(product *domain.Product) {
 // SubscribablePanel renders the subscription toggle as a standalone partial for htmx swaps.
 templ SubscribablePanel(product *domain.Product) {
 	@SubscribableToggle(product)
+}
+
+// FeaturedToggle renders the home-page-feature toggle row.
+templ FeaturedToggle(product *domain.Product) {
+	<div id="featured-panel">
+		<div class="flex items-center justify-between">
+			<div>
+				<p class="text-sm font-medium text-rr-heading">Feature on home page</p>
+				<p class="text-sm text-rr-muted">Show this product as the hero on the storefront landing page. Only one product is featured at a time — turning this on will replace the current pick.</p>
+			</div>
+			@switchcomp.Switch(switchcomp.Props{
+				ID:      fmt.Sprintf("featured-%s", product.ID),
+				Name:    "featured",
+				Value:   "true",
+				Checked: product.IsFeatured,
+				Attributes: templ.Attributes{
+					"hx-post":    fmt.Sprintf("/admin/catalog/%s/featured", product.ID),
+					"hx-target":  "#featured-panel",
+					"hx-swap":    "outerHTML",
+					"hx-trigger": "change",
+				},
+			})
+		</div>
+	</div>
+}
+
+// FeaturedPanel renders the featured toggle as a standalone partial for htmx swaps.
+templ FeaturedPanel(product *domain.Product) {
+	@FeaturedToggle(product)
 }
 
 templ ProductEdit(props ProductEditProps) {

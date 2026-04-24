@@ -389,6 +389,7 @@ type Product struct {
 	Subscribable  bool               `json:"subscribable"`
 	Visibility    string             `json:"visibility"`
 	TaxExempt     bool               `json:"tax_exempt"`
+	IsFeatured    bool               `json:"is_featured"`
 }
 
 type ProductAttributeSet struct {

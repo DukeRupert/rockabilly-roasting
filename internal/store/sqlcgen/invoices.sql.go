@@ -681,7 +681,7 @@ const updateProductVisibility = `-- name: UpdateProductVisibility :one
 UPDATE products
 SET visibility = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility, tax_exempt
+RETURNING id, slug, title, description, status, product_type_id, taxon_id, metadata, available_on, discontinue_on, created_at, updated_at, subscribable, visibility, tax_exempt, is_featured
 `
 
 type UpdateProductVisibilityParams struct {
@@ -708,6 +708,7 @@ func (q *Queries) UpdateProductVisibility(ctx context.Context, arg UpdateProduct
 		&i.Subscribable,
 		&i.Visibility,
 		&i.TaxExempt,
+		&i.IsFeatured,
 	)
 	return i, err
 }

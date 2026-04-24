@@ -44,6 +44,7 @@ type Product struct {
 	Subscribable  bool
 	Visibility    ProductVisibility
 	TaxExempt     bool
+	IsFeatured    bool
 	Metadata      map[string]any
 	AvailableOn   *time.Time
 	DiscontinueOn *time.Time

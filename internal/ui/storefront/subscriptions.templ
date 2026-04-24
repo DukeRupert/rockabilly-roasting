@@ -21,135 +21,207 @@ type SubscriptionsPageProps struct {
 }
 
 templ SubscriptionsContent(props SubscriptionsPageProps) {
-	<!-- Hero -->
-	<section class="-mx-4 sm:-mx-6 lg:-mx-8">
-		<div class="relative" style="background: linear-gradient(rgba(14,15,16,0.85), rgba(14,15,16,0.85)), url('/static/rockabilly_shop.webp') center/cover no-repeat; background-color: #0E0F10;">
-			<div class="texture-dots absolute inset-0 opacity-30"></div>
-			<div class="relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center">
-				<p class="label-font text-rr-teal text-xs mb-3" style="letter-spacing: 0.35em;">FRESH ON YOUR SCHEDULE</p>
-				<h1 class="font-display text-rr-heading leading-none tracking-wide" style="font-size: clamp(3rem, 10vw, 5.5rem);">
-					THE DAILY GRIND
-				</h1>
-				<p class="mt-4 font-body text-lg text-rr-muted max-w-xl mx-auto leading-relaxed">
-					Your favorite coffee, roasted fresh and delivered on your schedule.
-					if props.maxDiscount() > 0 {
-						Save up to { fmt.Sprintf("%d%%", props.maxDiscount()) } on every bag.
-					}
+	<!-- Hero: ink surface, candle glow, stamp-pressed headline -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 -mt-8 relative bg-ink overflow-hidden">
+		<!-- Amber radial glow centered -->
+		<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse at center, rgba(242,160,61,0.16) 0%, rgba(242,160,61,0.04) 45%, transparent 75%);"></div>
+		<!-- Paper halftone dot texture -->
+		<div class="absolute inset-0 texture-halftone-paper pointer-events-none" style="mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent);"></div>
+		<div class="relative mx-auto max-w-5xl px-6 sm:px-10 lg:px-14 py-20 sm:py-28 text-center">
+			<p class="font-oswald font-semibold text-candle text-xs sm:text-sm" style="letter-spacing:0.3em; text-transform:uppercase;">
+				Fresh on your schedule
+			</p>
+			<h1 class="font-slab text-paper uppercase leading-[0.9] mt-5" style="font-size: clamp(2.75rem, 8vw, 5.5rem); letter-spacing:-0.005em;">
+				The Daily
+				<span class="font-script text-candle normal-case inline-block align-baseline" style="font-size:1.05em; letter-spacing:0;">grind.</span>
+			</h1>
+			<p class="font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-xl mx-auto">
+				Pick the roast. Pick the cadence. We roast it, bag it, and ship it fresh — same day it comes off the drum.
+			</p>
+			<!-- Three inline value props, newspaper-column feel -->
+			<ul class="mt-10 inline-flex flex-col sm:flex-row items-center gap-3 sm:gap-0 font-oswald font-bold text-paper text-xs sm:text-sm" style="letter-spacing:0.2em; text-transform:uppercase;">
+				<li class="inline-flex items-center gap-2">
+					<span class="text-candle" aria-hidden="true">◆</span>
+					Always fresh
+				</li>
+				<li class="hidden sm:inline-block text-chrome-deep mx-5" aria-hidden="true">·</li>
+				if props.maxDiscount() > 0 {
+					<li class="inline-flex items-center gap-2">
+						<span class="text-candle" aria-hidden="true">◆</span>
+						Save { fmt.Sprintf("%d%%", props.maxDiscount()) } every bag
+					</li>
+				} else {
+					<li class="inline-flex items-center gap-2">
+						<span class="text-candle" aria-hidden="true">◆</span>
+						Save more
+					</li>
+				}
+				<li class="hidden sm:inline-block text-chrome-deep mx-5" aria-hidden="true">·</li>
+				<li class="inline-flex items-center gap-2">
+					<span class="text-candle" aria-hidden="true">◆</span>
+					Cancel anytime
+				</li>
+			</ul>
+			<!-- CTA -->
+			<div class="mt-12 flex flex-col items-center gap-3">
+				<a
+					href="#subscribe-products"
+					hx-boost="false"
+					class="btn-stamp-paper inline-flex items-center gap-2 bg-rust text-paper border-2 border-paper px-8 py-4 font-oswald font-bold text-sm"
+					style="letter-spacing:0.14em; text-transform:uppercase;"
+				>
+					Choose your coffee
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3"/>
+					</svg>
+				</a>
+				<p class="font-oswald text-chrome-deep text-xs" style="letter-spacing:0.18em; text-transform:uppercase;">
+					No membership fee · Cancel in two clicks
 				</p>
-				<p class="mt-6 font-display text-rr-heading tracking-widest text-lg sm:text-xl">
-					ALWAYS FRESH
-					<span class="text-rr-teal mx-3">&middot;</span>
-					if props.maxDiscount() > 0 {
-						SAVE { fmt.Sprintf("%d%%", props.maxDiscount()) }
-					} else {
-						SAVE MORE
-					}
-					<span class="text-rr-teal mx-3">&middot;</span>
-					CANCEL ANYTIME
+			</div>
+		</div>
+		<div class="flame-stripe"></div>
+	</section>
+	<!-- Product grid: paper surface -->
+	<section id="subscribe-products" class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper">
+		<!-- Paper grain overlay -->
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-20">
+			<!-- Section header -->
+			<div class="mb-10 sm:mb-14">
+				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+					Subscribe to a roast
 				</p>
-				<div class="mt-8">
-					<a href="#subscribe-products" hx-boost="false" class="btn label-font px-10 py-4 rounded-sm text-white text-sm bg-rr-teal hover:bg-rr-teal-lt transition-colors">
-						CHOOSE YOUR COFFEE
-					</a>
+				<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mt-3">
+					<h2 class="font-slab text-ink uppercase leading-[0.92]" style="font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing:-0.005em;">
+						Pick your
+						<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">cadence.</span>
+					</h2>
+					<p class="font-oswald text-ink-soft text-sm leading-relaxed max-w-xs">
+						Every week, every two weeks, every month. Whatever keeps the shelf stocked.
+					</p>
 				</div>
 			</div>
-			<div class="flame-stripe"></div>
-		</div>
-	</section>
-	<!-- Product grid -->
-	<section id="subscribe-products" class="-mx-4 sm:-mx-6 lg:-mx-8">
-		<div class="relative bg-rr-surface/50">
-			<div class="window-glow absolute inset-0 opacity-50"></div>
-			<div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
-				<div class="text-center mb-10">
-					<h2 class="font-display text-3xl tracking-widest text-rr-heading">PICK YOUR ROAST</h2>
-					<p class="mt-1 font-body text-sm text-rr-muted">Choose a coffee below to set up your subscription.</p>
-				</div>
-		if len(props.Products) == 0 {
-				<div class="text-center py-16">
-					<svg class="mx-auto size-10 text-rr-faint mb-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+			if len(props.Products) == 0 {
+				<div class="border-2 border-ink bg-cream-hi py-16 px-6 text-center shadow-stamp">
+					<svg class="mx-auto size-10 text-ink mb-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"></path>
 					</svg>
-					<p class="font-body text-rr-muted">No subscribable products available yet.</p>
-					<a href="/catalog" class="btn label-font inline-block mt-4 px-6 py-2.5 rounded-sm text-white text-sm bg-rr-red hover:bg-rr-red-lt transition-colors">
-						BROWSE ALL COFFEE
+					<p class="font-oswald text-ink text-base" style="letter-spacing:0.04em;">No subscribable roasts on the shelf yet.</p>
+					<a href="/catalog" class="btn-stamp inline-flex items-center gap-2 mt-6 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">
+						Browse all coffee
+						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+						</svg>
 					</a>
 				</div>
 			} else {
-				<div class="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4">
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
 					for _, card := range props.Products {
-						@subscriptionProductCard(card)
+						@subscriptionProductCardPaper(card)
 					}
 				</div>
-				<div class="mt-10 text-center">
-					<a href="/catalog" class="btn label-font px-10 py-4 rounded-sm text-white text-sm bg-rr-red hover:bg-rr-red-lt transition-colors">
-						BROWSE ALL COFFEE
+				<div class="mt-14 text-center">
+					<a href="/catalog" class="btn-stamp inline-flex items-center gap-2 bg-cream-hi text-ink border-2 border-ink px-8 py-4 font-oswald font-bold text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">
+						Browse all coffee
+						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+						</svg>
 					</a>
 				</div>
 			}
-			</div>
 		</div>
 	</section>
 }
 
-templ subscriptionProductCard(card SubscriptionProductCard) {
-	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug + "?mode=subscribe") } class="product-card group rounded-sm overflow-hidden border border-rr-border bg-rr-surface">
-		<!-- Image — 3:4 ratio matching catalog cards -->
-		<div class={ "aspect-3/4 w-full overflow-hidden bg-rr-bg relative", placeholderTint(card.Coffee) }>
+// subscriptionProductCardPaper is the paper-and-ink variant of the
+// subscription-specific product card. Links through with ?mode=subscribe so
+// the product detail lands in subscribe mode. Shows crossed-out base price
+// plus the max-discount price in rust for the subscription savings moment.
+templ subscriptionProductCardPaper(card SubscriptionProductCard) {
+	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug + "?mode=subscribe") } class="btn-stamp group block bg-cream-hi border-2 border-ink">
+		<!-- Image panel -->
+		<div class="relative aspect-square bg-paper-warm border-b-2 border-ink overflow-hidden">
 			if card.ThumbnailURL != "" {
 				<img
 					src={ card.ThumbnailURL }
 					alt={ cardAltText(card.Product.Title, card.Coffee) }
-					class="h-full w-full object-cover object-center group-hover:opacity-80 transition-opacity"
+					class="h-full w-full object-cover object-center"
 					loading="lazy"
 				/>
 			} else {
-				<div class="texture-dots absolute inset-0"></div>
-				<div class="flex h-full w-full items-center justify-center relative">
-					<div class="w-16 h-16 rounded-full border-2 border-rr-border bg-rr-surface flex items-center justify-center">
-						<span class="font-display text-rr-muted text-lg tracking-widest">
+				<div class="flex h-full w-full items-center justify-center">
+					<div class="w-16 h-16 border-2 border-ink bg-paper flex items-center justify-center">
+						<span class="font-slab text-ink text-2xl leading-none">
 							{ string([]rune(card.Product.Title)[0:1]) }
 						</span>
 					</div>
 				</div>
 			}
-			<!-- Subscription badge overlay -->
+			<!-- SAVE X% candle sticker, top-right -->
 			if card.MaxDiscount > 0 {
 				<div class="absolute top-2 right-2">
-					<span class="label-font px-2 py-1 rounded-sm text-white bg-rr-teal text-[0.6rem]">
-						{ fmt.Sprintf("SAVE %d%%", card.MaxDiscount) }
+					<span class="inline-block font-oswald font-bold text-[10px] text-ink bg-candle border-2 border-ink px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
+						Save { fmt.Sprintf("%d%%", card.MaxDiscount) }
+					</span>
+				</div>
+			}
+			<!-- Seasonal, top-left (below SAVE if both present) -->
+			if card.Coffee != nil && card.Coffee.IsSeasonal {
+				<div class="absolute top-2 left-2">
+					<span class="inline-block font-oswald font-bold text-[10px] text-ink bg-paper border-2 border-ink px-2 py-0.5" style="letter-spacing:0.16em; text-transform:uppercase;">
+						Seasonal
 					</span>
 				</div>
 			}
 		</div>
-		<!-- Product info — tight padding, matching catalog card pattern -->
-		<div class="p-3">
-			<h3 class="font-heading text-rr-heading text-base leading-tight group-hover:text-rr-teal transition-colors">{ card.Product.Title }</h3>
-			<div class="mt-1 flex items-center gap-2">
-				if card.BasePrice != nil && card.MaxDiscount > 0 {
-					<span class="font-heading text-rr-muted text-sm line-through">{ formatCents(*card.BasePrice) }</span>
-					<span class="font-heading text-rr-teal text-lg">{ formatCents(discountedPrice(*card.BasePrice, card.MaxDiscount)) }</span>
-				} else if card.BasePrice != nil {
-					<span class="font-heading text-rr-heading text-lg">{ formatCents(*card.BasePrice) }</span>
-				}
-			</div>
-			<!-- Coffee attributes: roast scale + tasting note pills -->
-			if card.Coffee != nil {
-				if validRoastLevel(card.Coffee.RoastLevel) {
-					<div class="mt-2">
-						@roastDots(card.Coffee.RoastLevel, "small")
-					</div>
-				}
-				if len(card.Coffee.TastingNotes) > 0 {
-					<div class="mt-1.5 flex flex-wrap gap-1">
-						for _, note := range cardTastingNotesList(card.Coffee.TastingNotes, 3) {
-							<span class="label-font px-1.5 py-0.5 rounded-sm text-rr-amber/80 border border-rr-amber/20 bg-rr-amber/5 text-[0.6rem]">
-								{ note }
-							</span>
-						}
-					</div>
-				}
+		<!-- Content -->
+		<div class="p-4 sm:p-5 flex flex-col gap-2">
+			<!-- Origin tag -->
+			if card.Coffee != nil && len(card.Coffee.Regions) > 0 {
+				<p class="font-oswald text-chrome-deep text-[10px] sm:text-[11px] font-semibold" style="letter-spacing:0.2em; text-transform:uppercase;">
+					{ card.Coffee.Regions[0] }
+				</p>
+			} else if card.Coffee != nil && validRoastLevel(card.Coffee.RoastLevel) {
+				<p class="font-oswald text-chrome-deep text-[10px] sm:text-[11px] font-semibold" style="letter-spacing:0.2em; text-transform:uppercase;">
+					{ roastLevelLabel(card.Coffee.RoastLevel) } roast
+				</p>
 			}
+			<!-- Title -->
+			<h3 class="font-slab text-ink uppercase leading-[0.95] text-xl sm:text-2xl group-hover:text-rust transition-colors" style="letter-spacing:-0.005em;">
+				{ card.Product.Title }
+			</h3>
+			<!-- Tasting notes -->
+			if card.Coffee != nil && len(card.Coffee.TastingNotes) > 0 {
+				<ul class="flex flex-wrap gap-1.5 mt-1">
+					for _, note := range cardTastingNotesList(card.Coffee.TastingNotes, 3) {
+						<li class="font-oswald font-bold text-[9px] sm:text-[10px] text-ink bg-paper border-2 border-ink px-2 py-0.5 rounded-full" style="letter-spacing:0.12em; text-transform:uppercase;">
+							{ note }
+						</li>
+					}
+				</ul>
+			}
+			<!-- Footer row: price + CTA, separated by ink double-rule -->
+			<div class="mt-3 pt-3 border-t-2 border-ink flex items-center justify-between gap-2">
+				if card.BasePrice != nil && card.MaxDiscount > 0 {
+					<span class="inline-flex items-baseline gap-2">
+						<span class="font-special text-chrome-deep text-xs line-through">{ formatCents(*card.BasePrice) }</span>
+						<span class="font-special text-rust text-sm sm:text-base">{ formatCents(discountedPrice(*card.BasePrice, card.MaxDiscount)) }</span>
+					</span>
+				} else if card.BasePrice != nil {
+					<span class="font-special text-ink text-sm sm:text-base">
+						{ formatCents(*card.BasePrice) }
+					</span>
+				} else {
+					<span></span>
+				}
+				<span class="inline-flex items-center gap-1 font-oswald font-bold text-[10px] sm:text-[11px] text-rust group-hover:text-rust-deep transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">
+					Subscribe
+					<svg class="size-3 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+					</svg>
+				</span>
+			</div>
 		</div>
 	</a>
 }

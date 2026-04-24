@@ -49,83 +49,60 @@ func SubscriptionsContent(props SubscriptionsPageProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Hero --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8\"><div class=\"relative\" style=\"background: linear-gradient(rgba(14,15,16,0.85), rgba(14,15,16,0.85)), url('/static/rockabilly_shop.webp') center/cover no-repeat; background-color: #0E0F10;\"><div class=\"texture-dots absolute inset-0 opacity-30\"></div><div class=\"relative mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center\"><p class=\"label-font text-rr-teal text-xs mb-3\" style=\"letter-spacing: 0.35em;\">FRESH ON YOUR SCHEDULE</p><h1 class=\"font-display text-rr-heading leading-none tracking-wide\" style=\"font-size: clamp(3rem, 10vw, 5.5rem);\">THE DAILY GRIND</h1><p class=\"mt-4 font-body text-lg text-rr-muted max-w-xl mx-auto leading-relaxed\">Your favorite coffee, roasted fresh and delivered on your schedule. ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Hero: ink surface, candle glow, stamp-pressed headline --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 -mt-8 relative bg-ink overflow-hidden\"><!-- Amber radial glow centered --><div class=\"absolute inset-0 pointer-events-none\" style=\"background: radial-gradient(ellipse at center, rgba(242,160,61,0.16) 0%, rgba(242,160,61,0.04) 45%, transparent 75%);\"></div><!-- Paper halftone dot texture --><div class=\"absolute inset-0 texture-halftone-paper pointer-events-none\" style=\"mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent);\"></div><div class=\"relative mx-auto max-w-5xl px-6 sm:px-10 lg:px-14 py-20 sm:py-28 text-center\"><p class=\"font-oswald font-semibold text-candle text-xs sm:text-sm\" style=\"letter-spacing:0.3em; text-transform:uppercase;\">Fresh on your schedule</p><h1 class=\"font-slab text-paper uppercase leading-[0.9] mt-5\" style=\"font-size: clamp(2.75rem, 8vw, 5.5rem); letter-spacing:-0.005em;\">The Daily <span class=\"font-script text-candle normal-case inline-block align-baseline\" style=\"font-size:1.05em; letter-spacing:0;\">grind.</span></h1><p class=\"font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-xl mx-auto\">Pick the roast. Pick the cadence. We roast it, bag it, and ship it fresh — same day it comes off the drum.</p><!-- Three inline value props, newspaper-column feel --><ul class=\"mt-10 inline-flex flex-col sm:flex-row items-center gap-3 sm:gap-0 font-oswald font-bold text-paper text-xs sm:text-sm\" style=\"letter-spacing:0.2em; text-transform:uppercase;\"><li class=\"inline-flex items-center gap-2\"><span class=\"text-candle\" aria-hidden=\"true\">◆</span> Always fresh</li><li class=\"hidden sm:inline-block text-chrome-deep mx-5\" aria-hidden=\"true\">·</li>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.maxDiscount() > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Save up to ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<li class=\"inline-flex items-center gap-2\"><span class=\"text-candle\" aria-hidden=\"true\">◆</span> Save ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d%%", props.maxDiscount()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 36, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 51, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " on every bag.")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p><p class=\"mt-6 font-display text-rr-heading tracking-widest text-lg sm:text-xl\">ALWAYS FRESH <span class=\"text-rr-teal mx-3\">&middot;</span> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if props.maxDiscount() > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "SAVE ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d%%", props.maxDiscount()))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 43, Col: 53}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " every bag</li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "SAVE MORE ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<li class=\"inline-flex items-center gap-2\"><span class=\"text-candle\" aria-hidden=\"true\">◆</span> Save more</li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<span class=\"text-rr-teal mx-3\">&middot;</span> CANCEL ANYTIME</p><div class=\"mt-8\"><a href=\"#subscribe-products\" hx-boost=\"false\" class=\"btn label-font px-10 py-4 rounded-sm text-white text-sm bg-rr-teal hover:bg-rr-teal-lt transition-colors\">CHOOSE YOUR COFFEE</a></div></div><div class=\"flame-stripe\"></div></div></section><!-- Product grid --><section id=\"subscribe-products\" class=\"-mx-4 sm:-mx-6 lg:-mx-8\"><div class=\"relative bg-rr-surface/50\"><div class=\"window-glow absolute inset-0 opacity-50\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20\"><div class=\"text-center mb-10\"><h2 class=\"font-display text-3xl tracking-widest text-rr-heading\">PICK YOUR ROAST</h2><p class=\"mt-1 font-body text-sm text-rr-muted\">Choose a coffee below to set up your subscription.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<li class=\"hidden sm:inline-block text-chrome-deep mx-5\" aria-hidden=\"true\">·</li><li class=\"inline-flex items-center gap-2\"><span class=\"text-candle\" aria-hidden=\"true\">◆</span> Cancel anytime</li></ul><!-- CTA --><div class=\"mt-12 flex flex-col items-center gap-3\"><a href=\"#subscribe-products\" hx-boost=\"false\" class=\"btn-stamp-paper inline-flex items-center gap-2 bg-rust text-paper border-2 border-paper px-8 py-4 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Choose your coffee <svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3\"></path></svg></a><p class=\"font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">No membership fee · Cancel in two clicks</p></div></div><div class=\"flame-stripe\"></div></section><!-- Product grid: paper surface --><section id=\"subscribe-products\" class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-20\"><!-- Section header --><div class=\"mb-10 sm:mb-14\"><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Subscribe to a roast</p><div class=\"flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mt-3\"><h2 class=\"font-slab text-ink uppercase leading-[0.92]\" style=\"font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing:-0.005em;\">Pick your <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">cadence.</span></h2><p class=\"font-oswald text-ink-soft text-sm leading-relaxed max-w-xs\">Every week, every two weeks, every month. Whatever keeps the shelf stocked.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(props.Products) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"text-center py-16\"><svg class=\"mx-auto size-10 text-rr-faint mb-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z\"></path></svg><p class=\"font-body text-rr-muted\">No subscribable products available yet.</p><a href=\"/catalog\" class=\"btn label-font inline-block mt-4 px-6 py-2.5 rounded-sm text-white text-sm bg-rr-red hover:bg-rr-red-lt transition-colors\">BROWSE ALL COFFEE</a></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"border-2 border-ink bg-cream-hi py-16 px-6 text-center shadow-stamp\"><svg class=\"mx-auto size-10 text-ink mb-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 10.5V6a3.75 3.75 0 1 0-7.5 0v4.5m11.356-1.993 1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 0 1-1.12-1.243l1.264-12A1.125 1.125 0 0 1 5.513 7.5h12.974c.576 0 1.059.435 1.119 1.007ZM8.625 10.5a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm7.5 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z\"></path></svg><p class=\"font-oswald text-ink text-base\" style=\"letter-spacing:0.04em;\">No subscribable roasts on the shelf yet.</p><a href=\"/catalog\" class=\"btn-stamp inline-flex items-center gap-2 mt-6 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Browse all coffee <svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-4\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, card := range props.Products {
-				templ_7745c5c3_Err = subscriptionProductCard(card).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = subscriptionProductCardPaper(card).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div><div class=\"mt-10 text-center\"><a href=\"/catalog\" class=\"btn label-font px-10 py-4 rounded-sm text-white text-sm bg-rr-red hover:bg-rr-red-lt transition-colors\">BROWSE ALL COFFEE</a></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div><div class=\"mt-14 text-center\"><a href=\"/catalog\" class=\"btn-stamp inline-flex items-center gap-2 bg-cream-hi text-ink border-2 border-ink px-8 py-4 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Browse all coffee <svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -133,7 +110,11 @@ func SubscriptionsContent(props SubscriptionsPageProps) templ.Component {
 	})
 }
 
-func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
+// subscriptionProductCardPaper is the paper-and-ink variant of the
+// subscription-specific product card. Links through with ?mode=subscribe so
+// the product detail lands in subscribe mode. Shows crossed-out base price
+// plus the max-discount price in rust for the subscription savings moment.
+func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -149,244 +130,258 @@ func subscriptionProductCard(card SubscriptionProductCard) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
+		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var3 == nil {
+			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var5 templ.SafeURL
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/catalog/" + card.Product.Slug + "?mode=subscribe"))
+		var templ_7745c5c3_Var4 templ.SafeURL
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/catalog/" + card.Product.Slug + "?mode=subscribe"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 96, Col: 77}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 142, Col: 77}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" class=\"product-card group rounded-sm overflow-hidden border border-rr-border bg-rr-surface\"><!-- Image — 3:4 ratio matching catalog cards -->")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var6 = []any{"aspect-3/4 w-full overflow-hidden bg-rr-bg relative", placeholderTint(card.Coffee)}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(templ.CSSClasses(templ_7745c5c3_Var6).String())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 1, Col: 0}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" class=\"btn-stamp group block bg-cream-hi border-2 border-ink\"><!-- Image panel --><div class=\"relative aspect-square bg-paper-warm border-b-2 border-ink overflow-hidden\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if card.ThumbnailURL != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<img src=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<img src=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var5 string
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(card.ThumbnailURL)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 147, Col: 28}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" alt=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var6 string
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(cardAltText(card.Product.Title, card.Coffee))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 148, Col: 55}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" class=\"h-full w-full object-cover object-center\" loading=\"lazy\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"flex h-full w-full items-center justify-center\"><div class=\"w-16 h-16 border-2 border-ink bg-paper flex items-center justify-center\"><span class=\"font-slab text-ink text-2xl leading-none\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var7 string
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(card.Product.Title)[0:1]))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 156, Col: 48}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</span></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<!-- SAVE X% candle sticker, top-right -->")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if card.MaxDiscount > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"absolute top-2 right-2\"><span class=\"inline-block font-oswald font-bold text-[10px] text-ink bg-candle border-2 border-ink px-2 py-0.5\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Save ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var8 string
-			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(card.ThumbnailURL)
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d%%", card.MaxDiscount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 101, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 165, Col: 50}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" alt=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</span></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<!-- Seasonal, top-left (below SAVE if both present) -->")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if card.Coffee != nil && card.Coffee.IsSeasonal {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div class=\"absolute top-2 left-2\"><span class=\"inline-block font-oswald font-bold text-[10px] text-ink bg-paper border-2 border-ink px-2 py-0.5\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Seasonal</span></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div><!-- Content --><div class=\"p-4 sm:p-5 flex flex-col gap-2\"><!-- Origin tag -->")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if card.Coffee != nil && len(card.Coffee.Regions) > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<p class=\"font-oswald text-chrome-deep text-[10px] sm:text-[11px] font-semibold\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(cardAltText(card.Product.Title, card.Coffee))
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(card.Coffee.Regions[0])
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 102, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 183, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\" class=\"h-full w-full object-cover object-center group-hover:opacity-80 transition-opacity\" loading=\"lazy\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"texture-dots absolute inset-0\"></div><div class=\"flex h-full w-full items-center justify-center relative\"><div class=\"w-16 h-16 rounded-full border-2 border-rr-border bg-rr-surface flex items-center justify-center\"><span class=\"font-display text-rr-muted text-lg tracking-widest\">")
+		} else if card.Coffee != nil && validRoastLevel(card.Coffee.RoastLevel) {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<p class=\"font-oswald text-chrome-deep text-[10px] sm:text-[11px] font-semibold\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
-			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(card.Product.Title)[0:1]))
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(roastLevelLabel(card.Coffee.RoastLevel))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 111, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 187, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</span></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, " roast</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<!-- Subscription badge overlay -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<!-- Title --><h3 class=\"font-slab text-ink uppercase leading-[0.95] text-xl sm:text-2xl group-hover:text-rust transition-colors\" style=\"letter-spacing:-0.005em;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if card.MaxDiscount > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"absolute top-2 right-2\"><span class=\"label-font px-2 py-1 rounded-sm text-white bg-rr-teal text-[0.6rem]\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var11 string
-			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("SAVE %d%%", card.MaxDiscount))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 120, Col: 50}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</span></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
+		var templ_7745c5c3_Var11 string
+		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(card.Product.Title)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 192, Col: 24}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div><!-- Product info — tight padding, matching catalog card pattern --><div class=\"p-3\"><h3 class=\"font-heading text-rr-heading text-base leading-tight group-hover:text-rr-teal transition-colors\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var12 string
-		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(card.Product.Title)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 127, Col: 131}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</h3><!-- Tasting notes -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</h3><div class=\"mt-1 flex items-center gap-2\">")
+		if card.Coffee != nil && len(card.Coffee.TastingNotes) > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<ul class=\"flex flex-wrap gap-1.5 mt-1\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			for _, note := range cardTastingNotesList(card.Coffee.TastingNotes, 3) {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<li class=\"font-oswald font-bold text-[9px] sm:text-[10px] text-ink bg-paper border-2 border-ink px-2 py-0.5 rounded-full\" style=\"letter-spacing:0.12em; text-transform:uppercase;\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var12 string
+				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(note)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 199, Col: 13}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</li>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</ul>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<!-- Footer row: price + CTA, separated by ink double-rule --><div class=\"mt-3 pt-3 border-t-2 border-ink flex items-center justify-between gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if card.BasePrice != nil && card.MaxDiscount > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<span class=\"font-heading text-rr-muted text-sm line-through\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<span class=\"inline-flex items-baseline gap-2\"><span class=\"font-special text-chrome-deep text-xs line-through\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(*card.BasePrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 130, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 208, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</span> <span class=\"font-heading text-rr-teal text-lg\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</span> <span class=\"font-special text-rust text-sm sm:text-base\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(discountedPrice(*card.BasePrice, card.MaxDiscount)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 131, Col: 118}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 209, Col: 129}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "</span></span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if card.BasePrice != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<span class=\"font-heading text-rr-heading text-lg\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<span class=\"font-special text-ink text-sm sm:text-base\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(*card.BasePrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 133, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 213, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<span></span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</div><!-- Coffee attributes: roast scale + tasting note pills -->")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if card.Coffee != nil {
-			if validRoastLevel(card.Coffee.RoastLevel) {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<div class=\"mt-2\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = roastDots(card.Coffee.RoastLevel, "small").Render(ctx, templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</div>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, " ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if len(card.Coffee.TastingNotes) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"mt-1.5 flex flex-wrap gap-1\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				for _, note := range cardTastingNotesList(card.Coffee.TastingNotes, 3) {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<span class=\"label-font px-1.5 py-0.5 rounded-sm text-rr-amber/80 border border-rr-amber/20 bg-rr-amber/5 text-[0.6rem]\">")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var16 string
-					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(note)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 147, Col: 14}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</div>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</div></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<span class=\"inline-flex items-center gap-1 font-oswald font-bold text-[10px] sm:text-[11px] text-rust group-hover:text-rust-deep transition-colors\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Subscribe <svg class=\"size-3 transition-transform group-hover:translate-x-0.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></span></div></div></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -420,12 +415,12 @@ func SubscriptionsPage(props SubscriptionsPageProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var17 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var17 == nil {
-			templ_7745c5c3_Var17 = templ.NopComponent
+		templ_7745c5c3_Var16 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var16 == nil {
+			templ_7745c5c3_Var16 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var18 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var17 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -447,7 +442,7 @@ func SubscriptionsPage(props SubscriptionsPageProps) templ.Component {
 			Title:       "The Daily Grind",
 			Description: "Join The Daily Grind — subscribe to your favorite coffee and save on every delivery",
 			CartCount:   props.CartCount,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var18), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var17), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
@@ -130,6 +131,12 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 	var sub *domain.Subscription
 	var plan *domain.SubscriptionPlan
 	var customer *domain.Customer
+	var product *domain.Product
+	var variant *domain.Variant
+	var shippingAddr *domain.Address
+	var thumbnailURL string
+	var unitPrice int
+	var hasUnitPrice bool
 	var enrichedOrders []admin.EnrichedSubOrder
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -146,6 +153,28 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		if txErr != nil {
 			return txErr
 		}
+		variant, txErr = d.CatalogService.GetVariant(ctx, tx, sub.VariantID)
+		if txErr != nil {
+			return txErr
+		}
+		product, txErr = d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+		if txErr != nil {
+			return txErr
+		}
+		if media, mErr := d.CatalogService.ListProductMedia(ctx, tx, variant.ProductID); mErr == nil && len(media) > 0 {
+			thumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
+		}
+		if price, pErr := d.PricingService.GetBasePrice(ctx, tx, variant.ID, "USD"); pErr == nil {
+			unit := price.Amount
+			if plan.DiscountPct > 0 {
+				unit = unit - (unit*plan.DiscountPct)/100
+			}
+			unitPrice = unit
+			hasUnitPrice = true
+		}
+		if addr, aErr := d.CustomerService.GetAddressByIDAsStaff(ctx, tx, sub.ShippingAddressID); aErr == nil {
+			shippingAddr = addr
+		}
 		subOrders, txErr := d.SubscriptionService.ListSubscriptionOrders(ctx, tx, id)
 		if txErr != nil {
 			return txErr
@@ -155,6 +184,8 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 			enrichedOrders[i] = admin.EnrichedSubOrder{SubscriptionOrder: so}
 			if order, oErr := d.OrderService.GetOrderAsStaff(ctx, tx, so.OrderID); oErr == nil {
 				enrichedOrders[i].OrderNumber = order.Number
+				enrichedOrders[i].OrderTotal = order.Total
+				enrichedOrders[i].OrderStatus = order.Status
 			}
 		}
 		return nil
@@ -170,13 +201,19 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 
 	name, role := staffNameRole(r)
 	props := admin.SubscriptionShowProps{
-		Subscription: sub,
-		Plan:         plan,
-		Customer:     customer,
-		Orders:       enrichedOrders,
-		Flash:        r.URL.Query().Get("flash"),
-		StaffName:    name,
-		StaffRole:    role,
+		Subscription:    sub,
+		Plan:            plan,
+		Customer:        customer,
+		Product:         product,
+		Variant:         variant,
+		ThumbnailURL:    thumbnailURL,
+		UnitPrice:       unitPrice,
+		HasUnitPrice:    hasUnitPrice,
+		ShippingAddress: shippingAddr,
+		Orders:          enrichedOrders,
+		Flash:           r.URL.Query().Get("flash"),
+		StaffName:       name,
+		StaffRole:       role,
 	}
 
 	if IsHTMX(r) {

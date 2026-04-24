@@ -2,6 +2,8 @@ package admin
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -9,16 +11,24 @@ import (
 type EnrichedSubOrder struct {
 	domain.SubscriptionOrder
 	OrderNumber string
+	OrderTotal  int
+	OrderStatus domain.OrderStatus
 }
 
 type SubscriptionShowProps struct {
-	Subscription *domain.Subscription
-	Plan         *domain.SubscriptionPlan
-	Customer     *domain.Customer
-	Orders       []EnrichedSubOrder
-	Flash        string
-	StaffName    string
-	StaffRole    string
+	Subscription    *domain.Subscription
+	Plan            *domain.SubscriptionPlan
+	Customer        *domain.Customer
+	Product         *domain.Product
+	Variant         *domain.Variant
+	ThumbnailURL    string
+	UnitPrice       int
+	HasUnitPrice    bool
+	ShippingAddress *domain.Address
+	Orders          []EnrichedSubOrder
+	Flash           string
+	StaffName       string
+	StaffRole       string
 }
 
 func canPause(status domain.SubscriptionStatus) bool {
@@ -35,100 +45,183 @@ func canCancel(status domain.SubscriptionStatus) bool {
 		status == domain.SubscriptionStatusPastDue
 }
 
+func planCadence(p *domain.SubscriptionPlan) string {
+	if p == nil {
+		return ""
+	}
+	raw := strings.TrimPrefix(string(p.Interval), "every_")
+	raw = strings.ReplaceAll(raw, "_", " ")
+	return "every " + raw
+}
+
 templ SubscriptionShowContent(props SubscriptionShowProps) {
 	if props.Flash != "" {
 		@flashToast(props.Flash)
 	}
 	<!-- Header -->
-	<div class="sm:flex sm:items-center sm:justify-between">
+	<div class="sm:flex sm:items-start sm:justify-between">
 		<div>
-			<div class="flex items-center gap-3">
-				<h1 class="admin-page-title">{ props.Plan.Name } — { props.Customer.FirstName } { props.Customer.LastName }</h1>
+			<div class="flex flex-wrap items-center gap-3">
+				<h1 class="admin-page-title">Subscription</h1>
 				@SubscriptionStatusBadge(props.Subscription.Status)
 			</div>
-			<p class="mt-1 text-sm text-rr-muted">Created { props.Subscription.CreatedAt.Format("January 2, 2006 at 3:04 PM") }</p>
+			<p class="mt-1 text-sm text-rr-muted">
+				<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())) } class="font-medium text-rr-heading hover:text-rr-red">
+					{ props.Customer.FirstName } { props.Customer.LastName }
+				</a>
+				<span class="mx-1.5">·</span>
+				<span>{ props.Customer.Email }</span>
+				<span class="mx-1.5">·</span>
+				<span>Created { props.Subscription.CreatedAt.Format("Jan 2, 2006") }</span>
+				<span class="mx-1.5">·</span>
+				<code class="text-xs">{ props.Subscription.ID.String()[:8] }</code>
+			</p>
 		</div>
 		<div class="mt-4 sm:mt-0">
 			<a href="/admin/subscriptions" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">&larr; Back to subscriptions</a>
 		</div>
 	</div>
+	<!-- State banners -->
+	if props.Subscription.CancelledAt != nil {
+		<div class="mt-6 border-2 border-rr-border bg-rr-raised p-4">
+			<p class="text-sm text-rr-heading">
+				<span class="font-semibold">Cancelled</span>
+				<span class="text-rr-muted"> on { props.Subscription.CancelledAt.Format("January 2, 2006 at 3:04 PM") }</span>
+			</p>
+		</div>
+	}
+	if props.Subscription.PauseUntil != nil {
+		<div class="mt-6 badge-amber rounded-sm p-4">
+			<p class="text-sm">
+				<span class="font-semibold">Paused until</span> { props.Subscription.PauseUntil.Format("January 2, 2006") }
+			</p>
+		</div>
+	}
 	<!-- Actions -->
-	<div class="mt-6 flex gap-3">
-		if canPause(props.Subscription.Status) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/pause", props.Subscription.ID.String())) }>
-				<button type="submit" class="btn-secondary">
-					Pause
-				</button>
-			</form>
-		}
-		if canResume(props.Subscription.Status) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/resume", props.Subscription.ID.String())) }>
-				<button type="submit" class="btn-confirm">
-					Resume
-				</button>
-			</form>
-		}
-		if canCancel(props.Subscription.Status) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/cancel", props.Subscription.ID.String())) }>
-				<button
-					type="submit"
-					class="btn-danger"
-					onclick="return confirm('Are you sure you want to cancel this subscription?')"
-				>
-					Cancel Subscription
-				</button>
-			</form>
-		}
-	</div>
-	<!-- Details grid -->
-	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+	if canPause(props.Subscription.Status) || canResume(props.Subscription.Status) || canCancel(props.Subscription.Status) {
+		<div class="mt-6 flex flex-wrap gap-3">
+			if canPause(props.Subscription.Status) {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/pause", props.Subscription.ID.String())) }>
+					<button type="submit" class="btn-secondary">Pause</button>
+				</form>
+			}
+			if canResume(props.Subscription.Status) {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/resume", props.Subscription.ID.String())) }>
+					<button type="submit" class="btn-confirm">Resume</button>
+				</form>
+			}
+			if canCancel(props.Subscription.Status) {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/cancel", props.Subscription.ID.String())) }>
+					<button
+						type="submit"
+						class="btn-danger"
+						onclick="return confirm('Cancel this subscription? This cannot be undone.')"
+					>
+						Cancel Subscription
+					</button>
+				</form>
+			}
+		</div>
+	}
+	<!-- Product line -->
+	if props.Product != nil && props.Variant != nil {
+		<div class="mt-6 border-2 border-rr-border bg-rr-surface p-4">
+			<div class="flex items-start gap-4">
+				if props.ThumbnailURL != "" {
+					<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", props.Product.ID.String())) } class="block shrink-0">
+						<img src={ props.ThumbnailURL } alt={ props.Product.Title } class="size-20 rounded-sm border border-rr-border object-cover"/>
+					</a>
+				} else {
+					<div class="size-20 shrink-0 rounded-sm border border-rr-border bg-rr-raised"></div>
+				}
+				<div class="flex-1">
+					<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", props.Product.ID.String())) } class="text-base font-semibold text-rr-heading hover:text-rr-red">
+						{ props.Product.Title }
+					</a>
+					if props.Variant.SKU != "" {
+						<p class="mt-0.5 text-xs text-rr-muted">SKU { props.Variant.SKU }</p>
+					}
+					<div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+						<span class="text-rr-muted">Quantity: <span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.Subscription.Quantity) }</span></span>
+						if props.HasUnitPrice {
+							<span class="text-rr-muted">Unit: <span class="font-medium text-rr-heading tabular-nums">{ formatCents(props.UnitPrice) }</span></span>
+							<span class="text-rr-muted">Per period: <span class="font-semibold text-rr-heading tabular-nums">{ formatCents(props.UnitPrice * props.Subscription.Quantity) }</span></span>
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+	<!-- Schedule + plan stats -->
+	<div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
 		<div class="border-2 border-rr-border bg-rr-surface p-4">
-			<dt class="text-sm font-medium text-rr-muted">Plan</dt>
+			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Plan</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ props.Plan.Name }</dd>
-			<dd class="text-xs text-rr-muted">{ string(props.Plan.Interval) } (&times;{ fmt.Sprintf("%d", props.Plan.IntervalCount) })</dd>
+			<dd class="text-xs text-rr-muted">
+				{ planCadence(props.Plan) }
+				if props.Plan.DiscountPct > 0 {
+					<span class="ml-1">· { fmt.Sprintf("%d", props.Plan.DiscountPct) }% off</span>
+				}
+			</dd>
 		</div>
 		<div class="border-2 border-rr-border bg-rr-surface p-4">
-			<dt class="text-sm font-medium text-rr-muted">Quantity</dt>
-			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ fmt.Sprintf("%d", props.Subscription.Quantity) }</dd>
+			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Next Order</dt>
+			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ props.Subscription.NextOrderAt.Format("Jan 2, 2006") }</dd>
+			<dd class="text-xs text-rr-muted">{ props.Subscription.NextOrderAt.Format("Monday") }</dd>
 		</div>
 		<div class="border-2 border-rr-border bg-rr-surface p-4">
-			<dt class="text-sm font-medium text-rr-muted">Customer</dt>
+			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Current Period</dt>
+			<dd class="mt-1 text-sm font-semibold text-rr-heading">
+				{ props.Subscription.CurrentPeriodStart.Format("Jan 2") } &ndash; { props.Subscription.CurrentPeriodEnd.Format("Jan 2, 2006") }
+			</dd>
+		</div>
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
+			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Payment</dt>
+			if props.Subscription.StripePaymentMethodID != nil && *props.Subscription.StripePaymentMethodID != "" {
+				<dd class="mt-1 text-sm font-semibold text-rr-heading">Card on file</dd>
+				<dd class="text-xs text-rr-muted"><code>{ *props.Subscription.StripePaymentMethodID }</code></dd>
+			} else {
+				<dd class="mt-1 text-sm font-semibold text-rr-heading">&mdash;</dd>
+				<dd class="text-xs text-rr-muted">No payment method</dd>
+			}
+		</div>
+	</div>
+	<!-- Customer + shipping -->
+	<div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+		<div class="border-2 border-rr-border bg-rr-surface p-4">
+			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Customer</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">
 				<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())) } class="text-rr-red hover:text-rr-red-lt">
 					{ props.Customer.FirstName } { props.Customer.LastName }
 				</a>
 			</dd>
 			<dd class="text-xs text-rr-muted">{ props.Customer.Email }</dd>
+			if props.Customer.Phone != nil && *props.Customer.Phone != "" {
+				<dd class="text-xs text-rr-muted">{ *props.Customer.Phone }</dd>
+			}
 		</div>
 		<div class="border-2 border-rr-border bg-rr-surface p-4">
-			<dt class="text-sm font-medium text-rr-muted">Current Period</dt>
-			<dd class="mt-1 text-sm text-rr-heading">
-				{ props.Subscription.CurrentPeriodStart.Format("Jan 2") } — { props.Subscription.CurrentPeriodEnd.Format("Jan 2, 2006") }
-			</dd>
-		</div>
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
-			<dt class="text-sm font-medium text-rr-muted">Next Order</dt>
-			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ props.Subscription.NextOrderAt.Format("January 2, 2006") }</dd>
+			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Ship to</dt>
+			if props.ShippingAddress != nil {
+				<address class="mt-1 text-sm text-rr-heading not-italic">
+					<p class="font-medium">{ props.ShippingAddress.FirstName } { props.ShippingAddress.LastName }</p>
+					if props.ShippingAddress.Company != nil && *props.ShippingAddress.Company != "" {
+						<p class="text-rr-muted">{ *props.ShippingAddress.Company }</p>
+					}
+					<p class="text-rr-muted">{ props.ShippingAddress.Line1 }</p>
+					if props.ShippingAddress.Line2 != nil && *props.ShippingAddress.Line2 != "" {
+						<p class="text-rr-muted">{ *props.ShippingAddress.Line2 }</p>
+					}
+					<p class="text-rr-muted">{ props.ShippingAddress.City }, { props.ShippingAddress.State } { props.ShippingAddress.PostalCode }</p>
+				</address>
+			} else {
+				<dd class="mt-1 text-sm text-rr-muted">No shipping address on file</dd>
+			}
 		</div>
 	</div>
-	<!-- Extra status info -->
-	if props.Subscription.CancelledAt != nil {
-		<div class="mt-4 border-2 border-rr-border bg-rr-raised p-4">
-			<p class="text-sm text-rr-muted">
-				<span class="font-medium">Cancelled:</span> { props.Subscription.CancelledAt.Format("January 2, 2006 at 3:04 PM") }
-			</p>
-		</div>
-	}
-	if props.Subscription.PauseUntil != nil {
-		<div class="mt-4 badge-amber rounded-sm p-4">
-			<p class="text-sm">
-				<span class="font-medium">Paused until:</span> { props.Subscription.PauseUntil.Format("January 2, 2006") }
-			</p>
-		</div>
-	}
 	<!-- Renewal orders -->
 	<div class="mt-8">
-		<h2 class="text-sm font-semibold text-rr-heading">Renewal Orders</h2>
+		<h2 class="text-sm font-semibold text-rr-heading">Renewal orders</h2>
 		if len(props.Orders) == 0 {
 			<p class="mt-2 text-sm text-rr-muted">No renewal orders yet.</p>
 		} else {
@@ -137,8 +230,9 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 					<thead class="bg-rr-raised">
 						<tr>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Period Start</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Period End</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Period</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Total</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
@@ -152,15 +246,26 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 										if so.OrderNumber != "" {
 											{ so.OrderNumber }
 										} else {
-											{ so.OrderID.String()[:8] }...
+											{ so.OrderID.String()[:8] }
 										}
 									</a>
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
-									{ so.PeriodStart.Format("Jan 2, 2006") }
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									if string(so.OrderStatus) != "" {
+										@OrderStatusBadge(so.OrderStatus)
+									} else {
+										<span class="text-rr-border">&mdash;</span>
+									}
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
-									{ so.PeriodEnd.Format("Jan 2, 2006") }
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
+									{ so.PeriodStart.Format("Jan 2") } &ndash; { so.PeriodEnd.Format("Jan 2, 2006") }
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-rr-heading tabular-nums">
+									if so.OrderTotal > 0 {
+										{ formatCents(so.OrderTotal) }
+									} else {
+										<span class="text-rr-border">&mdash;</span>
+									}
 								</td>
 							</tr>
 						}

@@ -2,9 +2,23 @@ package admin
 
 import (
 	"fmt"
+	"net/url"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
+
+func subscriptionPageURL(page int, status, q string) string {
+	v := url.Values{}
+	v.Set("page", fmt.Sprintf("%d", page))
+	if status != "" {
+		v.Set("status", status)
+	}
+	if q != "" {
+		v.Set("q", q)
+	}
+	return "/admin/subscriptions?" + v.Encode()
+}
 
 type EnrichedSubscription struct {
 	domain.Subscription
@@ -16,6 +30,7 @@ type EnrichedSubscription struct {
 type SubscriptionListProps struct {
 	Subscriptions []EnrichedSubscription
 	StatusFilter  string
+	SearchQuery   string
 	Page          int
 	PerPage       int
 	HasMore       bool
@@ -32,8 +47,20 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 		</div>
 	</div>
 	<!-- Filters -->
-	<form method="get" action="/admin/subscriptions" class="mt-6 flex items-center gap-3">
-		<div class="grid grid-cols-1">
+	<form method="get" action="/admin/subscriptions" class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+		<div class="relative flex-1 sm:max-w-sm">
+			<input
+				type="search"
+				name="q"
+				value={ props.SearchQuery }
+				placeholder="Search by name, email, or company"
+				class="w-full rounded-sm bg-rr-surface py-1.5 pl-9 pr-3 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+			/>
+			<svg class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-rr-muted" viewBox="0 0 20 20" fill="currentColor">
+				<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 3.4 9.8l3.65 3.65a.75.75 0 1 0 1.06-1.06l-3.65-3.65A5.5 5.5 0 0 0 9 3.5ZM5 9a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd"></path>
+			</svg>
+		</div>
+		<div class="grid grid-cols-1 sm:w-48">
 			<select
 				name="status"
 				onchange="this.form.submit()"
@@ -50,6 +77,10 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 				<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
 			</svg>
 		</div>
+		<button type="submit" class="btn-secondary sm:w-auto">Search</button>
+		if props.SearchQuery != "" || props.StatusFilter != "" {
+			<a href="/admin/subscriptions" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">Clear</a>
+		}
 	</form>
 	<!-- Subscription table -->
 	<div class="mt-6">
@@ -113,7 +144,7 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 				<div class="-mt-px flex w-0 flex-1">
 					if props.Page > 1 {
 						<a
-							href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions?page=%d&status=%s", props.Page-1, props.StatusFilter)) }
+							href={ templ.SafeURL(subscriptionPageURL(props.Page-1, props.StatusFilter, props.SearchQuery)) }
 							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 						>
 							Previous
@@ -123,7 +154,7 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 				<div class="-mt-px flex w-0 flex-1 justify-end">
 					if props.HasMore {
 						<a
-							href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions?page=%d&status=%s", props.Page+1, props.StatusFilter)) }
+							href={ templ.SafeURL(subscriptionPageURL(props.Page+1, props.StatusFilter, props.SearchQuery)) }
 							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 						>
 							Next

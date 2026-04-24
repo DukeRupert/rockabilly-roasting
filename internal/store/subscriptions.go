@@ -273,28 +273,40 @@ func (s *SubscriptionStore) CountByStatus(ctx context.Context, tx pgx.Tx, status
 
 // SubscriptionFilter holds optional filters for listing subscriptions.
 type SubscriptionFilter struct {
-	Status *domain.SubscriptionStatus
-	Limit  int
-	Offset int
+	Status        *domain.SubscriptionStatus
+	CustomerQuery string // free-text match on customer name / email / company
+	Limit         int
+	Offset        int
 }
 
 // List returns subscriptions matching the given filter (hand-written for dynamic WHERE).
 func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionFilter) ([]domain.Subscription, error) {
-	query := `SELECT id, customer_id, plan_id, variant_id, quantity, status, shipping_address_id,
-	                 stripe_payment_method_id,
-	                 current_period_start, current_period_end, next_order_at,
-	                 ends_at, cancelled_at, pause_until, metadata, created_at, updated_at
-	          FROM subscriptions WHERE true`
+	query := `SELECT s.id, s.customer_id, s.plan_id, s.variant_id, s.quantity, s.status, s.shipping_address_id,
+	                 s.stripe_payment_method_id,
+	                 s.current_period_start, s.current_period_end, s.next_order_at,
+	                 s.ends_at, s.cancelled_at, s.pause_until, s.metadata, s.created_at, s.updated_at
+	          FROM subscriptions s`
 	args := []any{}
 	argN := 1
 
+	if f.CustomerQuery != "" {
+		query += " JOIN customers c ON c.id = s.customer_id"
+	}
+	query += " WHERE true"
+
 	if f.Status != nil {
-		query += fmt.Sprintf(" AND status = $%d", argN)
+		query += fmt.Sprintf(" AND s.status = $%d", argN)
 		args = append(args, string(*f.Status))
 		argN++
 	}
 
-	query += " ORDER BY created_at DESC"
+	if f.CustomerQuery != "" {
+		query += fmt.Sprintf(" AND (c.email ILIKE $%d OR c.first_name ILIKE $%d OR c.last_name ILIKE $%d OR (c.first_name || ' ' || c.last_name) ILIKE $%d OR c.company_name ILIKE $%d)", argN, argN, argN, argN, argN)
+		args = append(args, "%"+f.CustomerQuery+"%")
+		argN++
+	}
+
+	query += " ORDER BY s.created_at DESC"
 
 	limit := f.Limit
 	if limit <= 0 {

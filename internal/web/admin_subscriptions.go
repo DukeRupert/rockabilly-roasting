@@ -19,6 +19,7 @@ func (d *Deps) handleAdminSubscriptionList(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 
 	statusFilter := r.URL.Query().Get("status")
+	searchQuery := strings.TrimSpace(r.URL.Query().Get("q"))
 	pageStr := r.URL.Query().Get("page")
 
 	page := 1
@@ -28,8 +29,9 @@ func (d *Deps) handleAdminSubscriptionList(w http.ResponseWriter, r *http.Reques
 
 	perPage := 25
 	filter := store.SubscriptionFilter{
-		Limit:  perPage + 1,
-		Offset: (page - 1) * perPage,
+		CustomerQuery: searchQuery,
+		Limit:         perPage + 1,
+		Offset:        (page - 1) * perPage,
 	}
 
 	if statusFilter != "" {
@@ -101,6 +103,7 @@ func (d *Deps) handleAdminSubscriptionList(w http.ResponseWriter, r *http.Reques
 	props := admin.SubscriptionListProps{
 		Subscriptions: enriched,
 		StatusFilter:  statusFilter,
+		SearchQuery:   searchQuery,
 		Page:          page,
 		PerPage:       perPage,
 		HasMore:       hasMore,

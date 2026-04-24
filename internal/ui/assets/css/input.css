@@ -132,10 +132,10 @@ html {
 	--radius: 0.125rem;
 }
 
-/* Flame stripe — brand signature divider */
+/* Flame stripe — brand signature divider (paper-and-ink palette) */
 .flame-stripe {
 	height: 3px;
-	background: linear-gradient(90deg, #7A1210, #B82018, #E8921A, #B82018, #7A1210);
+	background: linear-gradient(90deg, var(--color-rust-deep), var(--color-rust), var(--color-candle), var(--color-rust), var(--color-rust-deep));
 }
 
 /* Amber focus ring for inputs */

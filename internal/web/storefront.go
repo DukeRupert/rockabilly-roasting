@@ -783,13 +783,16 @@ func (d *Deps) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(body)) //nolint:errcheck
 }
 
-// handleSitemapXML serves a sitemap with static pages and product URLs.
+// handleSitemapXML serves a sitemap with static pages, help articles, and
+// product URLs. Products carry a <lastmod> derived from their UpdatedAt
+// timestamp so crawlers prioritize freshly edited pages.
 func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	base := strings.TrimRight(d.BaseURL, "/")
 
 	type sitemapURL struct {
 		Loc        string
+		LastMod    string // ISO-8601 date; empty means omit
 		ChangeFreq string
 		Priority   string
 	}
@@ -801,12 +804,22 @@ func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
 		{Loc: base + "/subscriptions", ChangeFreq: "weekly", Priority: "0.8"},
 		{Loc: base + "/wholesale", ChangeFreq: "monthly", Priority: "0.6"},
 		{Loc: base + "/about", ChangeFreq: "monthly", Priority: "0.5"},
+		{Loc: base + "/help", ChangeFreq: "monthly", Priority: "0.4"},
 		{Loc: base + "/shipping", ChangeFreq: "monthly", Priority: "0.4"},
 		{Loc: base + "/privacy", ChangeFreq: "yearly", Priority: "0.2"},
 		{Loc: base + "/terms", ChangeFreq: "yearly", Priority: "0.2"},
 	}
 
-	// Add active product pages
+	// Help articles
+	for _, art := range d.HelpRegistry.TOC("storefront") {
+		urls = append(urls, sitemapURL{
+			Loc:        base + "/help/" + art.Slug,
+			ChangeFreq: "monthly",
+			Priority:   "0.3",
+		})
+	}
+
+	// Active product pages
 	activeStatus := domain.ProductStatusActive
 	filter := store.ProductFilter{
 		Status: &activeStatus,
@@ -825,6 +838,7 @@ func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
 	for _, p := range products {
 		urls = append(urls, sitemapURL{
 			Loc:        base + "/catalog/" + p.Slug,
+			LastMod:    p.UpdatedAt.UTC().Format("2006-01-02"),
 			ChangeFreq: "weekly",
 			Priority:   "0.8",
 		})
@@ -834,7 +848,11 @@ func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?>`)
 	fmt.Fprint(w, `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
 	for _, u := range urls {
-		fmt.Fprintf(w, `<url><loc>%s</loc><changefreq>%s</changefreq><priority>%s</priority></url>`, u.Loc, u.ChangeFreq, u.Priority)
+		fmt.Fprint(w, `<url><loc>`+u.Loc+`</loc>`)
+		if u.LastMod != "" {
+			fmt.Fprint(w, `<lastmod>`+u.LastMod+`</lastmod>`)
+		}
+		fmt.Fprintf(w, `<changefreq>%s</changefreq><priority>%s</priority></url>`, u.ChangeFreq, u.Priority)
 	}
 	fmt.Fprint(w, `</urlset>`)
 }

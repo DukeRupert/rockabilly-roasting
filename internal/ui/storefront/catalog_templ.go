@@ -689,7 +689,7 @@ func productCardPaper(card ProductCard) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" class=\"h-full w-full object-cover object-center\" loading=\"lazy\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" width=\"800\" height=\"800\" class=\"h-full w-full object-cover object-center\" loading=\"lazy\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -701,7 +701,7 @@ func productCardPaper(card ProductCard) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(card.Product.Title)[0:1]))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 370, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 372, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
@@ -744,7 +744,7 @@ func productCardPaper(card ProductCard) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(card.Coffee.Regions[0])
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 397, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 399, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -762,7 +762,7 @@ func productCardPaper(card ProductCard) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(roastLevelLabel(card.Coffee.RoastLevel))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 401, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 403, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -780,7 +780,7 @@ func productCardPaper(card ProductCard) templ.Component {
 		var templ_7745c5c3_Var30 string
 		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(card.Product.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 406, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 408, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
@@ -803,7 +803,7 @@ func productCardPaper(card ProductCard) templ.Component {
 				var templ_7745c5c3_Var31 string
 				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(note)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 413, Col: 13}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 415, Col: 13}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 				if templ_7745c5c3_Err != nil {
@@ -831,7 +831,7 @@ func productCardPaper(card ProductCard) templ.Component {
 			var templ_7745c5c3_Var32 string
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(*card.BasePrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 422, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 424, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 			if templ_7745c5c3_Err != nil {
@@ -903,7 +903,7 @@ func roastDots(level string, size string) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(roastLevelLabel(level) + " roast")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 441, Col: 151}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 443, Col: 151}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -1074,7 +1074,7 @@ func catalogSidebar(props CatalogPageProps) templ.Component {
 			var templ_7745c5c3_Var46 templ.SafeURL
 			templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, 1, nil)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 491, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 493, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 			if templ_7745c5c3_Err != nil {
@@ -1087,7 +1087,7 @@ func catalogSidebar(props CatalogPageProps) templ.Component {
 			var templ_7745c5c3_Var47 string
 			templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(catalogURL(props.ActiveTaxon, props.Search, 1, nil))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 492, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 494, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 			if templ_7745c5c3_Err != nil {
@@ -1166,7 +1166,7 @@ func roastLevelFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 		var templ_7745c5c3_Var49 string
 		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(f.Key.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 523, Col: 127}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 525, Col: 127}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 		if templ_7745c5c3_Err != nil {
@@ -1184,7 +1184,7 @@ func roastLevelFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 			var templ_7745c5c3_Var50 templ.SafeURL
 			templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(filterSingleSelectURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 528, Col: 119}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 530, Col: 119}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 			if templ_7745c5c3_Err != nil {
@@ -1197,7 +1197,7 @@ func roastLevelFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 			var templ_7745c5c3_Var51 string
 			templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(filterSingleSelectURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 529, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 531, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 			if templ_7745c5c3_Err != nil {
@@ -1210,7 +1210,7 @@ func roastLevelFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 			var templ_7745c5c3_Var52 string
 			templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(boolAttr(isFilterActive(props.ActiveFilters, f.Key.Slug, val)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 535, Col: 82}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 537, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 			if templ_7745c5c3_Err != nil {
@@ -1223,7 +1223,7 @@ func roastLevelFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 			var templ_7745c5c3_Var53 string
 			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(formatFilterValue(val) + " roast")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 536, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 538, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 			if templ_7745c5c3_Err != nil {
@@ -1268,7 +1268,7 @@ func roastLevelFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 			var templ_7745c5c3_Var56 string
 			templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(formatFilterValue(f.ActiveValues[0]))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 544, Col: 88}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 546, Col: 88}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 			if templ_7745c5c3_Err != nil {
@@ -1316,7 +1316,7 @@ func checkboxFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 		var templ_7745c5c3_Var58 string
 		templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(f.Key.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 552, Col: 127}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 554, Col: 127}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 		if templ_7745c5c3_Err != nil {
@@ -1339,7 +1339,7 @@ func checkboxFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 			var templ_7745c5c3_Var60 templ.SafeURL
 			templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 556, Col: 113}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 558, Col: 113}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 			if templ_7745c5c3_Err != nil {
@@ -1352,7 +1352,7 @@ func checkboxFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 			var templ_7745c5c3_Var61 string
 			templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 557, Col: 100}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 559, Col: 100}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 			if templ_7745c5c3_Err != nil {
@@ -1410,7 +1410,7 @@ func checkboxFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 			var templ_7745c5c3_Var65 string
 			templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(formatFilterValue(val))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 570, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 572, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 			if templ_7745c5c3_Err != nil {
@@ -1463,7 +1463,7 @@ func booleanFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 		var templ_7745c5c3_Var68 templ.SafeURL
 		templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, "true")))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 580, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 582, Col: 113}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 		if templ_7745c5c3_Err != nil {
@@ -1476,7 +1476,7 @@ func booleanFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 		var templ_7745c5c3_Var69 string
 		templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, "true"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 581, Col: 100}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 583, Col: 100}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 		if templ_7745c5c3_Err != nil {
@@ -1534,7 +1534,7 @@ func booleanFilter(props CatalogPageProps, f CatalogFilter) templ.Component {
 		var templ_7745c5c3_Var73 string
 		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(f.Key.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 594, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 596, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 		if templ_7745c5c3_Err != nil {
@@ -1604,7 +1604,7 @@ func mobileFilterButton(props CatalogPageProps) templ.Component {
 			var templ_7745c5c3_Var77 string
 			templ_7745c5c3_Var77, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", countActiveFilters(props.ActiveFilters)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 613, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 615, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var77))
 			if templ_7745c5c3_Err != nil {
@@ -1680,7 +1680,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 				var templ_7745c5c3_Var80 templ.SafeURL
 				templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, "true")))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 640, Col: 119}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 642, Col: 119}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 				if templ_7745c5c3_Err != nil {
@@ -1693,7 +1693,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 				var templ_7745c5c3_Var81 string
 				templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, "true"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 641, Col: 106}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 643, Col: 106}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 				if templ_7745c5c3_Err != nil {
@@ -1751,7 +1751,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 				var templ_7745c5c3_Var85 string
 				templ_7745c5c3_Var85, templ_7745c5c3_Err = templ.JoinStringErrs(f.Key.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 654, Col: 112}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 656, Col: 112}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var85))
 				if templ_7745c5c3_Err != nil {
@@ -1779,7 +1779,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 				var templ_7745c5c3_Var86 string
 				templ_7745c5c3_Var86, templ_7745c5c3_Err = templ.JoinStringErrs(f.Key.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 661, Col: 21}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 663, Col: 21}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var86))
 				if templ_7745c5c3_Err != nil {
@@ -1797,7 +1797,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 					var templ_7745c5c3_Var87 string
 					templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(f.ActiveValues)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 663, Col: 80}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 665, Col: 80}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 					if templ_7745c5c3_Err != nil {
@@ -1825,7 +1825,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 					var templ_7745c5c3_Var89 templ.SafeURL
 					templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 673, Col: 118}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 675, Col: 118}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var89))
 					if templ_7745c5c3_Err != nil {
@@ -1838,7 +1838,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 					var templ_7745c5c3_Var90 string
 					templ_7745c5c3_Var90, templ_7745c5c3_Err = templ.JoinStringErrs(filterToggleURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 674, Col: 105}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 676, Col: 105}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var90))
 					if templ_7745c5c3_Err != nil {
@@ -1896,7 +1896,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 					var templ_7745c5c3_Var94 string
 					templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.JoinStringErrs(formatFilterValue(val))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 687, Col: 34}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 689, Col: 34}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var94))
 					if templ_7745c5c3_Err != nil {
@@ -1925,7 +1925,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 			var templ_7745c5c3_Var95 templ.SafeURL
 			templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(catalogURL(props.ActiveTaxon, props.Search, 1, nil)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 698, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 700, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var95))
 			if templ_7745c5c3_Err != nil {
@@ -1938,7 +1938,7 @@ func mobileFilterDrawer(props CatalogPageProps) templ.Component {
 			var templ_7745c5c3_Var96 string
 			templ_7745c5c3_Var96, templ_7745c5c3_Err = templ.JoinStringErrs(catalogURL(props.ActiveTaxon, props.Search, 1, nil))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 699, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 701, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var96))
 			if templ_7745c5c3_Err != nil {
@@ -1996,7 +1996,7 @@ func activeFilterTags(props CatalogPageProps) templ.Component {
 				var templ_7745c5c3_Var98 templ.SafeURL
 				templ_7745c5c3_Var98, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(filterRemoveURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 724, Col: 113}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 726, Col: 113}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var98))
 				if templ_7745c5c3_Err != nil {
@@ -2009,7 +2009,7 @@ func activeFilterTags(props CatalogPageProps) templ.Component {
 				var templ_7745c5c3_Var99 string
 				templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinStringErrs(filterRemoveURL(props.ActiveTaxon, props.Search, props.ActiveFilters, f.Key.Slug, val))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 725, Col: 100}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 727, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 				if templ_7745c5c3_Err != nil {
@@ -2022,7 +2022,7 @@ func activeFilterTags(props CatalogPageProps) templ.Component {
 				var templ_7745c5c3_Var100 string
 				templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinStringErrs(f.Key.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 732, Col: 17}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 734, Col: 17}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 				if templ_7745c5c3_Err != nil {
@@ -2035,7 +2035,7 @@ func activeFilterTags(props CatalogPageProps) templ.Component {
 				var templ_7745c5c3_Var101 string
 				templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinStringErrs(formatFilterValue(val))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 732, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/catalog.templ`, Line: 734, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 				if templ_7745c5c3_Err != nil {

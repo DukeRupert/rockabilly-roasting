@@ -125,12 +125,16 @@ templ HomeContent(props HomePageProps) {
 								<img
 									src={ props.HeroImageURL }
 									alt={ props.FeaturedProduct.Product.Title }
+									width="1200"
+									height="900"
 									class="absolute inset-0 w-full h-full object-cover object-center"
 								/>
 							} else if props.FeaturedProduct.ThumbnailURL != "" {
 								<img
 									src={ props.FeaturedProduct.ThumbnailURL }
 									alt={ props.FeaturedProduct.Product.Title }
+									width="1200"
+									height="900"
 									class="absolute inset-0 w-full h-full object-cover object-center"
 								/>
 							}
@@ -297,6 +301,9 @@ templ HomeContent(props HomePageProps) {
 					<img
 						src="/static/rockabilly_cafe.webp"
 						alt="Inside Rockabilly Roasting Co. in Kennewick, WA"
+						width="900"
+						height="1125"
+						loading="lazy"
 						class="absolute inset-0 w-full h-full object-cover object-center"
 					/>
 					<!-- Tilted rust "EST. 2014" stamp, bottom-right -->

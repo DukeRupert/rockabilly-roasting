@@ -93,7 +93,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"absolute inset-0 w-full h-full object-cover object-center\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" width=\"1200\" height=\"900\" class=\"absolute inset-0 w-full h-full object-cover object-center\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -105,7 +105,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.ThumbnailURL)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 132, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 134, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -118,13 +118,13 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.Product.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 133, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 135, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" class=\"absolute inset-0 w-full h-full object-cover object-center\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" width=\"1200\" height=\"900\" class=\"absolute inset-0 w-full h-full object-cover object-center\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -141,7 +141,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(props.FeaturedProduct.Coffee.Regions, " · "))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 151, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 155, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -159,7 +159,7 @@ func HomeContent(props HomePageProps) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.Product.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 155, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 159, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -177,7 +177,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.Product.Description)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 159, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 163, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -201,7 +201,7 @@ func HomeContent(props HomePageProps) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(note)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 166, Col: 17}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 170, Col: 17}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -242,7 +242,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<!-- About / Visit — paper editorial close --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24\"><div class=\"grid md:grid-cols-2 gap-10 lg:gap-16 items-center\"><!-- Photo panel — ink-bordered with stamp shadow and tilted stamp sticker --><div class=\"relative border-2 border-ink bg-paper-warm shadow-stamp overflow-hidden aspect-[4/5] md:aspect-[3/4]\"><img src=\"/static/rockabilly_cafe.webp\" alt=\"Inside Rockabilly Roasting Co. in Kennewick, WA\" class=\"absolute inset-0 w-full h-full object-cover object-center\"><!-- Tilted rust \"EST. 2014\" stamp, bottom-right --><div class=\"absolute bottom-5 right-5 pointer-events-none\"><span class=\"inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust\" style=\"letter-spacing:0.2em; text-transform:uppercase; transform:rotate(-4deg); outline:2px solid var(--color-rust); outline-offset:2px;\">Est. 2014</span></div></div><!-- Content --><div><p class=\"font-oswald text-chrome-deep text-xs sm:text-sm font-semibold mb-5\" style=\"letter-spacing:0.3em; text-transform:uppercase;\">Kennewick, WA</p><h2 class=\"font-slab text-ink uppercase leading-[0.92]\" style=\"font-size: clamp(2.25rem, 5.5vw, 4rem); letter-spacing:-0.005em;\">Coffee with <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">character.</span></h2><p class=\"font-oswald text-ink-soft text-base sm:text-lg leading-relaxed mt-6 max-w-md\">Small-batch roaster on West Kennewick Ave. Specialty-grade beans from around the world, roasted on the drum in-house, shipped fresh — no shelves, no shortcuts, no middleman. Come by for a pour, or have us send one your way.</p><!-- Address + hours stripe: ink double-rule --><div class=\"mt-8 border-t-2 border-b-2 border-ink py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2\"><div class=\"font-oswald text-sm text-ink\" style=\"letter-spacing:0.08em; text-transform:uppercase;\">101 W. Kennewick Ave</div><div class=\"font-special text-ink-soft text-sm\">6am – 2pm · Mon – Thu</div></div><!-- CTAs --><div class=\"mt-8 flex flex-wrap gap-4 items-center\"><a href=\"/about\" class=\"btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Visit the cafe <svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a> <a href=\"/catalog\" class=\"btn inline-flex items-center gap-2 bg-transparent text-ink border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm hover:bg-ink hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shop coffee</a></div></div></div></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<!-- About / Visit — paper editorial close --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24\"><div class=\"grid md:grid-cols-2 gap-10 lg:gap-16 items-center\"><!-- Photo panel — ink-bordered with stamp shadow and tilted stamp sticker --><div class=\"relative border-2 border-ink bg-paper-warm shadow-stamp overflow-hidden aspect-[4/5] md:aspect-[3/4]\"><img src=\"/static/rockabilly_cafe.webp\" alt=\"Inside Rockabilly Roasting Co. in Kennewick, WA\" width=\"900\" height=\"1125\" loading=\"lazy\" class=\"absolute inset-0 w-full h-full object-cover object-center\"><!-- Tilted rust \"EST. 2014\" stamp, bottom-right --><div class=\"absolute bottom-5 right-5 pointer-events-none\"><span class=\"inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust\" style=\"letter-spacing:0.2em; text-transform:uppercase; transform:rotate(-4deg); outline:2px solid var(--color-rust); outline-offset:2px;\">Est. 2014</span></div></div><!-- Content --><div><p class=\"font-oswald text-chrome-deep text-xs sm:text-sm font-semibold mb-5\" style=\"letter-spacing:0.3em; text-transform:uppercase;\">Kennewick, WA</p><h2 class=\"font-slab text-ink uppercase leading-[0.92]\" style=\"font-size: clamp(2.25rem, 5.5vw, 4rem); letter-spacing:-0.005em;\">Coffee with <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">character.</span></h2><p class=\"font-oswald text-ink-soft text-base sm:text-lg leading-relaxed mt-6 max-w-md\">Small-batch roaster on West Kennewick Ave. Specialty-grade beans from around the world, roasted on the drum in-house, shipped fresh — no shelves, no shortcuts, no middleman. Come by for a pour, or have us send one your way.</p><!-- Address + hours stripe: ink double-rule --><div class=\"mt-8 border-t-2 border-b-2 border-ink py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2\"><div class=\"font-oswald text-sm text-ink\" style=\"letter-spacing:0.08em; text-transform:uppercase;\">101 W. Kennewick Ave</div><div class=\"font-special text-ink-soft text-sm\">6am – 2pm · Mon – Thu</div></div><!-- CTAs --><div class=\"mt-8 flex flex-wrap gap-4 items-center\"><a href=\"/about\" class=\"btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Visit the cafe <svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a> <a href=\"/catalog\" class=\"btn inline-flex items-center gap-2 bg-transparent text-ink border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm hover:bg-ink hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shop coffee</a></div></div></div></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

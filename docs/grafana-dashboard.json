@@ -1,0 +1,471 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "Prometheus",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "liveNow": false,
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["hiri", "rockabilly-roasting"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "hiri-prod", "value": "hiri-prod" },
+        "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+        "definition": "label_values(up, job)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Job",
+        "multi": false,
+        "name": "job",
+        "options": [],
+        "query": { "query": "label_values(up, job)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Rockabilly Roasting — Hiri",
+  "uid": "hiri-rockabilly",
+  "version": 1,
+  "weekStart": "",
+  "panels": [
+    {
+      "type": "row",
+      "title": "HTTP",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false,
+      "id": 100,
+      "panels": []
+    },
+    {
+      "id": 1,
+      "title": "Requests per second (by status)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (status_code) (rate(http_requests_total{job=\"$job\"}[1m]))",
+          "legendFormat": "{{status_code}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "p95 latency by route",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, path_pattern) (rate(http_request_duration_seconds_bucket{job=\"$job\"}[5m])))",
+          "legendFormat": "{{path_pattern}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Requests in flight",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "http_requests_in_flight{job=\"$job\"}",
+          "legendFormat": "in flight",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Error rate (5xx)",
+      "type": "timeseries",
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(http_requests_total{job=\"$job\",status_code=~\"5..\"}[5m])) / sum(rate(http_requests_total{job=\"$job\"}[5m]))",
+          "legendFormat": "5xx rate",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Top 5 slowest routes (p95)",
+      "type": "bargauge",
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 9 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "orientation": "horizontal", "displayMode": "gradient", "showUnfilled": true },
+      "targets": [
+        {
+          "expr": "topk(5, histogram_quantile(0.95, sum by (le, path_pattern) (rate(http_request_duration_seconds_bucket{job=\"$job\"}[5m]))))",
+          "legendFormat": "{{path_pattern}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Database",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "collapsed": false,
+      "id": 101,
+      "panels": []
+    },
+    {
+      "id": 6,
+      "title": "Pool connections (open / idle)",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "db_pool_open_connections{job=\"$job\"}", "legendFormat": "open", "refId": "A" },
+        { "expr": "db_pool_idle_connections{job=\"$job\"}", "legendFormat": "idle", "refId": "B" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Query p95 by query_name",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, query_name) (rate(db_query_duration_seconds_bucket{job=\"$job\"}[5m])))",
+          "legendFormat": "{{query_name}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Jobs (River)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false,
+      "id": 102,
+      "panels": []
+    },
+    {
+      "id": 8,
+      "title": "Pending queue depth by kind / state",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (job_kind, state) (river_jobs_pending{job=\"$job\"})",
+          "legendFormat": "{{job_kind}} / {{state}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Job completion vs failure rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (job_kind) (rate(river_jobs_completed_total{job=\"$job\"}[5m]))",
+          "legendFormat": "✓ {{job_kind}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (job_kind) (rate(river_jobs_failed_total{job=\"$job\"}[5m]))",
+          "legendFormat": "✗ {{job_kind}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Checkout",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "collapsed": false,
+      "id": 103,
+      "panels": []
+    },
+    {
+      "id": 10,
+      "title": "Funnel (per 5m)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 33 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "sum(rate(checkout_started_total{job=\"$job\"}[5m])) * 300", "legendFormat": "started", "refId": "A" },
+        { "expr": "sum(rate(checkout_completed_total{job=\"$job\"}[5m])) * 300", "legendFormat": "completed", "refId": "B" },
+        { "expr": "sum(rate(checkout_failed_total{job=\"$job\"}[5m])) * 300", "legendFormat": "failed", "refId": "C" }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Conversion rate (1h)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 33 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "green", "value": 0.7 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "textMode": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [
+        {
+          "expr": "sum(rate(checkout_completed_total{job=\"$job\"}[1h])) / sum(rate(checkout_started_total{job=\"$job\"}[1h]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Failures by reason",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 33 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }, "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false } },
+      "targets": [
+        {
+          "expr": "sum by (failure_reason) (rate(checkout_failed_total{job=\"$job\"}[1h]))",
+          "legendFormat": "{{failure_reason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Coupons (applied vs rejected)",
+      "type": "timeseries",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 37 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        { "expr": "rate(coupon_applied_total{job=\"$job\"}[5m])", "legendFormat": "applied", "refId": "A" },
+        { "expr": "sum(rate(coupon_rejected_total{job=\"$job\"}[5m]))", "legendFormat": "rejected", "refId": "B" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Subscriptions",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "collapsed": false,
+      "id": 104,
+      "panels": []
+    },
+    {
+      "id": 14,
+      "title": "Active",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 42 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "expr": "subscriptions_active_total{job=\"$job\"}", "refId": "A" }]
+    },
+    {
+      "id": 15,
+      "title": "Paused",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 42 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "yellow" } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "expr": "subscriptions_paused_total{job=\"$job\"}", "refId": "A" }]
+    },
+    {
+      "id": 16,
+      "title": "Cancelled",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 42 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "red" } }, "overrides": [] },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [{ "expr": "subscriptions_cancelled_total{job=\"$job\"}", "refId": "A" }]
+    },
+    {
+      "id": 17,
+      "title": "Renewal outcomes (per 1h)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (result) (rate(subscription_renewals_total{job=\"$job\"}[1h])) * 3600",
+          "legendFormat": "{{result}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "title": "Renewal success rate (24h)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 46 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.9 },
+              { "color": "green", "value": 0.97 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [
+        {
+          "expr": "sum(rate(subscription_renewals_total{job=\"$job\",result=\"success\"}[24h])) / sum(rate(subscription_renewals_total{job=\"$job\"}[24h]))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Stripe Webhooks",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
+      "collapsed": false,
+      "id": 105,
+      "panels": []
+    },
+    {
+      "id": 19,
+      "title": "Received by event_type",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 51 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (event_type) (rate(stripe_webhooks_received_total{job=\"$job\"}[5m]))",
+          "legendFormat": "{{event_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "title": "Processing failures by event_type",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 51 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (event_type) (rate(stripe_webhooks_processed_total{job=\"$job\",result=\"failed\"}[5m]))",
+          "legendFormat": "{{event_type}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Email & Rate Limiting",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 58 },
+      "collapsed": false,
+      "id": 106,
+      "panels": []
+    },
+    {
+      "id": 21,
+      "title": "Emails sent by kind / status",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 59 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (kind, status) (rate(emails_sent_total{job=\"$job\"}[5m]))",
+          "legendFormat": "{{kind}} / {{status}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "title": "Rate limit hits by config",
+      "type": "timeseries",
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 59 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "options": { "legend": { "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi" } },
+      "targets": [
+        {
+          "expr": "sum by (config) (rate(rate_limit_hits_total{job=\"$job\"}[5m]))",
+          "legendFormat": "{{config}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

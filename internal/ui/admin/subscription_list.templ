@@ -6,8 +6,15 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
+type EnrichedSubscription struct {
+	domain.Subscription
+	CustomerName  string
+	CustomerEmail string
+	PlanName      string
+}
+
 type SubscriptionListProps struct {
-	Subscriptions []domain.Subscription
+	Subscriptions []EnrichedSubscription
 	StatusFilter  string
 	Page          int
 	PerPage       int
@@ -59,7 +66,8 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">ID</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Customer</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Plan</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Next Order</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Created</th>
@@ -68,10 +76,23 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, sub := range props.Subscriptions {
 							<tr class="row-link">
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", sub.ID.String())) } class="row-link-target text-rr-red hover:text-rr-red-lt">
-										{ sub.ID.String()[:8] }...
+								<td class="py-4 pl-4 pr-3 text-sm sm:pl-6">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", sub.ID.String())) } class="row-link-target font-medium text-rr-red hover:text-rr-red-lt">
+										if sub.CustomerName != "" {
+											{ sub.CustomerName }
+										} else {
+											{ sub.CustomerEmail }
+										}
 									</a>
+									if sub.CustomerName != "" && sub.CustomerEmail != "" {
+										<div class="text-xs text-rr-muted">{ sub.CustomerEmail }</div>
+									}
+								</td>
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-heading md:table-cell">
+									{ sub.PlanName }
+									if sub.Quantity > 1 {
+										<span class="text-rr-muted">&times;{ fmt.Sprintf("%d", sub.Quantity) }</span>
+									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									@SubscriptionStatusBadge(sub.Status)

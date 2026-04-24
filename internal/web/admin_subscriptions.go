@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -37,25 +38,68 @@ func (d *Deps) handleAdminSubscriptionList(w http.ResponseWriter, r *http.Reques
 	}
 
 	var subscriptions []domain.Subscription
+	var enriched []admin.EnrichedSubscription
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		subscriptions, txErr = d.SubscriptionService.ListSubscriptions(ctx, tx, filter)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+
+		planNames := map[uuid.UUID]string{}
+		customerInfo := map[uuid.UUID]struct {
+			Name  string
+			Email string
+		}{}
+
+		for _, sub := range subscriptions {
+			if _, ok := planNames[sub.PlanID]; !ok {
+				if plan, pErr := d.SubscriptionService.GetPlan(ctx, tx, sub.PlanID); pErr == nil {
+					planNames[sub.PlanID] = plan.Name
+				} else {
+					planNames[sub.PlanID] = ""
+				}
+			}
+			if _, ok := customerInfo[sub.CustomerID]; !ok {
+				if cust, cErr := d.CustomerService.GetCustomer(ctx, tx, sub.CustomerID); cErr == nil {
+					name := strings.TrimSpace(cust.FirstName + " " + cust.LastName)
+					if name == "" && cust.CompanyName != nil {
+						name = *cust.CompanyName
+					}
+					customerInfo[sub.CustomerID] = struct {
+						Name  string
+						Email string
+					}{Name: name, Email: cust.Email}
+				}
+			}
+		}
+
+		enriched = make([]admin.EnrichedSubscription, len(subscriptions))
+		for i, sub := range subscriptions {
+			info := customerInfo[sub.CustomerID]
+			enriched[i] = admin.EnrichedSubscription{
+				Subscription:  sub,
+				CustomerName:  info.Name,
+				CustomerEmail: info.Email,
+				PlanName:      planNames[sub.PlanID],
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
 		return
 	}
 
-	hasMore := len(subscriptions) > perPage
+	hasMore := len(enriched) > perPage
 	if hasMore {
-		subscriptions = subscriptions[:perPage]
+		enriched = enriched[:perPage]
 	}
 
 	name, role := staffNameRole(r)
 	props := admin.SubscriptionListProps{
-		Subscriptions: subscriptions,
+		Subscriptions: enriched,
 		StatusFilter:  statusFilter,
 		Page:          page,
 		PerPage:       perPage,

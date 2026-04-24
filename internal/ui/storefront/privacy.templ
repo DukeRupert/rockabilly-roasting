@@ -7,64 +7,59 @@ type PrivacyProps struct {
 }
 
 templ PrivacyContent(props PrivacyProps) {
-	<div class="mx-auto max-w-3xl py-8">
-		<h1 class="font-display text-3xl text-rr-heading tracking-wide mb-8">PRIVACY POLICY</h1>
-		<p class="font-body text-sm text-rr-muted mb-8">Last updated: March 2026</p>
-
-		<div class="space-y-8 font-body text-sm text-rr-body leading-relaxed">
-			<section>
-				<h2 class="label-font text-rr-heading text-xs mb-3">WHAT WE COLLECT</h2>
-				<p>When you place an order, we collect the information needed to fulfill it: your name, email, shipping address, and payment details. Payment is processed by Stripe — we never see or store your full card number.</p>
-				<p class="mt-3">If you create an account or subscribe, we store your email and order history so you can manage your purchases.</p>
-			</section>
-
-			<section>
-				<h2 class="label-font text-rr-heading text-xs mb-3">ANALYTICS</h2>
-				<p>We use <a href="https://plausible.io" class="text-rr-red hover:text-rr-red-lt underline">Plausible Analytics</a>, a privacy-focused analytics tool. Plausible does not use cookies, does not collect personal data, and does not track you across sites. All data is aggregated — we see page view counts, not individual visitors.</p>
-			</section>
-
-			<section>
-				<h2 class="label-font text-rr-heading text-xs mb-3">HOW WE USE YOUR INFORMATION</h2>
-				<ul class="list-disc list-inside space-y-1.5 text-rr-body">
-					<li>To fulfill and ship your orders</li>
-					<li>To send order confirmations and shipping updates</li>
-					<li>To process returns or resolve issues</li>
-					<li>To send subscription-related emails (if you subscribe)</li>
-				</ul>
-				<p class="mt-3">We do not sell your data. We do not send marketing emails unless you opt in.</p>
-			</section>
-
-			<section>
-				<h2 class="label-font text-rr-heading text-xs mb-3">THIRD-PARTY SERVICES</h2>
-				<p>We share only what is necessary with the following services:</p>
-				<ul class="list-disc list-inside space-y-1.5 mt-3 text-rr-body">
-					<li><strong class="text-rr-heading">Stripe</strong> — payment processing</li>
-					<li><strong class="text-rr-heading">EasyPost</strong> — shipping label generation and tracking</li>
-					<li><strong class="text-rr-heading">Plausible</strong> — privacy-focused analytics (no personal data shared)</li>
-				</ul>
-			</section>
-
-			<section>
-				<h2 class="label-font text-rr-heading text-xs mb-3">COOKIES</h2>
-				<p>We use a session cookie to keep you logged in and to maintain your shopping cart. That is it. No tracking cookies, no third-party advertising cookies.</p>
-			</section>
-
-			<section>
-				<h2 class="label-font text-rr-heading text-xs mb-3">DATA RETENTION</h2>
-				<p>We keep order records as long as needed for tax and legal compliance. If you want your account deleted, contact us and we will take care of it.</p>
-			</section>
-
-			<section>
-				<h2 class="label-font text-rr-heading text-xs mb-3">CONTACT</h2>
-				<p>Questions about your data? Reach out.</p>
-				<p class="mt-2">
-					<a href="mailto:info@rockabillyroasting.com" class="text-rr-red hover:text-rr-red-lt underline">info@rockabillyroasting.com</a><br/>
-					509-585-2320<br/>
-					101 W. Kennewick Ave., Kennewick, WA
+	<!-- Full-bleed paper surface -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
+		<!-- Paper grain overlay -->
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-3xl px-6 sm:px-10 lg:px-14 py-12 sm:py-16">
+			<!-- Page heading -->
+			<header class="mb-12">
+				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+					How we handle your data
 				</p>
-			</section>
+				<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing:-0.005em;">
+					Privacy
+					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">policy.</span>
+				</h1>
+				<p class="font-special text-chrome-deep text-sm mt-4">Last updated: March 2026</p>
+			</header>
+			<!-- Legal body -->
+			<article class="space-y-10">
+				@legalSection("What we collect") {
+					<p>When you place an order, we collect the information needed to fulfill it: your name, email, shipping address, and payment details. Payment is processed by Stripe — we never see or store your full card number.</p>
+					<p>If you create an account or subscribe, we store your email and order history so you can manage your purchases.</p>
+				}
+				@legalSection("Analytics") {
+					<p>We use <a href="https://plausible.io" class="text-rust hover:text-rust-deep underline underline-offset-2">Plausible Analytics</a>, a privacy-focused analytics tool. Plausible doesn't use cookies, doesn't collect personal data, and doesn't track you across sites. All data is aggregated — we see page view counts, not individual visitors.</p>
+				}
+				@legalSection("How we use your information") {
+					<ul class="list-disc pl-5 space-y-2">
+						<li>To fulfill and ship your orders</li>
+						<li>To send order confirmations and shipping updates</li>
+						<li>To process returns or resolve issues</li>
+						<li>To send subscription-related emails (if you subscribe)</li>
+					</ul>
+					<p>We don't sell your data. We don't send marketing emails unless you opt in.</p>
+				}
+				@legalSection("Third-party services") {
+					<p>We share only what's necessary with the following services:</p>
+					<ul class="list-disc pl-5 space-y-2">
+						<li><strong class="font-oswald font-bold text-ink">Stripe</strong> — payment processing</li>
+						<li><strong class="font-oswald font-bold text-ink">EasyPost</strong> — shipping label generation and tracking</li>
+						<li><strong class="font-oswald font-bold text-ink">Plausible</strong> — privacy-focused analytics (no personal data shared)</li>
+					</ul>
+				}
+				@legalSection("Cookies") {
+					<p>We use a session cookie to keep you logged in and to maintain your shopping cart. That's it. No tracking cookies, no third-party advertising cookies.</p>
+				}
+				@legalSection("Data retention") {
+					<p>We keep order records as long as needed for tax and legal compliance. If you want your account deleted, contact us and we'll take care of it.</p>
+				}
+			</article>
+			<!-- Contact card -->
+			@legalContactCard()
 		</div>
-	</div>
+	</section>
 }
 
 templ PrivacyPage(props PrivacyProps) {

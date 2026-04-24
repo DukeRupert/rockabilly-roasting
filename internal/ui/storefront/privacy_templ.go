@@ -35,7 +35,151 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"mx-auto max-w-3xl py-8\"><h1 class=\"font-display text-3xl text-rr-heading tracking-wide mb-8\">PRIVACY POLICY</h1><p class=\"font-body text-sm text-rr-muted mb-8\">Last updated: March 2026</p><div class=\"space-y-8 font-body text-sm text-rr-body leading-relaxed\"><section><h2 class=\"label-font text-rr-heading text-xs mb-3\">WHAT WE COLLECT</h2><p>When you place an order, we collect the information needed to fulfill it: your name, email, shipping address, and payment details. Payment is processed by Stripe — we never see or store your full card number.</p><p class=\"mt-3\">If you create an account or subscribe, we store your email and order history so you can manage your purchases.</p></section><section><h2 class=\"label-font text-rr-heading text-xs mb-3\">ANALYTICS</h2><p>We use <a href=\"https://plausible.io\" class=\"text-rr-red hover:text-rr-red-lt underline\">Plausible Analytics</a>, a privacy-focused analytics tool. Plausible does not use cookies, does not collect personal data, and does not track you across sites. All data is aggregated — we see page view counts, not individual visitors.</p></section><section><h2 class=\"label-font text-rr-heading text-xs mb-3\">HOW WE USE YOUR INFORMATION</h2><ul class=\"list-disc list-inside space-y-1.5 text-rr-body\"><li>To fulfill and ship your orders</li><li>To send order confirmations and shipping updates</li><li>To process returns or resolve issues</li><li>To send subscription-related emails (if you subscribe)</li></ul><p class=\"mt-3\">We do not sell your data. We do not send marketing emails unless you opt in.</p></section><section><h2 class=\"label-font text-rr-heading text-xs mb-3\">THIRD-PARTY SERVICES</h2><p>We share only what is necessary with the following services:</p><ul class=\"list-disc list-inside space-y-1.5 mt-3 text-rr-body\"><li><strong class=\"text-rr-heading\">Stripe</strong> — payment processing</li><li><strong class=\"text-rr-heading\">EasyPost</strong> — shipping label generation and tracking</li><li><strong class=\"text-rr-heading\">Plausible</strong> — privacy-focused analytics (no personal data shared)</li></ul></section><section><h2 class=\"label-font text-rr-heading text-xs mb-3\">COOKIES</h2><p>We use a session cookie to keep you logged in and to maintain your shopping cart. That is it. No tracking cookies, no third-party advertising cookies.</p></section><section><h2 class=\"label-font text-rr-heading text-xs mb-3\">DATA RETENTION</h2><p>We keep order records as long as needed for tax and legal compliance. If you want your account deleted, contact us and we will take care of it.</p></section><section><h2 class=\"label-font text-rr-heading text-xs mb-3\">CONTACT</h2><p>Questions about your data? Reach out.</p><p class=\"mt-2\"><a href=\"mailto:info@rockabillyroasting.com\" class=\"text-rr-red hover:text-rr-red-lt underline\">info@rockabillyroasting.com</a><br>509-585-2320<br>101 W. Kennewick Ave., Kennewick, WA</p></section></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Full-bleed paper surface --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-3xl px-6 sm:px-10 lg:px-14 py-12 sm:py-16\"><!-- Page heading --><header class=\"mb-12\"><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">How we handle your data</p><h1 class=\"font-slab text-ink uppercase leading-[0.92] mt-2\" style=\"font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing:-0.005em;\">Privacy <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">policy.</span></h1><p class=\"font-special text-chrome-deep text-sm mt-4\">Last updated: March 2026</p></header><!-- Legal body --><article class=\"space-y-10\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var2 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p>When you place an order, we collect the information needed to fulfill it: your name, email, shipping address, and payment details. Payment is processed by Stripe — we never see or store your full card number.</p><p>If you create an account or subscribe, we store your email and order history so you can manage your purchases.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = legalSection("What we collect").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<p>We use <a href=\"https://plausible.io\" class=\"text-rust hover:text-rust-deep underline underline-offset-2\">Plausible Analytics</a>, a privacy-focused analytics tool. Plausible doesn't use cookies, doesn't collect personal data, and doesn't track you across sites. All data is aggregated — we see page view counts, not individual visitors.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = legalSection("Analytics").Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var4 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<ul class=\"list-disc pl-5 space-y-2\"><li>To fulfill and ship your orders</li><li>To send order confirmations and shipping updates</li><li>To process returns or resolve issues</li><li>To send subscription-related emails (if you subscribe)</li></ul><p>We don't sell your data. We don't send marketing emails unless you opt in.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = legalSection("How we use your information").Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p>We share only what's necessary with the following services:</p><ul class=\"list-disc pl-5 space-y-2\"><li><strong class=\"font-oswald font-bold text-ink\">Stripe</strong> — payment processing</li><li><strong class=\"font-oswald font-bold text-ink\">EasyPost</strong> — shipping label generation and tracking</li><li><strong class=\"font-oswald font-bold text-ink\">Plausible</strong> — privacy-focused analytics (no personal data shared)</li></ul>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = legalSection("Third-party services").Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p>We use a session cookie to keep you logged in and to maintain your shopping cart. That's it. No tracking cookies, no third-party advertising cookies.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = legalSection("Cookies").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var7 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<p>We keep order records as long as needed for tax and legal compliance. If you want your account deleted, contact us and we'll take care of it.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = legalSection("Data retention").Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</article><!-- Contact card -->")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = legalContactCard().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -59,12 +203,12 @@ func PrivacyPage(props PrivacyProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var2 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var2 == nil {
-			templ_7745c5c3_Var2 = templ.NopComponent
+		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var8 == nil {
+			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var9 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -86,7 +230,7 @@ func PrivacyPage(props PrivacyProps) templ.Component {
 			Title:       "Privacy Policy",
 			Description: "How Rockabilly Roasting Co. handles your data.",
 			CartCount:   props.CartCount,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

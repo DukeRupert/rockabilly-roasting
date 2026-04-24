@@ -290,8 +290,8 @@ func HomePage(props HomePageProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title:        "Fresh Roasted Coffee",
-			Description:  "Small-batch specialty coffee roasted fresh to order in Kennewick, WA.",
+			Title:        "Fresh Roasted Coffee in Kennewick, WA",
+			Description:  "Small-batch specialty coffee roasted fresh in Kennewick, WA. Whole bean, ground, and subscription delivery shipped the week it's roasted.",
 			CartCount:    props.CartCount,
 			CanonicalURL: props.CanonicalURL,
 			OGImage:      props.OGImage,

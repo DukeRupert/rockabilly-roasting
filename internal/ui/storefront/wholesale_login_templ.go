@@ -120,7 +120,8 @@ func WholesaleLoginPage(props WholesaleLoginProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title: "Wholesale Sign In",
+			Title:       "Wholesale Sign In",
+			Description: "Sign in to your Rockabilly Roasting Co. wholesale account to place orders and manage your business account.",
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

@@ -78,7 +78,8 @@ templ WholesaleLoginContent(props WholesaleLoginProps) {
 
 templ WholesaleLoginPage(props WholesaleLoginProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title: "Wholesale Sign In",
+		Title:       "Wholesale Sign In",
+		Description: "Sign in to your Rockabilly Roasting Co. wholesale account to place orders and manage your business account.",
 	}) {
 		@WholesaleLoginContent(props)
 	}

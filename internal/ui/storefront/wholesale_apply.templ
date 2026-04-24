@@ -77,8 +77,9 @@ templ WholesaleApplyContent(props WholesaleApplyProps) {
 
 templ WholesaleApplyPage(props WholesaleApplyProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title:     "Wholesale Application",
-		CartCount: props.CartCount,
+		Title:       "Wholesale Application",
+		Description: "Apply for a wholesale account with Rockabilly Roasting Co. Our team reviews every application and usually replies within a business day.",
+		CartCount:   props.CartCount,
 	}) {
 		@WholesaleApplyContent(props)
 	}

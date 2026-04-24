@@ -136,7 +136,8 @@ func WholesaleSetupPage(props WholesaleSetupProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title: "Set Your Password",
+			Title:       "Set Your Password",
+			Description: "Finish activating your Rockabilly Roasting Co. wholesale account.",
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

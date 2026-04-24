@@ -84,7 +84,8 @@ templ AccountLoginContent(props AccountLoginProps) {
 
 templ AccountLoginPage(props AccountLoginProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title: "Sign In",
+		Title:       "Sign In",
+		Description: "Sign in to your Rockabilly Roasting Co. account to manage orders, subscriptions, and addresses.",
 	}) {
 		@AccountLoginContent(props)
 	}
@@ -139,7 +140,8 @@ templ MagicLinkExpiredContent() {
 
 templ MagicLinkExpiredPage() {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title: "Link Expired",
+		Title:       "Link Expired",
+		Description: "Your sign-in link has expired or already been used. Request a fresh one.",
 	}) {
 		@MagicLinkExpiredContent()
 	}

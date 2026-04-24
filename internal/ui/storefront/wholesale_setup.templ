@@ -84,7 +84,8 @@ templ WholesaleSetupContent(props WholesaleSetupProps) {
 
 templ WholesaleSetupPage(props WholesaleSetupProps) {
 	@layouts.Storefront(layouts.StorefrontProps{
-		Title: "Set Your Password",
+		Title:       "Set Your Password",
+		Description: "Finish activating your Rockabilly Roasting Co. wholesale account.",
 	}) {
 		@WholesaleSetupContent(props)
 	}

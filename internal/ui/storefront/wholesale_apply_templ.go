@@ -83,8 +83,9 @@ func WholesaleApplyPage(props WholesaleApplyProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title:     "Wholesale Application",
-			CartCount: props.CartCount,
+			Title:       "Wholesale Application",
+			Description: "Apply for a wholesale account with Rockabilly Roasting Co. Our team reviews every application and usually replies within a business day.",
+			CartCount:   props.CartCount,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

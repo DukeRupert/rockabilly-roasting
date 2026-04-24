@@ -169,7 +169,8 @@ func AccountLoginPage(props AccountLoginProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title: "Sign In",
+			Title:       "Sign In",
+			Description: "Sign in to your Rockabilly Roasting Co. account to manage orders, subscriptions, and addresses.",
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -247,7 +248,8 @@ func MagicLinkExpiredPage() templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
-			Title: "Link Expired",
+			Title:       "Link Expired",
+			Description: "Your sign-in link has expired or already been used. Request a fresh one.",
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var10), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

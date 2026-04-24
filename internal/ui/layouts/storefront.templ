@@ -78,6 +78,8 @@ templ Storefront(props StorefrontProps) {
 				"image": "https://rockabillyroasting.com/static/rockabilly-logo.png",
 				"telephone": "+1-509-585-2320",
 				"email": "info@rockabillyroasting.com",
+				"priceRange": "$",
+				"servesCuisine": "Coffee",
 				"address": {
 					"@type": "PostalAddress",
 					"streetAddress": "101 W. Kennewick Ave.",
@@ -86,12 +88,20 @@ templ Storefront(props StorefrontProps) {
 					"postalCode": "99336",
 					"addressCountry": "US"
 				},
+				"geo": {
+					"@type": "GeoCoordinates",
+					"latitude": 46.2112,
+					"longitude": -119.1372
+				},
 				"openingHoursSpecification": [
 					{"@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday"], "opens": "07:00", "closes": "14:00"},
 					{"@type": "OpeningHoursSpecification", "dayOfWeek": "Friday", "opens": "07:00", "closes": "16:00"},
 					{"@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "08:00", "closes": "16:00"}
 				],
-				"sameAs": []
+				"sameAs": [
+					"https://www.facebook.com/rockabillyroasting/",
+					"https://www.instagram.com/rockabillyroasting/"
+				]
 			}
 			</script>
 			<link rel="icon" type="image/svg+xml" href="/static/rockabilly-logo.svg"/>

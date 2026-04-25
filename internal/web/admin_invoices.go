@@ -46,11 +46,12 @@ func (d *Deps) handleAdminInvoiceShow(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.InvoiceShowProps{
-		Invoice:   invoice,
-		Lines:     lines,
-		Payments:  payments,
-		StaffName: name,
-		StaffRole: role,
+		Invoice:    invoice,
+		Lines:      lines,
+		Payments:   payments,
+		MerchantTZ: d.MerchantTZ,
+		StaffName:  name,
+		StaffRole:  role,
 	}
 
 	if IsHTMX(r) {

@@ -2,16 +2,19 @@ package admin
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
 type InvoiceShowProps struct {
-	Invoice   *domain.Invoice
-	Lines     []domain.InvoiceLine
-	Payments  []domain.InvoicePayment
-	StaffName string
-	StaffRole string
+	Invoice    *domain.Invoice
+	Lines      []domain.InvoiceLine
+	Payments   []domain.InvoicePayment
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
 }
 
 func canSendInvoice(inv *domain.Invoice) bool {
@@ -35,9 +38,9 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 				@InvoiceStatusBadge(props.Invoice.Status)
 			</div>
 			<p class="mt-1 text-sm text-rr-muted">
-				Created { props.Invoice.CreatedAt.Format("January 2, 2006") }
+				Created { props.Invoice.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }
 				if props.Invoice.DueDate != nil {
-					 — Due { props.Invoice.DueDate.Format("January 2, 2006") }
+					 — Due { props.Invoice.DueDate.In(props.MerchantTZ).Format("January 2, 2006") }
 				}
 			</p>
 		</div>
@@ -159,7 +162,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 						for _, p := range props.Payments {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-rr-muted sm:pl-6">
-									{ p.PaidAt.Format("Jan 2, 2006") }
+									{ p.PaidAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
 									{ string(p.Method) }

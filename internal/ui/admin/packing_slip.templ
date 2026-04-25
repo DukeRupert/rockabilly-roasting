@@ -2,6 +2,8 @@ package admin
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 )
 
@@ -10,6 +12,7 @@ type PackingSlipProps struct {
 	LineItems       []EnrichedLineItem
 	Customer        *domain.Customer
 	ShippingAddress *domain.Address
+	MerchantTZ      *time.Location
 }
 
 templ PackingSlip(props PackingSlipProps) {
@@ -50,7 +53,7 @@ templ PackingSlip(props PackingSlipProps) {
 				<div class="company">Hiri Coffee</div>
 				<div class="order-info">
 					<div class="order-number">{ props.Order.Number }</div>
-					<div class="order-date">{ props.Order.PlacedAt.Format("January 2, 2006") }</div>
+					<div class="order-date">{ props.Order.PlacedAt.In(props.MerchantTZ).Format("January 2, 2006") }</div>
 				</div>
 			</div>
 			<div class="addresses">

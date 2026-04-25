@@ -343,6 +343,7 @@ func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Reques
 		LineItems:       enrichedItems,
 		Customer:        customer,
 		ShippingAddress: shippingAddress,
+		MerchantTZ:      d.MerchantTZ,
 	}
 
 	admin.PackingSlip(props).Render(ctx, w) //nolint:errcheck

@@ -2,6 +2,8 @@ package admin
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 )
 
@@ -11,6 +13,7 @@ type OrderInvoiceProps struct {
 	Customer        *domain.Customer
 	ShippingAddress *domain.Address
 	BillingAddress  *domain.Address
+	MerchantTZ      *time.Location
 }
 
 func invoicePaymentLabel(s domain.PaymentStatus) string {
@@ -303,7 +306,7 @@ templ OrderInvoice(props OrderInvoiceProps) {
 					<div class="doc-meta">
 						<div class="kind">Invoice</div>
 						<div class="number">{ props.Order.Number }</div>
-						<div class="date">{ props.Order.PlacedAt.Format("January 2, 2006") }</div>
+						<div class="date">{ props.Order.PlacedAt.In(props.MerchantTZ).Format("January 2, 2006") }</div>
 						if props.Order.SubscriptionID != nil {
 							<div class="badge">Subscription</div>
 						}
@@ -392,7 +395,7 @@ templ OrderInvoice(props OrderInvoiceProps) {
 						if props.Order.RequestedDeliveryDate != nil {
 							<div class="item">
 								<div class="lbl">Requested delivery</div>
-								<div class="val">{ props.Order.RequestedDeliveryDate.Format("Jan 2, 2006") }</div>
+								<div class="val">{ props.Order.RequestedDeliveryDate.In(props.MerchantTZ).Format("Jan 2, 2006") }</div>
 							</div>
 						}
 						if props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "" {

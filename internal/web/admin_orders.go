@@ -437,6 +437,7 @@ func (d *Deps) handleAdminOrderInvoice(w http.ResponseWriter, r *http.Request) {
 		Customer:        customer,
 		ShippingAddress: shippingAddress,
 		BillingAddress:  billingAddress,
+		MerchantTZ:      d.MerchantTZ,
 	}
 
 	admin.OrderInvoice(props).Render(ctx, w) //nolint:errcheck

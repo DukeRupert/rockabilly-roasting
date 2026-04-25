@@ -3,20 +3,23 @@ package admin
 import (
 	"fmt"
 	"strings"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
 type AuditListProps struct {
-	Entries          []domain.AuditEntry
-	ActorTypeFilter  string
-	ActionFilter     string
-	ResourceFilter   string
-	Page             int
-	PerPage          int
-	HasMore          bool
-	StaffName        string
-	StaffRole        string
+	Entries         []domain.AuditEntry
+	ActorTypeFilter string
+	ActionFilter    string
+	ResourceFilter  string
+	Page            int
+	PerPage         int
+	HasMore         bool
+	MerchantTZ      *time.Location
+	StaffName       string
+	StaffRole       string
 }
 
 func auditActorBadgeClass(t domain.AuditActorType) string {
@@ -131,7 +134,7 @@ templ AuditListContent(props AuditListProps) {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-rr-muted sm:pl-6">
 									<time datetime={ e.CreatedAt.Format("2006-01-02T15:04:05Z07:00") }>
-										{ e.CreatedAt.Format("Jan 2 15:04") }
+										{ e.CreatedAt.In(props.MerchantTZ).Format("Jan 2 15:04") }
 									</time>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">

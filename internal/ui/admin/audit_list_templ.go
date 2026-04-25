@@ -10,9 +10,11 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
-	"strings"
 )
 
 type AuditListProps struct {
@@ -23,6 +25,7 @@ type AuditListProps struct {
 	Page            int
 	PerPage         int
 	HasMore         bool
+	MerchantTZ      *time.Location
 	StaffName       string
 	StaffRole       string
 }
@@ -218,7 +221,7 @@ func AuditListContent(props AuditListProps) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(e.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 133, Col: 73}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 136, Col: 73}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -229,9 +232,9 @@ func AuditListContent(props AuditListProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var3 string
-				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(e.CreatedAt.Format("Jan 2 15:04"))
+				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(e.CreatedAt.In(props.MerchantTZ).Format("Jan 2 15:04"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 134, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 137, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -266,7 +269,7 @@ func AuditListContent(props AuditListProps) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(string(e.ActorType))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 139, Col: 31}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 142, Col: 31}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -279,7 +282,7 @@ func AuditListContent(props AuditListProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(e.ActorName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 141, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 144, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -292,7 +295,7 @@ func AuditListContent(props AuditListProps) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(auditActionDisplay(e.Action))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 144, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 147, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -305,7 +308,7 @@ func AuditListContent(props AuditListProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(e.ResourceType)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 147, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 150, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -318,7 +321,7 @@ func AuditListContent(props AuditListProps) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(e.ResourceID.String()[:8])
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 148, Col: 88}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 151, Col: 88}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -341,7 +344,7 @@ func AuditListContent(props AuditListProps) templ.Component {
 				var templ_7745c5c3_Var11 templ.SafeURL
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(auditFilterURL(props.Page-1, props.ActorTypeFilter, props.ActionFilter, props.ResourceFilter)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 160, Col: 122}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 163, Col: 122}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -364,7 +367,7 @@ func AuditListContent(props AuditListProps) templ.Component {
 				var templ_7745c5c3_Var12 templ.SafeURL
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(auditFilterURL(props.Page+1, props.ActorTypeFilter, props.ActionFilter, props.ResourceFilter)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 170, Col: 122}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/audit_list.templ`, Line: 173, Col: 122}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {

@@ -2,6 +2,8 @@ package admin
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -12,6 +14,7 @@ type DiscountListProps struct {
 	Page         int
 	PerPage      int
 	HasMore      bool
+	MerchantTZ   *time.Location
 	StaffName    string
 	StaffRole    string
 }
@@ -109,13 +112,13 @@ templ DiscountListContent(props DiscountListProps) {
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
 									if d.StartsAt != nil || d.ExpiresAt != nil {
 										if d.StartsAt != nil {
-											{ d.StartsAt.Format("Jan 2") }
+											{ d.StartsAt.In(props.MerchantTZ).Format("Jan 2") }
 										} else {
 											<span class="text-rr-border">&mdash;</span>
 										}
 										<span class="text-rr-border"> &rarr; </span>
 										if d.ExpiresAt != nil {
-											{ d.ExpiresAt.Format("Jan 2") }
+											{ d.ExpiresAt.In(props.MerchantTZ).Format("Jan 2") }
 										} else {
 											<span class="text-rr-border">&mdash;</span>
 										}
@@ -124,7 +127,7 @@ templ DiscountListContent(props DiscountListProps) {
 									}
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
-									{ d.CreatedAt.Format("Jan 2, 2006") }
+									{ d.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
 								</td>
 							</tr>
 						}

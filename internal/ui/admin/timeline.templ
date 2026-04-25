@@ -42,7 +42,7 @@ func timelineRelative(t time.Time) string {
 
 // timelineRow renders a single timeline entry — marker + connecting rail +
 // event card. Used by SubscriptionTimeline and CustomerActivity.
-templ timelineRow(e domain.AuditEntry, label, markerClass string, isLast bool) {
+templ timelineRow(e domain.AuditEntry, label, markerClass string, isLast bool, loc *time.Location) {
 	<li class={ "relative flex gap-x-4", templ.KV("pb-6", !isLast) }>
 		if !isLast {
 			<div class="absolute left-0 top-0 bottom-0 flex w-6 justify-center">
@@ -65,7 +65,7 @@ templ timelineRow(e domain.AuditEntry, label, markerClass string, isLast bool) {
 			}
 			<p class="mt-1 text-xs text-rr-muted">
 				<time datetime={ e.CreatedAt.Format(time.RFC3339) }>
-					{ e.CreatedAt.Format("Jan 2, 2006 at 3:04 PM") }
+					{ e.CreatedAt.In(loc).Format("Jan 2, 2006 at 3:04 PM") }
 				</time>
 				<span class="mx-1.5">·</span>
 				<span>{ timelineRelative(e.CreatedAt) }</span>

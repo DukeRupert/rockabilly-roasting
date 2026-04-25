@@ -2,6 +2,7 @@ package admin
 
 import (
 	"strings"
+	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
@@ -91,7 +92,7 @@ func customerEventMarker(action string) string {
 // CustomerActivity renders a vertical activity log for a customer, sourced
 // from audit_log entries where the customer was either the actor or the
 // resource. Newest first.
-templ CustomerActivity(entries []domain.AuditEntry) {
+templ CustomerActivity(entries []domain.AuditEntry, loc *time.Location) {
 	<div class="mt-8">
 		<h2 class="text-sm font-semibold text-rr-heading">Activity</h2>
 		if len(entries) == 0 {
@@ -99,7 +100,7 @@ templ CustomerActivity(entries []domain.AuditEntry) {
 		} else {
 			<ol role="list" class="mt-4">
 				for i, e := range entries {
-					@timelineRow(e, customerEventLabel(e.Action), customerEventMarker(e.Action), i == len(entries)-1)
+					@timelineRow(e, customerEventLabel(e.Action), customerEventMarker(e.Action), i == len(entries)-1, loc)
 				}
 			</ol>
 		}

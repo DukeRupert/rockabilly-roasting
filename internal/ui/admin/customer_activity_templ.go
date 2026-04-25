@@ -10,6 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"strings"
+	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
@@ -99,7 +100,7 @@ func customerEventMarker(action string) string {
 // CustomerActivity renders a vertical activity log for a customer, sourced
 // from audit_log entries where the customer was either the actor or the
 // resource. Newest first.
-func CustomerActivity(entries []domain.AuditEntry) templ.Component {
+func CustomerActivity(entries []domain.AuditEntry, loc *time.Location) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -135,7 +136,7 @@ func CustomerActivity(entries []domain.AuditEntry) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for i, e := range entries {
-				templ_7745c5c3_Err = timelineRow(e, customerEventLabel(e.Action), customerEventMarker(e.Action), i == len(entries)-1).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = timelineRow(e, customerEventLabel(e.Action), customerEventMarker(e.Action), i == len(entries)-1, loc).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

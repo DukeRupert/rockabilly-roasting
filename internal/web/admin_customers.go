@@ -130,6 +130,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		AllGroups:    allGroups,
 		RecentOrders: recentOrders,
 		Activity:     activity,
+		MerchantTZ:   d.MerchantTZ,
 		StaffName:    name,
 		StaffRole:    role,
 	}

@@ -2,7 +2,10 @@ package admin
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -14,6 +17,7 @@ type CustomerShowProps struct {
 	AllGroups    []domain.CustomerGroup
 	RecentOrders []domain.Order
 	Activity     []domain.AuditEntry
+	MerchantTZ   *time.Location
 	StaffName    string
 	StaffRole    string
 }
@@ -160,7 +164,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
 									<time datetime={ o.PlacedAt.Format("2006-01-02T15:04:05Z07:00") }>
-										{ o.PlacedAt.Format("Jan 2, 2006") }
+										{ o.PlacedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
 									</time>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-rr-heading tabular-nums">
@@ -174,7 +178,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 		}
 	</div>
 	<!-- Activity -->
-	@CustomerActivity(props.Activity)
+	@CustomerActivity(props.Activity, props.MerchantTZ)
 	<!-- Details -->
 	<div class="mt-8 border-2 border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6">
@@ -190,7 +194,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 				}
 				<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
 					<dt class="text-sm font-medium text-rr-muted">Customer since</dt>
-					<dd class="mt-1 text-sm text-rr-heading sm:col-span-2 sm:mt-0">{ props.Customer.CreatedAt.Format("January 2, 2006") }</dd>
+					<dd class="mt-1 text-sm text-rr-heading sm:col-span-2 sm:mt-0">{ props.Customer.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }</dd>
 				</div>
 			</dl>
 		</div>

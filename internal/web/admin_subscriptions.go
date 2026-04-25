@@ -229,6 +229,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		Orders:          enrichedOrders,
 		Activity:        activity,
 		Flash:           r.URL.Query().Get("flash"),
+		MerchantTZ:      d.MerchantTZ,
 		StaffName:       name,
 		StaffRole:       role,
 	}

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"strings"
+	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
@@ -52,7 +53,7 @@ func subscriptionEventMarker(action string) string {
 
 // SubscriptionTimeline renders a vertical activity log for a single
 // subscription, sourced from the audit_log table. Newest events first.
-templ SubscriptionTimeline(entries []domain.AuditEntry) {
+templ SubscriptionTimeline(entries []domain.AuditEntry, loc *time.Location) {
 	<div class="mt-8">
 		<h2 class="text-sm font-semibold text-rr-heading">Activity</h2>
 		if len(entries) == 0 {
@@ -60,7 +61,7 @@ templ SubscriptionTimeline(entries []domain.AuditEntry) {
 		} else {
 			<ol role="list" class="mt-4">
 				for i, e := range entries {
-					@timelineRow(e, subscriptionEventLabel(e.Action), subscriptionEventMarker(e.Action), i == len(entries)-1)
+					@timelineRow(e, subscriptionEventLabel(e.Action), subscriptionEventMarker(e.Action), i == len(entries)-1, loc)
 				}
 			</ol>
 		}

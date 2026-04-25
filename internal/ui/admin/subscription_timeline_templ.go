@@ -10,6 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"strings"
+	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
@@ -60,7 +61,7 @@ func subscriptionEventMarker(action string) string {
 
 // SubscriptionTimeline renders a vertical activity log for a single
 // subscription, sourced from the audit_log table. Newest events first.
-func SubscriptionTimeline(entries []domain.AuditEntry) templ.Component {
+func SubscriptionTimeline(entries []domain.AuditEntry, loc *time.Location) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -96,7 +97,7 @@ func SubscriptionTimeline(entries []domain.AuditEntry) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for i, e := range entries {
-				templ_7745c5c3_Err = timelineRow(e, subscriptionEventLabel(e.Action), subscriptionEventMarker(e.Action), i == len(entries)-1).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = timelineRow(e, subscriptionEventLabel(e.Action), subscriptionEventMarker(e.Action), i == len(entries)-1, loc).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

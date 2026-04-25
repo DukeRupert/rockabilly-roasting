@@ -3,6 +3,7 @@ package admin
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
@@ -28,6 +29,7 @@ type SubscriptionShowProps struct {
 	Orders          []EnrichedSubOrder
 	Activity        []domain.AuditEntry
 	Flash           string
+	MerchantTZ      *time.Location
 	StaffName       string
 	StaffRole       string
 }
@@ -73,7 +75,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 				<span class="mx-1.5">·</span>
 				<span>{ props.Customer.Email }</span>
 				<span class="mx-1.5">·</span>
-				<span>Created { props.Subscription.CreatedAt.Format("Jan 2, 2006") }</span>
+				<span>Created { props.Subscription.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }</span>
 				<span class="mx-1.5">·</span>
 				<code class="text-xs">{ props.Subscription.ID.String()[:8] }</code>
 			</p>
@@ -87,14 +89,14 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 		<div class="mt-6 border-2 border-rr-border bg-rr-raised p-4">
 			<p class="text-sm text-rr-heading">
 				<span class="font-semibold">Cancelled</span>
-				<span class="text-rr-muted"> on { props.Subscription.CancelledAt.Format("January 2, 2006 at 3:04 PM") }</span>
+				<span class="text-rr-muted"> on { props.Subscription.CancelledAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM") }</span>
 			</p>
 		</div>
 	}
 	if props.Subscription.PauseUntil != nil {
 		<div class="mt-6 badge-amber rounded-sm p-4">
 			<p class="text-sm">
-				<span class="font-semibold">Paused until</span> { props.Subscription.PauseUntil.Format("January 2, 2006") }
+				<span class="font-semibold">Paused until</span> { props.Subscription.PauseUntil.In(props.MerchantTZ).Format("January 2, 2006") }
 			</p>
 		</div>
 	}
@@ -167,13 +169,13 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 		</div>
 		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Next Order</dt>
-			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ props.Subscription.NextOrderAt.Format("Jan 2, 2006") }</dd>
-			<dd class="text-xs text-rr-muted">{ props.Subscription.NextOrderAt.Format("Monday") }</dd>
+			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006") }</dd>
+			<dd class="text-xs text-rr-muted">{ props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Monday") }</dd>
 		</div>
 		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Current Period</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">
-				{ props.Subscription.CurrentPeriodStart.Format("Jan 2") } &ndash; { props.Subscription.CurrentPeriodEnd.Format("Jan 2, 2006") }
+				{ props.Subscription.CurrentPeriodStart.In(props.MerchantTZ).Format("Jan 2") } &ndash; { props.Subscription.CurrentPeriodEnd.In(props.MerchantTZ).Format("Jan 2, 2006") }
 			</dd>
 		</div>
 		<div class="border-2 border-rr-border bg-rr-surface p-4">
@@ -259,7 +261,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 									}
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
-									{ so.PeriodStart.Format("Jan 2") } &ndash; { so.PeriodEnd.Format("Jan 2, 2006") }
+									{ so.PeriodStart.In(props.MerchantTZ).Format("Jan 2") } &ndash; { so.PeriodEnd.In(props.MerchantTZ).Format("Jan 2, 2006") }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-rr-heading tabular-nums">
 									if so.OrderTotal > 0 {
@@ -275,7 +277,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			</div>
 		}
 	</div>
-	@SubscriptionTimeline(props.Activity)
+	@SubscriptionTimeline(props.Activity, props.MerchantTZ)
 }
 
 templ SubscriptionShow(props SubscriptionShowProps) {

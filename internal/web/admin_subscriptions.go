@@ -119,6 +119,7 @@ func (d *Deps) handleAdminSubscriptionList(w http.ResponseWriter, r *http.Reques
 		Page:          page,
 		PerPage:       perPage,
 		HasMore:       hasMore,
+		MerchantTZ:    d.MerchantTZ,
 		StaffName:     name,
 		StaffRole:     role,
 	}

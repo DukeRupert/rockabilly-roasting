@@ -3,6 +3,7 @@ package admin
 import (
 	"fmt"
 	"net/url"
+	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
@@ -84,6 +85,7 @@ type SubscriptionListProps struct {
 	Page          int
 	PerPage       int
 	HasMore       bool
+	MerchantTZ    *time.Location
 	StaffName     string
 	StaffRole     string
 }
@@ -206,10 +208,10 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 									@SubscriptionStatusBadge(sub.Status)
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
-									{ sub.NextOrderAt.Format("Jan 2, 2006") }
+									{ sub.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
-									{ sub.CreatedAt.Format("Jan 2, 2006") }
+									{ sub.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
 								</td>
 							</tr>
 						}

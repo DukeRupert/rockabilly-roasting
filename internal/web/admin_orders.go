@@ -170,6 +170,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		Customer:        customer,
 		ShippingAddress: shippingAddress,
 		Flash:           r.URL.Query().Get("flash"),
+		MerchantTZ:      d.MerchantTZ,
 		StaffName:       name,
 		StaffRole:       role,
 	}

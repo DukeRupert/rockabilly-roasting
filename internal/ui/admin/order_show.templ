@@ -2,6 +2,8 @@ package admin
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -20,6 +22,7 @@ type OrderShowProps struct {
 	Customer        *domain.Customer
 	ShippingAddress *domain.Address
 	Flash           string
+	MerchantTZ      *time.Location
 	StaffName       string
 	StaffRole       string
 }
@@ -102,7 +105,7 @@ templ OrderShowContent(props OrderShowProps) {
 					@OrderStatusBadge(props.Order.Status)
 				}
 			</div>
-			<p class="mt-1 text-sm text-rr-muted">Placed { props.Order.PlacedAt.Format("January 2, 2006 at 3:04 PM") }</p>
+			<p class="mt-1 text-sm text-rr-muted">Placed { props.Order.PlacedAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM") }</p>
 		</div>
 		<div class="mt-4 flex items-center gap-3 sm:mt-0">
 			<a
@@ -278,7 +281,7 @@ templ OrderShowContent(props OrderShowProps) {
 				if props.Order.RequestedDeliveryDate != nil {
 					<div class="flex items-center gap-2">
 						<span class="text-sm font-medium text-rr-muted">Delivery date:</span>
-						<span class="text-sm text-rr-heading">{ props.Order.RequestedDeliveryDate.Format("January 2, 2006") }</span>
+						<span class="text-sm text-rr-heading">{ props.Order.RequestedDeliveryDate.In(props.MerchantTZ).Format("January 2, 2006") }</span>
 					</div>
 				}
 				if props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "" {

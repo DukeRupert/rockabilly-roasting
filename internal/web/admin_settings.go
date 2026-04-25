@@ -55,12 +55,13 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.SettingsProps{
-		QB:        qbStatus,
-		QBEnabled: qbEnabled,
-		Shipping:  shipping,
-		Flash:     r.URL.Query().Get("flash"),
-		StaffName: name,
-		StaffRole: role,
+		QB:         qbStatus,
+		QBEnabled:  qbEnabled,
+		Shipping:   shipping,
+		Flash:      r.URL.Query().Get("flash"),
+		MerchantTZ: d.MerchantTZ,
+		StaffName:  name,
+		StaffRole:  role,
 	}
 
 	if IsHTMX(r) {

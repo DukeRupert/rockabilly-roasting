@@ -26,12 +26,13 @@ type ShippingSettings struct {
 }
 
 type SettingsProps struct {
-	QB        QBConnectionStatus
-	QBEnabled bool // true if QB_CLIENT_ID is configured
-	Shipping  ShippingSettings
-	Flash     string
-	StaffName string
-	StaffRole string
+	QB         QBConnectionStatus
+	QBEnabled  bool // true if QB_CLIENT_ID is configured
+	Shipping   ShippingSettings
+	Flash      string
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
 }
 
 // centsToDollars formats integer cents as a dollar string with no symbol, e.g.
@@ -224,7 +225,7 @@ templ SettingsContent(props SettingsProps) {
 											{ fmt.Sprintf("%d days", refreshTokenDaysRemaining(props.QB.RefreshExpiresAt)) }
 										</span>
 										<span class="text-rr-muted ml-1">
-											({ props.QB.RefreshExpiresAt.Format("Jan 2, 2006") })
+											({ props.QB.RefreshExpiresAt.In(props.MerchantTZ).Format("Jan 2, 2006") })
 										</span>
 										if refreshTokenDaysRemaining(props.QB.RefreshExpiresAt) <= 14 {
 											<p class="mt-1 text-xs text-red-600">

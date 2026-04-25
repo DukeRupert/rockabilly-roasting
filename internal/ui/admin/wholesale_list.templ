@@ -2,6 +2,8 @@ package admin
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -11,6 +13,7 @@ type WholesaleListProps struct {
 	StatusFilter string
 	Page         int
 	HasMore      bool
+	MerchantTZ   *time.Location
 	StaffName    string
 	StaffRole    string
 }
@@ -98,7 +101,7 @@ templ WholesaleListContent(props WholesaleListProps) {
 									}
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
-									{ c.CreatedAt.Format("Jan 2, 2006") }
+									{ c.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									if c.WholesaleStatus != nil {

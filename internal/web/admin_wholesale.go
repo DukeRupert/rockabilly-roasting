@@ -58,6 +58,7 @@ func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) 
 		StatusFilter: statusFilter,
 		Page:         page,
 		HasMore:      hasMore,
+		MerchantTZ:   d.MerchantTZ,
 		StaffName:    name,
 		StaffRole:    role,
 	}

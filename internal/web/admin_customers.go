@@ -61,6 +61,7 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 		Page:       page,
 		PerPage:    perPage,
 		HasMore:    hasMore,
+		MerchantTZ: d.MerchantTZ,
 		StaffName:  name,
 		StaffRole:  role,
 	}

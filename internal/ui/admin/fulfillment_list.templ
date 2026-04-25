@@ -2,9 +2,11 @@ package admin
 
 import (
 	"fmt"
+	"net/url"
+	"time"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
-	"net/url"
 )
 
 type FulfillmentListProps struct {
@@ -14,6 +16,7 @@ type FulfillmentListProps struct {
 	Page       int
 	PerPage    int
 	HasMore    bool
+	MerchantTZ *time.Location
 	StaffName  string
 	StaffRole  string
 }
@@ -99,7 +102,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 									@FulfillmentStatusBadge(o.FulfillmentStatus)
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
-									{ o.PlacedAt.Format("Jan 2, 2006") }
+									{ o.PlacedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
 								</td>
 								<td class="hidden whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:table-cell sm:pr-6">
 									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="text-rr-red hover:text-rr-red-lt">

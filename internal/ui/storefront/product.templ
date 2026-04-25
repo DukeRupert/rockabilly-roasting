@@ -39,9 +39,44 @@ type ProductDetailProps struct {
 	Coffee            *CoffeeAttrs // nil if not a coffee product
 	PrevProduct       *ProductNav  // nil when catalog has ≤1 active product
 	NextProduct       *ProductNav
+	Category          string // taxon name, used as item_category on GA4 events
 	CanonicalURL      string
 	OGImage           string
 	BaseURL           string // e.g. "https://rockabillyroasting.com" — for JSON-LD absolute URLs
+}
+
+// productAnalyticsJSON builds the GA4 payload for view_item / add_to_cart.
+// Carries product-level info plus a variant→{sku, price_cents} map so the
+// add-to-cart handler can resolve the selected variant at submission time.
+func productAnalyticsJSON(props ProductDetailProps) string {
+	type variantEntry struct {
+		SKU        string `json:"sku"`
+		PriceCents int    `json:"price_cents"`
+	}
+	variants := make(map[string]variantEntry, len(props.Variants))
+	for _, v := range props.Variants {
+		entry := variantEntry{SKU: v.Variant.SKU}
+		if v.BasePrice != nil {
+			entry.PriceCents = *v.BasePrice
+		}
+		variants[v.Variant.ID.String()] = entry
+	}
+	var defaultPrice int
+	if props.DefaultPrice != nil {
+		defaultPrice = *props.DefaultPrice
+	}
+	b, err := json.Marshal(map[string]any{
+		"item_id":            props.Product.ID.String(),
+		"item_name":          props.Product.Title,
+		"item_category":      props.Category,
+		"currency":           props.CurrencyCode,
+		"default_price_cents": defaultPrice,
+		"variants":           variants,
+	})
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // ProductNav carries the minimum data needed for prev/next links at the
@@ -402,6 +437,63 @@ templ ProductContent(props ProductDetailProps) {
 	if len(props.SubscriptionPlans) > 0 && len(props.Variants) > 0 {
 		@purchaseModeScript()
 	}
+	<script id="ga-product-data" type="application/json">
+		@templ.Raw(productAnalyticsJSON(props))
+	</script>
+	<script>
+		(function() {
+			var node = document.getElementById('ga-product-data');
+			if (!node || !window.rrTrack) return;
+			var data;
+			try { data = JSON.parse(node.textContent); } catch (e) { return; }
+			var defaultPrice = (data.default_price_cents || 0) / 100;
+			window.rrTrack('view_item', {
+				currency: data.currency || 'USD',
+				value: defaultPrice,
+				items: [{
+					item_id: data.item_id,
+					item_name: data.item_name,
+					item_category: data.item_category || undefined,
+					price: defaultPrice,
+					quantity: 1
+				}]
+			});
+			// Hook the one-time-purchase add-to-cart form. The Alpine submit
+			// component prevents reading variant after a successful swap, so we
+			// snapshot at htmx:beforeRequest and dispatch on success.
+			var form = document.querySelector('#onetime-form form[hx-post="/cart/add"]');
+			if (!form) return;
+			var pending = null;
+			form.addEventListener('htmx:beforeRequest', function() {
+				var fd = new FormData(form);
+				var variantID = fd.get('variant_id');
+				var qty = parseInt(fd.get('quantity') || '1', 10) || 1;
+				var v = (data.variants || {})[variantID] || {};
+				pending = {
+					variant_id: variantID,
+					sku: v.sku || '',
+					price: (v.price_cents || data.default_price_cents || 0) / 100,
+					quantity: qty
+				};
+			});
+			form.addEventListener('htmx:afterRequest', function(evt) {
+				if (!pending || !evt.detail || !evt.detail.successful) { pending = null; return; }
+				window.rrTrack('add_to_cart', {
+					currency: data.currency || 'USD',
+					value: pending.price * pending.quantity,
+					items: [{
+						item_id: data.item_id,
+						item_name: data.item_name,
+						item_variant: pending.sku || undefined,
+						item_category: data.item_category || undefined,
+						price: pending.price,
+						quantity: pending.quantity
+					}]
+				});
+				pending = null;
+			});
+		})();
+	</script>
 }
 
 templ tastingProfile(attrs *CoffeeAttrs) {

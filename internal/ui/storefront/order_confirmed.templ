@@ -1,10 +1,47 @@
 package storefront
 
-import "github.com/dukerupert/hiri/internal/ui/layouts"
+import (
+	"encoding/json"
+
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type OrderConfirmedItem struct {
+	ItemID       string `json:"item_id"`
+	ItemName     string `json:"item_name"`
+	ItemVariant  string `json:"item_variant,omitempty"`
+	ItemCategory string `json:"item_category,omitempty"`
+	PriceCents   int    `json:"price_cents"`
+	Quantity     int    `json:"quantity"`
+}
+
+type OrderConfirmedAnalytics struct {
+	TransactionID string               `json:"transaction_id"`
+	Currency      string               `json:"currency"`
+	ValueCents    int                  `json:"value_cents"`
+	TaxCents      int                  `json:"tax_cents"`
+	ShippingCents int                  `json:"shipping_cents"`
+	Items         []OrderConfirmedItem `json:"items"`
+}
 
 type OrderConfirmedProps struct {
 	OrderNumber string
 	CartCount   int
+	// Analytics is populated only when the rr_last_order cookie matches the
+	// URL order number — i.e., the visitor is the buyer who just placed it.
+	// nil on refresh or third-party visits, in which case no GA4 event fires.
+	Analytics *OrderConfirmedAnalytics
+}
+
+func orderConfirmedAnalyticsJSON(a *OrderConfirmedAnalytics) string {
+	if a == nil {
+		return ""
+	}
+	b, err := json.Marshal(a)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 templ OrderConfirmedContent(props OrderConfirmedProps) {
@@ -73,6 +110,40 @@ templ OrderConfirmedContent(props OrderConfirmedProps) {
 			</div>
 		</div>
 	</section>
+	if props.Analytics != nil {
+		<script id="ga-purchase-data" type="application/json">
+			@templ.Raw(orderConfirmedAnalyticsJSON(props.Analytics))
+		</script>
+		<script>
+			(function() {
+				var node = document.getElementById('ga-purchase-data');
+				if (!node || !window.rrTrack) return;
+				var data;
+				try { data = JSON.parse(node.textContent); } catch (e) { return; }
+				// Idempotency: don't refire if we've already sent this transaction.
+				var key = 'rrPurchaseFired:' + data.transaction_id;
+				try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) {}
+				var items = (data.items || []).map(function(it) {
+					return {
+						item_id: it.item_id,
+						item_name: it.item_name,
+						item_variant: it.item_variant || undefined,
+						item_category: it.item_category || undefined,
+						price: (it.price_cents || 0) / 100,
+						quantity: it.quantity || 1
+					};
+				});
+				window.rrTrack('purchase', {
+					transaction_id: data.transaction_id,
+					currency: data.currency || 'USD',
+					value: (data.value_cents || 0) / 100,
+					tax: (data.tax_cents || 0) / 100,
+					shipping: (data.shipping_cents || 0) / 100,
+					items: items
+				});
+			})();
+		</script>
+	}
 }
 
 templ OrderConfirmedPage(props OrderConfirmedProps) {

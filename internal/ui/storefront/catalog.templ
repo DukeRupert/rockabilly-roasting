@@ -38,6 +38,88 @@ type CatalogPageProps struct {
 	BaseURL       string // e.g. "https://rockabillyroasting.com" — for JSON-LD absolute URLs
 }
 
+// productCardPriceCentsAttr renders the BasePrice as a string for a data-attr.
+// Empty string when price is unknown; the client treats absent values as 0.
+func productCardPriceCentsAttr(card ProductCard) string {
+	if card.BasePrice == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", *card.BasePrice)
+}
+
+// catalogItemListID derives a stable, slug-safe id for the active product list
+// — used as `item_list_id`/`item_list_name` on GA4 list events.
+func catalogItemListID(props CatalogPageProps) string {
+	if props.ActiveTaxon != "" {
+		return "catalog:" + props.ActiveTaxon
+	}
+	if props.Search != "" {
+		return "catalog:search"
+	}
+	return "catalog"
+}
+
+// catalogItemListName is a human-readable label paired with the list id.
+func catalogItemListName(props CatalogPageProps) string {
+	for _, t := range props.Taxons {
+		if t.Slug == props.ActiveTaxon {
+			return t.Name
+		}
+	}
+	if props.Search != "" {
+		return "Search: " + props.Search
+	}
+	return "Catalog"
+}
+
+// catalogAnalyticsItemsJSON produces the GA4 items[] payload for view_item_list,
+// matching the shape rrTrack consumes (price in cents — converted client-side).
+func catalogAnalyticsItemsJSON(props CatalogPageProps) string {
+	type item struct {
+		ItemID       string `json:"item_id"`
+		ItemName     string `json:"item_name"`
+		ItemListID   string `json:"item_list_id"`
+		ItemListName string `json:"item_list_name"`
+		ItemCategory string `json:"item_category,omitempty"`
+		PriceCents   int    `json:"price_cents,omitempty"`
+		Index        int    `json:"index"`
+	}
+	listID := catalogItemListID(props)
+	listName := catalogItemListName(props)
+	out := make([]item, 0, len(props.Products))
+	for i, c := range props.Products {
+		var price int
+		if c.BasePrice != nil {
+			price = *c.BasePrice
+		}
+		var category string
+		for _, t := range props.Taxons {
+			if t.ID == c.Product.TaxonID {
+				category = t.Name
+				break
+			}
+		}
+		out = append(out, item{
+			ItemID:       c.Product.ID.String(),
+			ItemName:     c.Product.Title,
+			ItemListID:   listID,
+			ItemListName: listName,
+			ItemCategory: category,
+			PriceCents:   price,
+			Index:        i,
+		})
+	}
+	b, err := json.Marshal(map[string]any{
+		"item_list_id":   listID,
+		"item_list_name": listName,
+		"items":          out,
+	})
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
 // hasActiveFilters returns true if any attribute filters are selected.
 func (p CatalogPageProps) hasActiveFilters() bool {
 	for _, vals := range p.ActiveFilters {
@@ -370,12 +452,66 @@ templ CatalogResults(props CatalogPageProps) {
 	if len(props.Filters) > 0 {
 		@mobileFilterDrawer(props)
 	}
+	if len(props.Products) > 0 {
+		<script id="ga-list-data" type="application/json">
+			@templ.Raw(catalogAnalyticsItemsJSON(props))
+		</script>
+		<script>
+			(function() {
+				var node = document.getElementById('ga-list-data');
+				if (!node || !window.rrTrack) return;
+				var data;
+				try { data = JSON.parse(node.textContent); } catch (e) { return; }
+				var items = (data.items || []).map(function(it) {
+					return {
+						item_id: it.item_id,
+						item_name: it.item_name,
+						item_list_id: it.item_list_id,
+						item_list_name: it.item_list_name,
+						item_category: it.item_category || undefined,
+						price: (it.price_cents || 0) / 100,
+						index: it.index
+					};
+				});
+				window.rrTrack('view_item_list', {
+					item_list_id: data.item_list_id,
+					item_list_name: data.item_list_name,
+					items: items
+				});
+				// Delegated click handler — fires select_item for any product card click in the grid.
+				document.querySelectorAll('a[data-rr-product-id]').forEach(function(a) {
+					if (a.dataset.rrBound) return;
+					a.dataset.rrBound = '1';
+					a.addEventListener('click', function() {
+						var priceCents = parseInt(a.dataset.rrPriceCents || '0', 10) || 0;
+						window.rrTrack('select_item', {
+							item_list_id: data.item_list_id,
+							item_list_name: data.item_list_name,
+							items: [{
+								item_id: a.dataset.rrProductId,
+								item_name: a.dataset.rrProductName,
+								item_list_id: data.item_list_id,
+								item_list_name: data.item_list_name,
+								price: priceCents / 100
+							}]
+						});
+					}, { passive: true });
+				});
+			})();
+		</script>
+	}
 }
 
 // productCardPaper is the paper-and-ink product card used on the catalog grid
 // and the home "Popular Roasts" section.
 templ productCardPaper(card ProductCard) {
-	<a href={ templ.SafeURL("/catalog/" + card.Product.Slug) } class="btn-stamp group block bg-cream-hi border-2 border-ink">
+	<a
+		href={ templ.SafeURL("/catalog/" + card.Product.Slug) }
+		class="btn-stamp group block bg-cream-hi border-2 border-ink"
+		data-rr-product-id={ card.Product.ID.String() }
+		data-rr-product-name={ card.Product.Title }
+		data-rr-price-cents={ productCardPriceCentsAttr(card) }
+	>
 		<!-- Image panel -->
 		<div class="relative aspect-square bg-paper-warm border-b-2 border-ink overflow-hidden">
 			if card.ThumbnailURL != "" {

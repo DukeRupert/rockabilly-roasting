@@ -36,7 +36,7 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Full-bleed paper surface --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-3xl px-6 sm:px-10 lg:px-14 py-12 sm:py-16\"><!-- Page heading --><header class=\"mb-12\"><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">How we handle your data</p><h1 class=\"font-slab text-ink uppercase leading-[0.92] mt-2\" style=\"font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing:-0.005em;\">Privacy <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">policy.</span></h1><p class=\"font-special text-chrome-deep text-sm mt-4\">Last updated: March 2026</p></header><!-- Legal body --><article class=\"space-y-10\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Full-bleed paper surface --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-3xl px-6 sm:px-10 lg:px-14 py-12 sm:py-16\"><!-- Page heading --><header class=\"mb-12\"><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">How we handle your data</p><h1 class=\"font-slab text-ink uppercase leading-[0.92] mt-2\" style=\"font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing:-0.005em;\">Privacy <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">policy.</span></h1><p class=\"font-special text-chrome-deep text-sm mt-4\">Last updated: April 2026</p></header><!-- Legal body --><article class=\"space-y-10\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -74,7 +74,7 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<p>We use <a href=\"https://plausible.io\" class=\"text-rust hover:text-rust-deep underline underline-offset-2\">Plausible Analytics</a>, a privacy-focused analytics tool. Plausible doesn't use cookies, doesn't collect personal data, and doesn't track you across sites. All data is aggregated — we see page view counts, not individual visitors.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<p>We use <a href=\"https://marketingplatform.google.com/about/analytics/\" class=\"text-rust hover:text-rust-deep underline underline-offset-2\">Google Analytics 4</a> to understand how the shop is used — which roasts get viewed, how people move through checkout, where the funnel leaks. Google Analytics sets cookies and may collect a truncated IP address and device-type information. We never pass your name, email, or address to it.</p><p>If you'd rather not be measured, most browsers have a built-in tracking-protection mode that blocks Google Analytics by default — turning it on is the simplest way to opt out. Browser extensions like uBlock Origin or Privacy Badger work too.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -118,7 +118,7 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p>We share only what's necessary with the following services:</p><ul class=\"list-disc pl-5 space-y-2\"><li><strong class=\"font-oswald font-bold text-ink\">Stripe</strong> — payment processing</li><li><strong class=\"font-oswald font-bold text-ink\">EasyPost</strong> — shipping label generation and tracking</li><li><strong class=\"font-oswald font-bold text-ink\">Plausible</strong> — privacy-focused analytics (no personal data shared)</li></ul>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p>We share only what's necessary with the following services:</p><ul class=\"list-disc pl-5 space-y-2\"><li><strong class=\"font-oswald font-bold text-ink\">Stripe</strong> — payment processing</li><li><strong class=\"font-oswald font-bold text-ink\">EasyPost</strong> — shipping label generation and tracking</li><li><strong class=\"font-oswald font-bold text-ink\">Postmark</strong> — order, shipping, and account emails</li><li><strong class=\"font-oswald font-bold text-ink\">Google Analytics 4</strong> — anonymized site usage analytics</li><li><strong class=\"font-oswald font-bold text-ink\">Cloudflare</strong> — image and asset delivery</li></ul>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -140,7 +140,7 @@ func PrivacyContent(props PrivacyProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p>We use a session cookie to keep you logged in and to maintain your shopping cart. That's it. No tracking cookies, no third-party advertising cookies.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<p>We use a small set of cookies — a session cookie to keep you logged in, a cart cookie to remember what's in your bag, and the cookies set by Google Analytics described above. We don't use third-party advertising cookies.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

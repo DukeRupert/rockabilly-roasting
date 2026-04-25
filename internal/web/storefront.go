@@ -781,6 +781,16 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Look up taxon name for analytics; non-fatal if missing.
+	var category string
+	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		taxon, tErr := d.CatalogService.GetTaxon(ctx, tx, product.TaxonID)
+		if tErr == nil && taxon != nil {
+			category = taxon.Name
+		}
+		return nil
+	})
+
 	ogImage := ""
 	if len(media) > 0 {
 		ogImage = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantHero)
@@ -799,6 +809,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		Coffee:            coffeeAttrs,
 		PrevProduct:       prevNav,
 		NextProduct:       nextNav,
+		Category:          category,
 		CanonicalURL:      d.BaseURL + r.URL.Path,
 		OGImage:           ogImage,
 		BaseURL:           d.BaseURL,

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -127,11 +128,78 @@ func (d *Deps) handleCheckoutPage(w http.ResponseWriter, r *http.Request) {
 		CartCount: cartCount,
 	}
 
+	// Build the begin_checkout payload from cart contents. Best-effort — if the
+	// cart can't be loaded we still render the page; just no GA event fires.
+	if cartID != nil {
+		if analytics, err := d.loadCheckoutAnalytics(ctx, *cartID); err == nil && analytics != nil {
+			props.Analytics = analytics
+		} else if err != nil {
+			logging.FromContext(ctx).Warn("checkout page: load analytics", "error", err)
+		}
+	}
+
 	if IsHTMX(r) {
 		storefront.CheckoutContent(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
 	storefront.CheckoutPage(props).Render(ctx, w) //nolint:errcheck
+}
+
+// loadCheckoutAnalytics resolves cart items into a GA4 begin_checkout payload.
+// Returns nil (no error) when the cart is empty.
+func (d *Deps) loadCheckoutAnalytics(ctx context.Context, cartID uuid.UUID) (*storefront.CheckoutAnalytics, error) {
+	var analytics storefront.CheckoutAnalytics
+	analytics.Currency = "USD"
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		items, txErr := d.CartService.ListItems(ctx, tx, cartID)
+		if txErr != nil {
+			return fmt.Errorf("list cart items: %w", txErr)
+		}
+		if len(items) == 0 {
+			return nil
+		}
+		productCache := map[uuid.UUID]*domain.Product{}
+		out := make([]storefront.CheckoutAnalyticsItem, 0, len(items))
+		var subtotal int
+		for _, ci := range items {
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
+			if vErr != nil {
+				return fmt.Errorf("get variant: %w", vErr)
+			}
+			product, ok := productCache[variant.ProductID]
+			if !ok {
+				product, vErr = d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+				if vErr != nil {
+					return fmt.Errorf("get product: %w", vErr)
+				}
+				productCache[variant.ProductID] = product
+			}
+			price, pErr := d.PricingService.GetBasePrice(ctx, tx, ci.VariantID, "USD")
+			var unitCents int
+			if pErr == nil && price != nil {
+				unitCents = price.Amount
+			}
+			subtotal += unitCents * ci.Quantity
+			out = append(out, storefront.CheckoutAnalyticsItem{
+				ItemID:      product.ID.String(),
+				ItemName:    product.Title,
+				ItemVariant: variant.SKU,
+				PriceCents:  unitCents,
+				Quantity:    ci.Quantity,
+			})
+		}
+		analytics.ValueCents = subtotal
+		analytics.Items = out
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(analytics.Items) == 0 {
+		return nil, nil
+	}
+	return &analytics, nil
 }
 
 // handleCheckoutCart returns cart contents for the checkout UI.
@@ -809,12 +877,29 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 		MaxAge: -1,
 	})
 
+	// Stash the just-placed order number so /order/confirmed can render the
+	// GA4 purchase payload without exposing line items to anyone who knows or
+	// guesses an order number.
+	http.SetCookie(w, &http.Cookie{
+		Name:     lastOrderCookieName,
+		Value:    resp.OrderNumber,
+		Path:     "/",
+		MaxAge:   600,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+
 	JSON(w, http.StatusOK, resp)
 }
 
 // handleOrderConfirmed renders a server-side order confirmation page.
 // This is the redirect target after the Svelte checkout completes, so the
 // confirmation survives a page refresh.
+//
+// When the rr_last_order cookie matches the URL `?number=` param, the page
+// loads the order's line items + totals and embeds them so the client can fire
+// a GA4 `purchase` event. The cookie expires in 10 min and is cleared after
+// one read so refreshes don't double-fire.
 func (d *Deps) handleOrderConfirmed(w http.ResponseWriter, r *http.Request) {
 	orderNumber := r.URL.Query().Get("number")
 	if orderNumber == "" {
@@ -826,11 +911,88 @@ func (d *Deps) handleOrderConfirmed(w http.ResponseWriter, r *http.Request) {
 		OrderNumber: orderNumber,
 		CartCount:   0, // Cart was just cleared
 	}
+
+	if c, err := r.Cookie(lastOrderCookieName); err == nil && c.Value == orderNumber {
+		if analytics, loadErr := d.loadOrderAnalytics(r.Context(), orderNumber); loadErr == nil {
+			props.Analytics = analytics
+			http.SetCookie(w, &http.Cookie{
+				Name:   lastOrderCookieName,
+				Value:  "",
+				Path:   "/",
+				MaxAge: -1,
+			})
+		} else {
+			logging.FromContext(r.Context()).Warn("order confirmed: load analytics", "error", loadErr, "order_number", orderNumber)
+		}
+	}
+
 	if IsHTMX(r) {
 		storefront.OrderConfirmedContent(props).Render(r.Context(), w) //nolint:errcheck
 		return
 	}
 	storefront.OrderConfirmedPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// loadOrderAnalytics builds the GA4 purchase payload for a confirmed order.
+// Resolves variants → products so each line item carries title + SKU + category.
+func (d *Deps) loadOrderAnalytics(ctx context.Context, orderNumber string) (*storefront.OrderConfirmedAnalytics, error) {
+	var analytics storefront.OrderConfirmedAnalytics
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		order, txErr := d.OrderService.GetOrderByNumberAsStaff(ctx, tx, orderNumber)
+		if txErr != nil {
+			return fmt.Errorf("get order: %w", txErr)
+		}
+		lineItems, txErr := d.OrderService.ListLineItems(ctx, tx, order.ID)
+		if txErr != nil {
+			return fmt.Errorf("list line items: %w", txErr)
+		}
+
+		productCache := map[uuid.UUID]*domain.Product{}
+		taxonCache := map[uuid.UUID]string{}
+		items := make([]storefront.OrderConfirmedItem, 0, len(lineItems))
+		for _, li := range lineItems {
+			variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
+			if vErr != nil {
+				return fmt.Errorf("get variant %s: %w", li.VariantID, vErr)
+			}
+			product, ok := productCache[variant.ProductID]
+			if !ok {
+				product, vErr = d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+				if vErr != nil {
+					return fmt.Errorf("get product %s: %w", variant.ProductID, vErr)
+				}
+				productCache[variant.ProductID] = product
+			}
+			category, ok := taxonCache[product.TaxonID]
+			if !ok {
+				if taxon, tErr := d.CatalogService.GetTaxon(ctx, tx, product.TaxonID); tErr == nil {
+					category = taxon.Name
+				}
+				taxonCache[product.TaxonID] = category
+			}
+			items = append(items, storefront.OrderConfirmedItem{
+				ItemID:       product.ID.String(),
+				ItemName:     product.Title,
+				ItemVariant:  variant.SKU,
+				ItemCategory: category,
+				PriceCents:   li.UnitPrice,
+				Quantity:     li.Quantity,
+			})
+		}
+
+		analytics.TransactionID = order.Number
+		analytics.Currency = order.CurrencyCode
+		analytics.ValueCents = order.Total
+		analytics.TaxCents = order.TaxTotal
+		analytics.ShippingCents = order.ShippingTotal
+		analytics.Items = items
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &analytics, nil
 }
 
 // calculateDiscountAmount computes the discount amount in cents.

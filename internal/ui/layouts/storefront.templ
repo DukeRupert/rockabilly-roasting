@@ -59,7 +59,31 @@ templ Storefront(props StorefrontProps) {
 				window.dataLayer = window.dataLayer || [];
 				function gtag(){dataLayer.push(arguments);}
 				gtag('js', new Date());
-				gtag('config', 'G-5L4668EW6X');
+				// send_page_view: false — htmx-swapped navigation means GA4's auto pageview
+				// would only fire on the very first load. We fire page_view manually below
+				// (and on htmx:pushedIntoHistory) so SPA-style nav is tracked.
+				gtag('config', 'G-5L4668EW6X', { send_page_view: false });
+				window.rrTrack = function(name, params) {
+					try { gtag('event', name, params || {}); } catch (e) {}
+				};
+				window.rrTrack('page_view', {
+					page_location: location.href,
+					page_title: document.title,
+					page_path: location.pathname + location.search
+				});
+				document.addEventListener('htmx:pushedIntoHistory', function() {
+					window.rrTrack('page_view', {
+						page_location: location.href,
+						page_title: document.title,
+						page_path: location.pathname + location.search
+					});
+				});
+				// Listen for ecommerce events dispatched as CustomEvents (rrEcom).
+				// Pages embed a JSON payload and dispatch window.dispatchEvent(new CustomEvent('rrEcom', { detail: {name, params} })).
+				window.addEventListener('rrEcom', function(evt) {
+					if (!evt.detail || !evt.detail.name) return;
+					window.rrTrack(evt.detail.name, evt.detail.params || {});
+				});
 			</script>
 			<title>{ props.Title } - Rockabilly Roasting Co.</title>
 			if props.Description != "" {

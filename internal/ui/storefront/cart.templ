@@ -1,6 +1,7 @@
 package storefront
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
@@ -21,6 +22,42 @@ type CartPageProps struct {
 	Subtotal           int
 	CartCount          int
 	FreeShippingHint   string // e.g. "Spend $12.00 more for free shipping"; "" if unused
+}
+
+// cartAnalyticsJSON renders the cart contents for view_cart / remove_from_cart.
+// VariantID is used as item_id since we don't expose the parent product UUID
+// on the cart line — variant SKU still flows through as item_variant.
+func cartAnalyticsJSON(props CartPageProps) string {
+	type itemEntry struct {
+		ItemID       string `json:"item_id"`
+		ItemName     string `json:"item_name"`
+		ItemVariant  string `json:"item_variant,omitempty"`
+		PriceCents   int    `json:"price_cents"`
+		Quantity     int    `json:"quantity"`
+	}
+	items := make(map[string]itemEntry, len(props.Items))
+	list := make([]itemEntry, 0, len(props.Items))
+	for _, it := range props.Items {
+		entry := itemEntry{
+			ItemID:      it.VariantID.String(),
+			ItemName:    it.ProductTitle,
+			ItemVariant: it.SKU,
+			PriceCents:  it.UnitPrice,
+			Quantity:    it.Quantity,
+		}
+		items[it.ItemID.String()] = entry
+		list = append(list, entry)
+	}
+	b, err := json.Marshal(map[string]any{
+		"currency":      "USD",
+		"value_cents":   props.Subtotal,
+		"items":         list,
+		"by_cart_item":  items,
+	})
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 templ CartContent(props CartPageProps) {
@@ -122,6 +159,8 @@ templ CartContent(props CartPageProps) {
 										hx-target="#main-content"
 										hx-swap="innerHTML"
 										class="sm:pt-0.5"
+										data-rr-cart-remove
+										data-rr-cart-item-id={ item.ItemID.String() }
 									>
 										<input type="hidden" name="item_id" value={ item.ItemID.String() }/>
 										<button
@@ -190,6 +229,54 @@ templ CartContent(props CartPageProps) {
 			}
 		</div>
 	</section>
+	if len(props.Items) > 0 {
+		<script id="ga-cart-data" type="application/json">
+			@templ.Raw(cartAnalyticsJSON(props))
+		</script>
+		<script>
+			(function() {
+				var node = document.getElementById('ga-cart-data');
+				if (!node || !window.rrTrack) return;
+				var data;
+				try { data = JSON.parse(node.textContent); } catch (e) { return; }
+				var items = (data.items || []).map(function(it) {
+					return {
+						item_id: it.item_id,
+						item_name: it.item_name,
+						item_variant: it.item_variant || undefined,
+						price: (it.price_cents || 0) / 100,
+						quantity: it.quantity || 1
+					};
+				});
+				window.rrTrack('view_cart', {
+					currency: data.currency || 'USD',
+					value: (data.value_cents || 0) / 100,
+					items: items
+				});
+				document.querySelectorAll('form[data-rr-cart-remove]').forEach(function(f) {
+					if (f.dataset.rrBound) return;
+					f.dataset.rrBound = '1';
+					f.addEventListener('htmx:beforeRequest', function() {
+						var cartItemID = f.dataset.rrCartItemId;
+						var entry = (data.by_cart_item || {})[cartItemID];
+						if (!entry) return;
+						var price = (entry.price_cents || 0) / 100;
+						window.rrTrack('remove_from_cart', {
+							currency: data.currency || 'USD',
+							value: price * (entry.quantity || 1),
+							items: [{
+								item_id: entry.item_id,
+								item_name: entry.item_name,
+								item_variant: entry.item_variant || undefined,
+								price: price,
+								quantity: entry.quantity || 1
+							}]
+						});
+					});
+				});
+			})();
+		</script>
+	}
 }
 
 templ CartPage(props CartPageProps) {

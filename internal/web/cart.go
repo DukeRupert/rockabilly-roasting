@@ -29,6 +29,12 @@ func freeShippingHint(cfg *domain.ShippingConfig, subtotalCents int) string {
 
 const cartCookieName = "cart_id"
 
+// lastOrderCookieName carries the just-placed order number from the checkout
+// confirm endpoint to /order/confirmed. Used to authorize embedding line-item
+// + total data into the page for the GA4 `purchase` event so a refresh, or a
+// stranger guessing an order number, doesn't leak order details.
+const lastOrderCookieName = "rr_last_order"
+
 // getCartID reads the cart ID from the cookie. Returns nil if not set.
 func getCartID(r *http.Request) *uuid.UUID {
 	c, err := r.Cookie(cartCookieName)

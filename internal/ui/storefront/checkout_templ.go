@@ -8,12 +8,42 @@ package storefront
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/dukerupert/hiri/internal/ui/layouts"
+import (
+	"encoding/json"
+
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type CheckoutAnalyticsItem struct {
+	ItemID      string `json:"item_id"`
+	ItemName    string `json:"item_name"`
+	ItemVariant string `json:"item_variant,omitempty"`
+	PriceCents  int    `json:"price_cents"`
+	Quantity    int    `json:"quantity"`
+}
+
+type CheckoutAnalytics struct {
+	Currency   string                  `json:"currency"`
+	ValueCents int                     `json:"value_cents"`
+	Items      []CheckoutAnalyticsItem `json:"items"`
+}
 
 type CheckoutPageProps struct {
 	CartID    string
 	StripeKey string
 	CartCount int
+	Analytics *CheckoutAnalytics // nil ⇒ no begin_checkout fires (e.g. empty cart)
+}
+
+func checkoutAnalyticsJSON(a *CheckoutAnalytics) string {
+	if a == nil {
+		return ""
+	}
+	b, err := json.Marshal(a)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 func CheckoutContent(props CheckoutPageProps) templ.Component {
@@ -44,7 +74,7 @@ func CheckoutContent(props CheckoutPageProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.CartID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 12, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 42, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -57,7 +87,7 @@ func CheckoutContent(props CheckoutPageProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.StripeKey)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 12, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 42, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -66,6 +96,12 @@ func CheckoutContent(props CheckoutPageProps) templ.Component {
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"></div><script type=\"module\" src=\"/static/checkout/checkout.js\"></script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
+		}
+		if props.Analytics != nil {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<script id=\"ga-checkout-data\" type=\"application/json\">\n\t\t\t@templ.Raw(checkoutAnalyticsJSON(props.Analytics))\n\t\t</script> <script>\n\t\t\t(function() {\n\t\t\t\tvar node = document.getElementById('ga-checkout-data');\n\t\t\t\tif (!node || !window.rrTrack) return;\n\t\t\t\tvar data;\n\t\t\t\ttry { data = JSON.parse(node.textContent); } catch (e) { return; }\n\t\t\t\tvar items = (data.items || []).map(function(it) {\n\t\t\t\t\treturn {\n\t\t\t\t\t\titem_id: it.item_id,\n\t\t\t\t\t\titem_name: it.item_name,\n\t\t\t\t\t\titem_variant: it.item_variant || undefined,\n\t\t\t\t\t\tprice: (it.price_cents || 0) / 100,\n\t\t\t\t\t\tquantity: it.quantity || 1\n\t\t\t\t\t};\n\t\t\t\t});\n\t\t\t\twindow.rrTrack('begin_checkout', {\n\t\t\t\t\tcurrency: data.currency || 'USD',\n\t\t\t\t\tvalue: (data.value_cents || 0) / 100,\n\t\t\t\t\titems: items\n\t\t\t\t});\n\t\t\t})();\n\t\t</script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
 		return nil
 	})

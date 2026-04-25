@@ -1,16 +1,73 @@
 package storefront
 
-import "github.com/dukerupert/hiri/internal/ui/layouts"
+import (
+	"encoding/json"
+
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type CheckoutAnalyticsItem struct {
+	ItemID      string `json:"item_id"`
+	ItemName    string `json:"item_name"`
+	ItemVariant string `json:"item_variant,omitempty"`
+	PriceCents  int    `json:"price_cents"`
+	Quantity    int    `json:"quantity"`
+}
+
+type CheckoutAnalytics struct {
+	Currency    string                  `json:"currency"`
+	ValueCents  int                     `json:"value_cents"`
+	Items       []CheckoutAnalyticsItem `json:"items"`
+}
 
 type CheckoutPageProps struct {
 	CartID    string
 	StripeKey string
 	CartCount int
+	Analytics *CheckoutAnalytics // nil ⇒ no begin_checkout fires (e.g. empty cart)
+}
+
+func checkoutAnalyticsJSON(a *CheckoutAnalytics) string {
+	if a == nil {
+		return ""
+	}
+	b, err := json.Marshal(a)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 templ CheckoutContent(props CheckoutPageProps) {
 	<div id="checkout-app" data-cart-id={ props.CartID } data-stripe-key={ props.StripeKey }></div>
 	<script type="module" src="/static/checkout/checkout.js"></script>
+	if props.Analytics != nil {
+		<script id="ga-checkout-data" type="application/json">
+			@templ.Raw(checkoutAnalyticsJSON(props.Analytics))
+		</script>
+		<script>
+			(function() {
+				var node = document.getElementById('ga-checkout-data');
+				if (!node || !window.rrTrack) return;
+				var data;
+				try { data = JSON.parse(node.textContent); } catch (e) { return; }
+				var items = (data.items || []).map(function(it) {
+					return {
+						item_id: it.item_id,
+						item_name: it.item_name,
+						item_variant: it.item_variant || undefined,
+						price: (it.price_cents || 0) / 100,
+						quantity: it.quantity || 1
+					};
+				});
+				window.rrTrack('begin_checkout', {
+					currency: data.currency || 'USD',
+					value: (data.value_cents || 0) / 100,
+					items: items
+				});
+			})();
+		</script>
+	}
 }
 
 templ CheckoutPage(props CheckoutPageProps) {

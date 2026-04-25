@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	sentryhttp "github.com/getsentry/sentry-go/http"
 	"github.com/jackc/pgx/v5"
@@ -67,6 +68,7 @@ type Deps struct {
 	Mailer               email.Sender
 	EmailFrom            string // sender address for transactional emails
 	StaffEmail           string // staff notification recipient
+	MerchantTZ           *time.Location // local timezone for day-bounded queries (e.g. "today's revenue")
 }
 
 // MetricsMux returns a handler for the internal metrics listener.

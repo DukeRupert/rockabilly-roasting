@@ -15,13 +15,15 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var props admin.DashboardProps
+	props.MerchantTZ = d.MerchantTZ
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 
-		// Today boundaries (UTC)
-		now := time.Now().UTC()
-		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+		// "Today" is the merchant's local calendar day, not UTC — otherwise late-day
+		// orders look like "yesterday" once UTC rolls over.
+		now := time.Now().In(d.MerchantTZ)
+		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, d.MerchantTZ)
 
 		// Today's order count
 		props.TodayOrderCount, txErr = d.OrderService.CountOrders(ctx, tx, store.OrderFilter{

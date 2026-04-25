@@ -126,6 +126,16 @@ func run() error {
 	storeName := os.Getenv("STORE_NAME")
 	staffEmail := os.Getenv("STAFF_NOTIFICATION_EMAIL")
 
+	merchantTZName := os.Getenv("MERCHANT_TIMEZONE")
+	if merchantTZName == "" {
+		merchantTZName = "America/Los_Angeles"
+	}
+	merchantTZ, err := time.LoadLocation(merchantTZName)
+	if err != nil {
+		return fmt.Errorf("load MERCHANT_TIMEZONE %q: %w", merchantTZName, err)
+	}
+	logger.Info("merchant timezone configured", "tz", merchantTZName)
+
 	// QuickBooks Online integration
 	qbCredStore := store.NewQBCredentialStore()
 	var qbClient quickbooks.Client
@@ -350,6 +360,7 @@ func run() error {
 		Mailer:                 mailer,
 		EmailFrom:              fromAddr,
 		StaffEmail:             staffEmail,
+		MerchantTZ:             merchantTZ,
 	}
 
 	handler := web.NewRouter(deps)

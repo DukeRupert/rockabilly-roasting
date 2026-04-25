@@ -37,6 +37,9 @@ type DashboardProps struct {
 	// Recent orders
 	RecentOrders []domain.Order
 
+	// Merchant local timezone for date display.
+	MerchantTZ *time.Location
+
 	StaffName string
 	StaffRole string
 }
@@ -58,7 +61,8 @@ func (p DashboardProps) hasAnyAction() bool {
 }
 
 // ageLabel returns a compact "Nm / Nh / Nd ago" string for a timestamp.
-func ageLabel(t time.Time) string {
+// loc is used only for the fallback "Jan 2" rendering on items older than 7 days.
+func ageLabel(t time.Time, loc *time.Location) string {
 	d := time.Since(t)
 	switch {
 	case d < time.Minute:
@@ -70,7 +74,7 @@ func ageLabel(t time.Time) string {
 	case d < 7*24*time.Hour:
 		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 	default:
-		return t.Format("Jan 2")
+		return t.In(loc).Format("Jan 2")
 	}
 }
 
@@ -134,7 +138,7 @@ templ DashboardContent(props DashboardProps) {
 							"/admin/orders?status=on_hold",
 						)
 						for _, o := range props.OnHold {
-							@orderLinkRow(o, "On hold", "text-rr-red", true)
+							@orderLinkRow(o, "On hold", "text-rr-red", true, props.MerchantTZ)
 						}
 					}
 					if props.FailedPaymentCount > 0 {
@@ -144,7 +148,7 @@ templ DashboardContent(props DashboardProps) {
 							"/admin/orders",
 						)
 						for _, o := range props.FailedPayments {
-							@orderLinkRow(o, "Payment failed", "text-rr-red", true)
+							@orderLinkRow(o, "Payment failed", "text-rr-red", true, props.MerchantTZ)
 						}
 					}
 				</div>
@@ -180,8 +184,8 @@ templ DashboardContent(props DashboardProps) {
 			<div class={ bandSpacing(props.urgentCount() + props.reviewCount()) }>
 				@bandHeader("Pipeline", props.pipelineCount(), "text-rr-heading")
 				<div class="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-					@pipelineGroup("Pack", props.ToFulfillCount, props.ToFulfill, "/admin/orders?fulfillment=unfulfilled", "text-rr-red", "bg-rr-red")
-					@pipelineGroup("Ship", props.ToShipCount, props.ToShip, "/admin/orders?fulfillment=fulfilled", "text-rr-teal", "bg-rr-teal")
+					@pipelineGroup("Pack", props.ToFulfillCount, props.ToFulfill, "/admin/orders?fulfillment=unfulfilled", "text-rr-red", "bg-rr-red", props.MerchantTZ)
+					@pipelineGroup("Ship", props.ToShipCount, props.ToShip, "/admin/orders?fulfillment=fulfilled", "text-rr-teal", "bg-rr-teal", props.MerchantTZ)
 				</div>
 			</div>
 		}
@@ -236,7 +240,7 @@ templ DashboardContent(props DashboardProps) {
 									{ formatCents(o.Total) }
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-3 text-sm text-rr-muted sm:table-cell">
-									{ o.PlacedAt.Format("Jan 2, 3:04 PM") }
+									{ o.PlacedAt.In(props.MerchantTZ).Format("Jan 2, 3:04 PM") }
 								</td>
 							</tr>
 						}
@@ -298,7 +302,7 @@ templ urgentGroupLink(title, detail, href string) {
 }
 
 // orderLinkRow renders a single order row inside a band.
-templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool) {
+templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *time.Location) {
 	<a
 		href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) }
 		class={ "flex items-center justify-between gap-4 border-2 px-4 py-2.5 hover:bg-rr-raised transition-colors",
@@ -310,9 +314,9 @@ templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool) {
 			<span class="text-sm font-semibold text-rr-heading">{ o.Number }</span>
 			<span class="hidden sm:inline text-sm text-rr-muted tabular-nums">{ formatCents(o.Total) }</span>
 			if ageIsStale(o.PlacedAt) {
-				<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt) }</span>
+				<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt, loc) }</span>
 			} else {
-				<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt) }</span>
+				<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt, loc) }</span>
 			}
 		</div>
 		<div class="flex items-center gap-3 shrink-0">
@@ -323,7 +327,7 @@ templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool) {
 }
 
 // pipelineGroup renders a named queue (Pack / Ship) with a count header and row list.
-templ pipelineGroup(label string, count int, orders []domain.Order, viewAllHref, labelClass, dotClass string) {
+templ pipelineGroup(label string, count int, orders []domain.Order, viewAllHref, labelClass, dotClass string, loc *time.Location) {
 	<div class="border-2 border-rr-border bg-rr-surface">
 		<div class="flex items-baseline justify-between px-4 py-2.5 border-b-2 border-rr-border bg-rr-raised">
 			<div class="flex items-baseline gap-2">
@@ -356,9 +360,9 @@ templ pipelineGroup(label string, count int, orders []domain.Order, viewAllHref,
 						</div>
 						<div class="flex items-center gap-2 shrink-0">
 							if ageIsStale(o.PlacedAt) {
-								<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt) }</span>
+								<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt, loc) }</span>
 							} else {
-								<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt) }</span>
+								<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt, loc) }</span>
 							}
 							@chevronRight()
 						</div>

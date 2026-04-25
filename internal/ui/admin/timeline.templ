@@ -1,0 +1,75 @@
+package admin
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+// actorLabel returns a displayable actor description for timeline entries.
+// System events get a stable "System" label rather than the raw actor name
+// (which is often a job identifier like "subscription_renewal").
+func actorLabel(e domain.AuditEntry) string {
+	if e.ActorType == domain.AuditActorTypeSystem {
+		return "System"
+	}
+	if e.ActorName == "" {
+		return string(e.ActorType)
+	}
+	return e.ActorName
+}
+
+// timelineRelative renders a coarse "x ago" hint. Absolute timestamps are
+// shown alongside, so this only needs to be a quick visual.
+func timelineRelative(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	case d < 365*24*time.Hour:
+		return fmt.Sprintf("%dmo ago", int(d.Hours()/(24*30)))
+	default:
+		return fmt.Sprintf("%dy ago", int(d.Hours()/(24*365)))
+	}
+}
+
+// timelineRow renders a single timeline entry — marker + connecting rail +
+// event card. Used by SubscriptionTimeline and CustomerActivity.
+templ timelineRow(e domain.AuditEntry, label, markerClass string, isLast bool) {
+	<li class={ "relative flex gap-x-4", templ.KV("pb-6", !isLast) }>
+		if !isLast {
+			<div class="absolute left-0 top-0 bottom-0 flex w-6 justify-center">
+				<div class="w-px bg-rr-border"></div>
+			</div>
+		}
+		<div class="relative flex size-6 flex-none items-center justify-center bg-rr-surface">
+			<div class={ "size-2.5 border border-rr-border " + markerClass }></div>
+		</div>
+		<div class="flex-auto pt-0.5">
+			<div class="flex flex-wrap items-baseline gap-x-2">
+				<span class="text-sm font-semibold text-rr-heading">{ label }</span>
+				<span class="text-xs text-rr-muted">
+					by <span class="text-rr-body">{ actorLabel(e) }</span>
+					<span class={ "ml-1 " + auditActorBadgeClass(e.ActorType) }>{ string(e.ActorType) }</span>
+				</span>
+			</div>
+			if e.Reason != nil && *e.Reason != "" {
+				<p class="mt-1 text-sm text-rr-body">{ *e.Reason }</p>
+			}
+			<p class="mt-1 text-xs text-rr-muted">
+				<time datetime={ e.CreatedAt.Format(time.RFC3339) }>
+					{ e.CreatedAt.Format("Jan 2, 2006 at 3:04 PM") }
+				</time>
+				<span class="mx-1.5">·</span>
+				<span>{ timelineRelative(e.CreatedAt) }</span>
+			</p>
+		</div>
+	</li>
+}

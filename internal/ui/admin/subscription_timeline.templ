@@ -1,0 +1,68 @@
+package admin
+
+import (
+	"strings"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/audit"
+)
+
+// subscriptionEventLabel returns a human-readable title for an audit action
+// recorded against a subscription resource. Falls back to a titleized form
+// of the action string for actions we don't have explicit copy for.
+func subscriptionEventLabel(action string) string {
+	switch action {
+	case audit.AuditSubscriptionCreated:
+		return "Subscription created"
+	case audit.AuditSubscriptionPaused:
+		return "Paused"
+	case audit.AuditSubscriptionResumed:
+		return "Resumed"
+	case audit.AuditSubscriptionCancelled:
+		return "Cancelled"
+	case audit.AuditSubscriptionRenewed:
+		return "Renewed"
+	case audit.AuditSubscriptionFailed:
+		return "Renewal failed"
+	case audit.AuditEmailSubscriptionConfirmed:
+		return "Confirmation email sent"
+	}
+	parts := strings.SplitN(action, ".", 2)
+	if len(parts) == 2 {
+		return strings.Title(strings.ReplaceAll(parts[1], "_", " "))
+	}
+	return action
+}
+
+// subscriptionEventMarker returns Tailwind classes for the small square stamp
+// marker. Color encodes event category — amber for creation/renewal/resumed,
+// rust for cancelled/failed, paper-warm for paused.
+func subscriptionEventMarker(action string) string {
+	switch action {
+	case audit.AuditSubscriptionCreated, audit.AuditSubscriptionRenewed, audit.AuditSubscriptionResumed:
+		return "bg-rr-amber"
+	case audit.AuditSubscriptionCancelled, audit.AuditSubscriptionFailed:
+		return "bg-rr-red"
+	case audit.AuditSubscriptionPaused:
+		return "bg-rr-raised"
+	default:
+		return "bg-rr-surface"
+	}
+}
+
+// SubscriptionTimeline renders a vertical activity log for a single
+// subscription, sourced from the audit_log table. Newest events first.
+templ SubscriptionTimeline(entries []domain.AuditEntry) {
+	<div class="mt-8">
+		<h2 class="text-sm font-semibold text-rr-heading">Activity</h2>
+		if len(entries) == 0 {
+			<p class="mt-2 text-sm text-rr-muted">No activity recorded yet.</p>
+		} else {
+			<ol role="list" class="mt-4">
+				for i, e := range entries {
+					@timelineRow(e, subscriptionEventLabel(e.Action), subscriptionEventMarker(e.Action), i == len(entries)-1)
+				}
+			</ol>
+		}
+	</div>
+}

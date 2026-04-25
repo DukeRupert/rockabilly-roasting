@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -27,6 +28,27 @@ func (s *AuditQueryService) List(ctx context.Context, tx pgx.Tx, f store.AuditFi
 	entries, err := s.entries.List(ctx, tx, f)
 	if err != nil {
 		return nil, fmt.Errorf("list audit entries: %w", err)
+	}
+	return entries, nil
+}
+
+// ListByResource returns all audit entries for a single resource, newest first.
+// Used to render per-resource activity timelines on detail pages.
+func (s *AuditQueryService) ListByResource(ctx context.Context, tx pgx.Tx, resourceType string, resourceID uuid.UUID) ([]domain.AuditEntry, error) {
+	entries, err := s.entries.ListByResource(ctx, tx, resourceType, resourceID)
+	if err != nil {
+		return nil, fmt.Errorf("list audit by resource: %w", err)
+	}
+	return entries, nil
+}
+
+// ListForCustomer returns audit entries that relate to a single customer —
+// either as actor (self-service actions, login, logout) or as resource (staff
+// actions on the customer, wholesale events). Newest first, capped at limit.
+func (s *AuditQueryService) ListForCustomer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, limit int) ([]domain.AuditEntry, error) {
+	entries, err := s.entries.ListForCustomer(ctx, tx, customerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list audit for customer: %w", err)
 	}
 	return entries, nil
 }

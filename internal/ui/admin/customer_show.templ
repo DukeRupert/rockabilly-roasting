@@ -12,6 +12,8 @@ type CustomerShowProps struct {
 	Addresses    []domain.Address
 	MemberGroups []domain.CustomerGroup
 	AllGroups    []domain.CustomerGroup
+	RecentOrders []domain.Order
+	Activity     []domain.AuditEntry
 	StaffName    string
 	StaffRole    string
 }
@@ -112,6 +114,67 @@ templ CustomerShowContent(props CustomerShowProps) {
 			</dd>
 		</div>
 	</div>
+	<!-- Recent Orders -->
+	<div class="mt-8">
+		<div class="sm:flex sm:items-center sm:justify-between">
+			<h2 class="text-sm font-semibold text-rr-heading">Recent orders</h2>
+			if len(props.RecentOrders) > 0 {
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/admin/orders?q=%s", props.Customer.Email)) }
+					class="text-sm font-semibold text-rr-red hover:text-rr-red-lt"
+				>
+					View all &rarr;
+				</a>
+			}
+		</div>
+		if len(props.RecentOrders) == 0 {
+			<p class="mt-2 text-sm text-rr-muted">No orders placed yet.</p>
+		} else {
+			<div class="mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Placed</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Total</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, o := range props.RecentOrders {
+							<tr>
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+									<a
+										href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID.String())) }
+										class="font-medium text-rr-red hover:text-rr-red-lt"
+									>
+										if o.Number != "" {
+											{ o.Number }
+										} else {
+											{ o.ID.String()[:8] }
+										}
+									</a>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									@OrderStatusBadge(o.Status)
+								</td>
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
+									<time datetime={ o.PlacedAt.Format("2006-01-02T15:04:05Z07:00") }>
+										{ o.PlacedAt.Format("Jan 2, 2006") }
+									</time>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-right text-sm text-rr-heading tabular-nums">
+									{ formatCents(o.Total) }
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+	<!-- Activity -->
+	@CustomerActivity(props.Activity)
 	<!-- Details -->
 	<div class="mt-8 border-2 border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6">

@@ -1,0 +1,107 @@
+package admin
+
+import (
+	"strings"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/audit"
+)
+
+// customerEventLabel returns a human-readable title for an audit action that
+// shows up on a customer activity feed. Covers customer.*, wholesale.*,
+// address.*, subscription self-actions, and login/logout.
+func customerEventLabel(action string) string {
+	switch action {
+	case audit.AuditCustomerLogin:
+		return "Logged in"
+	case audit.AuditCustomerLogout:
+		return "Logged out"
+	case audit.AuditCustomerGroupChanged:
+		return "Customer group changed"
+	case audit.AuditCustomerTaxExemptionGranted:
+		return "Tax exemption granted"
+	case audit.AuditCustomerTaxExemptionRevoked:
+		return "Tax exemption revoked"
+	case audit.AuditCustomerDeactivated:
+		return "Account deactivated"
+	case audit.AuditCustomerAddressAdded:
+		return "Address added"
+	case audit.AuditCustomerAddressUpdated:
+		return "Address updated"
+	case audit.AuditCustomerAddressDeleted:
+		return "Address removed"
+	case audit.AuditCustomerPaymentTermsUpdated:
+		return "Payment terms updated"
+	case audit.AuditCustomerBillingMethodUpdated:
+		return "Billing method updated"
+	case audit.AuditCustomerStripeIDLinked:
+		return "Linked to Stripe"
+	case audit.AuditWholesaleApplicationApproved:
+		return "Wholesale application approved"
+	case audit.AuditWholesaleApplicationDeclined:
+		return "Wholesale application declined"
+	case audit.AuditWholesaleAccountSuspended:
+		return "Wholesale account suspended"
+	case audit.AuditWholesaleAccountReactivated:
+		return "Wholesale account reactivated"
+	case audit.AuditSubscriptionCreated:
+		return "Subscription created"
+	case audit.AuditSubscriptionPaused:
+		return "Subscription paused"
+	case audit.AuditSubscriptionResumed:
+		return "Subscription resumed"
+	case audit.AuditSubscriptionCancelled:
+		return "Subscription cancelled"
+	}
+	parts := strings.SplitN(action, ".", 2)
+	if len(parts) == 2 {
+		resource := strings.Title(strings.ReplaceAll(parts[0], "_", " "))
+		verb := strings.ReplaceAll(parts[1], "_", " ")
+		return resource + " " + verb
+	}
+	return action
+}
+
+// customerEventMarker returns the marker color class for an action on the
+// customer activity feed. Auth events stay neutral; positive lifecycle events
+// are amber; problems and revocations are rust.
+func customerEventMarker(action string) string {
+	switch action {
+	case audit.AuditCustomerLogin, audit.AuditCustomerLogout:
+		return "bg-rr-surface"
+	case audit.AuditCustomerDeactivated,
+		audit.AuditCustomerTaxExemptionRevoked,
+		audit.AuditWholesaleApplicationDeclined,
+		audit.AuditWholesaleAccountSuspended,
+		audit.AuditSubscriptionCancelled:
+		return "bg-rr-red"
+	case audit.AuditWholesaleApplicationApproved,
+		audit.AuditWholesaleAccountReactivated,
+		audit.AuditCustomerTaxExemptionGranted,
+		audit.AuditSubscriptionCreated,
+		audit.AuditSubscriptionResumed:
+		return "bg-rr-amber"
+	case audit.AuditSubscriptionPaused:
+		return "bg-rr-raised"
+	default:
+		return "bg-rr-surface"
+	}
+}
+
+// CustomerActivity renders a vertical activity log for a customer, sourced
+// from audit_log entries where the customer was either the actor or the
+// resource. Newest first.
+templ CustomerActivity(entries []domain.AuditEntry) {
+	<div class="mt-8">
+		<h2 class="text-sm font-semibold text-rr-heading">Activity</h2>
+		if len(entries) == 0 {
+			<p class="mt-2 text-sm text-rr-muted">No activity recorded yet.</p>
+		} else {
+			<ol role="list" class="mt-4">
+				for i, e := range entries {
+					@timelineRow(e, customerEventLabel(e.Action), customerEventMarker(e.Action), i == len(entries)-1)
+				}
+			</ol>
+		}
+	</div>
+}

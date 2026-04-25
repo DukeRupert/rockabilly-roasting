@@ -149,6 +149,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 	var unitPrice int
 	var hasUnitPrice bool
 	var enrichedOrders []admin.EnrichedSubOrder
+	var activity []domain.AuditEntry
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -199,6 +200,10 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 				enrichedOrders[i].OrderStatus = order.Status
 			}
 		}
+		activity, txErr = d.AuditQueryService.ListByResource(ctx, tx, "subscription", id)
+		if txErr != nil {
+			return txErr
+		}
 		return nil
 	})
 	if err != nil {
@@ -222,6 +227,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		HasUnitPrice:    hasUnitPrice,
 		ShippingAddress: shippingAddr,
 		Orders:          enrichedOrders,
+		Activity:        activity,
 		Flash:           r.URL.Query().Get("flash"),
 		StaffName:       name,
 		StaffRole:       role,

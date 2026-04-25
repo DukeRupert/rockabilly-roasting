@@ -26,6 +26,7 @@ type SubscriptionShowProps struct {
 	HasUnitPrice    bool
 	ShippingAddress *domain.Address
 	Orders          []EnrichedSubOrder
+	Activity        []domain.AuditEntry
 	Flash           string
 	StaffName       string
 	StaffRole       string
@@ -274,6 +275,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			</div>
 		}
 	</div>
+	@SubscriptionTimeline(props.Activity)
 }
 
 templ SubscriptionShow(props SubscriptionShowProps) {

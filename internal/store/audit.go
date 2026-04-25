@@ -87,6 +87,50 @@ func (s *AuditStore) ListByAction(ctx context.Context, tx pgx.Tx, action string)
 	return auditEntriesFromRows(rows), nil
 }
 
+// ListForCustomer returns audit entries that relate to a single customer:
+// either entries where the customer was the actor (self-service actions, login,
+// logout) or where the customer was the resource (staff actions on the customer,
+// wholesale events). Ordered newest first, capped at limit.
+func (s *AuditStore) ListForCustomer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, limit int) ([]domain.AuditEntry, error) {
+	if limit <= 0 {
+		limit = 25
+	}
+	query := `SELECT id, actor_type, actor_id, actor_name, action, resource_type, resource_id,
+	                 after_snapshot, request_id, ip_address, reason, metadata, created_at
+	          FROM audit_log
+	          WHERE (actor_type = 'customer' AND actor_id = $1)
+	             OR (resource_type = 'customer' AND resource_id = $1)
+	          ORDER BY created_at DESC
+	          LIMIT $2`
+	rows, err := tx.Query(ctx, query, customerID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list audit for customer: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []domain.AuditEntry
+	for rows.Next() {
+		var e domain.AuditEntry
+		var actorType string
+		var metadataJSON json.RawMessage
+		if err := rows.Scan(
+			&e.ID, &actorType, &e.ActorID, &e.ActorName,
+			&e.Action, &e.ResourceType, &e.ResourceID,
+			&e.AfterSnapshot, &e.RequestID, &e.IPAddress,
+			&e.Reason, &metadataJSON, &e.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan audit entry: %w", err)
+		}
+		e.ActorType = domain.AuditActorType(actorType)
+		e.Metadata = metadataFromJSON(metadataJSON)
+		entries = append(entries, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate audit entries: %w", err)
+	}
+	return entries, nil
+}
+
 // AuditFilter holds optional filters for listing audit entries.
 type AuditFilter struct {
 	ActorType    *string

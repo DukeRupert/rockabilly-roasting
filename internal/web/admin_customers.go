@@ -85,6 +85,8 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	var addresses []domain.Address
 	var memberGroups []domain.CustomerGroup
 	var allGroups []domain.CustomerGroup
+	var recentOrders []domain.Order
+	var activity []domain.AuditEntry
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -101,6 +103,17 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		allGroups, txErr = d.CustomerGroupService.List(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		recentOrders, txErr = d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+			CustomerID: &id,
+			Limit:      5,
+		})
+		if txErr != nil {
+			return txErr
+		}
+		activity, txErr = d.AuditQueryService.ListForCustomer(ctx, tx, id, 25)
 		return txErr
 	})
 	if err != nil {
@@ -114,6 +127,8 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		Addresses:    addresses,
 		MemberGroups: memberGroups,
 		AllGroups:    allGroups,
+		RecentOrders: recentOrders,
+		Activity:     activity,
 		StaffName:    name,
 		StaffRole:    role,
 	}

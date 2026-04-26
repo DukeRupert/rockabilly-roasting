@@ -82,14 +82,6 @@ func (s *CustomerService) UpdateEmail(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return c, nil
 }
 
-// UpdatePassword updates a customer's password hash.
-func (s *CustomerService) UpdatePassword(ctx context.Context, tx pgx.Tx, id uuid.UUID, hash string) error {
-	if err := s.customers.UpdatePassword(ctx, tx, id, hash); err != nil {
-		return fmt.Errorf("update password: %w", err)
-	}
-	return nil
-}
-
 // VerifyEmail marks a customer's email as verified.
 func (s *CustomerService) VerifyEmail(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if err := s.customers.UpdateEmailVerified(ctx, tx, id, true); err != nil {

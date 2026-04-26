@@ -104,8 +104,11 @@ func TestChangePassword_Success(t *testing.T) {
 	require.NotNil(t, stored)
 	require.NoError(t, bcrypt.CompareHashAndPassword([]byte(*stored), []byte("newpassword1")))
 
-	// Audit row should record the change.
-	entry := testutil.LastAuditEntry(t, tx, "customer", customer.ID)
+	// Audit row should record the change. Filter by action because the prior
+	// SetPassword call also wrote a row for this customer in the same tx, and
+	// the audit_log primary key is a random UUID — ordering between same-tx
+	// entries is non-deterministic.
+	entry := testutil.LastAuditEntryWithAction(t, tx, "customer", customer.ID, audit.AuditCustomerPasswordChanged)
 	assert.Equal(t, audit.AuditCustomerPasswordChanged, entry.Action)
 }
 

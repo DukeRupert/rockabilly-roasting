@@ -52,8 +52,11 @@ const (
 	AuditCustomerGroupMemberRemoved = "customer_group.member_removed"
 
 	// Customer auth actions
-	AuditCustomerLogin  = "customer.login"
-	AuditCustomerLogout = "customer.logout"
+	AuditCustomerLogin           = "customer.login"
+	AuditCustomerLogout          = "customer.logout"
+	AuditCustomerPasswordSet     = "customer.password_set"
+	AuditCustomerPasswordChanged = "customer.password_changed"
+	AuditCustomerEmailVerified   = "customer.email_verified"
 
 	// Staff actions
 	AuditStaffCreated     = "staff.created"

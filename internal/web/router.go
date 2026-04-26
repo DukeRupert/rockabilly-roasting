@@ -102,6 +102,17 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /robots.txt", deps.handleRobotsTxt)
 	mux.HandleFunc("GET /sitemap.xml", deps.handleSitemapXML)
 
+	// Legacy WooCommerce URL redirects (pre-cutover paths). Both trailing-
+	// slash and bare forms are registered because WC always emitted a slash.
+	mux.HandleFunc("GET /product/{slug}", deps.handleLegacyProductRedirect)
+	mux.HandleFunc("GET /product/{slug}/{$}", deps.handleLegacyProductRedirect)
+	mux.HandleFunc("GET /product-category/{slug}", deps.handleLegacyCatalogRedirect)
+	mux.HandleFunc("GET /product-category/{slug}/{$}", deps.handleLegacyCatalogRedirect)
+	mux.HandleFunc("GET /shop-merchandise", deps.handleLegacyCatalogRedirect)
+	mux.HandleFunc("GET /shop-merchandise/{$}", deps.handleLegacyCatalogRedirect)
+	mux.HandleFunc("GET /rhythm-and-brews", deps.handleLegacyCatalogRedirect)
+	mux.HandleFunc("GET /rhythm-and-brews/{$}", deps.handleLegacyCatalogRedirect)
+
 	// Storefront routes
 	mux.HandleFunc("GET /{$}", deps.handleStorefrontHome)
 	mux.HandleFunc("GET /catalog", deps.handleStorefrontCatalog)

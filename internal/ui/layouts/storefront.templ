@@ -400,7 +400,13 @@ templ Storefront(props StorefrontProps) {
 							<p class="font-oswald text-paper-warm text-sm mb-4 leading-relaxed">
 								Roast drops, fresh deals, nothing else. No spam — just the good stuff.
 							</p>
-							<form method="post" action="https://broadwave.fireflysoftware.dev/api/subscribe" hx-boost="false" class="flex flex-col gap-2">
+							<form
+								method="post"
+								action="https://broadwave.fireflysoftware.dev/api/subscribe"
+								hx-target="#newsletter-status"
+								hx-swap="innerHTML"
+								class="flex flex-col gap-2"
+							>
 								<input type="hidden" name="api_key" value="bw_1ae328f598638462f357e01d43adf6d6"/>
 								<input type="hidden" name="list" value="rockabilly-roasting-newsletter"/>
 								<input type="hidden" name="redirect" value="https://rockabillyroasting.com/newsletter/thanks"/>
@@ -422,6 +428,7 @@ templ Storefront(props StorefrontProps) {
 								>
 									Join the list
 								</button>
+								<div id="newsletter-status" class="font-oswald text-paper-warm text-sm" aria-live="polite"></div>
 							</form>
 						</div>
 					</div>

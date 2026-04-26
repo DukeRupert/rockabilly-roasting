@@ -17,7 +17,7 @@ type AccountSecurityProps struct {
 }
 
 templ AccountSecurityContent(props AccountSecurityProps) {
-	@accountLayout("/account/security") {
+	@accountLayout("/account/security", props.Customer) {
 		<div class="max-w-lg">
 			@accountPageHeading("Security", "Password")
 			if props.Error != "" {

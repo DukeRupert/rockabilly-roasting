@@ -108,6 +108,7 @@ func (d *Deps) handleAccountOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.AccountOrdersProps{
+		Customer:  customer,
 		Orders:    orders,
 		CartCount: d.cartItemCountFromCookie(r),
 	}
@@ -166,11 +167,12 @@ func (d *Deps) handleAccountOrderShow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.AccountOrderShowProps{
-		Order:       order,
-		LineItems:   lineItems,
-		Shipments:   shipments,
-		Address:     shippingAddr,
-		CartCount:   d.cartItemCountFromCookie(r),
+		Customer:  customer,
+		Order:     order,
+		LineItems: lineItems,
+		Shipments: shipments,
+		Address:   shippingAddr,
+		CartCount: d.cartItemCountFromCookie(r),
 	}
 
 	if IsHTMX(r) {
@@ -264,6 +266,7 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 	}
 
 	props := storefront.AccountSubscriptionsProps{
+		Customer:  customer,
 		Rows:      rows,
 		CartCount: d.cartItemCountFromCookie(r),
 	}
@@ -376,6 +379,7 @@ func (d *Deps) handleAccountAddresses(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.AccountAddressesProps{
+		Customer:  customer,
 		Addresses: addresses,
 		CartCount: d.cartItemCountFromCookie(r),
 	}

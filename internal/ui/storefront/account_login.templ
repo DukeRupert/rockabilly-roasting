@@ -25,7 +25,7 @@ templ AccountLoginContent(props AccountLoginProps) {
 					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">in.</span>
 				</h1>
 				<p class="font-oswald text-ink-soft text-sm mt-3 max-w-xs mx-auto leading-relaxed">
-					Enter your email and we'll send you a one-tap sign-in link. No password to remember.
+					Enter your email. Add your password to sign in directly, or leave it blank and we'll email you a one-tap link.
 				</p>
 			</div>
 			<!-- Card -->
@@ -62,12 +62,26 @@ templ AccountLoginContent(props AccountLoginProps) {
 								style="letter-spacing:0.04em;"
 							/>
 						</div>
+						<div>
+							<label for="password" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Password</label>
+							<input
+								type="password"
+								name="password"
+								id="password"
+								autocomplete="current-password"
+								class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none"
+								style="letter-spacing:0.04em;"
+							/>
+							<p class="mt-2 font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">
+								Have a password? Enter it to sign in directly. Otherwise leave it blank and we'll email you a link.
+							</p>
+						</div>
 						<button
 							type="submit"
 							class="btn-stamp w-full inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm"
 							style="letter-spacing:0.16em; text-transform:uppercase;"
 						>
-							Send sign-in link
+							Sign in
 							<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
 							</svg>
@@ -75,8 +89,8 @@ templ AccountLoginContent(props AccountLoginProps) {
 					</form>
 				}
 			</div>
-			<p class="mt-6 text-center font-oswald text-chrome-deep text-xs" style="letter-spacing:0.18em; text-transform:uppercase;">
-				No password · Link expires in 15 min
+			<p class="mt-6 text-center font-oswald text-chrome-deep text-xs" style="letter-spacing:0.06em;">
+				Sign in with your password — or get a one-tap link by email.
 			</p>
 		</div>
 	</section>

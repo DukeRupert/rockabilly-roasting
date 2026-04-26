@@ -54,7 +54,34 @@ templ accountNav(activePath string) {
 	</nav>
 }
 
-templ accountLayout(activePath string) {
+// emailVerificationBanner renders an amber-accented strip prompting the customer to verify their email.
+// Renders nothing if customer is nil or already verified.
+templ emailVerificationBanner(customer *domain.Customer) {
+	if customer != nil && !customer.EmailVerified {
+		<div class="mb-6 border-2 border-amber bg-candle/20 px-5 py-4" style="border-left: 4px solid var(--color-amber);">
+			<p class="font-oswald font-bold text-ink text-[11px] mb-1" style="letter-spacing:0.2em; text-transform:uppercase;">Verify your email</p>
+			<p class="font-oswald text-ink-soft text-sm mb-3" style="letter-spacing:0.04em;">
+				We haven't confirmed <span class="font-bold text-ink">{ customer.Email }</span> is yours yet. Verify it to keep your account secure.
+			</p>
+			<form method="POST" action="/account/login">
+				<input type="hidden" name="email" value={ customer.Email }/>
+				<input type="hidden" name="next" value="/account/security"/>
+				<button
+					type="submit"
+					class="btn-stamp inline-flex items-center gap-2 bg-amber text-ink border-2 border-ink px-4 py-2 font-oswald font-bold text-[11px]"
+					style="letter-spacing:0.16em; text-transform:uppercase;"
+				>
+					Send verification link
+					<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/>
+					</svg>
+				</button>
+			</form>
+		</div>
+	}
+}
+
+templ accountLayout(activePath string, customer *domain.Customer) {
 	<!-- Full-bleed paper surface -->
 	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)]">
 		<!-- Paper grain overlay -->
@@ -81,6 +108,7 @@ templ accountLayout(activePath string) {
 					@accountNav(activePath)
 				</div>
 				<div class="flex-1 min-w-0">
+					@emailVerificationBanner(customer)
 					{ children... }
 				</div>
 			</div>
@@ -122,7 +150,7 @@ type AccountSettingsProps struct {
 }
 
 templ AccountSettingsContent(props AccountSettingsProps) {
-	@accountLayout("/account/settings") {
+	@accountLayout("/account/settings", props.Customer) {
 		<div class="max-w-lg">
 			@accountPageHeading("My account", "Your details")
 			if props.Success != "" {
@@ -173,12 +201,13 @@ templ AccountSettingsPage(props AccountSettingsProps) {
 // --- Order List ---
 
 type AccountOrdersProps struct {
+	Customer  *domain.Customer
 	Orders    []domain.Order
 	CartCount int
 }
 
 templ AccountOrdersContent(props AccountOrdersProps) {
-	@accountLayout("/account/orders") {
+	@accountLayout("/account/orders", props.Customer) {
 		@accountPageHeading("Past purchases", "Your orders")
 		if len(props.Orders) == 0 {
 			<div class="border-2 border-ink bg-cream-hi py-14 px-6 text-center shadow-stamp">
@@ -266,6 +295,7 @@ templ orderStatusBadge(status domain.OrderStatus, fulfillment domain.Fulfillment
 // --- Order Detail ---
 
 type AccountOrderShowProps struct {
+	Customer  *domain.Customer
 	Order     *domain.Order
 	LineItems []domain.LineItem
 	Shipments []domain.Shipment
@@ -274,7 +304,7 @@ type AccountOrderShowProps struct {
 }
 
 templ AccountOrderShowContent(props AccountOrderShowProps) {
-	@accountLayout("/account/orders") {
+	@accountLayout("/account/orders", props.Customer) {
 		<div>
 			<div class="mb-6">
 				<a href="/account/orders" class="inline-flex items-center gap-1.5 font-oswald font-bold text-[11px] text-chrome-deep hover:text-rust transition-colors" style="letter-spacing:0.2em; text-transform:uppercase;">
@@ -390,6 +420,7 @@ type AccountSubscriptionRow struct {
 }
 
 type AccountSubscriptionsProps struct {
+	Customer  *domain.Customer
 	Rows      []AccountSubscriptionRow
 	CartCount int
 }
@@ -452,7 +483,7 @@ func intervalLabel(interval domain.SubscriptionInterval) string {
 }
 
 templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
-	@accountLayout("/account/subscriptions") {
+	@accountLayout("/account/subscriptions", props.Customer) {
 		@accountPageHeading("The daily grind", "Your subscriptions")
 		if len(props.Rows) == 0 {
 			<div class="border-2 border-ink bg-cream-hi py-14 px-6 text-center shadow-stamp">
@@ -619,12 +650,13 @@ templ AccountSubscriptionsPage(props AccountSubscriptionsProps) {
 // --- Addresses ---
 
 type AccountAddressesProps struct {
+	Customer  *domain.Customer
 	Addresses []domain.Address
 	CartCount int
 }
 
 templ AccountAddressesContent(props AccountAddressesProps) {
-	@accountLayout("/account/addresses") {
+	@accountLayout("/account/addresses", props.Customer) {
 		<div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
 			<div>
 				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">

@@ -396,6 +396,85 @@ func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilt
 	return int(total), nil
 }
 
+// RevenueByDay returns daily revenue and order counts in the merchant's local
+// timezone, between [from, to). Cancelled and refunded orders are excluded.
+// Days with zero orders are NOT returned — callers fill gaps as needed.
+func (s *OrderStore) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to time.Time, tz *time.Location) ([]domain.DailyRevenue, error) {
+	tzName := "UTC"
+	if tz != nil {
+		tzName = tz.String()
+	}
+	query := `
+		SELECT (placed_at AT TIME ZONE $3)::date AS day,
+		       COALESCE(SUM(total), 0)::int       AS cents,
+		       COUNT(*)::int                      AS orders
+		FROM orders
+		WHERE placed_at >= $1
+		  AND placed_at < $2
+		  AND status NOT IN ('cancelled', 'refunded')
+		GROUP BY day
+		ORDER BY day`
+	rows, err := tx.Query(ctx, query, from, to, tzName)
+	if err != nil {
+		return nil, fmt.Errorf("revenue by day: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.DailyRevenue
+	for rows.Next() {
+		var d pgtype.Date
+		var cents, orders int32
+		if err := rows.Scan(&d, &cents, &orders); err != nil {
+			return nil, fmt.Errorf("scan revenue by day: %w", err)
+		}
+		out = append(out, domain.DailyRevenue{
+			Date:       d.Time,
+			Cents:      int(cents),
+			OrderCount: int(orders),
+		})
+	}
+	return out, rows.Err()
+}
+
+// TopProductsByUnits returns the top-N products by total units sold over
+// [from, to). Cancelled and refunded orders are excluded. Results are ordered
+// by units desc, ties broken by revenue desc.
+func (s *OrderStore) TopProductsByUnits(ctx context.Context, tx pgx.Tx, from, to time.Time, limit int) ([]domain.ProductSales, error) {
+	if limit <= 0 {
+		limit = 5
+	}
+	query := `
+		SELECT p.id, p.title,
+		       COALESCE(SUM(li.quantity), 0)::int AS units,
+		       COALESCE(SUM(li.total), 0)::int    AS revenue
+		FROM line_items li
+		JOIN orders   o ON o.id = li.order_id
+		JOIN variants v ON v.id = li.variant_id
+		JOIN products p ON p.id = v.product_id
+		WHERE o.placed_at >= $1
+		  AND o.placed_at < $2
+		  AND o.status NOT IN ('cancelled', 'refunded')
+		GROUP BY p.id, p.title
+		ORDER BY units DESC, revenue DESC
+		LIMIT $3`
+	rows, err := tx.Query(ctx, query, from, to, limit)
+	if err != nil {
+		return nil, fmt.Errorf("top products by units: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.ProductSales
+	for rows.Next() {
+		var ps domain.ProductSales
+		var units, revenue int32
+		if err := rows.Scan(&ps.ProductID, &ps.Title, &units, &revenue); err != nil {
+			return nil, fmt.Errorf("scan top products: %w", err)
+		}
+		ps.Units = int(units)
+		ps.Revenue = int(revenue)
+		out = append(out, ps)
+	}
+	return out, rows.Err()
+}
+
 // --- QuickBooks sync methods ---
 
 // SetQBInvoice stores the QB invoice ID and number on an order.

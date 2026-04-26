@@ -134,6 +134,23 @@ type LineItem struct {
 	Metadata      map[string]any
 }
 
+// DailyRevenue is one day's revenue and order count, bucketed in the
+// merchant's local timezone. Cancelled and refunded orders are excluded.
+type DailyRevenue struct {
+	Date       time.Time
+	Cents      int
+	OrderCount int
+}
+
+// ProductSales is one product's units sold and revenue over a window.
+// Cancelled and refunded orders are excluded.
+type ProductSales struct {
+	ProductID uuid.UUID
+	Title     string
+	Units     int
+	Revenue   int
+}
+
 // Adjustment represents an order-level or line-item-level adjustment.
 type Adjustment struct {
 	ID         uuid.UUID

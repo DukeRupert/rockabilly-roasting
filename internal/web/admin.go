@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
+	"github.com/dukerupert/hiri/internal/ui/admin/charts"
 )
 
 func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +139,24 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// Revenue trend — last 14 days, oldest → today
+		trendStart := todayStart.AddDate(0, 0, -13)
+		trendEnd := todayStart.AddDate(0, 0, 1) // exclusive upper bound
+		dailyRows, txErr := d.OrderService.RevenueByDay(ctx, tx, trendStart, trendEnd, d.MerchantTZ)
+		if txErr != nil {
+			return txErr
+		}
+		props.RevenueTrend = buildRevenueTrend(dailyRows, trendStart, d.MerchantTZ)
+
+		// Top products — last 30 days
+		topStart := todayStart.AddDate(0, 0, -29)
+		topEnd := trendEnd
+		topRows, txErr := d.OrderService.TopProductsByUnits(ctx, tx, topStart, topEnd, 5)
+		if txErr != nil {
+			return txErr
+		}
+		props.TopProducts = buildTopProducts(topRows)
+
 		return nil
 	})
 	if err != nil {
@@ -153,4 +173,81 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.Dashboard(props).Render(ctx, w) //nolint:errcheck
+}
+
+// buildRevenueTrend fills 14 contiguous days starting at trendStart, normalizes
+// magnitudes against the max, and shows a value label on today's bar only.
+// Returned slice is always exactly 14 elements ordered oldest → today.
+func buildRevenueTrend(rows []domain.DailyRevenue, trendStart time.Time, tz *time.Location) []charts.ChartPoint {
+	const days = 14
+	byDay := make(map[string]int, len(rows))
+	for _, r := range rows {
+		byDay[r.Date.Format("2006-01-02")] = r.Cents
+	}
+	maxCents := 0
+	for _, c := range byDay {
+		if c > maxCents {
+			maxCents = c
+		}
+	}
+	out := make([]charts.ChartPoint, days)
+	for i := 0; i < days; i++ {
+		day := trendStart.AddDate(0, 0, i).In(tz)
+		key := day.Format("2006-01-02")
+		cents := byDay[key]
+		mag := 0.0
+		if maxCents > 0 {
+			mag = float64(cents) / float64(maxCents)
+		}
+		isToday := i == days-1
+		label := day.Format("Jan 2")
+		if isToday {
+			label = "Today"
+		}
+		sub := ""
+		if isToday && cents > 0 {
+			sub = compactDollars(cents)
+		}
+		out[i] = charts.ChartPoint{
+			Label:     label,
+			Sub:       sub,
+			Magnitude: mag,
+			Highlight: isToday,
+		}
+	}
+	return out
+}
+
+// buildTopProducts converts ProductSales rows to chart data, normalized against
+// the top entry's units. Returns nil if no rows.
+func buildTopProducts(rows []domain.ProductSales) []charts.LabeledValue {
+	if len(rows) == 0 {
+		return nil
+	}
+	maxUnits := rows[0].Units // already sorted desc by units
+	out := make([]charts.LabeledValue, len(rows))
+	for i, r := range rows {
+		mag := 0.0
+		if maxUnits > 0 {
+			mag = float64(r.Units) / float64(maxUnits)
+		}
+		out[i] = charts.LabeledValue{
+			Label:     r.Title,
+			Value:     fmt.Sprintf("%d units", r.Units),
+			Sub:       compactDollars(r.Revenue),
+			Magnitude: mag,
+		}
+	}
+	return out
+}
+
+// compactDollars renders cents as "$1.2k" / "$240" — kept short for chart labels.
+func compactDollars(cents int) string {
+	dollars := cents / 100
+	switch {
+	case dollars >= 1000:
+		return fmt.Sprintf("$%.1fk", float64(dollars)/1000)
+	default:
+		return fmt.Sprintf("$%d", dollars)
+	}
 }

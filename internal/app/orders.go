@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -107,6 +108,27 @@ func (s *OrderService) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f store.O
 		return 0, fmt.Errorf("sum order revenue: %w", err)
 	}
 	return total, nil
+}
+
+// RevenueByDay returns daily revenue (cents) and order counts in [from, to),
+// bucketed in the merchant's local timezone. Cancelled and refunded orders are
+// excluded. Days with zero orders are not returned.
+func (s *OrderService) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to time.Time, tz *time.Location) ([]domain.DailyRevenue, error) {
+	rows, err := s.orders.RevenueByDay(ctx, tx, from, to, tz)
+	if err != nil {
+		return nil, fmt.Errorf("revenue by day: %w", err)
+	}
+	return rows, nil
+}
+
+// TopProductsByUnits returns the top-N products by units sold in [from, to).
+// Cancelled and refunded orders are excluded.
+func (s *OrderService) TopProductsByUnits(ctx context.Context, tx pgx.Tx, from, to time.Time, limit int) ([]domain.ProductSales, error) {
+	rows, err := s.orders.TopProductsByUnits(ctx, tx, from, to, limit)
+	if err != nil {
+		return nil, fmt.Errorf("top products by units: %w", err)
+	}
+	return rows, nil
 }
 
 // ListLineItems returns all line items for an order.

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/admin/charts"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
@@ -36,6 +37,10 @@ type DashboardProps struct {
 
 	// Recent orders
 	RecentOrders []domain.Order
+
+	// Charts
+	RevenueTrend  []charts.ChartPoint   // last 14 days, oldest → today
+	TopProducts   []charts.LabeledValue // top 5 by units sold, last 30 days
 
 	// Merchant local timezone for date display.
 	MerchantTZ *time.Location
@@ -106,6 +111,25 @@ templ DashboardContent(props DashboardProps) {
 		</div>
 	</div>
 	<div class="flame-stripe mt-8"></div>
+	<!-- Charts -->
+	<div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+		<div class="border-2 border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
+			<div class="flex items-baseline justify-between">
+				<p class="label-font text-rr-muted">Revenue · last 14 days</p>
+			</div>
+			<div class="mt-4">
+				@charts.BarVertical(props.RevenueTrend)
+			</div>
+		</div>
+		<div class="border-2 border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
+			<div class="flex items-baseline justify-between">
+				<p class="label-font text-rr-muted">Top sellers · last 30 days</p>
+			</div>
+			<div class="mt-4">
+				@charts.BarHorizontal(props.TopProducts)
+			</div>
+		</div>
+	</div>
 	if !props.hasAnyAction() {
 		<!-- All caught up -->
 		<div class="mt-8">

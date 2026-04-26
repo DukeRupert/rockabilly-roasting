@@ -1,0 +1,145 @@
+// Package charts holds reusable SVG chart partials for the admin UI.
+//
+// Charts are pure rendering: callers compute purpose-shaped data, normalize
+// magnitudes to [0,1], and pre-format all label strings (currency, dates).
+// This keeps charts trivially reusable across reports without coupling them
+// to business types.
+package charts
+
+import "fmt"
+
+// ChartPoint is a single time-series datum for vertical bar charts.
+//   - Label: x-axis label (e.g. "Apr 22")
+//   - Sub: value label rendered above the bar (e.g. "$1,240")
+//   - Magnitude: bar height as a fraction of the available area, in [0,1]
+//   - Highlight: when true, the bar is rendered in the accent color
+type ChartPoint struct {
+	Label     string
+	Sub       string
+	Magnitude float64
+	Highlight bool
+}
+
+// LabeledValue is a single datum for horizontal bar charts.
+//   - Label: row label (e.g. product title)
+//   - Sub: secondary value label (e.g. "$1,240")
+//   - Value: primary value label (e.g. "248 units")
+//   - Magnitude: bar width as a fraction of the available area, in [0,1]
+type LabeledValue struct {
+	Label     string
+	Sub       string
+	Value     string
+	Magnitude float64
+}
+
+// BarVertical renders a vertical bar chart of time-series points.
+// Bars are evenly spaced across the SVG width; each bar's height is
+// Magnitude * (chart height - top label area).
+templ BarVertical(data []ChartPoint) {
+	if len(data) == 0 {
+		<p class="text-sm text-rr-muted">No data.</p>
+	} else {
+		<div class="w-full overflow-x-auto">
+			<svg viewBox="0 0 700 220" preserveAspectRatio="none" class="block w-full" style="height: 14rem;" role="img" aria-label="Bar chart">
+				@verticalBars(data)
+			</svg>
+		</div>
+	}
+}
+
+templ verticalBars(data []ChartPoint) {
+	{{
+		// Reserved areas: 28px top for value label, 26px bottom for x label.
+		// Bars share the middle band (~166px tall).
+		const W, H = 700.0, 220.0
+		const topPad, botPad = 28.0, 26.0
+		const barInsetFrac = 0.18 // gap between bars as fraction of slot width
+		bandH := H - topPad - botPad
+		n := float64(len(data))
+		slotW := W / n
+		barW := slotW * (1.0 - 2.0*barInsetFrac)
+	}}
+	for i, p := range data {
+		{{
+			x := float64(i)*slotW + slotW*barInsetFrac
+			barH := p.Magnitude * bandH
+			if barH < 2 && p.Magnitude > 0 {
+				barH = 2 // ensure non-zero days are visible
+			}
+			y := topPad + (bandH - barH)
+			cx := float64(i)*slotW + slotW/2
+			fillClass := "fill-rr-heading"
+			if p.Highlight {
+				fillClass = "fill-rr-red"
+			}
+		}}
+		<rect
+			x={ fmt.Sprintf("%.2f", x) }
+			y={ fmt.Sprintf("%.2f", y) }
+			width={ fmt.Sprintf("%.2f", barW) }
+			height={ fmt.Sprintf("%.2f", barH) }
+			class={ fillClass }
+		></rect>
+		if p.Sub != "" && p.Magnitude > 0 {
+			<text
+				x={ fmt.Sprintf("%.2f", cx) }
+				y={ fmt.Sprintf("%.2f", y-6) }
+				text-anchor="middle"
+				class="fill-rr-muted"
+				style="font-family: 'Special Elite', monospace; font-size: 10px;"
+			>{ p.Sub }</text>
+		}
+		<text
+			x={ fmt.Sprintf("%.2f", cx) }
+			y={ fmt.Sprintf("%.2f", H-8) }
+			text-anchor="middle"
+			class="fill-rr-muted"
+			style="font-family: 'Special Elite', monospace; font-size: 10px;"
+		>{ p.Label }</text>
+	}
+	<line
+		x1="0" x2={ fmt.Sprintf("%.2f", W) }
+		y1={ fmt.Sprintf("%.2f", H-botPad+1) }
+		y2={ fmt.Sprintf("%.2f", H-botPad+1) }
+		class="stroke-rr-border"
+		stroke-width="1"
+	></line>
+}
+
+// BarHorizontal renders a horizontal bar chart of labeled values.
+// Each row is fixed height; bars share the right column with the
+// label/sub text rendered above the bar.
+templ BarHorizontal(data []LabeledValue) {
+	if len(data) == 0 {
+		<p class="text-sm text-rr-muted">No data.</p>
+	} else {
+		<div class="space-y-3">
+			for _, v := range data {
+				@horizontalRow(v)
+			}
+		</div>
+	}
+}
+
+templ horizontalRow(v LabeledValue) {
+	{{
+		pct := v.Magnitude * 100
+		if pct < 1.5 && v.Magnitude > 0 {
+			pct = 1.5
+		}
+	}}
+	<div>
+		<div class="flex items-baseline justify-between gap-3 mb-1">
+			<p class="text-sm font-semibold text-rr-heading truncate">{ v.Label }</p>
+			<p class="text-sm tabular-nums text-rr-heading shrink-0" style="font-family: 'Special Elite', monospace;">
+				{ v.Value }
+				if v.Sub != "" {
+					<span class="text-rr-muted ml-2">{ v.Sub }</span>
+				}
+			</p>
+		</div>
+		<div class="h-3 bg-rr-raised border border-rr-border">
+			<div class="h-full bg-rr-heading" style={ fmt.Sprintf("width: %.2f%%;", pct) }></div>
+		</div>
+	</div>
+}

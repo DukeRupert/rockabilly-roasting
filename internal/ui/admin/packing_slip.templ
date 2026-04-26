@@ -21,138 +21,306 @@ templ PackingSlip(props PackingSlipProps) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>Packing Slip — { props.Order.Number }</title>
+			<title>Packing Slip &mdash; { props.Order.Number }</title>
 			<style>
 				* { margin: 0; padding: 0; box-sizing: border-box; }
-				body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 12px; color: #1c1917; padding: 24px; }
-				.header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1c1917; padding-bottom: 16px; margin-bottom: 24px; }
-				.company { font-size: 18px; font-weight: 700; }
-				.order-info { text-align: right; }
-				.order-number { font-size: 14px; font-weight: 700; }
-				.order-date { color: #78716c; margin-top: 4px; }
-				.addresses { display: flex; gap: 48px; margin-bottom: 24px; }
-				.address-block h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #78716c; margin-bottom: 8px; }
-				.address-block p { line-height: 1.5; }
-				table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-				thead th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #78716c; padding: 8px 12px; border-bottom: 1px solid #d6d3d1; }
+				:root {
+					--paper: #F6EFE1;
+					--ink: #0E0D0C;
+					--amber: #F2A03D;
+					--rust: #B4351D;
+					--muted: #6B6258;
+				}
+				body {
+					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+					font-size: 12px;
+					line-height: 1.55;
+					color: var(--ink);
+					background: var(--paper);
+					padding: 32px 36px;
+				}
+				.sheet { max-width: 780px; margin: 0 auto; }
+
+				.masthead {
+					display: flex;
+					justify-content: space-between;
+					align-items: flex-start;
+					border-bottom: 3px solid var(--ink);
+					padding-bottom: 16px;
+					margin-bottom: 20px;
+					gap: 24px;
+				}
+				.brand { display: flex; gap: 14px; align-items: flex-start; }
+				.brand .badge-mark {
+					width: 72px;
+					height: 72px;
+					object-fit: contain;
+					flex-shrink: 0;
+				}
+				.brand .mark {
+					font-weight: 900;
+					font-size: 22px;
+					letter-spacing: 0.04em;
+					text-transform: uppercase;
+					line-height: 1;
+				}
+				.brand .mark .accent { color: var(--rust); }
+				.brand .tagline {
+					margin-top: 6px;
+					font-size: 10px;
+					text-transform: uppercase;
+					letter-spacing: 0.14em;
+					color: var(--muted);
+				}
+				.brand .contact {
+					margin-top: 10px;
+					font-size: 11px;
+					color: var(--muted);
+					line-height: 1.5;
+				}
+
+				.doc-meta { text-align: right; }
+				.doc-meta .kind {
+					display: inline-block;
+					font-family: "Impact", "Helvetica Neue", Helvetica, Arial, sans-serif;
+					font-weight: 900;
+					font-size: 30px;
+					letter-spacing: 0.06em;
+					text-transform: uppercase;
+					padding: 4px 14px;
+					background: var(--ink);
+					color: var(--paper);
+					line-height: 1;
+				}
+				.doc-meta .number {
+					margin-top: 10px;
+					font-size: 13px;
+					font-weight: 700;
+				}
+				.doc-meta .date { margin-top: 2px; font-size: 11px; color: var(--muted); }
+
+				.addresses {
+					display: flex;
+					gap: 36px;
+					margin-bottom: 22px;
+				}
+				.addr {
+					flex: 1;
+					border: 2px solid var(--ink);
+					padding: 12px 14px;
+					background: #FFFFFF;
+				}
+				.addr h3 {
+					font-size: 10px;
+					font-weight: 700;
+					text-transform: uppercase;
+					letter-spacing: 0.12em;
+					color: var(--muted);
+					margin-bottom: 6px;
+				}
+				.addr p { line-height: 1.5; font-size: 12px; }
+				.addr .name { font-weight: 700; }
+
+				table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+				thead th {
+					text-align: left;
+					font-size: 10px;
+					font-weight: 700;
+					text-transform: uppercase;
+					letter-spacing: 0.08em;
+					color: var(--paper);
+					background: var(--ink);
+					padding: 8px 10px;
+				}
 				thead th.right { text-align: right; }
-				tbody td { padding: 10px 12px; border-bottom: 1px solid #e7e5e4; }
-				tbody td.right { text-align: right; }
-				.totals { margin-left: auto; width: 240px; }
-				.totals .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
-				.totals .row.total { border-top: 1px solid #1c1917; padding-top: 8px; margin-top: 4px; font-weight: 700; font-size: 14px; }
-				.footer { margin-top: 48px; text-align: center; font-size: 11px; color: #a8a29e; }
+				tbody td {
+					padding: 10px;
+					border-bottom: 1px solid var(--ink);
+					vertical-align: top;
+				}
+				tbody td.right { text-align: right; font-variant-numeric: tabular-nums; }
+				tbody td .sku { color: var(--muted); font-size: 10px; margin-top: 2px; }
+
+				.totals-wrap { display: flex; justify-content: flex-end; }
+				.totals {
+					width: 280px;
+					border: 2px solid var(--ink);
+					background: #FFFFFF;
+					padding: 10px 14px;
+				}
+				.totals .row {
+					display: flex;
+					justify-content: space-between;
+					padding: 3px 0;
+					font-size: 12px;
+					font-variant-numeric: tabular-nums;
+				}
+				.totals .row.muted { color: var(--muted); }
+				.totals .row.grand {
+					border-top: 2px solid var(--ink);
+					padding-top: 8px;
+					margin-top: 6px;
+					font-weight: 700;
+					font-size: 15px;
+				}
+
+				.notes {
+					margin-top: 22px;
+					padding: 12px 14px;
+					border: 2px solid var(--ink);
+					background: #FFFFFF;
+				}
+				.notes h4 {
+					font-size: 10px;
+					text-transform: uppercase;
+					letter-spacing: 0.12em;
+					color: var(--muted);
+					margin-bottom: 4px;
+				}
+
+				.footer {
+					margin-top: 28px;
+					padding-top: 14px;
+					border-top: 2px solid var(--ink);
+					display: flex;
+					justify-content: space-between;
+					align-items: flex-end;
+					font-size: 10px;
+					color: var(--muted);
+				}
+				.footer .thanks {
+					font-family: "Georgia", "Times New Roman", serif;
+					font-style: italic;
+					font-size: 14px;
+					color: var(--ink);
+				}
+
 				@media print {
-					body { padding: 0; }
+					body { background: #FFFFFF; padding: 0; }
+					.sheet { max-width: none; }
 					@page { margin: 0.5in; }
 				}
 			</style>
 		</head>
 		<body onload="window.print()">
-			<div class="header">
-				<div class="company">Hiri Coffee</div>
-				<div class="order-info">
-					<div class="order-number">{ props.Order.Number }</div>
-					<div class="order-date">{ props.Order.PlacedAt.In(props.MerchantTZ).Format("January 2, 2006") }</div>
+			<div class="sheet">
+				<div class="masthead">
+					<div class="brand">
+						<img src="/static/badge-black.png" alt="" class="badge-mark"/>
+						<div>
+							<div class="mark">Rockabilly <span class="accent">Roasting</span> Co.</div>
+							<div class="tagline">Small&mdash;batch. Hand&mdash;packed. Kennewick, WA.</div>
+							<div class="contact">
+								101 W Kennewick Ave, Kennewick, WA 99336<br/>
+								(509) 585&ndash;2320 &middot; info@rockabillyroasting.com
+							</div>
+						</div>
+					</div>
+					<div class="doc-meta">
+						<div class="kind">Packing Slip</div>
+						<div class="number">{ props.Order.Number }</div>
+						<div class="date">{ props.Order.PlacedAt.In(props.MerchantTZ).Format("January 2, 2006") }</div>
+					</div>
 				</div>
-			</div>
-			<div class="addresses">
-				if props.ShippingAddress != nil {
-					<div class="address-block">
-						<h3>Ship To</h3>
-						<p>
-							{ props.ShippingAddress.FirstName } { props.ShippingAddress.LastName }
-							if props.ShippingAddress.Company != nil && *props.ShippingAddress.Company != "" {
-								<br/>
-								{ *props.ShippingAddress.Company }
-							}
-							<br/>
-							{ props.ShippingAddress.Line1 }
-							if props.ShippingAddress.Line2 != nil && *props.ShippingAddress.Line2 != "" {
-								<br/>
-								{ *props.ShippingAddress.Line2 }
-							}
-							<br/>
-							{ props.ShippingAddress.City }, { props.ShippingAddress.State } { props.ShippingAddress.PostalCode }
-						</p>
-					</div>
-				}
-				if props.Customer != nil {
-					<div class="address-block">
-						<h3>Customer</h3>
-						<p>
-							{ props.Customer.FirstName } { props.Customer.LastName }
-							<br/>
-							{ props.Customer.Email }
-						</p>
-					</div>
-				}
-			</div>
-			<table>
-				<thead>
-					<tr>
-						<th>Product</th>
-						<th>SKU</th>
-						<th class="right">Qty</th>
-						<th class="right">Unit Price</th>
-						<th class="right">Total</th>
-					</tr>
-				</thead>
-				<tbody>
-					for _, eli := range props.LineItems {
-						<tr>
-							<td>
-								if eli.ProductTitle != "" {
-									{ eli.ProductTitle }
-								} else {
-									{ eli.LineItem.VariantID.String()[:8] }...
+				<div class="addresses">
+					if props.ShippingAddress != nil {
+						<div class="addr">
+							<h3>Ship to</h3>
+							<p>
+								<span class="name">{ props.ShippingAddress.FirstName } { props.ShippingAddress.LastName }</span>
+								if props.ShippingAddress.Company != nil && *props.ShippingAddress.Company != "" {
+									<br/>
+									{ *props.ShippingAddress.Company }
 								}
-							</td>
-							<td>
-								if eli.VariantSKU != "" {
-									{ eli.VariantSKU }
-								} else {
-									—
+								<br/>
+								{ props.ShippingAddress.Line1 }
+								if props.ShippingAddress.Line2 != nil && *props.ShippingAddress.Line2 != "" {
+									<br/>
+									{ *props.ShippingAddress.Line2 }
 								}
-							</td>
-							<td class="right">{ fmt.Sprintf("%d", eli.LineItem.Quantity) }</td>
-							<td class="right">{ formatCents(eli.LineItem.UnitPrice) }</td>
-							<td class="right">{ formatCents(eli.LineItem.Total) }</td>
-						</tr>
+								<br/>
+								{ props.ShippingAddress.City }, { props.ShippingAddress.State } { props.ShippingAddress.PostalCode }
+							</p>
+						</div>
 					}
-				</tbody>
-			</table>
-			<div class="totals">
-				<div class="row">
-					<span>Subtotal</span>
-					<span>{ formatCents(props.Order.Subtotal) }</span>
+					if props.Customer != nil {
+						<div class="addr">
+							<h3>Customer</h3>
+							<p>
+								<span class="name">{ props.Customer.FirstName } { props.Customer.LastName }</span>
+								<br/>
+								<span style="color: var(--muted);">{ props.Customer.Email }</span>
+							</p>
+						</div>
+					}
 				</div>
-				if props.Order.DiscountTotal > 0 {
-					<div class="row">
-						<span>Discounts</span>
-						<span>-{ formatCents(props.Order.DiscountTotal) }</span>
+				<table>
+					<thead>
+						<tr>
+							<th>Item</th>
+							<th class="right">Qty</th>
+							<th class="right">Unit Price</th>
+							<th class="right">Total</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, eli := range props.LineItems {
+							<tr>
+								<td>
+									if eli.ProductTitle != "" {
+										<div class="name" style="font-weight: 700;">{ eli.ProductTitle }</div>
+									} else {
+										<div class="name" style="font-weight: 700;">{ eli.LineItem.VariantID.String()[:8] }&hellip;</div>
+									}
+									if eli.VariantSKU != "" {
+										<div class="sku">SKU { eli.VariantSKU }</div>
+									}
+								</td>
+								<td class="right">{ fmt.Sprintf("%d", eli.LineItem.Quantity) }</td>
+								<td class="right">{ formatCents(eli.LineItem.UnitPrice) }</td>
+								<td class="right">{ formatCents(eli.LineItem.Total) }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+				<div class="totals-wrap">
+					<div class="totals">
+						<div class="row muted">
+							<span>Subtotal</span>
+							<span>{ formatCents(props.Order.Subtotal) }</span>
+						</div>
+						if props.Order.DiscountTotal > 0 {
+							<div class="row muted">
+								<span>Discounts</span>
+								<span>&minus;{ formatCents(props.Order.DiscountTotal) }</span>
+							</div>
+						}
+						<div class="row muted">
+							<span>Shipping</span>
+							<span>{ formatCents(props.Order.ShippingTotal) }</span>
+						</div>
+						<div class="row muted">
+							<span>Tax</span>
+							<span>{ formatCents(props.Order.TaxTotal) }</span>
+						</div>
+						<div class="row grand">
+							<span>Total</span>
+							<span>{ formatCents(props.Order.Total) }</span>
+						</div>
+					</div>
+				</div>
+				if props.Order.Notes != nil && *props.Order.Notes != "" {
+					<div class="notes">
+						<h4>Notes</h4>
+						<p>{ *props.Order.Notes }</p>
 					</div>
 				}
-				<div class="row">
-					<span>Shipping</span>
-					<span>{ formatCents(props.Order.ShippingTotal) }</span>
+				<div class="footer">
+					<div class="thanks">Thanks for drinking with us.</div>
+					<div>
+						Questions? info@rockabillyroasting.com &middot; (509) 585&ndash;2320
+					</div>
 				</div>
-				<div class="row">
-					<span>Tax</span>
-					<span>{ formatCents(props.Order.TaxTotal) }</span>
-				</div>
-				<div class="row total">
-					<span>Total</span>
-					<span>{ formatCents(props.Order.Total) }</span>
-				</div>
-			</div>
-			if props.Order.Notes != nil && *props.Order.Notes != "" {
-				<div style="margin-top: 24px; padding: 12px; background: #fafaf9; border: 1px solid #e7e5e4;">
-					<strong>Notes:</strong> { *props.Order.Notes }
-				</div>
-			}
-			<div class="footer">
-				Thank you for your order!
 			</div>
 		</body>
 	</html>

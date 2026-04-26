@@ -83,6 +83,14 @@ templ OrderInvoice(props OrderInvoiceProps) {
 					border-bottom: 3px solid var(--ink);
 					padding-bottom: 16px;
 					margin-bottom: 20px;
+					gap: 24px;
+				}
+				.brand { display: flex; gap: 14px; align-items: flex-start; }
+				.brand .badge-mark {
+					width: 72px;
+					height: 72px;
+					object-fit: contain;
+					flex-shrink: 0;
 				}
 				.brand .mark {
 					font-weight: 900;
@@ -296,11 +304,14 @@ templ OrderInvoice(props OrderInvoiceProps) {
 			<div class="sheet">
 				<div class="masthead">
 					<div class="brand">
-						<div class="mark">Rockabilly <span class="accent">Roasting</span> Co.</div>
-						<div class="tagline">Small&mdash;batch. Hand&mdash;packed. Kennewick, WA.</div>
-						<div class="contact">
-							101 W Kennewick Ave, Kennewick, WA 99336<br/>
-							(509) 585&ndash;2320 &middot; info@rockabillyroasting.com
+						<img src="/static/badge-black.png" alt="" class="badge-mark"/>
+						<div>
+							<div class="mark">Rockabilly <span class="accent">Roasting</span> Co.</div>
+							<div class="tagline">Small&mdash;batch. Hand&mdash;packed. Kennewick, WA.</div>
+							<div class="contact">
+								101 W Kennewick Ave, Kennewick, WA 99336<br/>
+								(509) 585&ndash;2320 &middot; info@rockabillyroasting.com
+							</div>
 						</div>
 					</div>
 					<div class="doc-meta">

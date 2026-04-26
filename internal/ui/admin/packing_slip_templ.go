@@ -44,40 +44,40 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Packing Slip — ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Packing Slip &mdash; ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 24, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 24, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><style>\n\t\t\t\t* { margin: 0; padding: 0; box-sizing: border-box; }\n\t\t\t\tbody { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif; font-size: 12px; color: #1c1917; padding: 24px; }\n\t\t\t\t.header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1c1917; padding-bottom: 16px; margin-bottom: 24px; }\n\t\t\t\t.company { font-size: 18px; font-weight: 700; }\n\t\t\t\t.order-info { text-align: right; }\n\t\t\t\t.order-number { font-size: 14px; font-weight: 700; }\n\t\t\t\t.order-date { color: #78716c; margin-top: 4px; }\n\t\t\t\t.addresses { display: flex; gap: 48px; margin-bottom: 24px; }\n\t\t\t\t.address-block h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #78716c; margin-bottom: 8px; }\n\t\t\t\t.address-block p { line-height: 1.5; }\n\t\t\t\ttable { width: 100%; border-collapse: collapse; margin-bottom: 24px; }\n\t\t\t\tthead th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: #78716c; padding: 8px 12px; border-bottom: 1px solid #d6d3d1; }\n\t\t\t\tthead th.right { text-align: right; }\n\t\t\t\ttbody td { padding: 10px 12px; border-bottom: 1px solid #e7e5e4; }\n\t\t\t\ttbody td.right { text-align: right; }\n\t\t\t\t.totals { margin-left: auto; width: 240px; }\n\t\t\t\t.totals .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }\n\t\t\t\t.totals .row.total { border-top: 1px solid #1c1917; padding-top: 8px; margin-top: 4px; font-weight: 700; font-size: 14px; }\n\t\t\t\t.footer { margin-top: 48px; text-align: center; font-size: 11px; color: #a8a29e; }\n\t\t\t\t@media print {\n\t\t\t\t\tbody { padding: 0; }\n\t\t\t\t\t@page { margin: 0.5in; }\n\t\t\t\t}\n\t\t\t</style></head><body onload=\"window.print()\"><div class=\"header\"><div class=\"company\">Hiri Coffee</div><div class=\"order-info\"><div class=\"order-number\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><style>\n\t\t\t\t* { margin: 0; padding: 0; box-sizing: border-box; }\n\t\t\t\t:root {\n\t\t\t\t\t--paper: #F6EFE1;\n\t\t\t\t\t--ink: #0E0D0C;\n\t\t\t\t\t--amber: #F2A03D;\n\t\t\t\t\t--rust: #B4351D;\n\t\t\t\t\t--muted: #6B6258;\n\t\t\t\t}\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n\t\t\t\t\tfont-size: 12px;\n\t\t\t\t\tline-height: 1.55;\n\t\t\t\t\tcolor: var(--ink);\n\t\t\t\t\tbackground: var(--paper);\n\t\t\t\t\tpadding: 32px 36px;\n\t\t\t\t}\n\t\t\t\t.sheet { max-width: 780px; margin: 0 auto; }\n\n\t\t\t\t.masthead {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\talign-items: flex-start;\n\t\t\t\t\tborder-bottom: 3px solid var(--ink);\n\t\t\t\t\tpadding-bottom: 16px;\n\t\t\t\t\tmargin-bottom: 20px;\n\t\t\t\t\tgap: 24px;\n\t\t\t\t}\n\t\t\t\t.brand { display: flex; gap: 14px; align-items: flex-start; }\n\t\t\t\t.brand .badge-mark {\n\t\t\t\t\twidth: 72px;\n\t\t\t\t\theight: 72px;\n\t\t\t\t\tobject-fit: contain;\n\t\t\t\t\tflex-shrink: 0;\n\t\t\t\t}\n\t\t\t\t.brand .mark {\n\t\t\t\t\tfont-weight: 900;\n\t\t\t\t\tfont-size: 22px;\n\t\t\t\t\tletter-spacing: 0.04em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tline-height: 1;\n\t\t\t\t}\n\t\t\t\t.brand .mark .accent { color: var(--rust); }\n\t\t\t\t.brand .tagline {\n\t\t\t\t\tmargin-top: 6px;\n\t\t\t\t\tfont-size: 10px;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.14em;\n\t\t\t\t\tcolor: var(--muted);\n\t\t\t\t}\n\t\t\t\t.brand .contact {\n\t\t\t\t\tmargin-top: 10px;\n\t\t\t\t\tfont-size: 11px;\n\t\t\t\t\tcolor: var(--muted);\n\t\t\t\t\tline-height: 1.5;\n\t\t\t\t}\n\n\t\t\t\t.doc-meta { text-align: right; }\n\t\t\t\t.doc-meta .kind {\n\t\t\t\t\tdisplay: inline-block;\n\t\t\t\t\tfont-family: \"Impact\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n\t\t\t\t\tfont-weight: 900;\n\t\t\t\t\tfont-size: 30px;\n\t\t\t\t\tletter-spacing: 0.06em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tpadding: 4px 14px;\n\t\t\t\t\tbackground: var(--ink);\n\t\t\t\t\tcolor: var(--paper);\n\t\t\t\t\tline-height: 1;\n\t\t\t\t}\n\t\t\t\t.doc-meta .number {\n\t\t\t\t\tmargin-top: 10px;\n\t\t\t\t\tfont-size: 13px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t}\n\t\t\t\t.doc-meta .date { margin-top: 2px; font-size: 11px; color: var(--muted); }\n\n\t\t\t\t.addresses {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tgap: 36px;\n\t\t\t\t\tmargin-bottom: 22px;\n\t\t\t\t}\n\t\t\t\t.addr {\n\t\t\t\t\tflex: 1;\n\t\t\t\t\tborder: 2px solid var(--ink);\n\t\t\t\t\tpadding: 12px 14px;\n\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t}\n\t\t\t\t.addr h3 {\n\t\t\t\t\tfont-size: 10px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.12em;\n\t\t\t\t\tcolor: var(--muted);\n\t\t\t\t\tmargin-bottom: 6px;\n\t\t\t\t}\n\t\t\t\t.addr p { line-height: 1.5; font-size: 12px; }\n\t\t\t\t.addr .name { font-weight: 700; }\n\n\t\t\t\ttable { width: 100%; border-collapse: collapse; margin-bottom: 20px; }\n\t\t\t\tthead th {\n\t\t\t\t\ttext-align: left;\n\t\t\t\t\tfont-size: 10px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.08em;\n\t\t\t\t\tcolor: var(--paper);\n\t\t\t\t\tbackground: var(--ink);\n\t\t\t\t\tpadding: 8px 10px;\n\t\t\t\t}\n\t\t\t\tthead th.right { text-align: right; }\n\t\t\t\ttbody td {\n\t\t\t\t\tpadding: 10px;\n\t\t\t\t\tborder-bottom: 1px solid var(--ink);\n\t\t\t\t\tvertical-align: top;\n\t\t\t\t}\n\t\t\t\ttbody td.right { text-align: right; font-variant-numeric: tabular-nums; }\n\t\t\t\ttbody td .sku { color: var(--muted); font-size: 10px; margin-top: 2px; }\n\n\t\t\t\t.totals-wrap { display: flex; justify-content: flex-end; }\n\t\t\t\t.totals {\n\t\t\t\t\twidth: 280px;\n\t\t\t\t\tborder: 2px solid var(--ink);\n\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t\tpadding: 10px 14px;\n\t\t\t\t}\n\t\t\t\t.totals .row {\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\tpadding: 3px 0;\n\t\t\t\t\tfont-size: 12px;\n\t\t\t\t\tfont-variant-numeric: tabular-nums;\n\t\t\t\t}\n\t\t\t\t.totals .row.muted { color: var(--muted); }\n\t\t\t\t.totals .row.grand {\n\t\t\t\t\tborder-top: 2px solid var(--ink);\n\t\t\t\t\tpadding-top: 8px;\n\t\t\t\t\tmargin-top: 6px;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tfont-size: 15px;\n\t\t\t\t}\n\n\t\t\t\t.notes {\n\t\t\t\t\tmargin-top: 22px;\n\t\t\t\t\tpadding: 12px 14px;\n\t\t\t\t\tborder: 2px solid var(--ink);\n\t\t\t\t\tbackground: #FFFFFF;\n\t\t\t\t}\n\t\t\t\t.notes h4 {\n\t\t\t\t\tfont-size: 10px;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.12em;\n\t\t\t\t\tcolor: var(--muted);\n\t\t\t\t\tmargin-bottom: 4px;\n\t\t\t\t}\n\n\t\t\t\t.footer {\n\t\t\t\t\tmargin-top: 28px;\n\t\t\t\t\tpadding-top: 14px;\n\t\t\t\t\tborder-top: 2px solid var(--ink);\n\t\t\t\t\tdisplay: flex;\n\t\t\t\t\tjustify-content: space-between;\n\t\t\t\t\talign-items: flex-end;\n\t\t\t\t\tfont-size: 10px;\n\t\t\t\t\tcolor: var(--muted);\n\t\t\t\t}\n\t\t\t\t.footer .thanks {\n\t\t\t\t\tfont-family: \"Georgia\", \"Times New Roman\", serif;\n\t\t\t\t\tfont-style: italic;\n\t\t\t\t\tfont-size: 14px;\n\t\t\t\t\tcolor: var(--ink);\n\t\t\t\t}\n\n\t\t\t\t@media print {\n\t\t\t\t\tbody { background: #FFFFFF; padding: 0; }\n\t\t\t\t\t.sheet { max-width: none; }\n\t\t\t\t\t@page { margin: 0.5in; }\n\t\t\t\t}\n\t\t\t</style></head><body onload=\"window.print()\"><div class=\"sheet\"><div class=\"masthead\"><div class=\"brand\"><img src=\"/static/badge-black.png\" alt=\"\" class=\"badge-mark\"><div><div class=\"mark\">Rockabilly <span class=\"accent\">Roasting</span> Co.</div><div class=\"tagline\">Small&mdash;batch. Hand&mdash;packed. Kennewick, WA.</div><div class=\"contact\">101 W Kennewick Ave, Kennewick, WA 99336<br>(509) 585&ndash;2320 &middot; info@rockabillyroasting.com</div></div></div><div class=\"doc-meta\"><div class=\"kind\">Packing Slip</div><div class=\"number\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 55, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 221, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div class=\"order-date\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div class=\"date\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.PlacedAt.In(props.MerchantTZ).Format("January 2, 2006"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 56, Col: 98}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 222, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -88,14 +88,14 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.ShippingAddress != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"address-block\"><h3>Ship To</h3><p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"addr\"><h3>Ship to</h3><p><span class=\"name\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.FirstName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 64, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 230, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -108,13 +108,13 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.LastName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 64, Col: 75}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 230, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -126,7 +126,7 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(*props.ShippingAddress.Company)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 67, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 233, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -140,7 +140,7 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.Line1)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 70, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 236, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -158,7 +158,7 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(*props.ShippingAddress.Line2)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 73, Col: 38}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 239, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -172,7 +172,7 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.City)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 76, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 242, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -185,7 +185,7 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.State)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 76, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 242, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -198,7 +198,7 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.PostalCode)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 76, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 242, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -210,14 +210,14 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 			}
 		}
 		if props.Customer != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"address-block\"><h3>Customer</h3><p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"addr\"><h3>Customer</h3><p><span class=\"name\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.FirstName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 84, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 250, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -230,31 +230,31 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.LastName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 84, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 250, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<br>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</span><br><span style=\"color: var(--muted);\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 86, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 252, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</span></p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div><table><thead><tr><th>Product</th><th>SKU</th><th class=\"right\">Qty</th><th class=\"right\">Unit Price</th><th class=\"right\">Total</th></tr></thead> <tbody>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div><table><thead><tr><th>Item</th><th class=\"right\">Qty</th><th class=\"right\">Unit Price</th><th class=\"right\">Total</th></tr></thead> <tbody>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -264,193 +264,204 @@ func PackingSlip(props PackingSlipProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if eli.ProductTitle != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"name\" style=\"font-weight: 700;\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(eli.ProductTitle)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 106, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 271, Col: 72}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			} else {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<div class=\"name\" style=\"font-weight: 700;\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(eli.LineItem.VariantID.String()[:8])
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 108, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 273, Col: 91}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "...")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "&hellip;</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</td><td>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
 			if eli.VariantSKU != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<div class=\"sku\">SKU ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(eli.VariantSKU)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 113, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 276, Col: 47}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "—")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</td><td class=\"right\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</td><td class=\"right\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", eli.LineItem.Quantity))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 118, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 279, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</td><td class=\"right\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</td><td class=\"right\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(eli.LineItem.UnitPrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 119, Col: 62}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 280, Col: 63}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</td><td class=\"right\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</td><td class=\"right\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(eli.LineItem.Total))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 120, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 281, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</tbody></table><div class=\"totals\"><div class=\"row\"><span>Subtotal</span> <span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</tbody></table><div class=\"totals-wrap\"><div class=\"totals\"><div class=\"row muted\"><span>Subtotal</span> <span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.Subtotal))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 128, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 290, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.Order.DiscountTotal > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"row\"><span>Discounts</span> <span>-")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div class=\"row muted\"><span>Discounts</span> <span>&minus;")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.DiscountTotal))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 133, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 295, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</span></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</span></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<div class=\"row\"><span>Shipping</span> <span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div class=\"row muted\"><span>Shipping</span> <span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.ShippingTotal))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 138, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 300, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</span></div><div class=\"row\"><span>Tax</span> <span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</span></div><div class=\"row muted\"><span>Tax</span> <span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.TaxTotal))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 142, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 304, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</span></div><div class=\"row total\"><span>Total</span> <span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span></div><div class=\"row grand\"><span>Total</span> <span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.Total))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 146, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 308, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "</span></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</span></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.Order.Notes != nil && *props.Order.Notes != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<div style=\"margin-top: 24px; padding: 12px; background: #fafaf9; border: 1px solid #e7e5e4;\"><strong>Notes:</strong> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<div class=\"notes\"><h4>Notes</h4><p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Order.Notes)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 151, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/packing_slip.templ`, Line: 315, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div class=\"footer\">Thank you for your order!</div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<div class=\"footer\"><div class=\"thanks\">Thanks for drinking with us.</div><div>Questions? info@rockabillyroasting.com &middot; (509) 585&ndash;2320</div></div></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

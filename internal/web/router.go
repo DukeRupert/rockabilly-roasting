@@ -170,6 +170,7 @@ func NewRouter(deps *Deps) http.Handler {
 	})
 	mux.Handle("POST /account/security/set", securityLimit(deps.requireRetailCustomer(http.HandlerFunc(deps.handleAccountPasswordSet))))
 	mux.Handle("POST /account/security/change", securityLimit(deps.requireRetailCustomer(http.HandlerFunc(deps.handleAccountPasswordChange))))
+	mux.Handle("POST /account/verify-email/send", magicLinkLimit(deps.requireRetailCustomer(http.HandlerFunc(deps.handleAccountVerifyEmailSend))))
 
 	// Retail customer account routes — requires authenticated retail customer
 	accountMux := http.NewServeMux()

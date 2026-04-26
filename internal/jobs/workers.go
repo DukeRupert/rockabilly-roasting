@@ -131,6 +131,19 @@ type MagicLinkSendArgs struct {
 // Kind returns the job kind identifier.
 func (MagicLinkSendArgs) Kind() string { return "magic_link_send" }
 
+// EmailVerifySendArgs sends an email-verification message to a customer.
+// The underlying token is a magic-link token; redeeming it verifies the
+// email and signs the customer in. The email copy is framed around
+// verification rather than sign-in.
+type EmailVerifySendArgs struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+	RawToken   string    `json:"raw_token"`
+	Next       string    `json:"next,omitempty"`
+}
+
+// Kind returns the job kind identifier.
+func (EmailVerifySendArgs) Kind() string { return "email_verify_send" }
+
 // R2ImageDeleteArgs deletes an image from Cloudflare R2.
 // Enqueued when a product media record is removed from the DB.
 type R2ImageDeleteArgs struct {

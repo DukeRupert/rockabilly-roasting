@@ -81,3 +81,66 @@ func (s *AuthService) SendMagicLink(ctx context.Context, pool *pgxpool.Pool, cus
 	s.metrics.EmailsSent.WithLabelValues("magic_link", "sent").Inc()
 	return nil
 }
+
+// SendVerificationEmail renders and sends an email-verification message. The
+// underlying token is a magic-link token (created via CreateMagicLinkToken),
+// so redeeming the link both verifies the email and signs the customer in —
+// but the email itself is framed as a verification, not a sign-in. Same
+// three-phase pattern as SendMagicLink.
+func (s *AuthService) SendVerificationEmail(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID, rawToken, next string) error {
+	var customer *domain.Customer
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		c, err := s.customers.GetByID(ctx, tx, customerID)
+		if err != nil {
+			return fmt.Errorf("get customer %s: %w", customerID, err)
+		}
+		customer = c
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	verifyURL := s.email.BaseURL + "/account/magic?token=" + url.QueryEscape(rawToken)
+	if next != "" {
+		verifyURL += "&next=" + url.QueryEscape(next)
+	}
+
+	html, text, err := s.email.Renderer.Render("verify_email", emailtemplates.VerifyEmailData{
+		CustomerName: customer.FirstName,
+		VerifyURL:    verifyURL,
+		ExpiresIn:    "15 minutes",
+		StoreName:    s.email.StoreName,
+		StoreURL:     s.email.BaseURL,
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("email_verification", "failed").Inc()
+		return fmt.Errorf("render verify email template: %w", err)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      customer.Email,
+		Subject: "Verify your email",
+		HTML:    html,
+		Text:    text,
+		Tag:     "email-verification",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("email_verification", "failed").Inc()
+		return fmt.Errorf("send verify email: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "email_verify_worker",
+			Action:       audit.AuditEmailVerificationSent,
+			ResourceType: "customer",
+			ResourceID:   customer.ID,
+		})
+	}); err != nil {
+		return fmt.Errorf("audit verify email sent: %w", err)
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("email_verification", "sent").Inc()
+	return nil
+}

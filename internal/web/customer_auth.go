@@ -336,11 +336,59 @@ func (d *Deps) handleAccountSecurity(w http.ResponseWriter, r *http.Request) {
 		HasPassword:  customer.PasswordHash != nil,
 		InitialSetup: r.URL.Query().Get("initial") == "1",
 	}
+	if r.URL.Query().Get("verify_sent") == "1" {
+		props.Success = "Verification email sent — check your inbox."
+	}
 	if IsHTMX(r) {
 		storefront.AccountSecurityContent(props).Render(r.Context(), w) //nolint:errcheck
 		return
 	}
 	storefront.AccountSecurityPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleAccountVerifyEmailSend creates a magic-link token for the
+// authenticated customer and enqueues an email-verification message. The
+// underlying token is a magic link — redeeming it both verifies the email
+// and creates a session — but the email copy is framed around verification.
+func (d *Deps) handleAccountVerifyEmailSend(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	customer, ok := auth.CustomerFromContext(ctx)
+	if !ok {
+		http.Redirect(w, r, "/account/login", http.StatusSeeOther)
+		return
+	}
+
+	// Already verified — bounce back without enqueuing anything.
+	if customer.EmailVerified {
+		http.Redirect(w, r, "/account/security", http.StatusSeeOther)
+		return
+	}
+
+	next := r.FormValue("next")
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		rawToken, txErr := d.AuthService.CreateMagicLinkToken(ctx, tx, customer.ID)
+		if txErr != nil {
+			return txErr
+		}
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.EmailVerifySendArgs{
+			CustomerID: customer.ID,
+			RawToken:   rawToken,
+			Next:       next,
+		}, nil)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	redirectTo := "/account/security?verify_sent=1"
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", redirectTo)
+		return
+	}
+	http.Redirect(w, r, redirectTo, http.StatusSeeOther)
 }
 
 // handleAccountPasswordSet sets a first-time password for an authenticated customer.

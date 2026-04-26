@@ -1,0 +1,15 @@
+{{define "verify_email.txt"}}{{.StoreName}}
+==========================================
+
+CONFIRM YOUR EMAIL
+
+Hey{{if .CustomerName}} {{.CustomerName}}{{end}} -- use the link below to confirm this email belongs to you. Keeps your account locked down so receipts, shipping notes, and renewal alerts land in the right inbox. The link runs out in {{.ExpiresIn}}.
+
+{{.VerifyURL}}
+
+Didn't sign up for an account? Ignore the email -- nothing changes until that link is clicked.
+
+------------------------------------------
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

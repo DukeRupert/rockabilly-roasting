@@ -63,8 +63,7 @@ templ emailVerificationBanner(customer *domain.Customer) {
 			<p class="font-oswald text-ink-soft text-sm mb-3" style="letter-spacing:0.04em;">
 				We haven't confirmed <span class="font-bold text-ink">{ customer.Email }</span> is yours yet. Verify it to keep your account secure.
 			</p>
-			<form method="POST" action="/account/login">
-				<input type="hidden" name="email" value={ customer.Email }/>
+			<form method="POST" action="/account/verify-email/send">
 				<input type="hidden" name="next" value="/account/security"/>
 				<button
 					type="submit"

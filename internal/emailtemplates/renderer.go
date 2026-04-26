@@ -107,6 +107,15 @@ type MagicLinkData struct {
 	StoreURL     string
 }
 
+// VerifyEmailData holds data for the email verification email.
+type VerifyEmailData struct {
+	CustomerName string
+	VerifyURL    string
+	ExpiresIn    string
+	StoreName    string
+	StoreURL     string
+}
+
 // SubscriptionConfirmData holds data for the subscription confirmation email.
 type SubscriptionConfirmData struct {
 	CustomerName string

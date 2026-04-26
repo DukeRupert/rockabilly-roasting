@@ -105,6 +105,7 @@ const (
 
 	// Email actions (audited on successful send)
 	AuditEmailMagicLinkSent                 = "email.magic_link_sent"
+	AuditEmailVerificationSent              = "email.verification_sent"
 	AuditEmailOrderConfirmed                = "email.order_confirmed"
 	AuditEmailSubscriptionConfirmed         = "email.subscription_confirmed"
 	AuditEmailInvoiceSent                   = "email.invoice_sent"

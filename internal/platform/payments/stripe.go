@@ -160,9 +160,9 @@ func (p *StripeProvider) DetachPaymentMethod(_ context.Context, paymentMethodID 
 }
 
 func (p *StripeProvider) ListPaymentMethods(_ context.Context, customerID string) ([]PaymentMethod, error) {
+	// No Type filter — return every attached PM (card, link, us_bank_account, ...).
 	params := &stripe.PaymentMethodListParams{
 		Customer: stripe.String(customerID),
-		Type:     stripe.String(string(stripe.PaymentMethodTypeCard)),
 	}
 
 	iter := p.client.PaymentMethods.List(params)

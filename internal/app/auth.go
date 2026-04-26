@@ -171,24 +171,50 @@ func (s *AuthService) CustomerLogin(ctx context.Context, tx pgx.Tx, email, passw
 		return nil, "", ErrInvalidCredentials
 	}
 
-	duration := sessions.CustomerSessionDuration
-	if rememberMe {
+	return s.CreateCustomerSession(ctx, tx, customer.ID, customer.Email, "password", rememberMe, ipAddress, userAgent)
+}
+
+// CreateCustomerSession mints a customer session and records the appropriate
+// login audit entry. This is the SOLE entry point for creating customer sessions —
+// CustomerLogin, RedeemMagicLink, and any future OAuth login route through this.
+//
+// The audit entry uses Action=AuditCustomerLogin. Caller passes method which is
+// recorded in audit metadata as {"method": method} (e.g. "password",
+// "magic_link", "oauth"). actorName should be the customer email when known,
+// otherwise empty string.
+func (s *AuthService) CreateCustomerSession(
+	ctx context.Context,
+	tx pgx.Tx,
+	customerID uuid.UUID,
+	actorName string,
+	method string,
+	rememberMe bool,
+	ipAddress, userAgent *string,
+) (*domain.Session, string, error) {
+	var duration time.Duration
+	switch {
+	case method == "magic_link":
+		duration = MagicLinkSessionDuration
+	case rememberMe:
 		duration = sessions.CustomerRememberMeDuration
+	default:
+		duration = sessions.CustomerSessionDuration
 	}
 
 	expiresAt := time.Now().Add(duration)
-	session, rawToken, err := s.sessions.GetStore().Create(ctx, tx, domain.SessionActorTypeCustomer, customer.ID, expiresAt, ipAddress, userAgent)
+	session, rawToken, err := s.sessions.GetStore().Create(ctx, tx, domain.SessionActorTypeCustomer, customerID, expiresAt, ipAddress, userAgent)
 	if err != nil {
 		return nil, "", fmt.Errorf("create customer session: %w", err)
 	}
 
 	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
 		ActorType:    domain.AuditActorTypeCustomer,
-		ActorID:      &customer.ID,
-		ActorName:    customer.Email,
+		ActorID:      &customerID,
+		ActorName:    actorName,
 		Action:       audit.AuditCustomerLogin,
 		ResourceType: "session",
 		ResourceID:   session.ID,
+		Metadata:     map[string]any{"method": method},
 	}); err != nil {
 		return nil, "", fmt.Errorf("audit customer login: %w", err)
 	}
@@ -234,6 +260,7 @@ func (s *AuthService) CreateMagicLinkToken(ctx context.Context, tx pgx.Tx, custo
 
 // RedeemMagicLink validates a magic link token and creates a session.
 // The token is single-use and expires after MagicLinkDuration.
+// If the customer's email is not yet verified, it is flipped to verified in the same transaction.
 func (s *AuthService) RedeemMagicLink(ctx context.Context, tx pgx.Tx, rawToken string, ipAddress, userAgent *string) (*domain.Session, string, error) {
 	hash := sha256.Sum256([]byte(rawToken))
 	tokenHash := hex.EncodeToString(hash[:])
@@ -246,23 +273,29 @@ func (s *AuthService) RedeemMagicLink(ctx context.Context, tx pgx.Tx, rawToken s
 		return nil, "", fmt.Errorf("redeem magic link: %w", err)
 	}
 
-	// Create a long-lived session (30 days).
-	expiresAt := time.Now().Add(MagicLinkSessionDuration)
-	session, sessionToken, err := s.sessions.GetStore().Create(ctx, tx, domain.SessionActorTypeCustomer, token.CustomerID, expiresAt, ipAddress, userAgent)
+	session, sessionToken, err := s.CreateCustomerSession(ctx, tx, token.CustomerID, "", "magic_link", false, ipAddress, userAgent)
 	if err != nil {
-		return nil, "", fmt.Errorf("create magic link session: %w", err)
+		return nil, "", err
 	}
 
-	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
-		ActorType:    domain.AuditActorTypeCustomer,
-		ActorID:      &token.CustomerID,
-		ActorName:    "",
-		Action:       audit.AuditCustomerLogin,
-		ResourceType: "session",
-		ResourceID:   session.ID,
-		Metadata:     map[string]any{"method": "magic_link"},
-	}); err != nil {
-		return nil, "", fmt.Errorf("audit magic link login: %w", err)
+	// Flip email_verified if not already set — idempotent.
+	customer, err := s.customers.GetByID(ctx, tx, token.CustomerID)
+	if err != nil {
+		return nil, "", fmt.Errorf("get customer for email verification: %w", err)
+	}
+	if !customer.EmailVerified {
+		if err := s.customers.UpdateEmailVerified(ctx, tx, token.CustomerID, true); err != nil {
+			return nil, "", fmt.Errorf("update email verified: %w", err)
+		}
+		if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "magic_link_redeem",
+			Action:       audit.AuditCustomerEmailVerified,
+			ResourceType: "customer",
+			ResourceID:   token.CustomerID,
+		}); err != nil {
+			return nil, "", fmt.Errorf("audit email verified: %w", err)
+		}
 	}
 
 	return session, sessionToken, nil
@@ -290,7 +323,8 @@ func (s *AuthService) CreateSetupToken(ctx context.Context, tx pgx.Tx, customerI
 }
 
 // SetPasswordWithToken validates a setup token and sets the customer's password.
-// The token is single-use.
+// The token is single-use. If the customer's email is not yet verified, it is
+// flipped to verified in the same transaction.
 func (s *AuthService) SetPasswordWithToken(ctx context.Context, tx pgx.Tx, rawToken, password string) (*domain.Customer, error) {
 	if len(password) < 10 {
 		return nil, ErrPasswordTooShort
@@ -321,5 +355,110 @@ func (s *AuthService) SetPasswordWithToken(ctx context.Context, tx pgx.Tx, rawTo
 		return nil, fmt.Errorf("get customer: %w", err)
 	}
 
+	// Flip email_verified if not already set — idempotent.
+	if !customer.EmailVerified {
+		if err := s.customers.UpdateEmailVerified(ctx, tx, token.CustomerID, true); err != nil {
+			return nil, fmt.Errorf("update email verified: %w", err)
+		}
+		if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "setup_token_redeem",
+			Action:       audit.AuditCustomerEmailVerified,
+			ResourceType: "customer",
+			ResourceID:   token.CustomerID,
+		}); err != nil {
+			return nil, fmt.Errorf("audit email verified: %w", err)
+		}
+		// Re-fetch so the returned customer reflects the verified state.
+		customer, err = s.customers.GetByID(ctx, tx, token.CustomerID)
+		if err != nil {
+			return nil, fmt.Errorf("get customer after email verification: %w", err)
+		}
+	}
+
 	return customer, nil
+}
+
+// SetPassword sets a customer's password without requiring the current one.
+// CALLER MUST verify the request is from an authenticated session for this
+// customer — the service does not re-check identity.
+//
+// Returns ErrPasswordTooShort if newPassword is fewer than 10 characters.
+// Records AuditCustomerPasswordSet with the provided actor.
+func (s *AuthService) SetPassword(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, newPassword string, actor Actor) error {
+	if len(newPassword) < 10 {
+		return ErrPasswordTooShort
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+
+	if err := s.customers.UpdatePassword(ctx, tx, customerID, string(hash)); err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerPasswordSet,
+		ResourceType: "customer",
+		ResourceID:   customerID,
+	}); err != nil {
+		return fmt.Errorf("audit set password: %w", err)
+	}
+
+	return nil
+}
+
+// ChangePassword updates a customer's password after verifying the current one.
+// Returns ErrInvalidCredentials if currentPassword does not match the stored hash,
+// or if no password is currently set. Returns ErrPasswordTooShort if newPassword
+// is fewer than 10 characters.
+//
+// Records AuditCustomerPasswordChanged with the provided actor.
+func (s *AuthService) ChangePassword(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, currentPassword, newPassword string, actor Actor) error {
+	customer, err := s.customers.GetByID(ctx, tx, customerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrCustomerNotFound
+		}
+		return fmt.Errorf("get customer for password change: %w", err)
+	}
+
+	if customer.PasswordHash == nil {
+		return ErrInvalidCredentials
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*customer.PasswordHash), []byte(currentPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	if len(newPassword) < 10 {
+		return ErrPasswordTooShort
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash new password: %w", err)
+	}
+
+	if err := s.customers.UpdatePassword(ctx, tx, customerID, string(hash)); err != nil {
+		return fmt.Errorf("update password: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerPasswordChanged,
+		ResourceType: "customer",
+		ResourceID:   customerID,
+	}); err != nil {
+		return fmt.Errorf("audit change password: %w", err)
+	}
+
+	return nil
 }

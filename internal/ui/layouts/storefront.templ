@@ -154,6 +154,68 @@ templ Storefront(props StorefrontProps) {
 				"sameAs": [
 					"https://www.facebook.com/rockabillyroasting/",
 					"https://www.instagram.com/rockabillyroasting/"
+				],
+				"paymentAccepted": "Credit Card, Debit Card, Apple Pay, Google Pay",
+				"hasMerchantReturnPolicy": {
+					"@type": "MerchantReturnPolicy",
+					"applicableCountry": "US",
+					"returnPolicyCategory": "https://schema.org/MerchantReturnNotPermitted"
+				},
+				"shippingDetails": [
+					{
+						"@type": "OfferShippingDetails",
+						"shippingRate": {
+							"@type": "MonetaryAmount",
+							"value": 0,
+							"currency": "USD"
+						},
+						"shippingDestination": {
+							"@type": "DefinedRegion",
+							"addressCountry": "US"
+						},
+						"deliveryTime": {
+							"@type": "ShippingDeliveryTime",
+							"handlingTime": {
+								"@type": "QuantitativeValue",
+								"minValue": 1,
+								"maxValue": 3,
+								"unitCode": "DAY"
+							},
+							"transitTime": {
+								"@type": "QuantitativeValue",
+								"minValue": 2,
+								"maxValue": 5,
+								"unitCode": "DAY"
+							}
+						}
+					},
+					{
+						"@type": "OfferShippingDetails",
+						"shippingRate": {
+							"@type": "MonetaryAmount",
+							"value": 6,
+							"currency": "USD"
+						},
+						"shippingDestination": {
+							"@type": "DefinedRegion",
+							"addressCountry": "US"
+						},
+						"deliveryTime": {
+							"@type": "ShippingDeliveryTime",
+							"handlingTime": {
+								"@type": "QuantitativeValue",
+								"minValue": 1,
+								"maxValue": 3,
+								"unitCode": "DAY"
+							},
+							"transitTime": {
+								"@type": "QuantitativeValue",
+								"minValue": 2,
+								"maxValue": 5,
+								"unitCode": "DAY"
+							}
+						}
+					}
 				]
 			}
 			</script>

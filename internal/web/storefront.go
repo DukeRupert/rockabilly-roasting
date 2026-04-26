@@ -653,6 +653,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	var variantsWithPrices []storefront.VariantWithPrice
 	var variantMap map[string]storefront.VariantOptionEntry
 	var defaultPrice *int
+	var defaultSKU string
 	var plans []domain.SubscriptionPlan
 	var coffeeAttrs *storefront.CoffeeAttrs
 	var prevNav, nextNav *storefront.ProductNav
@@ -719,6 +720,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 				vwp.BasePrice = &price.Amount
 				if v.IsDefault {
 					defaultPrice = &price.Amount
+					defaultSKU = v.SKU
 				}
 			}
 			variantsWithPrices[i] = vwp
@@ -803,6 +805,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		Options:           options,
 		VariantMap:        variantMap,
 		DefaultPrice:      defaultPrice,
+		DefaultSKU:        defaultSKU,
 		CurrencyCode:      "USD",
 		CartCount:         d.cartItemCountFromCookie(r),
 		SubscriptionPlans: plans,

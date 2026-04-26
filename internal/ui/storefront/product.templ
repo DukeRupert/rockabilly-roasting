@@ -33,6 +33,7 @@ type ProductDetailProps struct {
 	Options           []OptionWithValues
 	VariantMap        map[string]VariantOptionEntry // variantID -> option value IDs + price
 	DefaultPrice      *int
+	DefaultSKU        string // SKU of the default variant; used in Product JSON-LD Offer
 	CurrencyCode      string
 	CartCount         int
 	SubscriptionPlans []domain.SubscriptionPlan
@@ -967,13 +968,18 @@ func productJSONLDScript(props ProductDetailProps) string {
 	}
 
 	if props.DefaultPrice != nil {
-		product["offers"] = map[string]any{
+		offer := map[string]any{
 			"@type":         "Offer",
 			"price":         fmt.Sprintf("%.2f", float64(*props.DefaultPrice)/100),
 			"priceCurrency": props.CurrencyCode,
 			"availability":  "https://schema.org/InStock",
 			"url":           productURL,
 		}
+		if props.DefaultSKU != "" {
+			offer["sku"] = props.DefaultSKU
+			product["sku"] = props.DefaultSKU
+		}
+		product["offers"] = offer
 	}
 
 	breadcrumb := map[string]any{

@@ -220,22 +220,77 @@ func (d *Deps) handleAccountLoginPage(w http.ResponseWriter, r *http.Request) {
 	storefront.AccountLoginPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
+// safeNextOr returns next if it is a safe local path (starts with "/" but not "//"),
+// otherwise returns fallback. Prevents open-redirect attacks.
+func safeNextOr(next, fallback string) string {
+	if strings.HasPrefix(next, "/") && !strings.HasPrefix(next, "//") {
+		return next
+	}
+	return fallback
+}
+
+// renderLogin renders the login page (htmx-aware).
+func renderLogin(w http.ResponseWriter, r *http.Request, props storefront.AccountLoginProps) {
+	if IsHTMX(r) {
+		storefront.AccountLoginContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.AccountLoginPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
 func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	email := r.FormValue("email")
 	next := r.FormValue("next")
 
 	if email == "" {
-		props := storefront.AccountLoginProps{Error: "Please enter your email address.", Next: next}
-		if IsHTMX(r) {
-			storefront.AccountLoginContent(props).Render(ctx, w) //nolint:errcheck
-			return
-		}
-		storefront.AccountLoginPage(props).Render(ctx, w) //nolint:errcheck
+		renderLogin(w, r, storefront.AccountLoginProps{Error: "Please enter your email address.", Next: next})
 		return
 	}
 
-	// Always show the same success message to prevent email enumeration.
+	password := r.FormValue("password")
+	if password != "" {
+		// Password login path.
+		ip := ratelimit.ClientIP(r)
+		ua := r.UserAgent()
+		var rawToken string
+		err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			var txErr error
+			_, rawToken, txErr = d.AuthService.CustomerLogin(ctx, tx, email, password, false /*rememberMe*/, &ip, &ua)
+			return txErr
+		})
+		if err != nil {
+			// Generic error for all failures — no enumeration, no wholesale-aware branching.
+			renderLogin(w, r, storefront.AccountLoginProps{Error: "Invalid email or password.", Email: email, Next: next})
+			return
+		}
+
+		// Reset rate limit counters on successful login.
+		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIPKey(ratelimit.ClientIP(r)))
+		_ = d.RateLimiter.Reset(ctx, ratelimit.AuthIdentifierKey(ratelimit.HashIdentifier(email)))
+
+		// SameSite=Strict for password logins (not a cross-site redirect from email).
+		http.SetCookie(w, &http.Cookie{
+			Name:     customerCookieName,
+			Value:    rawToken,
+			Path:     "/",
+			MaxAge:   int(sessions.CustomerSessionDuration.Seconds()),
+			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
+			Secure:   d.SecureCookies,
+		})
+
+		redirectTo := safeNextOr(next, "/account")
+		if IsHTMX(r) {
+			w.Header().Set("HX-Redirect", redirectTo)
+			return
+		}
+		http.Redirect(w, r, redirectTo, http.StatusSeeOther)
+		return
+	}
+
+	// Magic-link path (no password supplied). Always return a generic success
+	// message to prevent email enumeration.
 	successMsg := "If you have an account, check your email for a sign-in link."
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -265,12 +320,124 @@ func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	props := storefront.AccountLoginProps{Success: successMsg}
-	if IsHTMX(r) {
-		storefront.AccountLoginContent(props).Render(ctx, w) //nolint:errcheck
+	renderLogin(w, r, storefront.AccountLoginProps{Success: successMsg})
+}
+
+// handleAccountSecurity renders the security / password management page.
+func (d *Deps) handleAccountSecurity(w http.ResponseWriter, r *http.Request) {
+	customer, ok := auth.CustomerFromContext(r.Context())
+	if !ok {
+		// Should not happen — middleware guarantees this. Defensive.
+		http.Redirect(w, r, "/account/login", http.StatusSeeOther)
 		return
 	}
-	storefront.AccountLoginPage(props).Render(ctx, w) //nolint:errcheck
+	props := storefront.AccountSecurityProps{
+		Customer:     customer,
+		HasPassword:  customer.PasswordHash != nil,
+		InitialSetup: r.URL.Query().Get("initial") == "1",
+	}
+	if IsHTMX(r) {
+		storefront.AccountSecurityContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.AccountSecurityPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleAccountPasswordSet sets a first-time password for an authenticated customer.
+// No current-password check — the live session is the credential.
+func (d *Deps) handleAccountPasswordSet(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	customer, ok := auth.CustomerFromContext(ctx)
+	if !ok {
+		http.Redirect(w, r, "/account/login", http.StatusSeeOther)
+		return
+	}
+	newPassword := r.FormValue("new_password")
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.AuthService.SetPassword(ctx, tx, customer.ID, newPassword, customerActor(r))
+	})
+
+	if err != nil {
+		props := storefront.AccountSecurityProps{
+			Customer:    customer,
+			HasPassword: customer.PasswordHash != nil,
+		}
+		if errors.Is(err, app.ErrPasswordTooShort) {
+			props.Error = "Password must be at least 10 characters."
+		} else {
+			Error(w, r, err)
+			return
+		}
+		if IsHTMX(r) {
+			storefront.AccountSecurityContent(props).Render(ctx, w) //nolint:errcheck
+			return
+		}
+		storefront.AccountSecurityPage(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+
+	// Success — re-render with HasPassword=true so the form switches to the change variant.
+	props := storefront.AccountSecurityProps{
+		Customer:    customer,
+		HasPassword: true,
+		Success:     "Password set. You can now sign in with your password.",
+	}
+	if IsHTMX(r) {
+		storefront.AccountSecurityContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	storefront.AccountSecurityPage(props).Render(ctx, w) //nolint:errcheck
+}
+
+// handleAccountPasswordChange updates an existing password after verifying the current one.
+func (d *Deps) handleAccountPasswordChange(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	customer, ok := auth.CustomerFromContext(ctx)
+	if !ok {
+		http.Redirect(w, r, "/account/login", http.StatusSeeOther)
+		return
+	}
+	currentPassword := r.FormValue("current_password")
+	newPassword := r.FormValue("new_password")
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.AuthService.ChangePassword(ctx, tx, customer.ID, currentPassword, newPassword, customerActor(r))
+	})
+
+	if err != nil {
+		props := storefront.AccountSecurityProps{
+			Customer:    customer,
+			HasPassword: customer.PasswordHash != nil,
+		}
+		switch {
+		case errors.Is(err, app.ErrInvalidCredentials):
+			props.Error = "Current password is incorrect."
+		case errors.Is(err, app.ErrPasswordTooShort):
+			props.Error = "Password must be at least 10 characters."
+		default:
+			Error(w, r, err)
+			return
+		}
+		if IsHTMX(r) {
+			storefront.AccountSecurityContent(props).Render(ctx, w) //nolint:errcheck
+			return
+		}
+		storefront.AccountSecurityPage(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+
+	// Success — re-render with success flash.
+	props := storefront.AccountSecurityProps{
+		Customer:    customer,
+		HasPassword: true,
+		Success:     "Password updated.",
+	}
+	if IsHTMX(r) {
+		storefront.AccountSecurityContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	storefront.AccountSecurityPage(props).Render(ctx, w) //nolint:errcheck
 }
 
 func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) {
@@ -313,13 +480,7 @@ func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) 
 		Secure:   d.SecureCookies,
 	})
 
-	redirectTo := "/account"
-	if next := r.URL.Query().Get("next"); next != "" {
-		// Only allow local paths to prevent open redirect.
-		if strings.HasPrefix(next, "/") && !strings.HasPrefix(next, "//") {
-			redirectTo = next
-		}
-	}
+	redirectTo := safeNextOr(r.URL.Query().Get("next"), "/account")
 
 	if IsHTMX(r) {
 		w.Header().Set("HX-Redirect", redirectTo)
@@ -432,13 +593,7 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 		Secure:   d.SecureCookies,
 	})
 
-	// Redirect to the wholesale portal. Only allow local paths to prevent open redirect.
-	redirect := "/wholesale/portal"
-	if next := r.URL.Query().Get("redirect"); next != "" {
-		if strings.HasPrefix(next, "/") && !strings.HasPrefix(next, "//") {
-			redirect = next
-		}
-	}
+	redirect := safeNextOr(r.URL.Query().Get("redirect"), "/wholesale/portal")
 	if IsHTMX(r) {
 		w.Header().Set("HX-Redirect", redirect)
 		return

@@ -161,6 +161,16 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /account/magic", deps.handleAccountMagicRedeem)
 	mux.Handle("POST /account/logout", deps.requireCustomerSession(http.HandlerFunc(deps.handleAccountLogout)))
 
+	// Security POST routes: rate-limited + authenticated. Registered at the outer
+	// mux so the rate-limit middleware wraps the auth check (same pattern as wholesale
+	// auth routes). The limiter uses the same IP-based limits as magic-link since the
+	// threat model is identical: someone with a stolen session brute-forcing passwords.
+	securityLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
+		return ratelimit.ClientIP(r)
+	})
+	mux.Handle("POST /account/security/set", securityLimit(deps.requireRetailCustomer(http.HandlerFunc(deps.handleAccountPasswordSet))))
+	mux.Handle("POST /account/security/change", securityLimit(deps.requireRetailCustomer(http.HandlerFunc(deps.handleAccountPasswordChange))))
+
 	// Retail customer account routes — requires authenticated retail customer
 	accountMux := http.NewServeMux()
 	accountMux.HandleFunc("GET /account/{$}", func(w http.ResponseWriter, r *http.Request) {
@@ -179,6 +189,7 @@ func NewRouter(deps *Deps) http.Handler {
 	accountMux.HandleFunc("POST /account/addresses/{id}", deps.handleAccountAddressUpdate)
 	accountMux.HandleFunc("POST /account/addresses/{id}/delete", deps.handleAccountAddressDelete)
 	accountMux.HandleFunc("POST /account/addresses/{id}/default", deps.handleAccountAddressSetDefault)
+	accountMux.HandleFunc("GET /account/security", deps.handleAccountSecurity)
 	mux.Handle("GET /account/{path...}", deps.requireRetailCustomer(accountMux))
 	mux.Handle("POST /account/{path...}", deps.requireRetailCustomer(accountMux))
 

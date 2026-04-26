@@ -33,7 +33,10 @@ type OrderConfirmedProps struct {
 	Analytics *OrderConfirmedAnalytics
 }
 
-func orderConfirmedAnalyticsJSON(a *OrderConfirmedAnalytics) string {
+// orderConfirmedAnalyticsScript returns the purchase payload wrapped in a
+// <script id="ga-purchase-data"> tag. Emitted via @templ.Raw because templ
+// does not interpolate Go expressions inside <script> bodies.
+func orderConfirmedAnalyticsScript(a *OrderConfirmedAnalytics) string {
 	if a == nil {
 		return ""
 	}
@@ -41,7 +44,7 @@ func orderConfirmedAnalyticsJSON(a *OrderConfirmedAnalytics) string {
 	if err != nil {
 		return ""
 	}
-	return string(b)
+	return `<script id="ga-purchase-data" type="application/json">` + string(b) + `</script>`
 }
 
 templ OrderConfirmedContent(props OrderConfirmedProps) {
@@ -111,9 +114,7 @@ templ OrderConfirmedContent(props OrderConfirmedProps) {
 		</div>
 	</section>
 	if props.Analytics != nil {
-		<script id="ga-purchase-data" type="application/json">
-			@templ.Raw(orderConfirmedAnalyticsJSON(props.Analytics))
-		</script>
+		@templ.Raw(orderConfirmedAnalyticsScript(props.Analytics))
 		<script>
 			(function() {
 				var node = document.getElementById('ga-purchase-data');

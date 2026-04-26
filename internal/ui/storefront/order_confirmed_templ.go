@@ -41,7 +41,10 @@ type OrderConfirmedProps struct {
 	Analytics *OrderConfirmedAnalytics
 }
 
-func orderConfirmedAnalyticsJSON(a *OrderConfirmedAnalytics) string {
+// orderConfirmedAnalyticsScript returns the purchase payload wrapped in a
+// <script id="ga-purchase-data"> tag. Emitted via @templ.Raw because templ
+// does not interpolate Go expressions inside <script> bodies.
+func orderConfirmedAnalyticsScript(a *OrderConfirmedAnalytics) string {
 	if a == nil {
 		return ""
 	}
@@ -49,7 +52,7 @@ func orderConfirmedAnalyticsJSON(a *OrderConfirmedAnalytics) string {
 	if err != nil {
 		return ""
 	}
-	return string(b)
+	return `<script id="ga-purchase-data" type="application/json">` + string(b) + `</script>`
 }
 
 func OrderConfirmedContent(props OrderConfirmedProps) templ.Component {
@@ -80,7 +83,7 @@ func OrderConfirmedContent(props OrderConfirmedProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.OrderNumber)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `order_confirmed.templ`, Line: 85, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/order_confirmed.templ`, Line: 88, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -91,7 +94,11 @@ func OrderConfirmedContent(props OrderConfirmedProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.Analytics != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<script id=\"ga-purchase-data\" type=\"application/json\">\n\t\t\t@templ.Raw(orderConfirmedAnalyticsJSON(props.Analytics))\n\t\t</script> <script>\n\t\t\t(function() {\n\t\t\t\tvar node = document.getElementById('ga-purchase-data');\n\t\t\t\tif (!node || !window.rrTrack) return;\n\t\t\t\tvar data;\n\t\t\t\ttry { data = JSON.parse(node.textContent); } catch (e) { return; }\n\t\t\t\t// Idempotency: don't refire if we've already sent this transaction.\n\t\t\t\tvar key = 'rrPurchaseFired:' + data.transaction_id;\n\t\t\t\ttry { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) {}\n\t\t\t\tvar items = (data.items || []).map(function(it) {\n\t\t\t\t\treturn {\n\t\t\t\t\t\titem_id: it.item_id,\n\t\t\t\t\t\titem_name: it.item_name,\n\t\t\t\t\t\titem_variant: it.item_variant || undefined,\n\t\t\t\t\t\titem_category: it.item_category || undefined,\n\t\t\t\t\t\tprice: (it.price_cents || 0) / 100,\n\t\t\t\t\t\tquantity: it.quantity || 1\n\t\t\t\t\t};\n\t\t\t\t});\n\t\t\t\twindow.rrTrack('purchase', {\n\t\t\t\t\ttransaction_id: data.transaction_id,\n\t\t\t\t\tcurrency: data.currency || 'USD',\n\t\t\t\t\tvalue: (data.value_cents || 0) / 100,\n\t\t\t\t\ttax: (data.tax_cents || 0) / 100,\n\t\t\t\t\tshipping: (data.shipping_cents || 0) / 100,\n\t\t\t\t\titems: items\n\t\t\t\t});\n\t\t\t})();\n\t\t</script>")
+			templ_7745c5c3_Err = templ.Raw(orderConfirmedAnalyticsScript(props.Analytics)).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " <script>\n\t\t\t(function() {\n\t\t\t\tvar node = document.getElementById('ga-purchase-data');\n\t\t\t\tif (!node || !window.rrTrack) return;\n\t\t\t\tvar data;\n\t\t\t\ttry { data = JSON.parse(node.textContent); } catch (e) { return; }\n\t\t\t\t// Idempotency: don't refire if we've already sent this transaction.\n\t\t\t\tvar key = 'rrPurchaseFired:' + data.transaction_id;\n\t\t\t\ttry { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, '1'); } catch (e) {}\n\t\t\t\tvar items = (data.items || []).map(function(it) {\n\t\t\t\t\treturn {\n\t\t\t\t\t\titem_id: it.item_id,\n\t\t\t\t\t\titem_name: it.item_name,\n\t\t\t\t\t\titem_variant: it.item_variant || undefined,\n\t\t\t\t\t\titem_category: it.item_category || undefined,\n\t\t\t\t\t\tprice: (it.price_cents || 0) / 100,\n\t\t\t\t\t\tquantity: it.quantity || 1\n\t\t\t\t\t};\n\t\t\t\t});\n\t\t\t\twindow.rrTrack('purchase', {\n\t\t\t\t\ttransaction_id: data.transaction_id,\n\t\t\t\t\tcurrency: data.currency || 'USD',\n\t\t\t\t\tvalue: (data.value_cents || 0) / 100,\n\t\t\t\t\ttax: (data.tax_cents || 0) / 100,\n\t\t\t\t\tshipping: (data.shipping_cents || 0) / 100,\n\t\t\t\t\titems: items\n\t\t\t\t});\n\t\t\t})();\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

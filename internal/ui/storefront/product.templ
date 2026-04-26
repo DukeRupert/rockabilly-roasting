@@ -46,10 +46,11 @@ type ProductDetailProps struct {
 	BaseURL           string // e.g. "https://rockabillyroasting.com" — for JSON-LD absolute URLs
 }
 
-// productAnalyticsJSON builds the GA4 payload for view_item / add_to_cart.
-// Carries product-level info plus a variant→{sku, price_cents} map so the
-// add-to-cart handler can resolve the selected variant at submission time.
-func productAnalyticsJSON(props ProductDetailProps) string {
+// productAnalyticsScript builds the GA4 payload for view_item / add_to_cart
+// and returns it wrapped in a <script id="ga-product-data"> tag. The full
+// tag is emitted via @templ.Raw because templ does not interpolate Go
+// expressions inside <script> bodies.
+func productAnalyticsScript(props ProductDetailProps) string {
 	type variantEntry struct {
 		SKU        string `json:"sku"`
 		PriceCents int    `json:"price_cents"`
@@ -67,17 +68,17 @@ func productAnalyticsJSON(props ProductDetailProps) string {
 		defaultPrice = *props.DefaultPrice
 	}
 	b, err := json.Marshal(map[string]any{
-		"item_id":            props.Product.ID.String(),
-		"item_name":          props.Product.Title,
-		"item_category":      props.Category,
-		"currency":           props.CurrencyCode,
+		"item_id":             props.Product.ID.String(),
+		"item_name":           props.Product.Title,
+		"item_category":       props.Category,
+		"currency":            props.CurrencyCode,
 		"default_price_cents": defaultPrice,
-		"variants":           variants,
+		"variants":            variants,
 	})
 	if err != nil {
 		return ""
 	}
-	return string(b)
+	return `<script id="ga-product-data" type="application/json">` + string(b) + `</script>`
 }
 
 // ProductNav carries the minimum data needed for prev/next links at the
@@ -438,9 +439,7 @@ templ ProductContent(props ProductDetailProps) {
 	if len(props.SubscriptionPlans) > 0 && len(props.Variants) > 0 {
 		@purchaseModeScript()
 	}
-	<script id="ga-product-data" type="application/json">
-		@templ.Raw(productAnalyticsJSON(props))
-	</script>
+	@templ.Raw(productAnalyticsScript(props))
 	<script>
 		(function() {
 			var node = document.getElementById('ga-product-data');

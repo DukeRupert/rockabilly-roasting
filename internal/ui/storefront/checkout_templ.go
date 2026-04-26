@@ -35,7 +35,10 @@ type CheckoutPageProps struct {
 	Analytics *CheckoutAnalytics // nil ⇒ no begin_checkout fires (e.g. empty cart)
 }
 
-func checkoutAnalyticsJSON(a *CheckoutAnalytics) string {
+// checkoutAnalyticsScript returns the begin_checkout payload wrapped in a
+// <script id="ga-checkout-data"> tag. Emitted via @templ.Raw because templ
+// does not interpolate Go expressions inside <script> bodies.
+func checkoutAnalyticsScript(a *CheckoutAnalytics) string {
 	if a == nil {
 		return ""
 	}
@@ -43,7 +46,7 @@ func checkoutAnalyticsJSON(a *CheckoutAnalytics) string {
 	if err != nil {
 		return ""
 	}
-	return string(b)
+	return `<script id="ga-checkout-data" type="application/json">` + string(b) + `</script>`
 }
 
 func CheckoutContent(props CheckoutPageProps) templ.Component {
@@ -74,7 +77,7 @@ func CheckoutContent(props CheckoutPageProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.CartID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `checkout.templ`, Line: 42, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 45, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -87,7 +90,7 @@ func CheckoutContent(props CheckoutPageProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.StripeKey)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `checkout.templ`, Line: 42, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/checkout.templ`, Line: 45, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -98,7 +101,11 @@ func CheckoutContent(props CheckoutPageProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.Analytics != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<script id=\"ga-checkout-data\" type=\"application/json\">\n\t\t\t@templ.Raw(checkoutAnalyticsJSON(props.Analytics))\n\t\t</script> <script>\n\t\t\t(function() {\n\t\t\t\tvar node = document.getElementById('ga-checkout-data');\n\t\t\t\tif (!node || !window.rrTrack) return;\n\t\t\t\tvar data;\n\t\t\t\ttry { data = JSON.parse(node.textContent); } catch (e) { return; }\n\t\t\t\tvar items = (data.items || []).map(function(it) {\n\t\t\t\t\treturn {\n\t\t\t\t\t\titem_id: it.item_id,\n\t\t\t\t\t\titem_name: it.item_name,\n\t\t\t\t\t\titem_variant: it.item_variant || undefined,\n\t\t\t\t\t\tprice: (it.price_cents || 0) / 100,\n\t\t\t\t\t\tquantity: it.quantity || 1\n\t\t\t\t\t};\n\t\t\t\t});\n\t\t\t\twindow.rrTrack('begin_checkout', {\n\t\t\t\t\tcurrency: data.currency || 'USD',\n\t\t\t\t\tvalue: (data.value_cents || 0) / 100,\n\t\t\t\t\titems: items\n\t\t\t\t});\n\t\t\t})();\n\t\t</script>")
+			templ_7745c5c3_Err = templ.Raw(checkoutAnalyticsScript(props.Analytics)).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " <script>\n\t\t\t(function() {\n\t\t\t\tvar node = document.getElementById('ga-checkout-data');\n\t\t\t\tif (!node || !window.rrTrack) return;\n\t\t\t\tvar data;\n\t\t\t\ttry { data = JSON.parse(node.textContent); } catch (e) { return; }\n\t\t\t\tvar items = (data.items || []).map(function(it) {\n\t\t\t\t\treturn {\n\t\t\t\t\t\titem_id: it.item_id,\n\t\t\t\t\t\titem_name: it.item_name,\n\t\t\t\t\t\titem_variant: it.item_variant || undefined,\n\t\t\t\t\t\tprice: (it.price_cents || 0) / 100,\n\t\t\t\t\t\tquantity: it.quantity || 1\n\t\t\t\t\t};\n\t\t\t\t});\n\t\t\t\twindow.rrTrack('begin_checkout', {\n\t\t\t\t\tcurrency: data.currency || 'USD',\n\t\t\t\t\tvalue: (data.value_cents || 0) / 100,\n\t\t\t\t\titems: items\n\t\t\t\t});\n\t\t\t})();\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

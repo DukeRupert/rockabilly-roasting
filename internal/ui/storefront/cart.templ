@@ -24,16 +24,19 @@ type CartPageProps struct {
 	FreeShippingHint   string // e.g. "Spend $12.00 more for free shipping"; "" if unused
 }
 
-// cartAnalyticsJSON renders the cart contents for view_cart / remove_from_cart.
-// VariantID is used as item_id since we don't expose the parent product UUID
-// on the cart line — variant SKU still flows through as item_variant.
-func cartAnalyticsJSON(props CartPageProps) string {
+// cartAnalyticsScript renders the cart contents for view_cart / remove_from_cart,
+// wrapped in a <script id="ga-cart-data"> tag. The tag is emitted via
+// @templ.Raw because templ does not interpolate Go expressions inside <script>
+// bodies. VariantID is used as item_id since we don't expose the parent
+// product UUID on the cart line — variant SKU still flows through as
+// item_variant.
+func cartAnalyticsScript(props CartPageProps) string {
 	type itemEntry struct {
-		ItemID       string `json:"item_id"`
-		ItemName     string `json:"item_name"`
-		ItemVariant  string `json:"item_variant,omitempty"`
-		PriceCents   int    `json:"price_cents"`
-		Quantity     int    `json:"quantity"`
+		ItemID      string `json:"item_id"`
+		ItemName    string `json:"item_name"`
+		ItemVariant string `json:"item_variant,omitempty"`
+		PriceCents  int    `json:"price_cents"`
+		Quantity    int    `json:"quantity"`
 	}
 	items := make(map[string]itemEntry, len(props.Items))
 	list := make([]itemEntry, 0, len(props.Items))
@@ -49,15 +52,15 @@ func cartAnalyticsJSON(props CartPageProps) string {
 		list = append(list, entry)
 	}
 	b, err := json.Marshal(map[string]any{
-		"currency":      "USD",
-		"value_cents":   props.Subtotal,
-		"items":         list,
-		"by_cart_item":  items,
+		"currency":     "USD",
+		"value_cents":  props.Subtotal,
+		"items":        list,
+		"by_cart_item": items,
 	})
 	if err != nil {
 		return ""
 	}
-	return string(b)
+	return `<script id="ga-cart-data" type="application/json">` + string(b) + `</script>`
 }
 
 templ CartContent(props CartPageProps) {
@@ -230,9 +233,7 @@ templ CartContent(props CartPageProps) {
 		</div>
 	</section>
 	if len(props.Items) > 0 {
-		<script id="ga-cart-data" type="application/json">
-			@templ.Raw(cartAnalyticsJSON(props))
-		</script>
+		@templ.Raw(cartAnalyticsScript(props))
 		<script>
 			(function() {
 				var node = document.getElementById('ga-cart-data');

@@ -72,9 +72,11 @@ func catalogItemListName(props CatalogPageProps) string {
 	return "Catalog"
 }
 
-// catalogAnalyticsItemsJSON produces the GA4 items[] payload for view_item_list,
-// matching the shape rrTrack consumes (price in cents — converted client-side).
-func catalogAnalyticsItemsJSON(props CatalogPageProps) string {
+// catalogAnalyticsScript produces the GA4 items[] payload for view_item_list,
+// wrapped in a <script id="ga-list-data"> tag. The tag is emitted via
+// @templ.Raw because templ does not interpolate Go expressions inside
+// <script> bodies. Price in cents — converted client-side.
+func catalogAnalyticsScript(props CatalogPageProps) string {
 	type item struct {
 		ItemID       string `json:"item_id"`
 		ItemName     string `json:"item_name"`
@@ -117,7 +119,7 @@ func catalogAnalyticsItemsJSON(props CatalogPageProps) string {
 	if err != nil {
 		return ""
 	}
-	return string(b)
+	return `<script id="ga-list-data" type="application/json">` + string(b) + `</script>`
 }
 
 // hasActiveFilters returns true if any attribute filters are selected.
@@ -453,9 +455,7 @@ templ CatalogResults(props CatalogPageProps) {
 		@mobileFilterDrawer(props)
 	}
 	if len(props.Products) > 0 {
-		<script id="ga-list-data" type="application/json">
-			@templ.Raw(catalogAnalyticsItemsJSON(props))
-		</script>
+		@templ.Raw(catalogAnalyticsScript(props))
 		<script>
 			(function() {
 				var node = document.getElementById('ga-list-data');

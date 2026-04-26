@@ -27,7 +27,10 @@ type CheckoutPageProps struct {
 	Analytics *CheckoutAnalytics // nil ⇒ no begin_checkout fires (e.g. empty cart)
 }
 
-func checkoutAnalyticsJSON(a *CheckoutAnalytics) string {
+// checkoutAnalyticsScript returns the begin_checkout payload wrapped in a
+// <script id="ga-checkout-data"> tag. Emitted via @templ.Raw because templ
+// does not interpolate Go expressions inside <script> bodies.
+func checkoutAnalyticsScript(a *CheckoutAnalytics) string {
 	if a == nil {
 		return ""
 	}
@@ -35,16 +38,14 @@ func checkoutAnalyticsJSON(a *CheckoutAnalytics) string {
 	if err != nil {
 		return ""
 	}
-	return string(b)
+	return `<script id="ga-checkout-data" type="application/json">` + string(b) + `</script>`
 }
 
 templ CheckoutContent(props CheckoutPageProps) {
 	<div id="checkout-app" data-cart-id={ props.CartID } data-stripe-key={ props.StripeKey }></div>
 	<script type="module" src="/static/checkout/checkout.js"></script>
 	if props.Analytics != nil {
-		<script id="ga-checkout-data" type="application/json">
-			@templ.Raw(checkoutAnalyticsJSON(props.Analytics))
-		</script>
+		@templ.Raw(checkoutAnalyticsScript(props.Analytics))
 		<script>
 			(function() {
 				var node = document.getElementById('ga-checkout-data');

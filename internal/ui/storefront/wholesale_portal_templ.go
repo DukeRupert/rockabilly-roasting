@@ -66,7 +66,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.CompanyName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 40, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 40, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -95,7 +95,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(product.ImageURL)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 66, Col: 30}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 66, Col: 30}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -108,7 +108,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(product.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 67, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 67, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -131,7 +131,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(product.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 77, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 77, Col: 71}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -149,7 +149,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(optName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 86, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 86, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -172,7 +172,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(variant.SKU)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 97, Col: 24}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 97, Col: 24}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -190,7 +190,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(val)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 101, Col: 17}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 101, Col: 17}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -208,7 +208,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(variant.UnitPrice))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 105, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 105, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -226,7 +226,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(*variant.MinQty))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 108, Col: 47}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 108, Col: 47}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -244,7 +244,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("qty[%s]", variant.ID.String()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 115, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 115, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -262,7 +262,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 					return "1"
 				}())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 123, Col: 16}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 123, Col: 16}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -275,7 +275,7 @@ func WholesalePortalContent(props WholesalePortalProps) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs("Quantity for " + variant.SKU)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_portal.templ`, Line: 126, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_portal.templ`, Line: 126, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {

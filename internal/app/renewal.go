@@ -126,12 +126,15 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 
 	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
 
-	// Look up saved payment methods for off-session charging
-	methods, err := s.payments.ListPaymentMethods(ctx, *customer.StripeCustomerID)
+	// Prefer the customer's default payment method (set when they update their
+	// card via Stripe Billing Portal). Fall back to the first attached method
+	// for legacy customers without a default. ListPaymentMethods returns every
+	// attached PM regardless of type, which is required for Stripe Link users.
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID)
 	if err != nil {
-		return nil, fmt.Errorf("list payment methods: %w", err)
+		return nil, err
 	}
-	if len(methods) == 0 {
+	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
 			if wasActive && s.enqueuer != nil {
@@ -147,7 +150,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		AmountCents:     int64(totalCents),
 		Currency:        "usd",
 		CustomerID:      *customer.StripeCustomerID,
-		PaymentMethodID: methods[0].ID,
+		PaymentMethodID: paymentMethodID,
 		OffSession:      true,
 		Metadata: map[string]string{
 			"subscription_id": sub.ID.String(),
@@ -380,11 +383,11 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 
 	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
 
-	methods, err := s.payments.ListPaymentMethods(ctx, *customer.StripeCustomerID)
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID)
 	if err != nil {
-		return nil, fmt.Errorf("list payment methods: %w", err)
+		return nil, err
 	}
-	if len(methods) == 0 {
+	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
 				wasActive := item.Sub.Status == domain.SubscriptionStatusActive
@@ -409,7 +412,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		AmountCents:     int64(orderTotal),
 		Currency:        "usd",
 		CustomerID:      *customer.StripeCustomerID,
-		PaymentMethodID: methods[0].ID,
+		PaymentMethodID: paymentMethodID,
 		OffSession:      true,
 		Metadata: map[string]string{
 			"batch_renewal": "true",
@@ -552,4 +555,34 @@ func ptrVal(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// pickRenewalPaymentMethod resolves the Stripe payment method to charge for an
+// off-session renewal. Returns the empty string when the customer has no usable
+// method (caller marks the subscription past_due).
+//
+// Resolution order:
+//  1. Customer's default_payment_method (set when they update their card via
+//     Stripe Billing Portal — works for any PM type, including Stripe Link).
+//  2. First attached payment method (legacy customers without a default set).
+//
+// Filtering by type=card was tried previously and broke Link customers — do
+// not reintroduce it.
+func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCustomerID string) (string, error) {
+	stripeCust, err := s.payments.GetCustomer(ctx, stripeCustomerID)
+	if err != nil {
+		return "", fmt.Errorf("get stripe customer: %w", err)
+	}
+	if stripeCust.DefaultPaymentMethodID != "" {
+		return stripeCust.DefaultPaymentMethodID, nil
+	}
+
+	methods, err := s.payments.ListPaymentMethods(ctx, stripeCustomerID)
+	if err != nil {
+		return "", fmt.Errorf("list payment methods: %w", err)
+	}
+	if len(methods) == 0 {
+		return "", nil
+	}
+	return methods[0].ID, nil
 }

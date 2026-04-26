@@ -65,7 +65,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_checkout.templ`, Line: 37, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_checkout.templ`, Line: 37, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -94,7 +94,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(item.ProductName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_checkout.templ`, Line: 63, Col: 72}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_checkout.templ`, Line: 63, Col: 72}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -107,7 +107,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(item.SKU)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_checkout.templ`, Line: 64, Col: 72}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_checkout.templ`, Line: 64, Col: 72}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -120,7 +120,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(item.UnitPrice))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_checkout.templ`, Line: 65, Col: 94}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_checkout.templ`, Line: 65, Col: 94}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -133,7 +133,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(item.Quantity))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_checkout.templ`, Line: 70, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_checkout.templ`, Line: 70, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -146,7 +146,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/wholesale/cart/update?item_id=%s", item.ItemID.String()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_checkout.templ`, Line: 73, Col: 90}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_checkout.templ`, Line: 73, Col: 90}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -159,7 +159,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(item.LineTotal))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_checkout.templ`, Line: 80, Col: 106}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_checkout.templ`, Line: 80, Col: 106}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -172,7 +172,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("/wholesale/cart/remove?item_id=%s", item.ItemID.String()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_checkout.templ`, Line: 85, Col: 90}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_checkout.templ`, Line: 85, Col: 90}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -190,7 +190,7 @@ func WholesaleCheckoutContent(props WholesaleCheckoutProps) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Subtotal))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_checkout.templ`, Line: 100, Col: 103}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `wholesale_checkout.templ`, Line: 100, Col: 103}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {

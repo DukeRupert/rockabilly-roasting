@@ -139,6 +139,11 @@ type Provider interface {
 	// ListPaymentMethods lists a customer's saved payment methods.
 	ListPaymentMethods(ctx context.Context, customerID string) ([]PaymentMethod, error)
 
+	// CreatePortalSession creates a Stripe Billing Portal session for a customer
+	// and returns the hosted URL the customer should be redirected to. The
+	// returnURL is where the portal sends the customer when they are done.
+	CreatePortalSession(ctx context.Context, customerID, returnURL string) (string, error)
+
 	// ConstructWebhookEvent verifies a webhook signature and parses the event.
 	ConstructWebhookEvent(payload []byte, signature string) (*WebhookEvent, error)
 }

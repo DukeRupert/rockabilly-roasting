@@ -189,6 +189,18 @@ func (p *StripeProvider) ListPaymentMethods(_ context.Context, customerID string
 	return methods, nil
 }
 
+func (p *StripeProvider) CreatePortalSession(_ context.Context, customerID, returnURL string) (string, error) {
+	params := &stripe.BillingPortalSessionParams{
+		Customer:  stripe.String(customerID),
+		ReturnURL: stripe.String(returnURL),
+	}
+	s, err := p.client.BillingPortalSessions.New(params)
+	if err != nil {
+		return "", fmt.Errorf("create billing portal session: %w", err)
+	}
+	return s.URL, nil
+}
+
 func (p *StripeProvider) ConstructWebhookEvent(payload []byte, signature string) (*WebhookEvent, error) {
 	event, err := webhook.ConstructEventWithOptions(payload, signature, p.webhookSecret, webhook.ConstructEventOptions{
 		IgnoreAPIVersionMismatch: true,

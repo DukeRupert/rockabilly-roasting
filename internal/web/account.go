@@ -334,6 +334,33 @@ func (d *Deps) handleAccountSubscriptionResume(w http.ResponseWriter, r *http.Re
 	http.Redirect(w, r, "/account/subscriptions", http.StatusSeeOther)
 }
 
+// handleAccountBillingPortal opens a Stripe-hosted Billing Portal session for
+// the authenticated customer and redirects them to it. The portal lets them
+// add/replace/remove payment methods on Stripe's side; nothing in our DB
+// changes here. Returning to /account/subscriptions when they're done.
+func (d *Deps) handleAccountBillingPortal(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	customer, _ := auth.CustomerFromContext(ctx)
+
+	if customer.StripeCustomerID == nil {
+		// Customers without a Stripe ID never checked out — nothing for the
+		// portal to manage. The button shouldn't render for them, so this is
+		// purely defensive.
+		d.Logger.Warn("billing portal requested but customer has no Stripe customer ID",
+			"customer_id", customer.ID)
+		http.Redirect(w, r, "/account/subscriptions", http.StatusSeeOther)
+		return
+	}
+
+	url, err := d.PaymentProvider.CreatePortalSession(ctx, *customer.StripeCustomerID, d.BaseURL+"/account/subscriptions")
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, url, http.StatusSeeOther)
+}
+
 func (d *Deps) handleAccountSubscriptionCancel(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	customer, _ := auth.CustomerFromContext(ctx)

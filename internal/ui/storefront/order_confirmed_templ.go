@@ -80,7 +80,7 @@ func OrderConfirmedContent(props OrderConfirmedProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.OrderNumber)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/order_confirmed.templ`, Line: 85, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `order_confirmed.templ`, Line: 85, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {

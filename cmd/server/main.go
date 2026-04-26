@@ -219,7 +219,7 @@ func run() error {
 	// Services. Those that send email have email-capable variants attached via WithEmail.
 	catalogSvc := app.NewCatalogService(catalogStore, auditWriter, metricsReg)
 	orderSvc := app.NewOrderService(orderStore, auditWriter, metricsReg).
-		WithEmail(emailEnv, customerStore, catalogStore)
+		WithEmail(emailEnv, customerStore, catalogStore, subscriptionStore)
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore)
@@ -252,6 +252,10 @@ func run() error {
 	river.AddWorker(workers, jobs.NewWholesaleSuspendedWorker(wholesaleSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderConfirmEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionConfirmEmailWorker(subscriptionSvc, pool))
+	river.AddWorker(workers, jobs.NewSubscriptionRenewalReceiptWorker(orderSvc, pool))
+	river.AddWorker(workers, jobs.NewSubscriptionPastDueWorker(subscriptionSvc, pool))
+	river.AddWorker(workers, jobs.NewSubscriptionCancelledWorker(subscriptionSvc, pool))
+	river.AddWorker(workers, jobs.NewRefundConfirmationWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
 
@@ -281,6 +285,11 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("create river client: %w", err)
 	}
+
+	// Now that the river client exists, attach the enqueuer to services that
+	// fan out jobs from inside their own transactions (e.g. renewal-receipt
+	// and past-due email enqueues atomic with the renewal write).
+	renewalSvc.WithJobEnqueuer(jobs.NewEnqueuer(riverClient))
 
 	// Register scheduler worker (needs the client for transactional inserts)
 	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient, metricsReg))

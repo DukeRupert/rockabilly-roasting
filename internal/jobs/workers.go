@@ -220,3 +220,44 @@ type EmailInvoicePaidArgs struct {
 
 // Kind returns the job kind identifier.
 func (EmailInvoicePaidArgs) Kind() string { return "email:invoice_paid" }
+
+// SubscriptionRenewalReceiptArgs sends a renewal receipt for a subscription
+// renewal order — fires after the off-session charge succeeds and the order
+// is created.
+type SubscriptionRenewalReceiptArgs struct {
+	OrderID    uuid.UUID `json:"order_id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (SubscriptionRenewalReceiptArgs) Kind() string { return "email:subscription_renewal_receipt" }
+
+// SubscriptionPastDueArgs sends a payment-failed / past-due notice to the
+// customer asking them to update their card.
+type SubscriptionPastDueArgs struct {
+	SubscriptionID uuid.UUID `json:"subscription_id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (SubscriptionPastDueArgs) Kind() string { return "email:subscription_past_due" }
+
+// SubscriptionCancelledArgs sends a cancellation confirmation to the customer.
+type SubscriptionCancelledArgs struct {
+	SubscriptionID uuid.UUID `json:"subscription_id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (SubscriptionCancelledArgs) Kind() string { return "email:subscription_cancelled" }
+
+// RefundConfirmationArgs sends a refund-issued confirmation. The amount is the
+// refunded total in cents (may be partial).
+type RefundConfirmationArgs struct {
+	OrderID      uuid.UUID `json:"order_id"`
+	CustomerID   uuid.UUID `json:"customer_id"`
+	RefundAmount int       `json:"refund_amount"`
+}
+
+// Kind returns the job kind identifier.
+func (RefundConfirmationArgs) Kind() string { return "email:refund_confirmation" }

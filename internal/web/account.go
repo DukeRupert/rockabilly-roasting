@@ -9,6 +9,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/auth"
 	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/store"
@@ -344,13 +345,20 @@ func (d *Deps) handleAccountSubscriptionCancel(w http.ResponseWriter, r *http.Re
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		sub, txErr := d.SubscriptionService.GetSubscriptionByCustomer(ctx, tx, id, customer.ID)
+		if _, txErr := d.SubscriptionService.GetSubscriptionByCustomer(ctx, tx, id, customer.ID); txErr != nil {
+			return txErr
+		}
+		sub, txErr := d.SubscriptionService.CancelSubscription(ctx, tx, id, customerActor(r))
 		if txErr != nil {
 			return txErr
 		}
-		_ = sub
-		_, txErr = d.SubscriptionService.CancelSubscription(ctx, tx, id, customerActor(r))
-		return txErr
+		if _, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionCancelledArgs{
+			SubscriptionID: sub.ID,
+			CustomerID:     sub.CustomerID,
+		}, nil); txErr != nil {
+			return txErr
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)

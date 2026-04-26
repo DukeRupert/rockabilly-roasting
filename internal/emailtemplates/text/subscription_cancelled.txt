@@ -1,0 +1,14 @@
+{{define "subscription_cancelled.txt"}}Subscription Cancelled
+
+Hi {{.CustomerName}},
+
+Your {{.ProductName}} subscription ({{.PlanName}}) is cancelled. We won't charge your card again or send another shipment.
+
+Thanks for riding with us. The shop's open whenever you want to come back — start a new subscription anytime from your account, or grab a one-time bag from the catalog.
+
+Visit the shop: {{.StoreURL}}
+Manage your account: {{.AccountURL}}
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

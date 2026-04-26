@@ -1,0 +1,27 @@
+{{define "subscription_renewal_receipt.txt"}}Subscription Renewed — {{.OrderNumber}}
+
+Hi {{.CustomerName}},
+
+Your subscription renewed today. We've packed it up and charged your card on file. Here's the receipt:
+
+Order #: {{.OrderNumber}}
+Date:    {{date .OrderDate}}
+
+Items:
+{{range .Items}}- {{.ProductName}} x{{.Quantity}} — {{cents .Total}}
+{{end}}
+Subtotal:  {{cents .Subtotal}}{{if .DiscountTotal}}
+Discount:  -{{cents .DiscountTotal}}{{end}}
+Shipping:  {{cents .ShippingTotal}}
+Tax:       {{cents .TaxTotal}}
+Charged:   {{cents .OrderTotal}}
+{{if .ShippingAddr}}
+Ships to: {{.ShippingAddr}}
+{{end}}{{if .NextChargeOn}}
+Next charge: {{date .NextChargeOn}}
+{{end}}
+Pause, skip, or cancel anytime from your account: {{.AccountURL}}
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

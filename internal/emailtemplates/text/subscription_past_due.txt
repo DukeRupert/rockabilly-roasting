@@ -1,0 +1,15 @@
+{{define "subscription_past_due.txt"}}We couldn't charge your card
+
+Hi {{.CustomerName}},
+
+Your card on file didn't go through when we tried to renew your {{.ProductName}} subscription ({{.PlanName}}). Until it's sorted, we'll hold the next shipment.
+
+Common causes: expired card, new card number, or a hold from the bank. Updating your payment method takes about a minute.
+
+Update your payment method: {{.AccountURL}}
+
+Once we have a working card, the renewal will go out automatically. Reply to this email if you need a hand.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

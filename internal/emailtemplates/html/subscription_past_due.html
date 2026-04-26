@@ -1,0 +1,31 @@
+{{define "subscription_past_due.html"}}<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:0;background-color:#F5F0E6;font-family:Arial,Helvetica,sans-serif;color:#1A1612;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F0E6;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background-color:#1A1612;padding:24px;text-align:center;">
+    <span style="color:#F5F0E6;font-size:20px;font-weight:bold;">{{.StoreName}}</span>
+  </td></tr>
+  <tr><td style="padding:32px 24px;">
+    <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">We couldn't charge your card</h1>
+    <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
+    <p style="margin:0 0 16px;">Your card on file didn't go through when we tried to renew your <strong>{{.ProductName}}</strong> subscription ({{.PlanName}}). Until it's sorted, we'll hold the next shipment.</p>
+
+    <p style="margin:0 0 24px;">Common causes: expired card, new card number, or a hold from the bank. Updating your payment method takes about a minute.</p>
+
+    <p style="margin:0 0 24px;text-align:center;">
+      <a href="{{.AccountURL}}" style="display:inline-block;background-color:#C0271D;color:#ffffff;text-decoration:none;padding:12px 24px;font-weight:bold;border-radius:4px;">Update payment method</a>
+    </p>
+
+    <p style="margin:0;font-size:13px;color:#666;">Once we have a working card, the renewal will go out automatically. Reply to this email if you need a hand.</p>
+  </td></tr>
+  <tr><td style="background-color:#F5F0E6;padding:16px 24px;text-align:center;font-size:12px;color:#666;">
+    {{.StoreName}} &middot; <a href="{{.StoreURL}}" style="color:#C0271D;">{{.StoreURL}}</a>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>{{end}}

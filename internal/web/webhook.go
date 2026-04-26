@@ -12,6 +12,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/store"
@@ -175,11 +176,24 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 			return fmt.Errorf("update payment status failed: %w", err)
 		}
 
-		// If this order belongs to a subscription, mark it past_due
-		if order.SubscriptionID != nil {
+		// If this order belongs to a subscription, mark it past_due and notify
+		// the customer — but only on the active → past_due transition.
+		// MarkPastDue returns ErrSubscriptionNotActive if the subscription is
+		// already past_due (or in another non-active state), in which case the
+		// customer was already notified by the original transition.
+		if order.SubscriptionID != nil && order.CustomerID != nil {
 			_, err = d.SubscriptionService.MarkPastDue(ctx, tx, *order.SubscriptionID)
-			if err != nil && !errors.Is(err, app.ErrSubscriptionNotActive) {
+			if err != nil {
+				if errors.Is(err, app.ErrSubscriptionNotActive) {
+					return nil
+				}
 				return fmt.Errorf("mark subscription past_due: %w", err)
+			}
+			if _, err := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionPastDueArgs{
+				SubscriptionID: *order.SubscriptionID,
+				CustomerID:     *order.CustomerID,
+			}, nil); err != nil {
+				return fmt.Errorf("enqueue past-due email: %w", err)
 			}
 		}
 
@@ -187,11 +201,14 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 	})
 }
 
-// handleChargeRefunded processes a refund event from Stripe.
+// handleChargeRefunded processes a refund event from Stripe. Idempotent on
+// the payment-status side (UpdatePaymentStatus tolerates re-runs), but the
+// notification email is suppressed if the order is already in a refunded
+// state to avoid double-sending when the admin has already marked it.
 func (d *Deps) handleChargeRefunded(ctx context.Context, event *payments.WebhookEvent) error {
-	piID, err := extractChargePaymentIntentID(event.Data)
+	piID, refundAmount, err := extractRefundDetails(event.Data)
 	if err != nil {
-		return fmt.Errorf("extract PI from charge: %w", err)
+		return fmt.Errorf("extract refund details: %w", err)
 	}
 
 	logger := logging.FromContext(ctx)
@@ -206,9 +223,23 @@ func (d *Deps) handleChargeRefunded(ctx context.Context, event *payments.Webhook
 			return fmt.Errorf("get order by PI: %w", err)
 		}
 
+		alreadyRefunded := order.PaymentStatus == domain.PaymentStatusRefunded
+
 		_, err = d.OrderService.UpdatePaymentStatus(ctx, tx, order.ID, domain.PaymentStatusRefunded, systemActor())
 		if err != nil {
 			return fmt.Errorf("update payment status refunded: %w", err)
+		}
+
+		if alreadyRefunded || order.CustomerID == nil {
+			return nil
+		}
+
+		if _, err := d.RiverClient.InsertTx(ctx, tx, jobs.RefundConfirmationArgs{
+			OrderID:      order.ID,
+			CustomerID:   *order.CustomerID,
+			RefundAmount: refundAmount,
+		}, nil); err != nil {
+			return fmt.Errorf("enqueue refund confirmation email: %w", err)
 		}
 
 		return nil
@@ -238,16 +269,31 @@ func extractPaymentIntentID(data []byte) (string, error) {
 	return obj.ID, nil
 }
 
-// extractChargePaymentIntentID pulls the PaymentIntent ID from a charge event's data.
-func extractChargePaymentIntentID(data []byte) (string, error) {
+// extractRefundDetails pulls the PaymentIntent ID and the most recent refund
+// amount (in cents) from a charge.refunded event's data. Stripe sends the
+// charge object with a list of refunds; the latest one is the refund this
+// event is firing for.
+func extractRefundDetails(data []byte) (string, int, error) {
 	var obj struct {
-		PaymentIntent string `json:"payment_intent"`
+		PaymentIntent  string `json:"payment_intent"`
+		AmountRefunded int    `json:"amount_refunded"`
+		Refunds        struct {
+			Data []struct {
+				Amount int `json:"amount"`
+			} `json:"data"`
+		} `json:"refunds"`
 	}
 	if err := json.Unmarshal(data, &obj); err != nil {
-		return "", fmt.Errorf("unmarshal charge event: %w", err)
+		return "", 0, fmt.Errorf("unmarshal charge event: %w", err)
 	}
 	if obj.PaymentIntent == "" {
-		return "", fmt.Errorf("missing payment_intent in charge event data")
+		return "", 0, fmt.Errorf("missing payment_intent in charge event data")
 	}
-	return obj.PaymentIntent, nil
+	// Prefer the most recent individual refund amount (works for partials);
+	// fall back to amount_refunded (cumulative) if the refunds list is empty.
+	amount := obj.AmountRefunded
+	if n := len(obj.Refunds.Data); n > 0 {
+		amount = obj.Refunds.Data[n-1].Amount
+	}
+	return obj.PaymentIntent, amount, nil
 }

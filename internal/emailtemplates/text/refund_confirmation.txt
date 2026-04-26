@@ -1,0 +1,13 @@
+{{define "refund_confirmation.txt"}}Refund Issued — {{.OrderNumber}}
+
+Hi {{.CustomerName}},
+
+We've issued a refund of {{cents .RefundAmount}} on order {{.OrderNumber}}.
+
+The refund will land back on the card you paid with. Banks usually post it within 5–10 business days.
+
+Reply to this email if anything looks off.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

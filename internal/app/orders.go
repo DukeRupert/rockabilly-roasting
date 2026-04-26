@@ -16,12 +16,13 @@ import (
 
 // OrderService contains business logic for orders and carts.
 type OrderService struct {
-	orders    *store.OrderStore
-	audit     *audit.AuditWriter
-	metrics   *metrics.Registry
-	customers *store.CustomerStore // populated via WithEmailSupport; required for SendConfirmationEmail
-	catalog   *store.CatalogStore  // populated via WithEmailSupport; required for SendConfirmationEmail
-	email     EmailEnv             // populated via WithEmail; required for SendConfirmationEmail
+	orders        *store.OrderStore
+	audit         *audit.AuditWriter
+	metrics       *metrics.Registry
+	customers     *store.CustomerStore     // populated via WithEmail; required for Send* methods
+	catalog       *store.CatalogStore      // populated via WithEmail; required for Send* methods
+	subscriptions *store.SubscriptionStore // populated via WithEmail; used by SendRenewalReceiptEmail to show next-charge date
+	email         EmailEnv                 // populated via WithEmail; required for Send* methods
 }
 
 // NewOrderService creates a new OrderService.
@@ -34,12 +35,13 @@ func NewOrderService(orders *store.OrderStore, audit *audit.AuditWriter, metrics
 }
 
 // WithEmail attaches email-send environment and the supporting stores required
-// for SendConfirmationEmail. Must be called before SendConfirmationEmail is
-// invoked; safe to call at wiring time.
-func (s *OrderService) WithEmail(env EmailEnv, customers *store.CustomerStore, catalog *store.CatalogStore) *OrderService {
+// for Send* methods. Must be called before any Send* method is invoked; safe
+// to call at wiring time.
+func (s *OrderService) WithEmail(env EmailEnv, customers *store.CustomerStore, catalog *store.CatalogStore, subscriptions *store.SubscriptionStore) *OrderService {
 	s.email = env
 	s.customers = customers
 	s.catalog = catalog
+	s.subscriptions = subscriptions
 	return s
 }
 

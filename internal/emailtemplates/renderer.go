@@ -151,6 +151,54 @@ type WholesaleApplicationData struct {
 	StoreName     string
 }
 
+// SubscriptionRenewalReceiptData holds data for a subscription renewal receipt
+// — sent after a successful off-session charge creates a renewal order.
+type SubscriptionRenewalReceiptData struct {
+	CustomerName  string
+	OrderNumber   string
+	OrderDate     time.Time
+	Items         []OrderLineItemData
+	Subtotal      int
+	DiscountTotal int
+	ShippingTotal int
+	TaxTotal      int
+	OrderTotal    int
+	ShippingAddr  string
+	NextChargeOn  *time.Time // when the next renewal is scheduled, nil if cancelled-at-period-end
+	StoreName     string
+	StoreURL      string
+	AccountURL    string
+}
+
+// SubscriptionPastDueData holds data for the past-due / payment-failed notice.
+type SubscriptionPastDueData struct {
+	CustomerName string
+	ProductName  string
+	PlanName     string
+	StoreName    string
+	StoreURL     string
+	AccountURL   string
+}
+
+// SubscriptionCancelledData holds data for the subscription-cancelled confirmation.
+type SubscriptionCancelledData struct {
+	CustomerName string
+	ProductName  string
+	PlanName     string
+	StoreName    string
+	StoreURL     string
+	AccountURL   string
+}
+
+// RefundConfirmationData holds data for the refund-issued confirmation.
+type RefundConfirmationData struct {
+	CustomerName string
+	OrderNumber  string
+	RefundAmount int // cents refunded (full or partial)
+	StoreName    string
+	StoreURL     string
+}
+
 // --- Template helpers ---
 
 func formatCents(cents int) string {

@@ -157,6 +157,104 @@ func TestRender_WholesaleApplication(t *testing.T) {
 	assert.Contains(t, text, "Bean Co")
 }
 
+func TestRender_SubscriptionRenewalReceipt(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	next := time.Date(2026, 5, 6, 0, 0, 0, 0, time.UTC)
+	data := SubscriptionRenewalReceiptData{
+		CustomerName: "Jane",
+		OrderNumber:  "SUB-789",
+		OrderDate:    time.Date(2026, 4, 6, 0, 0, 0, 0, time.UTC),
+		Items: []OrderLineItemData{
+			{ProductName: "Dark Roast 12oz", Quantity: 1, UnitPrice: 1620, Total: 1620},
+		},
+		Subtotal:      1620,
+		ShippingTotal: 0,
+		TaxTotal:      130,
+		OrderTotal:    1750,
+		ShippingAddr:  "123 Main St, Austin, TX 78701",
+		NextChargeOn:  &next,
+		StoreName:     "Test Store",
+		StoreURL:      "https://example.com",
+		AccountURL:    "https://example.com/account/subscriptions",
+	}
+
+	html, text, err := r.Render("subscription_renewal_receipt", data)
+	require.NoError(t, err)
+
+	assert.Contains(t, html, "SUB-789")
+	assert.Contains(t, html, "Dark Roast 12oz")
+	assert.Contains(t, html, "$17.50")
+	assert.Contains(t, html, "May 6, 2026")
+	assert.Contains(t, text, "SUB-789")
+	assert.Contains(t, text, "May 6, 2026")
+}
+
+func TestRender_SubscriptionPastDue(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	data := SubscriptionPastDueData{
+		CustomerName: "Jane",
+		ProductName:  "Dark Roast 12oz",
+		PlanName:     "Every 30 Days",
+		StoreName:    "Test Store",
+		StoreURL:     "https://example.com",
+		AccountURL:   "https://example.com/account/subscriptions",
+	}
+
+	html, text, err := r.Render("subscription_past_due", data)
+	require.NoError(t, err)
+
+	assert.Contains(t, html, "Dark Roast 12oz")
+	assert.Contains(t, html, "Every 30 Days")
+	assert.Contains(t, html, "/account/subscriptions")
+	assert.Contains(t, text, "Dark Roast 12oz")
+}
+
+func TestRender_SubscriptionCancelled(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	data := SubscriptionCancelledData{
+		CustomerName: "Jane",
+		ProductName:  "Dark Roast 12oz",
+		PlanName:     "Every 30 Days",
+		StoreName:    "Test Store",
+		StoreURL:     "https://example.com",
+		AccountURL:   "https://example.com/account/subscriptions",
+	}
+
+	html, text, err := r.Render("subscription_cancelled", data)
+	require.NoError(t, err)
+
+	assert.Contains(t, html, "Dark Roast 12oz")
+	assert.Contains(t, html, "Every 30 Days")
+	assert.Contains(t, text, "Dark Roast 12oz")
+}
+
+func TestRender_RefundConfirmation(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	data := RefundConfirmationData{
+		CustomerName: "Jane",
+		OrderNumber:  "ORD-123",
+		RefundAmount: 4752,
+		StoreName:    "Test Store",
+		StoreURL:     "https://example.com",
+	}
+
+	html, text, err := r.Render("refund_confirmation", data)
+	require.NoError(t, err)
+
+	assert.Contains(t, html, "ORD-123")
+	assert.Contains(t, html, "$47.52")
+	assert.Contains(t, text, "ORD-123")
+	assert.Contains(t, text, "$47.52")
+}
+
 func TestFormatCents(t *testing.T) {
 	assert.Equal(t, "$0.00", formatCents(0))
 	assert.Equal(t, "$1.00", formatCents(100))

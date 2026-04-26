@@ -25,6 +25,7 @@ type RenewalService struct {
 	payments      payments.Provider
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
+	enqueuer      JobEnqueuer // populated via WithJobEnqueuer; nil-safe (renewal still proceeds without it)
 }
 
 // NewRenewalService creates a new RenewalService.
@@ -46,6 +47,14 @@ func NewRenewalService(
 		audit:         audit,
 		metrics:       metrics,
 	}
+}
+
+// WithJobEnqueuer attaches the enqueuer used to fan out renewal-receipt and
+// past-due notification emails atomically with renewal state changes.
+// Wiring-time only.
+func (s *RenewalService) WithJobEnqueuer(e JobEnqueuer) *RenewalService {
+	s.enqueuer = e
+	return s
 }
 
 // RenewSubscription processes a single subscription renewal:
@@ -110,6 +119,11 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		return nil, fmt.Errorf("customer %s has no Stripe customer ID", customer.ID)
 	}
 
+	// Capture pre-renewal status so we only notify the customer on the
+	// active → past_due transition (not on subsequent failed retries while
+	// already past_due).
+	wasActive := sub.Status == domain.SubscriptionStatusActive
+
 	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
 
 	// Look up saved payment methods for off-session charging
@@ -120,6 +134,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	if len(methods) == 0 {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
+			if wasActive && s.enqueuer != nil {
+				_ = s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customer.ID)
+			}
 			return nil
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
@@ -150,6 +167,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		// Payment failed — mark subscription past_due
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
+			if wasActive && s.enqueuer != nil {
+				_ = s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customer.ID)
+			}
 			return nil
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
@@ -239,6 +259,13 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			After:        order,
 		}); txErr != nil {
 			return fmt.Errorf("audit renewal: %w", txErr)
+		}
+
+		// Enqueue renewal-receipt email atomically with the order.
+		if s.enqueuer != nil {
+			if txErr = s.enqueuer.EnqueueRenewalReceipt(ctx, tx, order.ID, customer.ID); txErr != nil {
+				return fmt.Errorf("enqueue renewal receipt: %w", txErr)
+			}
 		}
 
 		return nil
@@ -360,7 +387,11 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if len(methods) == 0 {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
+				wasActive := item.Sub.Status == domain.SubscriptionStatusActive
 				s.subscriptions.UpdateStatus(ctx, tx, item.Sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
+				if wasActive && s.enqueuer != nil {
+					_ = s.enqueuer.EnqueuePastDueNotice(ctx, tx, item.Sub.ID, customer.ID)
+				}
 			}
 			return nil
 		})
@@ -397,7 +428,11 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if err != nil {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
+				wasActive := item.Sub.Status == domain.SubscriptionStatusActive
 				s.subscriptions.UpdateStatus(ctx, tx, item.Sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
+				if wasActive && s.enqueuer != nil {
+					_ = s.enqueuer.EnqueuePastDueNotice(ctx, tx, item.Sub.ID, customer.ID)
+				}
 			}
 			return nil
 		})
@@ -493,6 +528,13 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			},
 		}); txErr != nil {
 			return fmt.Errorf("audit batch renewal: %w", txErr)
+		}
+
+		// Enqueue renewal-receipt email atomically with the order.
+		if s.enqueuer != nil {
+			if txErr = s.enqueuer.EnqueueRenewalReceipt(ctx, tx, order.ID, customer.ID); txErr != nil {
+				return fmt.Errorf("enqueue renewal receipt: %w", txErr)
+			}
 		}
 
 		return nil

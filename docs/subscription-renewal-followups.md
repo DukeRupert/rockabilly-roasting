@@ -34,7 +34,18 @@ Likely a no-op today (Hiri does not use Stripe Invoices — it creates PaymentIn
 
 **Suggested action:** either delete the unused constant, or wire up a handler if/when invoice-based billing is introduced.
 
-## 4. Default payment method is not respected
+## 4. Admin "Reactivate past_due" button — deliberately deferred
+
+The dashboard has no way to flip `past_due → active`. The 2026-04-26 incident required raw SQL on the production DB. A button is tempting, but the right pattern is two distinct actions, not one:
+
+- **Retry payment** — re-enqueue a renewal job for this subscription (operator says "I confirmed with the customer, try the saved PM again").
+- **Mark current period paid** — clear `past_due` without a charge (operator handled payment outside the system, e.g. customer paid by check).
+
+Both need a captured reason on the audit record. A single "Reactivate" button without those distinctions is dangerous in the general case: most past-due states are real card failures (declined, expired, insufficient funds), and a second immediate charge attempt is exactly what banks flag.
+
+**Blocked on item 1.** Until past-due transitions carry an audit trail with the underlying Stripe error, the operator has no basis for choosing between the two actions — they'd be guessing at the cause. Build item 1 first; then this becomes safe to add.
+
+## 5. Default payment method is not respected
 
 Both renewal paths pick `methods[0]` from the `ListPaymentMethods` response. With the type filter gone, this becomes "first PM Stripe returns" — usually the most recently attached, but not guaranteed. If a customer adds a backup card after their primary fails, the renewal job may still pick the broken one.
 

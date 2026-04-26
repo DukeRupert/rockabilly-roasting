@@ -65,7 +65,7 @@ templ timelineRow(e domain.AuditEntry, label, markerClass string, isLast bool, l
 			}
 			<p class="mt-1 text-xs text-rr-muted">
 				<time datetime={ e.CreatedAt.Format(time.RFC3339) }>
-					{ e.CreatedAt.In(loc).Format("Jan 2, 2006 at 3:04 PM") }
+					{ e.CreatedAt.In(loc).Format("Jan 2, 2006 at 3:04 PM MST") }
 				</time>
 				<span class="mx-1.5">·</span>
 				<span>{ timelineRelative(e.CreatedAt) }</span>

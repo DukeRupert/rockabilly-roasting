@@ -134,7 +134,7 @@ templ AuditListContent(props AuditListProps) {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm text-rr-muted sm:pl-6">
 									<time datetime={ e.CreatedAt.Format("2006-01-02T15:04:05Z07:00") }>
-										{ e.CreatedAt.In(props.MerchantTZ).Format("Jan 2 15:04") }
+										{ e.CreatedAt.In(props.MerchantTZ).Format("Jan 2 15:04 MST") }
 									</time>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">

@@ -25,6 +25,7 @@ func (s *PostmarkSender) Send(ctx context.Context, msg Message) (*SendResult, er
 	resp, err := s.client.SendEmail(ctx, postmark.Email{
 		From:     msg.From,
 		To:       msg.To,
+		Bcc:      msg.Bcc,
 		Subject:  msg.Subject,
 		HTMLBody: msg.HTML,
 		TextBody: msg.Text,

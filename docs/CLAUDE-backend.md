@@ -291,3 +291,91 @@ These are hard boundaries. Never cross them.
 - If you are about to add a new infrastructure concern (caching, feature flags, external API client): add it as a new sub-package under `platform/`, inject it as a dependency, never import it from `domain/` or `store/`.
 - **External service integrations** (shipping label providers, tax services, email providers) always go behind an interface in `platform/`. The interface lives in `platform/<concern>/provider.go`. Concrete implementations (`shippo.go`, `easypost.go`) live alongside it. The rest of the application depends only on the interface — never on a concrete provider type. This means swapping providers is a one-line change in `cmd/server/main.go`.
 - **External calls never happen inside a database transaction.** If a service method needs to call an external API and then write the result to the database, the external call happens first (outside any transaction), and the database write happens after in its own transaction. Document the failure mode in a comment if the external call can succeed while the subsequent DB write fails.
+
+---
+
+## Design rationale
+
+Non-obvious decisions and constraints that aren't visible from the code alone. Most "what" and "how" questions are answered by reading `internal/`; this section captures the "why" — alternatives rejected, hidden trade-offs, prior incidents, and warnings worth keeping around.
+
+### Domain & pricing
+
+- **Pricing is a separate domain, not a column on Product.** Variants have no price column. Lets currency variants, quantity tiers, customer-group rates, and promotional overrides exist without touching product tables.
+- **Plans are decoupled from products.** A `SubscriptionPlan` defines *how often*, not *what*. Customers can swap products without changing schedule, or change frequency without changing product.
+- **Subscription intervals are day-based, not calendar-based.** "Every 14/30/60 days" is predictable; "monthly" raises 28/30/31-day ambiguity.
+- **Order, payment, and fulfillment statuses are three separate enums.** A "complete" order may still have outstanding payments; a paid order may be only partially fulfilled. Collapsing them produces a confusing matrix.
+- **Line item prices are denormalized at order time.** Captures what the customer actually paid even if catalog pricing later changes.
+
+### Subscriptions
+
+- **Subscriptions are a scheduling mechanism, not a billing engine.** Each renewal generates a standard Order + PaymentIntent — no Stripe Subscriptions/Billing objects. Reasons: (1) WooCommerce migration compatibility, since existing customers had PaymentIntents and not Billing tokens; (2) full control over retry/grace logic without being constrained by Stripe's subscription lifecycle.
+- **Renewal payment-method lookup uses `ListPaymentMethods[0]` of any type, not filtered to `"card"`.** Filtering to card breaks Stripe Link customers.
+
+### Discounts
+
+- **Fixed-amount discounts are capped at subtotal — never go negative.** Avoids "negative subtotal" states and matches user intuition.
+- **Coupon redemption uses optimistic locking (`WHERE redeemed_at IS NULL` + `UPDATE ... RETURNING`), not distributed locks.** Two concurrent checkouts both pass the "not yet redeemed" read; only one `UPDATE` returns a row. The loser sees `ErrCouponAlreadyRedeemed`. Scales without Redis.
+
+### Wholesale & B2B
+
+- **Wholesale and retail are separate account types, not tiers.** Different login endpoints (password vs magic link), different portals, different price lists. Prevents cross-customer data leaks and lets each evolve independently.
+- **Declined wholesale applications are not deleted** — status stays `pending` so admin can revisit.
+- **Product visibility has three levels: public / wholesale / restricted.** A restricted product with no group assignments is invisible to non-staff — useful for prepping items for a not-yet-onboarded wholesale client.
+- **Standing orders (B2B recurring) use the same Order+PaymentIntent pattern as retail subscriptions.** No separate billing engine.
+
+### Tax
+
+- **WA sales tax is wired up but currently dormant.** Bagged coffee falls under WA's food-for-home-consumption exemption; products are flagged `tax_exempt = true`. To activate for non-exempt items: `UPDATE products SET tax_exempt = false WHERE id = ...;` (no admin UI for this yet).
+- **Tax is calculated on post-discount subtotal**, with each line item's taxable amount proportionally reduced. A 10% coupon reduces the tax bill too, not just the order price.
+- **Wholesale orders unconditionally skip tax**, regardless of store config — B2B customers expect this.
+
+### Shipping
+
+- **Shipping rates at checkout are calculated internally** (flat rate + free threshold). No external API call on the hot path.
+- **Label provider calls happen before the shipment record is persisted.** If the provider succeeds but the DB write fails, the label still exists in the provider's dashboard and the order number is in the Reference field for manual lookup.
+
+### Authentication
+
+- **Sessions are DB-backed opaque tokens, not JWTs.** Instant revocation matters more than statelessness for a small-team ecom: staff deactivation, account takeover response, and "log out all devices" all require killing sessions immediately — impossible with JWTs without a denylist (which reintroduces the DB lookup).
+- **Tokens are SHA-256 hashed at rest.** Raw token is sent to the client exactly once; only the hash is stored. A DB exfiltration doesn't expose live tokens.
+- **Customer and staff auth are separate endpoints with separate session rows.** A compromised customer token cannot be presented to a staff endpoint — session lookup always scopes by `actor_type`.
+- **Guest customers are persistent, not disposable.** `is_guest = true`, no password. On registration with the same email, cart/addresses/orders merge into the permanent account. Guest record is updated in place.
+- **Email verification gates checkout.** Closes a class of bot signups that never pay.
+- **Wholesale 2FA is architected but not enabled.** The `magic_link_tokens` table serves both retail passwordless auth and wholesale 2FA. To turn on: set `two_fa_enabled = true` on the customer; the login handler will issue a magic link after password verification. No schema change needed.
+
+### Rate limiting
+
+- **Token bucket, not fixed windows.** Fixed windows allow a burst at minute 0 and another at minute 1; token bucket captures burst capacity natively while catching sustained hammering.
+- **Email keys are SHA-256 hashed in the rate-limit store.** No plaintext PII in the limiter.
+- **Rate limiter fails open on store error.** Don't compound a Redis outage by locking out all users — log, alert, let traffic through.
+- **The `Store` interface is the seam for Redis migration.** `InMemoryStore` works for single-server; `RedisStore` (with Lua atomics) is the migration path. Middleware, limits, and headers stay identical.
+
+### Audit
+
+- **`actor_name` is denormalized onto audit records.** Staff get deactivated and renamed; storing the name at action time keeps rows self-contained and human-readable forever.
+- **`action` is a namespaced string constant, not a Postgres enum.** Enums require migrations to extend; new actions ship by adding a constant in `platform/audit/actions.go`. The namespace prefix (`order.`, `subscription.`) makes the log queryable per domain.
+- **No `before` snapshot stored.** The previous state is recoverable by querying the most recent audit row before the event. Avoids doubling storage for a rarely-needed query pattern.
+
+### Observability
+
+- **`/metrics` listens on `127.0.0.1:9090` by default**, not the public port. Metrics expose webhook counts, queue depth, DB pool stats — leaking publicly is real information disclosure. Production exposes via reverse proxy with IP allowlist + basic auth.
+- **URL paths are normalized for metrics labels.** `/orders/{id}` is the label, not `/orders/abc-123`. Without this every UUID creates a new Prometheus time series and cardinality explodes.
+- **`request_id` is the bridge between metrics and logs.** Alert fires on error rate → filter Loki by the time window and `level=ERROR` → grab the `request_id` → see the full request trace.
+- **Promtail label promotion: `level`, `request_id`, `actor_id` only.** Promoting `order_id` / `customer_id` would index-bloat Loki — keep those as JSON line content and filter via `| json | order_id="..."`.
+- **Metrics are incremented at the service layer, not the handler.** The service is where the business event happens and has access to label values (amount, currency, plan, …).
+
+### Testing
+
+- **Test isolation is per-transaction rollback, not per-test truncation.** `testutil.NewTestTx` opens a tx that always rolls back. No test ordering dependencies, no shared state, no truncation scripts.
+- **Coupon redemption race is the highest-priority concurrency test.** Two concurrent attempts on a single-use code — exactly one must succeed. Without this test, optimistic-locking bugs ship to production.
+- **Svelte checkout endpoints have golden-file contract tests.** Response shape changes fail CI; updating the golden requires `go test -update`. Prevents silent Go/Svelte API drift.
+
+### UI
+
+- **Charts are pure rendering, never computation.** Callers compute aggregates, normalize magnitudes to [0, 1], and pre-format labels. The chart partial knows nothing about business types — keeps it reusable across any future report.
+- **Toasts are server-driven via `HX-Trigger`.** No JS required for the happy path; survives JS failure.
+- **Feedback patterns are four distinct types, never mixed:** inline validation (field-level, on blur), toasts (success/error, auto-dismiss), inline confirmation (destructive actions, no centered modals), progress indicators (multi-step). Mixing produces inconsistent UX.
+
+### Frontend deployment
+
+- **The Svelte checkout is single-file, `go:embed`'d into the binary.** No separate frontend deploy, no CDN required for the critical path. The production binary is fully self-contained.

@@ -54,10 +54,12 @@ mage db:rollback  # roll back last migration
 mage db:status    # show migration status
 mage db:create <name>  # create new migration file
 
-# Data-migration / one-off commands (separate main packages under cmd/)
-mage wcMigrate    # WooCommerce subscription importer (cmd/migrate) — supports --dry-run, --mapping=path/to/mapping.json
-go run ./cmd/os-migrate  # Orderspace migration (no mage target)
+# One-off commands (separate main packages under cmd/) — see docs/operations.md
+go run ./cmd/support-reply --to person@example.com --name Alex --dry-run  # send a templated support email
 go run ./cmd/seed        # same thing mage seed runs
+go run ./cmd/sentrycheck # verify Sentry wiring
+mage wcMigrate           # WooCommerce subscription importer (cmd/migrate) — archived; --dry-run, --mapping flags
+go run ./cmd/os-migrate  # Orderspace wholesale importer — archived
 
 # Run a single test (use go test directly)
 go test ./internal/app/ -run TestOrderRefund
@@ -160,22 +162,18 @@ go test ./internal/app/ -run TestOrderRefund # single test
 mage testVerbose                             # verbose output
 ```
 
-## Key Design Docs
+## Key Docs
 
-Detailed specifications live in `docs/`:
-- `CLAUDE-backend.md` — full backend conventions (the authoritative reference)
-- `lean-commerce-package-structure.md` — directory tree and import graph
-- `lean-commerce-domain-model.md` — 6 domains: Catalog, Pricing, Customer, Order, Fulfillment, Subscription
-- `lean-commerce-auth.md` — session strategy, customer vs staff auth flows
-- `lean-commerce-infrastructure.md` — 8 infrastructure concerns
-- `lean-commerce-subscriptions.md` — subscription lifecycle and renewal
-- `lean-commerce-b2b.md` — wholesale/B2B customer workflows
-- `lean-commerce-discounts.md` — discount and coupon system
-- `lean-commerce-tax.md` — tax calculation via Stripe Tax
-- `lean-commerce-shipping.md` — shipping label and rate workflows
-- `lean-commerce-ui-plan.md` — UI plan and component specs
+Live docs in `docs/`:
+- `CLAUDE-backend.md` — backend conventions (the authoritative reference) + a "Design rationale" appendix capturing non-obvious decisions
+- `operations.md` — one-shot tools (`cmd/support-reply`, `cmd/seed`, `cmd/sentrycheck`) and runbook index
+- `backup-restore-runbook.md` — daily backup procedure and full restore steps
+- `stripe-setup.md` — Stripe wiring (keys, webhooks, tax)
+- `guide/` — end-user how-tos for admin, storefront, and wholesale
 
-The brand is defined by the **Rockabilly Roasting Design System/** folder at the repo root (README, `colors_and_type.css`, `assets/`, `preview/`, `ui_kits/website/`, `SKILL.md`). That folder is the source of truth for color, type, shadows, spacing, iconography, and voice — it supersedes the earlier `rockabilly-brand-guide-v3.html` and `rockabilly-brand-voice.md` docs.
+The original `lean-commerce-*.md` design specs were retired post-launch — the code is the source of truth, with non-obvious "why" decisions extracted into the Design rationale section of `CLAUDE-backend.md`. Completed migration plans live under `docs/archive/migrations/`. Run `git log --all -- docs/<filename>` to recover any retired doc.
+
+The brand is defined by the **Rockabilly Roasting Design System/** folder at the repo root (README, `colors_and_type.css`, `assets/`, `preview/`, `ui_kits/website/`, `SKILL.md`). That folder is the source of truth for color, type, shadows, spacing, iconography, and voice.
 
 ## Design Context
 

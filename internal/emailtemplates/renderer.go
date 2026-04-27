@@ -199,6 +199,15 @@ type RefundConfirmationData struct {
 	StoreURL     string
 }
 
+// AccountNotMigratedData holds data for the support reply explaining that the
+// customer's old account didn't carry over (only active subscribers were
+// migrated) and they'll be re-created automatically on their next order.
+type AccountNotMigratedData struct {
+	CustomerName string
+	StoreName    string
+	StoreURL     string
+}
+
 // --- Template helpers ---
 
 func formatCents(cents int) string {

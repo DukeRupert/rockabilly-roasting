@@ -1,0 +1,25 @@
+{{define "account_not_migrated.txt"}}{{.StoreName}}
+==========================================
+
+A QUICK NOTE -- NEW WEBSITE, SAME SHOP
+
+Hey{{if .CustomerName}} {{.CustomerName}}{{end}} -- thanks for reaching out, and sorry for the runaround on the sign-in.
+
+Same crew, same Kennewick storefront -- we just rebuilt the website and the system running behind it. When we switched everything over, only customers with active subscriptions carried across to the new system. Looks like yours wasn't active at the time, so there's no account waiting on this side -- that's why the sign-in link never lands.
+
+Easy fix: place an order on the new site and an account gets built for you automatically. After that, sign-in works the way you tried -- drop your email, we send a link, you're in.
+
+{{.StoreURL}}
+
+If you need anything from your old order history, just say the word and we'll dig it up and send it over.
+
+Thanks for sticking with us -- appreciate the patience.
+
+-- the Rockabilly crew
+
+------------------------------------------
+{{.StoreName}}
+101 W Kennewick Ave, Kennewick WA
+(509) 585-2320
+{{.StoreURL}}
+{{end}}

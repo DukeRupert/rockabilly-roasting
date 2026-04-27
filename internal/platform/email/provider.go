@@ -6,6 +6,7 @@ import "context"
 type Message struct {
 	From    string
 	To      string
+	Bcc     string // optional, comma-separated list of BCC recipients
 	Subject string
 	HTML    string
 	Text    string

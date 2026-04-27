@@ -122,10 +122,11 @@ type SubscriptionConfirmData struct {
 	PlanName     string
 	ProductName  string
 	Quantity     int
-	Interval     string
-	UnitPrice    int
+	IntervalDays int       // billing cadence in days (e.g. 30 for "every 30 days")
+	NextChargeOn time.Time // when the next renewal payment will run
 	StoreName    string
 	StoreURL     string
+	AccountURL   string
 }
 
 // WholesaleApprovedData holds data for the wholesale approved welcome email.

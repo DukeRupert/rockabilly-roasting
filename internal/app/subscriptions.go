@@ -521,6 +521,32 @@ func (s *SubscriptionService) LinkOrder(ctx context.Context, tx pgx.Tx, subscrip
 
 // --- Period calculation ---
 
+// intervalDays returns the billing cadence in days for the given interval and
+// count. Used for customer-facing copy (emails, account UI) where the raw enum
+// value (e.g. "every_30_days") is too awkward. Returns 0 for the dev-only
+// every_2_minutes interval — it should never appear in customer comms.
+func intervalDays(interval domain.SubscriptionInterval, count int) int {
+	if count < 1 {
+		count = 1
+	}
+	switch interval {
+	case domain.SubscriptionIntervalEvery7Days:
+		return 7 * count
+	case domain.SubscriptionIntervalEvery14Days:
+		return 14 * count
+	case domain.SubscriptionIntervalEvery21Days:
+		return 21 * count
+	case domain.SubscriptionIntervalEvery30Days:
+		return 30 * count
+	case domain.SubscriptionIntervalEvery60Days:
+		return 60 * count
+	case domain.SubscriptionIntervalEvery90Days:
+		return 90 * count
+	default:
+		return 0
+	}
+}
+
 func nextPeriodEnd(start time.Time, interval domain.SubscriptionInterval, count int) time.Time {
 	switch interval {
 	case domain.SubscriptionIntervalEvery2Minutes:

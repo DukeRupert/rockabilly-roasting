@@ -54,10 +54,11 @@ func (s *SubscriptionService) SendConfirmationEmail(ctx context.Context, pool *p
 		PlanName:     plan.Name,
 		ProductName:  productName,
 		Quantity:     sub.Quantity,
-		Interval:     string(plan.Interval),
-		UnitPrice:    0, // price is on the order, not the subscription
+		IntervalDays: intervalDays(plan.Interval, plan.IntervalCount),
+		NextChargeOn: sub.NextOrderAt,
 		StoreName:    s.email.StoreName,
 		StoreURL:     s.email.BaseURL,
+		AccountURL:   s.email.BaseURL + "/account/subscriptions",
 	})
 	if err != nil {
 		s.metrics.EmailsSent.WithLabelValues("subscription_confirm", "failed").Inc()

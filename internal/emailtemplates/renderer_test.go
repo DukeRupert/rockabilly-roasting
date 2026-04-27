@@ -104,18 +104,24 @@ func TestRender_SubscriptionConfirm(t *testing.T) {
 		PlanName:     "Every 30 Days",
 		ProductName:  "Dark Roast 12oz",
 		Quantity:     1,
-		Interval:     "Every 30 days",
-		UnitPrice:    1620,
+		IntervalDays: 30,
+		NextChargeOn: time.Date(2026, 5, 15, 0, 0, 0, 0, time.UTC),
 		StoreName:    "Test Store",
 		StoreURL:     "https://example.com",
+		AccountURL:   "https://example.com/account/subscriptions",
 	}
 
 	html, text, err := r.Render("subscription_confirm", data)
 	require.NoError(t, err)
 
 	assert.Contains(t, html, "Dark Roast 12oz")
-	assert.Contains(t, html, "$16.20")
+	assert.Contains(t, html, "Every 30 days")
+	assert.Contains(t, html, "May 15, 2026")
+	assert.Contains(t, html, "/account/subscriptions")
 	assert.Contains(t, text, "Dark Roast 12oz")
+	assert.Contains(t, text, "Every 30 days")
+	assert.Contains(t, text, "May 15, 2026")
+	assert.Contains(t, text, "/account/subscriptions")
 }
 
 func TestRender_WholesaleApproved(t *testing.T) {

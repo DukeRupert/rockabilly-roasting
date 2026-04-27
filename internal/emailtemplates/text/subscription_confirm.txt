@@ -4,13 +4,14 @@ Hi {{.CustomerName}},
 
 Your {{.ProductName}} subscription is set. Here are the details:
 
-Product:   {{.ProductName}}
-Plan:      {{.PlanName}}
-Quantity:  {{.Quantity}}
-Frequency: {{.Interval}}
-Price:     {{cents .UnitPrice}} each
+Product:     {{.ProductName}}
+Plan:        {{.PlanName}}
+Quantity:    {{.Quantity}}
+{{if .IntervalDays}}Ships:       Every {{.IntervalDays}} days
+{{end}}Next charge: {{date .NextChargeOn}}
 
-You can manage your subscription from your account page.
+Manage your subscription, update shipping, or change your payment method:
+{{.AccountURL}}
 
 {{.StoreName}}
 {{.StoreURL}}

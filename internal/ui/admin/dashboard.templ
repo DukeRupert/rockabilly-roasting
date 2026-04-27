@@ -294,7 +294,7 @@ templ TopSellersCard(data []charts.LabeledValue, by string) {
 
 templ topSellersToggle(value, label, current string) {
 	if value == current {
-		<span class="px-2 py-1 border-2 border-rr-border bg-rr-heading text-rr-surface font-semibold uppercase tracking-wide" style="font-size:0.65rem;">{ label }</span>
+		<span class="px-2 py-1 border-2 border-rr-border bg-ink text-paper font-semibold uppercase tracking-wide" style="font-size:0.65rem;">{ label }</span>
 	} else {
 		<a
 			href={ templ.SafeURL(fmt.Sprintf("/admin/dashboard/top-sellers?by=%s", value)) }

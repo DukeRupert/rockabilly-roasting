@@ -188,10 +188,10 @@ func run() error {
 	}
 
 	// Stores
-	orderStore := store.NewOrderStore()
+	orderStore := store.NewOrderStore(metricsReg)
 	customerStore := store.NewCustomerStore()
 	catalogStore := store.NewCatalogStore()
-	subscriptionStore := store.NewSubscriptionStore()
+	subscriptionStore := store.NewSubscriptionStore(metricsReg)
 	fulfillmentStore := store.NewFulfillmentStore()
 	shippingStore := store.NewShippingStore()
 	webhookStore := store.NewWebhookStore()

@@ -19,7 +19,7 @@ import (
 
 func newCheckoutService() *app.CheckoutService {
 	return app.NewCheckoutService(
-		store.NewOrderStore(),
+		store.NewOrderStore(nil),
 		store.NewCustomerStore(),
 		store.NewDiscountStore(),
 		store.NewSettingsStore(),

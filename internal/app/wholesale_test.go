@@ -20,7 +20,7 @@ func newWholesaleService() *app.WholesaleService {
 		store.NewCustomerStore(),
 		store.NewCustomerGroupStore(),
 		store.NewCatalogStore(),
-		store.NewOrderStore(),
+		store.NewOrderStore(nil),
 		store.NewCartStore(),
 		audit.NewAuditWriter(),
 		metrics.NewRegistry(),

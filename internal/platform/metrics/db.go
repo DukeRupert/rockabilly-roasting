@@ -8,23 +8,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// TrackQuery records duration and success for a named database query.
-// Use with defer at the store layer:
-//
-//	func (s *Store) ListOrders(ctx context.Context, tx pgx.Tx) (result []Order, err error) {
-//	    defer metrics.TrackQuery(s.metrics, "orders.list", time.Now(), &err)
-//	    ...
-//	}
-func TrackQuery(reg *Registry, name string, start time.Time, err *error) {
-	if reg == nil {
+// RecordQuery observes one database query's duration and success label.
+// It satisfies the store.QueryRecorder interface, so a *Registry can be
+// passed straight into store constructors.
+func (r *Registry) RecordQuery(name string, dur time.Duration, err error) {
+	if r == nil {
 		return
 	}
 	success := "true"
-	if err != nil && *err != nil {
+	if err != nil {
 		success = "false"
 	}
-	reg.DBQueryDuration.WithLabelValues(name, success).
-		Observe(time.Since(start).Seconds())
+	r.DBQueryDuration.WithLabelValues(name, success).Observe(dur.Seconds())
 }
 
 // CollectPoolMetrics starts a background goroutine that scrapes pgxpool stats

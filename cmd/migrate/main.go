@@ -236,7 +236,7 @@ func run() error {
 	defer pool.Close()
 
 	customerStore := store.NewCustomerStore()
-	subscriptionStore := store.NewSubscriptionStore()
+	subscriptionStore := store.NewSubscriptionStore(nil)
 
 	// Build plan mapping by querying existing plans
 	planMap, err := buildPlanMapping(ctx, pool, subscriptionStore)

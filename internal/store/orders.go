@@ -15,11 +15,14 @@ import (
 )
 
 // OrderStore provides database access for orders, carts, line items, and adjustments.
-type OrderStore struct{}
+type OrderStore struct {
+	metrics QueryRecorder
+}
 
-// NewOrderStore creates a new OrderStore.
-func NewOrderStore() *OrderStore {
-	return &OrderStore{}
+// NewOrderStore creates a new OrderStore. Pass nil for metrics to disable
+// query timing instrumentation (e.g. in tests or one-off CLI tools).
+func NewOrderStore(metrics QueryRecorder) *OrderStore {
+	return &OrderStore{metrics: metrics}
 }
 
 // --- Orders ---
@@ -52,7 +55,8 @@ type CreateOrderParams struct {
 }
 
 // CreateOrder inserts a new order and returns it.
-func (s *OrderStore) CreateOrder(ctx context.Context, tx pgx.Tx, p CreateOrderParams) (*domain.Order, error) {
+func (s *OrderStore) CreateOrder(ctx context.Context, tx pgx.Tx, p CreateOrderParams) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.create", time.Now(), &err)
 	var shippingMethod *string
 	if p.ShippingMethod != nil {
 		s := string(*p.ShippingMethod)
@@ -91,7 +95,8 @@ func (s *OrderStore) CreateOrder(ctx context.Context, tx pgx.Tx, p CreateOrderPa
 }
 
 // GetOrderByIDAsStaff returns an order by ID.
-func (s *OrderStore) GetOrderByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Order, error) {
+func (s *OrderStore) GetOrderByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.get_by_id", time.Now(), &err)
 	row, err := sqlcgen.New(tx).GetOrderByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get order %s: %w", id, err)
@@ -100,7 +105,8 @@ func (s *OrderStore) GetOrderByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid
 }
 
 // GetOrderByNumberAsStaff returns an order by its number.
-func (s *OrderStore) GetOrderByNumberAsStaff(ctx context.Context, tx pgx.Tx, number string) (*domain.Order, error) {
+func (s *OrderStore) GetOrderByNumberAsStaff(ctx context.Context, tx pgx.Tx, number string) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.get_by_number", time.Now(), &err)
 	row, err := sqlcgen.New(tx).GetOrderByNumber(ctx, number)
 	if err != nil {
 		return nil, fmt.Errorf("get order by number: %w", err)
@@ -109,7 +115,8 @@ func (s *OrderStore) GetOrderByNumberAsStaff(ctx context.Context, tx pgx.Tx, num
 }
 
 // UpdateOrderStatus updates an order's status and returns it.
-func (s *OrderStore) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
+func (s *OrderStore) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.OrderStatus) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.update_status", time.Now(), &err)
 	row, err := sqlcgen.New(tx).UpdateOrderStatus(ctx, sqlcgen.UpdateOrderStatusParams{
 		ID:     id,
 		Status: string(status),
@@ -121,7 +128,8 @@ func (s *OrderStore) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid.U
 }
 
 // UpdateOrderPaymentStatus updates an order's payment status and returns it.
-func (s *OrderStore) UpdateOrderPaymentStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.PaymentStatus) (*domain.Order, error) {
+func (s *OrderStore) UpdateOrderPaymentStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.PaymentStatus) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.update_payment_status", time.Now(), &err)
 	row, err := sqlcgen.New(tx).UpdateOrderPaymentStatus(ctx, sqlcgen.UpdateOrderPaymentStatusParams{
 		ID:            id,
 		PaymentStatus: string(status),
@@ -133,7 +141,8 @@ func (s *OrderStore) UpdateOrderPaymentStatus(ctx context.Context, tx pgx.Tx, id
 }
 
 // UpdateOrderFulfillmentStatus updates an order's fulfillment status and returns it.
-func (s *OrderStore) UpdateOrderFulfillmentStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.FulfillmentStatus) (*domain.Order, error) {
+func (s *OrderStore) UpdateOrderFulfillmentStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.FulfillmentStatus) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.update_fulfillment_status", time.Now(), &err)
 	row, err := sqlcgen.New(tx).UpdateOrderFulfillmentStatus(ctx, sqlcgen.UpdateOrderFulfillmentStatusParams{
 		ID:                id,
 		FulfillmentStatus: string(status),
@@ -145,7 +154,8 @@ func (s *OrderStore) UpdateOrderFulfillmentStatus(ctx context.Context, tx pgx.Tx
 }
 
 // UpdateOrderStripePaymentIntentID sets the Stripe PaymentIntent ID on an order.
-func (s *OrderStore) UpdateOrderStripePaymentIntentID(ctx context.Context, tx pgx.Tx, id uuid.UUID, intentID string) (*domain.Order, error) {
+func (s *OrderStore) UpdateOrderStripePaymentIntentID(ctx context.Context, tx pgx.Tx, id uuid.UUID, intentID string) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.update_stripe_payment_intent_id", time.Now(), &err)
 	row, err := sqlcgen.New(tx).UpdateOrderStripePaymentIntentID(ctx, sqlcgen.UpdateOrderStripePaymentIntentIDParams{
 		ID:                    id,
 		StripePaymentIntentID: &intentID,
@@ -157,7 +167,8 @@ func (s *OrderStore) UpdateOrderStripePaymentIntentID(ctx context.Context, tx pg
 }
 
 // GetOrderByStripePaymentIntentIDAsStaff returns an order by its Stripe PaymentIntent ID.
-func (s *OrderStore) GetOrderByStripePaymentIntentIDAsStaff(ctx context.Context, tx pgx.Tx, intentID string) (*domain.Order, error) {
+func (s *OrderStore) GetOrderByStripePaymentIntentIDAsStaff(ctx context.Context, tx pgx.Tx, intentID string) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.get_by_stripe_payment_intent_id", time.Now(), &err)
 	row, err := sqlcgen.New(tx).GetOrderByStripePaymentIntentID(ctx, &intentID)
 	if err != nil {
 		return nil, fmt.Errorf("get order by stripe payment intent id: %w", err)
@@ -166,8 +177,9 @@ func (s *OrderStore) GetOrderByStripePaymentIntentIDAsStaff(ctx context.Context,
 }
 
 // SetCustomerPONumber sets the customer PO number on a wholesale order.
-func (s *OrderStore) SetCustomerPONumber(ctx context.Context, tx pgx.Tx, id uuid.UUID, poNumber string) error {
-	_, err := tx.Exec(ctx,
+func (s *OrderStore) SetCustomerPONumber(ctx context.Context, tx pgx.Tx, id uuid.UUID, poNumber string) (err error) {
+	defer trackQuery(s.metrics, "orders.set_customer_po_number", time.Now(), &err)
+	_, err = tx.Exec(ctx,
 		`UPDATE orders SET customer_po_number = $2 WHERE id = $1`,
 		id, poNumber,
 	)
@@ -178,7 +190,8 @@ func (s *OrderStore) SetCustomerPONumber(ctx context.Context, tx pgx.Tx, id uuid
 }
 
 // DeleteOrder removes an order by ID.
-func (s *OrderStore) DeleteOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+func (s *OrderStore) DeleteOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "orders.delete", time.Now(), &err)
 	if err := sqlcgen.New(tx).DeleteOrder(ctx, id); err != nil {
 		return fmt.Errorf("delete order: %w", err)
 	}
@@ -199,7 +212,8 @@ type OrderFilter struct {
 }
 
 // ListOrders returns orders matching the given filter (hand-written for dynamic WHERE).
-func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) ([]domain.Order, error) {
+func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (_ []domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.list", time.Now(), &err)
 	query := `SELECT id, number, customer_id, status, payment_status, fulfillment_status,
 	                 currency_code, subtotal, discount_total, shipping_total, tax_total, total,
 	                 shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
@@ -313,7 +327,8 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 }
 
 // CountOrders returns the number of orders matching the given filter.
-func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (int, error) {
+func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (_ int, err error) {
+	defer trackQuery(s.metrics, "orders.count", time.Now(), &err)
 	query := `SELECT COUNT(*) FROM orders WHERE true`
 	args := []any{}
 	argN := 1
@@ -368,7 +383,8 @@ func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) 
 }
 
 // SumOrderRevenue returns the total revenue (in cents) for orders matching the filter.
-func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilter) (int, error) {
+func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilter) (_ int, err error) {
+	defer trackQuery(s.metrics, "orders.sum_revenue", time.Now(), &err)
 	query := `SELECT COALESCE(SUM(total), 0) FROM orders WHERE true`
 	args := []any{}
 	argN := 1
@@ -399,7 +415,8 @@ func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilt
 // RevenueByDay returns daily revenue and order counts in the merchant's local
 // timezone, between [from, to). Cancelled and refunded orders are excluded.
 // Days with zero orders are NOT returned — callers fill gaps as needed.
-func (s *OrderStore) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to time.Time, tz *time.Location) ([]domain.DailyRevenue, error) {
+func (s *OrderStore) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to time.Time, tz *time.Location) (_ []domain.DailyRevenue, err error) {
+	defer trackQuery(s.metrics, "orders.revenue_by_day", time.Now(), &err)
 	tzName := "UTC"
 	if tz != nil {
 		tzName = tz.String()
@@ -451,7 +468,8 @@ const (
 // When sorting by weight, products whose variants have no weight configured
 // (weight_grams IS NULL) are excluded — they would otherwise crowd the chart
 // with zeroes.
-func (s *OrderStore) TopProducts(ctx context.Context, tx pgx.Tx, from, to time.Time, sort TopProductsSort, limit int) ([]domain.ProductSales, error) {
+func (s *OrderStore) TopProducts(ctx context.Context, tx pgx.Tx, from, to time.Time, sort TopProductsSort, limit int) (_ []domain.ProductSales, err error) {
+	defer trackQuery(s.metrics, "orders.top_products", time.Now(), &err)
 	if limit <= 0 {
 		limit = 5
 	}
@@ -499,8 +517,9 @@ func (s *OrderStore) TopProducts(ctx context.Context, tx pgx.Tx, from, to time.T
 // --- QuickBooks sync methods ---
 
 // SetQBInvoice stores the QB invoice ID and number on an order.
-func (s *OrderStore) SetQBInvoice(ctx context.Context, tx pgx.Tx, id uuid.UUID, qbInvoiceID, qbInvoiceNo string) error {
-	_, err := tx.Exec(ctx,
+func (s *OrderStore) SetQBInvoice(ctx context.Context, tx pgx.Tx, id uuid.UUID, qbInvoiceID, qbInvoiceNo string) (err error) {
+	defer trackQuery(s.metrics, "orders.set_qb_invoice", time.Now(), &err)
+	_, err = tx.Exec(ctx,
 		`UPDATE orders SET qb_invoice_id = $2, qb_invoice_no = $3, qb_synced_at = now(), updated_at = now() WHERE id = $1`,
 		id, qbInvoiceID, qbInvoiceNo,
 	)
@@ -511,14 +530,15 @@ func (s *OrderStore) SetQBInvoice(ctx context.Context, tx pgx.Tx, id uuid.UUID, 
 }
 
 // GetOrderByQBInvoiceIDAsStaff returns an order by its QB invoice ID.
-func (s *OrderStore) GetOrderByQBInvoiceIDAsStaff(ctx context.Context, tx pgx.Tx, qbInvoiceID string) (*domain.Order, error) {
+func (s *OrderStore) GetOrderByQBInvoiceIDAsStaff(ctx context.Context, tx pgx.Tx, qbInvoiceID string) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.get_by_qb_invoice_id", time.Now(), &err)
 	var o domain.Order
 	var status, paymentStatus, fulfillmentStatus string
 	var shippingMethod *string
 	var requestedDeliveryDate pgtype.Timestamptz
 	var subtotal, discountTotal, shippingTotal, taxTotal, total int32
 	var metadata json.RawMessage
-	err := tx.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`SELECT id, number, customer_id, status, payment_status, fulfillment_status,
 		        currency_code, subtotal, discount_total, shipping_total, tax_total, total,
 		        shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
@@ -571,7 +591,8 @@ type CreateCartParams struct {
 }
 
 // CreateCart inserts a new cart and returns it.
-func (s *OrderStore) CreateCart(ctx context.Context, tx pgx.Tx, p CreateCartParams) (*domain.Cart, error) {
+func (s *OrderStore) CreateCart(ctx context.Context, tx pgx.Tx, p CreateCartParams) (_ *domain.Cart, err error) {
+	defer trackQuery(s.metrics, "carts.create", time.Now(), &err)
 	row, err := sqlcgen.New(tx).CreateCart(ctx, sqlcgen.CreateCartParams{
 		ID:                uuid.New(),
 		CustomerID:        p.CustomerID,
@@ -588,7 +609,8 @@ func (s *OrderStore) CreateCart(ctx context.Context, tx pgx.Tx, p CreateCartPara
 }
 
 // GetCartByIDAsStaff returns a cart by ID.
-func (s *OrderStore) GetCartByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Cart, error) {
+func (s *OrderStore) GetCartByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID) (_ *domain.Cart, err error) {
+	defer trackQuery(s.metrics, "carts.get_by_id", time.Now(), &err)
 	row, err := sqlcgen.New(tx).GetCartByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get cart %s: %w", id, err)
@@ -597,7 +619,8 @@ func (s *OrderStore) GetCartByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid.
 }
 
 // GetCartByCustomerID returns a cart by customer ID.
-func (s *OrderStore) GetCartByCustomerID(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (*domain.Cart, error) {
+func (s *OrderStore) GetCartByCustomerID(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (_ *domain.Cart, err error) {
+	defer trackQuery(s.metrics, "carts.get_by_customer", time.Now(), &err)
 	row, err := sqlcgen.New(tx).GetCartByCustomerID(ctx, &customerID)
 	if err != nil {
 		return nil, fmt.Errorf("get cart by customer: %w", err)
@@ -606,7 +629,8 @@ func (s *OrderStore) GetCartByCustomerID(ctx context.Context, tx pgx.Tx, custome
 }
 
 // UpdateCartAddresses updates a cart's shipping and billing addresses.
-func (s *OrderStore) UpdateCartAddresses(ctx context.Context, tx pgx.Tx, id, shippingAddressID, billingAddressID uuid.UUID) (*domain.Cart, error) {
+func (s *OrderStore) UpdateCartAddresses(ctx context.Context, tx pgx.Tx, id, shippingAddressID, billingAddressID uuid.UUID) (_ *domain.Cart, err error) {
+	defer trackQuery(s.metrics, "carts.update_addresses", time.Now(), &err)
 	row, err := sqlcgen.New(tx).UpdateCartAddresses(ctx, sqlcgen.UpdateCartAddressesParams{
 		ID:                id,
 		ShippingAddressID: &shippingAddressID,
@@ -619,7 +643,8 @@ func (s *OrderStore) UpdateCartAddresses(ctx context.Context, tx pgx.Tx, id, shi
 }
 
 // UpdateCartDiscount updates a cart's applied discount and coupon code.
-func (s *OrderStore) UpdateCartDiscount(ctx context.Context, tx pgx.Tx, id uuid.UUID, discountID, couponCodeID *uuid.UUID) (*domain.Cart, error) {
+func (s *OrderStore) UpdateCartDiscount(ctx context.Context, tx pgx.Tx, id uuid.UUID, discountID, couponCodeID *uuid.UUID) (_ *domain.Cart, err error) {
+	defer trackQuery(s.metrics, "carts.update_discount", time.Now(), &err)
 	row, err := sqlcgen.New(tx).UpdateCartDiscount(ctx, sqlcgen.UpdateCartDiscountParams{
 		ID:                  id,
 		AppliedDiscountID:   discountID,
@@ -632,7 +657,8 @@ func (s *OrderStore) UpdateCartDiscount(ctx context.Context, tx pgx.Tx, id uuid.
 }
 
 // DeleteCart removes a cart by ID.
-func (s *OrderStore) DeleteCart(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+func (s *OrderStore) DeleteCart(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "carts.delete", time.Now(), &err)
 	if err := sqlcgen.New(tx).DeleteCart(ctx, id); err != nil {
 		return fmt.Errorf("delete cart: %w", err)
 	}
@@ -655,7 +681,8 @@ type CreateLineItemParams struct {
 }
 
 // CreateLineItem inserts a new line item and returns it.
-func (s *OrderStore) CreateLineItem(ctx context.Context, tx pgx.Tx, p CreateLineItemParams) (*domain.LineItem, error) {
+func (s *OrderStore) CreateLineItem(ctx context.Context, tx pgx.Tx, p CreateLineItemParams) (_ *domain.LineItem, err error) {
+	defer trackQuery(s.metrics, "line_items.create", time.Now(), &err)
 	row, err := sqlcgen.New(tx).CreateLineItem(ctx, sqlcgen.CreateLineItemParams{
 		ID:            uuid.New(),
 		OrderID:       p.OrderID,
@@ -675,7 +702,8 @@ func (s *OrderStore) CreateLineItem(ctx context.Context, tx pgx.Tx, p CreateLine
 }
 
 // ListLineItems returns all line items for an order.
-func (s *OrderStore) ListLineItems(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) ([]domain.LineItem, error) {
+func (s *OrderStore) ListLineItems(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (_ []domain.LineItem, err error) {
+	defer trackQuery(s.metrics, "line_items.list_by_order", time.Now(), &err)
 	rows, err := sqlcgen.New(tx).ListLineItemsByOrder(ctx, orderID)
 	if err != nil {
 		return nil, fmt.Errorf("list line items: %w", err)
@@ -688,7 +716,8 @@ func (s *OrderStore) ListLineItems(ctx context.Context, tx pgx.Tx, orderID uuid.
 }
 
 // DeleteLineItem removes a line item by ID.
-func (s *OrderStore) DeleteLineItem(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+func (s *OrderStore) DeleteLineItem(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "line_items.delete", time.Now(), &err)
 	if err := sqlcgen.New(tx).DeleteLineItem(ctx, id); err != nil {
 		return fmt.Errorf("delete line item: %w", err)
 	}
@@ -696,7 +725,8 @@ func (s *OrderStore) DeleteLineItem(ctx context.Context, tx pgx.Tx, id uuid.UUID
 }
 
 // DeleteLineItemsByOrder removes all line items for an order.
-func (s *OrderStore) DeleteLineItemsByOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) error {
+func (s *OrderStore) DeleteLineItemsByOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "line_items.delete_by_order", time.Now(), &err)
 	if err := sqlcgen.New(tx).DeleteLineItemsByOrder(ctx, orderID); err != nil {
 		return fmt.Errorf("delete line items by order: %w", err)
 	}
@@ -716,7 +746,8 @@ type CreateAdjustmentParams struct {
 }
 
 // CreateAdjustment inserts a new adjustment and returns it.
-func (s *OrderStore) CreateAdjustment(ctx context.Context, tx pgx.Tx, p CreateAdjustmentParams) (*domain.Adjustment, error) {
+func (s *OrderStore) CreateAdjustment(ctx context.Context, tx pgx.Tx, p CreateAdjustmentParams) (_ *domain.Adjustment, err error) {
+	defer trackQuery(s.metrics, "adjustments.create", time.Now(), &err)
 	row, err := sqlcgen.New(tx).CreateAdjustment(ctx, sqlcgen.CreateAdjustmentParams{
 		ID:         uuid.New(),
 		OrderID:    p.OrderID,
@@ -733,7 +764,8 @@ func (s *OrderStore) CreateAdjustment(ctx context.Context, tx pgx.Tx, p CreateAd
 }
 
 // ListAdjustmentsByOrder returns all adjustments for an order.
-func (s *OrderStore) ListAdjustmentsByOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) ([]domain.Adjustment, error) {
+func (s *OrderStore) ListAdjustmentsByOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (_ []domain.Adjustment, err error) {
+	defer trackQuery(s.metrics, "adjustments.list_by_order", time.Now(), &err)
 	rows, err := sqlcgen.New(tx).ListAdjustmentsByOrder(ctx, orderID)
 	if err != nil {
 		return nil, fmt.Errorf("list adjustments: %w", err)
@@ -746,7 +778,8 @@ func (s *OrderStore) ListAdjustmentsByOrder(ctx context.Context, tx pgx.Tx, orde
 }
 
 // ListAdjustmentsByLineItem returns all adjustments for a line item.
-func (s *OrderStore) ListAdjustmentsByLineItem(ctx context.Context, tx pgx.Tx, lineItemID uuid.UUID) ([]domain.Adjustment, error) {
+func (s *OrderStore) ListAdjustmentsByLineItem(ctx context.Context, tx pgx.Tx, lineItemID uuid.UUID) (_ []domain.Adjustment, err error) {
+	defer trackQuery(s.metrics, "adjustments.list_by_line_item", time.Now(), &err)
 	rows, err := sqlcgen.New(tx).ListAdjustmentsByLineItem(ctx, &lineItemID)
 	if err != nil {
 		return nil, fmt.Errorf("list adjustments by line item: %w", err)
@@ -759,7 +792,8 @@ func (s *OrderStore) ListAdjustmentsByLineItem(ctx context.Context, tx pgx.Tx, l
 }
 
 // DeleteAdjustment removes an adjustment by ID.
-func (s *OrderStore) DeleteAdjustment(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+func (s *OrderStore) DeleteAdjustment(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "adjustments.delete", time.Now(), &err)
 	if err := sqlcgen.New(tx).DeleteAdjustment(ctx, id); err != nil {
 		return fmt.Errorf("delete adjustment: %w", err)
 	}

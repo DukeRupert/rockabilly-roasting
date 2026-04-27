@@ -18,7 +18,7 @@ import (
 )
 
 func newOrderService() *app.OrderService {
-	return app.NewOrderService(store.NewOrderStore(), audit.NewAuditWriter(), metrics.NewRegistry())
+	return app.NewOrderService(store.NewOrderStore(nil), audit.NewAuditWriter(), metrics.NewRegistry())
 }
 
 // orderFixtures creates the prerequisite customer + addresses and returns them.

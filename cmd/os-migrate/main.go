@@ -440,7 +440,7 @@ func importData(
 	logger *slog.Logger,
 ) {
 	customerStore := store.NewCustomerStore()
-	orderStore := store.NewOrderStore()
+	orderStore := store.NewOrderStore(nil)
 
 	// Map OrderSpace customer ID → Hiri customer ID
 	osToHiri := make(map[string]uuid.UUID)

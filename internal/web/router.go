@@ -246,6 +246,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// Admin routes — all require staff session
 	adminMux := http.NewServeMux()
 	adminMux.HandleFunc("GET /admin/", deps.handleAdminDashboard)
+	adminMux.HandleFunc("GET /admin/dashboard/top-sellers", deps.handleAdminTopSellers)
 
 	// Admin catalog — categories
 	adminMux.HandleFunc("GET /admin/categories", deps.handleAdminCategoryList)

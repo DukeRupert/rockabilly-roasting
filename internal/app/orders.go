@@ -121,12 +121,12 @@ func (s *OrderService) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to tim
 	return rows, nil
 }
 
-// TopProductsByUnits returns the top-N products by units sold in [from, to).
-// Cancelled and refunded orders are excluded.
-func (s *OrderService) TopProductsByUnits(ctx context.Context, tx pgx.Tx, from, to time.Time, limit int) ([]domain.ProductSales, error) {
-	rows, err := s.orders.TopProductsByUnits(ctx, tx, from, to, limit)
+// TopProducts returns the top-N products in [from, to), ranked by the chosen
+// metric. Cancelled and refunded orders are excluded.
+func (s *OrderService) TopProducts(ctx context.Context, tx pgx.Tx, from, to time.Time, sort store.TopProductsSort, limit int) ([]domain.ProductSales, error) {
+	rows, err := s.orders.TopProducts(ctx, tx, from, to, sort, limit)
 	if err != nil {
-		return nil, fmt.Errorf("top products by units: %w", err)
+		return nil, fmt.Errorf("top products: %w", err)
 	}
 	return rows, nil
 }

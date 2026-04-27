@@ -143,12 +143,15 @@ type DailyRevenue struct {
 }
 
 // ProductSales is one product's units sold and revenue over a window.
-// Cancelled and refunded orders are excluded.
+// Cancelled and refunded orders are excluded. WeightGrams is the total
+// shipped weight across all units (qty × variant weight) — zero for
+// products without configured variant weights.
 type ProductSales struct {
-	ProductID uuid.UUID
-	Title     string
-	Units     int
-	Revenue   int
+	ProductID   uuid.UUID
+	Title       string
+	Units       int
+	WeightGrams int
+	Revenue     int
 }
 
 // Adjustment represents an order-level or line-item-level adjustment.

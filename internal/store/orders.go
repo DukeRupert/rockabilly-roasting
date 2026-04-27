@@ -435,40 +435,61 @@ func (s *OrderStore) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to time.
 	return out, rows.Err()
 }
 
-// TopProductsByUnits returns the top-N products by total units sold over
-// [from, to). Cancelled and refunded orders are excluded. Results are ordered
-// by units desc, ties broken by revenue desc.
-func (s *OrderStore) TopProductsByUnits(ctx context.Context, tx pgx.Tx, from, to time.Time, limit int) ([]domain.ProductSales, error) {
+// TopProductsSort selects the metric used to rank products in TopProducts.
+type TopProductsSort string
+
+const (
+	TopProductsSortUnits  TopProductsSort = "units"
+	TopProductsSortWeight TopProductsSort = "weight"
+)
+
+// TopProducts returns the top-N products over [from, to), ranked by the
+// chosen metric. Cancelled and refunded orders are excluded. Each row carries
+// units, total shipped weight (grams), and revenue so the caller can present
+// any of them without re-querying. Ties are broken by revenue desc.
+//
+// When sorting by weight, products whose variants have no weight configured
+// (weight_grams IS NULL) are excluded — they would otherwise crowd the chart
+// with zeroes.
+func (s *OrderStore) TopProducts(ctx context.Context, tx pgx.Tx, from, to time.Time, sort TopProductsSort, limit int) ([]domain.ProductSales, error) {
 	if limit <= 0 {
 		limit = 5
 	}
-	query := `
+	orderBy := "units DESC, revenue DESC"
+	weightFilter := ""
+	if sort == TopProductsSortWeight {
+		orderBy = "weight_grams DESC, revenue DESC"
+		weightFilter = " AND v.weight_grams IS NOT NULL"
+	}
+	query := fmt.Sprintf(`
 		SELECT p.id, p.title,
-		       COALESCE(SUM(li.quantity), 0)::int AS units,
-		       COALESCE(SUM(li.total), 0)::int    AS revenue
+		       COALESCE(SUM(li.quantity), 0)::int                                AS units,
+		       COALESCE(SUM(li.quantity * COALESCE(v.weight_grams, 0)), 0)::int  AS weight_grams,
+		       COALESCE(SUM(li.total), 0)::int                                   AS revenue
 		FROM line_items li
 		JOIN orders   o ON o.id = li.order_id
 		JOIN variants v ON v.id = li.variant_id
 		JOIN products p ON p.id = v.product_id
 		WHERE o.placed_at >= $1
 		  AND o.placed_at < $2
-		  AND o.status NOT IN ('cancelled', 'refunded')
+		  AND o.status NOT IN ('cancelled', 'refunded')%s
 		GROUP BY p.id, p.title
-		ORDER BY units DESC, revenue DESC
-		LIMIT $3`
+		ORDER BY %s
+		LIMIT $3`, weightFilter, orderBy)
 	rows, err := tx.Query(ctx, query, from, to, limit)
 	if err != nil {
-		return nil, fmt.Errorf("top products by units: %w", err)
+		return nil, fmt.Errorf("top products: %w", err)
 	}
 	defer rows.Close()
 	var out []domain.ProductSales
 	for rows.Next() {
 		var ps domain.ProductSales
-		var units, revenue int32
-		if err := rows.Scan(&ps.ProductID, &ps.Title, &units, &revenue); err != nil {
+		var units, weight, revenue int32
+		if err := rows.Scan(&ps.ProductID, &ps.Title, &units, &weight, &revenue); err != nil {
 			return nil, fmt.Errorf("scan top products: %w", err)
 		}
 		ps.Units = int(units)
+		ps.WeightGrams = int(weight)
 		ps.Revenue = int(revenue)
 		out = append(out, ps)
 	}

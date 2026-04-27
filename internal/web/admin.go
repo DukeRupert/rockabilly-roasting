@@ -151,11 +151,12 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		// Top products — last 30 days
 		topStart := todayStart.AddDate(0, 0, -29)
 		topEnd := trendEnd
-		topRows, txErr := d.OrderService.TopProductsByUnits(ctx, tx, topStart, topEnd, 5)
+		props.TopBy = topSellersSort(r)
+		topRows, txErr := d.OrderService.TopProducts(ctx, tx, topStart, topEnd, store.TopProductsSort(props.TopBy), 5)
 		if txErr != nil {
 			return txErr
 		}
-		props.TopProducts = buildTopProducts(topRows)
+		props.TopProducts = buildTopProducts(topRows, props.TopBy)
 
 		return nil
 	})
@@ -218,27 +219,84 @@ func buildRevenueTrend(rows []domain.DailyRevenue, trendStart time.Time, tz *tim
 	return out
 }
 
-// buildTopProducts converts ProductSales rows to chart data, normalized against
-// the top entry's units. Returns nil if no rows.
-func buildTopProducts(rows []domain.ProductSales) []charts.LabeledValue {
+// buildTopProducts converts ProductSales rows to chart data. Bars are
+// normalized against the leading row's value for the active metric. The
+// secondary label always shows revenue so both metrics keep dollar context.
+func buildTopProducts(rows []domain.ProductSales, by string) []charts.LabeledValue {
 	if len(rows) == 0 {
 		return nil
 	}
-	maxUnits := rows[0].Units // already sorted desc by units
+	pickValue := func(r domain.ProductSales) (float64, string) {
+		if by == "weight" {
+			return float64(r.WeightGrams), formatPounds(r.WeightGrams)
+		}
+		return float64(r.Units), fmt.Sprintf("%d units", r.Units)
+	}
+	headValue, _ := pickValue(rows[0]) // rows already sorted desc by chosen metric
 	out := make([]charts.LabeledValue, len(rows))
 	for i, r := range rows {
+		v, label := pickValue(r)
 		mag := 0.0
-		if maxUnits > 0 {
-			mag = float64(r.Units) / float64(maxUnits)
+		if headValue > 0 {
+			mag = v / headValue
 		}
 		out[i] = charts.LabeledValue{
 			Label:     r.Title,
-			Value:     fmt.Sprintf("%d units", r.Units),
+			Value:     label,
 			Sub:       compactDollars(r.Revenue),
 			Magnitude: mag,
 		}
 	}
 	return out
+}
+
+// topSellersSort normalizes the ?by= query param to one of "units" / "weight",
+// defaulting to units. Lives here so both the dashboard and fragment endpoint
+// agree on validation.
+func topSellersSort(r *http.Request) string {
+	switch r.URL.Query().Get("by") {
+	case "weight":
+		return "weight"
+	default:
+		return "units"
+	}
+}
+
+// formatPounds renders a gram total as "X.X lb" (or "X lb" when whole). Coffee
+// volumes range from a half-pound bag to multi-pound wholesale orders, so one
+// decimal of precision keeps the chart readable across that whole range.
+func formatPounds(grams int) string {
+	const gramsPerPound = 453.59237
+	lbs := float64(grams) / gramsPerPound
+	if lbs >= 100 {
+		return fmt.Sprintf("%.0f lb", lbs)
+	}
+	return fmt.Sprintf("%.1f lb", lbs)
+}
+
+// handleAdminTopSellers renders just the top-sellers card for an htmx swap.
+// The full dashboard owns the same data + range; this endpoint only re-runs
+// the single product-sales query when the user toggles units ↔ pounds.
+func (d *Deps) handleAdminTopSellers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	by := topSellersSort(r)
+
+	now := time.Now().In(d.MerchantTZ)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, d.MerchantTZ)
+	from := todayStart.AddDate(0, 0, -29)
+	to := todayStart.AddDate(0, 0, 1)
+
+	var rows []domain.ProductSales
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		rows, txErr = d.OrderService.TopProducts(ctx, tx, from, to, store.TopProductsSort(by), 5)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	admin.TopSellersCard(buildTopProducts(rows, by), by).Render(ctx, w) //nolint:errcheck
 }
 
 // compactDollars renders cents as "$1.2k" / "$240" — kept short for chart labels.

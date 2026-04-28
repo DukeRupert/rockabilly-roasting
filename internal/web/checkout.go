@@ -901,6 +901,7 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 // a GA4 `purchase` event. The cookie expires in 10 min and is cleared after
 // one read so refreshes don't double-fire.
 func (d *Deps) handleOrderConfirmed(w http.ResponseWriter, r *http.Request) {
+	logger := logging.FromContext(r.Context())
 	orderNumber := r.URL.Query().Get("number")
 	if orderNumber == "" {
 		http.Redirect(w, r, "/catalog", http.StatusSeeOther)
@@ -912,9 +913,22 @@ func (d *Deps) handleOrderConfirmed(w http.ResponseWriter, r *http.Request) {
 		CartCount:   0, // Cart was just cleared
 	}
 
-	if c, err := r.Cookie(lastOrderCookieName); err == nil && c.Value == orderNumber {
+	cookieFound := false
+	cookieMatches := false
+	cookieValue := ""
+	if c, err := r.Cookie(lastOrderCookieName); err == nil {
+		cookieFound = true
+		cookieValue = c.Value
+		cookieMatches = c.Value == orderNumber
+	}
+
+	analyticsLoaded := false
+	itemsCount := 0
+	if cookieMatches {
 		if analytics, loadErr := d.loadOrderAnalytics(r.Context(), orderNumber); loadErr == nil {
 			props.Analytics = analytics
+			analyticsLoaded = true
+			itemsCount = len(analytics.Items)
 			http.SetCookie(w, &http.Cookie{
 				Name:   lastOrderCookieName,
 				Value:  "",
@@ -922,9 +936,21 @@ func (d *Deps) handleOrderConfirmed(w http.ResponseWriter, r *http.Request) {
 				MaxAge: -1,
 			})
 		} else {
-			logging.FromContext(r.Context()).Warn("order confirmed: load analytics", "error", loadErr, "order_number", orderNumber)
+			logger.Warn("GA_DEBUG order confirmed: load analytics", "error", loadErr, "order_number", orderNumber)
 		}
 	}
+
+	logger.Info("GA_DEBUG order confirmed: render",
+		"order_number", orderNumber,
+		"cookie_found", cookieFound,
+		"cookie_value", cookieValue,
+		"cookie_matches", cookieMatches,
+		"analytics_loaded", analyticsLoaded,
+		"items_count", itemsCount,
+		"is_htmx", IsHTMX(r),
+		"user_agent", r.Header.Get("User-Agent"),
+		"referer", r.Header.Get("Referer"),
+	)
 
 	if IsHTMX(r) {
 		storefront.OrderConfirmedContent(props).Render(r.Context(), w) //nolint:errcheck

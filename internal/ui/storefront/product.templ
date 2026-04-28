@@ -40,6 +40,7 @@ type ProductDetailProps struct {
 	Coffee            *CoffeeAttrs // nil if not a coffee product
 	PrevProduct       *ProductNav  // nil when catalog has ≤1 active product
 	NextProduct       *ProductNav
+	RoastBased        bool // true when PrevProduct/NextProduct were picked on the lighter/darker roast axis
 	Category          string // taxon name, used as item_category on GA4 events
 	CanonicalURL      string
 	OGImage           string
@@ -82,11 +83,13 @@ func productAnalyticsScript(props ProductDetailProps) string {
 }
 
 // ProductNav carries the minimum data needed for prev/next links at the
-// bottom of the product detail page.
+// bottom of the product detail page. RoastLevel is set when the pair is
+// chosen on a "lighter / darker" axis so the card can render roast dots.
 type ProductNav struct {
 	Title        string
 	Slug         string
 	ThumbnailURL string
+	RoastLevel   string // optional, drives the dot scale on roast-based pairs
 }
 
 templ ProductContent(props ProductDetailProps) {
@@ -468,9 +471,9 @@ templ ProductContent(props ProductDetailProps) {
 			if props.Coffee != nil && hasTastingProfile(props.Coffee) {
 				@tastingProfile(props.Coffee)
 			}
-			<!-- Prev / Next navigation -->
+			<!-- Try another roast (or generic prev/next when no roast data) -->
 			if props.PrevProduct != nil && props.NextProduct != nil {
-				@productNavPair(props.PrevProduct, props.NextProduct)
+				@productNavPair(props.PrevProduct, props.NextProduct, props.RoastBased)
 			}
 		</div>
 	</section>
@@ -604,21 +607,40 @@ templ tastingProfile(attrs *CoffeeAttrs) {
 	</section>
 }
 
-// productNavPair renders a two-panel "keep browsing" strip with previous and
-// next products, wrapping around at the ends.
-templ productNavPair(prev *ProductNav, next *ProductNav) {
-	<nav class="mt-16 pt-10 border-t-2 border-ink" aria-label="More roasts">
-		<p class="font-oswald text-chrome-deep text-xs font-semibold mb-6" style="letter-spacing:0.24em; text-transform:uppercase;">Keep browsing</p>
+// productNavPair renders a two-panel "try another roast" strip below the
+// tasting profile. When roastBased is true, the cards label themselves
+// "Lighter / Darker" and show a dot scale; otherwise they fall back to a
+// neutral "another to try" framing.
+templ productNavPair(prev *ProductNav, next *ProductNav, roastBased bool) {
+	<nav class="mt-16 pt-10 border-t-2 border-ink" aria-label="Other coffees to try">
+		<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+			if roastBased {
+				Try another roast
+			} else {
+				Another to try
+			}
+		</p>
+		<h2 class="font-slab text-ink uppercase leading-[0.95] mt-2 mb-8" style="font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing:-0.005em;">
+			if roastBased {
+				Lighter or
+				<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">darker?</span>
+			} else {
+				Pour another
+				<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">cup.</span>
+			}
+		</h2>
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8">
-			@productNavCard(prev, false)
-			@productNavCard(next, true)
+			@productNavCard(prev, false, roastBased)
+			@productNavCard(next, true, roastBased)
 		</div>
 	</nav>
 }
 
-// productNavCard renders one side of the prev/next pair. forward=true means
-// it's the "next" side — label and arrow on the right, image on the left.
-templ productNavCard(nav *ProductNav, forward bool) {
+// productNavCard renders one side of the recommendation pair. forward=true
+// means it's the "right" side — label and arrow on the right, image on the
+// left. roastBased flips the eyebrow to a Lighter/Darker call and shows the
+// roast dot scale beneath the title.
+templ productNavCard(nav *ProductNav, forward bool, roastBased bool) {
 	<a
 		href={ templ.SafeURL("/catalog/" + nav.Slug) }
 		class={ "btn-stamp group flex items-center gap-4 bg-cream-hi border-2 border-ink p-4", templ.KV("sm:flex-row-reverse sm:text-right", forward) }
@@ -647,9 +669,17 @@ templ productNavCard(nav *ProductNav, forward bool) {
 					<svg class="size-3 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
 					</svg>
-					<span>Previous roast</span>
+					if roastBased {
+						<span>Lighter</span>
+					} else {
+						<span>Try this</span>
+					}
 				} else {
-					<span>Next roast</span>
+					if roastBased {
+						<span>Darker</span>
+					} else {
+						<span>Try this</span>
+					}
 					<svg class="size-3 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
 					</svg>
@@ -658,6 +688,12 @@ templ productNavCard(nav *ProductNav, forward bool) {
 			<p class="font-slab text-ink uppercase leading-[1.0] mt-1.5 text-lg sm:text-xl group-hover:text-rust transition-colors truncate" style="letter-spacing:-0.005em;">
 				{ nav.Title }
 			</p>
+			if roastBased && validRoastLevel(nav.RoastLevel) {
+				<div class={ "mt-2 flex items-center gap-2", templ.KV("sm:justify-end", forward) }>
+					@roastDots(nav.RoastLevel, "small")
+					<span class="font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.18em; text-transform:uppercase;">{ roastLevelLabel(nav.RoastLevel) }</span>
+				</div>
+			}
 		</div>
 	</a>
 }

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/app"
@@ -657,6 +658,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 	var plans []domain.SubscriptionPlan
 	var coffeeAttrs *storefront.CoffeeAttrs
 	var prevNav, nextNav *storefront.ProductNav
+	var roastBased bool
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -673,29 +675,58 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
-		// Resolve prev/next products using the same ordering as the catalog listing
-		// (created_at DESC). Wraps around at the ends.
-		activeStatus := domain.ProductStatusActive
-		siblings, sibErr := d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{
-			Status: &activeStatus,
-			Limit:  500,
-		})
-		if sibErr != nil {
-			return sibErr
+		// Get coffee attributes early so we can use the roast level to pick
+		// neighbors on a "lighter / darker" axis below.
+		attrVals, attrErr := d.AttributeService.ListProductAttributeValues(ctx, tx, product.ID)
+		if attrErr != nil {
+			return attrErr
 		}
-		if len(siblings) > 1 {
-			idx := -1
-			for i, p := range siblings {
-				if p.ID == product.ID {
-					idx = i
-					break
-				}
+		coffeeAttrs = buildCoffeeAttrs(attrVals)
+
+		// Prefer roast-based recommendations when this product has a roast
+		// level. Falls back to created_at neighbors so the section still
+		// shows two coffees to consider.
+		if coffeeAttrs != nil && validRoast(coffeeAttrs.RoastLevel) {
+			lighter, darker := findRoastNeighbors(ctx, tx, d, product.ID, coffeeAttrs.RoastLevel)
+			if lighter != nil || darker != nil {
+				prevNav = lighter
+				nextNav = darker
+				roastBased = true
 			}
-			if idx >= 0 {
-				prev := siblings[(idx-1+len(siblings))%len(siblings)]
-				next := siblings[(idx+1)%len(siblings)]
-				prevNav = buildProductNav(ctx, tx, d, prev)
-				nextNav = buildProductNav(ctx, tx, d, next)
+		}
+
+		if prevNav == nil || nextNav == nil {
+			activeStatus := domain.ProductStatusActive
+			siblings, sibErr := d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{
+				Status: &activeStatus,
+				Limit:  500,
+			})
+			if sibErr != nil {
+				return sibErr
+			}
+			if len(siblings) > 1 {
+				idx := -1
+				for i, p := range siblings {
+					if p.ID == product.ID {
+						idx = i
+						break
+					}
+				}
+				if idx >= 0 {
+					if prevNav == nil {
+						prev := siblings[(idx-1+len(siblings))%len(siblings)]
+						prevNav = buildProductNav(ctx, tx, d, prev)
+					}
+					if nextNav == nil {
+						next := siblings[(idx+1)%len(siblings)]
+						nextNav = buildProductNav(ctx, tx, d, next)
+					}
+					// If the fallback would point back at the current product
+					// (single-sibling edge case), drop the section entirely.
+					if prevNav != nil && nextNav != nil && prevNav.Slug == nextNav.Slug {
+						roastBased = false
+					}
+				}
 			}
 		}
 
@@ -769,13 +800,6 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Get coffee attributes.
-		attrVals, attrErr := d.AttributeService.ListProductAttributeValues(ctx, tx, product.ID)
-		if attrErr != nil {
-			return attrErr
-		}
-		coffeeAttrs = buildCoffeeAttrs(attrVals)
-
 		return nil
 	})
 	if err != nil {
@@ -812,6 +836,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		Coffee:            coffeeAttrs,
 		PrevProduct:       prevNav,
 		NextProduct:       nextNav,
+		RoastBased:        roastBased,
 		Category:          category,
 		CanonicalURL:      d.BaseURL + r.URL.Path,
 		OGImage:           ogImage,
@@ -924,6 +949,109 @@ func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `<changefreq>%s</changefreq><priority>%s</priority></url>`, u.ChangeFreq, u.Priority)
 	}
 	fmt.Fprint(w, `</urlset>`)
+}
+
+// roastLevels lists the roast scale slugs in order from lightest to darkest.
+// Mirrors storefront.roastLevelIndex without exporting it.
+var roastLevels = []string{"light", "medium-light", "medium", "medium-dark", "dark"}
+
+// roastIdx returns the 0-based index of a roast slug in roastLevels, or -1.
+func roastIdx(level string) int {
+	for i, l := range roastLevels {
+		if l == level {
+			return i
+		}
+	}
+	return -1
+}
+
+// validRoast reports whether a roast slug is one of the recognized levels.
+func validRoast(level string) bool {
+	return roastIdx(level) >= 0
+}
+
+// findRoastNeighbors returns the nearest "lighter" and "darker" active products
+// relative to the current roast level, excluding currentID. When the current
+// product is at an extreme of the scale (lightest or darkest), it pulls a
+// second pick from the available direction so the section still has two cards.
+// Returns (nil, nil) when no neighbors exist at all.
+func findRoastNeighbors(ctx context.Context, tx pgx.Tx, d *Deps, currentID uuid.UUID, currentRoast string) (*storefront.ProductNav, *storefront.ProductNav) {
+	idx := roastIdx(currentRoast)
+	if idx < 0 {
+		return nil, nil
+	}
+	activeStatus := domain.ProductStatusActive
+
+	// Returns the first non-excluded active product whose roast-level matches.
+	pickAt := func(level string, exclude map[uuid.UUID]bool) *domain.Product {
+		products, err := d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{
+			Status:     &activeStatus,
+			Limit:      10,
+			Attributes: []store.AttributeFilter{{KeySlug: "roast-level", Value: level}},
+		})
+		if err != nil {
+			return nil
+		}
+		for i := range products {
+			if !exclude[products[i].ID] {
+				return &products[i]
+			}
+		}
+		return nil
+	}
+
+	exclude := map[uuid.UUID]bool{currentID: true}
+
+	var lighter, darker *domain.Product
+	var lighterLevel, darkerLevel string
+
+	for i := idx - 1; i >= 0; i-- {
+		if p := pickAt(roastLevels[i], exclude); p != nil {
+			lighter = p
+			lighterLevel = roastLevels[i]
+			exclude[p.ID] = true
+			break
+		}
+	}
+	for i := idx + 1; i < len(roastLevels); i++ {
+		if p := pickAt(roastLevels[i], exclude); p != nil {
+			darker = p
+			darkerLevel = roastLevels[i]
+			exclude[p.ID] = true
+			break
+		}
+	}
+
+	// Edge of the scale: backfill the empty slot from the other direction so
+	// the user still sees two coffees to consider.
+	if lighter == nil && darker != nil {
+		for i := idx + 1; i < len(roastLevels); i++ {
+			if p := pickAt(roastLevels[i], exclude); p != nil {
+				lighter = p
+				lighterLevel = roastLevels[i]
+				break
+			}
+		}
+	} else if darker == nil && lighter != nil {
+		for i := idx - 1; i >= 0; i-- {
+			if p := pickAt(roastLevels[i], exclude); p != nil {
+				darker = p
+				darkerLevel = roastLevels[i]
+				break
+			}
+		}
+	}
+
+	var leftNav, rightNav *storefront.ProductNav
+	if lighter != nil {
+		leftNav = buildProductNav(ctx, tx, d, *lighter)
+		leftNav.RoastLevel = lighterLevel
+	}
+	if darker != nil {
+		rightNav = buildProductNav(ctx, tx, d, *darker)
+		rightNav.RoastLevel = darkerLevel
+	}
+	return leftNav, rightNav
 }
 
 // buildProductNav returns a ProductNav for the prev/next links on the product

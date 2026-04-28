@@ -31,9 +31,9 @@ type DashboardProps struct {
 	FailedPayments     []domain.Order
 	FailedPaymentCount int
 
-	// Pipeline queues
-	ToFulfill []domain.Order
-	ToShip    []domain.Order
+	// Pipeline queues — enriched with item summary + customer name for at-a-glance scanning.
+	ToFulfill []PipelineRow
+	ToShip    []PipelineRow
 
 	// Recent orders
 	RecentOrders []domain.Order
@@ -48,6 +48,16 @@ type DashboardProps struct {
 
 	StaffName string
 	StaffRole string
+}
+
+// PipelineRow bundles an order with the summary fields the pack/ship queues
+// need to read at a glance: what the customer ordered, how much, and who from.
+type PipelineRow struct {
+	Order        domain.Order
+	ItemTitle    string // first product's title (e.g., "Espresso Blend")
+	ExtraItems   int    // count of additional distinct line items beyond the first
+	Quantity     int    // total quantity across all line items
+	CustomerName string // wholesale company name, customer "First Last", or "Guest"
 }
 
 func (p DashboardProps) urgentCount() int {
@@ -383,7 +393,7 @@ templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *t
 }
 
 // pipelineGroup renders a named queue (Pack / Ship) with a count header and row list.
-templ pipelineGroup(label string, count int, orders []domain.Order, viewAllHref, labelClass, dotClass string, loc *time.Location) {
+templ pipelineGroup(label string, count int, rows []PipelineRow, viewAllHref, labelClass, dotClass string, loc *time.Location) {
 	<div class="border-2 border-rr-border bg-rr-surface">
 		<div class="flex items-baseline justify-between px-4 py-2.5 border-b-2 border-rr-border bg-rr-raised">
 			<div class="flex items-baseline gap-2">
@@ -391,7 +401,7 @@ templ pipelineGroup(label string, count int, orders []domain.Order, viewAllHref,
 				<h3 class="text-sm font-bold uppercase tracking-wide text-rr-heading">{ label } queue</h3>
 				<span class="text-sm font-semibold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", count) }</span>
 			</div>
-			if count > len(orders) {
+			if count > len(rows) {
 				<a href={ templ.SafeURL(viewAllHref) } class="text-xs font-semibold text-rr-red hover:text-rr-red-lt">
 					View all { fmt.Sprintf("%d", count) } &rarr;
 				</a>
@@ -401,32 +411,73 @@ templ pipelineGroup(label string, count int, orders []domain.Order, viewAllHref,
 				</a>
 			}
 		</div>
-		if len(orders) == 0 {
+		if len(rows) == 0 {
 			<div class="px-4 py-6 text-center text-sm text-rr-muted">Nothing queued.</div>
 		} else {
 			<div class="divide-y divide-rr-border">
-				for _, o := range orders {
-					<a
-						href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) }
-						class="flex items-center justify-between gap-4 px-4 py-2.5 hover:bg-rr-raised transition-colors"
-					>
-						<div class="flex items-center gap-3 min-w-0">
-							<span class="text-sm font-semibold text-rr-heading">{ o.Number }</span>
-							<span class="hidden sm:inline text-sm text-rr-muted tabular-nums">{ formatCents(o.Total) }</span>
-						</div>
-						<div class="flex items-center gap-2 shrink-0">
-							if ageIsStale(o.PlacedAt) {
-								<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt, loc) }</span>
-							} else {
-								<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt, loc) }</span>
-							}
-							@chevronRight()
-						</div>
-					</a>
+				for _, row := range rows {
+					@pipelineRow(row, loc)
 				}
 			</div>
 		}
 	</div>
+}
+
+// pipelineRow renders one queue row. Stacks on small screens; on lg+ it lays out
+// item / qty / customer / price / age as a compact 5-column grid.
+templ pipelineRow(row PipelineRow, loc *time.Location) {
+	<a
+		href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) }
+		class="block px-4 py-2.5 hover:bg-rr-raised transition-colors"
+	>
+		<!-- Mobile / md: stacked summary -->
+		<div class="flex items-center justify-between gap-3 lg:hidden">
+			<div class="min-w-0">
+				<p class="truncate text-sm font-semibold text-rr-heading">{ pipelineItemLabel(row) }</p>
+				<p class="mt-0.5 truncate text-xs text-rr-muted">
+					×{ fmt.Sprintf("%d", row.Quantity) } · { row.CustomerName } · { row.Order.Number }
+				</p>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<span class="text-sm font-semibold tabular-nums text-rr-heading">{ formatCents(row.Order.Total) }</span>
+				if ageIsStale(row.Order.PlacedAt) {
+					<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>
+				} else {
+					<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>
+				}
+				@chevronRight()
+			</div>
+		</div>
+		<!-- lg+: tabular columns (item / qty / customer / price / age) -->
+		<div class="hidden lg:grid lg:grid-cols-[minmax(0,2fr)_auto_minmax(0,1.4fr)_auto_auto_auto] lg:items-baseline lg:gap-3">
+			<div class="min-w-0">
+				<p class="truncate text-sm font-semibold text-rr-heading">{ pipelineItemLabel(row) }</p>
+				<p class="text-xs text-rr-muted">{ row.Order.Number }</p>
+			</div>
+			<div class="text-sm tabular-nums text-rr-muted">×{ fmt.Sprintf("%d", row.Quantity) }</div>
+			<div class="min-w-0 truncate text-sm text-rr-muted">{ row.CustomerName }</div>
+			<div class="text-right text-sm font-semibold tabular-nums text-rr-heading">{ formatCents(row.Order.Total) }</div>
+			if ageIsStale(row.Order.PlacedAt) {
+				<span class="label-font text-rr-red text-right" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>
+			} else {
+				<span class="label-font text-rr-muted text-right" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>
+			}
+			@chevronRight()
+		</div>
+	</a>
+}
+
+// pipelineItemLabel renders the item title with a "+N" suffix when there are
+// additional distinct line items beyond the first.
+func pipelineItemLabel(row PipelineRow) string {
+	title := row.ItemTitle
+	if title == "" {
+		title = "—"
+	}
+	if row.ExtraItems > 0 {
+		return fmt.Sprintf("%s · +%d more", title, row.ExtraItems)
+	}
+	return title
 }
 
 templ chevronRight() {

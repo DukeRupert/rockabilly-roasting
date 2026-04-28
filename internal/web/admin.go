@@ -1,12 +1,17 @@
 package web
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
@@ -45,7 +50,7 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 
 		// Orders needing fulfillment (paid but unfulfilled)
 		toFulfillStatus := domain.FulfillmentStatusUnfulfilled
-		props.ToFulfill, txErr = d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+		toFulfillOrders, txErr := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
 			FulfillmentStatus: &toFulfillStatus,
 			Limit:             10,
 		})
@@ -54,19 +59,22 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		// Filter to only paid orders (payment captured)
 		var paidUnfulfilled []domain.Order
-		for _, o := range props.ToFulfill {
+		for _, o := range toFulfillOrders {
 			if o.PaymentStatus == domain.PaymentStatusCaptured &&
 				o.Status != domain.OrderStatusCancelled &&
 				o.Status != domain.OrderStatusRefunded {
 				paidUnfulfilled = append(paidUnfulfilled, o)
 			}
 		}
-		props.ToFulfill = paidUnfulfilled
 		props.ToFulfillCount = len(paidUnfulfilled)
+		props.ToFulfill, txErr = d.buildPipelineRows(ctx, tx, paidUnfulfilled)
+		if txErr != nil {
+			return txErr
+		}
 
 		// Orders ready to ship (fulfilled but not yet shipped)
 		toShipStatus := domain.FulfillmentStatusFulfilled
-		props.ToShip, txErr = d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+		toShipOrders, txErr := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
 			FulfillmentStatus: &toShipStatus,
 			Limit:             10,
 		})
@@ -75,13 +83,16 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		// Filter out cancelled/refunded
 		var readyToShip []domain.Order
-		for _, o := range props.ToShip {
+		for _, o := range toShipOrders {
 			if o.Status != domain.OrderStatusCancelled && o.Status != domain.OrderStatusRefunded {
 				readyToShip = append(readyToShip, o)
 			}
 		}
-		props.ToShip = readyToShip
 		props.ToShipCount = len(readyToShip)
+		props.ToShip, txErr = d.buildPipelineRows(ctx, tx, readyToShip)
+		if txErr != nil {
+			return txErr
+		}
 
 		// Orders on hold (explicit manual-review state)
 		onHoldStatus := domain.OrderStatusOnHold
@@ -297,6 +308,88 @@ func (d *Deps) handleAdminTopSellers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.TopSellersCard(buildTopProducts(rows, by), by).Render(ctx, w) //nolint:errcheck
+}
+
+// buildPipelineRows enriches each order with the summary fields the pack/ship
+// queues display: lead item, total quantity, and customer name. Up to ~10
+// orders per queue, so the per-order lookups are bounded — no batching needed.
+func (d *Deps) buildPipelineRows(ctx context.Context, tx pgx.Tx, orders []domain.Order) ([]admin.PipelineRow, error) {
+	rows := make([]admin.PipelineRow, len(orders))
+	for i, o := range orders {
+		row := admin.PipelineRow{Order: o, CustomerName: "Guest"}
+
+		if o.CustomerID != nil {
+			c, err := d.CustomerService.GetCustomer(ctx, tx, *o.CustomerID)
+			if err != nil && !errors.Is(err, app.ErrCustomerNotFound) {
+				return nil, err
+			}
+			if c != nil {
+				row.CustomerName = customerDisplayName(c)
+			}
+		}
+
+		items, err := d.OrderService.ListLineItems(ctx, tx, o.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, li := range items {
+			row.Quantity += li.Quantity
+		}
+		if len(items) > 0 {
+			title, err := d.lookupProductTitle(ctx, tx, items[0].VariantID)
+			if err != nil {
+				return nil, err
+			}
+			row.ItemTitle = title
+			if len(items) > 1 {
+				row.ExtraItems = len(items) - 1
+			}
+		}
+
+		rows[i] = row
+	}
+	return rows, nil
+}
+
+// lookupProductTitle resolves a variant ID to its product title. Missing
+// variant or product (e.g., deleted catalog entry) yields an empty string —
+// the template falls back to "—" so the row still renders.
+func (d *Deps) lookupProductTitle(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) (string, error) {
+	v, err := d.CatalogService.GetVariant(ctx, tx, variantID)
+	if err != nil {
+		if errors.Is(err, app.ErrVariantNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+	p, err := d.CatalogService.GetProduct(ctx, tx, v.ProductID)
+	if err != nil {
+		if errors.Is(err, app.ErrProductNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+	return p.Title, nil
+}
+
+// customerDisplayName picks the most useful label for a customer at a glance:
+// company name for wholesale buyers, otherwise "First Last", falling back to
+// the email local-part when no name is set.
+func customerDisplayName(c *domain.Customer) string {
+	if c.AccountType == domain.AccountTypeWholesale && c.CompanyName != nil && *c.CompanyName != "" {
+		return *c.CompanyName
+	}
+	full := strings.TrimSpace(c.FirstName + " " + c.LastName)
+	if full != "" {
+		return full
+	}
+	if c.Email != "" {
+		if at := strings.IndexByte(c.Email, '@'); at > 0 {
+			return c.Email[:at]
+		}
+		return c.Email
+	}
+	return "Guest"
 }
 
 // compactDollars renders cents as "$1.2k" / "$240" — kept short for chart labels.

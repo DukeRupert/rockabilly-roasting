@@ -89,7 +89,7 @@ func (d *Deps) handleStaffLoginPage(w http.ResponseWriter, r *http.Request) {
 	// If already logged in, redirect to admin.
 	cookie, err := r.Cookie(sessionCookieName)
 	if err == nil && cookie.Value != "" {
-		http.Redirect(w, r, "/admin/orders", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/", http.StatusSeeOther)
 		return
 	}
 	admin.StaffLoginPage("").Render(r.Context(), w) //nolint:errcheck
@@ -134,10 +134,10 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	if IsHTMX(r) {
-		w.Header().Set("HX-Redirect", "/admin/orders")
+		w.Header().Set("HX-Redirect", "/admin/")
 		return
 	}
-	http.Redirect(w, r, "/admin/orders", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/", http.StatusSeeOther)
 }
 
 func (d *Deps) renderStaffLoginError(w http.ResponseWriter, r *http.Request, errMsg, email string) {

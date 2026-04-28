@@ -297,9 +297,16 @@ templ ProductContent(props ProductDetailProps) {
 								role="tabpanel"
 								class="mt-6"
 								x-data="{
+									qty: 1,
 									state: 'idle',
 									_t: 0,
 									_spinTimer: null,
+									clampQty() {
+										let v = parseInt(this.qty, 10);
+										if (isNaN(v) || v < 1) v = 1;
+										else if (v > 10) v = 10;
+										this.qty = v;
+									},
 									submit() {
 										this._t = Date.now();
 										this._spinTimer = setTimeout(() => { if (this.state === 'pending') this.state = 'sending' }, 250);
@@ -326,7 +333,41 @@ templ ProductContent(props ProductDetailProps) {
 									@htmx:after-request.camel="done($event.detail.successful)"
 								>
 									<input type="hidden" name="variant_id" id="selected-variant-id" value={ defaultVariantID(props.Variants) }/>
-									<input type="hidden" name="quantity" value="1"/>
+									<!-- Quantity stepper -->
+									<div class="mb-4">
+										<label for="onetime-quantity" class="font-oswald font-bold text-ink text-[11px] mb-3 block" style="letter-spacing:0.2em; text-transform:uppercase;">Quantity</label>
+										<div class="inline-flex border-2 border-ink">
+											<button
+												type="button"
+												@click="if (qty > 1) qty = qty - 1"
+												:disabled="qty <= 1 || state !== 'idle'"
+												aria-label="Decrease quantity"
+												class="bg-paper-warm text-ink font-oswald font-bold px-4 py-2.5 text-lg leading-none border-r-2 border-ink hover:bg-ink hover:text-paper transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+											>
+												&minus;
+											</button>
+											<input
+												type="number"
+												id="onetime-quantity"
+												name="quantity"
+												x-model.number="qty"
+												@change="clampQty()"
+												min="1"
+												max="10"
+												:disabled="state !== 'idle'"
+												class="w-16 bg-cream-hi text-ink font-special text-center py-2.5 focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+											/>
+											<button
+												type="button"
+												@click="if (qty < 10) qty = qty + 1"
+												:disabled="qty >= 10 || state !== 'idle'"
+												aria-label="Increase quantity"
+												class="bg-paper-warm text-ink font-oswald font-bold px-4 py-2.5 text-lg leading-none border-l-2 border-ink hover:bg-ink hover:text-paper transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+											>
+												+
+											</button>
+										</div>
+									</div>
 									<button
 										type="submit"
 										class="btn-stamp w-full border-2 border-ink px-6 py-4 font-oswald font-bold text-sm transition-colors"

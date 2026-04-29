@@ -238,8 +238,15 @@ templ Admin(props AdminProps) {
 				.row-link {
 					position: relative;
 					cursor: pointer;
+					transition: background-color 150ms linear, box-shadow 150ms linear;
 				}
-				.row-link:hover { background: var(--color-rr-raised); }
+				.row-link:hover {
+					background: var(--color-rr-raised);
+					box-shadow: inset 4px 0 0 var(--color-rr-amber);
+				}
+				@media (prefers-reduced-motion: reduce) {
+					.row-link { transition: none; }
+				}
 				.row-link .row-link-target::after {
 					content: '';
 					position: absolute;

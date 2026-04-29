@@ -5,6 +5,78 @@ import "github.com/dukerupert/hiri/internal/domain"
 // Badge class helpers — semantic colors from brand guide v3.
 // CSS for .badge, .badge-dot, and color variants lives in admin.templ <style>.
 
+// OrderStatusLabel returns a human-readable label for an order status.
+// Used by badges and any other UI that shouldn't expose snake_case enum strings.
+func OrderStatusLabel(s domain.OrderStatus) string {
+	switch s {
+	case domain.OrderStatusPending:
+		return "Pending"
+	case domain.OrderStatusConfirmed:
+		return "Confirmed"
+	case domain.OrderStatusProcessing:
+		return "In Progress"
+	case domain.OrderStatusOnHold:
+		return "On Hold"
+	case domain.OrderStatusComplete:
+		return "Complete"
+	case domain.OrderStatusCancelled:
+		return "Cancelled"
+	case domain.OrderStatusRefunded:
+		return "Refunded"
+	}
+	return string(s)
+}
+
+// PaymentStatusLabel returns a human-readable label for a payment status.
+func PaymentStatusLabel(s domain.PaymentStatus) string {
+	switch s {
+	case domain.PaymentStatusAwaiting:
+		return "Awaiting"
+	case domain.PaymentStatusAuthorized:
+		return "Authorized"
+	case domain.PaymentStatusCaptured:
+		return "Captured"
+	case domain.PaymentStatusPartial, domain.PaymentStatusPartiallyPaid:
+		return "Partial"
+	case domain.PaymentStatusRefunded:
+		return "Refunded"
+	case domain.PaymentStatusFailed:
+		return "Failed"
+	case domain.PaymentStatusVoided:
+		return "Voided"
+	case domain.PaymentStatusPendingInvoice:
+		return "Invoice pending"
+	case domain.PaymentStatusInvoiced:
+		return "Invoiced"
+	case domain.PaymentStatusOverdue:
+		return "Overdue"
+	}
+	return string(s)
+}
+
+// FulfillmentStatusLabel returns a human-readable label for a fulfillment status.
+func FulfillmentStatusLabel(s domain.FulfillmentStatus) string {
+	switch s {
+	case domain.FulfillmentStatusUnfulfilled:
+		return "Unfulfilled"
+	case domain.FulfillmentStatusPartiallyFulfilled:
+		return "Partially fulfilled"
+	case domain.FulfillmentStatusFulfilled:
+		return "Fulfilled"
+	case domain.FulfillmentStatusPartiallyShipped:
+		return "Partially shipped"
+	case domain.FulfillmentStatusShipped:
+		return "Shipped"
+	case domain.FulfillmentStatusPartiallyDelivered:
+		return "Partially delivered"
+	case domain.FulfillmentStatusDelivered:
+		return "Delivered"
+	case domain.FulfillmentStatusReturned:
+		return "Returned"
+	}
+	return string(s)
+}
+
 func orderStatusBadgeClasses(status domain.OrderStatus) string {
 	switch status {
 	case domain.OrderStatusComplete:
@@ -26,7 +98,7 @@ func orderStatusBadgeClasses(status domain.OrderStatus) string {
 
 templ OrderStatusBadge(status domain.OrderStatus) {
 	<span class={ orderStatusBadgeClasses(status) }>
-		{ string(status) }
+		{ OrderStatusLabel(status) }
 	</span>
 }
 
@@ -47,8 +119,58 @@ func paymentStatusBadgeClasses(status domain.PaymentStatus) string {
 
 templ PaymentStatusBadge(status domain.PaymentStatus) {
 	<span class={ paymentStatusBadgeClasses(status) }>
-		{ string(status) }
+		{ PaymentStatusLabel(status) }
 	</span>
+}
+
+// paymentChipClasses returns the inline-chip color classes for a payment
+// status. Used beside totals so paid/due is visible without a full badge.
+func paymentChipClasses(s domain.PaymentStatus) string {
+	switch s {
+	case domain.PaymentStatusCaptured:
+		return "label-font text-[#2A6644]"
+	case domain.PaymentStatusOverdue:
+		return "label-font text-[#7A3010]"
+	case domain.PaymentStatusFailed, domain.PaymentStatusVoided:
+		return "label-font text-[#7A1210]"
+	case domain.PaymentStatusPartial, domain.PaymentStatusPartiallyPaid, domain.PaymentStatusAuthorized:
+		return "label-font text-[#7A4E08]"
+	case domain.PaymentStatusRefunded:
+		return "label-font text-[#5A5048]"
+	case domain.PaymentStatusInvoiced, domain.PaymentStatusPendingInvoice, domain.PaymentStatusAwaiting:
+		return "label-font text-rr-red"
+	}
+	return "label-font text-rr-muted"
+}
+
+// paymentChipText returns a short uppercase label suitable for an inline chip.
+// Different from PaymentStatusLabel which is sentence-case and longer.
+func paymentChipText(s domain.PaymentStatus) string {
+	switch s {
+	case domain.PaymentStatusCaptured:
+		return "Paid"
+	case domain.PaymentStatusAwaiting, domain.PaymentStatusInvoiced, domain.PaymentStatusPendingInvoice:
+		return "Due"
+	case domain.PaymentStatusOverdue:
+		return "Overdue"
+	case domain.PaymentStatusPartial, domain.PaymentStatusPartiallyPaid:
+		return "Partial"
+	case domain.PaymentStatusAuthorized:
+		return "Auth"
+	case domain.PaymentStatusFailed:
+		return "Failed"
+	case domain.PaymentStatusVoided:
+		return "Void"
+	case domain.PaymentStatusRefunded:
+		return "Refunded"
+	}
+	return string(s)
+}
+
+// PaymentChip is a compact inline label (Oswald uppercase, semantic color)
+// designed to sit next to a money amount: "$48.00 · PAID".
+templ PaymentChip(status domain.PaymentStatus) {
+	<span class={ paymentChipClasses(status) }>{ paymentChipText(status) }</span>
 }
 
 func fulfillmentStatusBadgeClasses(status domain.FulfillmentStatus) string {
@@ -68,7 +190,7 @@ func fulfillmentStatusBadgeClasses(status domain.FulfillmentStatus) string {
 
 templ FulfillmentStatusBadge(status domain.FulfillmentStatus) {
 	<span class={ fulfillmentStatusBadgeClasses(status) }>
-		{ string(status) }
+		{ FulfillmentStatusLabel(status) }
 	</span>
 }
 

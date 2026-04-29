@@ -44,6 +44,7 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var orders []domain.Order
+	var rows []admin.OrderRow
 	var totalCount int
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -53,21 +54,47 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		totalCount, txErr = d.OrderService.CountOrders(ctx, tx, filter)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+
+		// Enrich each order with customer display info. Bounded by perPage,
+		// so per-row lookup is acceptable here.
+		rows = make([]admin.OrderRow, 0, len(orders))
+		for _, o := range orders {
+			row := admin.OrderRow{
+				Order:        o,
+				CustomerName: "Guest",
+				AccountType:  domain.AccountTypeRetail,
+			}
+			if o.CustomerID != nil {
+				c, cErr := d.CustomerService.GetCustomer(ctx, tx, *o.CustomerID)
+				if cErr != nil && !errors.Is(cErr, app.ErrCustomerNotFound) {
+					return cErr
+				}
+				if c != nil {
+					row.CustomerName = customerDisplayName(c)
+					row.CustomerEmail = c.Email
+					row.AccountType = c.AccountType
+				}
+			}
+			rows = append(rows, row)
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
 		return
 	}
 
-	hasMore := len(orders) > perPage
+	hasMore := len(rows) > perPage
 	if hasMore {
-		orders = orders[:perPage]
+		rows = rows[:perPage]
 	}
 
 	name, role := staffNameRole(r)
 	props := admin.OrderListProps{
-		Orders:       orders,
+		Rows:         rows,
 		StatusFilter: statusFilter,
 		Search:       search,
 		TotalCount:   totalCount,

@@ -111,6 +111,12 @@ type Querier interface {
 	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 	GetOrderByNumber(ctx context.Context, number string) (Order, error)
 	GetOrderByStripePaymentIntentID(ctx context.Context, stripePaymentIntentID *string) (Order, error)
+	// Same as GetOrderByStripePaymentIntentID but takes a row-level lock.
+	// Use this on the redirect-back and webhook paths where two transactions
+	// can race for the same order — the second waits for the first to commit
+	// and then sees the post-transition state, so side effects (audit, email,
+	// coupon redemption) don't double-fire.
+	GetOrderByStripePaymentIntentIDForUpdate(ctx context.Context, stripePaymentIntentID *string) (Order, error)
 	GetPriceSetByVariant(ctx context.Context, variantID uuid.UUID) (PriceSet, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySlug(ctx context.Context, slug string) (Product, error)
@@ -184,6 +190,10 @@ type Querier interface {
 	// Returns the row if successful; pgx.ErrNoRows if already redeemed.
 	RedeemCouponCode(ctx context.Context, arg RedeemCouponCodeParams) (CouponCode, error)
 	RedeemMagicLinkToken(ctx context.Context, tokenHash string) (MagicLinkToken, error)
+	// Reverses a coupon redemption tied to a specific order. Used when an order
+	// is cancelled (admin or abandoned-checkout cleanup) so the code can be used
+	// again. No-op if the coupon was never redeemed for that order.
+	ReleaseCouponCodeByOrderID(ctx context.Context, redeemedByOrderID *uuid.UUID) error
 	ReleaseReservation(ctx context.Context, arg ReleaseReservationParams) (StockLevel, error)
 	RemoveAttributeSetFromProduct(ctx context.Context, arg RemoveAttributeSetFromProductParams) error
 	RemoveCustomerGroupMembership(ctx context.Context, arg RemoveCustomerGroupMembershipParams) error

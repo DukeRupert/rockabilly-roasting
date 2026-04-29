@@ -52,10 +52,12 @@ export interface PaymentIntentResponse {
 }
 
 export interface ConfirmRequest {
-  cart_id: string;
-  customer_id: string;
-  address_id: string;
   payment_intent_id: string;
+  // The server ignores these now (the order is keyed by payment_intent_id and
+  // was created at PI-creation time) but legacy clients may still send them.
+  cart_id?: string;
+  customer_id?: string;
+  address_id?: string;
 }
 
 export interface ConfirmResponse {

@@ -219,7 +219,8 @@ func run() error {
 	// Services. Those that send email have email-capable variants attached via WithEmail.
 	catalogSvc := app.NewCatalogService(catalogStore, auditWriter, metricsReg)
 	orderSvc := app.NewOrderService(orderStore, auditWriter, metricsReg).
-		WithEmail(emailEnv, customerStore, catalogStore, subscriptionStore)
+		WithEmail(emailEnv, customerStore, catalogStore, subscriptionStore).
+		WithDiscounts(discountStore)
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore)
@@ -258,6 +259,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewRefundConfirmationWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
+	river.AddWorker(workers, jobs.NewAbandonedOrderCleanupWorker(orderSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)
 	// See below after riverClient creation.
@@ -280,6 +282,22 @@ func run() error {
 				},
 				&river.PeriodicJobOpts{RunOnStart: true},
 			),
+			// Cancel orders that were pre-created at PI time but never had
+			// payment confirmed (customer closed browser, etc.). Stripe auto-
+			// cancels most async PIs at 48h via the canceled webhook; this
+			// catches card-path orders that Stripe leaves in
+			// requires_payment_method indefinitely.
+			river.NewPeriodicJob(
+				river.PeriodicInterval(1*time.Hour),
+				func() (river.JobArgs, *river.InsertOpts) {
+					return jobs.AbandonedOrderCleanupArgs{}, &river.InsertOpts{
+						UniqueOpts: river.UniqueOpts{
+							ByPeriod: 1 * time.Hour,
+						},
+					}
+				},
+				&river.PeriodicJobOpts{RunOnStart: false},
+			),
 		},
 	})
 	if err != nil {
@@ -289,7 +307,9 @@ func run() error {
 	// Now that the river client exists, attach the enqueuer to services that
 	// fan out jobs from inside their own transactions (e.g. renewal-receipt
 	// and past-due email enqueues atomic with the renewal write).
-	renewalSvc.WithJobEnqueuer(jobs.NewEnqueuer(riverClient))
+	enqueuer := jobs.NewEnqueuer(riverClient)
+	renewalSvc.WithJobEnqueuer(enqueuer)
+	checkoutSvc.WithCheckoutConfirmDeps(cartStore, enqueuer)
 
 	// Register scheduler worker (needs the client for transactional inserts)
 	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient, metricsReg))

@@ -89,6 +89,14 @@ type SessionPruneArgs struct{}
 // Kind returns the job kind identifier.
 func (SessionPruneArgs) Kind() string { return "session_prune" }
 
+// AbandonedOrderCleanupArgs scans for pre-paid-intent orders (status=pending,
+// payment_status=awaiting) that have been sitting unconfirmed for longer
+// than the configured threshold and cancels them.
+type AbandonedOrderCleanupArgs struct{}
+
+// Kind returns the job kind identifier.
+func (AbandonedOrderCleanupArgs) Kind() string { return "abandoned_order_cleanup" }
+
 // WholesaleApplicationNotifyArgs notifies staff of a new wholesale application.
 type WholesaleApplicationNotifyArgs struct {
 	CustomerID uuid.UUID `json:"customer_id"`

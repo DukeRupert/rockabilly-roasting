@@ -15,7 +15,6 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
-	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/store"
@@ -469,7 +468,14 @@ func (d *Deps) handleCheckoutRemoveCoupon(w http.ResponseWriter, r *http.Request
 	JSON(w, http.StatusOK, map[string]string{"status": "removed"})
 }
 
-// handleCheckoutPaymentIntent creates a Stripe PaymentIntent for the cart total.
+// handleCheckoutPaymentIntent creates a Stripe PaymentIntent and a pending
+// order linked to it. The order is created BEFORE the customer authorizes
+// payment so async/redirect-based methods (Klarna, Affirm) have an order to
+// transition once the webhook fires — even if the customer never returns to
+// the redirect-back URL. The order starts in status=pending,
+// payment_status=awaiting and is moved forward by ConfirmCheckoutPayment
+// from either the /checkout/confirm endpoint or the
+// payment_intent.succeeded webhook (whichever wins the race).
 func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.FromContext(ctx)
@@ -498,15 +504,19 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var subtotal int
-	var discountTotal int
-	var discountName string
-	var couponCode string
-	var taxTotal int
-	var taxLabel string
-	var shippingTotal int
-	var shippingLabel string
-	var shippingAddr *domain.Address
+	// Phase 1: load cart + compute totals (tx, no external calls).
+	var (
+		subtotal      int
+		discountTotal int
+		discountName  string
+		couponCode    string
+		taxTotal      int
+		taxLabel      string
+		shippingTotal int
+		shippingLabel string
+		shippingAddr  *domain.Address
+		orderItems    []app.CartItem
+	)
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		items, txErr := d.CartService.ListItems(ctx, tx, cartID)
@@ -517,8 +527,9 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return app.ErrCartEmpty
 		}
 
-		// Build subtotal and tax line items.
+		// Build subtotal, tax line items, and the order-items snapshot.
 		taxLineItems := make([]domain.TaxLineItem, len(items))
+		orderItems = make([]app.CartItem, len(items))
 		for i, ci := range items {
 			lineTotal := ci.UnitPrice * ci.Quantity
 			subtotal += lineTotal
@@ -537,9 +548,13 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 				Subtotal:  lineTotal,
 				TaxExempt: product.TaxExempt,
 			}
+			orderItems[i] = app.CartItem{
+				VariantID: ci.VariantID,
+				Quantity:  ci.Quantity,
+				UnitPrice: ci.UnitPrice,
+			}
 		}
 
-		// Check for applied coupon on cart.
 		cart, txErr := d.CartService.GetCart(ctx, tx, cartID)
 		if txErr != nil {
 			return fmt.Errorf("get cart: %w", txErr)
@@ -560,7 +575,6 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		discountedSubtotal := subtotal - discountTotal
 		for i := range taxLineItems {
 			if discountTotal > 0 && discountedSubtotal > 0 {
-				// Proportionally reduce each line's taxable amount.
 				ratio := float64(discountedSubtotal) / float64(subtotal)
 				taxLineItems[i].Subtotal = int(float64(taxLineItems[i].Subtotal) * ratio)
 			}
@@ -597,7 +611,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		return nil
 	})
 	if err != nil {
-		logger.Error("checkout payment-intent", "error", err)
+		logger.Error("checkout payment-intent: phase 1", "error", err)
 		if errors.Is(err, app.ErrCartEmpty) {
 			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "cart is empty"})
 			return
@@ -608,7 +622,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 
 	totalCents := subtotal - discountTotal + shippingTotal + taxTotal
 
-	// Create Stripe PaymentIntent (external call — outside transaction)
+	// Phase 2: create Stripe PaymentIntent (external — no tx).
 	pi, err := d.PaymentProvider.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
 		AmountCents: int64(totalCents),
 		Currency:    "usd",
@@ -630,6 +644,60 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		logger.Error("create payment intent", "error", err)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create payment"})
+		return
+	}
+
+	// Phase 3: place the order in pending+awaiting and link it to the PI.
+	// The cart_id is stashed on order.Metadata so ConfirmCheckoutPayment can
+	// find and delete the cart later. If a coupon was applied at Phase 1,
+	// we redeem it inside PlaceOrder — releasing it on order cancellation
+	// (handled by CancelOrder) is the path back if payment never completes.
+	var couponCodePtr *string
+	if couponCode != "" {
+		couponCodePtr = &couponCode
+	}
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
+			CustomerID:        customerID,
+			Items:             orderItems,
+			ShippingAddressID: addressID,
+			BillingAddressID:  addressID,
+			CurrencyCode:      "USD",
+			CouponCode:        couponCodePtr,
+			ShippingCents:     shippingTotal,
+			TaxCents:          taxTotal,
+			Metadata: map[string]any{
+				"cart_id":           cartID.String(),
+				"payment_intent_id": pi.ID,
+			},
+		}, app.Actor{
+			Type: domain.AuditActorTypeCustomer,
+			ID:   &customerID,
+			Name: "guest checkout",
+		})
+		if txErr != nil {
+			return fmt.Errorf("place order: %w", txErr)
+		}
+		if _, txErr := d.OrderService.UpdateStripePaymentIntentID(ctx, tx, order.ID, pi.ID); txErr != nil {
+			return fmt.Errorf("link payment intent: %w", txErr)
+		}
+		return nil
+	})
+	if err != nil {
+		logger.Error("checkout payment-intent: phase 3", "error", err, "payment_intent_id", pi.ID)
+		// Best-effort cancel the orphaned PI so the customer can retry. If
+		// the cancel call fails too, Stripe auto-cancels after 48h.
+		if cancelErr := d.PaymentProvider.CancelPaymentIntent(ctx, pi.ID); cancelErr != nil {
+			logger.Warn("orphaned payment intent cancel failed", "payment_intent_id", pi.ID, "error", cancelErr)
+		}
+		reason := "internal_error"
+		if errors.Is(err, app.ErrCouponAlreadyRedeemed) || errors.Is(err, app.ErrCouponAlreadyUsed) {
+			reason = "coupon_redeemed"
+			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "coupon was just used by another customer"})
+		} else {
+			JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to place order"})
+		}
+		d.Metrics.CheckoutFailed.WithLabelValues("retail", reason).Inc()
 		return
 	}
 
@@ -663,7 +731,12 @@ func shippingDisplayLabel(cfg *domain.ShippingConfig, shippingCents int, shipToZ
 	return ""
 }
 
-// handleCheckoutConfirm finalizes the order after Stripe payment succeeds.
+// handleCheckoutConfirm transitions the pre-created order to confirmed when
+// payment has succeeded. The order itself was created in the PI handler; this
+// endpoint only drives the state transition. It accepts both `succeeded` and
+// `processing` PI statuses — for async methods (Klarna), `processing` is
+// expected and the webhook will finalize the order shortly after. Idempotent:
+// safe to call multiple times for the same PI (returns the existing order).
 func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.FromContext(ctx)
@@ -675,201 +748,70 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cartID, err := uuid.Parse(req.CartID)
-	if err != nil {
-		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid cart_id"})
-		return
-	}
-	customerID, err := uuid.Parse(req.CustomerID)
-	if err != nil {
-		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid customer_id"})
-		return
-	}
-	addressID, err := uuid.Parse(req.AddressID)
-	if err != nil {
-		JSON(w, http.StatusBadRequest, map[string]string{"error": "invalid address_id"})
-		return
-	}
-
-	// Verify the payment intent succeeded (external call — outside transaction)
+	// Verify the payment intent's status (external call — outside transaction)
 	pi, err := d.PaymentProvider.GetPaymentIntent(ctx, req.PaymentIntentID)
 	if err != nil {
 		logger.Error("get payment intent", "error", err)
 		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to verify payment"})
 		return
 	}
-	if pi.Status != payments.PaymentIntentStatusSucceeded {
+
+	var resp checkoutConfirmResponse
+
+	switch pi.Status {
+	case payments.PaymentIntentStatusSucceeded:
+		// Sync (card) path: drive the order forward now.
+		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			order, _, txErr := d.CheckoutService.ConfirmCheckoutPayment(ctx, tx, req.PaymentIntentID, app.Actor{
+				Type: domain.AuditActorTypeSystem,
+				Name: "checkout_confirm",
+			})
+			if txErr != nil {
+				return txErr
+			}
+			resp.OrderID = order.ID.String()
+			resp.OrderNumber = order.Number
+			resp.Redirect = "/order/confirmed?number=" + order.Number
+			return nil
+		})
+	case payments.PaymentIntentStatusProcessing:
+		// Async (Klarna/BNPL) path: order stays in pending+awaiting; the
+		// payment_intent.succeeded webhook will finalize it. Return the
+		// confirmation redirect immediately so the customer's browser can
+		// land on the confirmation page; that page is tolerant of orders
+		// still in flight.
+		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			order, txErr := d.OrderService.GetOrderByStripePaymentIntentIDAsStaff(ctx, tx, req.PaymentIntentID)
+			if txErr != nil {
+				return fmt.Errorf("get order for processing pi: %w", txErr)
+			}
+			resp.OrderID = order.ID.String()
+			resp.OrderNumber = order.Number
+			resp.Redirect = "/order/confirmed?number=" + order.Number
+			return nil
+		})
+	default:
 		d.Metrics.CheckoutFailed.WithLabelValues("retail", "payment_failed").Inc()
 		d.Metrics.CheckoutDuration.WithLabelValues("retail").Observe(time.Since(checkoutStart).Seconds())
 		JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "payment has not succeeded"})
 		return
 	}
 
-	var resp checkoutConfirmResponse
-
-	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		items, txErr := d.CartService.ListItems(ctx, tx, cartID)
-		if txErr != nil {
-			return fmt.Errorf("list cart items: %w", txErr)
-		}
-		if len(items) == 0 {
-			return app.ErrCartEmpty
-		}
-
-		subtotal := 0
-		orderItems := make([]app.CartItem, len(items))
-		taxLineItems := make([]domain.TaxLineItem, len(items))
-		for i, ci := range items {
-			orderItems[i] = app.CartItem{
-				VariantID: ci.VariantID,
-				Quantity:  ci.Quantity,
-				UnitPrice: ci.UnitPrice,
-			}
-			lineTotal := ci.UnitPrice * ci.Quantity
-			subtotal += lineTotal
-
-			variant, vErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
-			if vErr != nil {
-				return fmt.Errorf("get variant for tax: %w", vErr)
-			}
-			product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
-			if pErr != nil {
-				return fmt.Errorf("get product for tax: %w", pErr)
-			}
-
-			taxLineItems[i] = domain.TaxLineItem{
-				LineIndex: i,
-				Subtotal:  lineTotal,
-				TaxExempt: product.TaxExempt,
-			}
-		}
-
-		// Check for applied coupon on cart.
-		var couponCode *string
-		discountTotal := 0
-		cart, txErr := d.CartService.GetCart(ctx, tx, cartID)
-		if txErr != nil {
-			return fmt.Errorf("get cart: %w", txErr)
-		}
-		if cart.AppliedCouponCodeID != nil {
-			cc, ccErr := d.CheckoutService.GetCouponCodeByID(ctx, tx, *cart.AppliedCouponCodeID)
-			if ccErr == nil && cc.RedeemedAt == nil {
-				discount, dErr := d.DiscountService.GetDiscount(ctx, tx, cc.DiscountID)
-				if dErr == nil && discount.Active {
-					discountTotal = calculateDiscountAmount(discount, subtotal)
-					couponCode = &cc.Code
-				}
-			}
-		}
-
-		// Tax is on discounted subtotal.
-		discountedSubtotal := subtotal - discountTotal
-		for i := range taxLineItems {
-			if discountTotal > 0 && discountedSubtotal > 0 {
-				ratio := float64(discountedSubtotal) / float64(subtotal)
-				taxLineItems[i].Subtotal = int(float64(taxLineItems[i].Subtotal) * ratio)
-			}
-		}
-
-		customer, txErr := d.CustomerService.GetCustomer(ctx, tx, customerID)
-		if txErr != nil {
-			return fmt.Errorf("get customer for tax: %w", txErr)
-		}
-		isWholesale := customer.AccountType == domain.AccountTypeWholesale
-
-		shippingAddr, txErr := d.CustomerService.GetAddressByIDAsStaff(ctx, tx, addressID)
-		if txErr != nil {
-			return fmt.Errorf("get address for tax: %w", txErr)
-		}
-
-		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, isWholesale, shippingAddr.State)
-		if txErr != nil {
-			return fmt.Errorf("calculate tax: %w", txErr)
-		}
-
-		shippingCents, _, txErr := d.CheckoutService.CalculateShipping(ctx, tx, discountedSubtotal, shippingAddr.PostalCode)
-		if txErr != nil {
-			return fmt.Errorf("calculate shipping: %w", txErr)
-		}
-
-		order, txErr := d.CheckoutService.PlaceOrder(ctx, tx, app.PlaceOrderParams{
-			CustomerID:        customerID,
-			Items:             orderItems,
-			ShippingAddressID: addressID,
-			BillingAddressID:  addressID,
-			CurrencyCode:      "USD",
-			CouponCode:        couponCode,
-			ShippingCents:     shippingCents,
-			TaxCents:          taxResult.TaxTotal,
-		}, app.Actor{
-			Type: "customer",
-			ID:   &customerID,
-			Name: "guest checkout",
-		})
-		if txErr != nil {
-			return fmt.Errorf("place order: %w", txErr)
-		}
-
-		// Verify payment amount matches server-computed order total
-		if int64(order.Total) != pi.AmountCents {
-			logger.Error("payment amount mismatch",
-				"order_total_cents", order.Total,
-				"pi_amount_cents", pi.AmountCents,
-				"payment_intent_id", req.PaymentIntentID,
-			)
-			return app.ErrPaymentAmountMismatch
-		}
-
-		_, txErr = d.OrderService.UpdateStripePaymentIntentID(ctx, tx, order.ID, req.PaymentIntentID)
-		if txErr != nil {
-			return fmt.Errorf("update stripe payment intent: %w", txErr)
-		}
-
-		_, txErr = d.OrderService.UpdatePaymentStatus(ctx, tx, order.ID, domain.PaymentStatusCaptured, app.Actor{
-			Type: "system",
-			Name: "checkout",
-		})
-		if txErr != nil {
-			return fmt.Errorf("update payment status: %w", txErr)
-		}
-
-		txErr = d.CartService.DeleteCart(ctx, tx, cartID)
-		if txErr != nil {
-			return fmt.Errorf("delete cart: %w", txErr)
-		}
-
-		// Enqueue order confirmation email in the same transaction.
-		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.OrderConfirmEmailArgs{
-			OrderID:    order.ID,
-			CustomerID: customerID,
-		}, nil)
-		if txErr != nil {
-			return fmt.Errorf("enqueue order confirm email: %w", txErr)
-		}
-
-		resp.OrderID = order.ID.String()
-		resp.OrderNumber = order.Number
-		resp.Redirect = "/order/confirmed?number=" + order.Number
-
-		return nil
-	})
 	if err != nil {
-		logger.Error("checkout confirm", "error", err)
+		logger.Error("checkout confirm", "error", err, "payment_intent_id", req.PaymentIntentID)
 		reason := classifyCheckoutError(err)
 		d.Metrics.CheckoutFailed.WithLabelValues("retail", reason).Inc()
 		d.Metrics.CheckoutDuration.WithLabelValues("retail").Observe(time.Since(checkoutStart).Seconds())
-		if errors.Is(err, app.ErrPaymentAmountMismatch) {
-			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "payment amount does not match order total"})
-			return
-		}
-		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create order"})
+		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to confirm order"})
 		return
 	}
 
 	d.Metrics.CheckoutCompleted.WithLabelValues("retail").Inc()
 	d.Metrics.CheckoutDuration.WithLabelValues("retail").Observe(time.Since(checkoutStart).Seconds())
 
-	// Clear cart cookie
+	// Clear cart cookie regardless of sync/async — the cart row was deleted
+	// inside ConfirmCheckoutPayment for sync, or will be by the webhook for
+	// async. Either way the customer's session cart cookie should drop.
 	http.SetCookie(w, &http.Cookie{
 		Name:   cartCookieName,
 		Value:  "",

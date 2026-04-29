@@ -32,9 +32,12 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		now := time.Now().In(d.MerchantTZ)
 		todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, d.MerchantTZ)
 
-		// Today's order count
+		// Today's order count. ExcludeUnconfirmed drops PI-created-but-not-paid
+		// orders (status=pending AND payment_status=awaiting) so dashboard
+		// metrics reflect actual sales, not in-flight intents.
 		props.TodayOrderCount, txErr = d.OrderService.CountOrders(ctx, tx, store.OrderFilter{
-			PlacedFrom: &todayStart,
+			PlacedFrom:         &todayStart,
+			ExcludeUnconfirmed: true,
 		})
 		if txErr != nil {
 			return txErr
@@ -42,7 +45,8 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 
 		// Today's revenue
 		props.TodayRevenue, txErr = d.OrderService.SumOrderRevenue(ctx, tx, store.OrderFilter{
-			PlacedFrom: &todayStart,
+			PlacedFrom:         &todayStart,
+			ExcludeUnconfirmed: true,
 		})
 		if txErr != nil {
 			return txErr

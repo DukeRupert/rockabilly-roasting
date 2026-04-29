@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getCart, type CartResponse, type PaymentIntentResponse } from './lib/api';
+  import { confirmOrder, getCart, type CartResponse, type PaymentIntentResponse } from './lib/api';
   import Information from './steps/Information.svelte';
   import Payment from './steps/Payment.svelte';
   import { formatCents } from './lib/format';
@@ -17,6 +17,9 @@
   let cart = $state<CartResponse | null>(null);
   let loading = $state(true);
   let error = $state('');
+  // True while we're handling a Stripe redirect-back (Klarna and other async
+  // methods). Suppresses the steps UI and shows a finalizing state instead.
+  let finalizing = $state(false);
 
   // Checkout state carried between steps
   let customerId = $state('');
@@ -31,8 +34,52 @@
   let currentStepIndex = $derived(steps.findIndex((s) => s.key === step));
 
   $effect(() => {
-    loadCart();
+    handleRedirectBack();
   });
+
+  // handleRedirectBack runs once on mount. If the URL carries Stripe's
+  // redirect-back query params (payment_intent + redirect_status) we skip
+  // the cart/steps flow entirely and finalize the order against the
+  // already-pre-created order row. The server-side handleCheckoutConfirm
+  // accepts both `succeeded` and `processing` PI statuses; for `processing`
+  // (typical Klarna), the order stays in awaiting+pending and the
+  // payment_intent.succeeded webhook will finalize it asynchronously.
+  async function handleRedirectBack() {
+    const params = new URLSearchParams(window.location.search);
+    const paymentIntentId = params.get('payment_intent');
+    const redirectStatus = params.get('redirect_status');
+
+    if (!paymentIntentId) {
+      // Normal flow — no redirect-back to handle. Load the cart.
+      loadCart();
+      return;
+    }
+
+    if (redirectStatus === 'failed') {
+      // Klarna (or another redirect-based method) declined. Drop the query
+      // params so a refresh doesn't re-enter this branch, then fall through
+      // to the normal cart/steps flow. The server-side webhook will move
+      // the linked order to payment_status=failed; the customer can retry.
+      window.history.replaceState({}, '', '/checkout');
+      error = 'Payment was not completed. You can choose another method below.';
+      loadCart();
+      return;
+    }
+
+    // succeeded or processing — drive the order to confirmation.
+    finalizing = true;
+    loading = false;
+    try {
+      const result = await confirmOrder({ payment_intent_id: paymentIntentId });
+      window.location.href = result.redirect;
+    } catch (e: any) {
+      error = e.message || 'Failed to finalize order';
+      finalizing = false;
+      // Drop the query params so the customer can try again from a clean slate.
+      window.history.replaceState({}, '', '/checkout');
+      loadCart();
+    }
+  }
 
   async function loadCart() {
     try {
@@ -157,7 +204,19 @@
       </ol>
     </nav>
 
-    {#if loading}
+    {#if finalizing}
+      <div class="border-2 border-ink bg-cream-hi py-16 px-6 text-center shadow-stamp">
+        <p
+          class="font-oswald font-bold text-ink text-base"
+          style="letter-spacing:0.18em; text-transform:uppercase;"
+        >
+          Finalizing your order…
+        </p>
+        <p class="font-oswald text-ink-soft text-sm mt-3" style="letter-spacing:0.04em;">
+          Don't close this window.
+        </p>
+      </div>
+    {:else if loading}
       <div class="text-center py-16">
         <p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
           Loading checkout…

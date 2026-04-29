@@ -50,3 +50,13 @@ RETURNING *;
 
 -- name: DeleteCouponCode :exec
 DELETE FROM coupon_codes WHERE id = $1;
+
+-- name: ReleaseCouponCodeByOrderID :exec
+-- Reverses a coupon redemption tied to a specific order. Used when an order
+-- is cancelled (admin or abandoned-checkout cleanup) so the code can be used
+-- again. No-op if the coupon was never redeemed for that order.
+UPDATE coupon_codes
+SET redeemed_at = NULL,
+    redeemed_by = NULL,
+    redeemed_by_order_id = NULL
+WHERE redeemed_by_order_id = $1;

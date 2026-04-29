@@ -104,6 +104,9 @@ func (d *Deps) processWebhookEvent(r *http.Request, _ *domain.WebhookEvent, even
 	case payments.EventPaymentIntentPaymentFailed:
 		return d.handlePaymentIntentFailed(ctx, event)
 
+	case payments.EventPaymentIntentCanceled:
+		return d.handlePaymentIntentCanceled(ctx, event)
+
 	case payments.EventChargeRefunded:
 		return d.handleChargeRefunded(ctx, event)
 
@@ -113,7 +116,10 @@ func (d *Deps) processWebhookEvent(r *http.Request, _ *domain.WebhookEvent, even
 	}
 }
 
-// handlePaymentIntentSucceeded confirms the order associated with a successful payment.
+// handlePaymentIntentSucceeded drives the pre-created order to confirmed when
+// Stripe reports the PI as succeeded. Idempotent — if the order has already
+// been transitioned (e.g. by the redirect-back path) this no-ops cleanly via
+// ConfirmCheckoutPayment's row-level lock.
 func (d *Deps) handlePaymentIntentSucceeded(ctx context.Context, event *payments.WebhookEvent) error {
 	piID, err := extractPaymentIntentID(event.Data)
 	if err != nil {
@@ -123,31 +129,14 @@ func (d *Deps) handlePaymentIntentSucceeded(ctx context.Context, event *payments
 	logger := logging.FromContext(ctx)
 
 	return store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		order, err := d.OrderService.GetOrderByStripePaymentIntentIDAsStaff(ctx, tx, piID)
+		_, _, err := d.CheckoutService.ConfirmCheckoutPayment(ctx, tx, piID, systemActor())
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, app.ErrOrderNotFound) {
 				logger.Warn("webhook: no order for PI", "payment_intent_id", piID)
 				return nil // PI might not be associated with an order yet
 			}
-			return fmt.Errorf("get order by PI: %w", err)
+			return fmt.Errorf("confirm checkout payment: %w", err)
 		}
-
-		// Only update if payment is still awaiting
-		if order.PaymentStatus == domain.PaymentStatusAwaiting || order.PaymentStatus == domain.PaymentStatusAuthorized {
-			_, err = d.OrderService.UpdatePaymentStatus(ctx, tx, order.ID, domain.PaymentStatusCaptured, systemActor())
-			if err != nil {
-				return fmt.Errorf("update payment status: %w", err)
-			}
-		}
-
-		// Confirm order if still pending
-		if order.Status == domain.OrderStatusPending {
-			_, err = d.OrderService.UpdateOrderStatus(ctx, tx, order.ID, domain.OrderStatusConfirmed, systemActor())
-			if err != nil {
-				return fmt.Errorf("confirm order: %w", err)
-			}
-		}
-
 		return nil
 	})
 }
@@ -162,7 +151,7 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 	logger := logging.FromContext(ctx)
 
 	return store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		order, err := d.OrderService.GetOrderByStripePaymentIntentIDAsStaff(ctx, tx, piID)
+		order, err := d.OrderService.GetOrderByStripePaymentIntentIDForUpdate(ctx, tx, piID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				logger.Warn("webhook: no order for failed PI", "payment_intent_id", piID)
@@ -171,9 +160,27 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 			return fmt.Errorf("get order by PI: %w", err)
 		}
 
+		// Idempotent: if payment is already failed (or already past awaiting
+		// for some other reason), skip the update + side effects.
+		if order.PaymentStatus == domain.PaymentStatusFailed {
+			return nil
+		}
+
 		_, err = d.OrderService.UpdatePaymentStatus(ctx, tx, order.ID, domain.PaymentStatusFailed, systemActor())
 		if err != nil {
 			return fmt.Errorf("update payment status failed: %w", err)
+		}
+
+		// If this is a one-shot retail order (no subscription) that was sitting
+		// in pending+awaiting because we pre-created it at PI time, cancel it
+		// now so the coupon is released and the order doesn't linger as a
+		// zombie waiting for cleanup. Subscription orders are handled below
+		// via MarkPastDue and stay around until renewed/dunned.
+		if order.SubscriptionID == nil && order.Status == domain.OrderStatusPending {
+			if _, cancelErr := d.OrderService.CancelOrder(ctx, tx, order.ID, systemActor()); cancelErr != nil {
+				return fmt.Errorf("cancel order on payment failed: %w", cancelErr)
+			}
+			return nil
 		}
 
 		// If this order belongs to a subscription, mark it past_due and notify
@@ -197,6 +204,45 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 			}
 		}
 
+		return nil
+	})
+}
+
+// handlePaymentIntentCanceled cancels the linked order. Stripe auto-cancels
+// PaymentIntents that the customer never finished authorizing (Klarna 48h
+// timeout, abandoned card flows that the merchant manually cancels, etc.).
+// CancelOrder releases any coupon redemption. Idempotent.
+func (d *Deps) handlePaymentIntentCanceled(ctx context.Context, event *payments.WebhookEvent) error {
+	piID, err := extractPaymentIntentID(event.Data)
+	if err != nil {
+		return fmt.Errorf("extract PI ID: %w", err)
+	}
+
+	logger := logging.FromContext(ctx)
+
+	return store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		order, err := d.OrderService.GetOrderByStripePaymentIntentIDForUpdate(ctx, tx, piID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				logger.Warn("webhook: no order for canceled PI", "payment_intent_id", piID)
+				return nil
+			}
+			return fmt.Errorf("get order by PI: %w", err)
+		}
+
+		// Only cancel pre-payment intent orders. If the order has already
+		// been confirmed (e.g. payment was eventually captured before the
+		// PI was canceled — unusual but possible), leave it alone.
+		if order.Status != domain.OrderStatusPending {
+			return nil
+		}
+
+		if _, err := d.OrderService.CancelOrder(ctx, tx, order.ID, systemActor()); err != nil {
+			if errors.Is(err, app.ErrOrderNotCancellable) {
+				return nil
+			}
+			return fmt.Errorf("cancel order on PI canceled: %w", err)
+		}
 		return nil
 	})
 }

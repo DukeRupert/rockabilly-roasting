@@ -88,14 +88,19 @@ func TestOrderService_CancelOrder(t *testing.T) {
 		assert.ErrorIs(t, err, app.ErrOrderNotCancellable)
 	})
 
-	t.Run("cannot cancel cancelled order", func(t *testing.T) {
+	t.Run("cancelling cancelled order is idempotent", func(t *testing.T) {
+		// Second cancel webhook delivery (or the cleanup job racing the
+		// payment_intent.canceled webhook) should not error — both want the
+		// same end state. CancelOrder no-ops cleanly on already-cancelled
+		// orders.
 		tx := testutil.NewTestTx(t, pool)
 		custID, shipID, billID := orderFixtures(t, tx)
 		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
 			testutil.WithOrderStatus(domain.OrderStatusCancelled))
 
-		_, err := svc.CancelOrder(ctx, tx, order.ID, actor)
-		assert.ErrorIs(t, err, app.ErrOrderNotCancellable)
+		got, err := svc.CancelOrder(ctx, tx, order.ID, actor)
+		assert.NoError(t, err)
+		assert.Equal(t, domain.OrderStatusCancelled, got.Status)
 	})
 }
 

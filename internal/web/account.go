@@ -98,8 +98,9 @@ func (d *Deps) handleAccountOrders(w http.ResponseWriter, r *http.Request) {
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		orders, txErr = d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
-			CustomerID: &customer.ID,
-			Limit:      50,
+			CustomerID:         &customer.ID,
+			Limit:              50,
+			ExcludeUnconfirmed: true,
 		})
 		return txErr
 	})

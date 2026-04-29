@@ -93,9 +93,6 @@
       }
 
       const result = await confirmOrder({
-        cart_id: cart.cart_id,
-        customer_id: customerId,
-        address_id: addressId,
         payment_intent_id: paymentIntent.id,
       });
 

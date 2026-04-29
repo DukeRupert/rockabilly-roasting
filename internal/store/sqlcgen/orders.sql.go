@@ -466,6 +466,55 @@ func (q *Queries) GetOrderByStripePaymentIntentID(ctx context.Context, stripePay
 	return i, err
 }
 
+const getOrderByStripePaymentIntentIDForUpdate = `-- name: GetOrderByStripePaymentIntentIDForUpdate :one
+SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at, shipping_method, requested_delivery_date FROM orders WHERE stripe_payment_intent_id = $1 FOR UPDATE
+`
+
+// Same as GetOrderByStripePaymentIntentID but takes a row-level lock.
+// Use this on the redirect-back and webhook paths where two transactions
+// can race for the same order — the second waits for the first to commit
+// and then sees the post-transition state, so side effects (audit, email,
+// coupon redemption) don't double-fire.
+func (q *Queries) GetOrderByStripePaymentIntentIDForUpdate(ctx context.Context, stripePaymentIntentID *string) (Order, error) {
+	row := q.db.QueryRow(ctx, getOrderByStripePaymentIntentIDForUpdate, stripePaymentIntentID)
+	var i Order
+	err := row.Scan(
+		&i.ID,
+		&i.Number,
+		&i.CustomerID,
+		&i.Status,
+		&i.PaymentStatus,
+		&i.FulfillmentStatus,
+		&i.CurrencyCode,
+		&i.Subtotal,
+		&i.DiscountTotal,
+		&i.ShippingTotal,
+		&i.TaxTotal,
+		&i.Total,
+		&i.ShippingAddressID,
+		&i.BillingAddressID,
+		&i.SubscriptionID,
+		&i.DraftByUserID,
+		&i.TaxExempt,
+		&i.TaxExemptReason,
+		&i.StripeTaxID,
+		&i.Notes,
+		&i.Metadata,
+		&i.PlacedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.StripePaymentIntentID,
+		&i.CustomerPoNumber,
+		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
+		&i.ShippingMethod,
+		&i.RequestedDeliveryDate,
+	)
+	return i, err
+}
+
 const listAdjustmentsByLineItem = `-- name: ListAdjustmentsByLineItem :many
 SELECT id, order_id, line_item_id, label, amount, source_type, source_id FROM adjustments
 WHERE line_item_id = $1

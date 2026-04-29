@@ -40,6 +40,14 @@ RETURNING *;
 -- name: GetOrderByStripePaymentIntentID :one
 SELECT * FROM orders WHERE stripe_payment_intent_id = $1;
 
+-- name: GetOrderByStripePaymentIntentIDForUpdate :one
+-- Same as GetOrderByStripePaymentIntentID but takes a row-level lock.
+-- Use this on the redirect-back and webhook paths where two transactions
+-- can race for the same order — the second waits for the first to commit
+-- and then sees the post-transition state, so side effects (audit, email,
+-- coupon redemption) don't double-fire.
+SELECT * FROM orders WHERE stripe_payment_intent_id = $1 FOR UPDATE;
+
 -- name: UpdateOrderShippingMethod :one
 UPDATE orders
 SET shipping_method = $2, updated_at = now()

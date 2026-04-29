@@ -31,8 +31,9 @@ func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request
 
 	perPage := 25
 	filter := store.OrderFilter{
-		Limit:  perPage + 1,
-		Offset: (page - 1) * perPage,
+		Limit:              perPage + 1,
+		Offset:             (page - 1) * perPage,
+		ExcludeUnconfirmed: true,
 	}
 
 	switch filterParam {

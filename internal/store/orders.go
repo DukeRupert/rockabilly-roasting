@@ -176,6 +176,20 @@ func (s *OrderStore) GetOrderByStripePaymentIntentIDAsStaff(ctx context.Context,
 	return orderFromRow(row), nil
 }
 
+// GetOrderByStripePaymentIntentIDForUpdate returns an order by its Stripe
+// PaymentIntent ID and takes a row-level lock. Concurrent transactions on the
+// same order serialize: the second tx waits for the first to commit and then
+// sees the post-transition state, so callers' conditional state transitions
+// (and the side effects gated on them) don't double-fire.
+func (s *OrderStore) GetOrderByStripePaymentIntentIDForUpdate(ctx context.Context, tx pgx.Tx, intentID string) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.get_by_stripe_payment_intent_id_for_update", time.Now(), &err)
+	row, err := sqlcgen.New(tx).GetOrderByStripePaymentIntentIDForUpdate(ctx, &intentID)
+	if err != nil {
+		return nil, fmt.Errorf("get order by stripe payment intent id (for update): %w", err)
+	}
+	return orderFromRow(row), nil
+}
+
 // SetCustomerPONumber sets the customer PO number on a wholesale order.
 func (s *OrderStore) SetCustomerPONumber(ctx context.Context, tx pgx.Tx, id uuid.UUID, poNumber string) (err error) {
 	defer trackQuery(s.metrics, "orders.set_customer_po_number", time.Now(), &err)
@@ -200,15 +214,22 @@ func (s *OrderStore) DeleteOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID) (
 
 // OrderFilter holds optional filters for listing orders.
 type OrderFilter struct {
-	Status               *domain.OrderStatus
-	FulfillmentStatus    *domain.FulfillmentStatus
-	FulfillmentStatuses  []domain.FulfillmentStatus // IN filter (takes precedence over singular)
-	CustomerID           *uuid.UUID
-	PlacedFrom           *time.Time
-	PlacedTo             *time.Time
-	Search               string // ILIKE on order number or customer name/email
-	Limit                int
-	Offset               int
+	Status              *domain.OrderStatus
+	FulfillmentStatus   *domain.FulfillmentStatus
+	FulfillmentStatuses []domain.FulfillmentStatus // IN filter (takes precedence over singular)
+	CustomerID          *uuid.UUID
+	PlacedFrom          *time.Time
+	PlacedTo            *time.Time
+	Search              string // ILIKE on order number or customer name/email
+	// ExcludeUnconfirmed drops orders that are still in the "intent to buy"
+	// state — status=pending AND payment_status=awaiting. These exist between
+	// PI creation and webhook-driven confirmation (especially for async/BNPL
+	// payment methods like Klarna). Set on dashboards, fulfillment queues,
+	// and customer-facing order history so unfinalized orders don't pollute
+	// counts, revenue, or what the customer sees.
+	ExcludeUnconfirmed bool
+	Limit              int
+	Offset             int
 }
 
 // ListOrders returns orders matching the given filter (hand-written for dynamic WHERE).
@@ -265,6 +286,9 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 		query += fmt.Sprintf(" AND (number ILIKE $%d OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.first_name || ' ' || c.last_name ILIKE $%d OR c.email ILIKE $%d)))", argN, argN, argN)
 		args = append(args, "%"+f.Search+"%")
 		argN++
+	}
+	if f.ExcludeUnconfirmed {
+		query += " AND NOT (status = 'pending' AND payment_status = 'awaiting')"
 	}
 
 	query += " ORDER BY placed_at DESC"
@@ -374,12 +398,49 @@ func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) 
 		args = append(args, "%"+f.Search+"%")
 		argN++ //nolint:ineffassign
 	}
+	if f.ExcludeUnconfirmed {
+		query += " AND NOT (status = 'pending' AND payment_status = 'awaiting')"
+	}
 
 	var count int
 	if err := tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {
 		return 0, fmt.Errorf("count orders: %w", err)
 	}
 	return count, nil
+}
+
+// ListAbandonedOrderIDs returns the IDs of pre-paid-intent orders (status=pending
+// AND payment_status=awaiting) older than olderThan. Used by the periodic
+// cleanup worker to cancel orders whose customer never completed payment.
+// Returns IDs only — the worker re-fetches each order before cancelling so
+// the FOR UPDATE lock is taken inside the cancellation transaction.
+func (s *OrderStore) ListAbandonedOrderIDs(ctx context.Context, tx pgx.Tx, olderThan time.Time, limit int) (_ []uuid.UUID, err error) {
+	defer trackQuery(s.metrics, "orders.list_abandoned_ids", time.Now(), &err)
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT id FROM orders
+		 WHERE status = 'pending'
+		   AND payment_status = 'awaiting'
+		   AND placed_at < $1
+		 ORDER BY placed_at ASC
+		 LIMIT $2`,
+		olderThan, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list abandoned orders: %w", err)
+	}
+	defer rows.Close()
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan abandoned order id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 // SumOrderRevenue returns the total revenue (in cents) for orders matching the filter.
@@ -404,6 +465,9 @@ func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilt
 		args = append(args, *f.PlacedTo)
 		argN++ //nolint:ineffassign
 	}
+	if f.ExcludeUnconfirmed {
+		query += " AND NOT (status = 'pending' AND payment_status = 'awaiting')"
+	}
 
 	var total int32
 	if err := tx.QueryRow(ctx, query, args...).Scan(&total); err != nil {
@@ -413,8 +477,9 @@ func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilt
 }
 
 // RevenueByDay returns daily revenue and order counts in the merchant's local
-// timezone, between [from, to). Cancelled and refunded orders are excluded.
-// Days with zero orders are NOT returned — callers fill gaps as needed.
+// timezone, between [from, to). Cancelled, refunded, and unconfirmed-payment
+// (status=pending AND payment_status=awaiting) orders are excluded. Days with
+// zero orders are NOT returned — callers fill gaps as needed.
 func (s *OrderStore) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to time.Time, tz *time.Location) (_ []domain.DailyRevenue, err error) {
 	defer trackQuery(s.metrics, "orders.revenue_by_day", time.Now(), &err)
 	tzName := "UTC"
@@ -429,6 +494,7 @@ func (s *OrderStore) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to time.
 		WHERE placed_at >= $1
 		  AND placed_at < $2
 		  AND status NOT IN ('cancelled', 'refunded')
+		  AND NOT (status = 'pending' AND payment_status = 'awaiting')
 		GROUP BY day
 		ORDER BY day`
 	rows, err := tx.Query(ctx, query, from, to, tzName)
@@ -490,7 +556,8 @@ func (s *OrderStore) TopProducts(ctx context.Context, tx pgx.Tx, from, to time.T
 		JOIN products p ON p.id = v.product_id
 		WHERE o.placed_at >= $1
 		  AND o.placed_at < $2
-		  AND o.status NOT IN ('cancelled', 'refunded')%s
+		  AND o.status NOT IN ('cancelled', 'refunded')
+		  AND NOT (o.status = 'pending' AND o.payment_status = 'awaiting')%s
 		GROUP BY p.id, p.title
 		ORDER BY %s
 		LIMIT $3`, weightFilter, orderBy)

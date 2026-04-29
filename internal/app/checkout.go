@@ -30,6 +30,10 @@ type CheckoutService struct {
 	payments  payments.Provider
 	audit     *audit.AuditWriter
 	metrics   *metrics.Registry
+
+	// Optional — required by ConfirmCheckoutPayment.
+	carts    *store.CartStore
+	enqueuer JobEnqueuer
 }
 
 // NewCheckoutService creates a new CheckoutService.
@@ -53,6 +57,15 @@ func NewCheckoutService(
 		audit:     audit,
 		metrics:   metrics,
 	}
+}
+
+// WithCheckoutConfirmDeps wires the cart store and job enqueuer required by
+// ConfirmCheckoutPayment. Must be called at startup before any checkout
+// confirmation paths run.
+func (s *CheckoutService) WithCheckoutConfirmDeps(carts *store.CartStore, enqueuer JobEnqueuer) *CheckoutService {
+	s.carts = carts
+	s.enqueuer = enqueuer
+	return s
 }
 
 // GetShippingConfig returns the merchant's shipping configuration so callers
@@ -385,6 +398,113 @@ func calculateDiscount(d *domain.Discount, subtotal int) int {
 	default:
 		return 0
 	}
+}
+
+// ConfirmCheckoutPayment performs the idempotent state transition for a
+// successfully-paid checkout: payment_status awaiting → captured, status
+// pending → confirmed, deletes the cart referenced in order.Metadata, and
+// enqueues the order-confirmation email. Looks up the order by Stripe PI ID
+// using a row-level lock so concurrent callers (e.g. the redirect-back path
+// and the payment_intent.succeeded webhook) serialize cleanly.
+//
+// Returns (order, transitioned, error). When transitioned is false the order
+// was already past the awaiting-payment state and no side effects fired —
+// callers should treat that as a successful no-op (idempotent re-entry).
+//
+// Caller must be inside an open transaction. Coupon redemption is NOT done
+// here — it happens in PlaceOrder at order creation time, and is released by
+// CancelOrder if the order is later abandoned.
+func (s *CheckoutService) ConfirmCheckoutPayment(ctx context.Context, tx pgx.Tx, paymentIntentID string, actor Actor) (*domain.Order, bool, error) {
+	order, err := s.orders.GetOrderByStripePaymentIntentIDForUpdate(ctx, tx, paymentIntentID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, false, ErrOrderNotFound
+		}
+		return nil, false, fmt.Errorf("get order for confirm: %w", err)
+	}
+
+	// Idempotent guard: if payment has already moved past awaiting we have
+	// nothing to do. The first caller (whichever raced and won) handled
+	// state + side effects; the second now sees the post-transition state.
+	if order.PaymentStatus != domain.PaymentStatusAwaiting {
+		return order, false, nil
+	}
+
+	order, err = s.orders.UpdateOrderPaymentStatus(ctx, tx, order.ID, domain.PaymentStatusCaptured)
+	if err != nil {
+		return nil, false, fmt.Errorf("update payment status captured: %w", err)
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderPaymentCaptured,
+		ResourceType: "order",
+		ResourceID:   order.ID,
+		After:        order,
+	}); err != nil {
+		return nil, false, fmt.Errorf("audit payment captured: %w", err)
+	}
+
+	if order.Status == domain.OrderStatusPending {
+		order, err = s.orders.UpdateOrderStatus(ctx, tx, order.ID, domain.OrderStatusConfirmed)
+		if err != nil {
+			return nil, false, fmt.Errorf("update order status confirmed: %w", err)
+		}
+		if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    actor.Type,
+			ActorID:      actor.ID,
+			ActorName:    actor.Name,
+			Action:       audit.AuditOrderStatusChanged,
+			ResourceType: "order",
+			ResourceID:   order.ID,
+			After:        order,
+			Metadata:     map[string]any{"new_status": string(domain.OrderStatusConfirmed)},
+		}); err != nil {
+			return nil, false, fmt.Errorf("audit order confirmed: %w", err)
+		}
+	}
+
+	// Delete the cart that was used to place this order. The cart_id is
+	// stashed in order.Metadata at PlaceOrder time. Best-effort: a missing
+	// or unparseable cart_id is not fatal here (the cart will be GC'd on
+	// session expiry anyway).
+	if s.carts != nil {
+		if cartID, ok := cartIDFromMetadata(order.Metadata); ok {
+			if err := s.carts.DeleteCart(ctx, tx, cartID); err != nil {
+				return nil, false, fmt.Errorf("delete cart: %w", err)
+			}
+		}
+	}
+
+	if order.CustomerID != nil && s.enqueuer != nil {
+		if err := s.enqueuer.EnqueueOrderConfirm(ctx, tx, order.ID, *order.CustomerID); err != nil {
+			return nil, false, fmt.Errorf("enqueue order confirm email: %w", err)
+		}
+	}
+
+	return order, true, nil
+}
+
+// cartIDFromMetadata pulls a UUID from order.Metadata["cart_id"]. Returns
+// (uuid.Nil, false) if the key is missing or unparseable.
+func cartIDFromMetadata(metadata map[string]any) (uuid.UUID, bool) {
+	if metadata == nil {
+		return uuid.Nil, false
+	}
+	raw, ok := metadata["cart_id"]
+	if !ok {
+		return uuid.Nil, false
+	}
+	s, ok := raw.(string)
+	if !ok {
+		return uuid.Nil, false
+	}
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return id, true
 }
 
 // ManualOrderItem is one line item for a manually-entered order.

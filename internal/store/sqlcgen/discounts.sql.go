@@ -259,6 +259,22 @@ func (q *Queries) RedeemCouponCode(ctx context.Context, arg RedeemCouponCodePara
 	return i, err
 }
 
+const releaseCouponCodeByOrderID = `-- name: ReleaseCouponCodeByOrderID :exec
+UPDATE coupon_codes
+SET redeemed_at = NULL,
+    redeemed_by = NULL,
+    redeemed_by_order_id = NULL
+WHERE redeemed_by_order_id = $1
+`
+
+// Reverses a coupon redemption tied to a specific order. Used when an order
+// is cancelled (admin or abandoned-checkout cleanup) so the code can be used
+// again. No-op if the coupon was never redeemed for that order.
+func (q *Queries) ReleaseCouponCodeByOrderID(ctx context.Context, redeemedByOrderID *uuid.UUID) error {
+	_, err := q.db.Exec(ctx, releaseCouponCodeByOrderID, redeemedByOrderID)
+	return err
+}
+
 const updateDiscount = `-- name: UpdateDiscount :one
 UPDATE discounts
 SET name = $2, description = $3, type = $4, value = $5, minimum_order_cents = $6,

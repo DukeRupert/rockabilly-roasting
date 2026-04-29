@@ -256,6 +256,17 @@ func (s *DiscountStore) DeleteCouponCode(ctx context.Context, tx pgx.Tx, id uuid
 	return nil
 }
 
+// ReleaseCouponCodeByOrderID reverses a coupon redemption tied to a specific
+// order. Used when an order is cancelled (admin action or abandoned-checkout
+// cleanup) so the code can be redeemed again. No-op if the coupon was never
+// redeemed for that order.
+func (s *DiscountStore) ReleaseCouponCodeByOrderID(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) error {
+	if err := sqlcgen.New(tx).ReleaseCouponCodeByOrderID(ctx, &orderID); err != nil {
+		return fmt.Errorf("release coupon code: %w", err)
+	}
+	return nil
+}
+
 // --- Row converters ---
 
 func discountFromRow(r sqlcgen.Discount) *domain.Discount {

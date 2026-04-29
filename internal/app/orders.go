@@ -24,6 +24,7 @@ type OrderService struct {
 	catalog       *store.CatalogStore      // populated via WithEmail; required for Send* methods
 	subscriptions *store.SubscriptionStore // populated via WithEmail; used by SendRenewalReceiptEmail to show next-charge date
 	email         EmailEnv                 // populated via WithEmail; required for Send* methods
+	discounts     *store.DiscountStore     // populated via WithDiscounts; required for CancelOrder coupon release
 }
 
 // NewOrderService creates a new OrderService.
@@ -43,6 +44,14 @@ func (s *OrderService) WithEmail(env EmailEnv, customers *store.CustomerStore, c
 	s.customers = customers
 	s.catalog = catalog
 	s.subscriptions = subscriptions
+	return s
+}
+
+// WithDiscounts attaches the discount store used by CancelOrder to release a
+// coupon redemption when the order is cancelled. Must be called at wiring
+// time before any cancellation path runs.
+func (s *OrderService) WithDiscounts(discounts *store.DiscountStore) *OrderService {
+	s.discounts = discounts
 	return s
 }
 
@@ -158,6 +167,29 @@ func (s *OrderService) GetOrderByStripePaymentIntentIDAsStaff(ctx context.Contex
 	return o, nil
 }
 
+// GetOrderByStripePaymentIntentIDForUpdate is the row-locking variant for
+// flows that race on the same order — webhook + redirect-back, or two
+// concurrent webhook deliveries. Callers must already be inside a transaction.
+func (s *OrderService) GetOrderByStripePaymentIntentIDForUpdate(ctx context.Context, tx pgx.Tx, intentID string) (*domain.Order, error) {
+	o, err := s.orders.GetOrderByStripePaymentIntentIDForUpdate(ctx, tx, intentID)
+	if err != nil {
+		return nil, fmt.Errorf("get order by stripe PI (for update): %w", err)
+	}
+	return o, nil
+}
+
+// ListAbandonedOrderIDs returns the IDs of pre-paid-intent orders that have
+// been sitting in pending+awaiting longer than olderThan. The cleanup worker
+// uses this to find orders whose customer never finished payment so they can
+// be cancelled (releasing any held coupon).
+func (s *OrderService) ListAbandonedOrderIDs(ctx context.Context, tx pgx.Tx, olderThan time.Time, limit int) ([]uuid.UUID, error) {
+	ids, err := s.orders.ListAbandonedOrderIDs(ctx, tx, olderThan, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list abandoned order ids: %w", err)
+	}
+	return ids, nil
+}
+
 // UpdateOrderStatus updates the order's status and records an audit entry.
 func (s *OrderService) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.OrderStatus, actor Actor) (*domain.Order, error) {
 	o, err := s.orders.UpdateOrderStatus(ctx, tx, id, status)
@@ -186,7 +218,11 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid
 
 // --- Mutation methods ---
 
-// CancelOrder cancels an order if allowed by the state machine.
+// CancelOrder cancels an order if allowed by the state machine and releases
+// any coupon redemption tied to it. Idempotent: returns the order unchanged
+// when it is already in cancelled state. Used by admin cancellation,
+// payment_intent.canceled webhook, payment_intent.payment_failed webhook,
+// and the abandoned-checkout cleanup job.
 func (s *OrderService) CancelOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
 	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
 	if err != nil {
@@ -196,6 +232,11 @@ func (s *OrderService) CancelOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID,
 		return nil, fmt.Errorf("get order for cancel: %w", err)
 	}
 
+	// Idempotent: skip if already cancelled.
+	if order.Status == domain.OrderStatusCancelled {
+		return order, nil
+	}
+
 	if !canCancelOrder(order.Status) {
 		return nil, ErrOrderNotCancellable
 	}
@@ -203,6 +244,14 @@ func (s *OrderService) CancelOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID,
 	order, err = s.orders.UpdateOrderStatus(ctx, tx, id, domain.OrderStatusCancelled)
 	if err != nil {
 		return nil, fmt.Errorf("cancel order: %w", err)
+	}
+
+	// Release any coupon redemption tied to this order so the code can be
+	// used again. Skipped if no discount store is wired (older test setups).
+	if s.discounts != nil {
+		if err := s.discounts.ReleaseCouponCodeByOrderID(ctx, tx, id); err != nil {
+			return nil, fmt.Errorf("release coupon: %w", err)
+		}
 	}
 
 	if err := s.audit.Record(ctx, tx, audit.AuditEntry{

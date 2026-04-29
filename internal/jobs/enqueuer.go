@@ -37,3 +37,12 @@ func (e *Enqueuer) EnqueuePastDueNotice(ctx context.Context, tx pgx.Tx, subscrip
 	}, nil)
 	return err
 }
+
+// EnqueueOrderConfirm enqueues an order-confirmation email job in tx.
+func (e *Enqueuer) EnqueueOrderConfirm(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error {
+	_, err := e.client.InsertTx(ctx, tx, OrderConfirmEmailArgs{
+		OrderID:    orderID,
+		CustomerID: customerID,
+	}, nil)
+	return err
+}

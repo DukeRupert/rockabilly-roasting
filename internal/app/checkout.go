@@ -387,6 +387,106 @@ func calculateDiscount(d *domain.Discount, subtotal int) int {
 	}
 }
 
+// ManualOrderItem is one line item for a manually-entered order.
+type ManualOrderItem struct {
+	VariantID uuid.UUID
+	Quantity  int
+	UnitPrice int
+}
+
+// CreateManualOrderParams holds all inputs for an admin-created order.
+// Totals are admin-supplied (no cart, no tax/shipping calc, no coupon).
+type CreateManualOrderParams struct {
+	CustomerID            uuid.UUID
+	Items                 []ManualOrderItem
+	ShippingAddressID     uuid.UUID
+	BillingAddressID      uuid.UUID
+	CurrencyCode          string
+	Subtotal              int
+	DiscountTotal         int
+	ShippingTotal         int
+	TaxTotal              int
+	Total                 int
+	Status                domain.OrderStatus
+	PaymentStatus         domain.PaymentStatus
+	StripePaymentIntentID *string
+	Notes                 *string
+}
+
+// CreateManualOrder creates an order from admin input, bypassing the cart and
+// coupon flow. Used for reconciliation (e.g. payments processed by Stripe but
+// missing from Hiri) and phone/email orders. Totals are accepted as-given;
+// the admin is the source of truth.
+func (s *CheckoutService) CreateManualOrder(ctx context.Context, tx pgx.Tx, p CreateManualOrderParams, actor Actor) (*domain.Order, error) {
+	if len(p.Items) == 0 {
+		return nil, ErrCartEmpty
+	}
+	if _, err := s.customers.GetByID(ctx, tx, p.CustomerID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCustomerNotFound
+		}
+		return nil, fmt.Errorf("get customer: %w", err)
+	}
+
+	customerID := p.CustomerID
+	order, err := s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
+		Number:                generateOrderNumber(),
+		CustomerID:            &customerID,
+		Status:                p.Status,
+		PaymentStatus:         p.PaymentStatus,
+		FulfillmentStatus:     domain.FulfillmentStatusUnfulfilled,
+		CurrencyCode:          p.CurrencyCode,
+		Subtotal:              p.Subtotal,
+		DiscountTotal:         p.DiscountTotal,
+		ShippingTotal:         p.ShippingTotal,
+		TaxTotal:              p.TaxTotal,
+		Total:                 p.Total,
+		ShippingAddressID:     p.ShippingAddressID,
+		BillingAddressID:      p.BillingAddressID,
+		Notes:                 p.Notes,
+		Metadata:              map[string]any{"manual": true},
+		PlacedAt:              time.Now(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create order: %w", err)
+	}
+
+	if p.StripePaymentIntentID != nil && *p.StripePaymentIntentID != "" {
+		if _, err := s.orders.UpdateOrderStripePaymentIntentID(ctx, tx, order.ID, *p.StripePaymentIntentID); err != nil {
+			return nil, fmt.Errorf("set stripe payment intent id: %w", err)
+		}
+	}
+
+	for _, item := range p.Items {
+		lineSubtotal := item.UnitPrice * item.Quantity
+		if _, err := s.orders.CreateLineItem(ctx, tx, store.CreateLineItemParams{
+			OrderID:   order.ID,
+			VariantID: item.VariantID,
+			Quantity:  item.Quantity,
+			UnitPrice: item.UnitPrice,
+			Subtotal:  lineSubtotal,
+			Total:     lineSubtotal,
+		}); err != nil {
+			return nil, fmt.Errorf("create line item: %w", err)
+		}
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderCreated,
+		ResourceType: "order",
+		ResourceID:   order.ID,
+		After:        order,
+		Metadata:     map[string]any{"manual": true},
+	}); err != nil {
+		return nil, fmt.Errorf("audit manual order created: %w", err)
+	}
+
+	return order, nil
+}
+
 // generateOrderNumber creates a non-guessable order number using random bytes.
 // Format: "ORD-XXXXXXXXXX" where X is uppercase alphanumeric (5 random bytes → 10 hex chars).
 func generateOrderNumber() string {

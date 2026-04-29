@@ -1,0 +1,350 @@
+package admin
+
+import (
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type OrderNewItemRow struct {
+	SKU            string
+	Quantity       string
+	UnitPriceCents string
+}
+
+type OrderNewForm struct {
+	CustomerEmail         string
+	CustomerFirstName     string
+	CustomerLastName      string
+	ShippingFirstName     string
+	ShippingLastName      string
+	ShippingLine1         string
+	ShippingLine2         string
+	ShippingCity          string
+	ShippingState         string
+	ShippingPostalCode    string
+	ShippingCountry       string
+	Items                 []OrderNewItemRow
+	SubtotalCents         string
+	DiscountCents         string
+	ShippingCents         string
+	TaxCents              string
+	TotalCents            string
+	StripePaymentIntentID string
+	PaymentStatus         string
+	OrderStatus           string
+	Notes                 string
+}
+
+// Country returns the ISO country code, defaulting to "US" when blank.
+func (f OrderNewForm) Country() string {
+	if f.ShippingCountry == "" {
+		return "US"
+	}
+	return f.ShippingCountry
+}
+
+type OrderNewProps struct {
+	Form        OrderNewForm
+	FieldErrors map[string]string
+	Banner      string
+	StaffName   string
+	StaffRole   string
+}
+
+func selected(v, target string) bool {
+	return v == target
+}
+
+templ OrderNewContent(props OrderNewProps) {
+	<!-- Page header -->
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">New manual order</h1>
+			<p class="mt-1 text-sm text-rr-muted">For reconciliation, phone orders, or one-off entries. No tax or shipping is calculated — totals are accepted as entered.</p>
+		</div>
+		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+			<a
+				href="/admin/orders"
+				class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+			>Back to orders</a>
+		</div>
+	</div>
+	if props.Banner != "" {
+		<div class="mt-6 border-2 border-red-300 bg-red-50 p-3 text-sm text-red-800">
+			{ props.Banner }
+		</div>
+	}
+	<form method="post" action="/admin/orders/new" class="mt-6">
+		<div class="space-y-8">
+			<!-- Customer -->
+			<div class="border-b border-rr-border pb-8">
+				<h2 class="text-base/7 font-semibold text-rr-heading">Customer</h2>
+				<p class="mt-1 text-sm/6 text-rr-muted">Existing customers are matched by email. Provide a first and last name to create a new customer if no match.</p>
+				<div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
+					<div class="sm:col-span-3">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="customer_email">Email</label>
+						<input id="customer_email" name="customer_email" type="email" required value={ props.Form.CustomerEmail } class={ inputClasses(hasError(props.FieldErrors, "customer_email")) }/>
+						if msg := getError(props.FieldErrors, "customer_email"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+					<div class="sm:col-span-3"></div>
+					<div class="sm:col-span-3">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="customer_first_name">First name <span class="text-rr-muted">(only if creating)</span></label>
+						<input id="customer_first_name" name="customer_first_name" type="text" value={ props.Form.CustomerFirstName } class={ inputClasses(false) }/>
+					</div>
+					<div class="sm:col-span-3">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="customer_last_name">Last name</label>
+						<input id="customer_last_name" name="customer_last_name" type="text" value={ props.Form.CustomerLastName } class={ inputClasses(false) }/>
+					</div>
+				</div>
+			</div>
+			<!-- Shipping address -->
+			<div class="border-b border-rr-border pb-8">
+				<h2 class="text-base/7 font-semibold text-rr-heading">Shipping address</h2>
+				<p class="mt-1 text-sm/6 text-rr-muted">A new address is created and used for both shipping and billing.</p>
+				<div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
+					<div class="sm:col-span-3">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_first_name">First name</label>
+						<input id="shipping_first_name" name="shipping_first_name" type="text" required value={ props.Form.ShippingFirstName } class={ inputClasses(hasError(props.FieldErrors, "shipping_first_name")) }/>
+						if msg := getError(props.FieldErrors, "shipping_first_name"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+					<div class="sm:col-span-3">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_last_name">Last name</label>
+						<input id="shipping_last_name" name="shipping_last_name" type="text" required value={ props.Form.ShippingLastName } class={ inputClasses(hasError(props.FieldErrors, "shipping_last_name")) }/>
+						if msg := getError(props.FieldErrors, "shipping_last_name"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+					<div class="col-span-full">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_line1">Address line 1</label>
+						<input id="shipping_line1" name="shipping_line1" type="text" required value={ props.Form.ShippingLine1 } class={ inputClasses(hasError(props.FieldErrors, "shipping_line1")) }/>
+						if msg := getError(props.FieldErrors, "shipping_line1"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+					<div class="col-span-full">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_line2">Address line 2</label>
+						<input id="shipping_line2" name="shipping_line2" type="text" value={ props.Form.ShippingLine2 } class={ inputClasses(false) }/>
+					</div>
+					<div class="sm:col-span-2">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_city">City</label>
+						<input id="shipping_city" name="shipping_city" type="text" required value={ props.Form.ShippingCity } class={ inputClasses(hasError(props.FieldErrors, "shipping_city")) }/>
+						if msg := getError(props.FieldErrors, "shipping_city"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+					<div class="sm:col-span-2">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_state">State</label>
+						<input id="shipping_state" name="shipping_state" type="text" required maxlength="2" placeholder="WA" value={ props.Form.ShippingState } class={ inputClasses(hasError(props.FieldErrors, "shipping_state")) }/>
+						if msg := getError(props.FieldErrors, "shipping_state"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+					<div class="sm:col-span-1">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_postal_code">ZIP</label>
+						<input id="shipping_postal_code" name="shipping_postal_code" type="text" required value={ props.Form.ShippingPostalCode } class={ inputClasses(hasError(props.FieldErrors, "shipping_postal_code")) }/>
+						if msg := getError(props.FieldErrors, "shipping_postal_code"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+					<div class="sm:col-span-1">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_country">Country</label>
+						<input id="shipping_country" name="shipping_country" type="text" maxlength="2" value={ props.Form.Country() } class={ inputClasses(false) }/>
+					</div>
+				</div>
+			</div>
+			<!-- Line items -->
+			<div class="border-b border-rr-border pb-8" x-data={ orderNewItemsState(props.Form) }>
+				<div class="flex items-center justify-between">
+					<div>
+						<h2 class="text-base/7 font-semibold text-rr-heading">Line items</h2>
+						<p class="mt-1 text-sm/6 text-rr-muted">Enter the SKU, quantity, and unit price (cents) for each line.</p>
+					</div>
+					<button type="button" @click="add()" class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised">+ Add line</button>
+				</div>
+				if msg := getError(props.FieldErrors, "items"); msg != "" {
+					<p class="mt-2 text-sm text-red-600">{ msg }</p>
+				}
+				<div class="mt-4 space-y-3">
+					<template x-for="(row, i) in rows" :key="i">
+						<div class="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-12 items-end border-b border-rr-border/50 pb-3">
+							<div class="sm:col-span-5">
+								<label class="block text-xs/5 font-medium text-rr-muted" :for="'sku-' + i">SKU</label>
+								<input :id="'sku-' + i" name="item_sku" type="text" x-model="row.sku" placeholder="e.g. CFE-001-12OZ" class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+							</div>
+							<div class="sm:col-span-2">
+								<label class="block text-xs/5 font-medium text-rr-muted" :for="'qty-' + i">Qty</label>
+								<input :id="'qty-' + i" name="item_quantity" type="number" min="1" x-model="row.quantity" class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+							</div>
+							<div class="sm:col-span-3">
+								<label class="block text-xs/5 font-medium text-rr-muted" :for="'price-' + i">Unit price (cents)</label>
+								<input :id="'price-' + i" name="item_unit_price_cents" type="number" min="0" x-model="row.price" placeholder="1800" class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+							</div>
+							<div class="sm:col-span-2 flex justify-end">
+								<button type="button" @click="remove(i)" class="text-sm text-red-700 hover:underline">Remove</button>
+							</div>
+						</div>
+					</template>
+				</div>
+			</div>
+			<!-- Totals -->
+			<div class="border-b border-rr-border pb-8">
+				<h2 class="text-base/7 font-semibold text-rr-heading">Totals (cents)</h2>
+				<p class="mt-1 text-sm/6 text-rr-muted">Whole cents — e.g. <code>1800</code> means $18.00. Empty fields default to 0.</p>
+				<div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-5">
+					<div>
+						<label class="block text-sm/6 font-medium text-rr-heading" for="subtotal_cents">Subtotal</label>
+						<input id="subtotal_cents" name="subtotal_cents" type="number" min="0" value={ props.Form.SubtotalCents } class={ inputClasses(hasError(props.FieldErrors, "subtotal_cents")) }/>
+						if msg := getError(props.FieldErrors, "subtotal_cents"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+					<div>
+						<label class="block text-sm/6 font-medium text-rr-heading" for="discount_cents">Discount</label>
+						<input id="discount_cents" name="discount_cents" type="number" min="0" value={ props.Form.DiscountCents } class={ inputClasses(hasError(props.FieldErrors, "discount_cents")) }/>
+					</div>
+					<div>
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_cents">Shipping</label>
+						<input id="shipping_cents" name="shipping_cents" type="number" min="0" value={ props.Form.ShippingCents } class={ inputClasses(hasError(props.FieldErrors, "shipping_cents")) }/>
+					</div>
+					<div>
+						<label class="block text-sm/6 font-medium text-rr-heading" for="tax_cents">Tax</label>
+						<input id="tax_cents" name="tax_cents" type="number" min="0" value={ props.Form.TaxCents } class={ inputClasses(hasError(props.FieldErrors, "tax_cents")) }/>
+					</div>
+					<div>
+						<label class="block text-sm/6 font-medium text-rr-heading" for="total_cents">Total</label>
+						<input id="total_cents" name="total_cents" type="number" min="0" required value={ props.Form.TotalCents } class={ inputClasses(hasError(props.FieldErrors, "total_cents")) }/>
+						if msg := getError(props.FieldErrors, "total_cents"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+				</div>
+			</div>
+			<!-- Payment & status -->
+			<div class="border-b border-rr-border pb-8">
+				<h2 class="text-base/7 font-semibold text-rr-heading">Payment & status</h2>
+				<div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
+					<div class="sm:col-span-3">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="stripe_payment_intent_id">Stripe payment intent ID <span class="text-rr-muted">(optional)</span></label>
+						<input id="stripe_payment_intent_id" name="stripe_payment_intent_id" type="text" placeholder="pi_..." value={ props.Form.StripePaymentIntentID } class={ inputClasses(false) }/>
+						<p class="mt-2 text-xs text-rr-muted">Stored as opaque text — not validated against Stripe.</p>
+					</div>
+					<div class="sm:col-span-3"></div>
+					<div class="sm:col-span-2">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="payment_status">Payment status</label>
+						<select id="payment_status" name="payment_status" class={ inputClasses(hasError(props.FieldErrors, "payment_status")) }>
+							@paymentStatusOption("captured", "Captured (paid)", props.Form.PaymentStatus)
+							@paymentStatusOption("awaiting", "Awaiting", props.Form.PaymentStatus)
+							@paymentStatusOption("authorized", "Authorized", props.Form.PaymentStatus)
+							@paymentStatusOption("failed", "Failed", props.Form.PaymentStatus)
+							@paymentStatusOption("refunded", "Refunded", props.Form.PaymentStatus)
+						</select>
+						if msg := getError(props.FieldErrors, "payment_status"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+					<div class="sm:col-span-2">
+						<label class="block text-sm/6 font-medium text-rr-heading" for="order_status">Order status</label>
+						<select id="order_status" name="order_status" class={ inputClasses(hasError(props.FieldErrors, "order_status")) }>
+							@orderStatusOption("confirmed", "Confirmed", props.Form.OrderStatus)
+							@orderStatusOption("pending", "Pending", props.Form.OrderStatus)
+							@orderStatusOption("processing", "Processing", props.Form.OrderStatus)
+							@orderStatusOption("complete", "Complete", props.Form.OrderStatus)
+							@orderStatusOption("cancelled", "Cancelled", props.Form.OrderStatus)
+						</select>
+						if msg := getError(props.FieldErrors, "order_status"); msg != "" {
+							<p class="mt-2 text-sm text-red-600">{ msg }</p>
+						}
+					</div>
+				</div>
+			</div>
+			<!-- Notes -->
+			<div class="pb-2">
+				<label class="block text-sm/6 font-medium text-rr-heading" for="notes">Internal notes</label>
+				<textarea id="notes" name="notes" rows="3" placeholder="Reason for manual entry, reference to upstream order, etc." class={ inputClasses(false) }>{ props.Form.Notes }</textarea>
+			</div>
+		</div>
+		<div class="mt-8 flex items-center justify-end gap-3">
+			<a href="/admin/orders" class="text-sm font-semibold text-rr-heading hover:underline">Cancel</a>
+			<button type="submit" class="rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">Create order</button>
+		</div>
+	</form>
+}
+
+templ paymentStatusOption(value, label, current string) {
+	if selected(value, current) || (current == "" && value == "captured") {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
+templ orderStatusOption(value, label, current string) {
+	if selected(value, current) || (current == "" && value == "confirmed") {
+		<option value={ value } selected>{ label }</option>
+	} else {
+		<option value={ value }>{ label }</option>
+	}
+}
+
+// orderNewItemsState builds the initial Alpine state from the (re-rendered)
+// form. On a fresh form it seeds three empty rows; on validation re-render it
+// keeps whatever the admin already filled in so they don't retype.
+func orderNewItemsState(f OrderNewForm) string {
+	if len(f.Items) == 0 {
+		return `{
+			rows: [
+				{ sku: '', quantity: '', price: '' },
+				{ sku: '', quantity: '', price: '' },
+				{ sku: '', quantity: '', price: '' }
+			],
+			add() { this.rows.push({ sku: '', quantity: '', price: '' }) },
+			remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1) }
+		}`
+	}
+	out := `{ rows: [`
+	for i, row := range f.Items {
+		if i > 0 {
+			out += ","
+		}
+		out += "{ sku: " + jsString(row.SKU) + ", quantity: " + jsString(row.Quantity) + ", price: " + jsString(row.UnitPriceCents) + " }"
+	}
+	out += `], add() { this.rows.push({ sku: '', quantity: '', price: '' }) }, remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1) } }`
+	return out
+}
+
+// jsString returns a JS-string literal for embedding admin-supplied text into
+// the Alpine x-data block. Only used inside admin (staff-only) — not customer-
+// facing — but still escapes the few characters that would break the literal.
+func jsString(s string) string {
+	out := []rune{'\''}
+	for _, r := range s {
+		switch r {
+		case '\\', '\'':
+			out = append(out, '\\', r)
+		case '\n':
+			out = append(out, '\\', 'n')
+		case '\r':
+			out = append(out, '\\', 'r')
+		case '<':
+			out = append(out, '\\', 'u', '0', '0', '3', 'c')
+		default:
+			out = append(out, r)
+		}
+	}
+	out = append(out, '\'')
+	return string(out)
+}
+
+templ OrderNew(props OrderNewProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "New manual order",
+		ActivePath: "/admin/orders",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@OrderNewContent(props)
+	}
+}

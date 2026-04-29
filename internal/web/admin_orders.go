@@ -1,15 +1,20 @@
 package web
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/logging"
+	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
@@ -205,6 +210,7 @@ func (d *Deps) handleAdminOrderCancel(w http.ResponseWriter, r *http.Request) {
 
 func (d *Deps) handleAdminOrderRefund(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	logger := logging.FromContext(ctx)
 
 	id, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
@@ -212,11 +218,41 @@ func (d *Deps) handleAdminOrderRefund(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Phase 1: read the order and validate it's refundable.
+	var order *domain.Order
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		order, txErr = d.OrderService.GetOrderAsStaff(ctx, tx, id)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	if order.StripePaymentIntentID == nil || *order.StripePaymentIntentID == "" {
+		Error(w, r, app.ErrOrderNotRefundable)
+		return
+	}
+
+	// Phase 2: issue the refund against Stripe (outside any transaction).
+	if _, err := d.PaymentProvider.Refund(ctx, payments.RefundRequest{
+		PaymentIntentID: *order.StripePaymentIntentID,
+	}); err != nil {
+		logger.Error("admin refund: stripe call failed", "order_id", id, "error", err)
+		Error(w, r, err)
+		return
+	}
+
+	// Phase 3: mark the order refunded in our DB (writes audit + status).
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		_, txErr := d.OrderService.RefundOrder(ctx, tx, id, staffActor(r))
 		return txErr
 	})
 	if err != nil {
+		// Stripe refund already succeeded; the charge.refunded webhook will
+		// reconcile our DB. Log loudly so we notice if that doesn't happen.
+		logger.Error("admin refund: stripe succeeded but db update failed", "order_id", id, "error", err)
 		Error(w, r, err)
 		return
 	}
@@ -442,3 +478,309 @@ func (d *Deps) handleAdminOrderInvoice(w http.ResponseWriter, r *http.Request) {
 
 	admin.OrderInvoice(props).Render(ctx, w) //nolint:errcheck
 }
+
+// --- Manual order entry ---
+
+// handleAdminOrderNew renders the manual order entry form.
+func (d *Deps) handleAdminOrderNew(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	name, role := staffNameRole(r)
+	props := admin.OrderNewProps{
+		Form:      admin.OrderNewForm{},
+		StaffName: name,
+		StaffRole: role,
+	}
+	if IsHTMX(r) {
+		admin.OrderNewContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.OrderNew(props).Render(ctx, w) //nolint:errcheck
+}
+
+// handleAdminOrderCreate parses the manual order form, looks up or creates the
+// customer, creates a fresh shipping address, validates each line item against
+// the catalog, and invokes CheckoutService.CreateManualOrder.
+func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := logging.FromContext(ctx)
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	form := admin.OrderNewForm{
+		CustomerEmail:         strings.TrimSpace(r.FormValue("customer_email")),
+		CustomerFirstName:     strings.TrimSpace(r.FormValue("customer_first_name")),
+		CustomerLastName:      strings.TrimSpace(r.FormValue("customer_last_name")),
+		ShippingFirstName:     strings.TrimSpace(r.FormValue("shipping_first_name")),
+		ShippingLastName:      strings.TrimSpace(r.FormValue("shipping_last_name")),
+		ShippingLine1:         strings.TrimSpace(r.FormValue("shipping_line1")),
+		ShippingLine2:         strings.TrimSpace(r.FormValue("shipping_line2")),
+		ShippingCity:          strings.TrimSpace(r.FormValue("shipping_city")),
+		ShippingState:         strings.TrimSpace(r.FormValue("shipping_state")),
+		ShippingPostalCode:    strings.TrimSpace(r.FormValue("shipping_postal_code")),
+		ShippingCountry:       strings.TrimSpace(r.FormValue("shipping_country")),
+		StripePaymentIntentID: strings.TrimSpace(r.FormValue("stripe_payment_intent_id")),
+		PaymentStatus:         strings.TrimSpace(r.FormValue("payment_status")),
+		OrderStatus:           strings.TrimSpace(r.FormValue("order_status")),
+		Notes:                 strings.TrimSpace(r.FormValue("notes")),
+		SubtotalCents:         r.FormValue("subtotal_cents"),
+		DiscountCents:         r.FormValue("discount_cents"),
+		ShippingCents:         r.FormValue("shipping_cents"),
+		TaxCents:              r.FormValue("tax_cents"),
+		TotalCents:            r.FormValue("total_cents"),
+	}
+
+	skus := r.Form["item_sku"]
+	qtys := r.Form["item_quantity"]
+	prices := r.Form["item_unit_price_cents"]
+	for i := range skus {
+		row := admin.OrderNewItemRow{SKU: strings.TrimSpace(skus[i])}
+		if i < len(qtys) {
+			row.Quantity = strings.TrimSpace(qtys[i])
+		}
+		if i < len(prices) {
+			row.UnitPriceCents = strings.TrimSpace(prices[i])
+		}
+		form.Items = append(form.Items, row)
+	}
+	if form.ShippingCountry == "" {
+		form.ShippingCountry = "US"
+	}
+
+	errs := map[string]string{}
+	if form.CustomerEmail == "" {
+		errs["customer_email"] = "Email is required"
+	}
+	if form.ShippingFirstName == "" {
+		errs["shipping_first_name"] = "First name is required"
+	}
+	if form.ShippingLastName == "" {
+		errs["shipping_last_name"] = "Last name is required"
+	}
+	if form.ShippingLine1 == "" {
+		errs["shipping_line1"] = "Address is required"
+	}
+	if form.ShippingCity == "" {
+		errs["shipping_city"] = "City is required"
+	}
+	if form.ShippingState == "" {
+		errs["shipping_state"] = "State is required"
+	}
+	if form.ShippingPostalCode == "" {
+		errs["shipping_postal_code"] = "Postal code is required"
+	}
+
+	subtotal, ok := parseCents(form.SubtotalCents)
+	if !ok {
+		errs["subtotal_cents"] = "Must be a whole number of cents"
+	}
+	discount, ok := parseCents(form.DiscountCents)
+	if !ok {
+		errs["discount_cents"] = "Must be a whole number of cents"
+	}
+	shippingCents, ok := parseCents(form.ShippingCents)
+	if !ok {
+		errs["shipping_cents"] = "Must be a whole number of cents"
+	}
+	taxCents, ok := parseCents(form.TaxCents)
+	if !ok {
+		errs["tax_cents"] = "Must be a whole number of cents"
+	}
+	total, ok := parseCents(form.TotalCents)
+	if !ok {
+		errs["total_cents"] = "Must be a whole number of cents"
+	}
+
+	switch domain.PaymentStatus(form.PaymentStatus) {
+	case domain.PaymentStatusAwaiting,
+		domain.PaymentStatusAuthorized,
+		domain.PaymentStatusCaptured,
+		domain.PaymentStatusFailed,
+		domain.PaymentStatusRefunded:
+	default:
+		errs["payment_status"] = "Invalid payment status"
+	}
+	switch domain.OrderStatus(form.OrderStatus) {
+	case domain.OrderStatusPending,
+		domain.OrderStatusConfirmed,
+		domain.OrderStatusProcessing,
+		domain.OrderStatusComplete,
+		domain.OrderStatusCancelled:
+	default:
+		errs["order_status"] = "Invalid order status"
+	}
+
+	// Validate line item rows. Empty rows are skipped (admin may leave trailing
+	// blanks). Variant SKU lookup happens inside the tx.
+	validRows := 0
+	for i, row := range form.Items {
+		if row.SKU == "" && row.Quantity == "" && row.UnitPriceCents == "" {
+			continue
+		}
+		if row.SKU == "" {
+			errs[fmt.Sprintf("item_%d_sku", i)] = "SKU is required"
+			continue
+		}
+		if qty, qOk := parseCents(row.Quantity); !qOk || qty <= 0 {
+			errs[fmt.Sprintf("item_%d_quantity", i)] = "Quantity must be > 0"
+			continue
+		}
+		if unit, uOk := parseCents(row.UnitPriceCents); !uOk || unit < 0 {
+			errs[fmt.Sprintf("item_%d_unit_price_cents", i)] = "Unit price must be ≥ 0"
+			continue
+		}
+		validRows++
+	}
+	if validRows == 0 {
+		errs["items"] = "Add at least one line item"
+	}
+
+	if len(errs) > 0 {
+		renderManualOrderForm(ctx, w, r, form, errs, "")
+		return
+	}
+
+	piPtr := (*string)(nil)
+	if form.StripePaymentIntentID != "" {
+		v := form.StripePaymentIntentID
+		piPtr = &v
+	}
+	notesPtr := (*string)(nil)
+	if form.Notes != "" {
+		v := form.Notes
+		notesPtr = &v
+	}
+
+	var order *domain.Order
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		// Resolve variant IDs from SKUs (one query per row — fine for admin).
+		manualItems := make([]app.ManualOrderItem, 0, validRows)
+		for i, row := range form.Items {
+			if row.SKU == "" && row.Quantity == "" && row.UnitPriceCents == "" {
+				continue
+			}
+			variant, vErr := d.CatalogService.GetVariantBySKU(ctx, tx, row.SKU)
+			if vErr != nil {
+				if errors.Is(vErr, app.ErrVariantNotFound) {
+					errs[fmt.Sprintf("item_%d_sku", i)] = "SKU not found"
+					return errSKUValidation
+				}
+				return fmt.Errorf("lookup variant %s: %w", row.SKU, vErr)
+			}
+			qty, _ := parseCents(row.Quantity)
+			unit, _ := parseCents(row.UnitPriceCents)
+			manualItems = append(manualItems, app.ManualOrderItem{
+				VariantID: variant.ID,
+				Quantity:  qty,
+				UnitPrice: unit,
+			})
+		}
+
+		// Find or create customer.
+		customer, cErr := d.CustomerService.GetCustomerByEmail(ctx, tx, form.CustomerEmail)
+		if cErr != nil {
+			if !errors.Is(cErr, app.ErrCustomerNotFound) {
+				return fmt.Errorf("lookup customer: %w", cErr)
+			}
+			if form.CustomerFirstName == "" || form.CustomerLastName == "" {
+				errs["customer_email"] = "No customer with that email — provide first and last name to create one"
+				return errSKUValidation
+			}
+			customer, cErr = d.CustomerService.CreateRetail(ctx, tx, form.CustomerEmail, form.CustomerFirstName, form.CustomerLastName)
+			if cErr != nil {
+				return fmt.Errorf("create customer: %w", cErr)
+			}
+		}
+
+		var line2 *string
+		if form.ShippingLine2 != "" {
+			v := form.ShippingLine2
+			line2 = &v
+		}
+		actor := staffActor(r)
+		address, aErr := d.CustomerService.CreateAddress(ctx, tx, store.CreateAddressParams{
+			CustomerID:  &customer.ID,
+			FirstName:   form.ShippingFirstName,
+			LastName:    form.ShippingLastName,
+			Line1:       form.ShippingLine1,
+			Line2:       line2,
+			City:        form.ShippingCity,
+			State:       form.ShippingState,
+			PostalCode:  form.ShippingPostalCode,
+			CountryCode: form.Country(),
+		}, actor)
+		if aErr != nil {
+			return fmt.Errorf("create address: %w", aErr)
+		}
+
+		var oErr error
+		order, oErr = d.CheckoutService.CreateManualOrder(ctx, tx, app.CreateManualOrderParams{
+			CustomerID:            customer.ID,
+			Items:                 manualItems,
+			ShippingAddressID:     address.ID,
+			BillingAddressID:      address.ID,
+			CurrencyCode:          "USD",
+			Subtotal:              subtotal,
+			DiscountTotal:         discount,
+			ShippingTotal:         shippingCents,
+			TaxTotal:              taxCents,
+			Total:                 total,
+			Status:                domain.OrderStatus(form.OrderStatus),
+			PaymentStatus:         domain.PaymentStatus(form.PaymentStatus),
+			StripePaymentIntentID: piPtr,
+			Notes:                 notesPtr,
+		}, staffActor(r))
+		if oErr != nil {
+			return fmt.Errorf("create manual order: %w", oErr)
+		}
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, errSKUValidation) {
+			renderManualOrderForm(ctx, w, r, form, errs, "")
+			return
+		}
+		logger.Error("create manual order", "error", err)
+		renderManualOrderForm(ctx, w, r, form, errs, "Could not create order: "+err.Error())
+		return
+	}
+
+	http.Redirect(w, r, "/admin/orders/"+order.ID.String()+"?flash=Manual+order+created", http.StatusSeeOther)
+}
+
+// errSKUValidation is a sentinel used to bail out of the manual-order tx and
+// fall through to form re-rendering when input validation fails inside the tx.
+var errSKUValidation = errors.New("manual order: validation")
+
+func renderManualOrderForm(ctx context.Context, w http.ResponseWriter, r *http.Request, form admin.OrderNewForm, errs map[string]string, banner string) {
+	name, role := staffNameRole(r)
+	props := admin.OrderNewProps{
+		Form:        form,
+		FieldErrors: errs,
+		Banner:      banner,
+		StaffName:   name,
+		StaffRole:   role,
+	}
+	if IsHTMX(r) {
+		admin.OrderNewContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.OrderNew(props).Render(ctx, w) //nolint:errcheck
+}
+
+// parseCents accepts a decimal string and returns the integer value. Empty
+// string parses as 0 (so optional discount/shipping/tax fields default cleanly).
+func parseCents(s string) (int, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, true
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+

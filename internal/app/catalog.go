@@ -408,6 +408,18 @@ func (s *CatalogService) GetVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID
 	return v, nil
 }
 
+// GetVariantBySKU returns a variant by its SKU.
+func (s *CatalogService) GetVariantBySKU(ctx context.Context, tx pgx.Tx, sku string) (*domain.Variant, error) {
+	v, err := s.catalog.GetVariantBySKU(ctx, tx, sku)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrVariantNotFound
+		}
+		return nil, fmt.Errorf("get variant by sku: %w", err)
+	}
+	return v, nil
+}
+
 // ListVariants returns all variants for a product.
 func (s *CatalogService) ListVariants(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]domain.Variant, error) {
 	variants, err := s.catalog.ListVariantsByProduct(ctx, tx, productID)

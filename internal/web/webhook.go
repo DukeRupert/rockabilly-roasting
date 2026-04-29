@@ -230,6 +230,15 @@ func (d *Deps) handleChargeRefunded(ctx context.Context, event *payments.Webhook
 			return fmt.Errorf("update payment status refunded: %w", err)
 		}
 
+		// Mirror the admin refund flow: the order itself transitions to
+		// refunded so the admin UI reflects it. Skip if already there to keep
+		// the webhook idempotent.
+		if order.Status != domain.OrderStatusRefunded {
+			if _, err := d.OrderService.UpdateOrderStatus(ctx, tx, order.ID, domain.OrderStatusRefunded, systemActor()); err != nil {
+				return fmt.Errorf("update order status refunded: %w", err)
+			}
+		}
+
 		if alreadyRefunded || order.CustomerID == nil {
 			return nil
 		}

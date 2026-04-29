@@ -3,11 +3,30 @@ package admin
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
+
+// orderListIDsJSON serializes the visible order IDs into a JS array literal so
+// Alpine's "select all on this page" knows the full set. UUIDs contain no
+// characters that need escaping, so simple string interpolation is safe.
+func orderListIDsJSON(orders []domain.Order) string {
+	if len(orders) == 0 {
+		return "[]"
+	}
+	parts := make([]string, len(orders))
+	for i, o := range orders {
+		parts[i] = `"` + o.ID.String() + `"`
+	}
+	return "[" + strings.Join(parts, ",") + "]"
+}
+
+func orderListAlpineState(orders []domain.Order) string {
+	return "{ selected: [], allIds: " + orderListIDsJSON(orders) + " }"
+}
 
 func formatCents(cents int) string {
 	return fmt.Sprintf("$%d.%02d", cents/100, cents%100)
@@ -125,57 +144,106 @@ templ OrderListContent(props OrderListProps) {
 				}
 			</div>
 		} else {
-			<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">
-				<table class="min-w-full divide-y divide-rr-border">
-					<thead class="bg-rr-raised">
-						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Order Status</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Fulfillment</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Shipping</th>
-							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Total</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Date</th>
-							<th scope="col" class="hidden relative py-3.5 pl-3 pr-4 sm:table-cell sm:pr-6">
-								<span class="sr-only">View</span>
-							</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-rr-border bg-rr-surface">
-						for _, o := range props.Orders {
-							<tr class="row-link">
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
-										{ o.Number }
-									</a>
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									@OrderStatusBadge(o.Status)
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									@FulfillmentStatusBadge(o.FulfillmentStatus)
-								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm md:table-cell">
-									if o.ShippingMethod != nil {
-										@ShippingMethodBadge(*o.ShippingMethod)
-									} else {
-										<span class="text-rr-border">&mdash;</span>
-									}
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-heading text-right tabular-nums">
-									{ formatCents(o.Total) }
-								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
-									{ o.PlacedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
-								</td>
-								<td class="hidden whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:table-cell sm:pr-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="text-rr-red hover:text-rr-red-lt">
-										View<span class="sr-only">, { o.Number }</span>
-									</a>
-								</td>
+			<div x-data={ orderListAlpineState(props.Orders) }>
+				<!-- Bulk action bar (visible when any row is selected) -->
+				<div
+					x-show="selected.length > 0"
+					x-cloak
+					x-transition.opacity
+					class="mb-3 flex items-center justify-between gap-3 border-2 border-rr-border bg-rr-raised px-3 py-2 text-sm"
+				>
+					<span class="font-medium text-rr-heading">
+						<span x-text="selected.length"></span> selected
+					</span>
+					<div class="flex items-center gap-2">
+						<button
+							type="button"
+							@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
+							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+						>
+							Print invoices
+						</button>
+						<button
+							type="button"
+							@click="selected = []"
+							class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-medium text-rr-heading border-2 border-rr-border hover:bg-rr-surface"
+						>
+							Clear
+						</button>
+					</div>
+				</div>
+				<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">
+					<table class="min-w-full divide-y divide-rr-border">
+						<thead class="bg-rr-raised">
+							<tr>
+								<th scope="col" class="relative w-10 px-3 py-3.5 sm:pl-6">
+									<input
+										type="checkbox"
+										aria-label="Select all orders on this page"
+										class="size-4 cursor-pointer accent-rr-red"
+										:checked="selected.length === allIds.length && allIds.length > 0"
+										:indeterminate="selected.length > 0 && selected.length < allIds.length"
+										@change="selected = $event.target.checked ? [...allIds] : []"
+									/>
+								</th>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">Order</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Order Status</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Fulfillment</th>
+								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Shipping</th>
+								<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Total</th>
+								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Date</th>
+								<th scope="col" class="hidden relative py-3.5 pl-3 pr-4 sm:table-cell sm:pr-6">
+									<span class="sr-only">View</span>
+								</th>
 							</tr>
-						}
-					</tbody>
-				</table>
+						</thead>
+						<tbody class="divide-y divide-rr-border bg-rr-surface">
+							for _, o := range props.Orders {
+								<tr class="row-link">
+									<td class="relative z-10 w-10 px-3 py-4 sm:pl-6" @click.stop>
+										<input
+											type="checkbox"
+											aria-label={ fmt.Sprintf("Select order %s", o.Number) }
+											class="size-4 cursor-pointer accent-rr-red"
+											value={ o.ID.String() }
+											x-model="selected"
+											@click.stop
+										/>
+									</td>
+									<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
+										<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
+											{ o.Number }
+										</a>
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm">
+										@OrderStatusBadge(o.Status)
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm">
+										@FulfillmentStatusBadge(o.FulfillmentStatus)
+									</td>
+									<td class="hidden whitespace-nowrap px-3 py-4 text-sm md:table-cell">
+										if o.ShippingMethod != nil {
+											@ShippingMethodBadge(*o.ShippingMethod)
+										} else {
+											<span class="text-rr-border">&mdash;</span>
+										}
+									</td>
+									<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-heading text-right tabular-nums">
+										{ formatCents(o.Total) }
+									</td>
+									<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
+										{ o.PlacedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
+									</td>
+									<td class="hidden whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:table-cell sm:pr-6">
+										<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="text-rr-red hover:text-rr-red-lt">
+											View<span class="sr-only">, { o.Number }</span>
+										</a>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
 			</div>
 			<!-- Pagination -->
 			@orderPagination(props)

@@ -394,68 +394,76 @@ func (d *Deps) handleAdminOrderInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var order *domain.Order
-	var lineItems []domain.LineItem
-	var customer *domain.Customer
-	var shippingAddress *domain.Address
-	var billingAddress *domain.Address
-	var enrichedItems []admin.EnrichedLineItem
-
+	var props admin.OrderInvoiceProps
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		order, txErr = d.OrderService.GetOrderAsStaff(ctx, tx, id)
-		if txErr != nil {
-			return txErr
+		props, txErr = d.loadOrderInvoiceProps(ctx, tx, id)
+		return txErr
+	})
+	if err != nil {
+		if errors.Is(err, app.ErrOrderNotFound) {
+			http.NotFound(w, r)
+			return
 		}
-		lineItems, txErr = d.OrderService.ListLineItems(ctx, tx, id)
-		if txErr != nil {
-			return txErr
-		}
+		Error(w, r, err)
+		return
+	}
 
-		if order.CustomerID != nil {
-			customer, txErr = d.CustomerService.GetCustomer(ctx, tx, *order.CustomerID)
-			if txErr != nil && !errors.Is(txErr, app.ErrCustomerNotFound) {
+	admin.OrderInvoice(props).Render(ctx, w) //nolint:errcheck
+}
+
+// handleAdminOrderInvoiceBatch renders one print-ready HTML document containing
+// invoices for every ID in the comma-separated `ids` query param. Used by the
+// "print invoices" bulk action on the orders list — opens in a new tab and
+// auto-fires window.print() on load.
+func (d *Deps) handleAdminOrderInvoiceBatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	raw := strings.TrimSpace(r.URL.Query().Get("ids"))
+	if raw == "" {
+		http.Error(w, "no orders selected", http.StatusBadRequest)
+		return
+	}
+
+	parts := strings.Split(raw, ",")
+	const maxBatch = 100
+	if len(parts) > maxBatch {
+		http.Error(w, fmt.Sprintf("too many orders (max %d per batch)", maxBatch), http.StatusBadRequest)
+		return
+	}
+
+	ids := make([]uuid.UUID, 0, len(parts))
+	seen := make(map[uuid.UUID]struct{}, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		id, err := uuid.Parse(p)
+		if err != nil {
+			http.Error(w, "invalid order id: "+p, http.StatusBadRequest)
+			return
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		http.Error(w, "no orders selected", http.StatusBadRequest)
+		return
+	}
+
+	items := make([]admin.OrderInvoiceProps, 0, len(ids))
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		for _, id := range ids {
+			props, txErr := d.loadOrderInvoiceProps(ctx, tx, id)
+			if txErr != nil {
 				return txErr
 			}
+			items = append(items, props)
 		}
-
-		shippingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
-		if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
-			return txErr
-		}
-
-		if order.BillingAddressID == order.ShippingAddressID {
-			billingAddress = shippingAddress
-		} else {
-			billingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.BillingAddressID)
-			if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
-				return txErr
-			}
-		}
-
-		enrichedItems = make([]admin.EnrichedLineItem, len(lineItems))
-		for i, li := range lineItems {
-			enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
-
-			variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
-			if vErr != nil {
-				if errors.Is(vErr, app.ErrVariantNotFound) {
-					continue
-				}
-				return vErr
-			}
-			enrichedItems[i].VariantSKU = variant.SKU
-
-			product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
-			if pErr != nil {
-				if errors.Is(pErr, app.ErrProductNotFound) {
-					continue
-				}
-				return pErr
-			}
-			enrichedItems[i].ProductTitle = product.Title
-		}
-
 		return nil
 	})
 	if err != nil {
@@ -467,16 +475,76 @@ func (d *Deps) handleAdminOrderInvoice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	props := admin.OrderInvoiceProps{
+	admin.OrderInvoiceBatch(admin.OrderInvoiceBatchProps{Items: items}).Render(ctx, w) //nolint:errcheck
+}
+
+// loadOrderInvoiceProps fetches everything needed to render a single invoice
+// (order, line items + product/variant enrichment, customer, both addresses).
+// Pure read; safe to call multiple times in one tx for batch rendering.
+func (d *Deps) loadOrderInvoiceProps(ctx context.Context, tx pgx.Tx, id uuid.UUID) (admin.OrderInvoiceProps, error) {
+	order, err := d.OrderService.GetOrderAsStaff(ctx, tx, id)
+	if err != nil {
+		return admin.OrderInvoiceProps{}, err
+	}
+	lineItems, err := d.OrderService.ListLineItems(ctx, tx, id)
+	if err != nil {
+		return admin.OrderInvoiceProps{}, err
+	}
+
+	var customer *domain.Customer
+	if order.CustomerID != nil {
+		customer, err = d.CustomerService.GetCustomer(ctx, tx, *order.CustomerID)
+		if err != nil && !errors.Is(err, app.ErrCustomerNotFound) {
+			return admin.OrderInvoiceProps{}, err
+		}
+	}
+
+	shippingAddress, err := d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
+	if err != nil && !errors.Is(err, app.ErrAddressNotFound) {
+		return admin.OrderInvoiceProps{}, err
+	}
+
+	var billingAddress *domain.Address
+	if order.BillingAddressID == order.ShippingAddressID {
+		billingAddress = shippingAddress
+	} else {
+		billingAddress, err = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.BillingAddressID)
+		if err != nil && !errors.Is(err, app.ErrAddressNotFound) {
+			return admin.OrderInvoiceProps{}, err
+		}
+	}
+
+	enrichedItems := make([]admin.EnrichedLineItem, len(lineItems))
+	for i, li := range lineItems {
+		enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
+
+		variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
+		if vErr != nil {
+			if errors.Is(vErr, app.ErrVariantNotFound) {
+				continue
+			}
+			return admin.OrderInvoiceProps{}, vErr
+		}
+		enrichedItems[i].VariantSKU = variant.SKU
+
+		product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+		if pErr != nil {
+			if errors.Is(pErr, app.ErrProductNotFound) {
+				continue
+			}
+			return admin.OrderInvoiceProps{}, pErr
+		}
+		enrichedItems[i].ProductTitle = product.Title
+	}
+
+	return admin.OrderInvoiceProps{
 		Order:           order,
 		LineItems:       enrichedItems,
 		Customer:        customer,
 		ShippingAddress: shippingAddress,
 		BillingAddress:  billingAddress,
 		MerchantTZ:      d.MerchantTZ,
-	}
-
-	admin.OrderInvoice(props).Render(ctx, w) //nolint:errcheck
+	}, nil
 }
 
 // --- Manual order entry ---

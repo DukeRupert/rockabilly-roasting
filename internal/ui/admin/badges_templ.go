@@ -71,6 +71,8 @@ func FulfillmentStatusLabel(s domain.FulfillmentStatus) string {
 		return "Partially fulfilled"
 	case domain.FulfillmentStatusFulfilled:
 		return "Fulfilled"
+	case domain.FulfillmentStatusReadyForPickup:
+		return "Ready for pickup"
 	case domain.FulfillmentStatusPartiallyShipped:
 		return "Partially shipped"
 	case domain.FulfillmentStatusShipped:
@@ -150,7 +152,7 @@ func OrderStatusBadge(status domain.OrderStatus) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(OrderStatusLabel(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 101, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 103, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -225,7 +227,7 @@ func PaymentStatusBadge(status domain.PaymentStatus) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(PaymentStatusLabel(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 122, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 124, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -331,7 +333,7 @@ func PaymentChip(status domain.PaymentStatus) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(paymentChipText(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 173, Col: 69}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 175, Col: 69}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -353,6 +355,8 @@ func fulfillmentStatusBadgeClasses(status domain.FulfillmentStatus) string {
 		return "badge badge-dot badge-green-solid"
 	case domain.FulfillmentStatusFulfilled:
 		return "badge badge-dot badge-green"
+	case domain.FulfillmentStatusReadyForPickup:
+		return "badge badge-dot badge-amber"
 	case domain.FulfillmentStatusReturned:
 		return "badge badge-dot badge-grey"
 	default:
@@ -406,7 +410,7 @@ func FulfillmentStatusBadge(status domain.FulfillmentStatus) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(FulfillmentStatusLabel(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 193, Col: 34}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 197, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -479,7 +483,7 @@ func SubscriptionStatusBadge(status domain.SubscriptionStatus) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 212, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 216, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -552,7 +556,7 @@ func FulfillmentItemStatusBadge(status domain.FulfillmentItemStatus) templ.Compo
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 231, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 235, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -702,7 +706,7 @@ func WholesaleStatusBadge(status domain.WholesaleStatus) templ.Component {
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 263, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 267, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
@@ -788,7 +792,7 @@ func ShippingMethodBadge(method domain.ShippingMethod) templ.Component {
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(shippingMethodLabel(method))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 295, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 299, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {
@@ -874,7 +878,7 @@ func BillingMethodBadge(method domain.BillingMethod) templ.Component {
 		var templ_7745c5c3_Var41 string
 		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(billingMethodLabel(method))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 327, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 331, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 		if templ_7745c5c3_Err != nil {
@@ -949,7 +953,7 @@ func InvoiceStatusBadge(status domain.InvoiceStatus) templ.Component {
 		var templ_7745c5c3_Var45 string
 		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(string(status))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 348, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 352, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 		if templ_7745c5c3_Err != nil {
@@ -994,7 +998,7 @@ func flashToast(message string) templ.Component {
 		var templ_7745c5c3_Var47 string
 		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 368, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/badges.templ`, Line: 372, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {

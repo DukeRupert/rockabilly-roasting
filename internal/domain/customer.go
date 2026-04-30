@@ -58,6 +58,11 @@ type Customer struct {
 	QBSyncedAt       *time.Time
 	TwoFAEnabled     bool
 	TwoFAMethod      *string
+	// PreferredLocalFulfillment is the customer's saved choice for orders
+	// shipping to a local zip. Nil means "ask each time at checkout".
+	// Persisted only as ShippingMethodPickup or ShippingMethodLocalDelivery;
+	// ShippingMethodShipped is never stored here (it's the non-local fallback).
+	PreferredLocalFulfillment *ShippingMethod
 	Metadata         map[string]any
 	CreatedAt        time.Time
 	UpdatedAt        time.Time

@@ -14,7 +14,11 @@ SET flat_rate_cents = $1,
     origin_state = $9,
     origin_zip = $10,
     origin_country = $11,
-    tare_weight_oz = $12;
+    tare_weight_oz = $12,
+    local_delivery_enabled = $13,
+    local_pickup_enabled = $14,
+    local_pickup_instructions = $15,
+    local_delivery_days = $16;
 
 -- name: CreateShipment :one
 INSERT INTO shipments (id, order_id, status, provider, tracking_number, label_url,

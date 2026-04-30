@@ -6,6 +6,7 @@
     createPaymentIntent,
     confirmOrder,
     type CartResponse,
+    type LocalFulfillmentMethod,
     type PaymentIntentResponse,
   } from '../lib/api';
   import { formatCents } from '../lib/format';
@@ -15,13 +16,32 @@
     stripeKey: string;
     customerId: string;
     addressId: string;
+    eligibleLocalMethods: LocalFulfillmentMethod[];
+    localPickupInstructions: string;
+    localDeliveryDays: string;
+    shippingMethod: LocalFulfillmentMethod | '';
+    onShippingMethodChange: (m: LocalFulfillmentMethod) => void;
     totalsLoaded?: (pi: PaymentIntentResponse) => void;
     onBack: () => void;
   }
 
-  let { cart, stripeKey, customerId, addressId, totalsLoaded, onBack }: Props = $props();
+  let {
+    cart,
+    stripeKey,
+    customerId,
+    addressId,
+    eligibleLocalMethods,
+    localPickupInstructions,
+    localDeliveryDays,
+    shippingMethod,
+    onShippingMethodChange,
+    totalsLoaded,
+    onBack,
+  }: Props = $props();
+
   let resolvedTotal = $state<number | null>(null);
   let totalAmount = $derived(resolvedTotal ?? cart.subtotal);
+  let showMethodRadio = $derived(eligibleLocalMethods.length > 1);
 
   let stripe = $state<Stripe | null>(null);
   let elements = $state<StripeElements | null>(null);
@@ -30,31 +50,60 @@
   let error = $state('');
   let clientSecret = $state('');
 
-  onMount(async () => {
-    try {
-      stripe = await getStripe(stripeKey);
-      if (!stripe) {
-        error = 'Failed to load payment system';
-        loading = false;
-        return;
-      }
+  // Track the method the current PI was created for. When the user toggles
+  // the radio, we tear down the Stripe element and re-create the PI so the
+  // pre-created order gets stamped with the new method. The previous order
+  // stays in payment_status=awaiting and Stripe auto-cancels its PI within a
+  // day — same lifecycle as a customer abandoning checkout.
+  let initializedMethod = $state<LocalFulfillmentMethod | '' | null>(null);
 
-      // Create PaymentIntent
+  onMount(async () => {
+    stripe = await getStripe(stripeKey);
+    if (!stripe) {
+      error = 'Failed to load payment system';
+      loading = false;
+      return;
+    }
+    await initializePayment();
+  });
+
+  $effect(() => {
+    // Re-init when the user picks a different local fulfillment method, but
+    // only after the first init completes — onMount handles the initial call.
+    if (
+      stripe &&
+      initializedMethod !== null &&
+      shippingMethod !== initializedMethod &&
+      !processing
+    ) {
+      initializePayment();
+    }
+  });
+
+  async function initializePayment() {
+    if (!stripe) return;
+    loading = true;
+    error = '';
+    try {
       const piResponse = await createPaymentIntent({
         cart_id: cart.cart_id,
         address_id: addressId,
         customer_id: customerId,
+        shipping_method: shippingMethod || '',
       });
 
       clientSecret = piResponse.client_secret;
       resolvedTotal = piResponse.amount;
+      initializedMethod = shippingMethod;
       totalsLoaded?.(piResponse);
 
-      // Ensure DOM is updated before mounting Stripe Element
       loading = false;
       await tick();
 
-      // Mount Stripe Payment Element using a selector
+      // Stripe Elements can't swap clientSecret in place — clear the mount
+      // point and create a fresh Elements instance every time.
+      const mount = document.getElementById('stripe-payment-element');
+      if (mount) mount.innerHTML = '';
       elements = createElements(stripe, clientSecret);
       const paymentElement = elements.create('payment');
       paymentElement.mount('#stripe-payment-element');
@@ -62,7 +111,7 @@
       error = e.message || 'Failed to initialize payment';
       loading = false;
     }
-  });
+  }
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
@@ -126,6 +175,59 @@
       <p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">
         {error}
       </p>
+    </div>
+  {/if}
+
+  {#if showMethodRadio}
+    <fieldset class="mb-6 border-2 border-ink bg-cream-hi p-4 sm:p-5">
+      <legend
+        class="px-2 font-oswald font-bold text-ink text-[11px]"
+        style="letter-spacing:0.2em; text-transform:uppercase;"
+      >
+        Local fulfillment
+      </legend>
+      <div class="space-y-3">
+        {#each eligibleLocalMethods as method}
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="shipping_method"
+              value={method}
+              checked={shippingMethod === method}
+              onchange={() => onShippingMethodChange(method)}
+              disabled={processing}
+              class="mt-1 size-4 accent-rust"
+            />
+            <span class="flex-1">
+              <span
+                class="block font-oswald font-bold text-ink text-sm"
+                style="letter-spacing:0.04em;"
+              >
+                {method === 'pickup' ? 'Free pickup at the shop' : 'Free local delivery'}
+              </span>
+              <span class="block font-oswald text-ink-soft text-xs mt-0.5">
+                {#if method === 'pickup'}
+                  {localPickupInstructions || "We'll email you when your order's ready."}
+                {:else}
+                  {localDeliveryDays
+                    ? `Out for delivery on ${localDeliveryDays}.`
+                    : "We'll email you when your order goes out for delivery."}
+                {/if}
+              </span>
+            </span>
+          </label>
+        {/each}
+      </div>
+    </fieldset>
+  {:else if eligibleLocalMethods.length === 1 && shippingMethod === 'pickup' && localPickupInstructions}
+    <div class="mb-6 border-2 border-ink bg-cream-hi p-4 sm:p-5">
+      <p
+        class="font-oswald font-bold text-ink text-[11px] mb-1"
+        style="letter-spacing:0.2em; text-transform:uppercase;"
+      >
+        Free pickup at the shop
+      </p>
+      <p class="font-oswald text-ink-soft text-sm">{localPickupInstructions}</p>
     </div>
   {/if}
 

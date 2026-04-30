@@ -130,7 +130,7 @@ func (q *Queries) GetShipmentLabelKey(ctx context.Context, id uuid.UUID) (*strin
 }
 
 const getShippingConfig = `-- name: GetShippingConfig :one
-SELECT flat_rate_cents, free_shipping_threshold, currency, local_zip_codes, origin_name, origin_street1, origin_street2, origin_city, origin_state, origin_zip, origin_country, tare_weight_oz FROM shipping_config LIMIT 1
+SELECT flat_rate_cents, free_shipping_threshold, currency, local_zip_codes, origin_name, origin_street1, origin_street2, origin_city, origin_state, origin_zip, origin_country, tare_weight_oz, local_delivery_enabled, local_pickup_enabled, local_pickup_instructions, local_delivery_days FROM shipping_config LIMIT 1
 `
 
 func (q *Queries) GetShippingConfig(ctx context.Context) (ShippingConfig, error) {
@@ -149,6 +149,10 @@ func (q *Queries) GetShippingConfig(ctx context.Context) (ShippingConfig, error)
 		&i.OriginZip,
 		&i.OriginCountry,
 		&i.TareWeightOz,
+		&i.LocalDeliveryEnabled,
+		&i.LocalPickupEnabled,
+		&i.LocalPickupInstructions,
+		&i.LocalDeliveryDays,
 	)
 	return i, err
 }
@@ -325,22 +329,30 @@ SET flat_rate_cents = $1,
     origin_state = $9,
     origin_zip = $10,
     origin_country = $11,
-    tare_weight_oz = $12
+    tare_weight_oz = $12,
+    local_delivery_enabled = $13,
+    local_pickup_enabled = $14,
+    local_pickup_instructions = $15,
+    local_delivery_days = $16
 `
 
 type UpdateShippingConfigParams struct {
-	FlatRateCents         int32          `json:"flat_rate_cents"`
-	FreeShippingThreshold *int32         `json:"free_shipping_threshold"`
-	Currency              string         `json:"currency"`
-	LocalZipCodes         []string       `json:"local_zip_codes"`
-	OriginName            string         `json:"origin_name"`
-	OriginStreet1         string         `json:"origin_street1"`
-	OriginStreet2         string         `json:"origin_street2"`
-	OriginCity            string         `json:"origin_city"`
-	OriginState           string         `json:"origin_state"`
-	OriginZip             string         `json:"origin_zip"`
-	OriginCountry         string         `json:"origin_country"`
-	TareWeightOz          pgtype.Numeric `json:"tare_weight_oz"`
+	FlatRateCents           int32          `json:"flat_rate_cents"`
+	FreeShippingThreshold   *int32         `json:"free_shipping_threshold"`
+	Currency                string         `json:"currency"`
+	LocalZipCodes           []string       `json:"local_zip_codes"`
+	OriginName              string         `json:"origin_name"`
+	OriginStreet1           string         `json:"origin_street1"`
+	OriginStreet2           string         `json:"origin_street2"`
+	OriginCity              string         `json:"origin_city"`
+	OriginState             string         `json:"origin_state"`
+	OriginZip               string         `json:"origin_zip"`
+	OriginCountry           string         `json:"origin_country"`
+	TareWeightOz            pgtype.Numeric `json:"tare_weight_oz"`
+	LocalDeliveryEnabled    bool           `json:"local_delivery_enabled"`
+	LocalPickupEnabled      bool           `json:"local_pickup_enabled"`
+	LocalPickupInstructions string         `json:"local_pickup_instructions"`
+	LocalDeliveryDays       string         `json:"local_delivery_days"`
 }
 
 func (q *Queries) UpdateShippingConfig(ctx context.Context, arg UpdateShippingConfigParams) error {
@@ -357,6 +369,10 @@ func (q *Queries) UpdateShippingConfig(ctx context.Context, arg UpdateShippingCo
 		arg.OriginZip,
 		arg.OriginCountry,
 		arg.TareWeightOz,
+		arg.LocalDeliveryEnabled,
+		arg.LocalPickupEnabled,
+		arg.LocalPickupInstructions,
+		arg.LocalDeliveryDays,
 	)
 	return err
 }

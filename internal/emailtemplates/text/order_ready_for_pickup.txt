@@ -1,0 +1,25 @@
+{{define "order_ready_for_pickup.txt"}}{{.StoreName}}
+==========================================
+
+READY FOR PICKUP
+
+Hi{{if .CustomerName}} {{.CustomerName}}{{end}},
+
+Your order {{.OrderNumber}} is packed and waiting on the counter.
+{{if .PickupInstructions}}
+PICKUP DETAILS
+{{.PickupInstructions}}
+{{end}}
+Bring this email or your order number and we'll hand it over.
+
+Questions? Just reply to this email.
+
+See you soon,
+The crew at Rockabilly Roasting Co.
+
+------------------------------------------
+{{.StoreName}}
+101 W Kennewick Ave, Kennewick WA
+(509) 585-2320
+{{.StoreURL}}
+{{end}}

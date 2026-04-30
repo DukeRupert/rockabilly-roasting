@@ -82,6 +82,22 @@ func (s *CustomerService) UpdateEmail(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return c, nil
 }
 
+// UpdatePreferredLocalFulfillment saves the customer's choice between local
+// delivery and pickup for future eligible orders. Pass nil to clear the
+// preference (back to "ask each time"). Validated against the two local
+// methods; any other value is rejected.
+func (s *CustomerService) UpdatePreferredLocalFulfillment(ctx context.Context, tx pgx.Tx, id uuid.UUID, method *domain.ShippingMethod) error {
+	if method != nil {
+		if *method != domain.ShippingMethodPickup && *method != domain.ShippingMethodLocalDelivery {
+			return fmt.Errorf("invalid local fulfillment method: %s", *method)
+		}
+	}
+	if err := s.customers.UpdatePreferredLocalFulfillment(ctx, tx, id, method); err != nil {
+		return fmt.Errorf("update preferred local fulfillment: %w", err)
+	}
+	return nil
+}
+
 // VerifyEmail marks a customer's email as verified.
 func (s *CustomerService) VerifyEmail(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if err := s.customers.UpdateEmailVerified(ctx, tx, id, true); err != nil {
@@ -91,11 +107,15 @@ func (s *CustomerService) VerifyEmail(ctx context.Context, tx pgx.Tx, id uuid.UU
 }
 
 // CreateRetail creates a retail customer with the given email and name (no password).
-func (s *CustomerService) CreateRetail(ctx context.Context, tx pgx.Tx, email, firstName, lastName string) (*domain.Customer, error) {
+// Phone is optional; it's persisted on creation so pickup customers can be
+// reached when their order is ready, but the checkout form leaves it blank
+// for callers who just want a guest account.
+func (s *CustomerService) CreateRetail(ctx context.Context, tx pgx.Tx, email, firstName, lastName string, phone *string) (*domain.Customer, error) {
 	c, err := s.customers.Create(ctx, tx, store.CreateCustomerParams{
 		Email:     email,
 		FirstName: firstName,
 		LastName:  lastName,
+		Phone:     phone,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create guest customer: %w", err)

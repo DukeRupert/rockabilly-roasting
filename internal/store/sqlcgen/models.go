@@ -155,33 +155,34 @@ type CouponCode struct {
 }
 
 type Customer struct {
-	ID               uuid.UUID          `json:"id"`
-	Email            string             `json:"email"`
-	EmailVerified    bool               `json:"email_verified"`
-	PasswordHash     *string            `json:"password_hash"`
-	FirstName        string             `json:"first_name"`
-	LastName         string             `json:"last_name"`
-	Phone            *string            `json:"phone"`
-	TaxExempt        bool               `json:"tax_exempt"`
-	TaxExemptReason  *string            `json:"tax_exempt_reason"`
-	CustomerGroupID  *uuid.UUID         `json:"customer_group_id"`
-	Metadata         json.RawMessage    `json:"metadata"`
-	CreatedAt        time.Time          `json:"created_at"`
-	UpdatedAt        time.Time          `json:"updated_at"`
-	StripeCustomerID *string            `json:"stripe_customer_id"`
-	AccountType      string             `json:"account_type"`
-	WholesaleStatus  *string            `json:"wholesale_status"`
-	CompanyName      *string            `json:"company_name"`
-	Website          *string            `json:"website"`
-	WholesaleNotes   *string            `json:"wholesale_notes"`
-	ApprovedAt       pgtype.Timestamptz `json:"approved_at"`
-	ApprovedBy       *uuid.UUID         `json:"approved_by"`
-	TwoFaEnabled     bool               `json:"two_fa_enabled"`
-	TwoFaMethod      *string            `json:"two_fa_method"`
-	QbCustomerID     *string            `json:"qb_customer_id"`
-	QbSyncedAt       pgtype.Timestamptz `json:"qb_synced_at"`
-	PaymentTermsDays *int32             `json:"payment_terms_days"`
-	BillingMethod    string             `json:"billing_method"`
+	ID                        uuid.UUID          `json:"id"`
+	Email                     string             `json:"email"`
+	EmailVerified             bool               `json:"email_verified"`
+	PasswordHash              *string            `json:"password_hash"`
+	FirstName                 string             `json:"first_name"`
+	LastName                  string             `json:"last_name"`
+	Phone                     *string            `json:"phone"`
+	TaxExempt                 bool               `json:"tax_exempt"`
+	TaxExemptReason           *string            `json:"tax_exempt_reason"`
+	CustomerGroupID           *uuid.UUID         `json:"customer_group_id"`
+	Metadata                  json.RawMessage    `json:"metadata"`
+	CreatedAt                 time.Time          `json:"created_at"`
+	UpdatedAt                 time.Time          `json:"updated_at"`
+	StripeCustomerID          *string            `json:"stripe_customer_id"`
+	AccountType               string             `json:"account_type"`
+	WholesaleStatus           *string            `json:"wholesale_status"`
+	CompanyName               *string            `json:"company_name"`
+	Website                   *string            `json:"website"`
+	WholesaleNotes            *string            `json:"wholesale_notes"`
+	ApprovedAt                pgtype.Timestamptz `json:"approved_at"`
+	ApprovedBy                *uuid.UUID         `json:"approved_by"`
+	TwoFaEnabled              bool               `json:"two_fa_enabled"`
+	TwoFaMethod               *string            `json:"two_fa_method"`
+	QbCustomerID              *string            `json:"qb_customer_id"`
+	QbSyncedAt                pgtype.Timestamptz `json:"qb_synced_at"`
+	PaymentTermsDays          *int32             `json:"payment_terms_days"`
+	BillingMethod             string             `json:"billing_method"`
+	PreferredLocalFulfillment *string            `json:"preferred_local_fulfillment"`
 }
 
 type CustomerGroup struct {
@@ -492,18 +493,22 @@ type Shipment struct {
 }
 
 type ShippingConfig struct {
-	FlatRateCents         int32          `json:"flat_rate_cents"`
-	FreeShippingThreshold *int32         `json:"free_shipping_threshold"`
-	Currency              string         `json:"currency"`
-	LocalZipCodes         []string       `json:"local_zip_codes"`
-	OriginName            string         `json:"origin_name"`
-	OriginStreet1         string         `json:"origin_street1"`
-	OriginStreet2         string         `json:"origin_street2"`
-	OriginCity            string         `json:"origin_city"`
-	OriginState           string         `json:"origin_state"`
-	OriginZip             string         `json:"origin_zip"`
-	OriginCountry         string         `json:"origin_country"`
-	TareWeightOz          pgtype.Numeric `json:"tare_weight_oz"`
+	FlatRateCents           int32          `json:"flat_rate_cents"`
+	FreeShippingThreshold   *int32         `json:"free_shipping_threshold"`
+	Currency                string         `json:"currency"`
+	LocalZipCodes           []string       `json:"local_zip_codes"`
+	OriginName              string         `json:"origin_name"`
+	OriginStreet1           string         `json:"origin_street1"`
+	OriginStreet2           string         `json:"origin_street2"`
+	OriginCity              string         `json:"origin_city"`
+	OriginState             string         `json:"origin_state"`
+	OriginZip               string         `json:"origin_zip"`
+	OriginCountry           string         `json:"origin_country"`
+	TareWeightOz            pgtype.Numeric `json:"tare_weight_oz"`
+	LocalDeliveryEnabled    bool           `json:"local_delivery_enabled"`
+	LocalPickupEnabled      bool           `json:"local_pickup_enabled"`
+	LocalPickupInstructions string         `json:"local_pickup_instructions"`
+	LocalDeliveryDays       string         `json:"local_delivery_days"`
 }
 
 type Staff struct {

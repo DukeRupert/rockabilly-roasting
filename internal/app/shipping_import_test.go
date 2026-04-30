@@ -44,6 +44,12 @@ func (f *fakeEnqueuer) EnqueueOrderShipped(_ context.Context, _ pgx.Tx, orderID,
 	f.shippedCalls = append(f.shippedCalls, shippedCall{orderID, customerID, shipmentID})
 	return nil
 }
+func (f *fakeEnqueuer) EnqueueOrderReadyForPickup(_ context.Context, _ pgx.Tx, _, _ uuid.UUID) error {
+	return nil
+}
+func (f *fakeEnqueuer) EnqueueOrderOutForDelivery(_ context.Context, _ pgx.Tx, _, _ uuid.UUID) error {
+	return nil
+}
 
 func newImportService(enq *fakeEnqueuer) *app.ShippingImportService {
 	// pool is unused by the per-row in-tx helper. Tests drive that helper

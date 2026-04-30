@@ -63,6 +63,11 @@ RETURNING *;
 -- name: GetCustomerByStripeCustomerID :one
 SELECT * FROM customers WHERE stripe_customer_id = $1;
 
+-- name: UpdateCustomerPreferredLocalFulfillment :exec
+UPDATE customers
+SET preferred_local_fulfillment = $2, updated_at = now()
+WHERE id = $1;
+
 -- name: DeleteCustomer :exec
 DELETE FROM customers WHERE id = $1;
 

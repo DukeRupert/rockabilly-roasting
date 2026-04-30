@@ -146,6 +146,14 @@ type AccountSettingsProps struct {
 	CartCount int
 	Success   string
 	Error     string
+	// Local fulfillment section (rendered only when at least one of the
+	// customer's saved addresses sits inside a local zip and the merchant
+	// has more than one local channel enabled).
+	ShowLocalFulfillment bool
+	LocalDeliveryEnabled bool
+	LocalPickupEnabled   bool
+	LocalDeliveryDays    string
+	LocalPickupNote      string
 }
 
 templ AccountSettingsContent(props AccountSettingsProps) {
@@ -181,6 +189,40 @@ templ AccountSettingsContent(props AccountSettingsProps) {
 						class="paper-input w-full border-2 border-ink bg-cream-hi px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 					<p class="mt-2 font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">Your sign-in link will be sent to this address.</p>
 				</div>
+				if props.ShowLocalFulfillment {
+					<div class="pt-4 border-t-2 border-ink/30 space-y-3">
+						<div>
+							<p class="font-oswald font-bold text-ink text-[11px] mb-1" style="letter-spacing:0.2em; text-transform:uppercase;">Local fulfillment preference</p>
+							<p class="font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">Used as the default at checkout when your address is in our local delivery zone.</p>
+						</div>
+						<label class="flex items-start gap-3 cursor-pointer">
+							<input type="radio" name="preferred_local_fulfillment" value="" checked?={ props.Customer.PreferredLocalFulfillment == nil } class="mt-1 size-4 accent-rust"/>
+							<span class="font-oswald text-sm text-ink" style="letter-spacing:0.04em;">Ask me each time</span>
+						</label>
+						if props.LocalDeliveryEnabled {
+							<label class="flex items-start gap-3 cursor-pointer">
+								<input type="radio" name="preferred_local_fulfillment" value="local_delivery" checked?={ props.Customer.PreferredLocalFulfillment != nil && *props.Customer.PreferredLocalFulfillment == domain.ShippingMethodLocalDelivery } class="mt-1 size-4 accent-rust"/>
+								<span>
+									<span class="block font-oswald font-bold text-ink text-sm" style="letter-spacing:0.04em;">Free local delivery</span>
+									if props.LocalDeliveryDays != "" {
+										<span class="block font-oswald text-chrome-deep text-xs">Out for delivery on { props.LocalDeliveryDays }.</span>
+									}
+								</span>
+							</label>
+						}
+						if props.LocalPickupEnabled {
+							<label class="flex items-start gap-3 cursor-pointer">
+								<input type="radio" name="preferred_local_fulfillment" value="pickup" checked?={ props.Customer.PreferredLocalFulfillment != nil && *props.Customer.PreferredLocalFulfillment == domain.ShippingMethodPickup } class="mt-1 size-4 accent-rust"/>
+								<span>
+									<span class="block font-oswald font-bold text-ink text-sm" style="letter-spacing:0.04em;">Free pickup at the shop</span>
+									if props.LocalPickupNote != "" {
+										<span class="block font-oswald text-chrome-deep text-xs">{ props.LocalPickupNote }</span>
+									}
+								</span>
+							</label>
+						}
+					</div>
+				}
 				<div class="pt-2">
 					<button type="submit" class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
 						Save changes

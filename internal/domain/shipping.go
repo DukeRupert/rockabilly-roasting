@@ -25,6 +25,17 @@ type ShippingConfig struct {
 	Currency              string
 	LocalZipCodes         []string
 
+	// Local fulfillment toggles. A local zip is always free, but the merchant
+	// chooses which channels to offer:
+	//   - LocalDeliveryEnabled: route delivery on configured days
+	//   - LocalPickupEnabled:   customer picks up at the shop when notified
+	// At least one should normally be true; if both are false the storefront
+	// falls back to the standard "shipped" flow even for local zips.
+	LocalDeliveryEnabled    bool
+	LocalPickupEnabled      bool
+	LocalPickupInstructions string // shown to customer at checkout + in the ready-for-pickup email
+	LocalDeliveryDays       string // display string, e.g. "Mondays and Thursdays"
+
 	// Origin address. Captured for future live-rate work; the Pirate Ship
 	// CSV round-trip uses Pirate Ship's own origin config, so these fields
 	// are informational for that flow.
@@ -67,6 +78,24 @@ func (c ShippingConfig) Calculate(subtotalCents int, shipToZip string) int {
 		return 0
 	}
 	return c.FlatRateCents
+}
+
+// EligibleLocalMethods returns the local fulfillment methods available for a
+// given ship-to zip, in stable display order (delivery first, then pickup).
+// Returns an empty slice when the zip is not local or when no local toggles
+// are enabled — callers should fall back to ShippingMethodShipped in that case.
+func (c ShippingConfig) EligibleLocalMethods(shipToZip string) []ShippingMethod {
+	if !c.IsLocal(shipToZip) {
+		return nil
+	}
+	out := make([]ShippingMethod, 0, 2)
+	if c.LocalDeliveryEnabled {
+		out = append(out, ShippingMethodLocalDelivery)
+	}
+	if c.LocalPickupEnabled {
+		out = append(out, ShippingMethodPickup)
+	}
+	return out
 }
 
 // normalizeZip trims whitespace and strips a ZIP+4 suffix so "99336-1234 "

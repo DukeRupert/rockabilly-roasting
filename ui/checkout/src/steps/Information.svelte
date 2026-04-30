@@ -1,14 +1,15 @@
 <script lang="ts">
-  import { submitAddress, type CartResponse } from '../lib/api';
+  import { submitAddress, type AddressResponse, type CartResponse } from '../lib/api';
 
   interface Props {
     cart: CartResponse;
-    onComplete: (result: { customerId: string; addressId: string }) => void;
+    onComplete: (result: AddressResponse) => void;
   }
 
   let { cart, onComplete }: Props = $props();
 
   let email = $state('');
+  let phone = $state('');
   let firstName = $state('');
   let lastName = $state('');
   let line1 = $state('');
@@ -31,6 +32,7 @@
     try {
       const result = await submitAddress({
         email,
+        phone: phone.trim() || undefined,
         first_name: firstName,
         last_name: lastName,
         line1,
@@ -41,10 +43,7 @@
         country,
       });
 
-      onComplete({
-        customerId: result.customer_id,
-        addressId: result.address_id,
-      });
+      onComplete(result);
     } catch (err: any) {
       if (err.errors) {
         errors = err.errors;
@@ -89,19 +88,33 @@
   {/if}
 
   <form onsubmit={handleSubmit} class="space-y-5">
-    <!-- Email -->
-    <div>
-      <label for="email" class={labelClasses} style={labelStyle}>Email</label>
-      <input
-        id="email"
-        type="email"
-        bind:value={email}
-        placeholder="you@example.com"
-        required
-        class={inputClasses}
-        style={inputStyle}
-      />
-      {#if errors.email}<p class={errorClasses}>{errors.email}</p>{/if}
+    <!-- Email + phone -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label for="email" class={labelClasses} style={labelStyle}>Email</label>
+        <input
+          id="email"
+          type="email"
+          bind:value={email}
+          placeholder="you@example.com"
+          required
+          class={inputClasses}
+          style={inputStyle}
+        />
+        {#if errors.email}<p class={errorClasses}>{errors.email}</p>{/if}
+      </div>
+      <div>
+        <label for="phone" class={labelClasses} style={labelStyle}>Phone (optional)</label>
+        <input
+          id="phone"
+          type="tel"
+          bind:value={phone}
+          placeholder="(509) 555-0123"
+          autocomplete="tel"
+          class={inputClasses}
+          style={inputStyle}
+        />
+      </div>
     </div>
 
     <!-- Name -->

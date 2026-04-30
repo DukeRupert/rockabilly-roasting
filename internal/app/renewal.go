@@ -22,6 +22,7 @@ type RenewalService struct {
 	orders        *store.OrderStore
 	customers     *store.CustomerStore
 	pricing       *store.PricingStore
+	shipping      *store.ShippingStore
 	payments      payments.Provider
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
@@ -34,6 +35,7 @@ func NewRenewalService(
 	orders *store.OrderStore,
 	customers *store.CustomerStore,
 	pricing *store.PricingStore,
+	shipping *store.ShippingStore,
 	payments payments.Provider,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
@@ -43,6 +45,7 @@ func NewRenewalService(
 		orders:        orders,
 		customers:     customers,
 		pricing:       pricing,
+		shipping:      shipping,
 		payments:      payments,
 		audit:         audit,
 		metrics:       metrics,
@@ -71,6 +74,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	var customer *domain.Customer
 	var addr *domain.Address
 	var priceCents int
+	var shipMethod *domain.ShippingMethod
 
 	err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -105,6 +109,17 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		priceCents = price.Amount
 		if plan.DiscountPct > 0 {
 			priceCents = priceCents - (priceCents * plan.DiscountPct / 100)
+		}
+
+		// Stamp the chosen local fulfillment method when the saved address
+		// sits inside a local zip and the merchant's config plus the
+		// customer's preference yield a single sensible choice. Otherwise
+		// the renewal order ships normally.
+		if s.shipping != nil {
+			cfg, txErr := s.shipping.GetConfig(ctx, tx)
+			if txErr == nil {
+				shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
+			}
 		}
 
 		return nil
@@ -200,6 +215,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			ShippingAddressID: sub.ShippingAddressID,
 			BillingAddressID:  sub.ShippingAddressID,
 			SubscriptionID:    &subID,
+			ShippingMethod:    shipMethod,
 			PlacedAt:          time.Now(),
 			Metadata: map[string]any{
 				"subscription_renewal": true,
@@ -307,6 +323,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	var customer *domain.Customer
 	var addr *domain.Address
 	var orderTotal int
+	var shipMethod *domain.ShippingMethod
 
 	err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		var customerID uuid.UUID
@@ -369,6 +386,13 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		addr, txErr = s.customers.GetAddressByIDAsStaff(ctx, tx, addressID)
 		if txErr != nil {
 			return fmt.Errorf("get address: %w", txErr)
+		}
+
+		if s.shipping != nil {
+			cfg, txErr := s.shipping.GetConfig(ctx, tx)
+			if txErr == nil {
+				shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
+			}
 		}
 
 		return nil
@@ -463,6 +487,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			ShippingAddressID: addr.ID,
 			BillingAddressID:  addr.ID,
 			SubscriptionID:    nil, // batched — use subscription_orders for linking
+			ShippingMethod:    shipMethod,
 			PlacedAt:          time.Now(),
 			Metadata: map[string]any{
 				"subscription_renewal": true,
@@ -585,4 +610,39 @@ func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCus
 		return "", nil
 	}
 	return methods[0].ID, nil
+}
+
+// pickRenewalLocalMethod returns the shipping method to stamp on a renewal
+// order. Renewals do not surface UI to the customer, so the only signals are
+// the merchant config and the customer's saved preference. Returns nil when
+// the address is not local or when the merchant has both channels disabled —
+// the order then falls back to the standard "shipped" flow.
+func pickRenewalLocalMethod(cfg *domain.ShippingConfig, shipToZip string, preference *domain.ShippingMethod) *domain.ShippingMethod {
+	eligible := cfg.EligibleLocalMethods(shipToZip)
+	if len(eligible) == 0 {
+		return nil
+	}
+	if preference != nil {
+		for _, m := range eligible {
+			if m == *preference {
+				v := m
+				return &v
+			}
+		}
+	}
+	if len(eligible) == 1 {
+		v := eligible[0]
+		return &v
+	}
+	// Both channels eligible but no preference saved — default to delivery
+	// (the legacy behaviour before pickup existed) so subscriptions keep
+	// shipping the way they always have until the customer opts in.
+	for _, m := range eligible {
+		if m == domain.ShippingMethodLocalDelivery {
+			v := m
+			return &v
+		}
+	}
+	v := eligible[0]
+	return &v
 }

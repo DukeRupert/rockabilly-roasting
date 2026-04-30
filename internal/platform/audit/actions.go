@@ -7,8 +7,11 @@ const (
 	AuditOrderStatusChanged = "order.status_changed"
 	AuditOrderRefunded      = "order.refunded"
 	AuditOrderCancelled     = "order.cancelled"
-	AuditOrderFulfilled     = "order.fulfilled"
-	AuditOrderShipped       = "order.shipped"
+	AuditOrderFulfilled       = "order.fulfilled"
+	AuditOrderShipped         = "order.shipped"
+	AuditOrderReadyForPickup  = "order.ready_for_pickup"
+	AuditOrderPickedUp        = "order.picked_up"
+	AuditOrderOutForDelivery  = "order.out_for_delivery"
 
 	// Product/pricing actions
 	AuditProductCreated      = "product.created"
@@ -71,7 +74,9 @@ const (
 	AuditShippingConfigUpdated = "shipping_config.updated"
 
 	// Email actions for shipping
-	AuditEmailOrderShipped = "email.order_shipped"
+	AuditEmailOrderShipped         = "email.order_shipped"
+	AuditEmailOrderReadyForPickup  = "email.order_ready_for_pickup"
+	AuditEmailOrderOutForDelivery  = "email.order_out_for_delivery"
 
 	// Discount actions
 	AuditDiscountCreated     = "discount.created"

@@ -92,31 +92,39 @@ func (s *CheckoutService) UpdateShippingConfig(ctx context.Context, tx pgx.Tx, c
 		ResourceType: "shipping_config",
 		ResourceID:   uuid.Nil,
 		After: map[string]any{
-			"flat_rate_cents":         cfg.FlatRateCents,
-			"free_shipping_threshold": cfg.FreeShippingThreshold,
-			"local_zip_codes":         cfg.LocalZipCodes,
-			"origin_name":             cfg.OriginName,
-			"origin_street1":          cfg.OriginStreet1,
-			"origin_street2":          cfg.OriginStreet2,
-			"origin_city":             cfg.OriginCity,
-			"origin_state":            cfg.OriginState,
-			"origin_zip":              cfg.OriginZip,
-			"origin_country":          cfg.OriginCountry,
-			"tare_weight_oz":          cfg.TareWeightOz,
+			"flat_rate_cents":           cfg.FlatRateCents,
+			"free_shipping_threshold":   cfg.FreeShippingThreshold,
+			"local_zip_codes":           cfg.LocalZipCodes,
+			"local_delivery_enabled":    cfg.LocalDeliveryEnabled,
+			"local_pickup_enabled":      cfg.LocalPickupEnabled,
+			"local_pickup_instructions": cfg.LocalPickupInstructions,
+			"local_delivery_days":       cfg.LocalDeliveryDays,
+			"origin_name":               cfg.OriginName,
+			"origin_street1":            cfg.OriginStreet1,
+			"origin_street2":            cfg.OriginStreet2,
+			"origin_city":               cfg.OriginCity,
+			"origin_state":              cfg.OriginState,
+			"origin_zip":                cfg.OriginZip,
+			"origin_country":            cfg.OriginCountry,
+			"tare_weight_oz":            cfg.TareWeightOz,
 		},
 		Metadata: map[string]any{
 			"before": map[string]any{
-				"flat_rate_cents":         before.FlatRateCents,
-				"free_shipping_threshold": before.FreeShippingThreshold,
-				"local_zip_codes":         before.LocalZipCodes,
-				"origin_name":             before.OriginName,
-				"origin_street1":          before.OriginStreet1,
-				"origin_street2":          before.OriginStreet2,
-				"origin_city":             before.OriginCity,
-				"origin_state":            before.OriginState,
-				"origin_zip":              before.OriginZip,
-				"origin_country":          before.OriginCountry,
-				"tare_weight_oz":          before.TareWeightOz,
+				"flat_rate_cents":           before.FlatRateCents,
+				"free_shipping_threshold":   before.FreeShippingThreshold,
+				"local_zip_codes":           before.LocalZipCodes,
+				"local_delivery_enabled":    before.LocalDeliveryEnabled,
+				"local_pickup_enabled":      before.LocalPickupEnabled,
+				"local_pickup_instructions": before.LocalPickupInstructions,
+				"local_delivery_days":       before.LocalDeliveryDays,
+				"origin_name":               before.OriginName,
+				"origin_street1":            before.OriginStreet1,
+				"origin_street2":            before.OriginStreet2,
+				"origin_city":               before.OriginCity,
+				"origin_state":              before.OriginState,
+				"origin_zip":                before.OriginZip,
+				"origin_country":            before.OriginCountry,
+				"tare_weight_oz":            before.TareWeightOz,
 			},
 		},
 	})
@@ -195,8 +203,13 @@ type PlaceOrderParams struct {
 	SubscriptionID    *uuid.UUID
 	ShippingCents     int
 	TaxCents          int
-	Notes             *string
-	Metadata          map[string]any
+	// ShippingMethod records the chosen fulfillment channel. For retail
+	// checkout this is set to pickup or local_delivery when the ship-to zip
+	// is local and the customer picked one; otherwise nil and downstream
+	// code treats the order as standard "shipped".
+	ShippingMethod *domain.ShippingMethod
+	Notes          *string
+	Metadata       map[string]any
 }
 
 // PlaceOrder creates a new order from the given parameters within the provided transaction.
@@ -282,6 +295,7 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		ShippingAddressID: p.ShippingAddressID,
 		BillingAddressID:  p.BillingAddressID,
 		SubscriptionID:    p.SubscriptionID,
+		ShippingMethod:    p.ShippingMethod,
 		Notes:             p.Notes,
 		Metadata:          p.Metadata,
 		PlacedAt:          time.Now(),

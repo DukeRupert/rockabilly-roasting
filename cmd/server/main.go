@@ -233,7 +233,7 @@ func run() error {
 	cartSvc := app.NewCartService(cartStore, pricingStore)
 	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg).
 		WithEmail(emailEnv)
-	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, paymentProvider, auditWriter, metricsReg)
+	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, shippingStore, paymentProvider, auditWriter, metricsReg)
 	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -260,6 +260,8 @@ func run() error {
 	river.AddWorker(workers, jobs.NewSubscriptionCancelledWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewRefundConfirmationWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderShippedEmailWorker(orderSvc, pool))
+	river.AddWorker(workers, jobs.NewOrderReadyForPickupEmailWorker(orderSvc, pool))
+	river.AddWorker(workers, jobs.NewOrderOutForDeliveryEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
 	river.AddWorker(workers, jobs.NewAbandonedOrderCleanupWorker(orderSvc, pool))
@@ -313,6 +315,7 @@ func run() error {
 	enqueuer := jobs.NewEnqueuer(riverClient)
 	renewalSvc.WithJobEnqueuer(enqueuer)
 	checkoutSvc.WithCheckoutConfirmDeps(cartStore, enqueuer)
+	orderSvc.WithEnqueuer(enqueuer)
 
 	// Pirate Ship CSV tracking import depends on the enqueuer to fire the
 	// "your order has shipped" email atomically with the per-row write.

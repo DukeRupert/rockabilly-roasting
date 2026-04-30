@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { confirmOrder, getCart, type CartResponse, type PaymentIntentResponse } from './lib/api';
+  import {
+    confirmOrder,
+    getCart,
+    type AddressResponse,
+    type CartResponse,
+    type LocalFulfillmentMethod,
+    type PaymentIntentResponse,
+  } from './lib/api';
   import Information from './steps/Information.svelte';
   import Payment from './steps/Payment.svelte';
   import { formatCents } from './lib/format';
@@ -24,6 +31,11 @@
   // Checkout state carried between steps
   let customerId = $state('');
   let addressId = $state('');
+  let eligibleLocalMethods = $state<LocalFulfillmentMethod[]>([]);
+  let localPickupInstructions = $state('');
+  let localDeliveryDays = $state('');
+  let preferredLocalFulfillment = $state<LocalFulfillmentMethod | ''>('');
+  let chosenShippingMethod = $state<LocalFulfillmentMethod | ''>('');
   let totals = $state<PaymentIntentResponse | null>(null);
 
   const steps: { key: Step; label: string }[] = [
@@ -96,11 +108,32 @@
     }
   }
 
-  function handleAddressComplete(e: { customerId: string; addressId: string }) {
-    customerId = e.customerId;
-    addressId = e.addressId;
+  function handleAddressComplete(e: AddressResponse) {
+    customerId = e.customer_id;
+    addressId = e.address_id;
+    eligibleLocalMethods = e.eligible_local_methods ?? [];
+    localPickupInstructions = e.local_pickup_instructions ?? '';
+    localDeliveryDays = e.local_delivery_days ?? '';
+    preferredLocalFulfillment = e.preferred_local_fulfillment ?? '';
+    // Default the radio: saved preference if it's still eligible, otherwise
+    // the first option. Empty string when there are zero or one option (one
+    // option still gets stamped server-side; UI just doesn't ask).
+    if (eligibleLocalMethods.length > 1) {
+      chosenShippingMethod =
+        preferredLocalFulfillment && eligibleLocalMethods.includes(preferredLocalFulfillment)
+          ? preferredLocalFulfillment
+          : eligibleLocalMethods[0];
+    } else {
+      chosenShippingMethod = '';
+    }
     totals = null;
     step = 'payment';
+  }
+
+  function handleShippingMethodChange(method: LocalFulfillmentMethod) {
+    chosenShippingMethod = method;
+    // Force Payment to recreate the PI with the new method.
+    totals = null;
   }
 
   function handleTotalsLoaded(pi: PaymentIntentResponse) {
@@ -255,6 +288,11 @@
               {stripeKey}
               {customerId}
               {addressId}
+              {eligibleLocalMethods}
+              {localPickupInstructions}
+              {localDeliveryDays}
+              shippingMethod={chosenShippingMethod}
+              onShippingMethodChange={handleShippingMethodChange}
               totalsLoaded={handleTotalsLoaded}
               onBack={() => (step = 'information')}
             />

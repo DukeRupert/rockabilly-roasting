@@ -271,6 +271,28 @@ type OrderShippedEmailArgs struct {
 // Kind returns the job kind identifier.
 func (OrderShippedEmailArgs) Kind() string { return "email:order_shipped" }
 
+// OrderReadyForPickupEmailArgs sends a "your order is ready" notification for
+// pickup orders. Enqueued from MarkReadyForPickup so the email rides on the
+// same transaction as the fulfillment status flip.
+type OrderReadyForPickupEmailArgs struct {
+	OrderID    uuid.UUID `json:"order_id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (OrderReadyForPickupEmailArgs) Kind() string { return "email:order_ready_for_pickup" }
+
+// OrderOutForDeliveryEmailArgs sends an "out for local delivery today"
+// notification. Enqueued from MarkOutForDelivery the day staff dispatches
+// the local-delivery route.
+type OrderOutForDeliveryEmailArgs struct {
+	OrderID    uuid.UUID `json:"order_id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (OrderOutForDeliveryEmailArgs) Kind() string { return "email:order_out_for_delivery" }
+
 // RefundConfirmationArgs sends a refund-issued confirmation. The amount is the
 // refunded total in cents (may be partial).
 type RefundConfirmationArgs struct {

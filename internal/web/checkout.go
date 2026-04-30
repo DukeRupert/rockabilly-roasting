@@ -41,6 +41,7 @@ type checkoutCartResponse struct {
 
 type checkoutAddressRequest struct {
 	Email      string `json:"email"`
+	Phone      string `json:"phone,omitempty"`
 	FirstName  string `json:"first_name"`
 	LastName   string `json:"last_name"`
 	Line1      string `json:"line1"`
@@ -54,6 +55,17 @@ type checkoutAddressRequest struct {
 type checkoutAddressResponse struct {
 	AddressID  string `json:"address_id"`
 	CustomerID string `json:"customer_id"`
+	// Local fulfillment options derived from the saved zip + merchant config.
+	// EligibleLocalMethods is empty for non-local zips; otherwise it contains
+	// any combination of "local_delivery" and "pickup". The Svelte client uses
+	// it to render a method radio + the supporting copy fields.
+	EligibleLocalMethods    []string `json:"eligible_local_methods"`
+	LocalPickupInstructions string   `json:"local_pickup_instructions,omitempty"`
+	LocalDeliveryDays       string   `json:"local_delivery_days,omitempty"`
+	// PreferredLocalFulfillment is the customer's saved choice ("pickup" or
+	// "local_delivery"), or "" if they haven't set one. Used as the default
+	// selection so repeat customers don't re-pick at every checkout.
+	PreferredLocalFulfillment string `json:"preferred_local_fulfillment,omitempty"`
 }
 
 type checkoutApplyCouponRequest struct {
@@ -74,9 +86,10 @@ type checkoutRemoveCouponRequest struct {
 }
 
 type checkoutPaymentIntentRequest struct {
-	CartID     string `json:"cart_id"`
-	AddressID  string `json:"address_id"`
-	CustomerID string `json:"customer_id"`
+	CartID         string `json:"cart_id"`
+	AddressID      string `json:"address_id"`
+	CustomerID     string `json:"customer_id"`
+	ShippingMethod string `json:"shipping_method,omitempty"` // "pickup" | "local_delivery" | "" (auto)
 }
 
 type checkoutPaymentIntentResponse struct {
@@ -315,7 +328,11 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 			if !errors.Is(txErr, app.ErrCustomerNotFound) {
 				return fmt.Errorf("lookup customer: %w", txErr)
 			}
-			customer, txErr = d.CustomerService.CreateRetail(ctx, tx, req.Email, req.FirstName, req.LastName)
+			var phone *string
+			if p := strings.TrimSpace(req.Phone); p != "" {
+				phone = &p
+			}
+			customer, txErr = d.CustomerService.CreateRetail(ctx, tx, req.Email, req.FirstName, req.LastName, phone)
 			if txErr != nil {
 				return fmt.Errorf("create guest customer: %w", txErr)
 			}
@@ -346,6 +363,26 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 			return fmt.Errorf("create address: %w", txErr)
 		}
 		resp.AddressID = addr.ID.String()
+
+		// Local fulfillment eligibility for this address. Populated for any
+		// local zip (even with one option enabled) so the Svelte client can
+		// render the corresponding copy without re-fetching the config.
+		cfg, txErr := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if txErr != nil {
+			return fmt.Errorf("get shipping config: %w", txErr)
+		}
+		methods := cfg.EligibleLocalMethods(addr.PostalCode)
+		resp.EligibleLocalMethods = make([]string, 0, len(methods))
+		for _, m := range methods {
+			resp.EligibleLocalMethods = append(resp.EligibleLocalMethods, string(m))
+		}
+		if len(methods) > 0 {
+			resp.LocalPickupInstructions = cfg.LocalPickupInstructions
+			resp.LocalDeliveryDays = cfg.LocalDeliveryDays
+			if customer.PreferredLocalFulfillment != nil {
+				resp.PreferredLocalFulfillment = string(*customer.PreferredLocalFulfillment)
+			}
+		}
 
 		return nil
 	})
@@ -516,6 +553,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		shippingLabel string
 		shippingAddr  *domain.Address
 		orderItems    []app.CartItem
+		chosenMethod  *domain.ShippingMethod
 	)
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -606,7 +644,15 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return fmt.Errorf("calculate shipping: %w", txErr)
 		}
 		shippingTotal = shipCents
-		shippingLabel = shippingDisplayLabel(shipCfg, shipCents, shippingAddr.PostalCode)
+
+		// Resolve the chosen local fulfillment method. The Svelte client sends
+		// a value when the zip is local; validate against the merchant config
+		// instead of trusting the input. If the customer has a saved preference
+		// and didn't send a method, fall back to it before defaulting to the
+		// first eligible option.
+		eligible := shipCfg.EligibleLocalMethods(shippingAddr.PostalCode)
+		chosenMethod = resolveLocalMethod(eligible, req.ShippingMethod, customer.PreferredLocalFulfillment)
+		shippingLabel = shippingDisplayLabel(shipCfg, shipCents, shippingAddr.PostalCode, chosenMethod)
 
 		return nil
 	})
@@ -666,6 +712,7 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			CouponCode:        couponCodePtr,
 			ShippingCents:     shippingTotal,
 			TaxCents:          taxTotal,
+			ShippingMethod:    chosenMethod,
 			Metadata: map[string]any{
 				"cart_id":           cartID.String(),
 				"payment_intent_id": pi.ID,
@@ -717,18 +764,63 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 }
 
 // shippingDisplayLabel returns the customer-facing descriptor for a computed
-// shipping line. Returns "" when the default "Shipping" label is sufficient.
-func shippingDisplayLabel(cfg *domain.ShippingConfig, shippingCents int, shipToZip string) string {
+// shipping line. The chosen method (set when the customer picked pickup vs
+// delivery for a local zip) drives the wording so the receipt and confirmation
+// page match the choice. Returns "" when the default "Shipping" label is
+// sufficient.
+func shippingDisplayLabel(cfg *domain.ShippingConfig, shippingCents int, shipToZip string, method *domain.ShippingMethod) string {
 	if cfg == nil {
 		return ""
 	}
-	if shippingCents == 0 {
-		if cfg.IsLocal(shipToZip) {
+	if shippingCents > 0 {
+		return ""
+	}
+	if method != nil {
+		switch *method {
+		case domain.ShippingMethodPickup:
+			return "Free pickup at the shop"
+		case domain.ShippingMethodLocalDelivery:
 			return "Free local delivery"
 		}
-		return "Free shipping"
 	}
-	return ""
+	if cfg.IsLocal(shipToZip) {
+		// Local zip but no method recorded — fall back to the more specific
+		// label so the receipt still reads correctly. Only happens when
+		// neither pickup nor delivery was offered (both toggles off).
+		return "Free local delivery"
+	}
+	return "Free shipping"
+}
+
+// resolveLocalMethod picks the shipping method to stamp on a retail order.
+// Priority: explicit client choice (must be in the eligible set), then the
+// customer's saved preference (likewise validated), then the first eligible
+// option. Returns nil for non-local addresses (eligible empty), which leaves
+// the order's shipping_method NULL — i.e. standard "shipped" downstream.
+func resolveLocalMethod(eligible []domain.ShippingMethod, requested string, preference *domain.ShippingMethod) *domain.ShippingMethod {
+	if len(eligible) == 0 {
+		return nil
+	}
+	contains := func(s domain.ShippingMethod) bool {
+		for _, m := range eligible {
+			if m == s {
+				return true
+			}
+		}
+		return false
+	}
+	if requested != "" {
+		m := domain.ShippingMethod(requested)
+		if contains(m) {
+			return &m
+		}
+	}
+	if preference != nil && contains(*preference) {
+		m := *preference
+		return &m
+	}
+	first := eligible[0]
+	return &first
 }
 
 // handleCheckoutConfirm transitions the pre-created order to confirmed when

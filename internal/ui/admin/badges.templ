@@ -63,6 +63,8 @@ func FulfillmentStatusLabel(s domain.FulfillmentStatus) string {
 		return "Partially fulfilled"
 	case domain.FulfillmentStatusFulfilled:
 		return "Fulfilled"
+	case domain.FulfillmentStatusReadyForPickup:
+		return "Ready for pickup"
 	case domain.FulfillmentStatusPartiallyShipped:
 		return "Partially shipped"
 	case domain.FulfillmentStatusShipped:
@@ -181,6 +183,8 @@ func fulfillmentStatusBadgeClasses(status domain.FulfillmentStatus) string {
 		return "badge badge-dot badge-green-solid"
 	case domain.FulfillmentStatusFulfilled:
 		return "badge badge-dot badge-green"
+	case domain.FulfillmentStatusReadyForPickup:
+		return "badge badge-dot badge-amber"
 	case domain.FulfillmentStatusReturned:
 		return "badge badge-dot badge-grey"
 	default:

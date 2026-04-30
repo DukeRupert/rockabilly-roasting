@@ -97,7 +97,10 @@ func (s *ShippingExportService) BuildPirateShipCSV(
 
 // loadCandidateOrders fetches the order set targeted by the export. Either
 // explicit IDs (each loaded individually — small lists assumed) or the
-// status-based ready-to-ship filter.
+// status-based ready-to-ship filter. Orders routed through a local
+// fulfillment channel (pickup or local_delivery) are filtered out — Pirate
+// Ship doesn't carry those; the admin lifecycle actions on the order page
+// drive their dispatch instead.
 func (s *ShippingExportService) loadCandidateOrders(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -113,13 +116,16 @@ func (s *ShippingExportService) loadCandidateOrders(
 				}
 				return nil, fmt.Errorf("get order %s: %w", id, err)
 			}
+			if isLocalFulfillment(o.ShippingMethod) {
+				continue
+			}
 			out = append(out, *o)
 		}
 		return out, nil
 	}
 
 	unfulfilled := domain.FulfillmentStatusUnfulfilled
-	return s.orders.ListOrders(ctx, tx, store.OrderFilter{
+	all, err := s.orders.ListOrders(ctx, tx, store.OrderFilter{
 		FulfillmentStatuses: []domain.FulfillmentStatus{unfulfilled},
 		PaymentStatuses: []domain.PaymentStatus{
 			domain.PaymentStatusCaptured,
@@ -127,6 +133,26 @@ func (s *ShippingExportService) loadCandidateOrders(
 		},
 		Limit: 1000, // cap; single-merchant volume is far below this
 	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.Order, 0, len(all))
+	for _, o := range all {
+		if isLocalFulfillment(o.ShippingMethod) {
+			continue
+		}
+		out = append(out, o)
+	}
+	return out, nil
+}
+
+// isLocalFulfillment reports whether an order's shipping method routes it
+// outside the Pirate Ship CSV pipeline.
+func isLocalFulfillment(m *domain.ShippingMethod) bool {
+	if m == nil {
+		return false
+	}
+	return *m == domain.ShippingMethodPickup || *m == domain.ShippingMethodLocalDelivery
 }
 
 // buildRow assembles one ExportRow. Returns (row, nil, nil) on success or

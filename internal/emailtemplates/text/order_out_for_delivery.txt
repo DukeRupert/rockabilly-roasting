@@ -1,0 +1,23 @@
+{{define "order_out_for_delivery.txt"}}{{.StoreName}}
+==========================================
+
+OUT FOR LOCAL DELIVERY
+
+Hi{{if .CustomerName}} {{.CustomerName}}{{end}},
+
+Your order {{.OrderNumber}} is on the local delivery route today. {{if .DeliveryDays}}We deliver {{.DeliveryDays}} -- expect it by end of day.{{else}}Expect it by end of day.{{end}}
+{{if .ShippingAddr}}
+HEADED TO
+{{.ShippingAddr}}
+{{end}}
+If no one's home we'll leave it on the porch in shade. Questions? Just reply to this email.
+
+Thanks for the order,
+The crew at Rockabilly Roasting Co.
+
+------------------------------------------
+{{.StoreName}}
+101 W Kennewick Ave, Kennewick WA
+(509) 585-2320
+{{.StoreURL}}
+{{end}}

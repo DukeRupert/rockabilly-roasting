@@ -19,18 +19,22 @@ type QBConnectionStatus struct {
 // ShippingSettings holds the editable shipping configuration shown on the
 // Settings page.
 type ShippingSettings struct {
-	FlatRateCents         int
-	FreeShippingThreshold *int
-	Currency              string
-	LocalZipCodes         []string
-	OriginName            string
-	OriginStreet1         string
-	OriginStreet2         string
-	OriginCity            string
-	OriginState           string
-	OriginZip             string
-	OriginCountry         string
-	TareWeightOz          float64
+	FlatRateCents           int
+	FreeShippingThreshold   *int
+	Currency                string
+	LocalZipCodes           []string
+	LocalDeliveryEnabled    bool
+	LocalPickupEnabled      bool
+	LocalPickupInstructions string
+	LocalDeliveryDays       string
+	OriginName              string
+	OriginStreet1           string
+	OriginStreet2           string
+	OriginCity              string
+	OriginState             string
+	OriginZip               string
+	OriginCountry           string
+	TareWeightOz            float64
 }
 
 // formatTareOz renders the tare weight as a number input value. Trailing
@@ -175,6 +179,63 @@ templ SettingsContent(props SettingsProps) {
 					<p class="mt-1 text-xs text-rr-muted">
 						Comma- or whitespace-separated 5-digit zips. Orders shipping to any of these zips ship free regardless of subtotal.
 					</p>
+				</div>
+				<div class="px-4 py-5 sm:px-6">
+					<h3 class="text-sm font-semibold text-rr-heading">Local fulfillment options</h3>
+					<p class="mt-1 text-xs text-rr-muted">
+						Channels offered to customers shipping to a local zip. Disable both to fall back to the standard shipped flow even for local zips.
+					</p>
+					<div class="mt-3 space-y-4">
+						<label class="flex items-start gap-3">
+							<input
+								type="checkbox"
+								name="local_delivery_enabled"
+								value="1"
+								checked?={ props.Shipping.LocalDeliveryEnabled }
+								class="mt-1 size-4 rounded-sm border-2 border-rr-border"
+							/>
+							<span>
+								<span class="block text-sm font-medium text-rr-heading">Free local delivery</span>
+								<span class="block text-xs text-rr-muted">Customer's order is hand-delivered on the configured days.</span>
+							</span>
+						</label>
+						<div class="ml-7 sm:max-w-md">
+							<label for="local-delivery-days" class="block text-sm font-medium text-rr-heading">Delivery days (display string)</label>
+							<input
+								id="local-delivery-days"
+								type="text"
+								name="local_delivery_days"
+								value={ props.Shipping.LocalDeliveryDays }
+								placeholder="Mondays and Thursdays"
+								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+							<p class="mt-1 text-xs text-rr-muted">Shown to the customer on receipts and "out for delivery" emails. Cosmetic — staff still chooses when to dispatch.</p>
+						</div>
+						<label class="flex items-start gap-3">
+							<input
+								type="checkbox"
+								name="local_pickup_enabled"
+								value="1"
+								checked?={ props.Shipping.LocalPickupEnabled }
+								class="mt-1 size-4 rounded-sm border-2 border-rr-border"
+							/>
+							<span>
+								<span class="block text-sm font-medium text-rr-heading">Free pickup at the shop</span>
+								<span class="block text-xs text-rr-muted">Customer is notified by email when the order is ready and picks it up at the shop.</span>
+							</span>
+						</label>
+						<div class="ml-7">
+							<label for="local-pickup-instructions" class="block text-sm font-medium text-rr-heading">Pickup instructions</label>
+							<textarea
+								id="local-pickup-instructions"
+								name="local_pickup_instructions"
+								rows="3"
+								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								placeholder="101 W Kennewick Ave, Tue–Sat 8a–4p"
+							>{ props.Shipping.LocalPickupInstructions }</textarea>
+							<p class="mt-1 text-xs text-rr-muted">Shown at checkout when pickup is selected and in the "ready for pickup" email.</p>
+						</div>
+					</div>
 				</div>
 				<div class="px-4 py-5 sm:px-6">
 					<h3 class="text-sm font-semibold text-rr-heading">Pickup origin</h3>

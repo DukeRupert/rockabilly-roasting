@@ -390,3 +390,162 @@ func (s *OrderService) SendRefundConfirmationEmail(ctx context.Context, pool *pg
 	s.metrics.EmailsSent.WithLabelValues("refund_confirmation", "sent").Inc()
 	return nil
 }
+
+// SendOrderReadyForPickupEmail tells a pickup customer their order is packed
+// and waiting at the shop. Loaded with the read → send → audit pattern.
+// The pickup instructions come from shipping_config so the merchant can
+// update them without a code change.
+func (s *OrderService) SendOrderReadyForPickupEmail(ctx context.Context, pool *pgxpool.Pool, orderID, customerID uuid.UUID) error {
+	var (
+		order              *domain.Order
+		customer           *domain.Customer
+		pickupInstructions string
+	)
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		o, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
+		if err != nil {
+			return fmt.Errorf("get order %s: %w", orderID, err)
+		}
+		order = o
+
+		c, err := s.customers.GetByID(ctx, tx, customerID)
+		if err != nil {
+			return fmt.Errorf("get customer %s: %w", customerID, err)
+		}
+		customer = c
+
+		if s.shipments != nil {
+			cfg, err := s.shipments.GetConfig(ctx, tx)
+			if err == nil {
+				pickupInstructions = cfg.LocalPickupInstructions
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	html, text, err := s.email.Renderer.Render("order_ready_for_pickup", emailtemplates.OrderReadyForPickupData{
+		CustomerName:       customer.FirstName,
+		OrderNumber:        order.Number,
+		PickupInstructions: pickupInstructions,
+		StoreName:          s.email.StoreName,
+		StoreURL:           s.email.BaseURL,
+		AccountURL:         s.email.BaseURL + "/account/orders/" + order.ID.String(),
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("order_ready_for_pickup", "failed").Inc()
+		return fmt.Errorf("render ready-for-pickup template: %w", err)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      customer.Email,
+		Subject: fmt.Sprintf("Your order's ready for pickup — %s", order.Number),
+		HTML:    html,
+		Text:    text,
+		Tag:     "order-ready-for-pickup",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("order_ready_for_pickup", "failed").Inc()
+		return fmt.Errorf("send ready-for-pickup email: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "order_ready_for_pickup_worker",
+			Action:       audit.AuditEmailOrderReadyForPickup,
+			ResourceType: "order",
+			ResourceID:   order.ID,
+			Metadata:     map[string]any{"order_number": order.Number},
+		})
+	}); err != nil {
+		return fmt.Errorf("audit ready-for-pickup sent: %w", err)
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("order_ready_for_pickup", "sent").Inc()
+	return nil
+}
+
+// SendOrderOutForDeliveryEmail tells a local-delivery customer their order is
+// on the route today. The configured display string for delivery days is
+// surfaced so customers see consistent wording across receipt and email.
+func (s *OrderService) SendOrderOutForDeliveryEmail(ctx context.Context, pool *pgxpool.Pool, orderID, customerID uuid.UUID) error {
+	var (
+		order        *domain.Order
+		customer     *domain.Customer
+		deliveryDays string
+		shippingAddr string
+	)
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		o, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
+		if err != nil {
+			return fmt.Errorf("get order %s: %w", orderID, err)
+		}
+		order = o
+
+		c, err := s.customers.GetByID(ctx, tx, customerID)
+		if err != nil {
+			return fmt.Errorf("get customer %s: %w", customerID, err)
+		}
+		customer = c
+
+		if s.shipments != nil {
+			cfg, err := s.shipments.GetConfig(ctx, tx)
+			if err == nil {
+				deliveryDays = cfg.LocalDeliveryDays
+			}
+		}
+		if addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID); err == nil {
+			shippingAddr = emailtemplates.FormatAddress(addr.Line1, addr.City, addr.State, addr.PostalCode)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	html, text, err := s.email.Renderer.Render("order_out_for_delivery", emailtemplates.OrderOutForDeliveryData{
+		CustomerName: customer.FirstName,
+		OrderNumber:  order.Number,
+		DeliveryDays: deliveryDays,
+		ShippingAddr: shippingAddr,
+		StoreName:    s.email.StoreName,
+		StoreURL:     s.email.BaseURL,
+		AccountURL:   s.email.BaseURL + "/account/orders/" + order.ID.String(),
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("order_out_for_delivery", "failed").Inc()
+		return fmt.Errorf("render out-for-delivery template: %w", err)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      customer.Email,
+		Subject: fmt.Sprintf("Out for local delivery today — %s", order.Number),
+		HTML:    html,
+		Text:    text,
+		Tag:     "order-out-for-delivery",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("order_out_for_delivery", "failed").Inc()
+		return fmt.Errorf("send out-for-delivery email: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "order_out_for_delivery_worker",
+			Action:       audit.AuditEmailOrderOutForDelivery,
+			ResourceType: "order",
+			ResourceID:   order.ID,
+			Metadata:     map[string]any{"order_number": order.Number},
+		})
+	}); err != nil {
+		return fmt.Errorf("audit out-for-delivery sent: %w", err)
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("order_out_for_delivery", "sent").Inc()
+	return nil
+}
+

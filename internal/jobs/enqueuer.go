@@ -58,3 +58,24 @@ func (e *Enqueuer) EnqueueOrderShipped(ctx context.Context, tx pgx.Tx, orderID, 
 	}, nil)
 	return err
 }
+
+// EnqueueOrderReadyForPickup enqueues a "your order is ready" notification
+// for a pickup order, in tx so it rides on the staff transition's commit.
+func (e *Enqueuer) EnqueueOrderReadyForPickup(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error {
+	_, err := e.client.InsertTx(ctx, tx, OrderReadyForPickupEmailArgs{
+		OrderID:    orderID,
+		CustomerID: customerID,
+	}, nil)
+	return err
+}
+
+// EnqueueOrderOutForDelivery enqueues an "out for local delivery today"
+// notification for a local-delivery order, in tx so it rides on the staff
+// transition's commit.
+func (e *Enqueuer) EnqueueOrderOutForDelivery(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error {
+	_, err := e.client.InsertTx(ctx, tx, OrderOutForDeliveryEmailArgs{
+		OrderID:    orderID,
+		CustomerID: customerID,
+	}, nil)
+	return err
+}

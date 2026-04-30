@@ -29,18 +29,22 @@ func (s *ShippingStore) GetConfig(ctx context.Context, tx pgx.Tx) (*domain.Shipp
 		return nil, fmt.Errorf("get shipping config: %w", err)
 	}
 	return &domain.ShippingConfig{
-		FlatRateCents:         int(row.FlatRateCents),
-		FreeShippingThreshold: int32PtrToIntPtr(row.FreeShippingThreshold),
-		Currency:              row.Currency,
-		LocalZipCodes:         row.LocalZipCodes,
-		OriginName:            row.OriginName,
-		OriginStreet1:         row.OriginStreet1,
-		OriginStreet2:         row.OriginStreet2,
-		OriginCity:            row.OriginCity,
-		OriginState:           row.OriginState,
-		OriginZip:             row.OriginZip,
-		OriginCountry:         row.OriginCountry,
-		TareWeightOz:          numericToFloat64(row.TareWeightOz),
+		FlatRateCents:           int(row.FlatRateCents),
+		FreeShippingThreshold:   int32PtrToIntPtr(row.FreeShippingThreshold),
+		Currency:                row.Currency,
+		LocalZipCodes:           row.LocalZipCodes,
+		LocalDeliveryEnabled:    row.LocalDeliveryEnabled,
+		LocalPickupEnabled:      row.LocalPickupEnabled,
+		LocalPickupInstructions: row.LocalPickupInstructions,
+		LocalDeliveryDays:       row.LocalDeliveryDays,
+		OriginName:              row.OriginName,
+		OriginStreet1:           row.OriginStreet1,
+		OriginStreet2:           row.OriginStreet2,
+		OriginCity:              row.OriginCity,
+		OriginState:             row.OriginState,
+		OriginZip:               row.OriginZip,
+		OriginCountry:           row.OriginCountry,
+		TareWeightOz:            numericToFloat64(row.TareWeightOz),
 	}, nil
 }
 
@@ -51,18 +55,22 @@ func (s *ShippingStore) UpdateConfig(ctx context.Context, tx pgx.Tx, cfg domain.
 		zips = []string{}
 	}
 	err := sqlcgen.New(tx).UpdateShippingConfig(ctx, sqlcgen.UpdateShippingConfigParams{
-		FlatRateCents:         int32(cfg.FlatRateCents),
-		FreeShippingThreshold: intPtrToInt32Ptr(cfg.FreeShippingThreshold),
-		Currency:              cfg.Currency,
-		LocalZipCodes:         zips,
-		OriginName:            cfg.OriginName,
-		OriginStreet1:         cfg.OriginStreet1,
-		OriginStreet2:         cfg.OriginStreet2,
-		OriginCity:            cfg.OriginCity,
-		OriginState:           cfg.OriginState,
-		OriginZip:             cfg.OriginZip,
-		OriginCountry:         cfg.OriginCountry,
-		TareWeightOz:          float64ToNumeric(cfg.TareWeightOz),
+		FlatRateCents:           int32(cfg.FlatRateCents),
+		FreeShippingThreshold:   intPtrToInt32Ptr(cfg.FreeShippingThreshold),
+		Currency:                cfg.Currency,
+		LocalZipCodes:           zips,
+		OriginName:              cfg.OriginName,
+		OriginStreet1:           cfg.OriginStreet1,
+		OriginStreet2:           cfg.OriginStreet2,
+		OriginCity:              cfg.OriginCity,
+		OriginState:             cfg.OriginState,
+		OriginZip:               cfg.OriginZip,
+		OriginCountry:           cfg.OriginCountry,
+		TareWeightOz:            float64ToNumeric(cfg.TareWeightOz),
+		LocalDeliveryEnabled:    cfg.LocalDeliveryEnabled,
+		LocalPickupEnabled:      cfg.LocalPickupEnabled,
+		LocalPickupInstructions: cfg.LocalPickupInstructions,
+		LocalDeliveryDays:       cfg.LocalDeliveryDays,
 	})
 	if err != nil {
 		return fmt.Errorf("update shipping config: %w", err)

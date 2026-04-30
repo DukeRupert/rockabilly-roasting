@@ -40,18 +40,22 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 			return cfgErr
 		}
 		shipping = admin.ShippingSettings{
-			FlatRateCents:         cfg.FlatRateCents,
-			FreeShippingThreshold: cfg.FreeShippingThreshold,
-			Currency:              cfg.Currency,
-			LocalZipCodes:         cfg.LocalZipCodes,
-			OriginName:            cfg.OriginName,
-			OriginStreet1:         cfg.OriginStreet1,
-			OriginStreet2:         cfg.OriginStreet2,
-			OriginCity:            cfg.OriginCity,
-			OriginState:           cfg.OriginState,
-			OriginZip:             cfg.OriginZip,
-			OriginCountry:         cfg.OriginCountry,
-			TareWeightOz:          cfg.TareWeightOz,
+			FlatRateCents:           cfg.FlatRateCents,
+			FreeShippingThreshold:   cfg.FreeShippingThreshold,
+			Currency:                cfg.Currency,
+			LocalZipCodes:           cfg.LocalZipCodes,
+			LocalDeliveryEnabled:    cfg.LocalDeliveryEnabled,
+			LocalPickupEnabled:      cfg.LocalPickupEnabled,
+			LocalPickupInstructions: cfg.LocalPickupInstructions,
+			LocalDeliveryDays:       cfg.LocalDeliveryDays,
+			OriginName:              cfg.OriginName,
+			OriginStreet1:           cfg.OriginStreet1,
+			OriginStreet2:           cfg.OriginStreet2,
+			OriginCity:              cfg.OriginCity,
+			OriginState:             cfg.OriginState,
+			OriginZip:               cfg.OriginZip,
+			OriginCountry:           cfg.OriginCountry,
+			TareWeightOz:            cfg.TareWeightOz,
 		}
 		return nil
 	})
@@ -120,18 +124,22 @@ func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.
 	}
 
 	cfg := domain.ShippingConfig{
-		FlatRateCents:         flatRateCents,
-		FreeShippingThreshold: threshold,
-		Currency:              "usd",
-		LocalZipCodes:         zips,
-		OriginName:            strings.TrimSpace(r.FormValue("origin_name")),
-		OriginStreet1:         strings.TrimSpace(r.FormValue("origin_street1")),
-		OriginStreet2:         strings.TrimSpace(r.FormValue("origin_street2")),
-		OriginCity:            strings.TrimSpace(r.FormValue("origin_city")),
-		OriginState:           strings.ToUpper(strings.TrimSpace(r.FormValue("origin_state"))),
-		OriginZip:             strings.TrimSpace(r.FormValue("origin_zip")),
-		OriginCountry:         originCountry,
-		TareWeightOz:          tareOz,
+		FlatRateCents:           flatRateCents,
+		FreeShippingThreshold:   threshold,
+		Currency:                "usd",
+		LocalZipCodes:           zips,
+		LocalDeliveryEnabled:    r.FormValue("local_delivery_enabled") != "",
+		LocalPickupEnabled:      r.FormValue("local_pickup_enabled") != "",
+		LocalPickupInstructions: strings.TrimSpace(r.FormValue("local_pickup_instructions")),
+		LocalDeliveryDays:       strings.TrimSpace(r.FormValue("local_delivery_days")),
+		OriginName:              strings.TrimSpace(r.FormValue("origin_name")),
+		OriginStreet1:           strings.TrimSpace(r.FormValue("origin_street1")),
+		OriginStreet2:           strings.TrimSpace(r.FormValue("origin_street2")),
+		OriginCity:              strings.TrimSpace(r.FormValue("origin_city")),
+		OriginState:             strings.ToUpper(strings.TrimSpace(r.FormValue("origin_state"))),
+		OriginZip:               strings.TrimSpace(r.FormValue("origin_zip")),
+		OriginCountry:           originCountry,
+		TareWeightOz:            tareOz,
 	}
 
 	actor := staffActor(r)

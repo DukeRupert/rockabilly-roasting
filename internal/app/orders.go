@@ -26,6 +26,7 @@ type OrderService struct {
 	shipments     *store.ShippingStore     // populated via WithShipments; required for SendOrderShippedEmail
 	email         EmailEnv                 // populated via WithEmail; required for Send* methods
 	discounts     *store.DiscountStore     // populated via WithDiscounts; required for CancelOrder coupon release
+	enqueuer      JobEnqueuer              // populated via WithEnqueuer; required for ready-for-pickup / out-for-delivery email enqueue
 }
 
 // NewOrderService creates a new OrderService.
@@ -61,6 +62,14 @@ func (s *OrderService) WithShipments(shipments *store.ShippingStore) *OrderServi
 // time before any cancellation path runs.
 func (s *OrderService) WithDiscounts(discounts *store.DiscountStore) *OrderService {
 	s.discounts = discounts
+	return s
+}
+
+// WithEnqueuer wires the job enqueuer used by the local fulfillment
+// transitions (MarkReadyForPickup / MarkOutForDelivery) to send the matching
+// notification email. Must be set at wiring time before those methods run.
+func (s *OrderService) WithEnqueuer(e JobEnqueuer) *OrderService {
+	s.enqueuer = e
 	return s
 }
 
@@ -402,6 +411,158 @@ func (s *OrderService) ShipOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, a
 		After:        order,
 	}); err != nil {
 		return nil, fmt.Errorf("audit order shipped: %w", err)
+	}
+
+	return order, nil
+}
+
+// MarkReadyForPickup transitions a pickup order to the ready_for_pickup
+// state and enqueues the "ready" notification. Allowed only for orders whose
+// shipping_method is pickup; the previous fulfillment status must be
+// unfulfilled or fulfilled (the latter accommodates a "fulfilled then made
+// ready" two-step workflow if staff prefer that).
+func (s *OrderService) MarkReadyForPickup(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for ready-for-pickup: %w", err)
+	}
+
+	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodPickup {
+		return nil, fmt.Errorf("order is not a pickup order: %w", ErrInvalidOrderStatus)
+	}
+	switch order.FulfillmentStatus {
+	case domain.FulfillmentStatusUnfulfilled, domain.FulfillmentStatusFulfilled:
+		// allowed
+	default:
+		return nil, fmt.Errorf("order cannot be marked ready: %w", ErrInvalidOrderStatus)
+	}
+
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusReadyForPickup)
+	if err != nil {
+		return nil, fmt.Errorf("set ready for pickup: %w", err)
+	}
+	if order.Status != domain.OrderStatusProcessing && order.Status != domain.OrderStatusComplete {
+		order, err = s.orders.UpdateOrderStatus(ctx, tx, id, domain.OrderStatusProcessing)
+		if err != nil {
+			return nil, fmt.Errorf("ready-for-pickup status: %w", err)
+		}
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderReadyForPickup,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+	}); err != nil {
+		return nil, fmt.Errorf("audit ready-for-pickup: %w", err)
+	}
+
+	if s.enqueuer != nil && order.CustomerID != nil {
+		if err := s.enqueuer.EnqueueOrderReadyForPickup(ctx, tx, order.ID, *order.CustomerID); err != nil {
+			return nil, fmt.Errorf("enqueue ready-for-pickup email: %w", err)
+		}
+	}
+
+	return order, nil
+}
+
+// MarkPickedUp transitions a ready_for_pickup order to delivered/complete.
+// No email — the customer already knows; this is the staff bookkeeping
+// counterpart to MarkReadyForPickup.
+func (s *OrderService) MarkPickedUp(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for picked-up: %w", err)
+	}
+
+	if order.FulfillmentStatus != domain.FulfillmentStatusReadyForPickup {
+		return nil, fmt.Errorf("order is not ready for pickup: %w", ErrInvalidOrderStatus)
+	}
+
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusDelivered)
+	if err != nil {
+		return nil, fmt.Errorf("set delivered: %w", err)
+	}
+	order, err = s.orders.UpdateOrderStatus(ctx, tx, id, domain.OrderStatusComplete)
+	if err != nil {
+		return nil, fmt.Errorf("complete order: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderPickedUp,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+	}); err != nil {
+		return nil, fmt.Errorf("audit picked-up: %w", err)
+	}
+
+	return order, nil
+}
+
+// MarkOutForDelivery transitions a local-delivery order from unfulfilled to
+// shipped (reusing the existing terminal-shipping vocabulary) and enqueues
+// the "out for delivery today" email. Local delivery doesn't get a tracking
+// number, so the EnqueueOrderShipped path isn't suitable — the courier is the
+// shop owner and the customer just needs to know it's coming.
+func (s *OrderService) MarkOutForDelivery(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for out-for-delivery: %w", err)
+	}
+
+	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodLocalDelivery {
+		return nil, fmt.Errorf("order is not a local delivery order: %w", ErrInvalidOrderStatus)
+	}
+	switch order.FulfillmentStatus {
+	case domain.FulfillmentStatusUnfulfilled, domain.FulfillmentStatusFulfilled:
+		// allowed
+	default:
+		return nil, fmt.Errorf("order cannot be marked out-for-delivery: %w", ErrInvalidOrderStatus)
+	}
+
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusShipped)
+	if err != nil {
+		return nil, fmt.Errorf("set out-for-delivery: %w", err)
+	}
+	if order.Status != domain.OrderStatusComplete {
+		order, err = s.orders.UpdateOrderStatus(ctx, tx, id, domain.OrderStatusComplete)
+		if err != nil {
+			return nil, fmt.Errorf("complete order: %w", err)
+		}
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderOutForDelivery,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+	}); err != nil {
+		return nil, fmt.Errorf("audit out-for-delivery: %w", err)
+	}
+
+	if s.enqueuer != nil && order.CustomerID != nil {
+		if err := s.enqueuer.EnqueueOrderOutForDelivery(ctx, tx, order.ID, *order.CustomerID); err != nil {
+			return nil, fmt.Errorf("enqueue out-for-delivery email: %w", err)
+		}
 	}
 
 	return order, nil

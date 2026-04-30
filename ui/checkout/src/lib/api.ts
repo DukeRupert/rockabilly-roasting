@@ -16,6 +16,7 @@ export interface CartResponse {
 
 export interface AddressRequest {
   email: string;
+  phone?: string;
   first_name: string;
   last_name: string;
   line1: string;
@@ -26,15 +27,22 @@ export interface AddressRequest {
   country: string;
 }
 
+export type LocalFulfillmentMethod = 'local_delivery' | 'pickup';
+
 export interface AddressResponse {
   address_id: string;
   customer_id: string;
+  eligible_local_methods: LocalFulfillmentMethod[];
+  local_pickup_instructions?: string;
+  local_delivery_days?: string;
+  preferred_local_fulfillment?: LocalFulfillmentMethod;
 }
 
 export interface PaymentIntentRequest {
   cart_id: string;
   address_id: string;
   customer_id: string;
+  shipping_method?: LocalFulfillmentMethod | '';
 }
 
 export interface PaymentIntentResponse {

@@ -43,6 +43,7 @@ const (
 	FulfillmentStatusUnfulfilled        FulfillmentStatus = "unfulfilled"
 	FulfillmentStatusPartiallyFulfilled FulfillmentStatus = "partially_fulfilled"
 	FulfillmentStatusFulfilled          FulfillmentStatus = "fulfilled"
+	FulfillmentStatusReadyForPickup     FulfillmentStatus = "ready_for_pickup"
 	FulfillmentStatusPartiallyShipped   FulfillmentStatus = "partially_shipped"
 	FulfillmentStatusShipped            FulfillmentStatus = "shipped"
 	FulfillmentStatusPartiallyDelivered FulfillmentStatus = "partially_delivered"

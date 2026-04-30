@@ -85,6 +85,7 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	                 website, wholesale_notes, approved_at, approved_by,
 	                 payment_terms_days, billing_method,
 	                 two_fa_enabled, two_fa_method,
+	                 preferred_local_fulfillment,
 	                 metadata, created_at, updated_at
 	          FROM customers WHERE true`
 	args := []any{}
@@ -139,6 +140,7 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 		var wholesaleStatus *string
 		var billingMethod string
 		var paymentTermsDays *int32
+		var preferredLocal *string
 		var metadata []byte
 		var approvedAt pgtype.Timestamptz
 		if err := rows.Scan(
@@ -148,6 +150,7 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 			&c.Website, &c.WholesaleNotes, &approvedAt, &c.ApprovedBy,
 			&paymentTermsDays, &billingMethod,
 			&c.TwoFAEnabled, &c.TwoFAMethod,
+			&preferredLocal,
 			&metadata, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
@@ -161,6 +164,10 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 		if wholesaleStatus != nil {
 			ws := domain.WholesaleStatus(*wholesaleStatus)
 			c.WholesaleStatus = &ws
+		}
+		if preferredLocal != nil {
+			m := domain.ShippingMethod(*preferredLocal)
+			c.PreferredLocalFulfillment = &m
 		}
 		c.ApprovedAt = timestampFromPG(approvedAt)
 		c.Metadata = metadataFromJSON(metadata)
@@ -453,6 +460,25 @@ func (s *CustomerStore) UpdatePaymentTerms(ctx context.Context, tx pgx.Tx, id uu
 	return nil
 }
 
+// UpdatePreferredLocalFulfillment sets a customer's saved choice for local
+// fulfillment. Pass nil to clear the preference (back to "ask each time").
+// The DB CHECK constraint enforces the value is pickup or local_delivery.
+func (s *CustomerStore) UpdatePreferredLocalFulfillment(ctx context.Context, tx pgx.Tx, id uuid.UUID, method *domain.ShippingMethod) error {
+	var v *string
+	if method != nil {
+		s := string(*method)
+		v = &s
+	}
+	err := sqlcgen.New(tx).UpdateCustomerPreferredLocalFulfillment(ctx, sqlcgen.UpdateCustomerPreferredLocalFulfillmentParams{
+		ID:                        id,
+		PreferredLocalFulfillment: v,
+	})
+	if err != nil {
+		return fmt.Errorf("update customer preferred local fulfillment: %w", err)
+	}
+	return nil
+}
+
 // UpdateBillingMethod sets a customer's billing method.
 func (s *CustomerStore) UpdateBillingMethod(ctx context.Context, tx pgx.Tx, id uuid.UUID, method domain.BillingMethod) error {
 	err := sqlcgen.New(tx).UpdateCustomerBillingMethod(ctx, sqlcgen.UpdateCustomerBillingMethodParams{
@@ -577,6 +603,7 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 		        payment_terms_days, billing_method,
 		        qb_customer_id, qb_synced_at,
 		        two_fa_enabled, two_fa_method,
+		        preferred_local_fulfillment,
 		        metadata, created_at, updated_at
 		 FROM customers
 		 WHERE account_type = 'wholesale' AND qb_customer_id IS NOT NULL
@@ -593,6 +620,7 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 		var wholesaleStatus *string
 		var billingMethod string
 		var paymentTermsDays *int32
+		var preferredLocal *string
 		var metadata []byte
 		var approvedAt pgtype.Timestamptz
 		var qbSyncedAt pgtype.Timestamptz
@@ -604,6 +632,7 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 			&paymentTermsDays, &billingMethod,
 			&c.QBCustomerID, &qbSyncedAt,
 			&c.TwoFAEnabled, &c.TwoFAMethod,
+			&preferredLocal,
 			&metadata, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan wholesale customer: %w", err)
@@ -617,6 +646,10 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 		if wholesaleStatus != nil {
 			ws := domain.WholesaleStatus(*wholesaleStatus)
 			c.WholesaleStatus = &ws
+		}
+		if preferredLocal != nil {
+			m := domain.ShippingMethod(*preferredLocal)
+			c.PreferredLocalFulfillment = &m
 		}
 		c.ApprovedAt = timestampFromPG(approvedAt)
 		c.QBSyncedAt = timestampFromPG(qbSyncedAt)
@@ -661,6 +694,10 @@ func customerFromRow(r sqlcgen.Customer) *domain.Customer {
 	if r.WholesaleStatus != nil {
 		ws := domain.WholesaleStatus(*r.WholesaleStatus)
 		c.WholesaleStatus = &ws
+	}
+	if r.PreferredLocalFulfillment != nil {
+		m := domain.ShippingMethod(*r.PreferredLocalFulfillment)
+		c.PreferredLocalFulfillment = &m
 	}
 	return c
 }

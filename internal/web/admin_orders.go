@@ -368,6 +368,66 @@ func (d *Deps) handleAdminOrderShip(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Order+marked+as+shipped", http.StatusSeeOther)
 }
 
+// handleAdminOrderReadyForPickup transitions a pickup order to ready and
+// emails the customer. Only valid for orders where shipping_method == pickup.
+func (d *Deps) handleAdminOrderReadyForPickup(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.MarkReadyForPickup(ctx, tx, id, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Customer+notified+pickup+is+ready", http.StatusSeeOther)
+}
+
+// handleAdminOrderPickedUp completes a pickup order after the customer
+// collects it. No email — the customer is standing at the counter.
+func (d *Deps) handleAdminOrderPickedUp(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.MarkPickedUp(ctx, tx, id, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Order+marked+as+picked+up", http.StatusSeeOther)
+}
+
+// handleAdminOrderOutForDelivery dispatches a local-delivery order on
+// delivery day and emails the customer.
+func (d *Deps) handleAdminOrderOutForDelivery(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.MarkOutForDelivery(ctx, tx, id, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Out+for+local+delivery", http.StatusSeeOther)
+}
+
 func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -822,7 +882,7 @@ func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
 				errs["customer_email"] = "No customer with that email — provide first and last name to create one"
 				return errSKUValidation
 			}
-			customer, cErr = d.CustomerService.CreateRetail(ctx, tx, form.CustomerEmail, form.CustomerFirstName, form.CustomerLastName)
+			customer, cErr = d.CustomerService.CreateRetail(ctx, tx, form.CustomerEmail, form.CustomerFirstName, form.CustomerLastName, nil)
 			if cErr != nil {
 				return fmt.Errorf("create customer: %w", cErr)
 			}

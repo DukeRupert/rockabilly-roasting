@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -19,18 +20,59 @@ import (
 // --- Account Settings ---
 
 func (d *Deps) handleAccountSettings(w http.ResponseWriter, r *http.Request) {
-	customer, _ := auth.CustomerFromContext(r.Context())
+	ctx := r.Context()
+	customer, _ := auth.CustomerFromContext(ctx)
 
 	props := storefront.AccountSettingsProps{
 		Customer:  customer,
 		CartCount: d.cartItemCountFromCookie(r),
 	}
+	d.fillLocalFulfillmentPrefs(ctx, customer.ID, &props)
 
 	if IsHTMX(r) {
-		storefront.AccountSettingsContent(props).Render(r.Context(), w) //nolint:errcheck
+		storefront.AccountSettingsContent(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
-	storefront.AccountSettingsPage(props).Render(r.Context(), w) //nolint:errcheck
+	storefront.AccountSettingsPage(props).Render(ctx, w) //nolint:errcheck
+}
+
+// fillLocalFulfillmentPrefs decides whether to render the local fulfillment
+// section on the account settings page. It only renders when (a) at least one
+// of the customer's saved addresses sits inside a local zip and (b) the
+// merchant has more than one local channel enabled — otherwise there's no
+// real preference to set.
+func (d *Deps) fillLocalFulfillmentPrefs(ctx context.Context, customerID uuid.UUID, props *storefront.AccountSettingsProps) {
+	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		cfg, err := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if err != nil {
+			return err
+		}
+		// Only ask the customer to choose when the merchant offers both
+		// channels — otherwise the single eligible option is forced anyway.
+		if !cfg.LocalDeliveryEnabled || !cfg.LocalPickupEnabled {
+			return nil
+		}
+		addrs, err := d.CustomerService.ListAddresses(ctx, tx, customerID)
+		if err != nil {
+			return err
+		}
+		hasLocal := false
+		for _, a := range addrs {
+			if cfg.IsLocal(a.PostalCode) {
+				hasLocal = true
+				break
+			}
+		}
+		if !hasLocal {
+			return nil
+		}
+		props.ShowLocalFulfillment = true
+		props.LocalDeliveryEnabled = cfg.LocalDeliveryEnabled
+		props.LocalPickupEnabled = cfg.LocalPickupEnabled
+		props.LocalDeliveryDays = cfg.LocalDeliveryDays
+		props.LocalPickupNote = cfg.LocalPickupInstructions
+		return nil
+	}) // best-effort; if it fails the section just doesn't render
 }
 
 func (d *Deps) handleAccountSettingsUpdate(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +97,15 @@ func (d *Deps) handleAccountSettingsUpdate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Local fulfillment preference: empty string clears the preference.
+	// Anything else is validated by the service layer.
+	preferredRaw := strings.TrimSpace(r.FormValue("preferred_local_fulfillment"))
+	var preferred *domain.ShippingMethod
+	if preferredRaw != "" {
+		m := domain.ShippingMethod(preferredRaw)
+		preferred = &m
+	}
+
 	var updated *domain.Customer
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -68,6 +119,16 @@ func (d *Deps) handleAccountSettingsUpdate(w http.ResponseWriter, r *http.Reques
 				return txErr
 			}
 		}
+		// Only update the preference field when the form actually carried it
+		// (preferredRaw == "" alone is ambiguous — could mean "clear" or "field
+		// absent"). The settings form always submits the field, so if it's
+		// missing entirely, leave the preference untouched.
+		if _, ok := r.Form["preferred_local_fulfillment"]; ok {
+			if perr := d.CustomerService.UpdatePreferredLocalFulfillment(ctx, tx, customer.ID, preferred); perr != nil {
+				return perr
+			}
+			updated.PreferredLocalFulfillment = preferred
+		}
 		return nil
 	})
 	if err != nil {
@@ -80,6 +141,7 @@ func (d *Deps) handleAccountSettingsUpdate(w http.ResponseWriter, r *http.Reques
 		CartCount: d.cartItemCountFromCookie(r),
 		Success:   "Your settings have been updated.",
 	}
+	d.fillLocalFulfillmentPrefs(ctx, customer.ID, &props)
 	if IsHTMX(r) {
 		storefront.AccountSettingsContent(props).Render(ctx, w) //nolint:errcheck
 		return

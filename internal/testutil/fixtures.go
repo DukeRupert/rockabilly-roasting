@@ -251,6 +251,13 @@ func WithOrderTotals(subtotal, discount, shipping, tax, total int) OrderOption {
 	}
 }
 
+func WithShippingMethod(m domain.ShippingMethod) OrderOption {
+	return func(p *sqlcgen.CreateOrderParams) {
+		s := string(m)
+		p.ShippingMethod = &s
+	}
+}
+
 func CreateOrder(t *testing.T, tx pgx.Tx, customerID, shippingAddrID, billingAddrID uuid.UUID, opts ...OrderOption) *domain.Order {
 	t.Helper()
 	p := sqlcgen.CreateOrderParams{

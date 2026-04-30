@@ -217,35 +217,43 @@ templ OrderListContent(props OrderListProps) {
 			<a href="/admin/orders/new" class="inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">+ New manual order</a>
 		</div>
 	</div>
-	<!-- Search + Filters -->
-	<div class="mt-6 space-y-5">
-		<!-- Search -->
-		<div class="max-w-sm">
-			<input
-				type="search"
-				name="q"
-				value={ props.Search }
-				placeholder="Search orders, names, emails"
-				hx-get={ orderViewHref(props.View, "") }
-				hx-trigger="input changed delay:300ms, search"
-				hx-target="#main-content"
-				hx-push-url="true"
-				hx-include="[name='view']"
-				class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-			/>
-			<input type="hidden" name="view" value={ props.View }/>
+	<!-- Filter masthead — newspaper-style section break holding the view tabs
+	     and search as one composable unit. Edge-to-edge ink rules top/bottom
+	     bind them visually; on desktop tabs live left, search lives right;
+	     on mobile they stack with tabs on top (col-reverse). -->
+	<section class="mt-6 border-y-2 border-rr-border py-3" aria-label="Filter orders">
+		<div class="flex flex-col-reverse items-stretch gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
+			<!-- View tabs — workflow-led buckets with counts. Active tab is stamped
+			     (ink border + hard offset shadow) so the current bucket is unmissable. -->
+			<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Order views">
+				for _, tab := range props.tabs() {
+					<a href={ templ.SafeURL(orderViewHref(tab.Key, props.Search)) } class={ orderTabClass(props.View == tab.Key) }>
+						<span>{ tab.Label }</span>
+						<span class={ orderTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
+					</a>
+				}
+			</nav>
+			<!-- Search — sits to the right of the tabs on desktop, above on mobile.
+			     Submits via htmx on type so the table refreshes inline. -->
+			<div class="md:w-72 md:shrink-0">
+				<label for="orders-search" class="sr-only">Search orders</label>
+				<input
+					id="orders-search"
+					type="search"
+					name="q"
+					value={ props.Search }
+					placeholder="Search orders, names, emails"
+					hx-get={ orderViewHref(props.View, "") }
+					hx-trigger="input changed delay:300ms, search"
+					hx-target="#main-content"
+					hx-push-url="true"
+					hx-include="[name='view']"
+					class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+				/>
+				<input type="hidden" name="view" value={ props.View }/>
+			</div>
 		</div>
-		<!-- View tabs — workflow-led buckets with counts. Active tab is stamped
-		     (ink border + hard offset shadow) so the current bucket is unmissable. -->
-		<nav class="flex flex-wrap items-end gap-2 label-font" aria-label="Order views">
-			for _, tab := range props.tabs() {
-				<a href={ templ.SafeURL(orderViewHref(tab.Key, props.Search)) } class={ orderTabClass(props.View == tab.Key) }>
-					<span>{ tab.Label }</span>
-					<span class={ orderTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
-				</a>
-			}
-		</nav>
-	</div>
+	</section>
 	<!-- Order table -->
 	<div class="mt-4">
 		if len(props.Rows) == 0 {

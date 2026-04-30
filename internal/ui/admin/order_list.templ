@@ -58,6 +58,43 @@ func formatCents(cents int) string {
 	return fmt.Sprintf("$%d.%02d", cents/100, cents%100)
 }
 
+// relativeOrderDate formats a placed-at date in merchant time relative to
+// "now" so staff can scan freshness at a glance instead of doing date math.
+// Returns "Today 3:04 PM", "Yesterday", "Nd ago" (2-6), "Jan 2" (this year),
+// or "Jan 2, 2006" (prior years).
+func relativeOrderDate(placedAt time.Time, tz *time.Location, now time.Time) string {
+	placed := placedAt.In(tz)
+	today := now.In(tz)
+	startOfToday := time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, tz)
+	startOfPlaced := time.Date(placed.Year(), placed.Month(), placed.Day(), 0, 0, 0, 0, tz)
+	dayDiff := int(startOfToday.Sub(startOfPlaced).Hours() / 24)
+	switch {
+	case dayDiff <= 0:
+		return "Today " + placed.Format("3:04 PM")
+	case dayDiff == 1:
+		return "Yesterday"
+	case dayDiff < 7:
+		return fmt.Sprintf("%dd ago", dayDiff)
+	}
+	if placed.Year() == today.Year() {
+		return placed.Format("Jan 2")
+	}
+	return placed.Format("Jan 2, 2006")
+}
+
+// orderIsStale returns true when an order is in a non-terminal status and
+// has been sitting for at least 48 hours. Drives the rust-flag accent on
+// the row's leading edge — staff's visual cue that the order is overdue
+// for attention. Pending intents are excluded since they're awaiting
+// payment, not action.
+func orderIsStale(o domain.Order, now time.Time) bool {
+	switch o.Status {
+	case domain.OrderStatusConfirmed, domain.OrderStatusProcessing, domain.OrderStatusOnHold:
+		return now.Sub(o.PlacedAt) >= 48*time.Hour
+	}
+	return false
+}
+
 // OrderViewCounts holds tab counts for the orders list. Mirrors
 // store.OrderViewCounts so the ui package stays free of store imports.
 type OrderViewCounts struct {
@@ -78,6 +115,7 @@ type OrderListProps struct {
 	PerPage    int
 	HasMore    bool
 	MerchantTZ *time.Location
+	Now        time.Time // injected so relative dates and staleness are deterministic in tests
 	StaffName  string
 	StaffRole  string
 }
@@ -296,15 +334,16 @@ templ OrderListContent(props OrderListProps) {
 									/>
 								</th>
 								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">Order</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">State</th>
-								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Shipping</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Shipping</th>
 								<th scope="col" class="px-3 py-3.5 pr-4 sm:pr-6 text-right text-sm font-semibold text-rr-heading">Total</th>
-								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Date</th>
+								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Placed</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-rr-border bg-rr-surface">
 							for _, row := range props.Rows {
-								<tr class="row-link">
+								{{ stale := orderIsStale(row.Order, props.Now) }}
+								<tr class={ "row-link", templ.KV("row-link-stale", stale) }>
 									<td class="relative z-10 w-10 px-3 py-4 sm:pl-6" @click.stop>
 										<input
 											type="checkbox"
@@ -317,13 +356,13 @@ templ OrderListContent(props OrderListProps) {
 									</td>
 									<td class="py-4 pl-4 pr-3 text-sm">
 										<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) } class="row-link-target block">
-											<div class="flex items-center gap-2 leading-none">
-												<span class="label-font text-rr-muted">{ row.Order.Number }</span>
+											<div class="flex items-baseline gap-2 leading-none">
+												<span class="font-bold text-rr-heading tabular-nums tracking-wide uppercase" style="font-size:0.95rem;">{ row.Order.Number }</span>
 												if row.AccountType == domain.AccountTypeWholesale {
 													<span class="label-font text-[#0A5E5C]" title="Wholesale customer">Wholesale</span>
 												}
 											</div>
-											<div class="mt-1 font-semibold text-rr-heading hover:text-rr-red">{ row.CustomerName }</div>
+											<div class="mt-1.5 text-sm text-rr-body">{ row.CustomerName }</div>
 											if row.CustomerEmail != "" {
 												<div class="mt-0.5 text-xs text-rr-muted truncate max-w-[22ch] md:max-w-none">{ row.CustomerEmail }</div>
 											}
@@ -336,21 +375,22 @@ templ OrderListContent(props OrderListProps) {
 											@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
 										}
 									</td>
-									<td class="hidden whitespace-nowrap px-3 py-4 text-sm md:table-cell">
+									<td class="hidden whitespace-nowrap px-3 py-4 text-sm lg:table-cell">
 										if row.Order.ShippingMethod != nil {
 											@ShippingMethodBadge(*row.Order.ShippingMethod)
 										} else {
-											<span class="text-rr-border">&mdash;</span>
+											<span class="text-rr-muted">&mdash;</span>
 										}
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 pr-4 sm:pr-6 text-sm text-right">
-										<div class="text-rr-heading tabular-nums">{ formatCents(row.Order.Total) }</div>
-										<div class="mt-0.5">
+										<div class="inline-flex items-baseline gap-2">
+											<span class="text-rr-heading font-semibold tabular-nums">{ formatCents(row.Order.Total) }</span>
+											<span class="text-rr-muted" aria-hidden="true">·</span>
 											@PaymentChip(row.Order.PaymentStatus)
 										</div>
 									</td>
-									<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
-										{ row.Order.PlacedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
+									<td class={ "hidden whitespace-nowrap px-3 py-4 text-sm tabular-nums md:table-cell", templ.KV("text-rr-red font-semibold", stale), templ.KV("text-rr-muted", !stale) }>
+										{ relativeOrderDate(row.Order.PlacedAt, props.MerchantTZ, props.Now) }
 									</td>
 								</tr>
 							}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -110,6 +111,7 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 		PerPage:    perPage,
 		HasMore:    hasMore,
 		MerchantTZ: d.MerchantTZ,
+		Now:        time.Now(),
 		StaffName:  name,
 		StaffRole:  role,
 	}

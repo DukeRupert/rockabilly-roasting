@@ -244,6 +244,14 @@ templ Admin(props AdminProps) {
 					background: var(--color-rr-raised);
 					box-shadow: inset 4px 0 0 var(--color-rr-amber);
 				}
+				/* Stale rows keep a persistent rust flag on the leading edge —
+				   the paper-and-ink equivalent of a sticky note "this is waiting." */
+				.row-link.row-link-stale {
+					box-shadow: inset 4px 0 0 var(--color-rr-red);
+				}
+				.row-link.row-link-stale:hover {
+					box-shadow: inset 4px 0 0 var(--color-rr-red);
+				}
 				@media (prefers-reduced-motion: reduce) {
 					.row-link { transition: none; }
 				}

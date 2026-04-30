@@ -71,7 +71,8 @@ var (
 	ErrInvalidTaxConfig     = errors.New("invalid tax configuration")
 
 	// Shipping errors
-	ErrShipmentNotFound = errors.New("shipment not found")
+	ErrShipmentNotFound        = errors.New("shipment not found")
+	ErrShipmentWeightUnknown   = errors.New("shipment weight cannot be calculated: variant has no weight set")
 
 	// Taxon errors
 	ErrTaxonNotFound = errors.New("taxon not found")

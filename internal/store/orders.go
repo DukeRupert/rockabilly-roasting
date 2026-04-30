@@ -218,6 +218,7 @@ type OrderFilter struct {
 	Statuses            []domain.OrderStatus // IN filter (takes precedence over singular)
 	FulfillmentStatus   *domain.FulfillmentStatus
 	FulfillmentStatuses []domain.FulfillmentStatus // IN filter (takes precedence over singular)
+	PaymentStatuses     []domain.PaymentStatus     // IN filter; empty = no constraint
 	CustomerID          *uuid.UUID
 	PlacedFrom          *time.Time
 	PlacedTo            *time.Time
@@ -278,6 +279,18 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 		query += fmt.Sprintf(" AND fulfillment_status = $%d", argN)
 		args = append(args, string(*f.FulfillmentStatus))
 		argN++
+	}
+	if len(f.PaymentStatuses) > 0 {
+		query += " AND payment_status IN ("
+		for i, s := range f.PaymentStatuses {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, string(s))
+			argN++
+		}
+		query += ")"
 	}
 	if f.CustomerID != nil {
 		query += fmt.Sprintf(" AND customer_id = $%d", argN)
@@ -400,6 +413,18 @@ func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) 
 		query += fmt.Sprintf(" AND fulfillment_status = $%d", argN)
 		args = append(args, string(*f.FulfillmentStatus))
 		argN++
+	}
+	if len(f.PaymentStatuses) > 0 {
+		query += " AND payment_status IN ("
+		for i, s := range f.PaymentStatuses {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, string(s))
+			argN++
+		}
+		query += ")"
 	}
 	if f.CustomerID != nil {
 		query += fmt.Sprintf(" AND customer_id = $%d", argN)

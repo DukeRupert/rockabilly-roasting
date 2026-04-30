@@ -225,6 +225,7 @@ func run() error {
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, labelProvider, auditWriter, metricsReg)
+	shippingExportSvc := app.NewShippingExportService(orderStore, customerStore, catalogStore, fulfillmentStore, shippingStore)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg)
 	pricingSvc := app.NewPricingService(pricingStore)
@@ -363,6 +364,7 @@ func run() error {
 		CatalogService:       catalogSvc,
 		CheckoutService:      checkoutSvc,
 		FulfillmentService:   fulfillmentSvc,
+		ShippingExportService: shippingExportSvc,
 		SubscriptionService:  subscriptionSvc,
 		DiscountService:      discountSvc,
 		AuthService:          authSvc,

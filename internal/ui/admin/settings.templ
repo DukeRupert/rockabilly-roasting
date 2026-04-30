@@ -23,6 +23,20 @@ type ShippingSettings struct {
 	FreeShippingThreshold *int
 	Currency              string
 	LocalZipCodes         []string
+	OriginName            string
+	OriginStreet1         string
+	OriginStreet2         string
+	OriginCity            string
+	OriginState           string
+	OriginZip             string
+	OriginCountry         string
+	TareWeightOz          float64
+}
+
+// formatTareOz renders the tare weight as a number input value. Trailing
+// zeros are kept (so 0 → "0.00") for consistency with the dollar inputs.
+func formatTareOz(oz float64) string {
+	return fmt.Sprintf("%.2f", oz)
 }
 
 type SettingsProps struct {
@@ -161,6 +175,109 @@ templ SettingsContent(props SettingsProps) {
 					<p class="mt-1 text-xs text-rr-muted">
 						Comma- or whitespace-separated 5-digit zips. Orders shipping to any of these zips ship free regardless of subtotal.
 					</p>
+				</div>
+				<div class="px-4 py-5 sm:px-6">
+					<h3 class="text-sm font-semibold text-rr-heading">Pickup origin</h3>
+					<p class="mt-1 text-xs text-rr-muted">
+						Where shipments leave from. Used as the return address on the Pirate Ship export and reserved for future live-rate work.
+					</p>
+					<div class="mt-3 grid gap-4 sm:grid-cols-2">
+						<div class="sm:col-span-2">
+							<label for="origin-name" class="block text-sm font-medium text-rr-heading">Sender name</label>
+							<input
+								id="origin-name"
+								type="text"
+								name="origin_name"
+								value={ props.Shipping.OriginName }
+								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+						</div>
+						<div>
+							<label for="origin-street1" class="block text-sm font-medium text-rr-heading">Street</label>
+							<input
+								id="origin-street1"
+								type="text"
+								name="origin_street1"
+								value={ props.Shipping.OriginStreet1 }
+								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+						</div>
+						<div>
+							<label for="origin-street2" class="block text-sm font-medium text-rr-heading">Street (line 2)</label>
+							<input
+								id="origin-street2"
+								type="text"
+								name="origin_street2"
+								value={ props.Shipping.OriginStreet2 }
+								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+						</div>
+						<div>
+							<label for="origin-city" class="block text-sm font-medium text-rr-heading">City</label>
+							<input
+								id="origin-city"
+								type="text"
+								name="origin_city"
+								value={ props.Shipping.OriginCity }
+								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+						</div>
+						<div class="grid grid-cols-3 gap-3">
+							<div>
+								<label for="origin-state" class="block text-sm font-medium text-rr-heading">State</label>
+								<input
+									id="origin-state"
+									type="text"
+									name="origin_state"
+									maxlength="2"
+									value={ props.Shipping.OriginState }
+									class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
+								/>
+							</div>
+							<div>
+								<label for="origin-zip" class="block text-sm font-medium text-rr-heading">ZIP</label>
+								<input
+									id="origin-zip"
+									type="text"
+									name="origin_zip"
+									value={ props.Shipping.OriginZip }
+									class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+								/>
+							</div>
+							<div>
+								<label for="origin-country" class="block text-sm font-medium text-rr-heading">Country</label>
+								<input
+									id="origin-country"
+									type="text"
+									name="origin_country"
+									maxlength="2"
+									value={ props.Shipping.OriginCountry }
+									class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
+								/>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="px-4 py-5 sm:px-6">
+					<h3 class="text-sm font-semibold text-rr-heading">Packaging tare weight</h3>
+					<p class="mt-1 text-xs text-rr-muted">
+						Weight of an empty box plus dunnage (in ounces). Added to every Pirate Ship export row on top of the product weights.
+					</p>
+					<div class="mt-3 sm:max-w-xs">
+						<label for="shipping-tare" class="sr-only">Tare weight (oz)</label>
+						<div class="mt-1 flex items-center">
+							<input
+								id="shipping-tare"
+								type="number"
+								name="tare_weight_oz"
+								step="0.01"
+								min="0"
+								value={ formatTareOz(props.Shipping.TareWeightOz) }
+								class="w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+							/>
+							<span class="text-rr-muted pl-2">oz</span>
+						</div>
+					</div>
 				</div>
 				<div class="px-4 py-4 sm:px-6 flex justify-end">
 					<button type="submit" class="inline-flex items-center rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper shadow-xs hover:opacity-90">

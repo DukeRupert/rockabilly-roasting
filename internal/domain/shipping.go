@@ -24,6 +24,21 @@ type ShippingConfig struct {
 	FreeShippingThreshold *int
 	Currency              string
 	LocalZipCodes         []string
+
+	// Origin address. Captured for future live-rate work; the Pirate Ship
+	// CSV round-trip uses Pirate Ship's own origin config, so these fields
+	// are informational for that flow.
+	OriginName    string
+	OriginStreet1 string
+	OriginStreet2 string
+	OriginCity    string
+	OriginState   string
+	OriginZip     string
+	OriginCountry string
+
+	// TareWeightOz is the packaging weight (box + dunnage) added to every
+	// computed shipment weight on export.
+	TareWeightOz float64
 }
 
 // IsLocal reports whether a ship-to zip falls inside the local delivery zone.

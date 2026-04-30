@@ -492,10 +492,18 @@ type Shipment struct {
 }
 
 type ShippingConfig struct {
-	FlatRateCents         int32    `json:"flat_rate_cents"`
-	FreeShippingThreshold *int32   `json:"free_shipping_threshold"`
-	Currency              string   `json:"currency"`
-	LocalZipCodes         []string `json:"local_zip_codes"`
+	FlatRateCents         int32          `json:"flat_rate_cents"`
+	FreeShippingThreshold *int32         `json:"free_shipping_threshold"`
+	Currency              string         `json:"currency"`
+	LocalZipCodes         []string       `json:"local_zip_codes"`
+	OriginName            string         `json:"origin_name"`
+	OriginStreet1         string         `json:"origin_street1"`
+	OriginStreet2         string         `json:"origin_street2"`
+	OriginCity            string         `json:"origin_city"`
+	OriginState           string         `json:"origin_state"`
+	OriginZip             string         `json:"origin_zip"`
+	OriginCountry         string         `json:"origin_country"`
+	TareWeightOz          pgtype.Numeric `json:"tare_weight_oz"`
 }
 
 type Staff struct {

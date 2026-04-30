@@ -32,6 +32,14 @@ func (s *ShippingStore) GetConfig(ctx context.Context, tx pgx.Tx) (*domain.Shipp
 		FreeShippingThreshold: int32PtrToIntPtr(row.FreeShippingThreshold),
 		Currency:              row.Currency,
 		LocalZipCodes:         row.LocalZipCodes,
+		OriginName:            row.OriginName,
+		OriginStreet1:         row.OriginStreet1,
+		OriginStreet2:         row.OriginStreet2,
+		OriginCity:            row.OriginCity,
+		OriginState:           row.OriginState,
+		OriginZip:             row.OriginZip,
+		OriginCountry:         row.OriginCountry,
+		TareWeightOz:          numericToFloat64(row.TareWeightOz),
 	}, nil
 }
 
@@ -46,6 +54,14 @@ func (s *ShippingStore) UpdateConfig(ctx context.Context, tx pgx.Tx, cfg domain.
 		FreeShippingThreshold: intPtrToInt32Ptr(cfg.FreeShippingThreshold),
 		Currency:              cfg.Currency,
 		LocalZipCodes:         zips,
+		OriginName:            cfg.OriginName,
+		OriginStreet1:         cfg.OriginStreet1,
+		OriginStreet2:         cfg.OriginStreet2,
+		OriginCity:            cfg.OriginCity,
+		OriginState:           cfg.OriginState,
+		OriginZip:             cfg.OriginZip,
+		OriginCountry:         cfg.OriginCountry,
+		TareWeightOz:          float64ToNumeric(cfg.TareWeightOz),
 	})
 	if err != nil {
 		return fmt.Errorf("update shipping config: %w", err)

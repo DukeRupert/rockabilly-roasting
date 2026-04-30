@@ -6,7 +6,15 @@ UPDATE shipping_config
 SET flat_rate_cents = $1,
     free_shipping_threshold = $2,
     currency = $3,
-    local_zip_codes = $4;
+    local_zip_codes = $4,
+    origin_name = $5,
+    origin_street1 = $6,
+    origin_street2 = $7,
+    origin_city = $8,
+    origin_state = $9,
+    origin_zip = $10,
+    origin_country = $11,
+    tare_weight_oz = $12;
 
 -- name: CreateShipment :one
 INSERT INTO shipments (id, order_id, status, provider, tracking_number, label_url,

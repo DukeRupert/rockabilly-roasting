@@ -44,6 +44,14 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 			FreeShippingThreshold: cfg.FreeShippingThreshold,
 			Currency:              cfg.Currency,
 			LocalZipCodes:         cfg.LocalZipCodes,
+			OriginName:            cfg.OriginName,
+			OriginStreet1:         cfg.OriginStreet1,
+			OriginStreet2:         cfg.OriginStreet2,
+			OriginCity:            cfg.OriginCity,
+			OriginState:           cfg.OriginState,
+			OriginZip:             cfg.OriginZip,
+			OriginCountry:         cfg.OriginCountry,
+			TareWeightOz:          cfg.TareWeightOz,
 		}
 		return nil
 	})
@@ -73,6 +81,10 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 
 // handleAdminShippingSettingsUpdate persists the edited shipping config and
 // records the audit event inside the same transaction.
+//
+// TODO: origin fields are informational today (Pirate Ship has its own origin
+// config). When a live-rate provider starts consuming them, tighten state +
+// zip + country validation here.
 func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -92,11 +104,34 @@ func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.
 	}
 	zips := parseZipList(r.FormValue("local_zip_codes"))
 
+	tareOz := 0.0
+	if raw := strings.TrimSpace(r.FormValue("tare_weight_oz")); raw != "" {
+		oz, tErr := strconv.ParseFloat(raw, 64)
+		if tErr != nil || oz < 0 {
+			http.Redirect(w, r, "/admin/settings?flash=Invalid+tare+weight", http.StatusSeeOther)
+			return
+		}
+		tareOz = oz
+	}
+
+	originCountry := strings.ToUpper(strings.TrimSpace(r.FormValue("origin_country")))
+	if originCountry == "" {
+		originCountry = "US"
+	}
+
 	cfg := domain.ShippingConfig{
 		FlatRateCents:         flatRateCents,
 		FreeShippingThreshold: threshold,
 		Currency:              "usd",
 		LocalZipCodes:         zips,
+		OriginName:            strings.TrimSpace(r.FormValue("origin_name")),
+		OriginStreet1:         strings.TrimSpace(r.FormValue("origin_street1")),
+		OriginStreet2:         strings.TrimSpace(r.FormValue("origin_street2")),
+		OriginCity:            strings.TrimSpace(r.FormValue("origin_city")),
+		OriginState:           strings.ToUpper(strings.TrimSpace(r.FormValue("origin_state"))),
+		OriginZip:             strings.TrimSpace(r.FormValue("origin_zip")),
+		OriginCountry:         originCountry,
+		TareWeightOz:          tareOz,
 	}
 
 	actor := staffActor(r)

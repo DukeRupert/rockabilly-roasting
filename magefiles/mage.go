@@ -189,6 +189,14 @@ func (DB) Create(name string) error {
 	return gooseCmd("create", name, "sql")
 }
 
+// FixPendingPaid sweeps orders stuck in status=pending, payment_status=captured.
+// Pass --dry-run to preview without writing.
+func FixPendingPaid(args ...string) error {
+	cmdArgs := []string{"run", "./cmd/fix-pending-paid"}
+	cmdArgs = append(cmdArgs, args...)
+	return sh.RunV("go", cmdArgs...)
+}
+
 // WCMigrate imports WooCommerce subscriptions into Hiri.
 // Set WC_CONSUMER_KEY, WC_CONSUMER_SECRET, and DATABASE_URL.
 // Use --dry-run to validate without importing.

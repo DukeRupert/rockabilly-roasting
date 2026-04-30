@@ -436,6 +436,19 @@ func (d *Deps) handleSubscribeConfirm(w http.ResponseWriter, r *http.Request) {
 			return fmt.Errorf("update payment status: %w", txErr)
 		}
 
+		// Mirror retail's ConfirmCheckoutPayment: pending → confirmed in the
+		// same tx as payment captured. Without this, the order looks paid in
+		// the pipeline but its status badge stays "pending" forever, and the
+		// webhook can't repair it because ConfirmCheckoutPayment short-circuits
+		// once payment_status leaves awaiting.
+		_, txErr = d.OrderService.UpdateOrderStatus(ctx, tx, order.ID, domain.OrderStatusConfirmed, app.Actor{
+			Type: "system",
+			Name: "subscription_checkout",
+		})
+		if txErr != nil {
+			return fmt.Errorf("update order status: %w", txErr)
+		}
+
 		// Link order to subscription
 		txErr = d.SubscriptionService.LinkOrder(ctx, tx, sub.ID, order.ID, sub.CurrentPeriodStart, sub.CurrentPeriodEnd)
 		if txErr != nil {

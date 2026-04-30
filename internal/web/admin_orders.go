@@ -22,7 +22,7 @@ import (
 func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	statusFilter := r.URL.Query().Get("status")
+	view := normalizeOrderView(r.URL.Query().Get("view"))
 	search := r.URL.Query().Get("q")
 	pageStr := r.URL.Query().Get("page")
 
@@ -37,15 +37,12 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 		Limit:  perPage + 1,
 		Offset: (page - 1) * perPage,
 	}
-
-	if statusFilter != "" {
-		s := domain.OrderStatus(statusFilter)
-		filter.Status = &s
-	}
+	applyOrderViewFilter(view, &filter)
 
 	var orders []domain.Order
 	var rows []admin.OrderRow
 	var totalCount int
+	var counts store.OrderViewCounts
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -54,6 +51,10 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		totalCount, txErr = d.OrderService.CountOrders(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+		counts, txErr = d.OrderService.CountOrdersByView(ctx, tx, search)
 		if txErr != nil {
 			return txErr
 		}
@@ -94,16 +95,23 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.OrderListProps{
-		Rows:         rows,
-		StatusFilter: statusFilter,
-		Search:       search,
-		TotalCount:   totalCount,
-		Page:         page,
-		PerPage:      perPage,
-		HasMore:      hasMore,
-		MerchantTZ:   d.MerchantTZ,
-		StaffName:    name,
-		StaffRole:    role,
+		Rows: rows,
+		View: view,
+		Counts: admin.OrderViewCounts{
+			NeedsAction: counts.NeedsAction,
+			OnHold:      counts.OnHold,
+			Shipped:     counts.Shipped,
+			Archive:     counts.Archive,
+			All:         counts.All,
+		},
+		Search: search,
+		TotalCount: totalCount,
+		Page:       page,
+		PerPage:    perPage,
+		HasMore:    hasMore,
+		MerchantTZ: d.MerchantTZ,
+		StaffName:  name,
+		StaffRole:  role,
 	}
 
 	if IsHTMX(r) {
@@ -111,6 +119,35 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.OrderList(props).Render(ctx, w) //nolint:errcheck
+}
+
+// normalizeOrderView returns the canonical view key for the orders list,
+// defaulting to "needs_action" when unrecognized or empty.
+func normalizeOrderView(v string) string {
+	switch v {
+	case "needs_action", "on_hold", "shipped", "archive", "all":
+		return v
+	default:
+		return "needs_action"
+	}
+}
+
+// applyOrderViewFilter mutates the filter to match the chosen view's bucket.
+// "all" applies no status restriction.
+func applyOrderViewFilter(view string, f *store.OrderFilter) {
+	switch view {
+	case "needs_action":
+		f.Statuses = []domain.OrderStatus{domain.OrderStatusConfirmed, domain.OrderStatusProcessing}
+		f.ExcludeUnconfirmed = true
+	case "on_hold":
+		s := domain.OrderStatusOnHold
+		f.Status = &s
+	case "shipped":
+		s := domain.OrderStatusComplete
+		f.Status = &s
+	case "archive":
+		f.Statuses = []domain.OrderStatus{domain.OrderStatusCancelled, domain.OrderStatusRefunded}
+	}
 }
 
 func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {

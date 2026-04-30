@@ -110,6 +110,15 @@ func (s *OrderService) CountOrders(ctx context.Context, tx pgx.Tx, f store.Order
 	return count, nil
 }
 
+// CountOrdersByView returns per-tab counts for the admin orders list.
+func (s *OrderService) CountOrdersByView(ctx context.Context, tx pgx.Tx, search string) (store.OrderViewCounts, error) {
+	c, err := s.orders.CountOrdersByView(ctx, tx, search)
+	if err != nil {
+		return store.OrderViewCounts{}, fmt.Errorf("count orders by view: %w", err)
+	}
+	return c, nil
+}
+
 // SumOrderRevenue returns the total revenue (in cents) for orders matching the filter.
 func (s *OrderService) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f store.OrderFilter) (int, error) {
 	total, err := s.orders.SumOrderRevenue(ctx, tx, f)

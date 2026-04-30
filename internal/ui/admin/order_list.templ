@@ -58,17 +58,46 @@ func formatCents(cents int) string {
 	return fmt.Sprintf("$%d.%02d", cents/100, cents%100)
 }
 
+// OrderViewCounts holds tab counts for the orders list. Mirrors
+// store.OrderViewCounts so the ui package stays free of store imports.
+type OrderViewCounts struct {
+	NeedsAction int
+	OnHold      int
+	Shipped     int
+	Archive     int
+	All         int
+}
+
 type OrderListProps struct {
-	Rows         []OrderRow
-	StatusFilter string
-	Search       string
-	TotalCount   int
-	Page         int
-	PerPage      int
-	HasMore      bool
-	MerchantTZ   *time.Location
-	StaffName    string
-	StaffRole    string
+	Rows       []OrderRow
+	View       string // one of: needs_action | on_hold | shipped | archive | all
+	Counts     OrderViewCounts
+	Search     string
+	TotalCount int
+	Page       int
+	PerPage    int
+	HasMore    bool
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
+}
+
+// orderViewTabs returns the tab definitions in display order. Centralizing
+// here keeps labels/keys consistent and lets `range` drive the markup.
+type orderViewTab struct {
+	Key   string
+	Label string
+	Count int
+}
+
+func (p OrderListProps) tabs() []orderViewTab {
+	return []orderViewTab{
+		{Key: "needs_action", Label: "Needs action", Count: p.Counts.NeedsAction},
+		{Key: "on_hold", Label: "On hold", Count: p.Counts.OnHold},
+		{Key: "shipped", Label: "Shipped", Count: p.Counts.Shipped},
+		{Key: "archive", Label: "Archive", Count: p.Counts.Archive},
+		{Key: "all", Label: "All", Count: p.Counts.All},
+	}
 }
 
 func (p OrderListProps) showingStart() int {
@@ -86,11 +115,12 @@ func (p OrderListProps) showingEnd() int {
 	return end
 }
 
-// orderTabHref builds a URL preserving the search query when switching tabs.
-func orderTabHref(status, search string) string {
+// orderViewHref builds a URL preserving the search query when switching tabs.
+// "needs_action" is the canonical default and renders as a bare /admin/orders.
+func orderViewHref(view, search string) string {
 	v := url.Values{}
-	if status != "" {
-		v.Set("status", status)
+	if view != "" && view != "needs_action" {
+		v.Set("view", view)
 	}
 	if search != "" {
 		v.Set("q", search)
@@ -101,11 +131,41 @@ func orderTabHref(status, search string) string {
 	return "/admin/orders?" + v.Encode()
 }
 
+// orderTabClass returns the class for an order-view tab. The active tab gets
+// the paper-and-ink stamp treatment: ink border, hard offset shadow, cream
+// surface — visually pasted on top of the row of inactive labels.
 func orderTabClass(active bool) string {
 	if active {
-		return "shrink-0 whitespace-nowrap border-b-2 border-rr-red px-3 py-2 text-sm font-semibold text-rr-heading"
+		return "relative shrink-0 whitespace-nowrap inline-flex items-center gap-2 border-2 border-rr-border bg-rr-surface px-3.5 py-2 text-rr-heading shadow-[4px_4px_0_0_var(--color-rr-border)] z-10"
 	}
-	return "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 py-2 text-sm font-medium text-rr-muted hover:text-rr-heading hover:border-rr-border transition-colors"
+	return "shrink-0 whitespace-nowrap inline-flex items-center gap-2 border-2 border-transparent px-3.5 py-2 text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
+}
+
+// orderEmptyBucketCopy returns the body copy shown when a tab has 0 rows
+// but other buckets have orders. Per-view phrasing reads more naturally
+// than a generic "no orders" line.
+func orderEmptyBucketCopy(view string) string {
+	switch view {
+	case "needs_action":
+		return "Inbox zero — no orders waiting on you right now."
+	case "on_hold":
+		return "Nothing on hold. The line's moving."
+	case "shipped":
+		return "Nothing shipped yet."
+	case "archive":
+		return "Archive's empty — no cancelled or refunded orders."
+	}
+	return "No orders match this view."
+}
+
+// orderTabCountClass returns the chip class beside each tab label. The active
+// tab's count chip pops in rust to draw the eye to "you have N here";
+// inactive chips sit quiet on raised paper.
+func orderTabCountClass(active bool) string {
+	if active {
+		return "inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-px bg-rr-red text-white text-[0.65rem] font-bold tabular-nums tracking-wider"
+	}
+	return "inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-px bg-rr-raised text-rr-body text-[0.65rem] font-bold tabular-nums tracking-wider"
 }
 
 templ OrderListContent(props OrderListProps) {
@@ -120,7 +180,7 @@ templ OrderListContent(props OrderListProps) {
 		</div>
 	</div>
 	<!-- Search + Filters -->
-	<div class="mt-6 space-y-4">
+	<div class="mt-6 space-y-5">
 		<!-- Search -->
 		<div class="max-w-sm">
 			<input
@@ -128,25 +188,24 @@ templ OrderListContent(props OrderListProps) {
 				name="q"
 				value={ props.Search }
 				placeholder="Search orders, names, emails"
-				hx-get={ orderTabHref(props.StatusFilter, "") }
+				hx-get={ orderViewHref(props.View, "") }
 				hx-trigger="input changed delay:300ms, search"
 				hx-target="#main-content"
 				hx-push-url="true"
-				hx-include="[name='status']"
+				hx-include="[name='view']"
 				class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 			/>
-			<input type="hidden" name="status" value={ props.StatusFilter }/>
+			<input type="hidden" name="view" value={ props.View }/>
 		</div>
-		<!-- Tab filters -->
-		<nav class="flex gap-0 border-b-2 border-rr-border -mb-px overflow-x-auto">
-			<a href={ templ.SafeURL(orderTabHref("", props.Search)) } class={ orderTabClass(props.StatusFilter == "") }>All</a>
-			<a href={ templ.SafeURL(orderTabHref("pending", props.Search)) } class={ orderTabClass(props.StatusFilter == "pending") }>Pending</a>
-			<a href={ templ.SafeURL(orderTabHref("confirmed", props.Search)) } class={ orderTabClass(props.StatusFilter == "confirmed") }>Confirmed</a>
-			<a href={ templ.SafeURL(orderTabHref("processing", props.Search)) } class={ orderTabClass(props.StatusFilter == "processing") }>Processing</a>
-			<a href={ templ.SafeURL(orderTabHref("on_hold", props.Search)) } class={ orderTabClass(props.StatusFilter == "on_hold") }>On Hold</a>
-			<a href={ templ.SafeURL(orderTabHref("complete", props.Search)) } class={ orderTabClass(props.StatusFilter == "complete") }>Complete</a>
-			<a href={ templ.SafeURL(orderTabHref("cancelled", props.Search)) } class={ orderTabClass(props.StatusFilter == "cancelled") }>Cancelled</a>
-			<a href={ templ.SafeURL(orderTabHref("refunded", props.Search)) } class={ orderTabClass(props.StatusFilter == "refunded") }>Refunded</a>
+		<!-- View tabs — workflow-led buckets with counts. Active tab is stamped
+		     (ink border + hard offset shadow) so the current bucket is unmissable. -->
+		<nav class="flex flex-wrap items-end gap-2 label-font" aria-label="Order views">
+			for _, tab := range props.tabs() {
+				<a href={ templ.SafeURL(orderViewHref(tab.Key, props.Search)) } class={ orderTabClass(props.View == tab.Key) }>
+					<span>{ tab.Label }</span>
+					<span class={ orderTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
+				</a>
+			}
 		</nav>
 	</div>
 	<!-- Order table -->
@@ -157,6 +216,17 @@ templ OrderListContent(props OrderListProps) {
 				<div class="border-2 border-rr-border bg-rr-surface px-6 py-14 text-center">
 					<h2 class="admin-page-title text-2xl">No match.</h2>
 					<p class="mt-3 text-sm text-rr-body">Nothing for &ldquo;{ props.Search }&rdquo;. Try a different angle &mdash; name, email, or order number.</p>
+				</div>
+			} else if props.Counts.All > 0 {
+				<!-- Empty: this bucket is empty but other tabs have orders. -->
+				<div class="border-2 border-rr-border bg-rr-surface px-6 py-14 text-center">
+					<h2 class="admin-page-title text-2xl">Nothing here.</h2>
+					<p class="mt-3 text-sm text-rr-body">{ orderEmptyBucketCopy(props.View) }</p>
+					if props.View != "all" {
+						<a href={ templ.SafeURL(orderViewHref("all", "")) } class="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-rr-red hover:text-rr-red-lt">
+							View all orders &rarr;
+						</a>
+					}
 				</div>
 			} else {
 				<!-- Empty: no orders ever — branded stamp -->
@@ -299,7 +369,7 @@ templ orderPagination(props OrderListProps) {
 		<div class="-mt-px flex w-0 flex-1">
 			if props.Page > 1 {
 				<a
-					href={ templ.SafeURL(orderPageHref(props.Page-1, props.StatusFilter, props.Search)) }
+					href={ templ.SafeURL(orderPageHref(props.Page-1, props.View, props.Search)) }
 					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 				>
 					Previous
@@ -314,7 +384,7 @@ templ orderPagination(props OrderListProps) {
 		<div class="-mt-px flex w-0 flex-1 justify-end">
 			if props.HasMore {
 				<a
-					href={ templ.SafeURL(orderPageHref(props.Page+1, props.StatusFilter, props.Search)) }
+					href={ templ.SafeURL(orderPageHref(props.Page+1, props.View, props.Search)) }
 					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
 				>
 					Next
@@ -335,11 +405,11 @@ templ OrderList(props OrderListProps) {
 	}
 }
 
-func orderPageHref(page int, status, search string) string {
+func orderPageHref(page int, view, search string) string {
 	v := url.Values{}
 	v.Set("page", fmt.Sprintf("%d", page))
-	if status != "" {
-		v.Set("status", status)
+	if view != "" && view != "needs_action" {
+		v.Set("view", view)
 	}
 	if search != "" {
 		v.Set("q", search)

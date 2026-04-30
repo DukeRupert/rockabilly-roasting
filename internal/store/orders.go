@@ -215,6 +215,7 @@ func (s *OrderStore) DeleteOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID) (
 // OrderFilter holds optional filters for listing orders.
 type OrderFilter struct {
 	Status              *domain.OrderStatus
+	Statuses            []domain.OrderStatus // IN filter (takes precedence over singular)
 	FulfillmentStatus   *domain.FulfillmentStatus
 	FulfillmentStatuses []domain.FulfillmentStatus // IN filter (takes precedence over singular)
 	CustomerID          *uuid.UUID
@@ -246,7 +247,18 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	args := []any{}
 	argN := 1
 
-	if f.Status != nil {
+	if len(f.Statuses) > 0 {
+		query += " AND status IN ("
+		for i, s := range f.Statuses {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, string(s))
+			argN++
+		}
+		query += ")"
+	} else if f.Status != nil {
 		query += fmt.Sprintf(" AND status = $%d", argN)
 		args = append(args, string(*f.Status))
 		argN++
@@ -357,7 +369,18 @@ func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) 
 	args := []any{}
 	argN := 1
 
-	if f.Status != nil {
+	if len(f.Statuses) > 0 {
+		query += " AND status IN ("
+		for i, s := range f.Statuses {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, string(s))
+			argN++
+		}
+		query += ")"
+	} else if f.Status != nil {
 		query += fmt.Sprintf(" AND status = $%d", argN)
 		args = append(args, string(*f.Status))
 		argN++
@@ -407,6 +430,46 @@ func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) 
 		return 0, fmt.Errorf("count orders: %w", err)
 	}
 	return count, nil
+}
+
+// OrderViewCounts holds per-bucket totals for the admin orders list tabs.
+// Buckets are workflow-led, not raw status enums:
+//   - NeedsAction = confirmed + processing (excludes unconfirmed pending)
+//   - OnHold      = on_hold
+//   - Shipped     = complete
+//   - Archive     = cancelled + refunded
+//   - All         = every order, including unconfirmed
+type OrderViewCounts struct {
+	NeedsAction int
+	OnHold      int
+	Shipped     int
+	Archive     int
+	All         int
+}
+
+// CountOrdersByView returns counts for each tab on the admin orders list in
+// one query. Search applies to all buckets so tab counts reflect the active
+// search term.
+func (s *OrderStore) CountOrdersByView(ctx context.Context, tx pgx.Tx, search string) (_ OrderViewCounts, err error) {
+	defer trackQuery(s.metrics, "orders.count_by_view", time.Now(), &err)
+	query := `SELECT
+		COUNT(*) FILTER (WHERE status IN ('confirmed', 'processing') AND NOT (status = 'pending' AND payment_status = 'awaiting')) AS needs_action,
+		COUNT(*) FILTER (WHERE status = 'on_hold')                                                                                AS on_hold,
+		COUNT(*) FILTER (WHERE status = 'complete')                                                                               AS shipped,
+		COUNT(*) FILTER (WHERE status IN ('cancelled', 'refunded'))                                                               AS archive,
+		COUNT(*)                                                                                                                  AS total
+	FROM orders WHERE true`
+	args := []any{}
+	if search != "" {
+		query += ` AND (number ILIKE $1 OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.first_name || ' ' || c.last_name ILIKE $1 OR c.email ILIKE $1)))`
+		args = append(args, "%"+search+"%")
+	}
+
+	var c OrderViewCounts
+	if err := tx.QueryRow(ctx, query, args...).Scan(&c.NeedsAction, &c.OnHold, &c.Shipped, &c.Archive, &c.All); err != nil {
+		return OrderViewCounts{}, fmt.Errorf("count orders by view: %w", err)
+	}
+	return c, nil
 }
 
 // ListAbandonedOrderIDs returns the IDs of pre-paid-intent orders (status=pending

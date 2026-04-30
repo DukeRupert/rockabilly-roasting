@@ -44,9 +44,10 @@ const (
 	AuditCustomerAddressAdded        = "customer.address_added"
 	AuditCustomerAddressUpdated      = "customer.address_updated"
 	AuditCustomerAddressDeleted      = "customer.address_deleted"
-	AuditCustomerPaymentTermsUpdated  = "customer.payment_terms_updated"
-	AuditCustomerBillingMethodUpdated = "customer.billing_method_updated"
-	AuditCustomerStripeIDLinked       = "customer.stripe_customer_id_linked"
+	AuditCustomerPaymentTermsUpdated      = "customer.payment_terms_updated"
+	AuditCustomerBillingMethodUpdated     = "customer.billing_method_updated"
+	AuditCustomerLocalFulfillmentUpdated  = "customer.local_fulfillment_updated"
+	AuditCustomerStripeIDLinked           = "customer.stripe_customer_id_linked"
 
 	// Customer group actions
 	AuditCustomerGroupCreated       = "customer_group.created"

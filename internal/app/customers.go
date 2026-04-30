@@ -82,11 +82,10 @@ func (s *CustomerService) UpdateEmail(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return c, nil
 }
 
-// UpdatePreferredLocalFulfillment saves the customer's choice between local
-// delivery and pickup for future eligible orders. Pass nil to clear the
-// preference (back to "ask each time"). Validated against the two local
-// methods; any other value is rejected.
-func (s *CustomerService) UpdatePreferredLocalFulfillment(ctx context.Context, tx pgx.Tx, id uuid.UUID, method *domain.ShippingMethod) error {
+// UpdatePreferredLocalFulfillmentSelf is the customer-initiated path (no
+// audit). The audited staff path is UpdatePreferredLocalFulfillment, below.
+// Pass nil to clear the preference back to "ask each time".
+func (s *CustomerService) UpdatePreferredLocalFulfillmentSelf(ctx context.Context, tx pgx.Tx, id uuid.UUID, method *domain.ShippingMethod) error {
 	if method != nil {
 		if *method != domain.ShippingMethodPickup && *method != domain.ShippingMethodLocalDelivery {
 			return fmt.Errorf("invalid local fulfillment method: %s", *method)
@@ -290,6 +289,38 @@ func (s *CustomerService) UpdateBillingMethod(ctx context.Context, tx pgx.Tx, id
 		After:        map[string]any{"billing_method": string(method)},
 	}); err != nil {
 		return fmt.Errorf("audit billing method updated: %w", err)
+	}
+	return nil
+}
+
+// UpdatePreferredLocalFulfillment is the staff-initiated path: same write as
+// the self-service variant but additionally records an audit entry. Pass nil
+// to clear the preference back to "ask each time".
+func (s *CustomerService) UpdatePreferredLocalFulfillment(ctx context.Context, tx pgx.Tx, id uuid.UUID, method *domain.ShippingMethod, actor Actor) error {
+	if method != nil {
+		if *method != domain.ShippingMethodPickup && *method != domain.ShippingMethodLocalDelivery {
+			return fmt.Errorf("invalid local fulfillment method: %s", *method)
+		}
+	}
+	if err := s.customers.UpdatePreferredLocalFulfillment(ctx, tx, id, method); err != nil {
+		return fmt.Errorf("update preferred local fulfillment: %w", err)
+	}
+
+	after := map[string]any{"preferred_local_fulfillment": nil}
+	if method != nil {
+		after["preferred_local_fulfillment"] = string(*method)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerLocalFulfillmentUpdated,
+		ResourceType: "customer",
+		ResourceID:   id,
+		After:        after,
+	}); err != nil {
+		return fmt.Errorf("audit preferred local fulfillment updated: %w", err)
 	}
 	return nil
 }

@@ -124,7 +124,7 @@ func (d *Deps) handleAccountSettingsUpdate(w http.ResponseWriter, r *http.Reques
 		// absent"). The settings form always submits the field, so if it's
 		// missing entirely, leave the preference untouched.
 		if _, ok := r.Form["preferred_local_fulfillment"]; ok {
-			if perr := d.CustomerService.UpdatePreferredLocalFulfillment(ctx, tx, customer.ID, preferred); perr != nil {
+			if perr := d.CustomerService.UpdatePreferredLocalFulfillmentSelf(ctx, tx, customer.ID, preferred); perr != nil {
 				return perr
 			}
 			updated.PreferredLocalFulfillment = preferred

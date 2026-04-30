@@ -197,3 +197,38 @@ func (d *Deps) handleAdminCustomerBillingMethod(w http.ResponseWriter, r *http.R
 
 	http.Redirect(w, r, fmt.Sprintf("/admin/customers/%s", id), http.StatusSeeOther)
 }
+
+func (d *Deps) handleAdminCustomerLocalFulfillment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var preferred *domain.ShippingMethod
+	switch v := r.FormValue("local_fulfillment"); v {
+	case "":
+		preferred = nil
+	case string(domain.ShippingMethodLocalDelivery):
+		m := domain.ShippingMethodLocalDelivery
+		preferred = &m
+	case string(domain.ShippingMethodPickup):
+		m := domain.ShippingMethodPickup
+		preferred = &m
+	default:
+		http.Error(w, "Invalid local fulfillment preference", http.StatusBadRequest)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.CustomerService.UpdatePreferredLocalFulfillment(ctx, tx, id, preferred, staffActor(r))
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/customers/%s", id), http.StatusSeeOther)
+}

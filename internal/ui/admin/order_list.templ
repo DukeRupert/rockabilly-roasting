@@ -213,8 +213,9 @@ templ OrderListContent(props OrderListProps) {
 			<h1 class="admin-page-title">Orders</h1>
 			<p class="mt-2 label-font text-rr-amber" style="font-size:0.65rem;">✦ The daybook</p>
 		</div>
-		<div class="mt-4 sm:mt-0">
-			<a href="/admin/orders/new" class="inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">+ New manual order</a>
+		<div class="mt-4 sm:mt-0 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+			@PirateShipExportButton()
+			<a href="/admin/orders/new" class="inline-flex items-center justify-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">+ New manual order</a>
 		</div>
 	</div>
 	<!-- Filter masthead — newspaper-style section break holding the view tabs

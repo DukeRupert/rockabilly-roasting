@@ -9,6 +9,8 @@ var (
 	ErrOrderNotRefundable = errors.New("order is not refundable")
 	ErrOrderNotCancellable = errors.New("order is not cancellable")
 	ErrOrderAlreadyFulfilled = errors.New("order is already fulfilled")
+	ErrOrderFulfillmentNotRevertible = errors.New("order fulfillment cannot be reverted")
+	ErrOrderShipmentNotRevertible    = errors.New("order shipment cannot be reverted")
 
 	// Cart errors
 	ErrCartNotFound  = errors.New("cart not found")

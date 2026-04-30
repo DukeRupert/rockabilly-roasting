@@ -76,6 +76,18 @@ func canMarkPickedUp(order *domain.Order) bool {
 		order.Status != domain.OrderStatusRefunded
 }
 
+func canRevertFulfillment(order *domain.Order) bool {
+	return order.FulfillmentStatus == domain.FulfillmentStatusFulfilled &&
+		order.Status != domain.OrderStatusCancelled &&
+		order.Status != domain.OrderStatusRefunded
+}
+
+func canRevertShipment(order *domain.Order) bool {
+	return order.FulfillmentStatus == domain.FulfillmentStatusShipped &&
+		order.Status != domain.OrderStatusCancelled &&
+		order.Status != domain.OrderStatusRefunded
+}
+
 func canMarkOutForDelivery(order *domain.Order) bool {
 	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodLocalDelivery {
 		return false
@@ -274,6 +286,34 @@ templ OrderShowContent(props OrderShowProps) {
 					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
 				>
 					Out for Local Delivery
+				</button>
+			</form>
+		}
+		if canRevertFulfillment(props.Order) {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-fulfillment", props.Order.ID.String())) }>
+				<button
+					type="submit"
+					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+					onclick="return confirm('Revert this order back to unfulfilled? Use only if it was marked fulfilled by mistake.')"
+				>
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"></path>
+					</svg>
+					Revert Fulfillment
+				</button>
+			</form>
+		}
+		if canRevertShipment(props.Order) {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-shipment", props.Order.ID.String())) }>
+				<button
+					type="submit"
+					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+					onclick="return confirm('Revert shipped status back to fulfilled? The shipping label and customer email will NOT be undone — handle that manually.')"
+				>
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"></path>
+					</svg>
+					Revert Shipment
 				</button>
 			</form>
 		}

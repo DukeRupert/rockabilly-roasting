@@ -75,6 +75,8 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, app.ErrOrderNotRefundable),
 		errors.Is(err, app.ErrOrderNotCancellable),
 		errors.Is(err, app.ErrOrderAlreadyFulfilled),
+		errors.Is(err, app.ErrOrderFulfillmentNotRevertible),
+		errors.Is(err, app.ErrOrderShipmentNotRevertible),
 		errors.Is(err, app.ErrCartExpired),
 		errors.Is(err, app.ErrCartEmpty),
 		errors.Is(err, app.ErrEmailNotVerified),

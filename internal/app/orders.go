@@ -416,6 +416,95 @@ func (s *OrderService) ShipOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, a
 	return order, nil
 }
 
+// RevertFulfillment moves an order from fulfilled back to unfulfilled when
+// staff marked it by mistake. Order status flips processing → confirmed to
+// stay consistent with FulfillOrder. Payment status is left untouched. Not
+// allowed once the order has shipped, been delivered, picked up, or moved
+// to a local-fulfillment state — those have their own undo paths.
+func (s *OrderService) RevertFulfillment(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for revert fulfillment: %w", err)
+	}
+
+	if order.FulfillmentStatus != domain.FulfillmentStatusFulfilled {
+		return nil, ErrOrderFulfillmentNotRevertible
+	}
+
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusUnfulfilled)
+	if err != nil {
+		return nil, fmt.Errorf("revert fulfillment: %w", err)
+	}
+
+	if order.Status == domain.OrderStatusProcessing {
+		order, err = s.orders.UpdateOrderStatus(ctx, tx, id, domain.OrderStatusConfirmed)
+		if err != nil {
+			return nil, fmt.Errorf("revert fulfillment status: %w", err)
+		}
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderFulfillmentReverted,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+	}); err != nil {
+		return nil, fmt.Errorf("audit revert fulfillment: %w", err)
+	}
+
+	return order, nil
+}
+
+// RevertShipment moves an order from shipped back to fulfilled when staff
+// marked it shipped by mistake. Order status flips complete → processing.
+// The shipping label and customer notification email are NOT undone — staff
+// must communicate any correction manually.
+func (s *OrderService) RevertShipment(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for revert shipment: %w", err)
+	}
+
+	if order.FulfillmentStatus != domain.FulfillmentStatusShipped {
+		return nil, ErrOrderShipmentNotRevertible
+	}
+
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusFulfilled)
+	if err != nil {
+		return nil, fmt.Errorf("revert shipment: %w", err)
+	}
+
+	if order.Status == domain.OrderStatusComplete {
+		order, err = s.orders.UpdateOrderStatus(ctx, tx, id, domain.OrderStatusProcessing)
+		if err != nil {
+			return nil, fmt.Errorf("revert shipment status: %w", err)
+		}
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderShipmentReverted,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+	}); err != nil {
+		return nil, fmt.Errorf("audit revert shipment: %w", err)
+	}
+
+	return order, nil
+}
+
 // MarkReadyForPickup transitions a pickup order to the ready_for_pickup
 // state and enqueues the "ready" notification. Allowed only for orders whose
 // shipping_method is pickup; the previous fulfillment status must be

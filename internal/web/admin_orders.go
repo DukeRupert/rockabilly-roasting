@@ -368,6 +368,48 @@ func (d *Deps) handleAdminOrderShip(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Order+marked+as+shipped", http.StatusSeeOther)
 }
 
+func (d *Deps) handleAdminOrderRevertFulfillment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.RevertFulfillment(ctx, tx, id, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Fulfillment+reverted", http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminOrderRevertShipment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.RevertShipment(ctx, tx, id, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Shipment+reverted", http.StatusSeeOther)
+}
+
 // handleAdminOrderReadyForPickup transitions a pickup order to ready and
 // emails the customer. Only valid for orders where shipping_method == pickup.
 func (d *Deps) handleAdminOrderReadyForPickup(w http.ResponseWriter, r *http.Request) {

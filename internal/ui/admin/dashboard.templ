@@ -35,9 +35,6 @@ type DashboardProps struct {
 	ToFulfill []PipelineRow
 	ToShip    []PipelineRow
 
-	// Recent orders
-	RecentOrders []domain.Order
-
 	// Charts
 	RevenueTrend []charts.ChartPoint   // last 14 days, oldest → today
 	TopProducts  []charts.LabeledValue // top 5 by selected metric, last 30 days
@@ -218,65 +215,6 @@ templ DashboardContent(props DashboardProps) {
 			</div>
 		}
 	}
-	<!-- Recent orders -->
-	<div class="mt-10">
-		<div class="flex items-baseline justify-between">
-			<h2 class="label-font text-rr-muted">Recent orders</h2>
-			<a href="/admin/orders" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">View all</a>
-		</div>
-		if len(props.RecentOrders) == 0 {
-			<div class="mt-3 border-2 border-dashed border-rr-border py-8 text-center">
-				<svg class="mx-auto size-10 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"></path>
-				</svg>
-				<p class="mt-2 text-sm font-medium text-rr-heading">No orders yet</p>
-				<p class="mt-1 text-sm text-rr-muted">Orders will appear here once customers start purchasing.</p>
-				<a href="/" target="_blank" class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-rr-red hover:text-rr-red-lt">
-					View your storefront
-					<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"></path>
-					</svg>
-				</a>
-			</div>
-		} else {
-			<div class="mt-3 overflow-hidden border-2 border-rr-border bg-rr-surface">
-				<table class="min-w-full divide-y divide-rr-border">
-					<thead class="bg-rr-raised">
-						<tr>
-							<th scope="col" class="py-3 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
-							<th scope="col" class="px-3 py-3 text-left text-sm font-semibold text-rr-heading">Status</th>
-							<th scope="col" class="px-3 py-3 text-left text-sm font-semibold text-rr-heading">Fulfillment</th>
-							<th scope="col" class="px-3 py-3 text-right text-sm font-semibold text-rr-heading">Total</th>
-							<th scope="col" class="hidden px-3 py-3 text-left text-sm font-semibold text-rr-heading sm:table-cell">Date</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-rr-border bg-rr-surface">
-						for _, o := range props.RecentOrders {
-							<tr class="row-link">
-								<td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
-										{ o.Number }
-									</a>
-								</td>
-								<td class="whitespace-nowrap px-3 py-3 text-sm">
-									@OrderStatusBadge(o.Status)
-								</td>
-								<td class="whitespace-nowrap px-3 py-3 text-sm">
-									@FulfillmentStatusBadge(o.FulfillmentStatus)
-								</td>
-								<td class="whitespace-nowrap px-3 py-3 text-sm text-rr-heading text-right tabular-nums">
-									{ formatCents(o.Total) }
-								</td>
-								<td class="hidden whitespace-nowrap px-3 py-3 text-sm text-rr-muted sm:table-cell">
-									{ o.PlacedAt.In(props.MerchantTZ).Format("Jan 2, 3:04 PM") }
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
-			</div>
-		}
-	</div>
 }
 
 // TopSellersCard renders the top-sellers chart with a unit/weight toggle.

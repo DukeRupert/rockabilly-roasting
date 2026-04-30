@@ -146,14 +146,6 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
-		// Recent orders (last 10)
-		props.RecentOrders, txErr = d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
-			Limit: 10,
-		})
-		if txErr != nil {
-			return txErr
-		}
-
 		// Revenue trend — last 14 days, oldest → today
 		trendStart := todayStart.AddDate(0, 0, -13)
 		trendEnd := todayStart.AddDate(0, 0, 1) // exclusive upper bound

@@ -231,6 +231,96 @@ func (s *OrderService) SendRenewalReceiptEmail(ctx context.Context, pool *pgxpoo
 	return nil
 }
 
+// SendOrderShippedEmail tells the customer their order has shipped, with
+// tracking. Loaded with the read → send → audit pattern. The CSV import path
+// enqueues this from inside its per-row tx — at job runtime we read order +
+// customer + shipment fresh.
+func (s *OrderService) SendOrderShippedEmail(ctx context.Context, pool *pgxpool.Pool, orderID, customerID, shipmentID uuid.UUID) error {
+	var (
+		order        *domain.Order
+		customer     *domain.Customer
+		shipment     *domain.Shipment
+		shippingAddr string
+	)
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		o, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
+		if err != nil {
+			return fmt.Errorf("get order %s: %w", orderID, err)
+		}
+		order = o
+
+		c, err := s.customers.GetByID(ctx, tx, customerID)
+		if err != nil {
+			return fmt.Errorf("get customer %s: %w", customerID, err)
+		}
+		customer = c
+
+		sh, err := s.shipments.GetShipmentByIDAsStaff(ctx, tx, shipmentID)
+		if err != nil {
+			return fmt.Errorf("get shipment %s: %w", shipmentID, err)
+		}
+		shipment = sh
+
+		if addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID); err == nil {
+			shippingAddr = emailtemplates.FormatAddress(addr.Line1, addr.City, addr.State, addr.PostalCode)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	html, text, err := s.email.Renderer.Render("order_shipped", emailtemplates.OrderShippedData{
+		CustomerName:   customer.FirstName,
+		OrderNumber:    order.Number,
+		CarrierName:    shipment.CarrierName,
+		ServiceName:    shipment.ServiceName,
+		TrackingNumber: shipment.TrackingNumber,
+		TrackingURL:    trackingURL(shipment.CarrierName, shipment.TrackingNumber),
+		ShippedOn:      shipment.ShippedAt,
+		ShippingAddr:   shippingAddr,
+		StoreName:      s.email.StoreName,
+		StoreURL:       s.email.BaseURL,
+		AccountURL:     s.email.BaseURL + "/account/orders/" + order.ID.String(),
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("order_shipped", "failed").Inc()
+		return fmt.Errorf("render order shipped template: %w", err)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      customer.Email,
+		Subject: fmt.Sprintf("Your order's on the road — %s", order.Number),
+		HTML:    html,
+		Text:    text,
+		Tag:     "order-shipped",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("order_shipped", "failed").Inc()
+		return fmt.Errorf("send order shipped email: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "order_shipped_worker",
+			Action:       audit.AuditEmailOrderShipped,
+			ResourceType: "shipment",
+			ResourceID:   shipment.ID,
+			Metadata: map[string]any{
+				"order_number":    order.Number,
+				"tracking_number": shipment.TrackingNumber,
+				"carrier":         shipment.CarrierName,
+			},
+		})
+	}); err != nil {
+		return fmt.Errorf("audit order shipped sent: %w", err)
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("order_shipped", "sent").Inc()
+	return nil
+}
+
 // SendRefundConfirmationEmail sends a refund-issued notice. The refund amount
 // is passed in by the caller (the webhook knows the actual refunded amount,
 // which may be partial). Uses the read → send → audit pattern.

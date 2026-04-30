@@ -376,8 +376,7 @@ speculation deferred to the implementer:
 
 ## Progress
 
-Steps 1–4 shipped on `main` between commits `033311c..4edbe1f`. Step 5
-remains.
+Steps 1–5 implemented. Step 5 work landed locally; commit pending.
 
 **Commits:**
 - `033311c` Step 1 — origin + tare on `shipping_config` (migration `039`,
@@ -452,23 +451,99 @@ remains.
   in Step 3 for the encoder package); use it in the import path's
   `CreateShipment` call.
 
-**Step 5 work order, when resumed:**
-1. Migration to relax `shipments` NOT NULL constraints on `label_url` +
-   dimensions; flip `domain.Shipment` to pointer types; update EasyPost
-   callers and store conversions in the same commit.
-2. Add `AuditShipmentImported` to `platform/audit/actions.go`.
-3. `platform/pirateship.Decode(reader) ([]TrackingRow, error)` —
-   case-insensitive header matching, extra columns ignored, hard fail
-   if `Order ID` is missing.
-4. New `OrderShippedEmail` River job + worker.
-5. New email template (HTML + text) — see Open Question #3.
-6. New `app.ShippingImportService.RecordPirateShipTracking` —
-   per-row transaction (write `shipments`, flip `fulfillment_status`,
-   audit, enqueue email job) with idempotency guard via the
-   already-shipped check.
-7. `POST /admin/orders/import-tracking` handler.
-8. Admin UI: matching upload form below the export button, summary
-   table renders updated/skipped/errors with per-row detail.
-9. Wire service + worker in `cmd/server/main.go`.
-10. Tests: unit tests for `Decode`; integration test for the per-row
-    service path covering success, order-not-found, already-shipped.
+**Step 5 work, as landed:**
+1. Migration `040_shipments_nullable.sql` relaxes NOT NULL on
+   `label_url` / `length_in` / `width_in` / `height_in`. `domain.Shipment`
+   flipped to pointer types for those four fields; EasyPost callers in
+   `internal/app/fulfillment.go` and the R2-label-store handler in
+   `internal/web/admin_shipment.go` updated to populate / dereference
+   pointers; `store/shipping.go` adds `numericToFloat64Ptr` /
+   `float64PtrToNumeric` helpers. The `CreateShipment` query gained a
+   `shipped_at` column so imports can record the carrier's ship date in
+   one shot.
+2. `platform/audit/actions.go` gained `AuditShipmentImported` and
+   `AuditEmailOrderShipped`.
+3. `platform/pirateship.Decode` — case-insensitive header matching,
+   tolerates extra columns and ragged rows, accepts both ISO and US
+   `M/D/YYYY` ship dates, parses dollar/cents costs with currency-symbol
+   and comma stripping. `ErrMissingOrderIDColumn` is the one hard-fail.
+4. New `OrderShippedEmailWorker` + `OrderShippedEmailArgs` (kind
+   `email:order_shipped`), thin delegator over
+   `OrderService.SendOrderShippedEmail`. The enqueue path goes through
+   the existing `app.JobEnqueuer` interface (extended with
+   `EnqueueOrderShipped`) to avoid the `app → jobs` import cycle.
+5. New `order_shipped.html` + `order_shipped.txt` templates in the
+   paper-and-ink design system, mirroring the masthead / double-rule /
+   stamp-shadow rhythm of `lost_order_cutover.html`. Tracking-number
+   stub renders carrier + service + tracking; the rust CTA renders only
+   when a `TrackingURL` is present. `app.trackingURL(carrier, number)`
+   maps USPS / UPS / FedEx / DHL to public tracking URLs; unknown
+   carriers fall through and the CTA is hidden.
+6. `ShippingImportService` (new file `internal/app/shipping_import.go`).
+   `RecordPirateShipTracking` opens its own per-row transaction;
+   `recordPirateShipTrackingInTx` is the testable core that takes a tx
+   directly. Idempotency guard checks
+   `canImportTrackingFor(fulfillment_status)` — anything past fulfilled
+   is "already shipped" and skipped. Successful row writes shipment,
+   flips fulfillment to `shipped`, records `AuditShipmentImported`, and
+   enqueues `OrderShippedEmailArgs` — all in the same tx. Guest orders
+   (`customer_id IS NULL`) skip the email but still record the
+   shipment.
+7. `POST /admin/orders/import-tracking` (handler:
+   `internal/web/admin_shipping_import.go`). 10 MB upload cap; renders
+   `admin.PirateShipImportSummary` inline. A missing-Order-ID column
+   returns 400 with the same summary template populated as a single
+   error row. Per-row results are bucketed into recorded / skipped /
+   errored; per-row failures log via `slog.Error` for ops visibility.
+8. UI: `admin.PirateShipImportButton` (popover with file input) +
+   `admin.PirateShipImportSummary` (three-bucket table). Sits next to
+   the existing export button on `/admin/orders`; htmx swaps the
+   summary into `#pirate-ship-import-summary`.
+9. Wired in `cmd/server/main.go`: `OrderService.WithShipments`,
+   `OrderShippedEmailWorker` registration, `ShippingImportService`
+   construction (after the enqueuer exists), and
+   `Deps.ShippingImportService`.
+10. Tests:
+    - Decoder unit tests in `internal/platform/pirateship/decoder_test.go`
+      (minimum columns, missing-Order-ID hard fail, case-insensitive
+      headers, extra columns ignored, ragged rows, $-and-comma cost,
+      US date format, blank rows skipped, empty file).
+    - Integration tests in `internal/app/shipping_import_test.go`
+      using the test-only `RecordPirateShipTrackingInTxForTest` export
+      (file `shipping_import_export_test.go`): success path
+      (shipment + fulfillment flip + audit + email-job enqueue all in
+      one tx, dimensions stay NULL), order-not-found, already-shipped
+      (no writes, status untouched), preflight skips, fulfillment
+      status guard.
+    - Email render tests in
+      `internal/emailtemplates/renderer_test.go` for `order_shipped`
+      (with and without tracking URL).
+    - Carrier-URL helper tests in `internal/app/tracking_url_test.go`.
+
+**Decisions made during implementation:**
+- **Open Question #1** — added `AuditShipmentImported` (vs. reusing
+  `AuditShipmentLabelCreated`). Audit logs benefit from distinguishing
+  the two paths; the metadata also tags `"source": "pirate_ship_csv"`.
+- **Open Question #3** — copied the `lost_order_cutover.html`
+  structure for `order_shipped.html` (paper masthead, double rule,
+  stamp-shadow tracking stub, rust CTA, ECE0C6 footer). The CTA URL
+  is built by `app.trackingURL` based on the carrier name; unknown
+  carriers degrade to text-only tracking.
+- **Schema relaxation as separate per-row tx.** The plan called for
+  per-row transactions; the import service opens its own tx and
+  `recordPirateShipTrackingInTx` is exposed via `_test.go` test
+  helper for unit-style integration tests inside the wrapping
+  test-tx.
+- **Prometheus counter.** `hiri_pirateship_imports_total{result=...}`
+  registered alongside the other counters; incremented after the
+  per-row tx commits or on skip/error.
+
+**Deferred / not done:**
+- **Per-route role gating.** Same as the export endpoint — the import
+  handler currently relies on `requireStaffSession`. TODO comment
+  flags the spot where `PermUpdateFulfillment` should attach.
+- **Step 3 integration test.** Not addressed in Step 5; encoder/format
+  unit tests still cover the file-shape contract.
+- **`mage db:migrate` not run on local** — committing migration `040`
+  along with the rest; deploy needs the migration applied before the
+  binary rolls.

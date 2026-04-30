@@ -259,6 +259,18 @@ type SubscriptionCancelledArgs struct {
 // Kind returns the job kind identifier.
 func (SubscriptionCancelledArgs) Kind() string { return "email:subscription_cancelled" }
 
+// OrderShippedEmailArgs sends an "order shipped" notification with tracking.
+// Enqueued in the same transaction as the shipment insert during a Pirate
+// Ship CSV tracking import.
+type OrderShippedEmailArgs struct {
+	OrderID    uuid.UUID `json:"order_id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+	ShipmentID uuid.UUID `json:"shipment_id"`
+}
+
+// Kind returns the job kind identifier.
+func (OrderShippedEmailArgs) Kind() string { return "email:order_shipped" }
+
 // RefundConfirmationArgs sends a refund-issued confirmation. The amount is the
 // refunded total in cents (may be partial).
 type RefundConfirmationArgs struct {

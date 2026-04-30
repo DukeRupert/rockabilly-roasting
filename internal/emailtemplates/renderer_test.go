@@ -49,6 +49,54 @@ func TestRender_OrderConfirm(t *testing.T) {
 	assert.Contains(t, text, "$36.00")
 }
 
+func TestRender_OrderShipped(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	shipDate := time.Date(2026, 4, 30, 0, 0, 0, 0, time.UTC)
+	data := OrderShippedData{
+		CustomerName:   "Jane",
+		OrderNumber:    "RR-1001",
+		CarrierName:    "USPS",
+		ServiceName:    "Ground Advantage",
+		TrackingNumber: "9400111202555842761523",
+		TrackingURL:    "https://tools.usps.com/track?qtc_tLabels1=9400111202555842761523",
+		ShippedOn:      &shipDate,
+		ShippingAddr:   "123 Main St, Austin, TX 78701",
+		StoreName:      "Rockabilly Roasting",
+		StoreURL:       "https://rockabillyroasting.com",
+	}
+
+	html, text, err := r.Render("order_shipped", data)
+	require.NoError(t, err)
+
+	for _, want := range []string{"RR-1001", "Jane", "USPS", "Ground Advantage", "9400111202555842761523"} {
+		assert.Contains(t, html, want)
+		assert.Contains(t, text, want)
+	}
+	// Tracking CTA only renders when a URL is provided.
+	assert.Contains(t, html, data.TrackingURL)
+	// Ship date formatted via the date helper.
+	assert.Contains(t, html, "April 30, 2026")
+}
+
+func TestRender_OrderShipped_OmitsTrackingCTAWhenURLEmpty(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	html, _, err := r.Render("order_shipped", OrderShippedData{
+		CustomerName:   "Jane",
+		OrderNumber:    "RR-1002",
+		CarrierName:    "USPS",
+		TrackingNumber: "9400111202555842761523",
+		StoreName:      "Rockabilly Roasting",
+		StoreURL:       "https://rockabillyroasting.com",
+	})
+	require.NoError(t, err)
+	// Without a TrackingURL, no CTA anchor is emitted.
+	assert.NotContains(t, html, "Track shipment")
+}
+
 func TestRender_MagicLink(t *testing.T) {
 	r, err := New()
 	require.NoError(t, err)

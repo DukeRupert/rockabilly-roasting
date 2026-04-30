@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -72,20 +73,23 @@ func (s *ShippingStore) UpdateConfig(ctx context.Context, tx pgx.Tx, cfg domain.
 // --- Shipments ---
 
 // CreateShipmentParams holds the fields needed to create a shipment.
+// LabelURL and the box dimensions are pointer-typed because Pirate Ship CSV
+// imports omit them; EasyPost callers always provide them.
 type CreateShipmentParams struct {
 	OrderID        uuid.UUID
 	Status         domain.ShipmentStatus
 	Provider       string
 	TrackingNumber string
-	LabelURL       string
+	LabelURL       *string
 	CarrierName    string
 	ServiceName    string
 	LabelCostCents int
 	LabelCurrency  string
 	WeightOz       float64
-	LengthIn       float64
-	WidthIn        float64
-	HeightIn       float64
+	LengthIn       *float64
+	WidthIn        *float64
+	HeightIn       *float64
+	ShippedAt      *time.Time
 	CreatedBy      uuid.UUID
 }
 
@@ -103,9 +107,10 @@ func (s *ShippingStore) CreateShipment(ctx context.Context, tx pgx.Tx, p CreateS
 		LabelCostCents: int32(p.LabelCostCents),
 		LabelCurrency:  p.LabelCurrency,
 		WeightOz:       float64ToNumeric(p.WeightOz),
-		LengthIn:       float64ToNumeric(p.LengthIn),
-		WidthIn:        float64ToNumeric(p.WidthIn),
-		HeightIn:       float64ToNumeric(p.HeightIn),
+		LengthIn:       float64PtrToNumeric(p.LengthIn),
+		WidthIn:        float64PtrToNumeric(p.WidthIn),
+		HeightIn:       float64PtrToNumeric(p.HeightIn),
+		ShippedAt:      timestampToPG(p.ShippedAt),
 		CreatedBy:      p.CreatedBy,
 	})
 	if err != nil {
@@ -153,7 +158,7 @@ func (s *ShippingStore) UpdateShipmentTracking(ctx context.Context, tx pgx.Tx, i
 	row, err := sqlcgen.New(tx).UpdateShipmentTracking(ctx, sqlcgen.UpdateShipmentTrackingParams{
 		ID:             id,
 		TrackingNumber: trackingNumber,
-		LabelUrl:       labelURL,
+		LabelUrl:       &labelURL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update shipment tracking: %w", err)
@@ -206,9 +211,9 @@ func shipmentFromRow(r sqlcgen.Shipment) *domain.Shipment {
 		LabelCostCents: int(r.LabelCostCents),
 		LabelCurrency:  r.LabelCurrency,
 		WeightOz:       numericToFloat64(r.WeightOz),
-		LengthIn:       numericToFloat64(r.LengthIn),
-		WidthIn:        numericToFloat64(r.WidthIn),
-		HeightIn:       numericToFloat64(r.HeightIn),
+		LengthIn:       numericToFloat64Ptr(r.LengthIn),
+		WidthIn:        numericToFloat64Ptr(r.WidthIn),
+		HeightIn:       numericToFloat64Ptr(r.HeightIn),
 		CreatedBy:      r.CreatedBy,
 		CreatedAt:      r.CreatedAt,
 		LabelCreatedAt: timestampFromPG(r.LabelCreatedAt),

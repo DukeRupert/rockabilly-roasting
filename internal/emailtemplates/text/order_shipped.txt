@@ -1,0 +1,30 @@
+{{define "order_shipped.txt"}}{{.StoreName}}
+==========================================
+
+ON THE ROAD
+
+Hi{{if .CustomerName}} {{.CustomerName}}{{end}},
+
+Your order {{.OrderNumber}} just left the roastery{{if .ShippedOn}} on {{date .ShippedOn}}{{end}}. Tracking is below.
+
+TRACKING
+{{if .CarrierName}}{{.CarrierName}}{{if .ServiceName}} -- {{.ServiceName}}{{end}}
+{{end}}{{.TrackingNumber}}{{if .TrackingURL}}
+{{.TrackingURL}}{{end}}
+
+{{if .ShippingAddr}}HEADED TO
+{{.ShippingAddr}}
+
+{{end}}Carrier scans can take a day or so to catch up -- if the link looks quiet right after you click it, give it some time.
+
+Questions about your order? Just reply to this email.
+
+Thanks for the order,
+The crew at Rockabilly Roasting Co.
+
+------------------------------------------
+{{.StoreName}}
+101 W Kennewick Ave, Kennewick WA
+(509) 585-2320
+{{.StoreURL}}
+{{end}}

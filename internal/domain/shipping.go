@@ -79,22 +79,24 @@ func normalizeZip(zip string) string {
 	return z
 }
 
-// Shipment represents a physical shipment with tracking.
+// Shipment represents a physical shipment with tracking. Several fields are
+// pointer-typed because Pirate Ship CSV imports do not carry a label artifact
+// or box dimensions — only EasyPost-purchased shipments populate them.
 type Shipment struct {
 	ID             uuid.UUID
 	OrderID        uuid.UUID
 	Status         ShipmentStatus
 	Provider       string
 	TrackingNumber string
-	LabelURL       string
+	LabelURL       *string
 	CarrierName    string
 	ServiceName    string
 	LabelCostCents int
 	LabelCurrency  string
 	WeightOz       float64
-	LengthIn       float64
-	WidthIn        float64
-	HeightIn       float64
+	LengthIn       *float64
+	WidthIn        *float64
+	HeightIn       *float64
 	CreatedBy      uuid.UUID
 	CreatedAt      time.Time
 	LabelCreatedAt *time.Time

@@ -15,27 +15,28 @@ import (
 const createShipment = `-- name: CreateShipment :one
 INSERT INTO shipments (id, order_id, status, provider, tracking_number, label_url,
                        carrier_name, service_name, label_cost_cents, label_currency,
-                       weight_oz, length_in, width_in, height_in, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                       weight_oz, length_in, width_in, height_in, shipped_at, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 RETURNING id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at, label_r2_key, label_format
 `
 
 type CreateShipmentParams struct {
-	ID             uuid.UUID      `json:"id"`
-	OrderID        uuid.UUID      `json:"order_id"`
-	Status         string         `json:"status"`
-	Provider       string         `json:"provider"`
-	TrackingNumber string         `json:"tracking_number"`
-	LabelUrl       string         `json:"label_url"`
-	CarrierName    string         `json:"carrier_name"`
-	ServiceName    string         `json:"service_name"`
-	LabelCostCents int32          `json:"label_cost_cents"`
-	LabelCurrency  string         `json:"label_currency"`
-	WeightOz       pgtype.Numeric `json:"weight_oz"`
-	LengthIn       pgtype.Numeric `json:"length_in"`
-	WidthIn        pgtype.Numeric `json:"width_in"`
-	HeightIn       pgtype.Numeric `json:"height_in"`
-	CreatedBy      uuid.UUID      `json:"created_by"`
+	ID             uuid.UUID          `json:"id"`
+	OrderID        uuid.UUID          `json:"order_id"`
+	Status         string             `json:"status"`
+	Provider       string             `json:"provider"`
+	TrackingNumber string             `json:"tracking_number"`
+	LabelUrl       *string            `json:"label_url"`
+	CarrierName    string             `json:"carrier_name"`
+	ServiceName    string             `json:"service_name"`
+	LabelCostCents int32              `json:"label_cost_cents"`
+	LabelCurrency  string             `json:"label_currency"`
+	WeightOz       pgtype.Numeric     `json:"weight_oz"`
+	LengthIn       pgtype.Numeric     `json:"length_in"`
+	WidthIn        pgtype.Numeric     `json:"width_in"`
+	HeightIn       pgtype.Numeric     `json:"height_in"`
+	ShippedAt      pgtype.Timestamptz `json:"shipped_at"`
+	CreatedBy      uuid.UUID          `json:"created_by"`
 }
 
 func (q *Queries) CreateShipment(ctx context.Context, arg CreateShipmentParams) (Shipment, error) {
@@ -54,6 +55,7 @@ func (q *Queries) CreateShipment(ctx context.Context, arg CreateShipmentParams) 
 		arg.LengthIn,
 		arg.WidthIn,
 		arg.HeightIn,
+		arg.ShippedAt,
 		arg.CreatedBy,
 	)
 	var i Shipment
@@ -278,7 +280,7 @@ RETURNING id, order_id, status, provider, tracking_number, label_url, carrier_na
 type UpdateShipmentTrackingParams struct {
 	ID             uuid.UUID `json:"id"`
 	TrackingNumber string    `json:"tracking_number"`
-	LabelUrl       string    `json:"label_url"`
+	LabelUrl       *string   `json:"label_url"`
 }
 
 func (q *Queries) UpdateShipmentTracking(ctx context.Context, arg UpdateShipmentTrackingParams) (Shipment, error) {

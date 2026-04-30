@@ -473,7 +473,7 @@ type Shipment struct {
 	Status         string             `json:"status"`
 	Provider       string             `json:"provider"`
 	TrackingNumber string             `json:"tracking_number"`
-	LabelUrl       string             `json:"label_url"`
+	LabelUrl       *string            `json:"label_url"`
 	CarrierName    string             `json:"carrier_name"`
 	ServiceName    string             `json:"service_name"`
 	LabelCostCents int32              `json:"label_cost_cents"`

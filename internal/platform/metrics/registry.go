@@ -51,6 +51,14 @@ type Registry struct {
 
 	// Email
 	EmailsSent *prometheus.CounterVec
+
+	// --- Shipping ---
+
+	// PirateShipImports counts each tracking row processed by the Pirate Ship
+	// CSV import endpoint, partitioned by outcome (recorded / skipped /
+	// error). The "skipped" bucket includes already-shipped and
+	// order-not-found rows, both of which are normal during a re-upload.
+	PirateShipImports *prometheus.CounterVec
 }
 
 // NewRegistry creates and registers all application metrics.
@@ -213,6 +221,13 @@ func NewRegistry() *Registry {
 			Name: "emails_sent_total",
 			Help: "Total transactional emails sent.",
 		}, []string{"kind", "status"}),
+
+		// --- Shipping ---
+
+		PirateShipImports: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "hiri_pirateship_imports_total",
+			Help: "Total Pirate Ship tracking-import rows processed, by outcome.",
+		}, []string{"result"}),
 	}
 
 	reg.MustRegister(
@@ -250,6 +265,8 @@ func NewRegistry() *Registry {
 		m.RateLimitHitsTotal,
 		// Email
 		m.EmailsSent,
+		// Shipping
+		m.PirateShipImports,
 	)
 
 	return m

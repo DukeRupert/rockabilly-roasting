@@ -23,6 +23,7 @@ type OrderService struct {
 	customers     *store.CustomerStore     // populated via WithEmail; required for Send* methods
 	catalog       *store.CatalogStore      // populated via WithEmail; required for Send* methods
 	subscriptions *store.SubscriptionStore // populated via WithEmail; used by SendRenewalReceiptEmail to show next-charge date
+	shipments     *store.ShippingStore     // populated via WithShipments; required for SendOrderShippedEmail
 	email         EmailEnv                 // populated via WithEmail; required for Send* methods
 	discounts     *store.DiscountStore     // populated via WithDiscounts; required for CancelOrder coupon release
 }
@@ -44,6 +45,14 @@ func (s *OrderService) WithEmail(env EmailEnv, customers *store.CustomerStore, c
 	s.customers = customers
 	s.catalog = catalog
 	s.subscriptions = subscriptions
+	return s
+}
+
+// WithShipments attaches the shipments store used by SendOrderShippedEmail to
+// load the shipment record being announced. Must be called at wiring time
+// before any "order shipped" email is enqueued.
+func (s *OrderService) WithShipments(shipments *store.ShippingStore) *OrderService {
+	s.shipments = shipments
 	return s
 }
 

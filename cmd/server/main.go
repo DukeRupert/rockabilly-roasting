@@ -220,6 +220,7 @@ func run() error {
 	catalogSvc := app.NewCatalogService(catalogStore, auditWriter, metricsReg)
 	orderSvc := app.NewOrderService(orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore, subscriptionStore).
+		WithShipments(shippingStore).
 		WithDiscounts(discountStore)
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
@@ -258,6 +259,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewSubscriptionPastDueWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionCancelledWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewRefundConfirmationWorker(orderSvc, pool))
+	river.AddWorker(workers, jobs.NewOrderShippedEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
 	river.AddWorker(workers, jobs.NewAbandonedOrderCleanupWorker(orderSvc, pool))
@@ -312,6 +314,10 @@ func run() error {
 	renewalSvc.WithJobEnqueuer(enqueuer)
 	checkoutSvc.WithCheckoutConfirmDeps(cartStore, enqueuer)
 
+	// Pirate Ship CSV tracking import depends on the enqueuer to fire the
+	// "your order has shipped" email atomically with the per-row write.
+	shippingImportSvc := app.NewShippingImportService(orderStore, shippingStore, auditWriter, metricsReg, enqueuer, pool)
+
 	// Register scheduler worker (needs the client for transactional inserts)
 	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient, metricsReg))
 
@@ -363,8 +369,9 @@ func run() error {
 		CustomerService:      customerSvc,
 		CatalogService:       catalogSvc,
 		CheckoutService:      checkoutSvc,
-		FulfillmentService:   fulfillmentSvc,
+		FulfillmentService:    fulfillmentSvc,
 		ShippingExportService: shippingExportSvc,
+		ShippingImportService: shippingImportSvc,
 		SubscriptionService:  subscriptionSvc,
 		DiscountService:      discountSvc,
 		AuthService:          authSvc,

@@ -77,20 +77,24 @@ func (s *FulfillmentService) CreateShipmentLabel(
 		return nil, fmt.Errorf("create label: %w", err)
 	}
 
+	labelURL := result.LabelURL
+	lengthIn := req.LengthIn
+	widthIn := req.WidthIn
+	heightIn := req.HeightIn
 	shipment, err := s.shipments.CreateShipment(ctx, tx, store.CreateShipmentParams{
 		OrderID:        orderID,
 		Status:         domain.ShipmentStatusLabelCreated,
 		Provider:       "easypost",
 		TrackingNumber: result.TrackingNumber,
-		LabelURL:       result.LabelURL,
+		LabelURL:       &labelURL,
 		CarrierName:    result.CarrierName,
 		ServiceName:    result.ServiceName,
 		LabelCostCents: result.RateCents,
 		LabelCurrency:  result.Currency,
 		WeightOz:       req.WeightOz,
-		LengthIn:       req.LengthIn,
-		WidthIn:        req.WidthIn,
-		HeightIn:       req.HeightIn,
+		LengthIn:       &lengthIn,
+		WidthIn:        &widthIn,
+		HeightIn:       &heightIn,
 		CreatedBy:      *actor.ID,
 	})
 	if err != nil {

@@ -200,6 +200,23 @@ type RefundConfirmationData struct {
 	StoreURL     string
 }
 
+// OrderShippedData holds data for the "your order is on the road" notification
+// — sent after a Pirate Ship tracking row imports successfully and the order
+// flips to shipped.
+type OrderShippedData struct {
+	CustomerName   string
+	OrderNumber    string
+	CarrierName    string
+	ServiceName    string
+	TrackingNumber string
+	TrackingURL    string // optional carrier tracking URL; blank if unknown
+	ShippedOn      *time.Time
+	ShippingAddr   string
+	StoreName      string
+	StoreURL       string
+	AccountURL     string
+}
+
 // AccountNotMigratedData holds data for the support reply explaining that the
 // customer's old account didn't carry over (only active subscribers were
 // migrated) and they'll be re-created automatically on their next order.

@@ -67,7 +67,11 @@ const (
 
 	// Shipping actions
 	AuditShipmentLabelCreated  = "shipment.label_created"
+	AuditShipmentImported      = "shipment.imported"
 	AuditShippingConfigUpdated = "shipping_config.updated"
+
+	// Email actions for shipping
+	AuditEmailOrderShipped = "email.order_shipped"
 
 	// Discount actions
 	AuditDiscountCreated     = "discount.created"

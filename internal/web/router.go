@@ -40,8 +40,9 @@ type Deps struct {
 	CustomerService      *app.CustomerService
 	CatalogService       *app.CatalogService
 	CheckoutService      *app.CheckoutService
-	FulfillmentService   *app.FulfillmentService
+	FulfillmentService    *app.FulfillmentService
 	ShippingExportService *app.ShippingExportService
+	ShippingImportService *app.ShippingImportService
 	SubscriptionService  *app.SubscriptionService
 	DiscountService      *app.DiscountService
 	AuthService          *app.AuthService
@@ -286,6 +287,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// Admin orders
 	adminMux.HandleFunc("GET /admin/orders", deps.handleAdminOrderList)
 	adminMux.HandleFunc("GET /admin/orders/export.csv", deps.handleAdminOrdersExportCSV)
+	adminMux.HandleFunc("POST /admin/orders/import-tracking", deps.handleAdminOrdersImportTracking)
 	adminMux.HandleFunc("GET /admin/orders/new", deps.handleAdminOrderNew)
 	adminMux.HandleFunc("POST /admin/orders/new", deps.handleAdminOrderCreate)
 	adminMux.HandleFunc("GET /admin/orders/batch/invoices", deps.handleAdminOrderInvoiceBatch)

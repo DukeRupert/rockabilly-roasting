@@ -46,3 +46,15 @@ func (e *Enqueuer) EnqueueOrderConfirm(ctx context.Context, tx pgx.Tx, orderID, 
 	}, nil)
 	return err
 }
+
+// EnqueueOrderShipped enqueues an "order shipped" notification job in tx.
+// Used by the Pirate Ship CSV import path so the email rides on the same
+// transaction as the shipment write — if the tx rolls back, no email goes.
+func (e *Enqueuer) EnqueueOrderShipped(ctx context.Context, tx pgx.Tx, orderID, customerID, shipmentID uuid.UUID) error {
+	_, err := e.client.InsertTx(ctx, tx, OrderShippedEmailArgs{
+		OrderID:    orderID,
+		CustomerID: customerID,
+		ShipmentID: shipmentID,
+	}, nil)
+	return err
+}

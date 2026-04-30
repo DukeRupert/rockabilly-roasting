@@ -72,10 +72,16 @@ func (d *Deps) handleAdminShipmentLabelCreate(w http.ResponseWriter, r *http.Req
 			return txErr
 		}
 
-		// Enqueue R2 storage job in the same transaction.
+		// Enqueue R2 storage job in the same transaction. EasyPost always
+		// returns a label URL, so dereference is safe here; if it ever isn't,
+		// CreateShipmentLabel would have already failed before this enqueue.
+		var labelURL string
+		if shipment.LabelURL != nil {
+			labelURL = *shipment.LabelURL
+		}
 		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.StoreLabelToR2Args{
 			ShipmentID: shipment.ID,
-			LabelURL:   shipment.LabelURL,
+			LabelURL:   labelURL,
 		}, nil)
 		return txErr
 	})

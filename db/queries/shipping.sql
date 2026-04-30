@@ -19,8 +19,8 @@ SET flat_rate_cents = $1,
 -- name: CreateShipment :one
 INSERT INTO shipments (id, order_id, status, provider, tracking_number, label_url,
                        carrier_name, service_name, label_cost_cents, label_currency,
-                       weight_oz, length_in, width_in, height_in, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+                       weight_oz, length_in, width_in, height_in, shipped_at, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 RETURNING *;
 
 -- name: GetShipmentByID :one

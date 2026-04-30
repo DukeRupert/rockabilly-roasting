@@ -58,6 +58,26 @@ func numericToFloat64(n pgtype.Numeric) float64 {
 	return f.Float64
 }
 
+// numericToFloat64Ptr converts a pgtype.Numeric to *float64. Returns nil when
+// the underlying column is NULL.
+func numericToFloat64Ptr(n pgtype.Numeric) *float64 {
+	if !n.Valid {
+		return nil
+	}
+	f, _ := n.Float64Value()
+	v := f.Float64
+	return &v
+}
+
+// float64PtrToNumeric converts a *float64 to pgtype.Numeric. Nil produces an
+// invalid (NULL) Numeric.
+func float64PtrToNumeric(p *float64) pgtype.Numeric {
+	if p == nil {
+		return pgtype.Numeric{Valid: false}
+	}
+	return float64ToNumeric(*p)
+}
+
 // float64ToNumeric converts a float64 to pgtype.Numeric.
 func float64ToNumeric(f float64) pgtype.Numeric {
 	// Use big.Float for precise conversion

@@ -215,9 +215,13 @@ templ OrderListContent(props OrderListProps) {
 		</div>
 		<div class="mt-4 sm:mt-0 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
 			@PirateShipExportButton()
+			@PirateShipImportButton()
 			<a href="/admin/orders/new" class="inline-flex items-center justify-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">+ New manual order</a>
 		</div>
 	</div>
+	<!-- Import summary swap target — populated by Pirate Ship tracking
+	     uploads. Empty until the form posts. -->
+	<div id="pirate-ship-import-summary"></div>
 	<!-- Filter masthead — newspaper-style section break holding the view tabs
 	     and search as one composable unit. Edge-to-edge ink rules top/bottom
 	     bind them visually; on desktop tabs live left, search lives right;

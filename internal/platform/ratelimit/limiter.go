@@ -39,6 +39,10 @@ var (
 	ContactIPLimit = 3
 	ContactWindow  = time.Hour
 
+	// Wholesale application form.
+	WholesaleApplyIPLimit = 3
+	WholesaleApplyWindow  = time.Hour
+
 	// Global per-IP.
 	GlobalIPLimit = 300
 	GlobalWindow  = time.Minute
@@ -157,4 +161,5 @@ func CouponSessionKey(sessionID string) string   { return "coupon:sess:" + sessi
 func CouponIPKey(ip string) string               { return "coupon:ip:" + ip }
 func CheckoutSessionKey(sessionID string) string { return "checkout:sess:" + sessionID }
 func ContactIPKey(ip string) string               { return "contact:ip:" + ip }
+func WholesaleApplyIPKey(ip string) string        { return "wholesale-apply:ip:" + ip }
 func GlobalIPKey(ip string) string               { return "global:ip:" + ip }

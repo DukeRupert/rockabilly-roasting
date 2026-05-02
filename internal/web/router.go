@@ -161,7 +161,10 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Wholesale application and password setup (public)
 	mux.HandleFunc("GET /wholesale/apply", deps.handleWholesaleApplyPage)
-	mux.HandleFunc("POST /wholesale/apply", deps.handleWholesaleApply)
+	wholesaleApplyIPLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.WholesaleApplyIPLimit, ratelimit.WholesaleApplyWindow, func(r *http.Request) string {
+		return ratelimit.WholesaleApplyIPKey(ratelimit.ClientIP(r))
+	})
+	mux.Handle("POST /wholesale/apply", wholesaleApplyIPLimit(http.HandlerFunc(deps.handleWholesaleApply)))
 	mux.HandleFunc("GET /wholesale/setup", deps.handleWholesaleSetupPage)
 	mux.HandleFunc("POST /wholesale/setup", deps.handleWholesaleSetup)
 

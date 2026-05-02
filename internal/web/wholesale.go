@@ -3,7 +3,9 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"net/mail"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -73,21 +75,48 @@ func (d *Deps) handleWholesaleApplyPage(w http.ResponseWriter, r *http.Request) 
 func (d *Deps) handleWholesaleApply(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	p := app.ApplyParams{
-		Email:       r.FormValue("email"),
-		FirstName:   r.FormValue("first_name"),
-		LastName:    r.FormValue("last_name"),
-		CompanyName: r.FormValue("company_name"),
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
 	}
-	if phone := r.FormValue("phone"); phone != "" {
+
+	// Honeypot — hidden field never filled by real users. Silently accept and
+	// render the same confirmation so bots can't distinguish a hit from a miss.
+	if strings.TrimSpace(r.FormValue("fax")) != "" {
+		storefront.WholesaleApplyConfirmation().Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+
+	p := app.ApplyParams{
+		Email:       strings.TrimSpace(r.FormValue("email")),
+		FirstName:   strings.TrimSpace(r.FormValue("first_name")),
+		LastName:    strings.TrimSpace(r.FormValue("last_name")),
+		CompanyName: strings.TrimSpace(r.FormValue("company_name")),
+	}
+	if phone := strings.TrimSpace(r.FormValue("phone")); phone != "" {
 		p.Phone = &phone
 	}
-	if website := r.FormValue("website"); website != "" {
+	if website := strings.TrimSpace(r.FormValue("website")); website != "" {
 		p.Website = &website
 	}
 
 	if p.Email == "" || p.FirstName == "" || p.LastName == "" || p.CompanyName == "" {
 		http.Error(w, "All required fields must be filled", http.StatusBadRequest)
+		return
+	}
+
+	// Length caps reject oversized payloads from automated probes.
+	if len(p.Email) > 254 ||
+		len(p.FirstName) > 100 || len(p.LastName) > 100 ||
+		len(p.CompanyName) > 200 ||
+		(p.Phone != nil && len(*p.Phone) > 30) ||
+		(p.Website != nil && len(*p.Website) > 255) {
+		http.Error(w, "Input too long", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := mail.ParseAddress(p.Email); err != nil {
+		http.Error(w, "Invalid email address", http.StatusBadRequest)
 		return
 	}
 

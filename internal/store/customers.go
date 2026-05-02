@@ -574,6 +574,21 @@ func (s *CustomerStore) SetWholesaleNotes(ctx context.Context, tx pgx.Tx, id uui
 	return nil
 }
 
+// SetWholesaleDeclined moves a pending application to the declined state and
+// records the decline reason in wholesale_notes.
+func (s *CustomerStore) SetWholesaleDeclined(ctx context.Context, tx pgx.Tx, id uuid.UUID, notes string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE customers
+		 SET wholesale_status = 'declined', wholesale_notes = $2, updated_at = now()
+		 WHERE id = $1`,
+		id, notes,
+	)
+	if err != nil {
+		return fmt.Errorf("set wholesale declined: %w", err)
+	}
+	return nil
+}
+
 // SetWholesaleSuspended suspends an approved wholesale account and records
 // the reason in wholesale_notes.
 func (s *CustomerStore) SetWholesaleSuspended(ctx context.Context, tx pgx.Tx, id uuid.UUID, notes string) error {

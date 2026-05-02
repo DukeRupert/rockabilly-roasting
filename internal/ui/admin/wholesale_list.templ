@@ -44,6 +44,9 @@ templ WholesaleListContent(props WholesaleListProps) {
 		<a href="/admin/wholesale?status=suspended" class={ wholesaleFilterClasses(props.StatusFilter, "suspended") }>
 			Suspended
 		</a>
+		<a href="/admin/wholesale?status=declined" class={ wholesaleFilterClasses(props.StatusFilter, "declined") }>
+			Declined
+		</a>
 	</div>
 	<!-- Applications table -->
 	<div class="mt-6">

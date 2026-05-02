@@ -21,6 +21,7 @@ const (
 	WholesaleStatusPending   WholesaleStatus = "pending"
 	WholesaleStatusApproved  WholesaleStatus = "approved"
 	WholesaleStatusSuspended WholesaleStatus = "suspended"
+	WholesaleStatusDeclined  WholesaleStatus = "declined"
 )
 
 // BillingMethod controls how a wholesale customer is billed.

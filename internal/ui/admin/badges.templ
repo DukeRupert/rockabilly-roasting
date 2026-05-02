@@ -257,6 +257,8 @@ func wholesaleStatusBadgeClasses(status domain.WholesaleStatus) string {
 		return "badge badge-dot badge-green"
 	case domain.WholesaleStatusSuspended:
 		return "badge badge-dot badge-red"
+	case domain.WholesaleStatusDeclined:
+		return "badge badge-dot badge-slate"
 	default:
 		return "badge badge-dot badge-amber"
 	}

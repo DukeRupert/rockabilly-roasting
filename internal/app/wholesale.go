@@ -162,8 +162,8 @@ func (s *WholesaleService) DeclineApplication(ctx context.Context, tx pgx.Tx, cu
 		return ErrWholesaleNotPending
 	}
 
-	if err := s.customers.SetWholesaleNotes(ctx, tx, customerID, notes); err != nil {
-		return fmt.Errorf("update wholesale notes: %w", err)
+	if err := s.customers.SetWholesaleDeclined(ctx, tx, customerID, notes); err != nil {
+		return fmt.Errorf("decline wholesale: %w", err)
 	}
 
 	if err := s.audit.Record(ctx, tx, audit.AuditEntry{

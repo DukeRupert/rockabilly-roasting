@@ -82,6 +82,34 @@ func (s *CustomerService) UpdateEmail(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return c, nil
 }
 
+// UpdatePhone updates a customer's phone number. Pass nil (or empty after
+// trimming) to clear it. Records a customer.phone_updated audit entry on every
+// successful update — including self-service edits, unlike UpdateName /
+// UpdateEmail. Phone gates outbound order notifications, so a clear trail of
+// who set the destination number is worth the extra audit row.
+func (s *CustomerService) UpdatePhone(ctx context.Context, tx pgx.Tx, id uuid.UUID, phone *string, actor Actor) (*domain.Customer, error) {
+	c, err := s.customers.UpdatePhone(ctx, tx, id, phone)
+	if err != nil {
+		return nil, fmt.Errorf("update phone: %w", err)
+	}
+	after := map[string]any{"phone": nil}
+	if phone != nil {
+		after["phone"] = *phone
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerPhoneUpdated,
+		ResourceType: "customer",
+		ResourceID:   id,
+		After:        after,
+	}); err != nil {
+		return nil, fmt.Errorf("record phone update audit: %w", err)
+	}
+	return c, nil
+}
+
 // UpdatePreferredLocalFulfillmentSelf is the customer-initiated path (no
 // audit). The audited staff path is UpdatePreferredLocalFulfillment, below.
 // Pass nil to clear the preference back to "ask each time".

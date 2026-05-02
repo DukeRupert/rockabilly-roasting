@@ -10,6 +10,13 @@ import (
 
 // --- Shared account layout ---
 
+func phoneValue(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
+}
+
 func accountNavClass(path, active string) string {
 	base := "flex items-center gap-3 border-l-2 px-3 py-2.5 font-oswald text-sm transition-colors"
 	if path == active {
@@ -188,6 +195,12 @@ templ AccountSettingsContent(props AccountSettingsProps) {
 					<input type="email" id="email" name="email" value={ props.Customer.Email } required
 						class="paper-input w-full border-2 border-ink bg-cream-hi px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none" style="letter-spacing:0.04em;"/>
 					<p class="mt-2 font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">Your sign-in link will be sent to this address.</p>
+				</div>
+				<div>
+					<label for="phone" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Phone (optional)</label>
+					<input type="tel" id="phone" name="phone" value={ phoneValue(props.Customer.Phone) } autocomplete="tel" placeholder="(509) 555-0123"
+						class="paper-input w-full border-2 border-ink bg-cream-hi px-3.5 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none" style="letter-spacing:0.04em;"/>
+					<p class="mt-2 font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">We'll only use this for order updates. Leave blank to remove.</p>
 				</div>
 				if props.ShowLocalFulfillment {
 					<div class="pt-4 border-t-2 border-ink/30 space-y-3">

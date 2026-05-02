@@ -82,6 +82,7 @@ func (d *Deps) handleAccountSettingsUpdate(w http.ResponseWriter, r *http.Reques
 	firstName := strings.TrimSpace(r.FormValue("first_name"))
 	lastName := strings.TrimSpace(r.FormValue("last_name"))
 	email := strings.TrimSpace(r.FormValue("email"))
+	phone := strings.TrimSpace(r.FormValue("phone"))
 
 	if firstName == "" || lastName == "" || email == "" {
 		props := storefront.AccountSettingsProps{
@@ -119,6 +120,18 @@ func (d *Deps) handleAccountSettingsUpdate(w http.ResponseWriter, r *http.Reques
 				return txErr
 			}
 		}
+		// Phone: empty submission clears the field. Skip when unchanged so we
+		// don't write no-op audit rows on every settings save.
+		var phonePtr *string
+		if phone != "" {
+			phonePtr = &phone
+		}
+		if !samePhone(customer.Phone, phonePtr) {
+			updated, txErr = d.CustomerService.UpdatePhone(ctx, tx, customer.ID, phonePtr, customerActor(r))
+			if txErr != nil {
+				return txErr
+			}
+		}
 		// Only update the preference field when the form actually carried it
 		// (preferredRaw == "" alone is ambiguous — could mean "clear" or "field
 		// absent"). The settings form always submits the field, so if it's
@@ -147,6 +160,17 @@ func (d *Deps) handleAccountSettingsUpdate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	storefront.AccountSettingsPage(props).Render(ctx, w) //nolint:errcheck
+}
+
+// samePhone reports whether two optional phone strings represent the same value.
+func samePhone(a, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 // --- Order History ---

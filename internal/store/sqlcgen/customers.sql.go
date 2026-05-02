@@ -675,6 +675,54 @@ func (q *Queries) UpdateCustomerPaymentTerms(ctx context.Context, arg UpdateCust
 	return err
 }
 
+const updateCustomerPhone = `-- name: UpdateCustomerPhone :one
+UPDATE customers
+SET phone = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, customer_group_id, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method, qb_customer_id, qb_synced_at, payment_terms_days, billing_method, preferred_local_fulfillment
+`
+
+type UpdateCustomerPhoneParams struct {
+	ID    uuid.UUID `json:"id"`
+	Phone *string   `json:"phone"`
+}
+
+func (q *Queries) UpdateCustomerPhone(ctx context.Context, arg UpdateCustomerPhoneParams) (Customer, error) {
+	row := q.db.QueryRow(ctx, updateCustomerPhone, arg.ID, arg.Phone)
+	var i Customer
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.EmailVerified,
+		&i.PasswordHash,
+		&i.FirstName,
+		&i.LastName,
+		&i.Phone,
+		&i.TaxExempt,
+		&i.TaxExemptReason,
+		&i.CustomerGroupID,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.StripeCustomerID,
+		&i.AccountType,
+		&i.WholesaleStatus,
+		&i.CompanyName,
+		&i.Website,
+		&i.WholesaleNotes,
+		&i.ApprovedAt,
+		&i.ApprovedBy,
+		&i.TwoFaEnabled,
+		&i.TwoFaMethod,
+		&i.QbCustomerID,
+		&i.QbSyncedAt,
+		&i.PaymentTermsDays,
+		&i.BillingMethod,
+		&i.PreferredLocalFulfillment,
+	)
+	return i, err
+}
+
 const updateCustomerPreferredLocalFulfillment = `-- name: UpdateCustomerPreferredLocalFulfillment :exec
 UPDATE customers
 SET preferred_local_fulfillment = $2, updated_at = now()

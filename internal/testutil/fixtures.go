@@ -31,6 +31,10 @@ func WithCustomerName(first, last string) CustomerOption {
 	}
 }
 
+func WithPhone(phone *string) CustomerOption {
+	return func(p *sqlcgen.CreateCustomerParams) { p.Phone = phone }
+}
+
 func CreateCustomer(t *testing.T, tx pgx.Tx, opts ...CustomerOption) *domain.Customer {
 	t.Helper()
 	p := sqlcgen.CreateCustomerParams{

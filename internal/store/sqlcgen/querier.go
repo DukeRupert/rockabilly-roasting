@@ -218,6 +218,7 @@ type Querier interface {
 	UpdateCustomerName(ctx context.Context, arg UpdateCustomerNameParams) (Customer, error)
 	UpdateCustomerPassword(ctx context.Context, arg UpdateCustomerPasswordParams) error
 	UpdateCustomerPaymentTerms(ctx context.Context, arg UpdateCustomerPaymentTermsParams) error
+	UpdateCustomerPhone(ctx context.Context, arg UpdateCustomerPhoneParams) (Customer, error)
 	UpdateCustomerPreferredLocalFulfillment(ctx context.Context, arg UpdateCustomerPreferredLocalFulfillmentParams) error
 	UpdateCustomerStripeCustomerID(ctx context.Context, arg UpdateCustomerStripeCustomerIDParams) (Customer, error)
 	UpdateCustomerTaxExempt(ctx context.Context, arg UpdateCustomerTaxExemptParams) error

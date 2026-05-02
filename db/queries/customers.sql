@@ -24,6 +24,12 @@ SET email = $2, email_verified = false, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateCustomerPhone :one
+UPDATE customers
+SET phone = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: UpdateCustomerPassword :exec
 UPDATE customers
 SET password_hash = $2, updated_at = now()

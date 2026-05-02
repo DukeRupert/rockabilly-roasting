@@ -63,6 +63,7 @@ const (
 	AuditCustomerPasswordSet     = "customer.password_set"
 	AuditCustomerPasswordChanged = "customer.password_changed"
 	AuditCustomerEmailVerified   = "customer.email_verified"
+	AuditCustomerPhoneUpdated    = "customer.phone_updated"
 
 	// Staff actions
 	AuditStaffCreated     = "staff.created"

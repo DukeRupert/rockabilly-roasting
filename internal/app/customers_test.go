@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
@@ -66,6 +67,58 @@ func TestCustomerService_UpdateEmail(t *testing.T) {
 
 		_, err := svc.UpdateEmail(ctx, tx, other.ID, "taken@example.com")
 		assert.ErrorIs(t, err, app.ErrEmailAlreadyExists)
+	})
+}
+
+func TestCustomerService_UpdatePhone(t *testing.T) {
+	pool := testPool
+	ctx := context.Background()
+	svc := newCustomerService()
+	actor := testutil.TestActor()
+
+	t.Run("set phone on customer with no phone", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		customer := testutil.CreateCustomer(t, tx)
+		require.Nil(t, customer.Phone)
+
+		phone := "(509) 555-0123"
+		updated, err := svc.UpdatePhone(ctx, tx, customer.ID, &phone, actor)
+		require.NoError(t, err)
+		require.NotNil(t, updated.Phone)
+		assert.Equal(t, phone, *updated.Phone)
+
+		entry := testutil.LastAuditEntryWithAction(t, tx, "customer", customer.ID, audit.AuditCustomerPhoneUpdated)
+		var after map[string]any
+		require.NoError(t, json.Unmarshal(entry.AfterSnapshot, &after))
+		assert.Equal(t, phone, after["phone"])
+	})
+
+	t.Run("clear phone with nil", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		existing := "(509) 555-9999"
+		customer := testutil.CreateCustomer(t, tx, testutil.WithPhone(&existing))
+		require.NotNil(t, customer.Phone)
+
+		updated, err := svc.UpdatePhone(ctx, tx, customer.ID, nil, actor)
+		require.NoError(t, err)
+		assert.Nil(t, updated.Phone)
+
+		entry := testutil.LastAuditEntryWithAction(t, tx, "customer", customer.ID, audit.AuditCustomerPhoneUpdated)
+		var after map[string]any
+		require.NoError(t, json.Unmarshal(entry.AfterSnapshot, &after))
+		assert.Nil(t, after["phone"])
+	})
+
+	t.Run("replace existing phone", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		old := "(509) 555-0001"
+		customer := testutil.CreateCustomer(t, tx, testutil.WithPhone(&old))
+
+		newPhone := "(509) 555-0002"
+		updated, err := svc.UpdatePhone(ctx, tx, customer.ID, &newPhone, actor)
+		require.NoError(t, err)
+		require.NotNil(t, updated.Phone)
+		assert.Equal(t, newPhone, *updated.Phone)
 	})
 }
 

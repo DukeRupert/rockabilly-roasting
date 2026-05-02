@@ -15,6 +15,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/store"
@@ -321,6 +322,8 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 
 	var resp checkoutAddressResponse
 
+	trimmedPhone := strings.TrimSpace(req.Phone)
+
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		// Find or create guest customer by email
 		customer, txErr := d.CustomerService.GetCustomerByEmail(ctx, tx, req.Email)
@@ -329,12 +332,29 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 				return fmt.Errorf("lookup customer: %w", txErr)
 			}
 			var phone *string
-			if p := strings.TrimSpace(req.Phone); p != "" {
-				phone = &p
+			if trimmedPhone != "" {
+				phone = &trimmedPhone
 			}
 			customer, txErr = d.CustomerService.CreateRetail(ctx, tx, req.Email, req.FirstName, req.LastName, phone)
 			if txErr != nil {
 				return fmt.Errorf("create guest customer: %w", txErr)
+			}
+		} else if trimmedPhone != "" {
+			// Returning customer: only mutate the saved phone when the request
+			// is from an authenticated session whose customer matches the
+			// looked-up email. Guests typing someone else's email must not be
+			// able to overwrite that customer's notification number.
+			if sessionCustomer, ok := auth.CustomerFromContext(ctx); ok && sessionCustomer.ID == customer.ID {
+				if customer.Phone == nil || *customer.Phone != trimmedPhone {
+					actor := app.Actor{
+						Type: domain.AuditActorTypeCustomer,
+						ID:   &customer.ID,
+						Name: customer.Email,
+					}
+					if _, phoneErr := d.CustomerService.UpdatePhone(ctx, tx, customer.ID, &trimmedPhone, actor); phoneErr != nil {
+						return fmt.Errorf("update phone: %w", phoneErr)
+					}
+				}
 			}
 		}
 		resp.CustomerID = customer.ID.String()

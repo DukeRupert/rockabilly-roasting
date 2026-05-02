@@ -235,6 +235,18 @@ func (s *CustomerStore) UpdateEmail(ctx context.Context, tx pgx.Tx, id uuid.UUID
 	return customerFromRow(row), nil
 }
 
+// UpdatePhone sets a customer's phone. Pass nil to clear it.
+func (s *CustomerStore) UpdatePhone(ctx context.Context, tx pgx.Tx, id uuid.UUID, phone *string) (*domain.Customer, error) {
+	row, err := sqlcgen.New(tx).UpdateCustomerPhone(ctx, sqlcgen.UpdateCustomerPhoneParams{
+		ID:    id,
+		Phone: phone,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update customer phone: %w", err)
+	}
+	return customerFromRow(row), nil
+}
+
 // UpdatePassword sets a customer's password hash.
 func (s *CustomerStore) UpdatePassword(ctx context.Context, tx pgx.Tx, id uuid.UUID, hash string) error {
 	err := sqlcgen.New(tx).UpdateCustomerPassword(ctx, sqlcgen.UpdateCustomerPasswordParams{

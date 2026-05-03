@@ -57,6 +57,7 @@ type Customer struct {
 	BillingMethod    BillingMethod
 	QBCustomerID     *string
 	QBSyncedAt       *time.Time
+	PriceListID      *uuid.UUID
 	TwoFAEnabled     bool
 	TwoFAMethod      *string
 	// PreferredLocalFulfillment is the customer's saved choice for orders

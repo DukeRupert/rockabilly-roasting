@@ -50,6 +50,11 @@ UPDATE customers
 SET customer_group_id = $2, updated_at = now()
 WHERE id = $1;
 
+-- name: UpdateCustomerPriceList :exec
+UPDATE customers
+SET price_list_id = $2, updated_at = now()
+WHERE id = $1;
+
 -- name: UpdateCustomerPaymentTerms :exec
 UPDATE customers
 SET payment_terms_days = $2, updated_at = now()

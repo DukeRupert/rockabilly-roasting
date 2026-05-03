@@ -183,6 +183,7 @@ type Customer struct {
 	PaymentTermsDays          *int32             `json:"payment_terms_days"`
 	BillingMethod             string             `json:"billing_method"`
 	PreferredLocalFulfillment *string            `json:"preferred_local_fulfillment"`
+	PriceListID               *uuid.UUID         `json:"price_list_id"`
 }
 
 type CustomerGroup struct {

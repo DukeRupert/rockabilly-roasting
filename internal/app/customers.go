@@ -185,6 +185,28 @@ func (s *CustomerService) UpdateCustomerGroup(ctx context.Context, tx pgx.Tx, id
 	return nil
 }
 
+// UpdatePriceList sets a customer's assigned price list and records an audit
+// entry. Pass nil to clear the assignment (falls back to base pricing).
+func (s *CustomerService) UpdatePriceList(ctx context.Context, tx pgx.Tx, id uuid.UUID, priceListID *uuid.UUID, actor Actor) error {
+	if err := s.customers.UpdatePriceList(ctx, tx, id, priceListID); err != nil {
+		return fmt.Errorf("update price list: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerPriceListUpdated,
+		ResourceType: "customer",
+		ResourceID:   id,
+		After:        map[string]any{"price_list_id": priceListID},
+	}); err != nil {
+		return fmt.Errorf("audit price list updated: %w", err)
+	}
+
+	return nil
+}
+
 // GrantTaxExemption grants tax exemption to a customer and records an audit entry.
 func (s *CustomerService) GrantTaxExemption(ctx context.Context, tx pgx.Tx, id uuid.UUID, reason string, actor Actor) error {
 	if err := s.customers.UpdateTaxExempt(ctx, tx, id, true, &reason); err != nil {

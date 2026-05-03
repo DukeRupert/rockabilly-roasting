@@ -144,6 +144,44 @@ func (q *Queries) GetGroupPrice(ctx context.Context, arg GetGroupPriceParams) (P
 	return i, err
 }
 
+const getPriceListPrice = `-- name: GetPriceListPrice :one
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.price_list_id, p.starts_at, p.ends_at
+FROM price_sets ps
+JOIN prices p ON p.price_set_id = ps.id
+WHERE ps.variant_id = $1
+  AND p.currency_code = $2
+  AND p.price_list_id = $3
+  AND p.customer_group_id IS NULL
+  AND p.min_quantity IS NULL
+LIMIT 1
+`
+
+type GetPriceListPriceParams struct {
+	VariantID    uuid.UUID  `json:"variant_id"`
+	CurrencyCode string     `json:"currency_code"`
+	PriceListID  *uuid.UUID `json:"price_list_id"`
+}
+
+func (q *Queries) GetPriceListPrice(ctx context.Context, arg GetPriceListPriceParams) (Price, error) {
+	row := q.db.QueryRow(ctx, getPriceListPrice, arg.VariantID, arg.CurrencyCode, arg.PriceListID)
+	var i Price
+	err := row.Scan(
+		&i.ID,
+		&i.PriceSetID,
+		&i.Amount,
+		&i.CurrencyCode,
+		&i.MinQuantity,
+		&i.MaxQuantity,
+		&i.CustomerGroupID,
+		&i.PriceListID,
+		&i.StartsAt,
+		&i.EndsAt,
+	)
+	return i, err
+}
+
 const getPriceSetByVariant = `-- name: GetPriceSetByVariant :one
 SELECT id, variant_id FROM price_sets WHERE variant_id = $1
 `
@@ -221,6 +259,71 @@ func (q *Queries) ListBasePricesByProduct(ctx context.Context, arg ListBasePrice
 	return items, nil
 }
 
+const listBasePricesByVariants = `-- name: ListBasePricesByVariants :many
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.price_list_id, p.starts_at, p.ends_at,
+       ps.variant_id
+FROM price_sets ps
+JOIN prices p ON p.price_set_id = ps.id
+WHERE ps.variant_id = ANY($1::uuid[])
+  AND p.currency_code = $2
+  AND p.price_list_id IS NULL
+  AND p.customer_group_id IS NULL
+  AND p.min_quantity IS NULL
+`
+
+type ListBasePricesByVariantsParams struct {
+	Column1      []uuid.UUID `json:"column_1"`
+	CurrencyCode string      `json:"currency_code"`
+}
+
+type ListBasePricesByVariantsRow struct {
+	ID              uuid.UUID          `json:"id"`
+	PriceSetID      uuid.UUID          `json:"price_set_id"`
+	Amount          int32              `json:"amount"`
+	CurrencyCode    string             `json:"currency_code"`
+	MinQuantity     *int32             `json:"min_quantity"`
+	MaxQuantity     *int32             `json:"max_quantity"`
+	CustomerGroupID *uuid.UUID         `json:"customer_group_id"`
+	PriceListID     *uuid.UUID         `json:"price_list_id"`
+	StartsAt        pgtype.Timestamptz `json:"starts_at"`
+	EndsAt          pgtype.Timestamptz `json:"ends_at"`
+	VariantID       uuid.UUID          `json:"variant_id"`
+}
+
+func (q *Queries) ListBasePricesByVariants(ctx context.Context, arg ListBasePricesByVariantsParams) ([]ListBasePricesByVariantsRow, error) {
+	rows, err := q.db.Query(ctx, listBasePricesByVariants, arg.Column1, arg.CurrencyCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBasePricesByVariantsRow{}
+	for rows.Next() {
+		var i ListBasePricesByVariantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceSetID,
+			&i.Amount,
+			&i.CurrencyCode,
+			&i.MinQuantity,
+			&i.MaxQuantity,
+			&i.CustomerGroupID,
+			&i.PriceListID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.VariantID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listGroupPricesByProduct = `-- name: ListGroupPricesByProduct :many
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
        p.min_quantity, p.max_quantity, p.customer_group_id,
@@ -264,6 +367,72 @@ func (q *Queries) ListGroupPricesByProduct(ctx context.Context, arg ListGroupPri
 	items := []ListGroupPricesByProductRow{}
 	for rows.Next() {
 		var i ListGroupPricesByProductRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceSetID,
+			&i.Amount,
+			&i.CurrencyCode,
+			&i.MinQuantity,
+			&i.MaxQuantity,
+			&i.CustomerGroupID,
+			&i.PriceListID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.VariantID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPriceListPricesByVariants = `-- name: ListPriceListPricesByVariants :many
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.price_list_id, p.starts_at, p.ends_at,
+       ps.variant_id
+FROM price_sets ps
+JOIN prices p ON p.price_set_id = ps.id
+WHERE ps.variant_id = ANY($1::uuid[])
+  AND p.currency_code = $2
+  AND p.price_list_id = $3
+  AND p.customer_group_id IS NULL
+  AND p.min_quantity IS NULL
+`
+
+type ListPriceListPricesByVariantsParams struct {
+	Column1      []uuid.UUID `json:"column_1"`
+	CurrencyCode string      `json:"currency_code"`
+	PriceListID  *uuid.UUID  `json:"price_list_id"`
+}
+
+type ListPriceListPricesByVariantsRow struct {
+	ID              uuid.UUID          `json:"id"`
+	PriceSetID      uuid.UUID          `json:"price_set_id"`
+	Amount          int32              `json:"amount"`
+	CurrencyCode    string             `json:"currency_code"`
+	MinQuantity     *int32             `json:"min_quantity"`
+	MaxQuantity     *int32             `json:"max_quantity"`
+	CustomerGroupID *uuid.UUID         `json:"customer_group_id"`
+	PriceListID     *uuid.UUID         `json:"price_list_id"`
+	StartsAt        pgtype.Timestamptz `json:"starts_at"`
+	EndsAt          pgtype.Timestamptz `json:"ends_at"`
+	VariantID       uuid.UUID          `json:"variant_id"`
+}
+
+func (q *Queries) ListPriceListPricesByVariants(ctx context.Context, arg ListPriceListPricesByVariantsParams) ([]ListPriceListPricesByVariantsRow, error) {
+	rows, err := q.db.Query(ctx, listPriceListPricesByVariants, arg.Column1, arg.CurrencyCode, arg.PriceListID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPriceListPricesByVariantsRow{}
+	for rows.Next() {
+		var i ListPriceListPricesByVariantsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.PriceSetID,

@@ -12,14 +12,21 @@ import (
 	"github.com/dukerupert/hiri/internal/store"
 )
 
+// customerPricingReader is the slice of CustomerStore that PricingService needs
+// to resolve customer-aware prices. *store.CustomerStore satisfies it.
+type customerPricingReader interface {
+	GetByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Customer, error)
+}
+
 // PricingService contains business logic for pricing.
 type PricingService struct {
-	pricing *store.PricingStore
+	pricing   *store.PricingStore
+	customers customerPricingReader
 }
 
 // NewPricingService creates a new PricingService.
-func NewPricingService(pricing *store.PricingStore) *PricingService {
-	return &PricingService{pricing: pricing}
+func NewPricingService(pricing *store.PricingStore, customers customerPricingReader) *PricingService {
+	return &PricingService{pricing: pricing, customers: customers}
 }
 
 // GetBasePrice returns the base price for a variant in a given currency.
@@ -110,4 +117,91 @@ func (s *PricingService) ListGroupPricesByProduct(ctx context.Context, tx pgx.Tx
 		return nil, fmt.Errorf("list group prices: %w", err)
 	}
 	return prices, nil
+}
+
+// ResolveForCustomer returns the effective price (in cents) for a variant given a customer.
+// If the customer has a price list assigned, that list is consulted first; missing entries
+// fall back to the base price. Returns ErrCustomerNotFound or ErrPriceNotFound on miss.
+func (s *PricingService) ResolveForCustomer(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, customerID uuid.UUID, currencyCode string) (int64, error) {
+	customer, err := s.customers.GetByID(ctx, tx, customerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, ErrCustomerNotFound
+		}
+		return 0, fmt.Errorf("get customer for pricing: %w", err)
+	}
+
+	if customer.PriceListID != nil {
+		price, err := s.pricing.GetPriceListPrice(ctx, tx, variantID, *customer.PriceListID, currencyCode)
+		if err == nil {
+			return int64(price.Amount), nil
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return 0, fmt.Errorf("get price list price: %w", err)
+		}
+	}
+
+	base, err := s.pricing.GetBasePrice(ctx, tx, variantID, currencyCode)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, ErrPriceNotFound
+		}
+		return 0, fmt.Errorf("get base price: %w", err)
+	}
+	return int64(base.Amount), nil
+}
+
+// ResolveForCustomerBatch returns effective prices for the given variants keyed by variant ID.
+// Missing entries on the customer's price list fall back to the base price; variants with no
+// base price are simply omitted from the returned map (consumer reads zero-value).
+func (s *PricingService) ResolveForCustomerBatch(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, variantIDs []uuid.UUID, currencyCode string) (map[uuid.UUID]int, error) {
+	customer, err := s.customers.GetByID(ctx, tx, customerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCustomerNotFound
+		}
+		return nil, fmt.Errorf("get customer for pricing: %w", err)
+	}
+
+	if len(variantIDs) == 0 {
+		return map[uuid.UUID]int{}, nil
+	}
+
+	if customer.PriceListID == nil {
+		basePrices, err := s.pricing.ListBasePricesByVariants(ctx, tx, variantIDs, currencyCode)
+		if err != nil {
+			return nil, fmt.Errorf("list base prices: %w", err)
+		}
+		return basePrices, nil
+	}
+
+	listPrices, err := s.pricing.ListPriceListPricesByVariants(ctx, tx, variantIDs, *customer.PriceListID, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("list price list prices: %w", err)
+	}
+
+	missing := make([]uuid.UUID, 0, len(variantIDs))
+	for _, id := range variantIDs {
+		if _, ok := listPrices[id]; !ok {
+			missing = append(missing, id)
+		}
+	}
+
+	if len(missing) == 0 {
+		return listPrices, nil
+	}
+
+	basePrices, err := s.pricing.ListBasePricesByVariants(ctx, tx, missing, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("list base prices for fallback: %w", err)
+	}
+
+	merged := make(map[uuid.UUID]int, len(listPrices)+len(basePrices))
+	for id, p := range basePrices {
+		merged[id] = p
+	}
+	for id, p := range listPrices {
+		merged[id] = p
+	}
+	return merged, nil
 }

@@ -117,6 +117,7 @@ type Querier interface {
 	// and then sees the post-transition state, so side effects (audit, email,
 	// coupon redemption) don't double-fire.
 	GetOrderByStripePaymentIntentIDForUpdate(ctx context.Context, stripePaymentIntentID *string) (Order, error)
+	GetPriceListPrice(ctx context.Context, arg GetPriceListPriceParams) (Price, error)
 	GetPriceSetByVariant(ctx context.Context, variantID uuid.UUID) (PriceSet, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySlug(ctx context.Context, slug string) (Product, error)
@@ -148,6 +149,7 @@ type Querier interface {
 	ListAuditByActor(ctx context.Context, actorID *uuid.UUID) ([]AuditLog, error)
 	ListAuditByResource(ctx context.Context, arg ListAuditByResourceParams) ([]AuditLog, error)
 	ListBasePricesByProduct(ctx context.Context, arg ListBasePricesByProductParams) ([]ListBasePricesByProductRow, error)
+	ListBasePricesByVariants(ctx context.Context, arg ListBasePricesByVariantsParams) ([]ListBasePricesByVariantsRow, error)
 	ListCartItems(ctx context.Context, cartID uuid.UUID) ([]CartItem, error)
 	ListCouponCodesByDiscount(ctx context.Context, discountID uuid.UUID) ([]CouponCode, error)
 	ListCustomerGroups(ctx context.Context) ([]CustomerGroup, error)
@@ -160,6 +162,7 @@ type Querier interface {
 	ListInvoicePaymentsByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoicePayment, error)
 	ListInvoicesByOrder(ctx context.Context, orderID uuid.UUID) ([]Invoice, error)
 	ListLineItemsByOrder(ctx context.Context, orderID uuid.UUID) ([]LineItem, error)
+	ListPriceListPricesByVariants(ctx context.Context, arg ListPriceListPricesByVariantsParams) ([]ListPriceListPricesByVariantsRow, error)
 	ListProductAttributeSets(ctx context.Context, productID uuid.UUID) ([]AttributeSet, error)
 	ListProductGroupVisibility(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
 	ListProductMediaByProduct(ctx context.Context, productID uuid.UUID) ([]ProductMedium, error)

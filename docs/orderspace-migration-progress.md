@@ -9,6 +9,7 @@ Working punch list for executing the OS → Hiri wholesale migration across mult
 | 2026-04-27 | Boundary contracts (D1–D5) + census | Plan settled, no code |
 | 2026-05-02 | Progress tracker created | This doc |
 | 2026-05-03 | W1 + W3a + W3b | Schema + customer wiring landed; sqlc regenerated; migrate/rollback verified; tests green |
+| 2026-05-03 | W4a + W4b + W4c | Customer-aware pricing resolver landed; PricingService gains ResolveForCustomer/Batch; tests green |
 
 When you finish a session, append a row. One sentence each.
 
@@ -16,7 +17,7 @@ When you finish a session, append a row. One sentence each.
 
 - Latest migration: `043_customer_price_list_id.sql` (W1 landed).
 - `Customer.PriceListID *uuid.UUID` present in domain + scanned in `customerFromRow`, `List`, `ListWholesaleWithQBCustomerID`. `CustomerStore.UpdatePriceList` + `CustomerService.UpdatePriceList` (audited) wired.
-- `PricingService.ResolveForCustomer` / `ResolveForCustomerBatch` not present in `internal/app/pricing.go`.
+- `PricingService.ResolveForCustomer` / `ResolveForCustomerBatch` landed (W4c). `PricingStore` has `GetPriceListPrice`, `ListBasePricesByVariants`, `ListPriceListPricesByVariants` (W4a/W4b). `NewPricingService` now takes `customerPricingReader`; wired in `cmd/server/main.go`.
 - `cart.AddItem` still snapshots base price unconditionally (`internal/app/cart.go:67`) — G1 blocker live.
 - `QuickOrderCatalog` does not pass `VisibilityContext` (`internal/app/wholesale.go`) — G3 blocker live.
 - `cmd/os-migrate/main.go` exists but predates pricing/visibility work; needs I1–I6.
@@ -24,7 +25,7 @@ When you finish a session, append a row. One sentence each.
 
 ## Next up
 
-W4a → W4b → W4c. W4c unblocks W5–W8.
+W5 → W6 → W8 → W7. W4c is done; cart + handler + visibility wiring is unblocked.
 
 ---
 
@@ -44,9 +45,9 @@ Each item is a single small commit unless flagged otherwise. Decisions column re
 
 ### Pricing service
 
-- [ ] **W4a** — `PricingStore.GetPriceListPrice` (single) + sqlc query. (D2, XS)
-- [ ] **W4b** — `PricingStore.ListBasePricesByVariants` + `ListPriceListPricesByVariants` (batch) + sqlc queries. (D5, S)
-- [ ] **W4c** — `PricingService.ResolveForCustomer` + `ResolveForCustomerBatch` + `customerPricingReader` interface; update constructor in `cmd/server/main.go`. **Blocks W5–W8.** (D2 + D5, S)
+- [x] **W4a** — `PricingStore.GetPriceListPrice` (single) + sqlc query. (D2, XS)
+- [x] **W4b** — `PricingStore.ListBasePricesByVariants` + `ListPriceListPricesByVariants` (batch) + sqlc queries. (D5, S)
+- [x] **W4c** — `PricingService.ResolveForCustomer` + `ResolveForCustomerBatch` + `customerPricingReader` interface; update constructor in `cmd/server/main.go`. **Blocks W5–W8.** (D2 + D5, S)
 
 ### Cart + checkout
 

@@ -90,6 +90,54 @@ func (s *PricingStore) ListBasePricesByProduct(ctx context.Context, tx pgx.Tx, p
 	return prices, nil
 }
 
+// GetPriceListPrice returns the price-list price for a variant+price-list+currency.
+func (s *PricingStore) GetPriceListPrice(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, priceListID uuid.UUID, currencyCode string) (*domain.Price, error) {
+	row, err := sqlcgen.New(tx).GetPriceListPrice(ctx, sqlcgen.GetPriceListPriceParams{
+		VariantID:    variantID,
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get price list price for variant %s list %s: %w", variantID, priceListID, err)
+	}
+	return priceFromRow(row), nil
+}
+
+// ListBasePricesByVariants returns base prices for the given variants, keyed by variant ID.
+// Variants without a base price are omitted from the map.
+func (s *PricingStore) ListBasePricesByVariants(ctx context.Context, tx pgx.Tx, variantIDs []uuid.UUID, currencyCode string) (map[uuid.UUID]int, error) {
+	rows, err := sqlcgen.New(tx).ListBasePricesByVariants(ctx, sqlcgen.ListBasePricesByVariantsParams{
+		Column1:      variantIDs,
+		CurrencyCode: currencyCode,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list base prices by variants: %w", err)
+	}
+	prices := make(map[uuid.UUID]int, len(rows))
+	for _, r := range rows {
+		prices[r.VariantID] = int(r.Amount)
+	}
+	return prices, nil
+}
+
+// ListPriceListPricesByVariants returns price-list prices for the given variants, keyed by variant ID.
+// Variants without an entry on the list are omitted from the map.
+func (s *PricingStore) ListPriceListPricesByVariants(ctx context.Context, tx pgx.Tx, variantIDs []uuid.UUID, priceListID uuid.UUID, currencyCode string) (map[uuid.UUID]int, error) {
+	rows, err := sqlcgen.New(tx).ListPriceListPricesByVariants(ctx, sqlcgen.ListPriceListPricesByVariantsParams{
+		Column1:      variantIDs,
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list price list prices by variants for list %s: %w", priceListID, err)
+	}
+	prices := make(map[uuid.UUID]int, len(rows))
+	for _, r := range rows {
+		prices[r.VariantID] = int(r.Amount)
+	}
+	return prices, nil
+}
+
 // GetGroupPrice returns the group price for a variant+group+currency.
 func (s *PricingStore) GetGroupPrice(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, customerGroupID uuid.UUID, currencyCode string) (*domain.Price, error) {
 	row, err := sqlcgen.New(tx).GetGroupPrice(ctx, sqlcgen.GetGroupPriceParams{

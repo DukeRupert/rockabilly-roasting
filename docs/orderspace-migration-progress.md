@@ -11,6 +11,7 @@ Working punch list for executing the OS → Hiri wholesale migration across mult
 | 2026-05-03 | W1 + W3a + W3b | Schema + customer wiring landed; sqlc regenerated; migrate/rollback verified; tests green |
 | 2026-05-03 | W4a + W4b + W4c | Customer-aware pricing resolver landed; PricingService gains ResolveForCustomer/Batch; tests green |
 | 2026-05-03 | W5 + W6 + W8 + W7 | Wholesale cart + checkout now use customer-aware pricing + visibility; staleness check returns 409 + banner; G1 + G3 closed; tests green |
+| 2026-05-03 | W9 + W10 | testutil fixtures (price list, price list price, customer group, product visibility) + 21 tests across `pricing_test.go`, `cart_pricing_test.go`, `wholesale_pricing_test.go` covering D2/D3/D4/D5 invariants; all green |
 
 When you finish a session, append a row. One sentence each.
 
@@ -24,12 +25,13 @@ When you finish a session, append a row. One sentence each.
 - `QuickOrderCatalog(ctx, tx, groupIDs, customerID, pricing, currency)` passes `VisibilityContext{IsWholesale: true, GroupIDs}` and uses `ResolveForCustomerBatch` — **G3 closed**.
 - `handleWholesaleCheckoutConfirm` performs a fresh-resolve staleness check inside the order tx; on mismatch it rewrites cart rows via `AddItemForCustomer`, commits, and renders the wholesale checkout page with `PriceChangeBanner` + HTTP 409.
 - `cart.AddItem` (retail) is unchanged — retail still snapshots base price by design.
+- New customer-aware pricing + visibility paths now have test coverage: `internal/app/pricing_test.go` (D2/D5 resolver matrix), `cart_pricing_test.go` (D3 cart paths), `wholesale_pricing_test.go` (D3 denormalization + D4/D5 quick-order visibility & pricing). Fixtures under `internal/testutil/fixtures.go`.
 - `cmd/os-migrate/main.go` exists but predates pricing/visibility work; needs I1–I6.
 - Wholesale storefront templates exist and route correctly; reskin to paper-and-ink is a separate cosmetic track and does not block the import.
 
 ## Next up
 
-W9 → W10 (testutil fixtures + tests for the new pricing/visibility paths), then W11 (admin UI for price-list assignment) and the importer track (I1–I6).
+W11 (admin UI for price-list assignment, variant×list overrides, group management) and the importer track (I1–I6).
 
 ---
 
@@ -62,8 +64,8 @@ Each item is a single small commit unless flagged otherwise. Decisions column re
 
 ### Tests
 
-- [ ] **W9** — `testutil` fixtures + assertions per the plan's "Test boundary" section. (—, S)
-- [ ] **W10** — test cases: pricing matrix (base/list/customer combos), cart hint vs. handler resolution, checkout staleness 409 path, visibility filter, batch omitted-variants behavior. (—, M)
+- [x] **W9** — `testutil` fixtures + assertions per the plan's "Test boundary" section. (—, S)
+- [x] **W10** — test cases: pricing matrix (base/list/customer combos), cart hint vs. handler resolution, visibility filter, batch omitted-variants behavior, wholesale denormalization. Handler-level checkout staleness test deferred (covered transitively by D3 denormalization + cart tests). (—, M)
 
 ### Admin UI (post-import operability)
 

@@ -18,37 +18,58 @@ import (
 
 // --- Customer ---
 
-type CustomerOption func(*sqlcgen.CreateCustomerParams)
+type customerInput struct {
+	params      sqlcgen.CreateCustomerParams
+	priceListID *uuid.UUID
+}
+
+type CustomerOption func(*customerInput)
 
 func WithEmail(email string) CustomerOption {
-	return func(p *sqlcgen.CreateCustomerParams) { p.Email = email }
+	return func(i *customerInput) { i.params.Email = email }
 }
 
 func WithCustomerName(first, last string) CustomerOption {
-	return func(p *sqlcgen.CreateCustomerParams) {
-		p.FirstName = first
-		p.LastName = last
+	return func(i *customerInput) {
+		i.params.FirstName = first
+		i.params.LastName = last
 	}
 }
 
 func WithPhone(phone *string) CustomerOption {
-	return func(p *sqlcgen.CreateCustomerParams) { p.Phone = phone }
+	return func(i *customerInput) { i.params.Phone = phone }
+}
+
+// WithPriceList stamps the customer's price_list_id after insert. The caller
+// is responsible for ensuring the price list exists.
+func WithPriceList(id uuid.UUID) CustomerOption {
+	return func(i *customerInput) { i.priceListID = &id }
 }
 
 func CreateCustomer(t *testing.T, tx pgx.Tx, opts ...CustomerOption) *domain.Customer {
 	t.Helper()
-	p := sqlcgen.CreateCustomerParams{
-		ID:        uuid.New(),
-		Email:     fmt.Sprintf("test-%s@example.com", uuid.New().String()[:8]),
-		FirstName: "Test",
-		LastName:  "Customer",
+	in := customerInput{
+		params: sqlcgen.CreateCustomerParams{
+			ID:        uuid.New(),
+			Email:     fmt.Sprintf("test-%s@example.com", uuid.New().String()[:8]),
+			FirstName: "Test",
+			LastName:  "Customer",
+		},
 	}
 	for _, o := range opts {
-		o(&p)
+		o(&in)
 	}
-	row, err := sqlcgen.New(tx).CreateCustomer(context.Background(), p)
+	row, err := sqlcgen.New(tx).CreateCustomer(context.Background(), in.params)
 	if err != nil {
 		t.Fatalf("create customer fixture: %v", err)
+	}
+	if in.priceListID != nil {
+		if err := sqlcgen.New(tx).UpdateCustomerPriceList(context.Background(), sqlcgen.UpdateCustomerPriceListParams{
+			ID:          row.ID,
+			PriceListID: in.priceListID,
+		}); err != nil {
+			t.Fatalf("set price list on customer fixture: %v", err)
+		}
 	}
 	return &domain.Customer{
 		ID:            row.ID,
@@ -59,9 +80,126 @@ func CreateCustomer(t *testing.T, tx pgx.Tx, opts ...CustomerOption) *domain.Cus
 		LastName:      row.LastName,
 		Phone:         row.Phone,
 		TaxExempt:     row.TaxExempt,
+		PriceListID:   in.priceListID,
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,
 	}
+}
+
+// --- Customer group ---
+
+func CreateCustomerGroup(t *testing.T, tx pgx.Tx, name string) *domain.CustomerGroup {
+	t.Helper()
+	if name == "" {
+		name = fmt.Sprintf("group-%s", uuid.New().String()[:8])
+	}
+	row, err := sqlcgen.New(tx).CreateCustomerGroup(context.Background(), sqlcgen.CreateCustomerGroupParams{
+		ID:       uuid.New(),
+		Name:     name,
+		Metadata: json.RawMessage(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("create customer group fixture: %v", err)
+	}
+	return &domain.CustomerGroup{
+		ID:   row.ID,
+		Name: row.Name,
+	}
+}
+
+// --- Price list ---
+
+type priceListInput struct {
+	name   string
+	status string
+}
+
+type PriceListOption func(*priceListInput)
+
+func WithPriceListStatus(status string) PriceListOption {
+	return func(i *priceListInput) { i.status = status }
+}
+
+// CreatePriceList inserts a row into price_lists and returns it. Status defaults
+// to "active". Inserts directly via SQL — there is no PriceListStore today.
+func CreatePriceList(t *testing.T, tx pgx.Tx, opts ...PriceListOption) *domain.PriceList {
+	t.Helper()
+	in := priceListInput{
+		name:   fmt.Sprintf("price-list-%s", uuid.New().String()[:8]),
+		status: string(domain.PriceListStatusActive),
+	}
+	for _, o := range opts {
+		o(&in)
+	}
+	id := uuid.New()
+	_, err := tx.Exec(context.Background(),
+		`INSERT INTO price_lists (id, name, type, status) VALUES ($1, $2, 'override', $3)`,
+		id, in.name, in.status,
+	)
+	if err != nil {
+		t.Fatalf("create price list fixture: %v", err)
+	}
+	return &domain.PriceList{
+		ID:     id,
+		Name:   in.name,
+		Type:   domain.PriceListTypeOverride,
+		Status: domain.PriceListStatus(in.status),
+	}
+}
+
+// CreatePriceListPrice writes a (price_set, price_list, amount) row for a variant.
+// Auto-creates the price_set if one doesn't exist for the variant.
+func CreatePriceListPrice(t *testing.T, tx pgx.Tx, priceListID, variantID uuid.UUID, amountCents int, currencyCode string) *domain.Price {
+	t.Helper()
+	psID := getOrCreatePriceSet(t, tx, variantID)
+	priceID := uuid.New()
+	_, err := tx.Exec(context.Background(),
+		`INSERT INTO prices (id, price_set_id, amount, currency_code, price_list_id)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		priceID, psID, amountCents, currencyCode, priceListID,
+	)
+	if err != nil {
+		t.Fatalf("create price list price fixture: %v", err)
+	}
+	pl := priceListID
+	return &domain.Price{
+		ID:           priceID,
+		PriceSetID:   psID,
+		Amount:       amountCents,
+		CurrencyCode: currencyCode,
+		PriceListID:  &pl,
+	}
+}
+
+// SetBasePriceForVariant inserts a base-price row for a variant. Mirrors
+// PricingService.SetBasePrice but stays inside testutil so tests don't need
+// a full service wiring.
+func SetBasePriceForVariant(t *testing.T, tx pgx.Tx, variantID uuid.UUID, amountCents int, currencyCode string) {
+	t.Helper()
+	psID := getOrCreatePriceSet(t, tx, variantID)
+	_, err := tx.Exec(context.Background(),
+		`INSERT INTO prices (id, price_set_id, amount, currency_code) VALUES ($1, $2, $3, $4)`,
+		uuid.New(), psID, amountCents, currencyCode,
+	)
+	if err != nil {
+		t.Fatalf("set base price fixture: %v", err)
+	}
+}
+
+func getOrCreatePriceSet(t *testing.T, tx pgx.Tx, variantID uuid.UUID) uuid.UUID {
+	t.Helper()
+	q := sqlcgen.New(tx)
+	if row, err := q.GetPriceSetByVariant(context.Background(), variantID); err == nil {
+		return row.ID
+	}
+	row, err := q.CreatePriceSet(context.Background(), sqlcgen.CreatePriceSetParams{
+		ID:        uuid.New(),
+		VariantID: variantID,
+	})
+	if err != nil {
+		t.Fatalf("create price set fixture: %v", err)
+	}
+	return row.ID
 }
 
 // --- Address ---
@@ -135,46 +273,71 @@ func CreateTaxon(t *testing.T, tx pgx.Tx) *domain.Taxon {
 
 // --- Product ---
 
-type ProductOption func(*sqlcgen.CreateProductParams)
+type productInput struct {
+	params     sqlcgen.CreateProductParams
+	visibility *domain.ProductVisibility
+}
+
+type ProductOption func(*productInput)
 
 func WithProductSlug(slug string) ProductOption {
-	return func(p *sqlcgen.CreateProductParams) { p.Slug = slug }
+	return func(i *productInput) { i.params.Slug = slug }
 }
 
 func WithProductTitle(title string) ProductOption {
-	return func(p *sqlcgen.CreateProductParams) { p.Title = title }
+	return func(i *productInput) { i.params.Title = title }
 }
 
 func WithProductStatus(status domain.ProductStatus) ProductOption {
-	return func(p *sqlcgen.CreateProductParams) { p.Status = string(status) }
+	return func(i *productInput) { i.params.Status = string(status) }
 }
 
 func WithProductTaxonID(taxonID uuid.UUID) ProductOption {
-	return func(p *sqlcgen.CreateProductParams) { p.TaxonID = &taxonID }
+	return func(i *productInput) { i.params.TaxonID = &taxonID }
+}
+
+// WithProductVisibility sets the product's visibility column ("public", "wholesale",
+// or "restricted") via UPDATE after CreateProduct, since CreateProductParams does
+// not expose the column.
+func WithProductVisibility(v domain.ProductVisibility) ProductOption {
+	return func(i *productInput) { i.visibility = &v }
 }
 
 func CreateProduct(t *testing.T, tx pgx.Tx, opts ...ProductOption) *domain.Product {
 	t.Helper()
 	slug := fmt.Sprintf("product-%s", uuid.New().String()[:8])
-	p := sqlcgen.CreateProductParams{
-		ID:          uuid.New(),
-		Slug:        slug,
-		Title:       "Test Product",
-		Description: "A test product",
-		Status:      string(domain.ProductStatusActive),
-		Metadata:    json.RawMessage(`{}`),
+	in := productInput{
+		params: sqlcgen.CreateProductParams{
+			ID:          uuid.New(),
+			Slug:        slug,
+			Title:       "Test Product",
+			Description: "A test product",
+			Status:      string(domain.ProductStatusActive),
+			Metadata:    json.RawMessage(`{}`),
+		},
 	}
 	for _, o := range opts {
-		o(&p)
+		o(&in)
 	}
 	// If no taxon set, create one.
-	if p.TaxonID == nil {
+	if in.params.TaxonID == nil {
 		taxon := CreateTaxon(t, tx)
-		p.TaxonID = &taxon.ID
+		in.params.TaxonID = &taxon.ID
 	}
-	row, err := sqlcgen.New(tx).CreateProduct(context.Background(), p)
+	row, err := sqlcgen.New(tx).CreateProduct(context.Background(), in.params)
 	if err != nil {
 		t.Fatalf("create product fixture: %v", err)
+	}
+	visibility := domain.ProductVisibility(row.Visibility)
+	if in.visibility != nil {
+		updated, err := sqlcgen.New(tx).UpdateProductVisibility(context.Background(), sqlcgen.UpdateProductVisibilityParams{
+			ID:         row.ID,
+			Visibility: string(*in.visibility),
+		})
+		if err != nil {
+			t.Fatalf("set product visibility fixture: %v", err)
+		}
+		visibility = domain.ProductVisibility(updated.Visibility)
 	}
 	var taxonID uuid.UUID
 	if row.TaxonID != nil {
@@ -186,9 +349,21 @@ func CreateProduct(t *testing.T, tx pgx.Tx, opts ...ProductOption) *domain.Produ
 		Title:       row.Title,
 		Description: row.Description,
 		Status:      domain.ProductStatus(row.Status),
+		Visibility:  visibility,
 		TaxonID:     taxonID,
 		CreatedAt:   row.CreatedAt,
 		UpdatedAt:   row.UpdatedAt,
+	}
+}
+
+// AddProductGroupVisibility grants a customer group access to a restricted product.
+func AddProductGroupVisibility(t *testing.T, tx pgx.Tx, productID, customerGroupID uuid.UUID) {
+	t.Helper()
+	if err := sqlcgen.New(tx).SetProductGroupVisibility(context.Background(), sqlcgen.SetProductGroupVisibilityParams{
+		ProductID:       productID,
+		CustomerGroupID: customerGroupID,
+	}); err != nil {
+		t.Fatalf("add product group visibility fixture: %v", err)
 	}
 }
 
@@ -478,6 +653,16 @@ func TestActorFromStaff(staffID uuid.UUID) app.Actor {
 		Type: domain.AuditActorTypeStaff,
 		ID:   &staffID,
 		Name: "Test Staff",
+	}
+}
+
+// --- Assertions ---
+
+// AssertResolvedPrice checks that a resolved price matches the expected cents value.
+func AssertResolvedPrice(t *testing.T, wantCents, gotCents int) {
+	t.Helper()
+	if wantCents != gotCents {
+		t.Errorf("resolved price: want %d cents, got %d cents", wantCents, gotCents)
 	}
 }
 

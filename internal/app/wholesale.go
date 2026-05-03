@@ -287,21 +287,37 @@ type QuickOrderProduct struct {
 }
 
 // QuickOrderCatalog returns products grouped with their variants, options, and prices
-// for the wholesale quick order page.
+// for the wholesale quick order page. Pricing reflects the customer's assigned price
+// list; visibility is filtered to the wholesale tier and any restricted products
+// granted to one of the customer's groups.
 func (s *WholesaleService) QuickOrderCatalog(
 	ctx context.Context,
 	tx pgx.Tx,
+	groupIDs []uuid.UUID,
+	customerID uuid.UUID,
 	pricing *PricingService,
 	currencyCode string,
 ) ([]QuickOrderProduct, error) {
 	products, err := s.catalog.ListProducts(ctx, tx, store.ProductFilter{
 		Status: ptrTo(domain.ProductStatusActive),
+		Visibility: &store.VisibilityContext{
+			IsWholesale: true,
+			GroupIDs:    groupIDs,
+		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list products: %w", err)
 	}
 
-	result := make([]QuickOrderProduct, 0, len(products))
+	type productCtx struct {
+		product  domain.Product
+		variants []domain.Variant
+		options  []domain.ProductOption
+		imageURL string
+	}
+
+	productCtxs := make([]productCtx, 0, len(products))
+	allVariantIDs := make([]uuid.UUID, 0)
 	for _, p := range products {
 		variants, err := s.catalog.ListVariantsByProduct(ctx, tx, p.ID)
 		if err != nil {
@@ -311,42 +327,42 @@ func (s *WholesaleService) QuickOrderCatalog(
 			continue
 		}
 
-		// Load product options for column headers.
 		options, err := s.catalog.ListProductOptions(ctx, tx, p.ID)
 		if err != nil {
 			return nil, fmt.Errorf("list options for %s: %w", p.ID, err)
 		}
 
-		optionNames := make([]string, len(options))
-		// Build option ID -> values map for lookup.
-		optionValueMap := make(map[uuid.UUID]string) // productOptionValueID -> display value
-		for i, opt := range options {
-			optionNames[i] = opt.Name
-			vals, err := s.catalog.ListProductOptionValues(ctx, tx, opt.ID)
-			if err != nil {
-				return nil, fmt.Errorf("list option values for %s: %w", opt.ID, err)
-			}
-			for _, v := range vals {
-				optionValueMap[v.ID] = v.Value
-			}
-		}
-
-		// Load prices for all variants of this product.
-		priceMap, err := pricing.ListBasePricesByProduct(ctx, tx, p.ID, currencyCode)
-		if err != nil {
-			return nil, fmt.Errorf("list prices for %s: %w", p.ID, err)
-		}
-
-		// Load first product image.
 		var imageURL string
 		media, err := s.catalog.ListProductMedia(ctx, tx, p.ID)
 		if err == nil && len(media) > 0 {
 			imageURL = media[0].R2Key
 		}
 
-		qVariants := make([]QuickOrderVariant, 0, len(variants))
 		for _, v := range variants {
-			// Load variant option values and map them to display strings in option order.
+			allVariantIDs = append(allVariantIDs, v.ID)
+		}
+		productCtxs = append(productCtxs, productCtx{
+			product:  p,
+			variants: variants,
+			options:  options,
+			imageURL: imageURL,
+		})
+	}
+
+	priceMap, err := pricing.ResolveForCustomerBatch(ctx, tx, customerID, allVariantIDs, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("resolve prices for wholesale catalog: %w", err)
+	}
+
+	result := make([]QuickOrderProduct, 0, len(productCtxs))
+	for _, pc := range productCtxs {
+		optionNames := make([]string, len(pc.options))
+		for i, opt := range pc.options {
+			optionNames[i] = opt.Name
+		}
+
+		qVariants := make([]QuickOrderVariant, 0, len(pc.variants))
+		for _, v := range pc.variants {
 			vovs, err := s.catalog.ListVariantOptionValues(ctx, tx, v.ID)
 			if err != nil {
 				return nil, fmt.Errorf("list variant option values for %s: %w", v.ID, err)
@@ -356,9 +372,8 @@ func (s *WholesaleService) QuickOrderCatalog(
 				vovMap[vov.ProductOptionValueID] = true
 			}
 
-			// Build option values in the same order as option columns.
-			optValues := make([]string, len(options))
-			for i, opt := range options {
+			optValues := make([]string, len(pc.options))
+			for i, opt := range pc.options {
 				vals, _ := s.catalog.ListProductOptionValues(ctx, tx, opt.ID)
 				for _, val := range vals {
 					if vovMap[val.ID] {
@@ -368,13 +383,11 @@ func (s *WholesaleService) QuickOrderCatalog(
 				}
 			}
 
-			unitPrice := priceMap[v.ID]
-
 			qVariants = append(qVariants, QuickOrderVariant{
 				ID:           v.ID,
 				SKU:          v.SKU,
 				OptionValues: optValues,
-				UnitPrice:    unitPrice,
+				UnitPrice:    priceMap[v.ID],
 				MinQty:       v.WholesaleMinQty,
 				Multiple:     v.WholesaleMultiple,
 				InStock:      true, // TODO: wire up inventory
@@ -382,9 +395,9 @@ func (s *WholesaleService) QuickOrderCatalog(
 		}
 
 		result = append(result, QuickOrderProduct{
-			ID:       p.ID,
-			Title:    p.Title,
-			ImageURL: imageURL,
+			ID:       pc.product.ID,
+			Title:    pc.product.Title,
+			ImageURL: pc.imageURL,
 			Options:  optionNames,
 			Variants: qVariants,
 		})

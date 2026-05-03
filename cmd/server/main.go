@@ -230,7 +230,7 @@ func run() error {
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg)
 	pricingSvc := app.NewPricingService(pricingStore, customerStore)
-	cartSvc := app.NewCartService(cartStore, pricingStore)
+	cartSvc := app.NewCartService(cartStore, pricingSvc)
 	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg).
 		WithEmail(emailEnv)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, shippingStore, paymentProvider, auditWriter, metricsReg)

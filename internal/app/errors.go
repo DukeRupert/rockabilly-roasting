@@ -97,9 +97,10 @@ var (
 	ErrSlugAlreadyExists = errors.New("slug already exists")
 
 	// Wholesale errors
-	ErrWholesaleNotApproved = errors.New("wholesale account is not approved")
-	ErrWholesaleNotPending  = errors.New("wholesale application is not pending")
-	ErrMOQViolation         = errors.New("minimum order quantity not met")
+	ErrWholesaleNotApproved   = errors.New("wholesale account is not approved")
+	ErrWholesaleNotPending    = errors.New("wholesale application is not pending")
+	ErrMOQViolation           = errors.New("minimum order quantity not met")
+	ErrWholesalePricesStale   = errors.New("wholesale cart prices are stale")
 
 	// Attribute errors
 	ErrAttributeSetNotFound          = errors.New("attribute set not found")

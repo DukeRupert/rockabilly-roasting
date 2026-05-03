@@ -80,6 +80,10 @@ type CartItem struct {
 	CartID    uuid.UUID
 	VariantID uuid.UUID
 	Quantity  int
+	// UnitPrice is the resolved effective price in cents at the time the item
+	// was added. For wholesale carts this reflects the customer's assigned
+	// price list; for retail, the base price. This value is the contract:
+	// PlaceOrder / PlaceWholesaleOrder writes it verbatim to the line item.
 	UnitPrice int
 	CreatedAt time.Time
 	UpdatedAt time.Time

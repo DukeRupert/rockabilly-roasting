@@ -16,11 +16,11 @@ import (
 // CartService contains business logic for shopping carts.
 type CartService struct {
 	carts   *store.CartStore
-	pricing *store.PricingStore
+	pricing *PricingService
 }
 
 // NewCartService creates a new CartService.
-func NewCartService(carts *store.CartStore, pricing *store.PricingStore) *CartService {
+func NewCartService(carts *store.CartStore, pricing *PricingService) *CartService {
 	return &CartService{carts: carts, pricing: pricing}
 }
 
@@ -63,16 +63,32 @@ func (s *CartService) AddItem(ctx context.Context, tx pgx.Tx, cartID, variantID 
 		return nil, ErrInvalidQuantity
 	}
 
-	// Resolve current base price for the variant
 	price, err := s.pricing.GetBasePrice(ctx, tx, variantID, "USD")
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrPriceNotFound
-		}
-		return nil, fmt.Errorf("get price for variant: %w", err)
+		return nil, err
 	}
 
 	item, err := s.carts.UpsertCartItem(ctx, tx, cartID, variantID, quantity, price.Amount)
+	if err != nil {
+		return nil, fmt.Errorf("add item to cart: %w", err)
+	}
+	return item, nil
+}
+
+// AddItemForCustomer adds a variant to the cart at the customer's effective price.
+// For wholesale customers with an assigned price list, list prices override base prices;
+// otherwise it falls back to the base price.
+func (s *CartService) AddItemForCustomer(ctx context.Context, tx pgx.Tx, cartID, variantID uuid.UUID, quantity int, customerID uuid.UUID, currencyCode string) (*domain.CartItem, error) {
+	if quantity <= 0 {
+		return nil, ErrInvalidQuantity
+	}
+
+	price, err := s.pricing.ResolveForCustomer(ctx, tx, variantID, customerID, currencyCode)
+	if err != nil {
+		return nil, err
+	}
+
+	item, err := s.carts.UpsertCartItem(ctx, tx, cartID, variantID, quantity, int(price))
 	if err != nil {
 		return nil, fmt.Errorf("add item to cart: %w", err)
 	}

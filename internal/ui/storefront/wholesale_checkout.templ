@@ -17,11 +17,12 @@ type WholesaleCheckoutItem struct {
 }
 
 type WholesaleCheckoutProps struct {
-	CompanyName string
-	Items       []WholesaleCheckoutItem
-	Subtotal    int
-	Error       string
-	CartCount   int
+	CompanyName       string
+	Items             []WholesaleCheckoutItem
+	Subtotal          int
+	Error             string
+	CartCount         int
+	PriceChangeBanner bool
 }
 
 templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
@@ -35,6 +36,13 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 		if props.Error != "" {
 			<div class="rounded-sm bg-rr-red/10 border border-rr-red/20 p-4">
 				<p class="text-sm font-body text-rr-red-lt">{ props.Error }</p>
+			</div>
+		}
+		if props.PriceChangeBanner {
+			<div class="rounded-sm bg-rr-amber/10 border border-rr-amber/30 p-4">
+				<p class="text-sm font-body text-rr-heading">
+					Some prices changed since you added items to your cart. Please review your cart before continuing.
+				</p>
 			</div>
 		}
 		if len(props.Items) == 0 {

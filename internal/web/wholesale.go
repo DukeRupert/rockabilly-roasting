@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/store"
@@ -219,10 +220,15 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 		companyName = *customer.CompanyName
 	}
 
+	var groupIDs []uuid.UUID
+	if customer.CustomerGroupID != nil {
+		groupIDs = []uuid.UUID{*customer.CustomerGroupID}
+	}
+
 	var products []app.QuickOrderProduct
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		products, txErr = d.WholesaleService.QuickOrderCatalog(ctx, tx, d.PricingService, "USD")
+		products, txErr = d.WholesaleService.QuickOrderCatalog(ctx, tx, groupIDs, customer.ID, d.PricingService, "USD")
 		return txErr
 	})
 	if err != nil {
@@ -269,6 +275,11 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 
 func (d *Deps) handleWholesaleBulkAdd(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	customer, ok := auth.CustomerFromContext(ctx)
+	if !ok {
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+		return
+	}
 
 	if err := r.ParseForm(); err != nil {
 		Error(w, r, fmt.Errorf("parse form: %w", err))
@@ -315,7 +326,7 @@ func (d *Deps) handleWholesaleBulkAdd(w http.ResponseWriter, r *http.Request) {
 		}
 		resultCartID = cart.ID
 		for _, item := range items {
-			if _, txErr := d.CartService.AddItem(ctx, tx, cart.ID, item.VariantID, item.Quantity); txErr != nil {
+			if _, txErr := d.CartService.AddItemForCustomer(ctx, tx, cart.ID, item.VariantID, item.Quantity, customer.ID, "USD"); txErr != nil {
 				return txErr
 			}
 		}
@@ -337,6 +348,13 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
 		return
 	}
+	d.renderWholesaleCheckout(w, r, customer, false, 0)
+}
+
+// renderWholesaleCheckout renders the wholesale checkout page. If banner is true,
+// the price-change banner is shown and the response uses status. status=0 means 200.
+func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, customer *domain.Customer, banner bool, status int) {
+	ctx := r.Context()
 
 	companyName := ""
 	if customer.CompanyName != nil {
@@ -390,12 +408,16 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 	}
 
 	props := storefront.WholesaleCheckoutProps{
-		CompanyName: companyName,
-		Items:       checkoutItems,
-		Subtotal:    subtotal,
-		CartCount:   d.wholesaleCartItemCount(r),
+		CompanyName:       companyName,
+		Items:             checkoutItems,
+		Subtotal:          subtotal,
+		CartCount:         d.wholesaleCartItemCount(r),
+		PriceChangeBanner: banner,
 	}
 
+	if status != 0 && !IsHTMX(r) {
+		w.WriteHeader(status)
+	}
 	if IsHTMX(r) {
 		storefront.WholesaleCheckoutContent(props).Render(ctx, w) //nolint:errcheck
 		return
@@ -422,6 +444,7 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	var stale bool
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		cart, txErr := d.CartService.GetOrCreateCart(ctx, tx, cartID)
 		if txErr != nil {
@@ -433,6 +456,26 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		}
 		if len(cartItems) == 0 {
 			return app.ErrCartEmpty
+		}
+
+		variantIDs := make([]uuid.UUID, len(cartItems))
+		for i, ci := range cartItems {
+			variantIDs[i] = ci.VariantID
+		}
+		freshPrices, txErr := d.PricingService.ResolveForCustomerBatch(ctx, tx, customer.ID, variantIDs, "USD")
+		if txErr != nil {
+			return txErr
+		}
+		for _, ci := range cartItems {
+			if ci.UnitPrice != freshPrices[ci.VariantID] {
+				stale = true
+				if _, txErr := d.CartService.AddItemForCustomer(ctx, tx, cart.ID, ci.VariantID, ci.Quantity, customer.ID, "USD"); txErr != nil {
+					return txErr
+				}
+			}
+		}
+		if stale {
+			return nil
 		}
 
 		items := make([]app.CartItem, 0, len(cartItems))
@@ -483,6 +526,12 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		reason := classifyCheckoutError(err)
 		d.Metrics.CheckoutFailed.WithLabelValues("wholesale", reason).Inc()
 		Error(w, r, err)
+		return
+	}
+
+	if stale {
+		d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "prices_stale").Inc()
+		d.renderWholesaleCheckout(w, r, customer, true, http.StatusConflict)
 		return
 	}
 

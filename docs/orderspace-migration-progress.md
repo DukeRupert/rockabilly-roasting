@@ -10,6 +10,7 @@ Working punch list for executing the OS → Hiri wholesale migration across mult
 | 2026-05-02 | Progress tracker created | This doc |
 | 2026-05-03 | W1 + W3a + W3b | Schema + customer wiring landed; sqlc regenerated; migrate/rollback verified; tests green |
 | 2026-05-03 | W4a + W4b + W4c | Customer-aware pricing resolver landed; PricingService gains ResolveForCustomer/Batch; tests green |
+| 2026-05-03 | W5 + W6 + W8 + W7 | Wholesale cart + checkout now use customer-aware pricing + visibility; staleness check returns 409 + banner; G1 + G3 closed; tests green |
 
 When you finish a session, append a row. One sentence each.
 
@@ -18,14 +19,17 @@ When you finish a session, append a row. One sentence each.
 - Latest migration: `043_customer_price_list_id.sql` (W1 landed).
 - `Customer.PriceListID *uuid.UUID` present in domain + scanned in `customerFromRow`, `List`, `ListWholesaleWithQBCustomerID`. `CustomerStore.UpdatePriceList` + `CustomerService.UpdatePriceList` (audited) wired.
 - `PricingService.ResolveForCustomer` / `ResolveForCustomerBatch` landed (W4c). `PricingStore` has `GetPriceListPrice`, `ListBasePricesByVariants`, `ListPriceListPricesByVariants` (W4a/W4b). `NewPricingService` now takes `customerPricingReader`; wired in `cmd/server/main.go`.
-- `cart.AddItem` still snapshots base price unconditionally (`internal/app/cart.go:67`) — G1 blocker live.
-- `QuickOrderCatalog` does not pass `VisibilityContext` (`internal/app/wholesale.go`) — G3 blocker live.
+- `CartService` now holds `*PricingService` (not `*PricingStore`); `AddItemForCustomer` resolves customer-aware price via `PricingService.ResolveForCustomer`.
+- `handleWholesaleBulkAdd` calls `AddItemForCustomer` — **G1 closed** for the wholesale write path.
+- `QuickOrderCatalog(ctx, tx, groupIDs, customerID, pricing, currency)` passes `VisibilityContext{IsWholesale: true, GroupIDs}` and uses `ResolveForCustomerBatch` — **G3 closed**.
+- `handleWholesaleCheckoutConfirm` performs a fresh-resolve staleness check inside the order tx; on mismatch it rewrites cart rows via `AddItemForCustomer`, commits, and renders the wholesale checkout page with `PriceChangeBanner` + HTTP 409.
+- `cart.AddItem` (retail) is unchanged — retail still snapshots base price by design.
 - `cmd/os-migrate/main.go` exists but predates pricing/visibility work; needs I1–I6.
 - Wholesale storefront templates exist and route correctly; reskin to paper-and-ink is a separate cosmetic track and does not block the import.
 
 ## Next up
 
-W5 → W6 → W8 → W7. W4c is done; cart + handler + visibility wiring is unblocked.
+W9 → W10 (testutil fixtures + tests for the new pricing/visibility paths), then W11 (admin UI for price-list assignment) and the importer track (I1–I6).
 
 ---
 
@@ -51,10 +55,10 @@ Each item is a single small commit unless flagged otherwise. Decisions column re
 
 ### Cart + checkout
 
-- [ ] **W5** — `CartService.AddItemForCustomer` (sibling to existing `AddItem`). (D3, XS)
-- [ ] **W6** — wire wholesale handlers (`handleWholesaleBulkAdd`, quick-order single-add) → `AddItemForCustomer`; update `QuickOrderCatalog` signature + handler call site. (D3 + D4 + D5, S)
-- [ ] **W7** — `handleWholesaleCheckoutConfirm` staleness check: re-resolve at confirm; on mismatch update cart row, return 409, render cart-page banner. (D3, S)
-- [ ] **W8** — `QuickOrderCatalog` two-pass refactor (collect variantIDs → batch resolve → stitch); pass `Visibility: &VisibilityContext{IsWholesale: true, GroupIDs: ...}` filter. (D4 + D5, S)
+- [x] **W5** — `CartService.AddItemForCustomer` (sibling to existing `AddItem`). (D3, XS)
+- [x] **W6** — wire wholesale handlers (`handleWholesaleBulkAdd`, quick-order single-add) → `AddItemForCustomer`; update `QuickOrderCatalog` signature + handler call site. (D3 + D4 + D5, S)
+- [x] **W7** — `handleWholesaleCheckoutConfirm` staleness check: re-resolve at confirm; on mismatch update cart row, return 409, render cart-page banner. (D3, S)
+- [x] **W8** — `QuickOrderCatalog` two-pass refactor (collect variantIDs → batch resolve → stitch); pass `Visibility: &VisibilityContext{IsWholesale: true, GroupIDs: ...}` filter. (D4 + D5, S)
 
 ### Tests
 

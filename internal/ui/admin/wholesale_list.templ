@@ -65,15 +65,15 @@ templ WholesaleListContent(props WholesaleListProps) {
 				</p>
 			</div>
 		} else {
-			<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">
+			<div class="overflow-visible border-2 border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Company</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Contact</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Email</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Terms</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Applied</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Contact</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Email</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Terms</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading 2xl:table-cell">Applied</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
@@ -90,20 +90,20 @@ templ WholesaleListContent(props WholesaleListProps) {
 										<span class="text-rr-border">&mdash;</span>
 									}
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
 									{ c.FirstName } { c.LastName }
 								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted md:table-cell">
 									{ c.Email }
 								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted md:table-cell">
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
 									if c.PaymentTermsDays != nil {
 										{ fmt.Sprintf("Net %d", *c.PaymentTermsDays) }
 									} else {
 										<span class="text-rr-border">&mdash;</span>
 									}
 								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted 2xl:table-cell">
 									{ c.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
@@ -112,31 +112,7 @@ templ WholesaleListContent(props WholesaleListProps) {
 									}
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-									<div class="flex items-center justify-end gap-3">
-										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
-											<div class="inline-flex gap-2">
-												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)) }>
-													<button type="submit" class="btn-confirm">Approve</button>
-												</form>
-												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
-													<button type="submit" class="btn-danger" onclick="return confirm('Decline this application?')">Decline</button>
-												</form>
-											</div>
-										}
-										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
-											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
-												<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
-											</form>
-										}
-										if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
-											<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
-												<button type="submit" class="btn-confirm" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
-											</form>
-										}
-										<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
-											View
-										</a>
-									</div>
+									@wholesaleRowActions(c)
 								</td>
 							</tr>
 						}
@@ -167,6 +143,86 @@ templ WholesaleListContent(props WholesaleListProps) {
 				</div>
 			</nav>
 		}
+	</div>
+}
+
+// wholesaleRowActions renders the per-row action controls. xl+ shows the
+// full inline button stack (Approve/Decline, Suspend, Reactivate, View);
+// below xl falls back to a kebab menu so the actions stay reachable on
+// narrow viewports where the table would otherwise clip them.
+templ wholesaleRowActions(c domain.Customer) {
+	<!-- Inline buttons: xl+ (~1280px). Hidden below to avoid horizontal overflow. -->
+	<div class="hidden xl:flex items-center justify-end gap-3">
+		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
+			<div class="inline-flex gap-2">
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)) }>
+					<button type="submit" class="btn-confirm">Approve</button>
+				</form>
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
+					<button type="submit" class="btn-danger" onclick="return confirm('Decline this application?')">Decline</button>
+				</form>
+			</div>
+		}
+		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
+				<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
+			</form>
+		}
+		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
+				<button type="submit" class="btn-confirm" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
+			</form>
+		}
+		<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
+			View
+		</a>
+	</div>
+	<!-- Kebab dropdown: visible below xl. Same actions, packed into a popover. -->
+	<div class="xl:hidden flex justify-end relative" x-data="{ open: false }">
+		<button
+			type="button"
+			x-on:click="open = !open"
+			x-bind:aria-expanded="open"
+			aria-haspopup="true"
+			aria-label="Actions"
+			class="inline-flex items-center justify-center rounded-sm border-2 border-rr-border bg-rr-surface p-1.5 text-rr-heading hover:bg-rr-raised"
+		>
+			<svg class="size-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+				<path d="M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"></path>
+			</svg>
+		</button>
+		<div
+			x-show="open"
+			x-cloak
+			x-transition.opacity
+			x-on:click.outside="open = false"
+			x-on:keydown.escape.window="open = false"
+			class="absolute right-0 top-full z-30 mt-1 w-48 border-2 border-rr-border bg-rr-surface py-1 text-left"
+			style="box-shadow: 4px 4px 0 0 var(--color-rr-border);"
+			role="menu"
+		>
+			if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)) }>
+					<button type="submit" role="menuitem" class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised">Approve</button>
+				</form>
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
+					<button type="submit" role="menuitem" onclick="return confirm('Decline this application?')" class="block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised">Decline</button>
+				</form>
+			}
+			if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
+					<button type="submit" role="menuitem" onclick="return confirm('Suspend this wholesale account?')" class="block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised">Suspend</button>
+				</form>
+			}
+			if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
+					<button type="submit" role="menuitem" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')" class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised">Reactivate</button>
+				</form>
+			}
+			<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } role="menuitem" class="block px-3 py-2 text-sm text-rr-heading hover:bg-rr-raised">
+				View customer
+			</a>
+		</div>
 	</div>
 }
 

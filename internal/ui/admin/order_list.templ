@@ -50,8 +50,51 @@ func orderListIDsJSON(rows []OrderRow) string {
 	return "[" + strings.Join(parts, ",") + "]"
 }
 
+// orderListAlpineState builds the inline x-data for the bulk-action bar.
+// Carries the multi-select state (`selected` / `allIds`) plus the
+// Pirate-Ship batch-export logic (`exporting`, `exportNotice`, runExport).
+// Export needs to own the fetch — we read X-Hiri-Export-Skipped-* headers
+// before triggering the download, which the browser's native handling
+// can't expose.
 func orderListAlpineState(rows []OrderRow) string {
-	return "{ selected: [], allIds: " + orderListIDsJSON(rows) + " }"
+	return `{
+		selected: [],
+		allIds: ` + orderListIDsJSON(rows) + `,
+		exporting: false,
+		exportNotice: null,
+		async runExport() {
+			if (this.selected.length === 0 || this.exporting) return;
+			this.exporting = true;
+			this.exportNotice = null;
+			try {
+				const url = '/admin/orders/export.csv?ids=' + this.selected.join(',');
+				const res = await fetch(url, { credentials: 'same-origin' });
+				if (!res.ok) throw new Error('HTTP ' + res.status);
+				const skippedCount = parseInt(res.headers.get('X-Hiri-Export-Skipped-Count') || '0', 10);
+				const skippedNumbers = res.headers.get('X-Hiri-Export-Skipped-Order-Numbers') || '';
+				const truncated = res.headers.get('X-Hiri-Export-Skipped-Truncated') === 'true';
+				const cd = res.headers.get('Content-Disposition') || '';
+				const m = cd.match(/filename="([^"]+)"/);
+				const filename = m ? m[1] : 'hiri-orders.csv';
+				const blob = await res.blob();
+				const blobUrl = URL.createObjectURL(blob);
+				const a = document.createElement('a');
+				a.href = blobUrl;
+				a.download = filename;
+				document.body.appendChild(a);
+				a.click();
+				a.remove();
+				URL.revokeObjectURL(blobUrl);
+				if (skippedCount > 0) {
+					this.exportNotice = { kind: 'skipped', count: skippedCount, numbers: skippedNumbers, truncated: truncated };
+				}
+			} catch (e) {
+				this.exportNotice = { kind: 'error', message: (e && e.message) ? e.message : String(e) };
+			} finally {
+				this.exporting = false;
+			}
+		}
+	}`
 }
 
 func formatCents(cents int) string {
@@ -310,26 +353,75 @@ templ OrderListContent(props OrderListProps) {
 					x-transition:leave="transition ease-in duration-150"
 					x-transition:leave-start="opacity-100"
 					x-transition:leave-end="opacity-0"
-					class="sticky top-16 z-20 mb-4 flex items-center justify-between gap-3 border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm shadow-[4px_4px_0_0_#0E0D0C]"
+					class="sticky top-16 z-20 mb-4"
 				>
-					<span class="text-rr-heading">
-						<span class="font-semibold tabular-nums" x-text="selected.length"></span> selected
-					</span>
-					<div class="flex items-center gap-2">
-						<button
-							type="button"
-							@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
-							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
-						>
-							Print invoices
-						</button>
-						<button
-							type="button"
-							@click="selected = []"
-							class="inline-flex items-center rounded-sm border-2 border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised"
-						>
-							Clear
-						</button>
+					<div class="flex items-center justify-between gap-3 border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm shadow-[4px_4px_0_0_#0E0D0C]">
+						<span class="text-rr-heading">
+							<span class="font-semibold tabular-nums" x-text="selected.length"></span> selected
+						</span>
+						<div class="flex items-center gap-2">
+							<button
+								type="button"
+								@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
+								class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+							>
+								Print invoices
+							</button>
+							<button
+								type="button"
+								@click="runExport()"
+								:disabled="exporting"
+								class="inline-flex items-center rounded-sm border-2 border-rr-ink bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-ink hover:bg-rr-raised disabled:opacity-60 disabled:cursor-wait"
+							>
+								<span x-show="!exporting">Export to Pirate Ship</span>
+								<span x-show="exporting" x-cloak>Building CSV…</span>
+							</button>
+							<button
+								type="button"
+								@click="selected = []"
+								class="inline-flex items-center rounded-sm border-2 border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised"
+							>
+								Clear
+							</button>
+						</div>
+					</div>
+					<!-- Skipped-orders / error notice — same paper-and-ink stamp treatment
+					     as the page-level export button. Anchored under the action bar so
+					     it travels with the sticky position. -->
+					<div
+						x-show="exportNotice"
+						x-cloak
+						x-transition.opacity
+						class="absolute right-0 top-full mt-2 w-80 max-w-[90vw] border-2 border-rr-ink bg-rr-paper p-4 text-sm text-rr-ink"
+						style="box-shadow: 4px 4px 0 0 var(--color-rr-ink, #0E0D0C);"
+					>
+						<div class="flex items-start justify-between gap-3">
+							<div>
+								<template x-if="exportNotice && exportNotice.kind === 'skipped'">
+									<div>
+										<p class="font-semibold">
+											<span x-text="exportNotice.count"></span>
+											<span x-text="exportNotice.count === 1 ? 'order' : 'orders'"></span>
+											skipped
+										</p>
+										<p class="mt-1 text-rr-body">Missing variant weight or shipping address. Fix and re-export.</p>
+										<p class="mt-2 break-all font-mono text-xs" x-text="exportNotice.numbers"></p>
+										<template x-if="exportNotice.truncated">
+											<p class="mt-1 text-xs text-rr-muted">… more not shown</p>
+										</template>
+									</div>
+								</template>
+								<template x-if="exportNotice && exportNotice.kind === 'error'">
+									<div>
+										<p class="font-semibold text-red-700">Export failed</p>
+										<p class="mt-1" x-text="exportNotice.message"></p>
+									</div>
+								</template>
+							</div>
+							<button type="button" @click="exportNotice = null" aria-label="Dismiss" class="text-rr-muted hover:text-rr-ink">
+								<svg class="size-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"></path></svg>
+							</button>
+						</div>
 					</div>
 				</div>
 				<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">

@@ -86,6 +86,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	var addresses []domain.Address
 	var memberGroups []domain.CustomerGroup
 	var allGroups []domain.CustomerGroup
+	var priceLists []domain.PriceList
 	var recentOrders []domain.Order
 	var activity []domain.AuditEntry
 
@@ -104,6 +105,10 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		allGroups, txErr = d.CustomerGroupService.List(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		priceLists, txErr = d.PriceListService.List(ctx, tx)
 		if txErr != nil {
 			return txErr
 		}
@@ -128,6 +133,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		Addresses:    addresses,
 		MemberGroups: memberGroups,
 		AllGroups:    allGroups,
+		PriceLists:   priceLists,
 		RecentOrders: recentOrders,
 		Activity:     activity,
 		MerchantTZ:   d.MerchantTZ,
@@ -163,6 +169,36 @@ func (d *Deps) handleAdminCustomerPaymentTerms(w http.ResponseWriter, r *http.Re
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		return d.CustomerService.UpdatePaymentTerms(ctx, tx, id, days, staffActor(r))
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/customers/%s", id), http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminCustomerPriceList(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var priceListID *uuid.UUID
+	if v := r.FormValue("price_list_id"); v != "" {
+		parsed, err := uuid.Parse(v)
+		if err != nil {
+			http.Error(w, "Invalid price list", http.StatusBadRequest)
+			return
+		}
+		priceListID = &parsed
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.CustomerService.UpdatePriceList(ctx, tx, id, priceListID, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)

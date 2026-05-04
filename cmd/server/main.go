@@ -203,6 +203,7 @@ func run() error {
 	auditStore := store.NewAuditStore()
 	staffStore := store.NewStaffStore()
 	customerGroupStore := store.NewCustomerGroupStore()
+	priceListStore := store.NewPriceListStore()
 	invoiceStore := store.NewInvoiceStore()
 	magicLinkStore := store.NewMagicLinkStore()
 
@@ -240,6 +241,7 @@ func run() error {
 	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore)
 	customerGroupSvc := app.NewCustomerGroupService(customerGroupStore, auditWriter, metricsReg)
+	priceListSvc := app.NewPriceListService(priceListStore, auditWriter, metricsReg)
 	auditQuerySvc := app.NewAuditQueryService(auditStore)
 	webhookSvc := app.NewWebhookService(webhookStore)
 
@@ -384,6 +386,7 @@ func run() error {
 		AttributeService:     attributeSvc,
 		InvoiceService:       invoiceSvc,
 		CustomerGroupService: customerGroupSvc,
+		PriceListService:     priceListSvc,
 		AuditQueryService:    auditQuerySvc,
 		WebhookService:       webhookSvc,
 		AuditWriter:          auditWriter,

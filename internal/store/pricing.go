@@ -185,6 +185,64 @@ func (s *PricingStore) DeleteGroupPrice(ctx context.Context, tx pgx.Tx, priceSet
 	})
 }
 
+// SetPriceListPrice deletes any existing price-list price for the (price set, list, currency)
+// triple and inserts a new one.
+func (s *PricingStore) SetPriceListPrice(ctx context.Context, tx pgx.Tx, priceSetID uuid.UUID, priceListID uuid.UUID, amount int, currencyCode string) (*domain.Price, error) {
+	q := sqlcgen.New(tx)
+
+	if err := q.DeletePriceListPrice(ctx, sqlcgen.DeletePriceListPriceParams{
+		PriceSetID:   priceSetID,
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+	}); err != nil {
+		return nil, fmt.Errorf("delete existing price list price: %w", err)
+	}
+
+	row, err := q.UpsertPriceListPrice(ctx, sqlcgen.UpsertPriceListPriceParams{
+		ID:           uuid.New(),
+		PriceSetID:   priceSetID,
+		Amount:       int32(amount),
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("insert price list price: %w", err)
+	}
+	return priceFromRow(row), nil
+}
+
+// DeletePriceListPrice deletes the price-list price for the (price set, list, currency) triple.
+func (s *PricingStore) DeletePriceListPrice(ctx context.Context, tx pgx.Tx, priceSetID uuid.UUID, priceListID uuid.UUID, currencyCode string) error {
+	return sqlcgen.New(tx).DeletePriceListPrice(ctx, sqlcgen.DeletePriceListPriceParams{
+		PriceSetID:   priceSetID,
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+	})
+}
+
+// ListPriceListPricesByProduct returns price-list prices for all variants of a product,
+// keyed by variant ID then price list ID.
+func (s *PricingStore) ListPriceListPricesByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID, currencyCode string) (map[uuid.UUID]map[uuid.UUID]int, error) {
+	rows, err := sqlcgen.New(tx).ListPriceListPricesByProduct(ctx, sqlcgen.ListPriceListPricesByProductParams{
+		ProductID:    productID,
+		CurrencyCode: currencyCode,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list price list prices for product %s: %w", productID, err)
+	}
+	prices := make(map[uuid.UUID]map[uuid.UUID]int)
+	for _, r := range rows {
+		if r.PriceListID == nil {
+			continue
+		}
+		if prices[r.VariantID] == nil {
+			prices[r.VariantID] = make(map[uuid.UUID]int)
+		}
+		prices[r.VariantID][*r.PriceListID] = int(r.Amount)
+	}
+	return prices, nil
+}
+
 // ListGroupPricesByProduct returns group prices for all variants of a product,
 // keyed by variant ID then customer group ID.
 func (s *PricingStore) ListGroupPricesByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID, currencyCode string) (map[uuid.UUID]map[uuid.UUID]int, error) {

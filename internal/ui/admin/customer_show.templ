@@ -15,6 +15,7 @@ type CustomerShowProps struct {
 	Addresses    []domain.Address
 	MemberGroups []domain.CustomerGroup
 	AllGroups    []domain.CustomerGroup
+	PriceLists   []domain.PriceList
 	RecentOrders []domain.Order
 	Activity     []domain.AuditEntry
 	MerchantTZ   *time.Location
@@ -261,6 +262,37 @@ templ CustomerShowContent(props CustomerShowProps) {
 										<option value="15" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 15 }>Net 15</option>
 										<option value="21" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 21 }>Net 21</option>
 										<option value="30" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 30 }>Net 30</option>
+									</select>
+									<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+										<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+									</svg>
+								</div>
+							</form>
+						</dd>
+					</div>
+					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+						<dt class="text-sm font-medium text-rr-muted">Price list</dt>
+						<dd class="mt-1 sm:col-span-2 sm:mt-0">
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/price-list", props.Customer.ID)) }
+								class="flex items-center gap-2"
+							>
+								<div class="grid grid-cols-1">
+									<select
+										name="price_list_id"
+										onchange="this.form.submit()"
+										class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+									>
+										<option value="" selected?={ props.Customer.PriceListID == nil }>Base prices</option>
+										for _, pl := range props.PriceLists {
+											<option value={ pl.ID.String() } selected?={ props.Customer.PriceListID != nil && *props.Customer.PriceListID == pl.ID }>
+												{ pl.Name }
+												if pl.Status != domain.PriceListStatusActive {
+													({ string(pl.Status) })
+												}
+											</option>
+										}
 									</select>
 									<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
 										<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>

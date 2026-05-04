@@ -1,0 +1,149 @@
+package admin
+
+import (
+	"fmt"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/google/uuid"
+)
+
+type PriceListListProps struct {
+	Lists          []domain.PriceList
+	CustomerCounts map[uuid.UUID]int
+	StaffName      string
+	StaffRole      string
+}
+
+templ PriceListListContent(props PriceListListProps) {
+	<!-- Page header -->
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Price Lists</h1>
+			<p class="mt-1 text-sm text-rr-muted">Define pricing tiers and assign them per customer. Variants without a list-price entry fall back to the base price.</p>
+		</div>
+		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+			<a
+				href="/admin/price-lists/prices"
+				class="block rounded-sm bg-rr-red px-3 py-2 text-center text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
+			>
+				Manage prices
+			</a>
+		</div>
+	</div>
+	<!-- Create form -->
+	<div class="mt-6">
+		<form method="post" action="/admin/price-lists" class="flex items-end gap-3">
+			<div class="flex-1 max-w-sm">
+				<label for="name" class="block text-sm/6 font-medium text-rr-heading">New price list</label>
+				<div class="mt-2">
+					<input
+						type="text"
+						name="name"
+						id="name"
+						required
+						placeholder="e.g. Wholesale Tier 1"
+						class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6"
+					/>
+				</div>
+			</div>
+			<div>
+				<label for="status" class="block text-sm/6 font-medium text-rr-heading">Status</label>
+				<select
+					name="status"
+					id="status"
+					class="mt-2 block rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6"
+				>
+					<option value="active" selected>Active</option>
+					<option value="draft">Draft</option>
+					<option value="expired">Expired</option>
+				</select>
+			</div>
+			<button
+				type="submit"
+				class="rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
+			>
+				Create list
+			</button>
+		</form>
+	</div>
+	<!-- Lists table -->
+	<div class="mt-8">
+		if len(props.Lists) == 0 {
+			<div class="border-2 border-dashed border-rr-border p-12 text-center">
+				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No price lists</h3>
+				<p class="mt-1 text-sm text-rr-muted">Create a price list to start assigning customers and overriding base prices.</p>
+			</div>
+		} else {
+			<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Name</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Customers</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">ID</th>
+							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+								<span class="sr-only">Actions</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, pl := range props.Lists {
+							<tr>
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+									<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s", pl.ID)) } class="flex items-center gap-2">
+										<input type="hidden" name="status" value={ string(pl.Status) }/>
+										<input
+											type="text"
+											name="name"
+											value={ pl.Name }
+											required
+											class="block w-56 rounded-sm bg-rr-surface px-2 py-1 text-sm font-medium text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+										/>
+										<button type="submit" class="text-xs text-rr-red hover:text-rr-red-lt">Save</button>
+									</form>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s", pl.ID)) } class="flex items-center gap-2">
+										<input type="hidden" name="name" value={ pl.Name }/>
+										<select
+											name="status"
+											onchange="this.form.submit()"
+											class="block rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+										>
+											<option value="active" selected?={ pl.Status == domain.PriceListStatusActive }>Active</option>
+											<option value="draft" selected?={ pl.Status == domain.PriceListStatusDraft }>Draft</option>
+											<option value="expired" selected?={ pl.Status == domain.PriceListStatusExpired }>Expired</option>
+										</select>
+									</form>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-body">
+									{ fmt.Sprintf("%d", props.CustomerCounts[pl.ID]) }
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted font-mono">
+									{ pl.ID.String() }
+								</td>
+								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+									<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s/delete", pl.ID)) }>
+										<button type="submit" class="text-rr-red hover:text-rr-red-lt" onclick="return confirm('Delete this price list? Customers assigned to it will fall back to base prices.')">Delete</button>
+									</form>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+templ PriceListList(props PriceListListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Price Lists",
+		ActivePath: "/admin/price-lists",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@PriceListListContent(props)
+	}
+}

@@ -120,6 +120,10 @@ func WithPriceListStatus(status string) PriceListOption {
 	return func(i *priceListInput) { i.status = status }
 }
 
+func WithPriceListName(name string) PriceListOption {
+	return func(i *priceListInput) { i.name = name }
+}
+
 // CreatePriceList inserts a row into price_lists and returns it. Status defaults
 // to "active". Inserts directly via SQL — there is no PriceListStore today.
 func CreatePriceList(t *testing.T, tx pgx.Tx, opts ...PriceListOption) *domain.PriceList {

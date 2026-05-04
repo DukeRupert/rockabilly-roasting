@@ -58,6 +58,11 @@ const (
 	AuditCustomerGroupMemberAdded   = "customer_group.member_added"
 	AuditCustomerGroupMemberRemoved = "customer_group.member_removed"
 
+	// Price list actions
+	AuditPriceListCreated = "price_list.created"
+	AuditPriceListUpdated = "price_list.updated"
+	AuditPriceListDeleted = "price_list.deleted"
+
 	// Customer auth actions
 	AuditCustomerLogin           = "customer.login"
 	AuditCustomerLogout          = "customer.logout"

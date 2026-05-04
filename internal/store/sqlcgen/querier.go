@@ -20,6 +20,7 @@ type Querier interface {
 	ClearDefaultVariants(ctx context.Context, productID uuid.UUID) error
 	ClearOtherFeaturedProducts(ctx context.Context, id uuid.UUID) error
 	CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error)
+	CountCustomersByPriceList(ctx context.Context, priceListID *uuid.UUID) (int64, error)
 	CountWholesaleByStatus(ctx context.Context, wholesaleStatus *string) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
 	CreateAdjustment(ctx context.Context, arg CreateAdjustmentParams) (Adjustment, error)
@@ -42,6 +43,7 @@ type Querier interface {
 	CreateLineItem(ctx context.Context, arg CreateLineItemParams) (LineItem, error)
 	CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkTokenParams) (MagicLinkToken, error)
 	CreateOrder(ctx context.Context, arg CreateOrderParams) (Order, error)
+	CreatePriceList(ctx context.Context, arg CreatePriceListParams) (PriceList, error)
 	CreatePriceSet(ctx context.Context, arg CreatePriceSetParams) (PriceSet, error)
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	CreateProductMedia(ctx context.Context, arg CreateProductMediaParams) (ProductMedium, error)
@@ -78,6 +80,8 @@ type Querier interface {
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteLineItemsByOrder(ctx context.Context, orderID uuid.UUID) error
 	DeleteOrder(ctx context.Context, id uuid.UUID) error
+	DeletePriceList(ctx context.Context, id uuid.UUID) error
+	DeletePriceListPrice(ctx context.Context, arg DeletePriceListPriceParams) error
 	DeleteProduct(ctx context.Context, id uuid.UUID) error
 	DeleteProductAttributeValuesByKey(ctx context.Context, attributeKeyID uuid.UUID) error
 	DeleteProductAttributeValuesByProduct(ctx context.Context, productID uuid.UUID) error
@@ -117,6 +121,7 @@ type Querier interface {
 	// and then sees the post-transition state, so side effects (audit, email,
 	// coupon redemption) don't double-fire.
 	GetOrderByStripePaymentIntentIDForUpdate(ctx context.Context, stripePaymentIntentID *string) (Order, error)
+	GetPriceListByID(ctx context.Context, id uuid.UUID) (PriceList, error)
 	GetPriceListPrice(ctx context.Context, arg GetPriceListPriceParams) (Price, error)
 	GetPriceSetByVariant(ctx context.Context, variantID uuid.UUID) (PriceSet, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
@@ -162,7 +167,9 @@ type Querier interface {
 	ListInvoicePaymentsByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoicePayment, error)
 	ListInvoicesByOrder(ctx context.Context, orderID uuid.UUID) ([]Invoice, error)
 	ListLineItemsByOrder(ctx context.Context, orderID uuid.UUID) ([]LineItem, error)
+	ListPriceListPricesByProduct(ctx context.Context, arg ListPriceListPricesByProductParams) ([]ListPriceListPricesByProductRow, error)
 	ListPriceListPricesByVariants(ctx context.Context, arg ListPriceListPricesByVariantsParams) ([]ListPriceListPricesByVariantsRow, error)
+	ListPriceLists(ctx context.Context) ([]PriceList, error)
 	ListProductAttributeSets(ctx context.Context, productID uuid.UUID) ([]AttributeSet, error)
 	ListProductGroupVisibility(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
 	ListProductMediaByProduct(ctx context.Context, productID uuid.UUID) ([]ProductMedium, error)
@@ -240,6 +247,7 @@ type Querier interface {
 	UpdateOrderShippingMethod(ctx context.Context, arg UpdateOrderShippingMethodParams) (Order, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
 	UpdateOrderStripePaymentIntentID(ctx context.Context, arg UpdateOrderStripePaymentIntentIDParams) (Order, error)
+	UpdatePriceList(ctx context.Context, arg UpdatePriceListParams) (PriceList, error)
 	UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error)
 	UpdateProductFeatured(ctx context.Context, arg UpdateProductFeaturedParams) (Product, error)
 	UpdateProductMediaPosition(ctx context.Context, arg UpdateProductMediaPositionParams) error
@@ -271,6 +279,7 @@ type Querier interface {
 	UpsertBasePrice(ctx context.Context, arg UpsertBasePriceParams) (Price, error)
 	UpsertCartItem(ctx context.Context, arg UpsertCartItemParams) (CartItem, error)
 	UpsertGroupPrice(ctx context.Context, arg UpsertGroupPriceParams) (Price, error)
+	UpsertPriceListPrice(ctx context.Context, arg UpsertPriceListPriceParams) (Price, error)
 	UpsertProductAttributeValue(ctx context.Context, arg UpsertProductAttributeValueParams) error
 }
 

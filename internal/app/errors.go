@@ -87,8 +87,9 @@ var (
 	ErrInvalidOrderStatus = errors.New("invalid order status transition")
 
 	// Price errors
-	ErrPriceNotFound = errors.New("price not found")
-	ErrInvalidPrice  = errors.New("price must not be negative")
+	ErrPriceNotFound     = errors.New("price not found")
+	ErrInvalidPrice      = errors.New("price must not be negative")
+	ErrPriceListNotFound = errors.New("price list not found")
 
 	// Cart errors (item-level)
 	ErrInvalidQuantity = errors.New("quantity must be greater than zero")

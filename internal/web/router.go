@@ -52,6 +52,7 @@ type Deps struct {
 	AttributeService     *app.AttributeService
 	InvoiceService       *app.InvoiceService
 	CustomerGroupService *app.CustomerGroupService
+	PriceListService     *app.PriceListService
 	AuditQueryService    *app.AuditQueryService
 	WebhookService       *app.WebhookService
 	AuditWriter          *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
@@ -313,6 +314,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/customers/{id}/groups/add", deps.handleAdminCustomerGroupAdd)
 	adminMux.HandleFunc("POST /admin/customers/{id}/groups/{groupID}/remove", deps.handleAdminCustomerGroupRemove)
 	adminMux.HandleFunc("POST /admin/customers/{id}/payment-terms", deps.handleAdminCustomerPaymentTerms)
+	adminMux.HandleFunc("POST /admin/customers/{id}/price-list", deps.handleAdminCustomerPriceList)
 	adminMux.HandleFunc("POST /admin/customers/{id}/billing-method", deps.handleAdminCustomerBillingMethod)
 	adminMux.HandleFunc("POST /admin/customers/{id}/local-fulfillment", deps.handleAdminCustomerLocalFulfillment)
 
@@ -323,6 +325,14 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("GET /admin/groups/prices", deps.handleAdminGroupPrices)
 	adminMux.HandleFunc("POST /admin/groups/prices/base", deps.handleAdminGroupPriceBaseUpdate)
 	adminMux.HandleFunc("POST /admin/groups/prices/group", deps.handleAdminGroupPriceGroupUpdate)
+
+	// Admin price lists
+	adminMux.HandleFunc("GET /admin/price-lists", deps.handleAdminPriceListList)
+	adminMux.HandleFunc("POST /admin/price-lists", deps.handleAdminPriceListCreate)
+	adminMux.HandleFunc("POST /admin/price-lists/{id}", deps.handleAdminPriceListUpdate)
+	adminMux.HandleFunc("POST /admin/price-lists/{id}/delete", deps.handleAdminPriceListDelete)
+	adminMux.HandleFunc("GET /admin/price-lists/prices", deps.handleAdminPriceListPrices)
+	adminMux.HandleFunc("POST /admin/price-lists/prices/list", deps.handleAdminPriceListPriceUpdate)
 
 	// Admin subscription plans
 	adminMux.HandleFunc("GET /admin/plans", deps.handleAdminPlanList)

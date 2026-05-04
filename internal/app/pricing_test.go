@@ -162,6 +162,99 @@ func TestResolveForCustomerBatch_VariantWithoutBasePrice(t *testing.T) {
 	assert.False(t, present, "variant without base price should be omitted from the map")
 }
 
+func TestSetPriceListPrice_Inserts(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+
+	priceList := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx, testutil.WithPriceList(priceList.ID))
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+
+	price, err := svc.SetPriceListPrice(ctx, tx, variant.ID, priceList.ID, 1100, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, 1100, price.Amount)
+	require.NotNil(t, price.PriceListID)
+	assert.Equal(t, priceList.ID, *price.PriceListID)
+
+	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1100), got)
+}
+
+func TestSetPriceListPrice_OverwritesExisting(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+
+	priceList := testutil.CreatePriceList(t, tx)
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.CreatePriceListPrice(t, tx, priceList.ID, variant.ID, 1100, "USD")
+
+	updated, err := svc.SetPriceListPrice(ctx, tx, variant.ID, priceList.ID, 999, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, 999, updated.Amount)
+}
+
+func TestSetPriceListPrice_RejectsNegative(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+
+	priceList := testutil.CreatePriceList(t, tx)
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+
+	_, err := svc.SetPriceListPrice(ctx, tx, variant.ID, priceList.ID, -1, "USD")
+	assert.ErrorIs(t, err, app.ErrInvalidPrice)
+}
+
+func TestDeletePriceListPrice_RemovesRow(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+
+	priceList := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx, testutil.WithPriceList(priceList.ID))
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+	testutil.CreatePriceListPrice(t, tx, priceList.ID, variant.ID, 1100, "USD")
+
+	require.NoError(t, svc.DeletePriceListPrice(ctx, tx, variant.ID, priceList.ID, "USD"))
+
+	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	require.NoError(t, err)
+	// Falls back to base.
+	assert.Equal(t, int64(1500), got)
+}
+
+func TestListPriceListPricesByProduct_GroupsByVariantAndList(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+
+	listA := testutil.CreatePriceList(t, tx, testutil.WithPriceListName("A"))
+	listB := testutil.CreatePriceList(t, tx, testutil.WithPriceListName("B"))
+	product := testutil.CreateProduct(t, tx)
+	v1 := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("V1"))
+	v2 := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("V2"))
+	testutil.CreatePriceListPrice(t, tx, listA.ID, v1.ID, 1000, "USD")
+	testutil.CreatePriceListPrice(t, tx, listB.ID, v1.ID, 1100, "USD")
+	testutil.CreatePriceListPrice(t, tx, listA.ID, v2.ID, 2000, "USD")
+
+	got, err := svc.ListPriceListPricesByProduct(ctx, tx, product.ID, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, 1000, got[v1.ID][listA.ID])
+	assert.Equal(t, 1100, got[v1.ID][listB.ID])
+	assert.Equal(t, 2000, got[v2.ID][listA.ID])
+	_, hasB := got[v2.ID][listB.ID]
+	assert.False(t, hasB)
+}
+
 func TestResolveForCustomerBatch_MixedListAndBase(t *testing.T) {
 	tx := testutil.NewTestTx(t, testPool)
 	svc := newPricingService()

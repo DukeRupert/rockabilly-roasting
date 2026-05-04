@@ -12,6 +12,7 @@ Working punch list for executing the OS → Hiri wholesale migration across mult
 | 2026-05-03 | W4a + W4b + W4c | Customer-aware pricing resolver landed; PricingService gains ResolveForCustomer/Batch; tests green |
 | 2026-05-03 | W5 + W6 + W8 + W7 | Wholesale cart + checkout now use customer-aware pricing + visibility; staleness check returns 409 + banner; G1 + G3 closed; tests green |
 | 2026-05-03 | W9 + W10 | testutil fixtures (price list, price list price, customer group, product visibility) + 21 tests across `pricing_test.go`, `cart_pricing_test.go`, `wholesale_pricing_test.go` covering D2/D3/D4/D5 invariants; all green |
+| 2026-05-03 | W11 | PriceListStore + PriceListService (CRUD, audited); PricingService.SetPriceListPrice + DeletePriceListPrice; admin pages at /admin/price-lists (list + inline edit) and /admin/price-lists/prices (variant×list matrix); customer-show price-list dropdown; sidebar entry; tests green |
 
 When you finish a session, append a row. One sentence each.
 
@@ -26,12 +27,13 @@ When you finish a session, append a row. One sentence each.
 - `handleWholesaleCheckoutConfirm` performs a fresh-resolve staleness check inside the order tx; on mismatch it rewrites cart rows via `AddItemForCustomer`, commits, and renders the wholesale checkout page with `PriceChangeBanner` + HTTP 409.
 - `cart.AddItem` (retail) is unchanged — retail still snapshots base price by design.
 - New customer-aware pricing + visibility paths now have test coverage: `internal/app/pricing_test.go` (D2/D5 resolver matrix), `cart_pricing_test.go` (D3 cart paths), `wholesale_pricing_test.go` (D3 denormalization + D4/D5 quick-order visibility & pricing). Fixtures under `internal/testutil/fixtures.go`.
+- Admin price-list management is live: `PriceListService` (Create/Get/List/Update/Delete + CountCustomers), `PricingService.SetPriceListPrice` / `DeletePriceListPrice`, three new audit constants (`AuditPriceList{Created,Updated,Deleted}`), and three admin surfaces — `/admin/price-lists` (CRUD + inline rename/status), `/admin/price-lists/prices` (variant×list matrix mirroring the group-pricing page), and a customer-page price-list dropdown next to payment terms.
 - `cmd/os-migrate/main.go` exists but predates pricing/visibility work; needs I1–I6.
 - Wholesale storefront templates exist and route correctly; reskin to paper-and-ink is a separate cosmetic track and does not block the import.
 
 ## Next up
 
-W11 (admin UI for price-list assignment, variant×list overrides, group management) and the importer track (I1–I6).
+The importer track (I1–I6). All schema, services, and admin UI are now in place.
 
 ---
 
@@ -69,7 +71,7 @@ Each item is a single small commit unless flagged otherwise. Decisions column re
 
 ### Admin UI (post-import operability)
 
-- [ ] **W11** — admin pages: assign price list to customer; manage variant×price-list overrides; assign customer to groups. **Largest single piece.** (—, M–L)
+- [x] **W11** — admin pages: assign price list to customer; manage variant×price-list overrides; price-list CRUD. (—, M–L)
 
 **Suggested order:** W1 → W3a → W3b → W4a → W4b → W4c → W5 → W6 → W8 → W7 → W9 → W10 → W11.
 

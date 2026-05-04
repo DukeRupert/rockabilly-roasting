@@ -119,6 +119,47 @@ func (s *PricingService) ListGroupPricesByProduct(ctx context.Context, tx pgx.Tx
 	return prices, nil
 }
 
+// SetPriceListPrice sets the price-list price (in cents) for a variant + price list.
+func (s *PricingService) SetPriceListPrice(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, priceListID uuid.UUID, amountCents int, currencyCode string) (*domain.Price, error) {
+	if amountCents < 0 {
+		return nil, ErrInvalidPrice
+	}
+
+	ps, err := s.pricing.GetOrCreatePriceSet(ctx, tx, variantID)
+	if err != nil {
+		return nil, fmt.Errorf("get or create price set: %w", err)
+	}
+
+	price, err := s.pricing.SetPriceListPrice(ctx, tx, ps.ID, priceListID, amountCents, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("set price list price: %w", err)
+	}
+	return price, nil
+}
+
+// DeletePriceListPrice removes the price-list price for a variant + price list.
+func (s *PricingService) DeletePriceListPrice(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, priceListID uuid.UUID, currencyCode string) error {
+	ps, err := s.pricing.GetOrCreatePriceSet(ctx, tx, variantID)
+	if err != nil {
+		return fmt.Errorf("get price set: %w", err)
+	}
+
+	if err := s.pricing.DeletePriceListPrice(ctx, tx, ps.ID, priceListID, currencyCode); err != nil {
+		return fmt.Errorf("delete price list price: %w", err)
+	}
+	return nil
+}
+
+// ListPriceListPricesByProduct returns price-list prices for all variants of a product,
+// keyed by variant ID then price list ID.
+func (s *PricingService) ListPriceListPricesByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID, currencyCode string) (map[uuid.UUID]map[uuid.UUID]int, error) {
+	prices, err := s.pricing.ListPriceListPricesByProduct(ctx, tx, productID, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("list price list prices: %w", err)
+	}
+	return prices, nil
+}
+
 // ResolveForCustomer returns the effective price (in cents) for a variant given a customer.
 // If the customer has a price list assigned, that list is consulted first; missing entries
 // fall back to the base price. Returns ErrCustomerNotFound or ErrPriceNotFound on miss.

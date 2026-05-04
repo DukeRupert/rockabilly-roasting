@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/mail"
@@ -14,6 +15,8 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/auth"
+	"github.com/dukerupert/hiri/internal/platform/ratelimit"
+	"github.com/dukerupert/hiri/internal/platform/turnstile"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
@@ -64,7 +67,8 @@ func (d *Deps) wholesaleCartItemCount(r *http.Request) int {
 
 func (d *Deps) handleWholesaleApplyPage(w http.ResponseWriter, r *http.Request) {
 	props := storefront.WholesaleApplyProps{
-		CartCount: d.cartItemCountFromCookie(r),
+		CartCount:        d.cartItemCountFromCookie(r),
+		TurnstileSiteKey: d.TurnstileSiteKey,
 	}
 	if IsHTMX(r) {
 		storefront.WholesaleApplyContent(props).Render(r.Context(), w) //nolint:errcheck
@@ -86,6 +90,22 @@ func (d *Deps) handleWholesaleApply(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(r.FormValue("fax")) != "" {
 		storefront.WholesaleApplyConfirmation().Render(r.Context(), w) //nolint:errcheck
 		return
+	}
+
+	// Cloudflare Turnstile — only enforced when a secret is configured. Real
+	// users get a visible failure they can retry; bots that can't solve the
+	// challenge are stopped before any DB work happens.
+	if d.TurnstileVerifier.Enabled() {
+		token := r.FormValue("cf-turnstile-response")
+		if err := d.TurnstileVerifier.Verify(ctx, token, ratelimit.ClientIP(r)); err != nil {
+			if errors.Is(err, turnstile.ErrInvalidToken) {
+				http.Error(w, "Bot check failed. Please refresh the page and try again.", http.StatusBadRequest)
+				return
+			}
+			d.Logger.Warn("turnstile verify failed", "error", err)
+			http.Error(w, "Bot check unavailable. Please try again in a moment.", http.StatusServiceUnavailable)
+			return
+		}
 	}
 
 	p := app.ApplyParams{

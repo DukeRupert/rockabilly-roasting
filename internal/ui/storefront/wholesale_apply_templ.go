@@ -11,7 +11,8 @@ import templruntime "github.com/a-h/templ/runtime"
 import "github.com/dukerupert/hiri/internal/ui/layouts"
 
 type WholesaleApplyProps struct {
-	CartCount int
+	CartCount        int
+	TurnstileSiteKey string // empty disables the widget (honeypot still active)
 }
 
 func WholesaleApplyContent(props WholesaleApplyProps) templ.Component {
@@ -35,7 +36,36 @@ func WholesaleApplyContent(props WholesaleApplyProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><h2 class=\"text-center font-display text-2xl tracking-widest text-rr-heading\">WHOLESALE APPLICATION</h2><p class=\"mt-2 text-center text-sm/6 text-rr-muted\">Apply for a wholesale account to access bulk pricing and net terms.</p></div><div class=\"mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]\"><div class=\"bg-rr-surface px-6 py-12 shadow-sm sm:rounded-sm sm:px-12\"><form method=\"post\" action=\"/wholesale/apply\" class=\"space-y-6\"><!-- Honeypot field — hidden from real users, catches bots --><div class=\"hidden\" aria-hidden=\"true\"><input type=\"text\" name=\"fax\" tabindex=\"-1\" autocomplete=\"off\"></div><div class=\"grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2\"><div><label for=\"first_name\" class=\"block text-sm/6 font-medium text-rr-body\">First name</label><div class=\"mt-2\"><input type=\"text\" name=\"first_name\" id=\"first_name\" required autocomplete=\"given-name\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div><div><label for=\"last_name\" class=\"block text-sm/6 font-medium text-rr-body\">Last name</label><div class=\"mt-2\"><input type=\"text\" name=\"last_name\" id=\"last_name\" required autocomplete=\"family-name\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div></div><div><label for=\"email\" class=\"block text-sm/6 font-medium text-rr-body\">Email address</label><div class=\"mt-2\"><input type=\"email\" name=\"email\" id=\"email\" required autocomplete=\"email\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div><div><label for=\"company_name\" class=\"block text-sm/6 font-medium text-rr-body\">Company name</label><div class=\"mt-2\"><input type=\"text\" name=\"company_name\" id=\"company_name\" required autocomplete=\"organization\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div><div class=\"grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2\"><div><label for=\"phone\" class=\"block text-sm/6 font-medium text-rr-body\">Phone <span class=\"text-rr-faint\">(optional)</span></label><div class=\"mt-2\"><input type=\"tel\" name=\"phone\" id=\"phone\" autocomplete=\"tel\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div><div><label for=\"website\" class=\"block text-sm/6 font-medium text-rr-body\">Website <span class=\"text-rr-faint\">(optional)</span></label><div class=\"mt-2\"><input type=\"url\" name=\"website\" id=\"website\" autocomplete=\"url\" placeholder=\"https://\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div></div><div><button type=\"submit\" class=\"btn flex w-full justify-center rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Submit Application</button></div></form></div><p class=\"mt-10 text-center text-sm/6 text-rr-muted\">Already have a wholesale account? <a href=\"/wholesale/login\" class=\"font-semibold text-rr-red hover:text-rr-red-lt\">Sign in</a></p></div></div>")
+		if props.TurnstileSiteKey != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<script src=\"https://challenges.cloudflare.com/turnstile/v0/api.js\" async defer></script>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8\"><div class=\"sm:mx-auto sm:w-full sm:max-w-md\"><h2 class=\"text-center font-display text-2xl tracking-widest text-rr-heading\">WHOLESALE APPLICATION</h2><p class=\"mt-2 text-center text-sm/6 text-rr-muted\">Apply for a wholesale account to access bulk pricing and net terms.</p></div><div class=\"mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]\"><div class=\"bg-rr-surface px-6 py-12 shadow-sm sm:rounded-sm sm:px-12\"><form method=\"post\" action=\"/wholesale/apply\" class=\"space-y-6\"><!-- Honeypot field — hidden from real users, catches bots --><div class=\"hidden\" aria-hidden=\"true\"><input type=\"text\" name=\"fax\" tabindex=\"-1\" autocomplete=\"off\"></div><div class=\"grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2\"><div><label for=\"first_name\" class=\"block text-sm/6 font-medium text-rr-body\">First name</label><div class=\"mt-2\"><input type=\"text\" name=\"first_name\" id=\"first_name\" required autocomplete=\"given-name\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div><div><label for=\"last_name\" class=\"block text-sm/6 font-medium text-rr-body\">Last name</label><div class=\"mt-2\"><input type=\"text\" name=\"last_name\" id=\"last_name\" required autocomplete=\"family-name\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div></div><div><label for=\"email\" class=\"block text-sm/6 font-medium text-rr-body\">Email address</label><div class=\"mt-2\"><input type=\"email\" name=\"email\" id=\"email\" required autocomplete=\"email\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div><div><label for=\"company_name\" class=\"block text-sm/6 font-medium text-rr-body\">Company name</label><div class=\"mt-2\"><input type=\"text\" name=\"company_name\" id=\"company_name\" required autocomplete=\"organization\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div><div class=\"grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2\"><div><label for=\"phone\" class=\"block text-sm/6 font-medium text-rr-body\">Phone <span class=\"text-rr-faint\">(optional)</span></label><div class=\"mt-2\"><input type=\"tel\" name=\"phone\" id=\"phone\" autocomplete=\"tel\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div><div><label for=\"website\" class=\"block text-sm/6 font-medium text-rr-body\">Website <span class=\"text-rr-faint\">(optional)</span></label><div class=\"mt-2\"><input type=\"url\" name=\"website\" id=\"website\" autocomplete=\"url\" placeholder=\"https://\" class=\"rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6\"></div></div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if props.TurnstileSiteKey != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"flex justify-center\"><div class=\"cf-turnstile\" data-sitekey=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var2 string
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.TurnstileSiteKey)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_apply.templ`, Line: 70, Col: 70}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" data-theme=\"light\"></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div><button type=\"submit\" class=\"btn flex w-full justify-center rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Submit Application</button></div></form></div><p class=\"mt-10 text-center text-sm/6 text-rr-muted\">Already have a wholesale account? <a href=\"/wholesale/login\" class=\"font-semibold text-rr-red hover:text-rr-red-lt\">Sign in</a></p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -59,12 +89,12 @@ func WholesaleApplyPage(props WholesaleApplyProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var2 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var2 == nil {
-			templ_7745c5c3_Var2 = templ.NopComponent
+		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var3 == nil {
+			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var4 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -86,7 +116,7 @@ func WholesaleApplyPage(props WholesaleApplyProps) templ.Component {
 			Title:       "Wholesale Application",
 			Description: "Apply for a wholesale account with Rockabilly Roasting Co. Our team reviews every application and usually replies within a business day.",
 			CartCount:   props.CartCount,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -110,12 +140,12 @@ func WholesaleApplyConfirmation() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"mx-auto max-w-lg text-center py-12\"><svg class=\"mx-auto size-16 text-rr-red\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg><h1 class=\"mt-4 font-display text-2xl tracking-widest text-rr-heading\">APPLICATION RECEIVED</h1><p class=\"mt-2 text-sm text-rr-muted\">Thank you for your interest! We'll review your application and get back to you within 2 business days.</p><div class=\"mt-8\"><a href=\"/catalog\" class=\"text-sm font-semibold text-rr-red hover:text-rr-red-lt\">&larr; Continue shopping</a></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"mx-auto max-w-lg text-center py-12\"><svg class=\"mx-auto size-16 text-rr-red\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg><h1 class=\"mt-4 font-display text-2xl tracking-widest text-rr-heading\">APPLICATION RECEIVED</h1><p class=\"mt-2 text-sm text-rr-muted\">Thank you for your interest! We'll review your application and get back to you within 2 business days.</p><div class=\"mt-8\"><a href=\"/catalog\" class=\"text-sm font-semibold text-rr-red hover:text-rr-red-lt\">&larr; Continue shopping</a></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

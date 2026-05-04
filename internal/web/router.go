@@ -22,6 +22,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
+	"github.com/dukerupert/hiri/internal/platform/turnstile"
 	"github.com/riverqueue/river"
 )
 
@@ -66,6 +67,8 @@ type Deps struct {
 	QBHTTPClient         *http.Client
 	HelpRegistry         *help.Registry
 	RateLimiter          *ratelimit.Limiter
+	TurnstileVerifier    *turnstile.Verifier // verifies Cloudflare Turnstile tokens; no-op when no secret configured
+	TurnstileSiteKey     string              // public site key embedded in widget; empty disables widget
 	SecureCookies        bool
 	BaseURL              string // public site URL, e.g. "https://rockabillyroasting.com"
 	Mailer               email.Sender

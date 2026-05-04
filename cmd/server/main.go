@@ -35,6 +35,7 @@ import (
 	hiresentry "github.com/dukerupert/hiri/internal/platform/sentry"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/platform/shipping"
+	"github.com/dukerupert/hiri/internal/platform/turnstile"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/web"
 )
@@ -96,6 +97,14 @@ func run() error {
 	metricsReg := metrics.NewRegistry()
 	rateLimitStore := ratelimit.NewMemoryStore(5 * time.Minute)
 	rateLimiter := ratelimit.NewLimiter(rateLimitStore)
+
+	turnstileSiteKey := strings.TrimSpace(os.Getenv("TURNSTILE_SITE_KEY"))
+	turnstileVerifier := turnstile.New(os.Getenv("TURNSTILE_SECRET_KEY"))
+	if turnstileVerifier.Enabled() {
+		logger.Info("turnstile verification enabled")
+	} else {
+		logger.Info("turnstile verification disabled (no secret configured)")
+	}
 
 	// Configure trusted reverse proxy CIDRs for accurate client IP extraction.
 	// Comma-separated list of CIDRs, e.g. "10.0.0.0/8,172.16.0.1/32".
@@ -400,6 +409,8 @@ func run() error {
 		QBHTTPClient:           qbHTTPClient,
 		HelpRegistry:           helpRegistry,
 		RateLimiter:            rateLimiter,
+		TurnstileVerifier:      turnstileVerifier,
+		TurnstileSiteKey:       turnstileSiteKey,
 		SecureCookies:          secureCookies,
 		BaseURL:                baseURL,
 		Mailer:                 mailer,

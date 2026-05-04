@@ -152,6 +152,37 @@ func applyOrderViewFilter(view string, f *store.OrderFilter) {
 	}
 }
 
+// buildVariantLabel joins the variant's option values (e.g., "Whole Bean / 12oz")
+// using a per-product label map built from product options.
+func buildVariantLabel(ctx context.Context, tx pgx.Tx, d *Deps, variantID uuid.UUID, labels map[uuid.UUID]string) (string, error) {
+	vovs, err := d.CatalogService.ListVariantOptionValues(ctx, tx, variantID)
+	if err != nil {
+		return "", err
+	}
+	parts := make([]string, 0, len(vovs))
+	for _, vov := range vovs {
+		if s, ok := labels[vov.ProductOptionValueID]; ok && s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, " / "), nil
+}
+
+// canEditOrderLineItemsView mirrors the service-level guard so the swap UI
+// only renders when the service would actually accept the change.
+func canEditOrderLineItemsView(o *domain.Order) bool {
+	if o.Status == domain.OrderStatusCancelled || o.Status == domain.OrderStatusRefunded {
+		return false
+	}
+	switch o.FulfillmentStatus {
+	case domain.FulfillmentStatusFulfilled,
+		domain.FulfillmentStatusShipped,
+		domain.FulfillmentStatusDelivered:
+		return false
+	}
+	return true
+}
+
 func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -197,8 +228,10 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
-		// Resolve variant + product names for each line item.
+		// Resolve variant + product names + sibling variants for each line item.
 		enrichedItems = make([]admin.EnrichedLineItem, len(lineItems))
+		// Per-product cache so multi-line orders don't re-query options.
+		optionLabelByProduct := map[uuid.UUID]map[uuid.UUID]string{}
 		for i, li := range lineItems {
 			enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
 
@@ -220,6 +253,63 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			}
 			enrichedItems[i].ProductTitle = product.Title
 			enrichedItems[i].ProductSlug = product.Slug
+
+			labels, ok := optionLabelByProduct[product.ID]
+			if !ok {
+				labels = map[uuid.UUID]string{}
+				opts, oErr := d.CatalogService.ListProductOptions(ctx, tx, product.ID)
+				if oErr != nil {
+					return oErr
+				}
+				for _, opt := range opts {
+					vals, vlErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
+					if vlErr != nil {
+						return vlErr
+					}
+					for _, val := range vals {
+						labels[val.ID] = val.Value
+					}
+				}
+				optionLabelByProduct[product.ID] = labels
+			}
+
+			currentLabel, lErr := buildVariantLabel(ctx, tx, d, variant.ID, labels)
+			if lErr != nil {
+				return lErr
+			}
+			enrichedItems[i].CurrentLabel = currentLabel
+
+			// Sibling variants (same product, same unit price). Always include
+			// the current variant so the select shows the active selection.
+			allVariants, avErr := d.CatalogService.ListVariants(ctx, tx, product.ID)
+			if avErr != nil {
+				return avErr
+			}
+			for _, sv := range allVariants {
+				if sv.ID != li.VariantID {
+					price, pErr := d.PricingService.GetBasePrice(ctx, tx, sv.ID, order.CurrencyCode)
+					if pErr != nil {
+						if errors.Is(pErr, app.ErrPriceNotFound) {
+							continue
+						}
+						return pErr
+					}
+					if price.Amount != li.UnitPrice {
+						continue
+					}
+				}
+				label, lblErr := buildVariantLabel(ctx, tx, d, sv.ID, labels)
+				if lblErr != nil {
+					return lblErr
+				}
+				if label == "" {
+					label = sv.SKU
+				}
+				enrichedItems[i].SiblingVariants = append(enrichedItems[i].SiblingVariants, admin.SiblingVariant{
+					ID:    sv.ID,
+					Label: label,
+				})
+			}
 		}
 
 		return nil
@@ -235,15 +325,16 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.OrderShowProps{
-		Order:           order,
-		LineItems:       enrichedItems,
-		Adjustments:     adjustments,
-		Customer:        customer,
-		ShippingAddress: shippingAddress,
-		Flash:           r.URL.Query().Get("flash"),
-		MerchantTZ:      d.MerchantTZ,
-		StaffName:       name,
-		StaffRole:       role,
+		Order:            order,
+		LineItems:        enrichedItems,
+		Adjustments:      adjustments,
+		Customer:         customer,
+		ShippingAddress:  shippingAddress,
+		Flash:            r.URL.Query().Get("flash"),
+		MerchantTZ:       d.MerchantTZ,
+		StaffName:        name,
+		StaffRole:        role,
+		CanEditLineItems: canEditOrderLineItemsView(order),
 	}
 
 	if IsHTMX(r) {
@@ -345,6 +436,42 @@ func (d *Deps) handleAdminOrderFulfill(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Order+fulfilled", http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminOrderLineItemVariantUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	orderID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	lineItemID, err := uuid.Parse(r.PathValue("lineItemID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+	newVariantID, err := uuid.Parse(r.FormValue("variant_id"))
+	if err != nil {
+		Error(w, r, app.ErrVariantNotFound)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.ChangeLineItemVariant(ctx, tx, orderID, lineItemID, newVariantID, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/orders/"+orderID.String()+"?flash=Grind+updated", http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminOrderShip(w http.ResponseWriter, r *http.Request) {

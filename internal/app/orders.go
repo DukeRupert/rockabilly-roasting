@@ -27,6 +27,7 @@ type OrderService struct {
 	email         EmailEnv                 // populated via WithEmail; required for Send* methods
 	discounts     *store.DiscountStore     // populated via WithDiscounts; required for CancelOrder coupon release
 	enqueuer      JobEnqueuer              // populated via WithEnqueuer; required for ready-for-pickup / out-for-delivery email enqueue
+	pricing       *store.PricingStore      // populated via WithPricing; required for ChangeLineItemVariant price-match guard
 }
 
 // NewOrderService creates a new OrderService.
@@ -65,6 +66,13 @@ func (s *OrderService) WithDiscounts(discounts *store.DiscountStore) *OrderServi
 	return s
 }
 
+// WithPricing wires the pricing store used by ChangeLineItemVariant to
+// enforce the same-price guard when swapping a line item's variant.
+func (s *OrderService) WithPricing(pricing *store.PricingStore) *OrderService {
+	s.pricing = pricing
+	return s
+}
+
 // WithEnqueuer wires the job enqueuer used by the local fulfillment
 // transitions (MarkReadyForPickup / MarkOutForDelivery) to send the matching
 // notification email. Must be set at wiring time before those methods run.
@@ -82,6 +90,22 @@ func canCancelOrder(status domain.OrderStatus) bool {
 func canRefundOrder(status domain.OrderStatus, paymentStatus domain.PaymentStatus) bool {
 	return (status == domain.OrderStatusComplete || status == domain.OrderStatusConfirmed) &&
 		paymentStatus == domain.PaymentStatusCaptured
+}
+
+// canEditOrderLineItems reports whether staff may make line-item-level edits
+// (e.g., grind swap). The bag must not be packed yet and the order must not
+// be in a terminal state.
+func canEditOrderLineItems(o *domain.Order) bool {
+	if o.Status == domain.OrderStatusCancelled || o.Status == domain.OrderStatusRefunded {
+		return false
+	}
+	switch o.FulfillmentStatus {
+	case domain.FulfillmentStatusFulfilled,
+		domain.FulfillmentStatusShipped,
+		domain.FulfillmentStatusDelivered:
+		return false
+	}
+	return true
 }
 
 // --- Query methods ---
@@ -375,6 +399,96 @@ func (s *OrderService) FulfillOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID
 	}
 
 	return order, nil
+}
+
+// ChangeLineItemVariant swaps a line item to a sibling variant on the same
+// product, e.g., switching grind from Whole Bean to Drip after the order has
+// been placed. The unit price and totals are preserved — the new variant
+// must have the same base price (in the order's currency) as the line item's
+// current unit price, otherwise the swap is rejected and the caller is told
+// to cancel and recreate the order. Records an audit entry capturing the old
+// and new variant IDs and SKUs.
+func (s *OrderService) ChangeLineItemVariant(ctx context.Context, tx pgx.Tx, orderID, lineItemID, newVariantID uuid.UUID, actor Actor) (*domain.LineItem, error) {
+	if s.catalog == nil || s.pricing == nil {
+		return nil, fmt.Errorf("change line item variant: service not wired with catalog/pricing")
+	}
+
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order: %w", err)
+	}
+	if !canEditOrderLineItems(order) {
+		return nil, ErrOrderNotEditable
+	}
+
+	li, err := s.orders.GetLineItem(ctx, tx, lineItemID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrLineItemNotFound
+		}
+		return nil, fmt.Errorf("get line item: %w", err)
+	}
+	if li.OrderID != orderID {
+		return nil, ErrLineItemNotInOrder
+	}
+	if li.VariantID == newVariantID {
+		return li, nil
+	}
+
+	oldVariant, err := s.catalog.GetVariantByID(ctx, tx, li.VariantID)
+	if err != nil {
+		return nil, fmt.Errorf("get current variant: %w", err)
+	}
+	newVariant, err := s.catalog.GetVariantByID(ctx, tx, newVariantID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrVariantNotFound
+		}
+		return nil, fmt.Errorf("get new variant: %w", err)
+	}
+	if newVariant.ProductID != oldVariant.ProductID {
+		return nil, ErrVariantNotOnSameProduct
+	}
+
+	newPrice, err := s.pricing.GetBasePrice(ctx, tx, newVariantID, order.CurrencyCode)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPriceNotFound
+		}
+		return nil, fmt.Errorf("get new variant price: %w", err)
+	}
+	if newPrice.Amount != li.UnitPrice {
+		return nil, ErrVariantPriceMismatch
+	}
+
+	updated, err := s.orders.UpdateLineItemVariant(ctx, tx, lineItemID, newVariantID)
+	if err != nil {
+		return nil, fmt.Errorf("update line item variant: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderLineItemVariantChanged,
+		ResourceType: "order",
+		ResourceID:   orderID,
+		After:        updated,
+		Metadata: map[string]any{
+			"line_item_id":    lineItemID,
+			"old_variant_id":  oldVariant.ID,
+			"new_variant_id":  newVariant.ID,
+			"old_variant_sku": oldVariant.SKU,
+			"new_variant_sku": newVariant.SKU,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit line item variant changed: %w", err)
+	}
+
+	return updated, nil
 }
 
 // ShipOrder marks an order as shipped and moves it to complete.

@@ -55,6 +55,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrShipmentNotFound),
 		errors.Is(err, app.ErrTaxonNotFound),
 		errors.Is(err, app.ErrPriceNotFound),
+		errors.Is(err, app.ErrLineItemNotFound),
 		errors.Is(err, app.ErrInvoiceNotFound):
 		return http.StatusNotFound, "not found"
 
@@ -77,6 +78,10 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrOrderAlreadyFulfilled),
 		errors.Is(err, app.ErrOrderFulfillmentNotRevertible),
 		errors.Is(err, app.ErrOrderShipmentNotRevertible),
+		errors.Is(err, app.ErrOrderNotEditable),
+		errors.Is(err, app.ErrLineItemNotInOrder),
+		errors.Is(err, app.ErrVariantNotOnSameProduct),
+		errors.Is(err, app.ErrVariantPriceMismatch),
 		errors.Is(err, app.ErrCartExpired),
 		errors.Is(err, app.ErrCartEmpty),
 		errors.Is(err, app.ErrEmailNotVerified),

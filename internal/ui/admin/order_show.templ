@@ -4,27 +4,40 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
 type EnrichedLineItem struct {
-	LineItem     domain.LineItem
-	ProductTitle string
-	ProductSlug  string
-	VariantSKU   string
+	LineItem        domain.LineItem
+	ProductTitle    string
+	ProductSlug     string
+	VariantSKU      string
+	CurrentLabel    string
+	SiblingVariants []SiblingVariant
+}
+
+// SiblingVariant is one selectable option in the line-item grind/variant
+// picker. Same-priced siblings only — variants priced differently from the
+// current line item are filtered out by the handler.
+type SiblingVariant struct {
+	ID    uuid.UUID
+	Label string
 }
 
 type OrderShowProps struct {
-	Order           *domain.Order
-	LineItems       []EnrichedLineItem
-	Adjustments     []domain.Adjustment
-	Customer        *domain.Customer
-	ShippingAddress *domain.Address
-	Flash           string
-	MerchantTZ      *time.Location
-	StaffName       string
-	StaffRole       string
+	Order            *domain.Order
+	LineItems        []EnrichedLineItem
+	Adjustments      []domain.Adjustment
+	Customer         *domain.Customer
+	ShippingAddress  *domain.Address
+	Flash            string
+	MerchantTZ       *time.Location
+	StaffName        string
+	StaffRole        string
+	CanEditLineItems bool
 }
 
 func canCancelOrder(status domain.OrderStatus) bool {
@@ -137,6 +150,39 @@ func stepLabelClasses(current int, step int) string {
 		return "text-xs font-medium text-rr-red"
 	}
 	return "text-xs text-rr-border"
+}
+
+templ grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) {
+	if canEdit && len(eli.SiblingVariants) > 1 {
+		<form
+			method="POST"
+			action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/line-items/%s/variant", orderID.String(), eli.LineItem.ID.String())) }
+			class="flex items-center gap-2"
+		>
+			<select
+				name="variant_id"
+				class="border-2 border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+			>
+				for _, sv := range eli.SiblingVariants {
+					if sv.ID == eli.LineItem.VariantID {
+						<option value={ sv.ID.String() } selected>{ sv.Label }</option>
+					} else {
+						<option value={ sv.ID.String() }>{ sv.Label }</option>
+					}
+				}
+			</select>
+			<button
+				type="submit"
+				class="border-2 border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
+			>Save</button>
+		</form>
+	} else {
+		if eli.CurrentLabel != "" {
+			{ eli.CurrentLabel }
+		} else {
+			<span class="text-rr-border">&mdash;</span>
+		}
+	}
 }
 
 templ OrderShowContent(props OrderShowProps) {
@@ -421,6 +467,7 @@ templ OrderShowContent(props OrderShowProps) {
 					<thead class="bg-rr-raised">
 						<tr>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Product</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Grind / option</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">SKU</th>
 							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Qty</th>
 							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Unit Price</th>
@@ -436,6 +483,9 @@ templ OrderShowContent(props OrderShowProps) {
 									} else {
 										<span class="font-medium text-rr-heading">{ eli.LineItem.VariantID.String()[:8] }...</span>
 									}
+								</td>
+								<td class="px-3 py-4 text-sm text-rr-muted">
+									@grindCell(props.Order.ID, eli, props.CanEditLineItems)
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
 									if eli.VariantSKU != "" {

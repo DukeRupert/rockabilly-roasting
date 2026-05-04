@@ -99,6 +99,16 @@ SELECT * FROM line_items
 WHERE order_id = $1
 ORDER BY id;
 
+-- name: GetLineItem :one
+SELECT * FROM line_items
+WHERE id = $1;
+
+-- name: UpdateLineItemVariant :one
+UPDATE line_items
+SET variant_id = $2
+WHERE id = $1
+RETURNING *;
+
 -- name: DeleteLineItem :exec
 DELETE FROM line_items WHERE id = $1;
 

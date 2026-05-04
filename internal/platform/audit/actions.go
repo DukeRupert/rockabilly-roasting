@@ -14,6 +14,7 @@ const (
 	AuditOrderReadyForPickup       = "order.ready_for_pickup"
 	AuditOrderPickedUp             = "order.picked_up"
 	AuditOrderOutForDelivery       = "order.out_for_delivery"
+	AuditOrderLineItemVariantChanged = "order.line_item_variant_changed"
 
 	// Product/pricing actions
 	AuditProductCreated      = "product.created"

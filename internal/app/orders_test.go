@@ -192,3 +192,117 @@ func TestOrderService_UpdateFulfillmentStatus(t *testing.T) {
 		testutil.AssertNoAuditEntry(t, tx, "order", order.ID)
 	})
 }
+
+// changeLineItemFixture sets up an order with a single line item priced at
+// 1500c, plus a same-product, same-priced sibling variant to swap to and a
+// different-priced sibling. Returns the order, the line item ID, the matching
+// sibling variant ID, and the mismatched sibling variant ID.
+func changeLineItemFixture(t *testing.T, tx pgx.Tx) (orderID, lineItemID, samePriceVariantID, otherPriceVariantID, otherProductVariantID uuid.UUID) {
+	t.Helper()
+	custID, shipID, billID := orderFixtures(t, tx)
+	product := testutil.CreateProduct(t, tx)
+	v1 := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("WHOLE-12"))
+	v2 := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("DRIP-12"))
+	v3 := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("ESPRESSO-12"))
+	testutil.SetBasePriceForVariant(t, tx, v1.ID, 1500, "USD")
+	testutil.SetBasePriceForVariant(t, tx, v2.ID, 1500, "USD")
+	testutil.SetBasePriceForVariant(t, tx, v3.ID, 1800, "USD")
+
+	otherProduct := testutil.CreateProduct(t, tx)
+	other := testutil.CreateVariant(t, tx, otherProduct.ID, testutil.WithSKU("OTHER-12"))
+	testutil.SetBasePriceForVariant(t, tx, other.ID, 1500, "USD")
+
+	order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+		testutil.WithOrderStatus(domain.OrderStatusConfirmed),
+		testutil.WithPaymentStatus(domain.PaymentStatusCaptured))
+	li, err := store.NewOrderStore(nil).CreateLineItem(context.Background(), tx, store.CreateLineItemParams{
+		OrderID:   order.ID,
+		VariantID: v1.ID,
+		Quantity:  1,
+		UnitPrice: 1500,
+		Subtotal:  1500,
+		Total:     1500,
+	})
+	require.NoError(t, err)
+	return order.ID, li.ID, v2.ID, v3.ID, other.ID
+}
+
+func newOrderServiceWithCatalogPricing() *app.OrderService {
+	customerStore := store.NewCustomerStore()
+	catalogStore := store.NewCatalogStore()
+	subscriptionStore := store.NewSubscriptionStore(nil)
+	pricingStore := store.NewPricingStore()
+	return app.NewOrderService(store.NewOrderStore(nil), audit.NewAuditWriter(), metrics.NewRegistry()).
+		WithEmail(app.EmailEnv{}, customerStore, catalogStore, subscriptionStore).
+		WithPricing(pricingStore)
+}
+
+func TestOrderService_ChangeLineItemVariant(t *testing.T) {
+	pool := testPool
+	ctx := context.Background()
+	svc := newOrderServiceWithCatalogPricing()
+	actor := testutil.TestActor()
+
+	t.Run("happy path swaps variant and writes audit", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		orderID, liID, samePriceID, _, _ := changeLineItemFixture(t, tx)
+
+		updated, err := svc.ChangeLineItemVariant(ctx, tx, orderID, liID, samePriceID, actor)
+		require.NoError(t, err)
+		assert.Equal(t, samePriceID, updated.VariantID)
+		assert.Equal(t, 1500, updated.UnitPrice, "unit price preserved")
+
+		entry := testutil.LastAuditEntry(t, tx, "order", orderID)
+		assert.Equal(t, audit.AuditOrderLineItemVariantChanged, entry.Action)
+	})
+
+	t.Run("rejects variant on different product", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		orderID, liID, _, _, otherProductID := changeLineItemFixture(t, tx)
+
+		_, err := svc.ChangeLineItemVariant(ctx, tx, orderID, liID, otherProductID, actor)
+		assert.ErrorIs(t, err, app.ErrVariantNotOnSameProduct)
+	})
+
+	t.Run("rejects variant with different price", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		orderID, liID, _, otherPriceID, _ := changeLineItemFixture(t, tx)
+
+		_, err := svc.ChangeLineItemVariant(ctx, tx, orderID, liID, otherPriceID, actor)
+		assert.ErrorIs(t, err, app.ErrVariantPriceMismatch)
+	})
+
+	t.Run("rejects when order is shipped", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		product := testutil.CreateProduct(t, tx)
+		v1 := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("A"))
+		v2 := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("B"))
+		testutil.SetBasePriceForVariant(t, tx, v1.ID, 1500, "USD")
+		testutil.SetBasePriceForVariant(t, tx, v2.ID, 1500, "USD")
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithOrderStatus(domain.OrderStatusComplete),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusShipped))
+		li, err := store.NewOrderStore(nil).CreateLineItem(ctx, tx, store.CreateLineItemParams{
+			OrderID: order.ID, VariantID: v1.ID, Quantity: 1, UnitPrice: 1500, Subtotal: 1500, Total: 1500,
+		})
+		require.NoError(t, err)
+
+		_, err = svc.ChangeLineItemVariant(ctx, tx, order.ID, li.ID, v2.ID, actor)
+		assert.ErrorIs(t, err, app.ErrOrderNotEditable)
+	})
+
+	t.Run("same-variant swap is a no-op", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		orderID, liID, _, _, _ := changeLineItemFixture(t, tx)
+
+		// Look up the current variant ID via GetLineItem so we don't depend
+		// on the fixture's internals.
+		current, err := store.NewOrderStore(nil).GetLineItem(ctx, tx, liID)
+		require.NoError(t, err)
+
+		_, err = svc.ChangeLineItemVariant(ctx, tx, orderID, liID, current.VariantID, actor)
+		require.NoError(t, err)
+		testutil.AssertNoAuditEntry(t, tx, "order", orderID)
+	})
+}

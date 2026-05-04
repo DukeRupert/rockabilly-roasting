@@ -856,6 +856,31 @@ func (s *OrderStore) CreateLineItem(ctx context.Context, tx pgx.Tx, p CreateLine
 	return lineItemFromRow(row), nil
 }
 
+// GetLineItem returns a single line item by ID.
+func (s *OrderStore) GetLineItem(ctx context.Context, tx pgx.Tx, id uuid.UUID) (_ *domain.LineItem, err error) {
+	defer trackQuery(s.metrics, "line_items.get", time.Now(), &err)
+	row, err := sqlcgen.New(tx).GetLineItem(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get line item: %w", err)
+	}
+	return lineItemFromRow(row), nil
+}
+
+// UpdateLineItemVariant changes the variant_id on a line item and returns
+// the updated row. Other line item fields (price, quantity, totals) are
+// untouched.
+func (s *OrderStore) UpdateLineItemVariant(ctx context.Context, tx pgx.Tx, id, variantID uuid.UUID) (_ *domain.LineItem, err error) {
+	defer trackQuery(s.metrics, "line_items.update_variant", time.Now(), &err)
+	row, err := sqlcgen.New(tx).UpdateLineItemVariant(ctx, sqlcgen.UpdateLineItemVariantParams{
+		ID:        id,
+		VariantID: variantID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update line item variant: %w", err)
+	}
+	return lineItemFromRow(row), nil
+}
+
 // ListLineItems returns all line items for an order.
 func (s *OrderStore) ListLineItems(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (_ []domain.LineItem, err error) {
 	defer trackQuery(s.metrics, "line_items.list_by_order", time.Now(), &err)

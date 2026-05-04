@@ -310,6 +310,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/orders/{id}/out-for-delivery", deps.handleAdminOrderOutForDelivery)
 	adminMux.HandleFunc("GET /admin/orders/{id}/packing-slip", deps.handleAdminOrderPackingSlip)
 	adminMux.HandleFunc("GET /admin/orders/{id}/invoice", deps.handleAdminOrderInvoice)
+	adminMux.HandleFunc("POST /admin/orders/{id}/line-items/{lineItemID}/variant", deps.handleAdminOrderLineItemVariantUpdate)
 
 	// Admin customers
 	adminMux.HandleFunc("GET /admin/customers", deps.handleAdminCustomerList)

@@ -11,6 +11,11 @@ var (
 	ErrOrderAlreadyFulfilled = errors.New("order is already fulfilled")
 	ErrOrderFulfillmentNotRevertible = errors.New("order fulfillment cannot be reverted")
 	ErrOrderShipmentNotRevertible    = errors.New("order shipment cannot be reverted")
+	ErrOrderNotEditable              = errors.New("order cannot be edited in its current state")
+	ErrLineItemNotFound              = errors.New("line item not found")
+	ErrLineItemNotInOrder            = errors.New("line item does not belong to this order")
+	ErrVariantNotOnSameProduct       = errors.New("target variant is not on the same product")
+	ErrVariantPriceMismatch          = errors.New("target variant has a different price; use cancel and recreate instead")
 
 	// Cart errors
 	ErrCartNotFound  = errors.New("cart not found")

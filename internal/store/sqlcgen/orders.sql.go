@@ -334,6 +334,29 @@ func (q *Queries) GetCartByID(ctx context.Context, id uuid.UUID) (Cart, error) {
 	return i, err
 }
 
+const getLineItem = `-- name: GetLineItem :one
+SELECT id, order_id, variant_id, quantity, unit_price, subtotal, discount_total, tax_total, total, metadata FROM line_items
+WHERE id = $1
+`
+
+func (q *Queries) GetLineItem(ctx context.Context, id uuid.UUID) (LineItem, error) {
+	row := q.db.QueryRow(ctx, getLineItem, id)
+	var i LineItem
+	err := row.Scan(
+		&i.ID,
+		&i.OrderID,
+		&i.VariantID,
+		&i.Quantity,
+		&i.UnitPrice,
+		&i.Subtotal,
+		&i.DiscountTotal,
+		&i.TaxTotal,
+		&i.Total,
+		&i.Metadata,
+	)
+	return i, err
+}
+
 const getOrderByID = `-- name: GetOrderByID :one
 SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at, shipping_method, requested_delivery_date FROM orders WHERE id = $1
 `
@@ -678,6 +701,36 @@ func (q *Queries) UpdateCartDiscount(ctx context.Context, arg UpdateCartDiscount
 		&i.Metadata,
 		&i.ExpiresAt,
 		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateLineItemVariant = `-- name: UpdateLineItemVariant :one
+UPDATE line_items
+SET variant_id = $2
+WHERE id = $1
+RETURNING id, order_id, variant_id, quantity, unit_price, subtotal, discount_total, tax_total, total, metadata
+`
+
+type UpdateLineItemVariantParams struct {
+	ID        uuid.UUID `json:"id"`
+	VariantID uuid.UUID `json:"variant_id"`
+}
+
+func (q *Queries) UpdateLineItemVariant(ctx context.Context, arg UpdateLineItemVariantParams) (LineItem, error) {
+	row := q.db.QueryRow(ctx, updateLineItemVariant, arg.ID, arg.VariantID)
+	var i LineItem
+	err := row.Scan(
+		&i.ID,
+		&i.OrderID,
+		&i.VariantID,
+		&i.Quantity,
+		&i.UnitPrice,
+		&i.Subtotal,
+		&i.DiscountTotal,
+		&i.TaxTotal,
+		&i.Total,
+		&i.Metadata,
 	)
 	return i, err
 }

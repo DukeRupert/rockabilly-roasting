@@ -841,20 +841,90 @@ templ optionSelectionScript(variantMap map[string]VariantOptionEntry) {
 			var variantMap = JSON.parse(scriptEl.dataset.variantMap);
 			var activeCls = 'option-pill font-oswald font-bold text-[11px] text-paper bg-rust border-2 border-ink px-4 py-2 transition-colors';
 			var inactiveCls = 'option-pill font-oswald font-bold text-[11px] text-ink bg-cream-hi border-2 border-ink px-4 py-2 hover:bg-paper-warm transition-colors';
+			var disabledCls = 'option-pill font-oswald font-bold text-[11px] text-ink/40 bg-cream-hi border-2 border-ink/30 px-4 py-2 line-through cursor-not-allowed';
 
-			// Handle option pill clicks
 			document.querySelectorAll('.option-pill').forEach(function(btn) {
 				btn.addEventListener('click', function() {
+					if (btn.disabled) return;
 					var optionId = btn.dataset.optionId;
 					document.querySelectorAll('.option-pill[data-option-id="' + optionId + '"]').forEach(function(b) {
-						b.className = inactiveCls;
 						b.setAttribute('aria-pressed', 'false');
 					});
-					btn.className = activeCls;
 					btn.setAttribute('aria-pressed', 'true');
-					resolveVariant();
+					refreshOptionStates();
 				});
 			});
+
+			// setPillEnabled toggles the disabled visual + HTML state on a pill.
+			// When enabling, the existing aria-pressed state determines active vs inactive class.
+			function setPillEnabled(pill, enabled) {
+				if (enabled) {
+					pill.disabled = false;
+					pill.removeAttribute('aria-disabled');
+					var isActive = pill.getAttribute('aria-pressed') === 'true';
+					pill.className = isActive ? activeCls : inactiveCls;
+				} else {
+					pill.disabled = true;
+					pill.setAttribute('aria-disabled', 'true');
+					pill.setAttribute('aria-pressed', 'false');
+					pill.className = disabledCls;
+				}
+			}
+
+			// computeEnabledStates marks each pill enabled/disabled based on whether
+			// any variant exists that contains the pill's value AND the currently
+			// selected values in every other option group.
+			function computeEnabledStates() {
+				var selectedByGroup = {};
+				document.querySelectorAll('div[data-option-id]').forEach(function(group) {
+					var active = group.querySelector('.option-pill[aria-pressed="true"]');
+					if (active) selectedByGroup[group.dataset.optionId] = active.dataset.valueId;
+				});
+				document.querySelectorAll('div[data-option-id]').forEach(function(group) {
+					var optId = group.dataset.optionId;
+					group.querySelectorAll('.option-pill').forEach(function(pill) {
+						var valId = pill.dataset.valueId;
+						var ok = false;
+						for (var vid in variantMap) {
+							var ids = variantMap[vid].optionValueIDs;
+							if (ids.indexOf(valId) === -1) continue;
+							var allOthersOk = true;
+							for (var otherId in selectedByGroup) {
+								if (otherId === optId) continue;
+								if (ids.indexOf(selectedByGroup[otherId]) === -1) { allOthersOk = false; break; }
+							}
+							if (allOthersOk) { ok = true; break; }
+						}
+						setPillEnabled(pill, ok);
+					});
+				});
+			}
+
+			// correctInvalidSelections promotes the first enabled pill to active when
+			// the current selection in a group has just been disabled. Returns true
+			// if any selection was changed (caller should recompute).
+			function correctInvalidSelections() {
+				var fixed = false;
+				document.querySelectorAll('div[data-option-id]').forEach(function(group) {
+					var active = group.querySelector('.option-pill[aria-pressed="true"]');
+					if (active && !active.disabled) return;
+					var firstEnabled = group.querySelector('.option-pill:not([disabled])');
+					if (!firstEnabled) return;
+					firstEnabled.setAttribute('aria-pressed', 'true');
+					firstEnabled.className = activeCls;
+					fixed = true;
+				});
+				return fixed;
+			}
+
+			function refreshOptionStates() {
+				// Two-group case converges in ≤2 passes; cap at 4 as a safety net.
+				for (var i = 0; i < 4; i++) {
+					computeEnabledStates();
+					if (!correctInvalidSelections()) break;
+				}
+				resolveVariant();
+			}
 
 			function resolveVariant() {
 				var selected = [];
@@ -883,6 +953,8 @@ templ optionSelectionScript(variantMap map[string]VariantOptionEntry) {
 			function formatCents(cents) {
 				return '$' + (cents / 100).toFixed(2);
 			}
+
+			refreshOptionStates();
 		})();
 	</script>
 }

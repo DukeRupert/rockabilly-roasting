@@ -206,22 +206,7 @@ templ ProductContent(props ProductDetailProps) {
 					if len(props.Options) > 0 {
 						<div class="mt-8 space-y-6">
 							for _, opt := range props.Options {
-								<fieldset>
-									<legend class="font-oswald font-bold text-ink text-[11px] mb-3 block" style="letter-spacing:0.2em; text-transform:uppercase;">{ opt.Option.Name }</legend>
-									<div class="flex flex-wrap gap-2" data-option-id={ opt.Option.ID.String() } role="radiogroup" aria-label={ opt.Option.Name }>
-										for i, val := range opt.Values {
-											<button
-												type="button"
-												class={ "option-pill " + optionPillClasses(i == 0) }
-												data-option-id={ opt.Option.ID.String() }
-												data-value-id={ val.ID.String() }
-												aria-pressed={ fmt.Sprintf("%t", i == 0) }
-											>
-												{ val.Value }
-											</button>
-										}
-									</div>
-								</fieldset>
+								@optionPillGroup(opt, defaultOptionValueIDSet(props.Variants, props.VariantMap))
 							}
 						</div>
 					}
@@ -540,6 +525,25 @@ templ ProductContent(props ProductDetailProps) {
 	</script>
 }
 
+templ optionPillGroup(opt OptionWithValues, defaultIDs map[string]bool) {
+	<fieldset>
+		<legend class="font-oswald font-bold text-ink text-[11px] mb-3 block" style="letter-spacing:0.2em; text-transform:uppercase;">{ opt.Option.Name }</legend>
+		<div class="flex flex-wrap gap-2" data-option-id={ opt.Option.ID.String() } role="radiogroup" aria-label={ opt.Option.Name }>
+			for i, val := range opt.Values {
+				<button
+					type="button"
+					class={ "option-pill " + optionPillClasses(pillActive(val, opt.Values, defaultIDs, i)) }
+					data-option-id={ opt.Option.ID.String() }
+					data-value-id={ val.ID.String() }
+					aria-pressed={ fmt.Sprintf("%t", pillActive(val, opt.Values, defaultIDs, i)) }
+				>
+					{ val.Value }
+				</button>
+			}
+		</div>
+	</fieldset>
+}
+
 templ tastingProfile(attrs *CoffeeAttrs) {
 	<section class="mt-16 pt-10 border-t-2 border-ink">
 		<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">What's in the cup</p>
@@ -751,6 +755,40 @@ func defaultVariantID(variants []VariantWithPrice) string {
 		return variants[0].Variant.ID.String()
 	}
 	return ""
+}
+
+// defaultOptionValueIDSet returns the option-value IDs of the default variant.
+// Used to mark the initially-active option pill so the visual selection always
+// matches the variant_id the form submits (otherwise the customer can see "drip"
+// highlighted while the form posts the whole-bean variant — orders ship wrong).
+func defaultOptionValueIDSet(variants []VariantWithPrice, variantMap map[string]VariantOptionEntry) map[string]bool {
+	defaultID := defaultVariantID(variants)
+	if defaultID == "" {
+		return nil
+	}
+	entry, ok := variantMap[defaultID]
+	if !ok {
+		return nil
+	}
+	set := make(map[string]bool, len(entry.OptionValueIDs))
+	for _, id := range entry.OptionValueIDs {
+		set[id] = true
+	}
+	return set
+}
+
+// pillActive picks which option pill is initially active: the default variant's
+// value when this option group has one, otherwise the first pill.
+func pillActive(val domain.ProductOptionValue, values []domain.ProductOptionValue, defaultIDs map[string]bool, i int) bool {
+	if defaultIDs[val.ID.String()] {
+		return true
+	}
+	for _, v := range values {
+		if defaultIDs[v.ID.String()] {
+			return false
+		}
+	}
+	return i == 0
 }
 
 func maxDiscount(plans []domain.SubscriptionPlan) int {

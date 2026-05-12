@@ -339,7 +339,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"> <span class=\"text-rr-muted pl-2\">oz</span></div></div></div><div class=\"px-4 py-4 sm:px-6 flex justify-end\"><button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper shadow-xs hover:opacity-90\">Save shipping settings</button></div></form></div></div><!-- Integrations section --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Integrations</h2><p class=\"mt-1 text-sm text-rr-muted\">Connect external services for billing and payments.</p><div class=\"mt-4 space-y-4\"><!-- QuickBooks Online --><div class=\"overflow-hidden border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><!-- QB logo placeholder --><div class=\"flex size-10 items-center justify-center rounded-sm bg-green-50 ring-1 ring-green-600/20\"><svg class=\"size-6 text-green-600\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg></div><div><h3 class=\"text-sm font-semibold text-rr-heading\">QuickBooks Online</h3><p class=\"text-sm text-rr-muted\">B2B wholesale invoicing and ACH payment collection</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"> <span class=\"text-rr-muted pl-2\">oz</span></div></div></div><div class=\"px-4 py-4 sm:px-6 flex justify-end\"><button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper shadow-xs hover:opacity-90\">Save shipping settings</button></div></form></div><!-- Box presets link --><div class=\"mt-4 border-2 border-rr-border bg-rr-surface px-4 py-4 sm:px-6 flex items-center justify-between\"><div><h3 class=\"text-sm font-semibold text-rr-heading\">Box presets</h3><p class=\"mt-1 text-xs text-rr-muted\">Named cartons used when buying shipping labels. The smallest preset that fits an order's weight is selected automatically.</p></div><a href=\"/admin/settings/box-presets\" class=\"rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Manage presets</a></div></div><!-- Integrations section --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Integrations</h2><p class=\"mt-1 text-sm text-rr-muted\">Connect external services for billing and payments.</p><div class=\"mt-4 space-y-4\"><!-- QuickBooks Online --><div class=\"overflow-hidden border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><!-- QB logo placeholder --><div class=\"flex size-10 items-center justify-center rounded-sm bg-green-50 ring-1 ring-green-600/20\"><svg class=\"size-6 text-green-600\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg></div><div><h3 class=\"text-sm font-semibold text-rr-heading\">QuickBooks Online</h3><p class=\"text-sm text-rr-muted\">B2B wholesale invoicing and ACH payment collection</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -398,7 +398,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RealmID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 395, Col: 100}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 405, Col: 100}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -439,7 +439,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d days", refreshTokenDaysRemaining(props.QB.RefreshExpiresAt)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 403, Col: 89}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 413, Col: 89}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -452,7 +452,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RefreshExpiresAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 406, Col: 82}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 416, Col: 82}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {

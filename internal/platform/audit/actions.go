@@ -83,6 +83,9 @@ const (
 	AuditShipmentLabelCreated  = "shipment.label_created"
 	AuditShipmentImported      = "shipment.imported"
 	AuditShippingConfigUpdated = "shipping_config.updated"
+	AuditBoxPresetCreated      = "box_preset.created"
+	AuditBoxPresetUpdated      = "box_preset.updated"
+	AuditBoxPresetDeleted      = "box_preset.deleted"
 
 	// Email actions for shipping
 	AuditEmailOrderShipped         = "email.order_shipped"

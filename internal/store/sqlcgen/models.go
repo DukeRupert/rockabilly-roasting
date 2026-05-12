@@ -120,6 +120,18 @@ type AuditLog struct {
 	CreatedAt     time.Time       `json:"created_at"`
 }
 
+type BoxPreset struct {
+	ID          uuid.UUID      `json:"id"`
+	Name        string         `json:"name"`
+	LengthIn    pgtype.Numeric `json:"length_in"`
+	WidthIn     pgtype.Numeric `json:"width_in"`
+	HeightIn    pgtype.Numeric `json:"height_in"`
+	MaxWeightOz pgtype.Numeric `json:"max_weight_oz"`
+	SortOrder   int32          `json:"sort_order"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
 type Cart struct {
 	ID                  uuid.UUID          `json:"id"`
 	CustomerID          *uuid.UUID         `json:"customer_id"`

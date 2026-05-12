@@ -123,4 +123,9 @@ var (
 	ErrInvoiceNotPayable  = errors.New("invoice cannot accept payments")
 	ErrInvoiceNotSendable = errors.New("invoice is not in draft status")
 	ErrInvoiceNotVoidable = errors.New("invoice cannot be voided")
+
+	// Box preset errors
+	ErrBoxPresetNameRequired      = errors.New("box preset name is required")
+	ErrBoxPresetDimensionsInvalid = errors.New("box preset dimensions must be positive")
+	ErrBoxPresetMaxWeightInvalid  = errors.New("box preset max weight must be positive")
 )

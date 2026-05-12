@@ -27,6 +27,7 @@ type Querier interface {
 	CreateAttributeKey(ctx context.Context, arg CreateAttributeKeyParams) (AttributeKey, error)
 	CreateAttributeSet(ctx context.Context, arg CreateAttributeSetParams) (AttributeSet, error)
 	CreateAuditEntry(ctx context.Context, arg CreateAuditEntryParams) (AuditLog, error)
+	CreateBoxPreset(ctx context.Context, arg CreateBoxPresetParams) (BoxPreset, error)
 	CreateCart(ctx context.Context, arg CreateCartParams) (Cart, error)
 	CreateCartForSession(ctx context.Context, arg CreateCartForSessionParams) (Cart, error)
 	CreateCouponCode(ctx context.Context, arg CreateCouponCodeParams) (CouponCode, error)
@@ -68,6 +69,7 @@ type Querier interface {
 	DeleteAttributeKey(ctx context.Context, id uuid.UUID) error
 	DeleteAttributeSet(ctx context.Context, id uuid.UUID) error
 	DeleteBasePrice(ctx context.Context, arg DeleteBasePriceParams) error
+	DeleteBoxPreset(ctx context.Context, id uuid.UUID) error
 	DeleteCart(ctx context.Context, id uuid.UUID) error
 	DeleteCartItem(ctx context.Context, id uuid.UUID) error
 	DeleteCartItemByCartAndVariant(ctx context.Context, arg DeleteCartItemByCartAndVariantParams) error
@@ -96,6 +98,7 @@ type Querier interface {
 	GetAttributeKeyByID(ctx context.Context, id uuid.UUID) (AttributeKey, error)
 	GetAttributeSetByID(ctx context.Context, id uuid.UUID) (AttributeSet, error)
 	GetBasePrice(ctx context.Context, arg GetBasePriceParams) (Price, error)
+	GetBoxPresetByID(ctx context.Context, id uuid.UUID) (BoxPreset, error)
 	GetCartByCustomerID(ctx context.Context, customerID *uuid.UUID) (Cart, error)
 	GetCartByID(ctx context.Context, id uuid.UUID) (Cart, error)
 	GetCartItemCount(ctx context.Context, cartID uuid.UUID) (int32, error)
@@ -156,6 +159,8 @@ type Querier interface {
 	ListAuditByResource(ctx context.Context, arg ListAuditByResourceParams) ([]AuditLog, error)
 	ListBasePricesByProduct(ctx context.Context, arg ListBasePricesByProductParams) ([]ListBasePricesByProductRow, error)
 	ListBasePricesByVariants(ctx context.Context, arg ListBasePricesByVariantsParams) ([]ListBasePricesByVariantsRow, error)
+	ListBoxPresets(ctx context.Context) ([]BoxPreset, error)
+	ListBoxPresetsByMaxWeightAsc(ctx context.Context) ([]BoxPreset, error)
 	ListCartItems(ctx context.Context, cartID uuid.UUID) ([]CartItem, error)
 	ListCouponCodesByDiscount(ctx context.Context, discountID uuid.UUID) ([]CouponCode, error)
 	ListCustomerGroups(ctx context.Context) ([]CustomerGroup, error)
@@ -220,6 +225,7 @@ type Querier interface {
 	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)
 	UpdateAttributeKey(ctx context.Context, arg UpdateAttributeKeyParams) (AttributeKey, error)
 	UpdateAttributeSet(ctx context.Context, arg UpdateAttributeSetParams) (AttributeSet, error)
+	UpdateBoxPreset(ctx context.Context, arg UpdateBoxPresetParams) (BoxPreset, error)
 	UpdateCartAddresses(ctx context.Context, arg UpdateCartAddressesParams) (Cart, error)
 	UpdateCartDiscount(ctx context.Context, arg UpdateCartDiscountParams) (Cart, error)
 	UpdateCustomerBillingMethod(ctx context.Context, arg UpdateCustomerBillingMethodParams) error

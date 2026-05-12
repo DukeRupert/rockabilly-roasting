@@ -108,6 +108,39 @@ func normalizeZip(zip string) string {
 	return z
 }
 
+// BoxPreset is a named carton size the merchant ships in. When a label is
+// purchased the system picks the smallest preset whose MaxWeightOz covers the
+// computed shipment weight; that preset's dimensions are sent to the carrier
+// for rating.
+type BoxPreset struct {
+	ID          uuid.UUID
+	Name        string
+	LengthIn    float64
+	WidthIn     float64
+	HeightIn    float64
+	MaxWeightOz float64
+	SortOrder   int
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// SelectBoxForWeight returns the smallest preset (by MaxWeightOz) whose
+// MaxWeightOz is at least weightOz. presets must be sorted by MaxWeightOz
+// ascending. If no preset fits, the heaviest one is returned with ok=false
+// so the caller can choose to proceed (oversized) or surface a warning.
+// Returns nil when the preset list is empty.
+func SelectBoxForWeight(presets []BoxPreset, weightOz float64) (*BoxPreset, bool) {
+	if len(presets) == 0 {
+		return nil, false
+	}
+	for i := range presets {
+		if presets[i].MaxWeightOz >= weightOz {
+			return &presets[i], true
+		}
+	}
+	return &presets[len(presets)-1], false
+}
+
 // Shipment represents a physical shipment with tracking. Several fields are
 // pointer-typed because Pirate Ship CSV imports do not carry a label artifact
 // or box dimensions — only EasyPost-purchased shipments populate them.

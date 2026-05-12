@@ -203,6 +203,7 @@ func run() error {
 	subscriptionStore := store.NewSubscriptionStore(metricsReg)
 	fulfillmentStore := store.NewFulfillmentStore()
 	shippingStore := store.NewShippingStore()
+	boxPresetStore := store.NewBoxPresetStore()
 	webhookStore := store.NewWebhookStore()
 	discountStore := store.NewDiscountStore()
 	pricingStore := store.NewPricingStore()
@@ -236,7 +237,7 @@ func run() error {
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore)
-	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, labelProvider, auditWriter, metricsReg)
+	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, labelProvider, auditWriter, metricsReg)
 	shippingExportSvc := app.NewShippingExportService(orderStore, customerStore, catalogStore, fulfillmentStore, shippingStore)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg)

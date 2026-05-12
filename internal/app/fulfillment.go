@@ -19,6 +19,7 @@ type FulfillmentService struct {
 	fulfillment   *store.FulfillmentStore
 	shipments     *store.ShippingStore
 	orders        *store.OrderStore
+	boxPresets    *store.BoxPresetStore
 	labelProvider shipping.LabelProvider
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
@@ -29,6 +30,7 @@ func NewFulfillmentService(
 	fulfillment *store.FulfillmentStore,
 	shipments *store.ShippingStore,
 	orders *store.OrderStore,
+	boxPresets *store.BoxPresetStore,
 	labelProvider shipping.LabelProvider,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
@@ -37,6 +39,7 @@ func NewFulfillmentService(
 		fulfillment:   fulfillment,
 		shipments:     shipments,
 		orders:        orders,
+		boxPresets:    boxPresets,
 		labelProvider: labelProvider,
 		audit:         audit,
 		metrics:       metrics,
@@ -132,4 +135,129 @@ func (s *FulfillmentService) GetShipmentLabelKey(ctx context.Context, tx pgx.Tx,
 		return nil, fmt.Errorf("get shipment label key: %w", err)
 	}
 	return key, nil
+}
+
+// --- Box presets ---
+
+// ListBoxPresets returns all box presets in display order.
+func (s *FulfillmentService) ListBoxPresets(ctx context.Context, tx pgx.Tx) ([]domain.BoxPreset, error) {
+	return s.boxPresets.List(ctx, tx)
+}
+
+// ListBoxPresetsForSelection returns presets sorted by capacity ascending —
+// the order needed for SelectBoxForWeight.
+func (s *FulfillmentService) ListBoxPresetsForSelection(ctx context.Context, tx pgx.Tx) ([]domain.BoxPreset, error) {
+	return s.boxPresets.ListByMaxWeightAsc(ctx, tx)
+}
+
+// GetBoxPreset returns a box preset by ID.
+func (s *FulfillmentService) GetBoxPreset(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.BoxPreset, error) {
+	return s.boxPresets.GetByID(ctx, tx, id)
+}
+
+// BoxPresetInput is the validated form data for create/update.
+type BoxPresetInput struct {
+	Name        string
+	LengthIn    float64
+	WidthIn     float64
+	HeightIn    float64
+	MaxWeightOz float64
+	SortOrder   int
+}
+
+func (in BoxPresetInput) validate() error {
+	if in.Name == "" {
+		return ErrBoxPresetNameRequired
+	}
+	if in.LengthIn <= 0 || in.WidthIn <= 0 || in.HeightIn <= 0 {
+		return ErrBoxPresetDimensionsInvalid
+	}
+	if in.MaxWeightOz <= 0 {
+		return ErrBoxPresetMaxWeightInvalid
+	}
+	return nil
+}
+
+// CreateBoxPreset inserts a new preset and records an audit entry.
+func (s *FulfillmentService) CreateBoxPreset(ctx context.Context, tx pgx.Tx, in BoxPresetInput, actor Actor) (*domain.BoxPreset, error) {
+	if err := in.validate(); err != nil {
+		return nil, err
+	}
+	preset, err := s.boxPresets.Create(ctx, tx, store.CreateBoxPresetParams{
+		Name:        in.Name,
+		LengthIn:    in.LengthIn,
+		WidthIn:     in.WidthIn,
+		HeightIn:    in.HeightIn,
+		MaxWeightOz: in.MaxWeightOz,
+		SortOrder:   in.SortOrder,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditBoxPresetCreated,
+		ResourceType: "box_preset",
+		ResourceID:   preset.ID,
+		After:        preset,
+	}); err != nil {
+		return nil, fmt.Errorf("audit box preset created: %w", err)
+	}
+	return preset, nil
+}
+
+// UpdateBoxPreset persists changes to a preset and records an audit entry.
+func (s *FulfillmentService) UpdateBoxPreset(ctx context.Context, tx pgx.Tx, id uuid.UUID, in BoxPresetInput, actor Actor) (*domain.BoxPreset, error) {
+	if err := in.validate(); err != nil {
+		return nil, err
+	}
+	after, err := s.boxPresets.Update(ctx, tx, store.UpdateBoxPresetParams{
+		ID:          id,
+		Name:        in.Name,
+		LengthIn:    in.LengthIn,
+		WidthIn:     in.WidthIn,
+		HeightIn:    in.HeightIn,
+		MaxWeightOz: in.MaxWeightOz,
+		SortOrder:   in.SortOrder,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditBoxPresetUpdated,
+		ResourceType: "box_preset",
+		ResourceID:   id,
+		After:        after,
+	}); err != nil {
+		return nil, fmt.Errorf("audit box preset updated: %w", err)
+	}
+	return after, nil
+}
+
+// DeleteBoxPreset removes a preset and records an audit entry.
+func (s *FulfillmentService) DeleteBoxPreset(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
+	before, err := s.boxPresets.GetByID(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	if err := s.boxPresets.Delete(ctx, tx, id); err != nil {
+		return err
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditBoxPresetDeleted,
+		ResourceType: "box_preset",
+		ResourceID:   id,
+		After:        before,
+	}); err != nil {
+		return fmt.Errorf("audit box preset deleted: %w", err)
+	}
+	return nil
 }

@@ -257,14 +257,9 @@ templ OrderListContent(props OrderListProps) {
 			<p class="mt-2 label-font text-rr-amber" style="font-size:0.65rem;">✦ The daybook</p>
 		</div>
 		<div class="mt-4 sm:mt-0 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-			@PirateShipExportButton()
-			@PirateShipImportButton()
 			<a href="/admin/orders/new" class="inline-flex items-center justify-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">+ New manual order</a>
 		</div>
 	</div>
-	<!-- Import summary swap target — populated by Pirate Ship tracking
-	     uploads. Empty until the form posts. -->
-	<div id="pirate-ship-import-summary"></div>
 	<!-- Filter masthead — newspaper-style section break holding the view tabs
 	     and search as one composable unit. Edge-to-edge ink rules top/bottom
 	     bind them visually; on desktop tabs live left, search lives right;
@@ -367,15 +362,20 @@ templ OrderListContent(props OrderListProps) {
 							>
 								Print invoices
 							</button>
-							<button
-								type="button"
-								@click="runExport()"
-								:disabled="exporting"
-								class="inline-flex items-center rounded-sm border-2 border-rr-ink bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-ink hover:bg-rr-raised disabled:opacity-60 disabled:cursor-wait"
+							<form
+								method="post"
+								action="/admin/orders/labels"
+								@submit="if (!confirm('Buy a label for ' + selected.length + ' order(s)? This will charge your Shippo account.')) { $event.preventDefault(); }"
+								class="contents"
 							>
-								<span x-show="!exporting">Export to Pirate Ship</span>
-								<span x-show="exporting" x-cloak>Building CSV…</span>
-							</button>
+								<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+								<button
+									type="submit"
+									class="inline-flex items-center rounded-sm border-2 border-rr-ink bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-ink hover:bg-rr-raised"
+								>
+									Buy labels
+								</button>
+							</form>
 							<button
 								type="button"
 								@click="selected = []"

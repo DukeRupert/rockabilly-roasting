@@ -1,25 +1,26 @@
 package web
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/jobs"
-	"github.com/dukerupert/hiri/internal/platform/shipping"
 	"github.com/dukerupert/hiri/internal/store"
 )
 
-// handleAdminShipmentLabelCreate creates a shipping label via the external
-// provider and enqueues a job to store it in R2.
+// handleAdminShipmentLabelCreate enqueues a BuyLabel job for one order. The
+// job orchestrates the two-phase label purchase (read → provider → write).
+// Staff are redirected back to the order page immediately — the new shipment
+// row appears on the next render once the worker finishes (typically 1–3s).
 //
 // POST /admin/orders/{id}/label
-// Form: weight_oz, length_in, width_in, height_in, service_code,
-//       from_name, from_street1, from_city, from_state, from_zip, from_country,
-//       to_name, to_street1, to_city, to_state, to_zip, to_country
+// Optional form field: service_code (defaults to Shippo's usps_ground_advantage)
 func (d *Deps) handleAdminShipmentLabelCreate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -33,64 +34,95 @@ func (d *Deps) handleAdminShipmentLabelCreate(w http.ResponseWriter, r *http.Req
 		Error(w, r, err)
 		return
 	}
-
-	weightOz, _ := strconv.ParseFloat(r.FormValue("weight_oz"), 64)
-	lengthIn, _ := strconv.ParseFloat(r.FormValue("length_in"), 64)
-	widthIn, _ := strconv.ParseFloat(r.FormValue("width_in"), 64)
-	heightIn, _ := strconv.ParseFloat(r.FormValue("height_in"), 64)
-
-	req := shipping.LabelRequest{
-		FromName:    r.FormValue("from_name"),
-		FromStreet1: r.FormValue("from_street1"),
-		FromCity:    r.FormValue("from_city"),
-		FromState:   r.FormValue("from_state"),
-		FromZip:     r.FormValue("from_zip"),
-		FromCountry: r.FormValue("from_country"),
-		ToName:      r.FormValue("to_name"),
-		ToStreet1:   r.FormValue("to_street1"),
-		ToCity:      r.FormValue("to_city"),
-		ToState:     r.FormValue("to_state"),
-		ToZip:       r.FormValue("to_zip"),
-		ToCountry:   r.FormValue("to_country"),
-		WeightOz:    weightOz,
-		LengthIn:    lengthIn,
-		WidthIn:     widthIn,
-		HeightIn:    heightIn,
-		ServiceCode: r.FormValue("service_code"),
-		Reference:   orderID.String(),
-	}
+	serviceCode := strings.TrimSpace(r.FormValue("service_code"))
 
 	actor := staffActor(r)
-
-	// CreateShipmentLabel calls the external API outside the tx, then
-	// persists the shipment record and audit entry inside the tx.
-	// We pass nil tx here because the service method needs the external
-	// API call to happen first — we open a tx for the DB write + job enqueue.
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		shipment, txErr := d.FulfillmentService.CreateShipmentLabel(ctx, tx, req, orderID, actor)
-		if txErr != nil {
-			return txErr
-		}
-
-		// Enqueue R2 storage job in the same transaction. EasyPost always
-		// returns a label URL, so dereference is safe here; if it ever isn't,
-		// CreateShipmentLabel would have already failed before this enqueue.
-		var labelURL string
-		if shipment.LabelURL != nil {
-			labelURL = *shipment.LabelURL
-		}
-		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.StoreLabelToR2Args{
-			ShipmentID: shipment.ID,
-			LabelURL:   labelURL,
+		_, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.BuyLabelArgs{
+			OrderID:     orderID,
+			ServiceCode: serviceCode,
+			ActorType:   string(actor.Type),
+			ActorID:     actor.ID,
+			ActorName:   actor.Name,
 		}, nil)
 		return txErr
 	})
 	if err != nil {
+		slog.Error("admin label create: enqueue failed", "error", err, "order_id", orderID)
 		Error(w, r, err)
 		return
 	}
 
-	http.Redirect(w, r, "/admin/orders/"+orderID.String(), http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/orders/"+orderID.String()+"?flash=Label+queued", http.StatusSeeOther)
+}
+
+// handleAdminShipmentBulkLabelCreate enqueues a BuyLabel job for each
+// selected order. Used by the order-list multi-select toolbar.
+//
+// POST /admin/orders/labels
+// Form: repeated order_id values, optional service_code
+func (d *Deps) handleAdminShipmentBulkLabelCreate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	// Accepts either repeated `order_id` (HTML-friendly) or a single
+	// comma-separated `order_ids` field (matches the Alpine multi-select state).
+	rawIDs := r.Form["order_id"]
+	if csv := strings.TrimSpace(r.FormValue("order_ids")); csv != "" {
+		rawIDs = append(rawIDs, strings.Split(csv, ",")...)
+	}
+	if len(rawIDs) == 0 {
+		http.Redirect(w, r, "/admin/orders?flash=No+orders+selected", http.StatusSeeOther)
+		return
+	}
+
+	orderIDs := make([]uuid.UUID, 0, len(rawIDs))
+	seen := map[uuid.UUID]bool{}
+	for _, raw := range rawIDs {
+		id, parseErr := uuid.Parse(strings.TrimSpace(raw))
+		if parseErr != nil {
+			continue
+		}
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		orderIDs = append(orderIDs, id)
+	}
+	if len(orderIDs) == 0 {
+		http.Redirect(w, r, "/admin/orders?flash=No+valid+order+IDs", http.StatusSeeOther)
+		return
+	}
+
+	serviceCode := strings.TrimSpace(r.FormValue("service_code"))
+	actor := staffActor(r)
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		for _, id := range orderIDs {
+			if _, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.BuyLabelArgs{
+				OrderID:     id,
+				ServiceCode: serviceCode,
+				ActorType:   string(actor.Type),
+				ActorID:     actor.ID,
+				ActorName:   actor.Name,
+			}, nil); txErr != nil {
+				return txErr
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		slog.Error("admin bulk label create: enqueue failed", "error", err, "count", len(orderIDs))
+		Error(w, r, err)
+		return
+	}
+
+	flash := "Queued+labels+for+" + strconv.Itoa(len(orderIDs)) + "+order(s)"
+	http.Redirect(w, r, "/admin/orders?flash="+flash, http.StatusSeeOther)
 }
 
 // handleAdminShipmentLabelDownload generates a presigned R2 URL for the

@@ -197,6 +197,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var adjustments []domain.Adjustment
 	var customer *domain.Customer
 	var shippingAddress *domain.Address
+	var shipments []domain.Shipment
 	var enrichedItems []admin.EnrichedLineItem
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -210,6 +211,10 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		adjustments, txErr = d.OrderService.ListAdjustments(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		shipments, txErr = d.FulfillmentService.ListShipmentsByOrder(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
@@ -330,6 +335,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		Adjustments:      adjustments,
 		Customer:         customer,
 		ShippingAddress:  shippingAddress,
+		Shipments:        shipments,
 		Flash:            r.URL.Query().Get("flash"),
 		MerchantTZ:       d.MerchantTZ,
 		StaffName:        name,

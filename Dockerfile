@@ -31,8 +31,10 @@ RUN apk add --no-cache git
 
 WORKDIR /src
 
-# Install templ and goose
-RUN go install github.com/a-h/templ/cmd/templ@latest && \
+# Install templ and goose. Pin templ to the same version as the library in
+# go.mod — using @latest broke v1.37.0 deploy when the CLI started emitting
+# calls into APIs newer than the pinned library version.
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001 && \
     go install github.com/pressly/goose/v3/cmd/goose@latest
 
 # Cache Go modules

@@ -34,6 +34,8 @@ type ShippingSettings struct {
 	OriginState             string
 	OriginZip               string
 	OriginCountry           string
+	OriginEmail             string
+	OriginPhone             string
 	TareWeightOz            float64
 }
 
@@ -240,7 +242,7 @@ templ SettingsContent(props SettingsProps) {
 				<div class="px-4 py-5 sm:px-6">
 					<h3 class="text-sm font-semibold text-rr-heading">Pickup origin</h3>
 					<p class="mt-1 text-xs text-rr-muted">
-						Where shipments leave from. Used as the return address on the Pirate Ship export and reserved for future live-rate work.
+						Where shipments leave from. Email and phone are required by USPS when buying labels through Shippo — purchases fail without them.
 					</p>
 					<div class="mt-3 grid gap-4 sm:grid-cols-2">
 						<div class="sm:col-span-2">
@@ -316,6 +318,27 @@ templ SettingsContent(props SettingsProps) {
 									class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
 								/>
 							</div>
+						</div>
+						<div>
+							<label for="origin-email" class="block text-sm font-medium text-rr-heading">Email</label>
+							<input
+								id="origin-email"
+								type="email"
+								name="origin_email"
+								value={ props.Shipping.OriginEmail }
+								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+						</div>
+						<div>
+							<label for="origin-phone" class="block text-sm font-medium text-rr-heading">Phone</label>
+							<input
+								id="origin-phone"
+								type="tel"
+								name="origin_phone"
+								value={ props.Shipping.OriginPhone }
+								placeholder="5095852320"
+								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+							/>
 						</div>
 					</div>
 				</div>

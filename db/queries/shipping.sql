@@ -18,7 +18,9 @@ SET flat_rate_cents = $1,
     local_delivery_enabled = $13,
     local_pickup_enabled = $14,
     local_pickup_instructions = $15,
-    local_delivery_days = $16;
+    local_delivery_days = $16,
+    origin_email = $17,
+    origin_phone = $18;
 
 -- name: CreateShipment :one
 INSERT INTO shipments (id, order_id, status, provider, tracking_number, label_url,

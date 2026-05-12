@@ -44,6 +44,8 @@ func (s *ShippingStore) GetConfig(ctx context.Context, tx pgx.Tx) (*domain.Shipp
 		OriginState:             row.OriginState,
 		OriginZip:               row.OriginZip,
 		OriginCountry:           row.OriginCountry,
+		OriginEmail:             row.OriginEmail,
+		OriginPhone:             row.OriginPhone,
 		TareWeightOz:            numericToFloat64(row.TareWeightOz),
 	}, nil
 }
@@ -66,6 +68,8 @@ func (s *ShippingStore) UpdateConfig(ctx context.Context, tx pgx.Tx, cfg domain.
 		OriginState:             cfg.OriginState,
 		OriginZip:               cfg.OriginZip,
 		OriginCountry:           cfg.OriginCountry,
+		OriginEmail:             cfg.OriginEmail,
+		OriginPhone:             cfg.OriginPhone,
 		TareWeightOz:            float64ToNumeric(cfg.TareWeightOz),
 		LocalDeliveryEnabled:    cfg.LocalDeliveryEnabled,
 		LocalPickupEnabled:      cfg.LocalPickupEnabled,

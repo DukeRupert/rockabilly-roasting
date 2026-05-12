@@ -106,6 +106,8 @@ func (s *CheckoutService) UpdateShippingConfig(ctx context.Context, tx pgx.Tx, c
 			"origin_state":              cfg.OriginState,
 			"origin_zip":                cfg.OriginZip,
 			"origin_country":            cfg.OriginCountry,
+			"origin_email":              cfg.OriginEmail,
+			"origin_phone":              cfg.OriginPhone,
 			"tare_weight_oz":            cfg.TareWeightOz,
 		},
 		Metadata: map[string]any{
@@ -124,6 +126,8 @@ func (s *CheckoutService) UpdateShippingConfig(ctx context.Context, tx pgx.Tx, c
 				"origin_state":              before.OriginState,
 				"origin_zip":                before.OriginZip,
 				"origin_country":            before.OriginCountry,
+				"origin_email":              before.OriginEmail,
+				"origin_phone":              before.OriginPhone,
 				"tare_weight_oz":            before.TareWeightOz,
 			},
 		},

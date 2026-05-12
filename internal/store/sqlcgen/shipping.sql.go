@@ -130,7 +130,7 @@ func (q *Queries) GetShipmentLabelKey(ctx context.Context, id uuid.UUID) (*strin
 }
 
 const getShippingConfig = `-- name: GetShippingConfig :one
-SELECT flat_rate_cents, free_shipping_threshold, currency, local_zip_codes, origin_name, origin_street1, origin_street2, origin_city, origin_state, origin_zip, origin_country, tare_weight_oz, local_delivery_enabled, local_pickup_enabled, local_pickup_instructions, local_delivery_days FROM shipping_config LIMIT 1
+SELECT flat_rate_cents, free_shipping_threshold, currency, local_zip_codes, origin_name, origin_street1, origin_street2, origin_city, origin_state, origin_zip, origin_country, tare_weight_oz, local_delivery_enabled, local_pickup_enabled, local_pickup_instructions, local_delivery_days, origin_email, origin_phone FROM shipping_config LIMIT 1
 `
 
 func (q *Queries) GetShippingConfig(ctx context.Context) (ShippingConfig, error) {
@@ -153,6 +153,8 @@ func (q *Queries) GetShippingConfig(ctx context.Context) (ShippingConfig, error)
 		&i.LocalPickupEnabled,
 		&i.LocalPickupInstructions,
 		&i.LocalDeliveryDays,
+		&i.OriginEmail,
+		&i.OriginPhone,
 	)
 	return i, err
 }
@@ -333,7 +335,9 @@ SET flat_rate_cents = $1,
     local_delivery_enabled = $13,
     local_pickup_enabled = $14,
     local_pickup_instructions = $15,
-    local_delivery_days = $16
+    local_delivery_days = $16,
+    origin_email = $17,
+    origin_phone = $18
 `
 
 type UpdateShippingConfigParams struct {
@@ -353,6 +357,8 @@ type UpdateShippingConfigParams struct {
 	LocalPickupEnabled      bool           `json:"local_pickup_enabled"`
 	LocalPickupInstructions string         `json:"local_pickup_instructions"`
 	LocalDeliveryDays       string         `json:"local_delivery_days"`
+	OriginEmail             string         `json:"origin_email"`
+	OriginPhone             string         `json:"origin_phone"`
 }
 
 func (q *Queries) UpdateShippingConfig(ctx context.Context, arg UpdateShippingConfigParams) error {
@@ -373,6 +379,8 @@ func (q *Queries) UpdateShippingConfig(ctx context.Context, arg UpdateShippingCo
 		arg.LocalPickupEnabled,
 		arg.LocalPickupInstructions,
 		arg.LocalDeliveryDays,
+		arg.OriginEmail,
+		arg.OriginPhone,
 	)
 	return err
 }

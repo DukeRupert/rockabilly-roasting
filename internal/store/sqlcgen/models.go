@@ -522,6 +522,8 @@ type ShippingConfig struct {
 	LocalPickupEnabled      bool           `json:"local_pickup_enabled"`
 	LocalPickupInstructions string         `json:"local_pickup_instructions"`
 	LocalDeliveryDays       string         `json:"local_delivery_days"`
+	OriginEmail             string         `json:"origin_email"`
+	OriginPhone             string         `json:"origin_phone"`
 }
 
 type Staff struct {

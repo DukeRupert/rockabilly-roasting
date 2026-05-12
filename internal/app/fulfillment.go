@@ -218,6 +218,21 @@ func (s *FulfillmentService) PrepareLabelRequest(
 		originCountry = "US"
 	}
 
+	// Customer contact populates the ship-to email/phone. Optional — Shippo
+	// accepts shipments without them, and tracking emails from the carrier
+	// are nice-to-have. Guest checkouts have no Customer row; the order has
+	// a customer email we could thread through later if useful.
+	toEmail, toPhone := "", ""
+	if order.CustomerID != nil {
+		c, cErr := s.customers.GetByID(ctx, tx, *order.CustomerID)
+		if cErr == nil && c != nil {
+			toEmail = c.Email
+			if c.Phone != nil {
+				toPhone = *c.Phone
+			}
+		}
+	}
+
 	return shipping.LabelRequest{
 		FromName:    cfg.OriginName,
 		FromStreet1: cfg.OriginStreet1,
@@ -225,12 +240,16 @@ func (s *FulfillmentService) PrepareLabelRequest(
 		FromState:   cfg.OriginState,
 		FromZip:     cfg.OriginZip,
 		FromCountry: originCountry,
+		FromEmail:   cfg.OriginEmail,
+		FromPhone:   cfg.OriginPhone,
 		ToName:      joinName(addr.FirstName, addr.LastName),
 		ToStreet1:   addr.Line1,
 		ToCity:      addr.City,
 		ToState:     addr.State,
 		ToZip:       addr.PostalCode,
 		ToCountry:   toCountry,
+		ToEmail:     toEmail,
+		ToPhone:     toPhone,
 		WeightOz:    weightOz,
 		LengthIn:    box.LengthIn,
 		WidthIn:     box.WidthIn,

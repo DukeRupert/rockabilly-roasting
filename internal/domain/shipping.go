@@ -36,9 +36,9 @@ type ShippingConfig struct {
 	LocalPickupInstructions string // shown to customer at checkout + in the ready-for-pickup email
 	LocalDeliveryDays       string // display string, e.g. "Mondays and Thursdays"
 
-	// Origin address. Captured for future live-rate work; the Pirate Ship
-	// CSV round-trip uses Pirate Ship's own origin config, so these fields
-	// are informational for that flow.
+	// Origin address. OriginEmail and OriginPhone are required by USPS via
+	// Shippo when buying labels — purchases fail without them. The other
+	// origin fields feed Shippo's address_from + show on the storefront.
 	OriginName    string
 	OriginStreet1 string
 	OriginStreet2 string
@@ -46,6 +46,8 @@ type ShippingConfig struct {
 	OriginState   string
 	OriginZip     string
 	OriginCountry string
+	OriginEmail   string
+	OriginPhone   string
 
 	// TareWeightOz is the packaging weight (box + dunnage) added to every
 	// computed shipment weight on export.

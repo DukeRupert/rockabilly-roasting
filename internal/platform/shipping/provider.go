@@ -3,6 +3,10 @@ package shipping
 import "context"
 
 // LabelRequest contains the data needed to create a shipping label.
+//
+// FromEmail and FromPhone are required by USPS via Shippo (transactions fail
+// with "Seller info missing email or phone" when omitted). ToEmail/ToPhone
+// are optional but improve carrier-side tracking notifications.
 type LabelRequest struct {
 	FromName    string
 	FromStreet1 string
@@ -10,12 +14,16 @@ type LabelRequest struct {
 	FromState   string
 	FromZip     string
 	FromCountry string
+	FromEmail   string
+	FromPhone   string
 	ToName      string
 	ToStreet1   string
 	ToCity      string
 	ToState     string
 	ToZip       string
 	ToCountry   string
+	ToEmail     string
+	ToPhone     string
 	WeightOz    float64
 	LengthIn    float64
 	WidthIn     float64

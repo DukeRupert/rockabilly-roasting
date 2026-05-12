@@ -55,6 +55,8 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 			OriginState:             cfg.OriginState,
 			OriginZip:               cfg.OriginZip,
 			OriginCountry:           cfg.OriginCountry,
+			OriginEmail:             cfg.OriginEmail,
+			OriginPhone:             cfg.OriginPhone,
 			TareWeightOz:            cfg.TareWeightOz,
 		}
 		return nil
@@ -139,6 +141,8 @@ func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.
 		OriginState:             strings.ToUpper(strings.TrimSpace(r.FormValue("origin_state"))),
 		OriginZip:               strings.TrimSpace(r.FormValue("origin_zip")),
 		OriginCountry:           originCountry,
+		OriginEmail:             strings.TrimSpace(r.FormValue("origin_email")),
+		OriginPhone:             strings.TrimSpace(r.FormValue("origin_phone")),
 		TareWeightOz:            tareOz,
 	}
 

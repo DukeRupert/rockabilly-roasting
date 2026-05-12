@@ -69,6 +69,8 @@ func (p *ShippoProvider) CreateLabel(ctx context.Context, req LabelRequest) (*La
 			State:   req.FromState,
 			Zip:     req.FromZip,
 			Country: req.FromCountry,
+			Email:   req.FromEmail,
+			Phone:   req.FromPhone,
 		},
 		AddressTo: shippoAddress{
 			Name:    req.ToName,
@@ -77,6 +79,8 @@ func (p *ShippoProvider) CreateLabel(ctx context.Context, req LabelRequest) (*La
 			State:   req.ToState,
 			Zip:     req.ToZip,
 			Country: req.ToCountry,
+			Email:   req.ToEmail,
+			Phone:   req.ToPhone,
 		},
 		Parcels: []shippoParcel{{
 			Length:       formatFloat(req.LengthIn),
@@ -244,6 +248,8 @@ type shippoAddress struct {
 	State   string `json:"state"`
 	Zip     string `json:"zip"`
 	Country string `json:"country"`
+	Email   string `json:"email,omitempty"`
+	Phone   string `json:"phone,omitempty"`
 }
 
 type shippoParcel struct {

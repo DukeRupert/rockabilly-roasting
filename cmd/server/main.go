@@ -124,7 +124,16 @@ func run() error {
 		os.Getenv("STRIPE_SECRET_KEY"),
 		os.Getenv("STRIPE_WEBHOOK_SECRET"),
 	)
-	labelProvider := shipping.NewEasyPostProvider(os.Getenv("EASYPOST_API_KEY"))
+	// Shipping label provider. Shippo is the active provider; EasyPost code
+	// stays compiled (internal/platform/shipping/easypost.go) as a fallback.
+	var labelProvider shipping.LabelProvider
+	if key := os.Getenv("SHIPPO_API_KEY"); key != "" {
+		labelProvider = shipping.NewShippoProvider(key)
+	} else {
+		// Fall back to EasyPost for envs that haven't migrated yet. Once
+		// every environment has SHIPPO_API_KEY set this branch can go.
+		labelProvider = shipping.NewEasyPostProvider(os.Getenv("EASYPOST_API_KEY"))
+	}
 	mailer := email.NewPostmarkSender(os.Getenv("POSTMARK_SERVER_TOKEN"))
 	emailRenderer, err := emailtemplates.New()
 	if err != nil {
@@ -237,7 +246,7 @@ func run() error {
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore)
-	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, labelProvider, auditWriter, metricsReg)
+	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
 	shippingExportSvc := app.NewShippingExportService(orderStore, customerStore, catalogStore, fulfillmentStore, shippingStore)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg)
@@ -336,6 +345,10 @@ func run() error {
 
 	// Register scheduler worker (needs the client for transactional inserts)
 	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient, metricsReg))
+
+	// BuyLabel needs the river client to enqueue the StoreLabelToR2 follow-up
+	// job atomically with the shipment write.
+	river.AddWorker(workers, jobs.NewBuyLabelWorker(fulfillmentSvc, pool, riverClient))
 
 	// Register QB workers (need riverClient for job chaining)
 	if qbClient != nil {

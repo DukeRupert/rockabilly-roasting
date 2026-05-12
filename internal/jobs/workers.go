@@ -171,6 +171,25 @@ type StoreLabelToR2Args struct {
 // Kind returns the job kind identifier.
 func (StoreLabelToR2Args) Kind() string { return "store_label_to_r2" }
 
+// BuyLabelArgs purchases a shipping label for an order via the configured
+// LabelProvider and persists the shipment. Idempotency note: each successful
+// run creates a new shipment row; UIs that enqueue this job must guard
+// against double-clicks (the order list multi-select uses a confirm dialog;
+// the order detail button disables itself when a label already exists).
+type BuyLabelArgs struct {
+	OrderID     uuid.UUID `json:"order_id"`
+	ServiceCode string    `json:"service_code,omitempty"` // "" → provider default (Shippo: usps_ground_advantage)
+
+	// Actor fields are copied into the job args so the worker can record
+	// audit entries with the original staff identity even when run later.
+	ActorType string     `json:"actor_type"`
+	ActorID   *uuid.UUID `json:"actor_id,omitempty"`
+	ActorName string     `json:"actor_name"`
+}
+
+// Kind returns the job kind identifier.
+func (BuyLabelArgs) Kind() string { return "buy_label" }
+
 // --- QuickBooks integration jobs ---
 
 // EnsureQBCustomerArgs creates or updates a QB customer, then chains to CreateQBInvoice.

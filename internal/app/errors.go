@@ -128,4 +128,8 @@ var (
 	ErrBoxPresetNameRequired      = errors.New("box preset name is required")
 	ErrBoxPresetDimensionsInvalid = errors.New("box preset dimensions must be positive")
 	ErrBoxPresetMaxWeightInvalid  = errors.New("box preset max weight must be positive")
+
+	// Label / shipment errors
+	ErrShipmentNoPhysicalItems = errors.New("order has no physical items to ship")
+	ErrNoBoxPreset             = errors.New("no box presets configured")
 )

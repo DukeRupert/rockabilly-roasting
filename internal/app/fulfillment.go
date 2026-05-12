@@ -20,6 +20,8 @@ type FulfillmentService struct {
 	shipments     *store.ShippingStore
 	orders        *store.OrderStore
 	boxPresets    *store.BoxPresetStore
+	customers     *store.CustomerStore
+	catalog       *store.CatalogStore
 	labelProvider shipping.LabelProvider
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
@@ -31,6 +33,8 @@ func NewFulfillmentService(
 	shipments *store.ShippingStore,
 	orders *store.OrderStore,
 	boxPresets *store.BoxPresetStore,
+	customers *store.CustomerStore,
+	catalog *store.CatalogStore,
 	labelProvider shipping.LabelProvider,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
@@ -40,6 +44,8 @@ func NewFulfillmentService(
 		shipments:     shipments,
 		orders:        orders,
 		boxPresets:    boxPresets,
+		customers:     customers,
+		catalog:       catalog,
 		labelProvider: labelProvider,
 		audit:         audit,
 		metrics:       metrics,
@@ -135,6 +141,172 @@ func (s *FulfillmentService) GetShipmentLabelKey(ctx context.Context, tx pgx.Tx,
 		return nil, fmt.Errorf("get shipment label key: %w", err)
 	}
 	return key, nil
+}
+
+// PrepareLabelRequest assembles a LabelRequest for an order from stored data:
+// origin from shipping config, destination from the order's shipping address,
+// weight from line item variants + tare, and box dimensions from the smallest
+// preset that fits. Returns ErrShipmentWeightUnknown if any physical line
+// item lacks a configured variant weight, and ErrNoBoxPreset if the merchant
+// has no presets defined.
+func (s *FulfillmentService) PrepareLabelRequest(
+	ctx context.Context,
+	tx pgx.Tx,
+	orderID uuid.UUID,
+	serviceCode string,
+) (shipping.LabelRequest, error) {
+	zero := shipping.LabelRequest{}
+
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
+	if err != nil {
+		return zero, fmt.Errorf("load order: %w", err)
+	}
+	cfg, err := s.shipments.GetConfig(ctx, tx)
+	if err != nil {
+		return zero, fmt.Errorf("load shipping config: %w", err)
+	}
+	addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
+	if err != nil {
+		return zero, fmt.Errorf("load shipping address: %w", err)
+	}
+	items, err := s.orders.ListLineItems(ctx, tx, order.ID)
+	if err != nil {
+		return zero, fmt.Errorf("list line items: %w", err)
+	}
+
+	// Filter to physical items and gather weights. Mirrors the export
+	// pipeline (see shipping_export.go buildRow) so a Pirate Ship export
+	// and a Shippo label compute the same weight for the same order.
+	physical := make([]domain.LineItem, 0, len(items))
+	weights := make(map[uuid.UUID]*int, len(items))
+	for _, item := range items {
+		variant, vErr := s.catalog.GetVariantByID(ctx, tx, item.VariantID)
+		if vErr != nil {
+			return zero, fmt.Errorf("get variant %s: %w", item.VariantID, vErr)
+		}
+		inv, _ := s.fulfillment.GetInventoryItemByVariantID(ctx, tx, item.VariantID)
+		if inv != nil && !inv.RequiresShipping {
+			continue
+		}
+		physical = append(physical, item)
+		weights[item.VariantID] = variant.WeightGrams
+	}
+	if len(physical) == 0 {
+		return zero, ErrShipmentNoPhysicalItems
+	}
+
+	weightOz, err := CalculateShipmentWeightOz(physical, weights, cfg.TareWeightOz)
+	if err != nil {
+		return zero, err
+	}
+
+	presets, err := s.boxPresets.ListByMaxWeightAsc(ctx, tx)
+	if err != nil {
+		return zero, fmt.Errorf("list box presets: %w", err)
+	}
+	box, _ := domain.SelectBoxForWeight(presets, weightOz)
+	if box == nil {
+		return zero, ErrNoBoxPreset
+	}
+
+	toCountry := addr.CountryCode
+	if toCountry == "" {
+		toCountry = "US"
+	}
+	originCountry := cfg.OriginCountry
+	if originCountry == "" {
+		originCountry = "US"
+	}
+
+	return shipping.LabelRequest{
+		FromName:    cfg.OriginName,
+		FromStreet1: cfg.OriginStreet1,
+		FromCity:    cfg.OriginCity,
+		FromState:   cfg.OriginState,
+		FromZip:     cfg.OriginZip,
+		FromCountry: originCountry,
+		ToName:      joinName(addr.FirstName, addr.LastName),
+		ToStreet1:   addr.Line1,
+		ToCity:      addr.City,
+		ToState:     addr.State,
+		ToZip:       addr.PostalCode,
+		ToCountry:   toCountry,
+		WeightOz:    weightOz,
+		LengthIn:    box.LengthIn,
+		WidthIn:     box.WidthIn,
+		HeightIn:    box.HeightIn,
+		ServiceCode: serviceCode,
+		Reference:   order.Number,
+	}, nil
+}
+
+// PurchaseLabel calls the configured label provider. This is an external API
+// call and MUST NOT be invoked from inside a database transaction — the
+// BuyLabel worker is the canonical caller and follows the two-phase pattern
+// (read tx → PurchaseLabel → write tx).
+func (s *FulfillmentService) PurchaseLabel(ctx context.Context, req shipping.LabelRequest) (*shipping.LabelResult, error) {
+	result, err := s.labelProvider.CreateLabel(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("create label: %w", err)
+	}
+	return result, nil
+}
+
+// PersistShipmentLabel writes a shipment record + audit entry for a label
+// that was already purchased via PurchaseLabel. Caller is responsible for
+// enqueueing the StoreLabelToR2 job in the same transaction.
+func (s *FulfillmentService) PersistShipmentLabel(
+	ctx context.Context,
+	tx pgx.Tx,
+	orderID uuid.UUID,
+	req shipping.LabelRequest,
+	result shipping.LabelResult,
+	actor Actor,
+) (*domain.Shipment, error) {
+	labelURL := result.LabelURL
+	lengthIn := req.LengthIn
+	widthIn := req.WidthIn
+	heightIn := req.HeightIn
+
+	shipment, err := s.shipments.CreateShipment(ctx, tx, store.CreateShipmentParams{
+		OrderID:        orderID,
+		Status:         domain.ShipmentStatusLabelCreated,
+		Provider:       "shippo",
+		TrackingNumber: result.TrackingNumber,
+		LabelURL:       &labelURL,
+		CarrierName:    result.CarrierName,
+		ServiceName:    result.ServiceName,
+		LabelCostCents: result.RateCents,
+		LabelCurrency:  result.Currency,
+		WeightOz:       req.WeightOz,
+		LengthIn:       &lengthIn,
+		WidthIn:        &widthIn,
+		HeightIn:       &heightIn,
+		CreatedBy:      derefUUID(actor.ID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("insert shipment: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditShipmentLabelCreated,
+		ResourceType: "shipment",
+		ResourceID:   shipment.ID,
+		After:        shipment,
+	}); err != nil {
+		return nil, fmt.Errorf("audit shipment label created: %w", err)
+	}
+	return shipment, nil
+}
+
+func derefUUID(p *uuid.UUID) uuid.UUID {
+	if p == nil {
+		return uuid.Nil
+	}
+	return *p
 }
 
 // --- Box presets ---

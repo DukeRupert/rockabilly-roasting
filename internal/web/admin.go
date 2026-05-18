@@ -146,18 +146,15 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
-		// Revenue trend — last 14 days, oldest → today
-		trendStart := todayStart.AddDate(0, 0, -13)
-		trendEnd := todayStart.AddDate(0, 0, 1) // exclusive upper bound
-		dailyRows, txErr := d.OrderService.RevenueByDay(ctx, tx, trendStart, trendEnd, d.MerchantTZ)
+		// Revenue trend — period from ?days= (7/30/90), defaults to 30
+		props.Revenue, txErr = d.buildRevenueProps(ctx, tx, revenueDays(r), todayStart)
 		if txErr != nil {
 			return txErr
 		}
-		props.RevenueTrend = buildRevenueTrend(dailyRows, trendStart, d.MerchantTZ)
 
 		// Top products — last 30 days
 		topStart := todayStart.AddDate(0, 0, -29)
-		topEnd := trendEnd
+		topEnd := todayStart.AddDate(0, 0, 1)
 		props.TopBy = topSellersSort(r)
 		topRows, txErr := d.OrderService.TopProducts(ctx, tx, topStart, topEnd, store.TopProductsSort(props.TopBy), 5)
 		if txErr != nil {
@@ -183,11 +180,11 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	admin.Dashboard(props).Render(ctx, w) //nolint:errcheck
 }
 
-// buildRevenueTrend fills 14 contiguous days starting at trendStart, normalizes
-// magnitudes against the max, and shows a value label on today's bar only.
-// Returned slice is always exactly 14 elements ordered oldest → today.
-func buildRevenueTrend(rows []domain.DailyRevenue, trendStart time.Time, tz *time.Location) []charts.ChartPoint {
-	const days = 14
+// buildRevenueTrend fills `days` contiguous days starting at trendStart, normalizes
+// magnitudes against the max, and populates Sub on every bar so the hover
+// tooltip can show the exact value. Returned slice is always exactly `days`
+// elements ordered oldest → today.
+func buildRevenueTrend(rows []domain.DailyRevenue, trendStart time.Time, tz *time.Location, days int) []charts.ChartPoint {
 	byDay := make(map[string]int, len(rows))
 	for _, r := range rows {
 		byDay[r.Date.Format("2006-01-02")] = r.Cents
@@ -212,18 +209,85 @@ func buildRevenueTrend(rows []domain.DailyRevenue, trendStart time.Time, tz *tim
 		if isToday {
 			label = "Today"
 		}
-		sub := ""
-		if isToday && cents > 0 {
-			sub = compactDollars(cents)
-		}
 		out[i] = charts.ChartPoint{
 			Label:     label,
-			Sub:       sub,
+			Sub:       compactDollars(cents),
 			Magnitude: mag,
 			Highlight: isToday,
 		}
 	}
 	return out
+}
+
+// revenueDays normalizes the ?days= query param to one of 7/30/90, defaulting
+// to 30. Lives here so the dashboard and the fragment endpoint agree on
+// validation.
+func revenueDays(r *http.Request) int {
+	switch r.URL.Query().Get("days") {
+	case "7":
+		return 7
+	case "90":
+		return 90
+	default:
+		return 30
+	}
+}
+
+// buildRevenueProps fetches the daily trend plus the prior-window total so the
+// card can render the period-over-period delta. The prior window is the same
+// length as the current one, ending the day before trendStart.
+func (d *Deps) buildRevenueProps(ctx context.Context, tx pgx.Tx, days int, todayStart time.Time) (admin.RevenueProps, error) {
+	trendStart := todayStart.AddDate(0, 0, -(days - 1))
+	trendEnd := todayStart.AddDate(0, 0, 1) // exclusive upper bound
+	daily, err := d.OrderService.RevenueByDay(ctx, tx, trendStart, trendEnd, d.MerchantTZ)
+	if err != nil {
+		return admin.RevenueProps{}, err
+	}
+
+	currentTotal := 0
+	for _, r := range daily {
+		currentTotal += r.Cents
+	}
+
+	priorStart := trendStart.AddDate(0, 0, -days)
+	priorEnd := trendStart // exclusive — equal to trendStart
+	priorTotal, err := d.OrderService.SumOrderRevenue(ctx, tx, store.OrderFilter{
+		PlacedFrom:         &priorStart,
+		PlacedTo:           &priorEnd,
+		ExcludeUnconfirmed: true,
+	})
+	if err != nil {
+		return admin.RevenueProps{}, err
+	}
+
+	return admin.RevenueProps{
+		Days:         days,
+		Trend:        buildRevenueTrend(daily, trendStart, d.MerchantTZ, days),
+		CurrentTotal: currentTotal,
+		PriorTotal:   priorTotal,
+	}, nil
+}
+
+// handleAdminRevenue renders just the revenue card for an htmx swap when the
+// user toggles the 7/30/90-day period selector.
+func (d *Deps) handleAdminRevenue(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	days := revenueDays(r)
+
+	now := time.Now().In(d.MerchantTZ)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, d.MerchantTZ)
+
+	var rp admin.RevenueProps
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		rp, txErr = d.buildRevenueProps(ctx, tx, days, todayStart)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	admin.RevenueCard(rp).Render(ctx, w) //nolint:errcheck
 }
 
 // buildTopProducts converts ProductSales rows to chart data. Bars are

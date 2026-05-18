@@ -34,15 +34,35 @@ type LabeledValue struct {
 
 // BarVertical renders a vertical bar chart of time-series points.
 // Bars are evenly spaced across the SVG width; each bar's height is
-// Magnitude * (chart height - top label area).
+// Magnitude * (chart height - top label area). Hovering a bar shows a
+// floating HTML tooltip with the bar's Label and Sub value, positioned
+// by viewBox percentage so it tracks the bar across container widths.
 templ BarVertical(data []ChartPoint) {
 	if len(data) == 0 {
 		<p class="text-sm text-rr-muted">No data.</p>
 	} else {
-		<div class="w-full overflow-x-auto">
-			<svg viewBox="0 0 700 220" preserveAspectRatio="none" class="block w-full" style="height: 14rem;" role="img" aria-label="Bar chart">
+		<div class="relative" x-data="{ tip: null }">
+			<svg
+				viewBox="0 0 700 220"
+				preserveAspectRatio="none"
+				class="block w-full"
+				style="height: 14rem;"
+				role="img"
+				aria-label="Bar chart"
+				@mouseleave="tip = null"
+			>
 				@verticalBars(data)
 			</svg>
+			<div
+				x-show="tip"
+				x-cloak
+				:style="tip ? `left: ${tip.left}; transform: translateX(-50%);` : ''"
+				class="absolute top-0 pointer-events-none border-2 border-rr-border bg-rr-heading px-2 py-1 text-xs whitespace-nowrap"
+				style="font-family: 'Special Elite', monospace;"
+			>
+				<span x-text="tip && tip.date" class="text-rr-paper opacity-80 mr-2"></span>
+				<span x-text="tip && tip.value" class="text-rr-paper font-bold"></span>
+			</div>
 		</div>
 	}
 }
@@ -58,6 +78,9 @@ templ verticalBars(data []ChartPoint) {
 		n := float64(len(data))
 		slotW := W / n
 		barW := slotW * (1.0 - 2.0*barInsetFrac)
+		// Show ~14 x-axis labels regardless of density. With 7-day view every
+		// bar is labeled; at 90 days only every 7th to avoid overlap.
+		stride := (len(data)-1)/14 + 1
 	}}
 	for i, p := range data {
 		{{
@@ -68,10 +91,14 @@ templ verticalBars(data []ChartPoint) {
 			}
 			y := topPad + (bandH - barH)
 			cx := float64(i)*slotW + slotW/2
+			slotX := float64(i) * slotW
+			leftPct := cx / W * 100
 			fillClass := "fill-rr-heading"
 			if p.Highlight {
 				fillClass = "fill-rr-red"
 			}
+			tipExpr := fmt.Sprintf("tip = { left: '%.2f%%', date: %q, value: %q }", leftPct, p.Label, p.Sub)
+			showLabel := i%stride == 0 || i == len(data)-1
 		}}
 		<rect
 			x={ fmt.Sprintf("%.2f", x) }
@@ -80,7 +107,15 @@ templ verticalBars(data []ChartPoint) {
 			height={ fmt.Sprintf("%.2f", barH) }
 			class={ fillClass }
 		></rect>
-		if p.Sub != "" && p.Magnitude > 0 {
+		<rect
+			x={ fmt.Sprintf("%.2f", slotX) }
+			y="0"
+			width={ fmt.Sprintf("%.2f", slotW) }
+			height={ fmt.Sprintf("%.2f", H) }
+			fill="transparent"
+			@mouseenter={ tipExpr }
+		></rect>
+		if p.Sub != "" && p.Magnitude > 0 && p.Highlight {
 			<text
 				x={ fmt.Sprintf("%.2f", cx) }
 				y={ fmt.Sprintf("%.2f", y-6) }
@@ -89,13 +124,15 @@ templ verticalBars(data []ChartPoint) {
 				style="font-family: 'Special Elite', monospace; font-size: 10px;"
 			>{ p.Sub }</text>
 		}
-		<text
-			x={ fmt.Sprintf("%.2f", cx) }
-			y={ fmt.Sprintf("%.2f", H-8) }
-			text-anchor="middle"
-			class="fill-rr-muted"
-			style="font-family: 'Special Elite', monospace; font-size: 10px;"
-		>{ p.Label }</text>
+		if showLabel {
+			<text
+				x={ fmt.Sprintf("%.2f", cx) }
+				y={ fmt.Sprintf("%.2f", H-8) }
+				text-anchor="middle"
+				class="fill-rr-muted"
+				style="font-family: 'Special Elite', monospace; font-size: 10px;"
+			>{ p.Label }</text>
+		}
 	}
 	<line
 		x1="0" x2={ fmt.Sprintf("%.2f", W) }

@@ -9,6 +9,16 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
+// RevenueProps holds the data backing the Revenue chart card. CurrentTotal
+// and PriorTotal (cents) are used to render the period-over-period delta;
+// PriorTotal == 0 hides the comparison since there's nothing to compare to.
+type RevenueProps struct {
+	Days         int                 // 7, 30, or 90
+	Trend        []charts.ChartPoint // contiguous days, oldest → today
+	CurrentTotal int
+	PriorTotal   int
+}
+
 type DashboardProps struct {
 	// Today stats
 	TodayOrderCount int
@@ -36,9 +46,9 @@ type DashboardProps struct {
 	ToShip    []PipelineRow
 
 	// Charts
-	RevenueTrend []charts.ChartPoint   // last 14 days, oldest → today
-	TopProducts  []charts.LabeledValue // top 5 by selected metric, last 30 days
-	TopBy        string                // "units" (default) or "weight"
+	Revenue     RevenueProps
+	TopProducts []charts.LabeledValue // top 5 by selected metric, last 30 days
+	TopBy       string                // "units" (default) or "weight"
 
 	// Merchant local timezone for date display.
 	MerchantTZ *time.Location
@@ -121,14 +131,7 @@ templ DashboardContent(props DashboardProps) {
 	<div class="flame-stripe mt-8"></div>
 	<!-- Charts -->
 	<div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-		<div class="border-2 border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
-			<div class="flex items-baseline justify-between">
-				<p class="label-font text-rr-muted">Revenue · last 14 days</p>
-			</div>
-			<div class="mt-4">
-				@charts.BarVertical(props.RevenueTrend)
-			</div>
-		</div>
+		@RevenueCard(props.Revenue)
 		@TopSellersCard(props.TopProducts, props.TopBy)
 	</div>
 	if !props.hasAnyAction() {
@@ -214,6 +217,64 @@ templ DashboardContent(props DashboardProps) {
 				</div>
 			</div>
 		}
+	}
+}
+
+// RevenueCard renders the revenue chart with a 7/30/90-day period selector
+// and a delta vs the equivalent prior window. htmx swaps the whole card on
+// toggle; the stable id makes #revenue-card the swap target.
+templ RevenueCard(props RevenueProps) {
+	<div id="revenue-card" class="border-2 border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
+		<div class="flex items-baseline justify-between gap-3">
+			<div class="min-w-0">
+				<p class="label-font text-rr-muted">{ fmt.Sprintf("Revenue · last %d days", props.Days) }</p>
+				<div class="mt-1 flex items-baseline gap-3 flex-wrap">
+					<p class="text-xl font-bold tabular-nums text-rr-heading">{ formatCents(props.CurrentTotal) }</p>
+					@revenueDelta(props)
+				</div>
+			</div>
+			<div class="flex items-center gap-1 text-xs shrink-0">
+				@revenuePeriodToggle(7, props.Days)
+				@revenuePeriodToggle(30, props.Days)
+				@revenuePeriodToggle(90, props.Days)
+			</div>
+		</div>
+		<div class="mt-4">
+			@charts.BarVertical(props.Trend)
+		</div>
+	</div>
+}
+
+templ revenuePeriodToggle(value, current int) {
+	if value == current {
+		<span class="px-2 py-1 border-2 border-rr-border bg-ink text-paper font-semibold uppercase tracking-wide" style="font-size:0.65rem;">{ fmt.Sprintf("%dd", value) }</span>
+	} else {
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/admin/dashboard/revenue?days=%d", value)) }
+			hx-get={ fmt.Sprintf("/admin/dashboard/revenue?days=%d", value) }
+			hx-target="#revenue-card"
+			hx-swap="outerHTML"
+			class="px-2 py-1 border-2 border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading font-semibold uppercase tracking-wide"
+			style="font-size:0.65rem;"
+		>{ fmt.Sprintf("%dd", value) }</a>
+	}
+}
+
+templ revenueDelta(props RevenueProps) {
+	if props.PriorTotal > 0 {
+		{{
+			deltaPct := float64(props.CurrentTotal-props.PriorTotal) / float64(props.PriorTotal) * 100
+		}}
+		<span class="text-xs">
+			if deltaPct >= 0.1 {
+				<span class="text-rr-teal font-bold">{ fmt.Sprintf("↑ %.1f%%", deltaPct) }</span>
+			} else if deltaPct <= -0.1 {
+				<span class="text-rr-red font-bold">{ fmt.Sprintf("↓ %.1f%%", -deltaPct) }</span>
+			} else {
+				<span class="text-rr-muted font-bold">flat</span>
+			}
+			<span class="text-rr-muted ml-1">{ fmt.Sprintf("vs prior %dd", props.Days) }</span>
+		</span>
 	}
 }
 

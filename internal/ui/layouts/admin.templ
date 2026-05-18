@@ -86,9 +86,9 @@ func staffInitials(name string) string {
 
 func navItemClasses(active bool) string {
 	if active {
-		return "group flex gap-x-3 rounded-sm bg-rr-raised p-2 text-sm/6 font-semibold text-rr-red"
+		return "group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-red"
 	}
-	return "group flex gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red"
+	return "group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red"
 }
 
 func navIconColor(active bool) string {
@@ -289,11 +289,11 @@ templ Admin(props AdminProps) {
 								@adminLogo()
 							</div>
 							<nav class="flex flex-1 flex-col">
-								<ul role="list" class="flex flex-1 flex-col gap-y-1">
+								<ul role="list" class="flex flex-1 flex-col gap-y-0.5">
 									for _, group := range adminNavGroups() {
 										<li>
 											if group.Label != "" {
-												<p class="label-font text-rr-brick mt-5 mb-1 px-2" style="font-size:0.6rem;">{ group.Label }</p>
+												<p class="label-font text-rr-brick mt-3 mb-0.5 px-2" style="font-size:0.6rem;">{ group.Label }</p>
 											}
 											<ul role="list" class="-mx-2 space-y-0.5">
 												for _, item := range group.Items {
@@ -308,7 +308,7 @@ templ Admin(props AdminProps) {
 										</li>
 									}
 									<li>
-										<p class="label-font text-rr-brick mt-5 mb-1 px-2" style="font-size:0.6rem;">SETTINGS</p>
+										<p class="label-font text-rr-brick mt-3 mb-0.5 px-2" style="font-size:0.6rem;">SETTINGS</p>
 										<ul role="list" class="-mx-2 space-y-0.5">
 											<li>
 												<a href="/admin/settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
@@ -329,7 +329,7 @@ templ Admin(props AdminProps) {
 			</div>
 			<!-- Desktop sidebar (expanded by default for desktop-first use) -->
 			<div id="desktop-sidebar" class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300">
-				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 bg-rr-surface border-r-2 border-rr-border px-6 pb-4 transition-all duration-300">
+				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface border-r-2 border-rr-border px-6 pb-4 transition-all duration-300">
 					<div class="flex h-16 shrink-0 items-center">
 						@adminSidebarToggle()
 					</div>
@@ -338,7 +338,7 @@ templ Admin(props AdminProps) {
 							for _, group := range adminNavGroups() {
 								<li>
 									if group.Label != "" {
-										<p data-sidebar-label class="label-font text-rr-brick mt-5 mb-1 px-2 transition-opacity duration-200" style="font-size:0.6rem;">{ group.Label }</p>
+										<p data-sidebar-label class="label-font text-rr-brick mt-3 mb-0.5 px-2 transition-opacity duration-200" style="font-size:0.6rem;">{ group.Label }</p>
 									}
 									<ul role="list" class="-mx-2 space-y-0.5">
 										for _, item := range group.Items {
@@ -353,7 +353,7 @@ templ Admin(props AdminProps) {
 								</li>
 							}
 							<li>
-								<p data-sidebar-label class="label-font text-rr-brick mt-5 mb-1 px-2 transition-opacity duration-200" style="font-size:0.6rem;">SETTINGS</p>
+								<p data-sidebar-label class="label-font text-rr-brick mt-3 mb-0.5 px-2 transition-opacity duration-200" style="font-size:0.6rem;">SETTINGS</p>
 								<ul role="list" class="-mx-2 space-y-0.5">
 									<li>
 										<a href="/admin/settings" title="Settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
@@ -514,8 +514,8 @@ templ Admin(props AdminProps) {
 						});
 					});
 				// Active nav highlighting after htmx navigation
-				var activeLink = 'group flex gap-x-3 rounded-sm bg-rr-raised p-2 text-sm/6 font-semibold text-rr-red';
-				var inactiveLink = 'group flex gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red';
+				var activeLink = 'group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-red';
+				var inactiveLink = 'group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red';
 				var activeIcon = 'size-6 shrink-0 text-rr-red';
 				var inactiveIcon = 'size-6 shrink-0 text-rr-muted group-hover:text-rr-red';
 

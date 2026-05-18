@@ -86,7 +86,7 @@ func BarVertical(data []ChartPoint) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</svg><div x-show=\"tip\" x-cloak :style=\"tip ? `left: ${tip.left}; transform: translateX(-50%);` : ''\" class=\"absolute top-0 pointer-events-none border-2 border-rr-border bg-rr-heading px-2 py-1 text-xs whitespace-nowrap\" style=\"font-family: 'Special Elite', monospace;\"><span x-text=\"tip && tip.date\" class=\"text-rr-paper opacity-80 mr-2\"></span> <span x-text=\"tip && tip.value\" class=\"text-rr-paper font-bold\"></span></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</svg><div x-show=\"tip\" x-cloak :style=\"tip ? `left: ${tip.left}; transform: translateX(-50%);` : ''\" class=\"absolute top-0 pointer-events-none border-2 border-rr-border bg-ink text-paper px-2 py-1 text-xs whitespace-nowrap\" style=\"font-family: 'Special Elite', monospace;\"><span x-text=\"tip && tip.date\" class=\"opacity-80 mr-2\"></span> <span x-text=\"tip && tip.value\" class=\"font-bold\"></span></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

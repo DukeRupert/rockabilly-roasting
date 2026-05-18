@@ -230,8 +230,15 @@ type OrderFilter struct {
 	// and customer-facing order history so unfinalized orders don't pollute
 	// counts, revenue, or what the customer sees.
 	ExcludeUnconfirmed bool
-	Limit              int
-	Offset             int
+	// ExcludeCancelledRefunded drops orders in the cancelled/refunded terminal
+	// states. Mirrors the exclusion baked into RevenueByDay so callers can
+	// keep aggregate sums consistent with the daily-trend chart.
+	ExcludeCancelledRefunded bool
+	// OnlySubscription narrows to subscription-originated orders (true) or
+	// one-time orders (false). Nil leaves the source unconstrained.
+	OnlySubscription *bool
+	Limit            int
+	Offset           int
 }
 
 // ListOrders returns orders matching the given filter (hand-written for dynamic WHERE).
@@ -555,6 +562,16 @@ func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilt
 	}
 	if f.ExcludeUnconfirmed {
 		query += " AND NOT (status = 'pending' AND payment_status = 'awaiting')"
+	}
+	if f.ExcludeCancelledRefunded {
+		query += " AND status NOT IN ('cancelled', 'refunded')"
+	}
+	if f.OnlySubscription != nil {
+		if *f.OnlySubscription {
+			query += " AND subscription_id IS NOT NULL"
+		} else {
+			query += " AND subscription_id IS NULL"
+		}
 	}
 
 	var total int32

@@ -12,11 +12,14 @@ import (
 // RevenueProps holds the data backing the Revenue chart card. CurrentTotal
 // and PriorTotal (cents) are used to render the period-over-period delta;
 // PriorTotal == 0 hides the comparison since there's nothing to compare to.
+// SubscriptionRevenue is a subset of CurrentTotal — orders with a non-null
+// subscription_id — so the card can show recurring vs one-time mix.
 type RevenueProps struct {
-	Days         int                 // 7, 30, or 90
-	Trend        []charts.ChartPoint // contiguous days, oldest → today
-	CurrentTotal int
-	PriorTotal   int
+	Days                int                 // 7, 30, or 90
+	Trend               []charts.ChartPoint // contiguous days, oldest → today
+	CurrentTotal        int
+	PriorTotal          int
+	SubscriptionRevenue int
 }
 
 type DashboardProps struct {
@@ -232,6 +235,7 @@ templ RevenueCard(props RevenueProps) {
 					<p class="text-xl font-bold tabular-nums text-rr-heading">{ formatCents(props.CurrentTotal) }</p>
 					@revenueDelta(props)
 				</div>
+				@revenueMix(props)
 			</div>
 			<div class="flex items-center gap-1 text-xs shrink-0">
 				@revenuePeriodToggle(7, props.Days)
@@ -275,6 +279,24 @@ templ revenueDelta(props RevenueProps) {
 			}
 			<span class="text-rr-muted ml-1">{ fmt.Sprintf("vs prior %dd", props.Days) }</span>
 		</span>
+	}
+}
+
+// revenueMix shows the subscription vs one-time split as a small text line.
+// Rendered only when there's revenue to break down — at $0 the percentages
+// are meaningless. Subscription revenue is the recurring component; everything
+// else (one-time orders, draft sales, manual orders) falls into "one-time".
+templ revenueMix(props RevenueProps) {
+	if props.CurrentTotal > 0 {
+		{{
+			subPct := float64(props.SubscriptionRevenue) / float64(props.CurrentTotal) * 100
+			oneTimePct := 100 - subPct
+		}}
+		<p class="mt-1 text-xs text-rr-muted">
+			<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%.0f%%", subPct) }</span> subscription
+			<span class="mx-1">·</span>
+			<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%.0f%%", oneTimePct) }</span> one-time
+		</p>
 	}
 }
 

@@ -252,19 +252,36 @@ func (d *Deps) buildRevenueProps(ctx context.Context, tx pgx.Tx, days int, today
 	priorStart := trendStart.AddDate(0, 0, -days)
 	priorEnd := trendStart // exclusive — equal to trendStart
 	priorTotal, err := d.OrderService.SumOrderRevenue(ctx, tx, store.OrderFilter{
-		PlacedFrom:         &priorStart,
-		PlacedTo:           &priorEnd,
-		ExcludeUnconfirmed: true,
+		PlacedFrom:               &priorStart,
+		PlacedTo:                 &priorEnd,
+		ExcludeUnconfirmed:       true,
+		ExcludeCancelledRefunded: true,
+	})
+	if err != nil {
+		return admin.RevenueProps{}, err
+	}
+
+	// Subscription revenue subset of the current window — drives the
+	// "X% subscription · Y% one-time" mix line on the card. Filter set
+	// mirrors RevenueByDay so the percentage adds up against the chart total.
+	onlySub := true
+	subRevenue, err := d.OrderService.SumOrderRevenue(ctx, tx, store.OrderFilter{
+		PlacedFrom:               &trendStart,
+		PlacedTo:                 &trendEnd,
+		ExcludeUnconfirmed:       true,
+		ExcludeCancelledRefunded: true,
+		OnlySubscription:         &onlySub,
 	})
 	if err != nil {
 		return admin.RevenueProps{}, err
 	}
 
 	return admin.RevenueProps{
-		Days:         days,
-		Trend:        buildRevenueTrend(daily, trendStart, d.MerchantTZ, days),
-		CurrentTotal: currentTotal,
-		PriorTotal:   priorTotal,
+		Days:                days,
+		Trend:               buildRevenueTrend(daily, trendStart, d.MerchantTZ, days),
+		CurrentTotal:        currentTotal,
+		PriorTotal:          priorTotal,
+		SubscriptionRevenue: subRevenue,
 	}, nil
 }
 

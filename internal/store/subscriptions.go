@@ -240,6 +240,19 @@ func (s *SubscriptionStore) UpdatePeriod(ctx context.Context, tx pgx.Tx, id uuid
 	return nil
 }
 
+// UpdateVariant changes a subscription's variant and returns the updated row.
+func (s *SubscriptionStore) UpdateVariant(ctx context.Context, tx pgx.Tx, id, variantID uuid.UUID) (_ *domain.Subscription, err error) {
+	defer trackQuery(s.metrics, "subscriptions.update_variant", time.Now(), &err)
+	row, err := sqlcgen.New(tx).UpdateSubscriptionVariant(ctx, sqlcgen.UpdateSubscriptionVariantParams{
+		ID:        id,
+		VariantID: variantID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update subscription variant: %w", err)
+	}
+	return subscriptionFromRow(row), nil
+}
+
 // UpdatePauseUntil sets or clears the pause_until date.
 func (s *SubscriptionStore) UpdatePauseUntil(ctx context.Context, tx pgx.Tx, id uuid.UUID, pauseUntil *time.Time) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.update_pause_until", time.Now(), &err)

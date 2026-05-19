@@ -245,7 +245,8 @@ func run() error {
 		WithPricing(pricingStore)
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
-		WithEmail(emailEnv, customerStore, catalogStore)
+		WithEmail(emailEnv, customerStore, catalogStore).
+		WithCatalog(catalogStore, pricingStore)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
 	shippingExportSvc := app.NewShippingExportService(orderStore, customerStore, catalogStore, fulfillmentStore, shippingStore)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)

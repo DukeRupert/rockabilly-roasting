@@ -22,7 +22,8 @@ type SubscriptionService struct {
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
 	customers     *store.CustomerStore // populated via WithEmail; required for SendConfirmationEmail
-	catalog       *store.CatalogStore  // populated via WithEmail; required for SendConfirmationEmail
+	catalog       *store.CatalogStore  // populated via WithEmail/WithCatalog; required for SendConfirmationEmail and ChangeVariant
+	pricing       *store.PricingStore  // populated via WithCatalog; required for ChangeVariant same-price guard
 	email         EmailEnv             // populated via WithEmail; required for SendConfirmationEmail
 }
 
@@ -50,6 +51,14 @@ func (s *SubscriptionService) WithEmail(env EmailEnv, customers *store.CustomerS
 	return s
 }
 
+// WithCatalog wires the catalog and pricing stores used by ChangeVariant to
+// validate the sibling variant and enforce the same-price guard.
+func (s *SubscriptionService) WithCatalog(catalog *store.CatalogStore, pricing *store.PricingStore) *SubscriptionService {
+	s.catalog = catalog
+	s.pricing = pricing
+	return s
+}
+
 // --- State machine helpers ---
 
 func canPauseSubscription(status domain.SubscriptionStatus) bool {
@@ -61,6 +70,12 @@ func canResumeSubscription(status domain.SubscriptionStatus) bool {
 }
 
 func canCancelSubscription(status domain.SubscriptionStatus) bool {
+	return status == domain.SubscriptionStatusActive ||
+		status == domain.SubscriptionStatusPaused ||
+		status == domain.SubscriptionStatusPastDue
+}
+
+func canEditSubscription(status domain.SubscriptionStatus) bool {
 	return status == domain.SubscriptionStatusActive ||
 		status == domain.SubscriptionStatusPaused ||
 		status == domain.SubscriptionStatusPastDue
@@ -450,6 +465,90 @@ func (s *SubscriptionService) CancelSubscription(ctx context.Context, tx pgx.Tx,
 	}
 
 	return sub, nil
+}
+
+// ChangeVariant swaps a subscription to a sibling variant on the same product
+// (e.g. Whole Bean → Drip Ground). Future renewals will use the new variant;
+// orders already generated for the current period are not modified — staff
+// must adjust those separately on the order page. The target variant must
+// belong to the same product and share the same base price (USD) as the
+// current variant, mirroring the order-side guard.
+func (s *SubscriptionService) ChangeVariant(ctx context.Context, tx pgx.Tx, id, newVariantID uuid.UUID, actor Actor) (*domain.Subscription, error) {
+	if s.catalog == nil || s.pricing == nil {
+		return nil, fmt.Errorf("change subscription variant: service not wired with catalog/pricing")
+	}
+
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for variant change: %w", err)
+	}
+	if !canEditSubscription(sub.Status) {
+		return nil, ErrSubscriptionNotEditable
+	}
+	if sub.VariantID == newVariantID {
+		return sub, nil
+	}
+
+	oldVariant, err := s.catalog.GetVariantByID(ctx, tx, sub.VariantID)
+	if err != nil {
+		return nil, fmt.Errorf("get current variant: %w", err)
+	}
+	newVariant, err := s.catalog.GetVariantByID(ctx, tx, newVariantID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrVariantNotFound
+		}
+		return nil, fmt.Errorf("get new variant: %w", err)
+	}
+	if newVariant.ProductID != oldVariant.ProductID {
+		return nil, ErrVariantNotOnSameProduct
+	}
+
+	oldPrice, err := s.pricing.GetBasePrice(ctx, tx, oldVariant.ID, "USD")
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPriceNotFound
+		}
+		return nil, fmt.Errorf("get current variant price: %w", err)
+	}
+	newPrice, err := s.pricing.GetBasePrice(ctx, tx, newVariantID, "USD")
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPriceNotFound
+		}
+		return nil, fmt.Errorf("get new variant price: %w", err)
+	}
+	if newPrice.Amount != oldPrice.Amount {
+		return nil, ErrVariantPriceMismatch
+	}
+
+	updated, err := s.subscriptions.UpdateVariant(ctx, tx, id, newVariantID)
+	if err != nil {
+		return nil, fmt.Errorf("update subscription variant: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditSubscriptionVariantChanged,
+		ResourceType: "subscription",
+		ResourceID:   id,
+		After:        updated,
+		Metadata: map[string]any{
+			"old_variant_id":  oldVariant.ID,
+			"new_variant_id":  newVariant.ID,
+			"old_variant_sku": oldVariant.SKU,
+			"new_variant_sku": newVariant.SKU,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit subscription variant changed: %w", err)
+	}
+
+	return updated, nil
 }
 
 // MarkPastDue transitions an active subscription to past_due after a payment failure.

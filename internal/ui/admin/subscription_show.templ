@@ -22,6 +22,8 @@ type SubscriptionShowProps struct {
 	Customer        *domain.Customer
 	Product         *domain.Product
 	Variant         *domain.Variant
+	VariantLabel    string
+	SiblingVariants []SiblingVariant
 	ThumbnailURL    string
 	UnitPrice       int
 	HasUnitPrice    bool
@@ -32,6 +34,12 @@ type SubscriptionShowProps struct {
 	MerchantTZ      *time.Location
 	StaffName       string
 	StaffRole       string
+}
+
+func canChangeSubscriptionVariant(status domain.SubscriptionStatus) bool {
+	return status == domain.SubscriptionStatusActive ||
+		status == domain.SubscriptionStatusPaused ||
+		status == domain.SubscriptionStatusPastDue
 }
 
 func canPause(status domain.SubscriptionStatus) bool {
@@ -149,6 +157,40 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 						if props.HasUnitPrice {
 							<span class="text-rr-muted">Unit: <span class="font-medium text-rr-heading tabular-nums">{ formatCents(props.UnitPrice) }</span></span>
 							<span class="text-rr-muted">Per period: <span class="font-semibold text-rr-heading tabular-nums">{ formatCents(props.UnitPrice * props.Subscription.Quantity) }</span></span>
+						}
+					</div>
+					<!-- Grind / variant selector -->
+					<div class="mt-3">
+						if canChangeSubscriptionVariant(props.Subscription.Status) && len(props.SiblingVariants) > 1 {
+							<form
+								method="POST"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/variant", props.Subscription.ID.String())) }
+								class="flex flex-wrap items-center gap-2"
+							>
+								<label class="text-xs font-medium uppercase tracking-wide text-rr-muted">Grind</label>
+								<select
+									name="variant_id"
+									class="border-2 border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+								>
+									for _, sv := range props.SiblingVariants {
+										if sv.ID == props.Variant.ID {
+											<option value={ sv.ID.String() } selected>{ sv.Label }</option>
+										} else {
+											<option value={ sv.ID.String() }>{ sv.Label }</option>
+										}
+									}
+								</select>
+								<button
+									type="submit"
+									class="border-2 border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
+									onclick="return confirm('Change grind on this subscription? Future renewals will use the new variant. The current pending order (if any) is not updated by this action.')"
+								>Save</button>
+								<span class="text-xs text-rr-muted">Applies to future renewals only.</span>
+							</form>
+						} else {
+							if props.VariantLabel != "" {
+								<p class="text-xs text-rr-muted">Grind: <span class="font-medium text-rr-heading">{ props.VariantLabel }</span></p>
+							}
 						}
 					</div>
 				</div>

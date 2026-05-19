@@ -279,6 +279,7 @@ type Querier interface {
 	UpdateSubscriptionPlanDiscount(ctx context.Context, arg UpdateSubscriptionPlanDiscountParams) error
 	UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscriptionStatusParams) (Subscription, error)
 	UpdateSubscriptionStripePaymentMethodID(ctx context.Context, arg UpdateSubscriptionStripePaymentMethodIDParams) error
+	UpdateSubscriptionVariant(ctx context.Context, arg UpdateSubscriptionVariantParams) (Subscription, error)
 	UpdateTaxConfig(ctx context.Context, arg UpdateTaxConfigParams) (StoreSetting, error)
 	UpdateTaxon(ctx context.Context, arg UpdateTaxonParams) (Taxon, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (Variant, error)

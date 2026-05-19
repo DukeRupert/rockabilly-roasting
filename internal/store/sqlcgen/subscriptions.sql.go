@@ -502,3 +502,40 @@ func (q *Queries) UpdateSubscriptionStripePaymentMethodID(ctx context.Context, a
 	_, err := q.db.Exec(ctx, updateSubscriptionStripePaymentMethodID, arg.ID, arg.StripePaymentMethodID)
 	return err
 }
+
+const updateSubscriptionVariant = `-- name: UpdateSubscriptionVariant :one
+UPDATE subscriptions
+SET variant_id = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id
+`
+
+type UpdateSubscriptionVariantParams struct {
+	ID        uuid.UUID `json:"id"`
+	VariantID uuid.UUID `json:"variant_id"`
+}
+
+func (q *Queries) UpdateSubscriptionVariant(ctx context.Context, arg UpdateSubscriptionVariantParams) (Subscription, error) {
+	row := q.db.QueryRow(ctx, updateSubscriptionVariant, arg.ID, arg.VariantID)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.CustomerID,
+		&i.PlanID,
+		&i.Status,
+		&i.ShippingAddressID,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.NextOrderAt,
+		&i.CancelledAt,
+		&i.PauseUntil,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.VariantID,
+		&i.Quantity,
+		&i.EndsAt,
+		&i.StripePaymentMethodID,
+	)
+	return i, err
+}

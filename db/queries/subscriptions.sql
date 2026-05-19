@@ -49,6 +49,12 @@ UPDATE subscriptions
 SET pause_until = $2, updated_at = now()
 WHERE id = $1;
 
+-- name: UpdateSubscriptionVariant :one
+UPDATE subscriptions
+SET variant_id = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: UpdateSubscriptionStripePaymentMethodID :exec
 UPDATE subscriptions
 SET stripe_payment_method_id = $2, updated_at = now()

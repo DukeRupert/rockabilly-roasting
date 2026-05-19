@@ -152,6 +152,8 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 	var hasUnitPrice bool
 	var enrichedOrders []admin.EnrichedSubOrder
 	var activity []domain.AuditEntry
+	var siblingVariants []admin.SiblingVariant
+	var currentVariantLabel string
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -174,6 +176,63 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		product, txErr = d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
 		if txErr != nil {
 			return txErr
+		}
+
+		// Build option label map for the product so we can label sibling variants
+		// the same way the order page does (e.g., "Whole Bean / 12oz").
+		labels := map[uuid.UUID]string{}
+		opts, oErr := d.CatalogService.ListProductOptions(ctx, tx, product.ID)
+		if oErr != nil {
+			return oErr
+		}
+		for _, opt := range opts {
+			vals, vlErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
+			if vlErr != nil {
+				return vlErr
+			}
+			for _, val := range vals {
+				labels[val.ID] = val.Value
+			}
+		}
+		currentVariantLabel, txErr = buildVariantLabel(ctx, tx, d, variant.ID, labels)
+		if txErr != nil {
+			return txErr
+		}
+
+		// Sibling variants on the same product with the same USD base price.
+		// Always include the current variant so the select shows the active selection.
+		currentPrice, cpErr := d.PricingService.GetBasePrice(ctx, tx, variant.ID, "USD")
+		if cpErr != nil && !errors.Is(cpErr, app.ErrPriceNotFound) {
+			return cpErr
+		}
+		allVariants, avErr := d.CatalogService.ListVariants(ctx, tx, product.ID)
+		if avErr != nil {
+			return avErr
+		}
+		for _, sv := range allVariants {
+			if sv.ID != variant.ID {
+				price, pErr := d.PricingService.GetBasePrice(ctx, tx, sv.ID, "USD")
+				if pErr != nil {
+					if errors.Is(pErr, app.ErrPriceNotFound) {
+						continue
+					}
+					return pErr
+				}
+				if currentPrice == nil || price.Amount != currentPrice.Amount {
+					continue
+				}
+			}
+			label, lblErr := buildVariantLabel(ctx, tx, d, sv.ID, labels)
+			if lblErr != nil {
+				return lblErr
+			}
+			if label == "" {
+				label = sv.SKU
+			}
+			siblingVariants = append(siblingVariants, admin.SiblingVariant{
+				ID:    sv.ID,
+				Label: label,
+			})
 		}
 		if media, mErr := d.CatalogService.ListProductMedia(ctx, tx, variant.ProductID); mErr == nil && len(media) > 0 {
 			thumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
@@ -219,21 +278,23 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 
 	name, role := staffNameRole(r)
 	props := admin.SubscriptionShowProps{
-		Subscription:    sub,
-		Plan:            plan,
-		Customer:        customer,
-		Product:         product,
-		Variant:         variant,
-		ThumbnailURL:    thumbnailURL,
-		UnitPrice:       unitPrice,
-		HasUnitPrice:    hasUnitPrice,
-		ShippingAddress: shippingAddr,
-		Orders:          enrichedOrders,
-		Activity:        activity,
-		Flash:           r.URL.Query().Get("flash"),
-		MerchantTZ:      d.MerchantTZ,
-		StaffName:       name,
-		StaffRole:       role,
+		Subscription:        sub,
+		Plan:                plan,
+		Customer:            customer,
+		Product:             product,
+		Variant:             variant,
+		VariantLabel:        currentVariantLabel,
+		SiblingVariants:     siblingVariants,
+		ThumbnailURL:        thumbnailURL,
+		UnitPrice:           unitPrice,
+		HasUnitPrice:        hasUnitPrice,
+		ShippingAddress:     shippingAddr,
+		Orders:              enrichedOrders,
+		Activity:            activity,
+		Flash:               r.URL.Query().Get("flash"),
+		MerchantTZ:          d.MerchantTZ,
+		StaffName:           name,
+		StaffRole:           role,
 	}
 
 	if IsHTMX(r) {
@@ -313,4 +374,35 @@ func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Requ
 	}
 
 	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+cancelled", http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminSubscriptionVariantUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+	newVariantID, err := uuid.Parse(r.FormValue("variant_id"))
+	if err != nil {
+		Error(w, r, app.ErrVariantNotFound)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.SubscriptionService.ChangeVariant(ctx, tx, id, newVariantID, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Grind+updated", http.StatusSeeOther)
 }

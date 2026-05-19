@@ -34,6 +34,7 @@ const (
 	AuditSubscriptionRenewed   = "subscription.renewed"
 	AuditSubscriptionResumed   = "subscription.resumed"
 	AuditSubscriptionFailed    = "subscription.renewal_failed"
+	AuditSubscriptionVariantChanged = "subscription.variant_changed"
 	AuditPlanCreated           = "subscription_plan.created"
 	AuditPlanDeactivated       = "subscription_plan.deactivated"
 	AuditPlanActivated         = "subscription_plan.activated"

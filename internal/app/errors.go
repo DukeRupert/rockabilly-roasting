@@ -43,6 +43,7 @@ var (
 	ErrSubscriptionNotPausable   = errors.New("subscription cannot be paused")
 	ErrSubscriptionNotResumable  = errors.New("subscription cannot be resumed")
 	ErrSubscriptionNotCancellable = errors.New("subscription cannot be cancelled")
+	ErrSubscriptionNotEditable    = errors.New("subscription cannot be edited in its current state")
 	ErrSubscriptionPlanNotFound  = errors.New("subscription plan not found")
 	ErrSubscriptionPlanInactive  = errors.New("subscription plan is not active")
 

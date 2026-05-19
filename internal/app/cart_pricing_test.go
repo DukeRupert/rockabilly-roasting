@@ -14,7 +14,7 @@ import (
 
 func newCartService() *app.CartService {
 	pricing := newPricingService()
-	return app.NewCartService(store.NewCartStore(), pricing)
+	return app.NewCartService(store.NewCartStore(), store.NewCatalogStore(), pricing)
 }
 
 func TestAddItemForCustomer_UsesPriceListPrice(t *testing.T) {
@@ -129,4 +129,29 @@ func TestAddItemForCustomer_ErrPriceNotFound(t *testing.T) {
 
 	_, err = svc.AddItemForCustomer(ctx, tx, cart.ID, variant.ID, 1, customer.ID, "USD")
 	assert.ErrorIs(t, err, app.ErrPriceNotFound)
+}
+
+func TestAddItem_ArchivedVariant_Rejected(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	cartSvc := newCartService()
+	catalogSvc := newCatalogService()
+	ctx := context.Background()
+	actor := testutil.TestActor()
+
+	customer := testutil.CreateCustomer(t, tx)
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+
+	_, err := catalogSvc.ArchiveVariant(ctx, tx, variant.ID, actor)
+	require.NoError(t, err)
+
+	cart, err := cartSvc.GetOrCreateCart(ctx, tx, nil)
+	require.NoError(t, err)
+
+	_, err = cartSvc.AddItem(ctx, tx, cart.ID, variant.ID, 1)
+	assert.ErrorIs(t, err, app.ErrVariantArchived)
+
+	_, err = cartSvc.AddItemForCustomer(ctx, tx, cart.ID, variant.ID, 1, customer.ID, "USD")
+	assert.ErrorIs(t, err, app.ErrVariantArchived)
 }

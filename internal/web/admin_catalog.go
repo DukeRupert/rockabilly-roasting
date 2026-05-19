@@ -1025,6 +1025,68 @@ func (d *Deps) handleAdminVariantDelete(w http.ResponseWriter, r *http.Request) 
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+deleted", productID), http.StatusSeeOther)
 }
 
+func (d *Deps) handleAdminVariantArchive(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	productID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	variantID, err := uuid.Parse(r.PathValue("variantID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.CatalogService.ArchiveVariant(ctx, tx, variantID, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	if IsHTMX(r) {
+		d.renderVariantsPanel(w, r, productID)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+archived", productID), http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminVariantUnarchive(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	productID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	variantID, err := uuid.Parse(r.PathValue("variantID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.CatalogService.UnarchiveVariant(ctx, tx, variantID, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	if IsHTMX(r) {
+		d.renderVariantsPanel(w, r, productID)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+unarchived", productID), http.StatusSeeOther)
+}
+
 // --- Variant Pricing ---
 
 func (d *Deps) handleAdminVariantPriceUpdate(w http.ResponseWriter, r *http.Request) {

@@ -16,12 +16,13 @@ import (
 // CartService contains business logic for shopping carts.
 type CartService struct {
 	carts   *store.CartStore
+	catalog *store.CatalogStore
 	pricing *PricingService
 }
 
 // NewCartService creates a new CartService.
-func NewCartService(carts *store.CartStore, pricing *PricingService) *CartService {
-	return &CartService{carts: carts, pricing: pricing}
+func NewCartService(carts *store.CartStore, catalog *store.CatalogStore, pricing *PricingService) *CartService {
+	return &CartService{carts: carts, catalog: catalog, pricing: pricing}
 }
 
 // GetCart returns a cart by ID.
@@ -63,6 +64,10 @@ func (s *CartService) AddItem(ctx context.Context, tx pgx.Tx, cartID, variantID 
 		return nil, ErrInvalidQuantity
 	}
 
+	if err := s.assertVariantPurchasable(ctx, tx, variantID); err != nil {
+		return nil, err
+	}
+
 	price, err := s.pricing.GetBasePrice(ctx, tx, variantID, "USD")
 	if err != nil {
 		return nil, err
@@ -83,6 +88,10 @@ func (s *CartService) AddItemForCustomer(ctx context.Context, tx pgx.Tx, cartID,
 		return nil, ErrInvalidQuantity
 	}
 
+	if err := s.assertVariantPurchasable(ctx, tx, variantID); err != nil {
+		return nil, err
+	}
+
 	price, err := s.pricing.ResolveForCustomer(ctx, tx, variantID, customerID, currencyCode)
 	if err != nil {
 		return nil, err
@@ -93,6 +102,22 @@ func (s *CartService) AddItemForCustomer(ctx context.Context, tx pgx.Tx, cartID,
 		return nil, fmt.Errorf("add item to cart: %w", err)
 	}
 	return item, nil
+}
+
+// assertVariantPurchasable returns ErrVariantArchived if the variant is archived,
+// or ErrVariantNotFound if it doesn't exist.
+func (s *CartService) assertVariantPurchasable(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) error {
+	v, err := s.catalog.GetVariantByID(ctx, tx, variantID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrVariantNotFound
+		}
+		return fmt.Errorf("check variant purchasable: %w", err)
+	}
+	if v.ArchivedAt != nil {
+		return ErrVariantArchived
+	}
+	return nil
 }
 
 // UpdateItemQuantity sets the quantity of a cart item.

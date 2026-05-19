@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/store/sqlcgen"
 	"github.com/dukerupert/hiri/internal/testutil"
 )
 
@@ -164,6 +166,80 @@ func TestCatalogService_UpdateVariant(t *testing.T) {
 		SKU: "SKU-B",
 	}, actor)
 	assert.ErrorIs(t, err, app.ErrSKUAlreadyExists)
+}
+
+func TestCatalogService_ArchiveVariant(t *testing.T) {
+	pool := testPool
+	tx := testutil.NewTestTx(t, pool)
+	svc := newCatalogService()
+	ctx := context.Background()
+	actor := testutil.TestActor()
+
+	product := testutil.CreateProduct(t, tx)
+	v := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("ARCH-1"))
+
+	archived, err := svc.ArchiveVariant(ctx, tx, v.ID, actor)
+	require.NoError(t, err)
+	require.NotNil(t, archived.ArchivedAt)
+
+	// Audit record written.
+	testutil.LastAuditEntryWithAction(t, tx, "variant", v.ID, audit.AuditVariantArchived)
+
+	// Active list excludes the archived variant.
+	active, err := svc.ListActiveVariants(ctx, tx, product.ID)
+	require.NoError(t, err)
+	for _, av := range active {
+		assert.NotEqual(t, v.ID, av.ID, "archived variant must not appear in ListActiveVariants")
+	}
+
+	// Full list still includes it.
+	all, err := svc.ListVariants(ctx, tx, product.ID)
+	require.NoError(t, err)
+	found := false
+	for _, av := range all {
+		if av.ID == v.ID {
+			found = true
+			require.NotNil(t, av.ArchivedAt)
+		}
+	}
+	assert.True(t, found, "archived variant must still appear in ListVariants")
+
+	// Unarchive clears the flag.
+	unarchived, err := svc.UnarchiveVariant(ctx, tx, v.ID, actor)
+	require.NoError(t, err)
+	assert.Nil(t, unarchived.ArchivedAt)
+
+	testutil.LastAuditEntryWithAction(t, tx, "variant", v.ID, audit.AuditVariantUnarchived)
+}
+
+func TestCatalogService_DeleteVariant_WithLineItems_ReturnsErrVariantInUse(t *testing.T) {
+	pool := testPool
+	tx := testutil.NewTestTx(t, pool)
+	svc := newCatalogService()
+	ctx := context.Background()
+	actor := testutil.TestActor()
+
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("INUSE-1"))
+	customer := testutil.CreateCustomer(t, tx)
+	addr := testutil.CreateAddress(t, tx, customer.ID)
+	order := testutil.CreateOrder(t, tx, customer.ID, addr.ID, addr.ID)
+
+	_, err := sqlcgen.New(tx).CreateLineItem(ctx, sqlcgen.CreateLineItemParams{
+		ID:        uuid.New(),
+		OrderID:   order.ID,
+		VariantID: variant.ID,
+		Quantity:  1,
+		UnitPrice: 1000,
+		Subtotal:  1000,
+		Total:     1000,
+		Metadata:  json.RawMessage(`{}`),
+	})
+	require.NoError(t, err)
+
+	err = svc.DeleteVariant(ctx, tx, variant.ID, actor)
+	assert.ErrorIs(t, err, app.ErrVariantInUse,
+		"DeleteVariant must surface a domain error, not a generic 500, when an order references the variant")
 }
 
 func TestCatalogService_GetTaxon(t *testing.T) {

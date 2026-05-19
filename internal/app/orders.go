@@ -452,6 +452,9 @@ func (s *OrderService) ChangeLineItemVariant(ctx context.Context, tx pgx.Tx, ord
 	if newVariant.ProductID != oldVariant.ProductID {
 		return nil, ErrVariantNotOnSameProduct
 	}
+	if newVariant.ArchivedAt != nil {
+		return nil, ErrVariantArchived
+	}
 
 	newPrice, err := s.pricing.GetBasePrice(ctx, tx, newVariantID, order.CurrencyCode)
 	if err != nil {

@@ -299,6 +299,21 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, tx pgx.Tx,
 		return nil, ErrSubscriptionPlanInactive
 	}
 
+	// Block new subscriptions on archived variants. Existing subs on an
+	// archived variant keep running — see ArchiveVariant.
+	if s.catalog != nil {
+		variant, err := s.catalog.GetVariantByID(ctx, tx, p.VariantID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrVariantNotFound
+			}
+			return nil, fmt.Errorf("check variant for new subscription: %w", err)
+		}
+		if variant.ArchivedAt != nil {
+			return nil, ErrVariantArchived
+		}
+	}
+
 	now := time.Now()
 	periodEnd := nextPeriodEnd(now, plan.Interval, plan.IntervalCount)
 
@@ -505,6 +520,9 @@ func (s *SubscriptionService) ChangeVariant(ctx context.Context, tx pgx.Tx, id, 
 	}
 	if newVariant.ProductID != oldVariant.ProductID {
 		return nil, ErrVariantNotOnSameProduct
+	}
+	if newVariant.ArchivedAt != nil {
+		return nil, ErrVariantArchived
 	}
 
 	oldPrice, err := s.pricing.GetBasePrice(ctx, tx, oldVariant.ID, "USD")

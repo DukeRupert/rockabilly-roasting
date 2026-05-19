@@ -24,6 +24,8 @@ const (
 	AuditProductDeleted      = "product.deleted"
 	AuditVariantCreated      = "variant.created"
 	AuditVariantUpdated      = "variant.updated"
+	AuditVariantArchived     = "variant.archived"
+	AuditVariantUnarchived   = "variant.unarchived"
 	AuditVariantDeleted      = "variant.deleted"
 	AuditVariantPriceUpdated = "variant.price_updated"
 

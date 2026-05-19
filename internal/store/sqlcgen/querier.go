@@ -14,6 +14,7 @@ type Querier interface {
 	AddCustomerGroupMembership(ctx context.Context, arg AddCustomerGroupMembershipParams) error
 	AdjustStockQuantity(ctx context.Context, arg AdjustStockQuantityParams) (StockLevel, error)
 	ApproveWholesaleCustomer(ctx context.Context, arg ApproveWholesaleCustomerParams) (Customer, error)
+	ArchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error)
 	AssignAttributeSetToProduct(ctx context.Context, arg AssignAttributeSetToProductParams) error
 	CancelSubscription(ctx context.Context, id uuid.UUID) error
 	ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error
@@ -149,6 +150,7 @@ type Querier interface {
 	GetVariantByID(ctx context.Context, id uuid.UUID) (Variant, error)
 	GetVariantBySKU(ctx context.Context, sku string) (Variant, error)
 	GetWebhookEventByProviderAndEventID(ctx context.Context, arg GetWebhookEventByProviderAndEventIDParams) (WebhookEvent, error)
+	ListActiveVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]Variant, error)
 	ListAddresses(ctx context.Context, customerID *uuid.UUID) ([]Address, error)
 	ListAdjustmentsByLineItem(ctx context.Context, lineItemID *uuid.UUID) ([]Adjustment, error)
 	ListAdjustmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Adjustment, error)
@@ -222,6 +224,7 @@ type Querier interface {
 	SetProductGroupVisibility(ctx context.Context, arg SetProductGroupVisibilityParams) error
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)
 	SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error)
+	UnarchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error)
 	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)
 	UpdateAttributeKey(ctx context.Context, arg UpdateAttributeKeyParams) (AttributeKey, error)
 	UpdateAttributeSet(ctx context.Context, arg UpdateAttributeSetParams) (AttributeSet, error)

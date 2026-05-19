@@ -517,13 +517,18 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, vwo := range variants {
-							<tr>
+							<tr class={ templ.KV("opacity-60", vwo.Variant.ArchivedAt != nil) }>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
 									<div>
 										<span class="font-mono font-medium text-rr-heading">{ vwo.Variant.SKU }</span>
 										if vwo.Variant.IsDefault {
 											<div class="mt-0.5">
 												<span class="badge badge-green">Default</span>
+											</div>
+										}
+										if vwo.Variant.ArchivedAt != nil {
+											<div class="mt-0.5">
+												<span class="badge badge-neutral">Archived</span>
 											</div>
 										}
 									</div>
@@ -556,7 +561,7 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 									}
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-3">
-									if !vwo.Variant.IsDefault {
+									if !vwo.Variant.IsDefault && vwo.Variant.ArchivedAt == nil {
 										<form
 											method="post"
 											action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s", product.ID, vwo.Variant.ID)) }
@@ -570,17 +575,30 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 											<button type="submit" class="text-rr-muted hover:text-rr-heading">Set default</button>
 										</form>
 									}
-									<form
-										method="post"
-										action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", product.ID, vwo.Variant.ID)) }
-										hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/delete", product.ID, vwo.Variant.ID) }
-										hx-target="#variants-panel"
-										hx-swap="outerHTML"
-										hx-confirm="Delete this variant?"
-										class="inline"
-									>
-										<button type="submit" class="text-rr-red hover:text-rr-red-lt">Delete</button>
-									</form>
+									if vwo.Variant.ArchivedAt == nil {
+										<form
+											method="post"
+											action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/archive", product.ID, vwo.Variant.ID)) }
+											hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/archive", product.ID, vwo.Variant.ID) }
+											hx-target="#variants-panel"
+											hx-swap="outerHTML"
+											hx-confirm="Archive this variant? It will be hidden from the storefront and refused at checkout. Existing subscriptions on this variant will continue to renew."
+											class="inline"
+										>
+											<button type="submit" class="text-rr-red hover:text-rr-red-lt">Archive</button>
+										</form>
+									} else {
+										<form
+											method="post"
+											action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/unarchive", product.ID, vwo.Variant.ID)) }
+											hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/unarchive", product.ID, vwo.Variant.ID) }
+											hx-target="#variants-panel"
+											hx-swap="outerHTML"
+											class="inline"
+										>
+											<button type="submit" class="text-rr-muted hover:text-rr-heading">Unarchive</button>
+										</form>
+									}
 								</td>
 							</tr>
 						}

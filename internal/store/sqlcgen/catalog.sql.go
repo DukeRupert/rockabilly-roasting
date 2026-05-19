@@ -13,6 +13,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const archiveVariant = `-- name: ArchiveVariant :one
+UPDATE variants
+SET archived_at = now(), updated_at = now()
+WHERE id = $1
+RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at
+`
+
+func (q *Queries) ArchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error) {
+	row := q.db.QueryRow(ctx, archiveVariant, id)
+	var i Variant
+	err := row.Scan(
+		&i.ID,
+		&i.ProductID,
+		&i.Sku,
+		&i.Barcode,
+		&i.Position,
+		&i.IsDefault,
+		&i.WeightGrams,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.WholesaleMinQty,
+		&i.WholesaleMultiple,
+		&i.ArchivedAt,
+	)
+	return i, err
+}
+
 const clearDefaultVariants = `-- name: ClearDefaultVariants :exec
 UPDATE variants SET is_default = false WHERE product_id = $1 AND is_default = true
 `
@@ -225,7 +253,7 @@ func (q *Queries) CreateTaxon(ctx context.Context, arg CreateTaxonParams) (Taxon
 const createVariant = `-- name: CreateVariant :one
 INSERT INTO variants (id, product_id, sku, barcode, position, is_default, weight_grams, metadata)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple
+RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at
 `
 
 type CreateVariantParams struct {
@@ -264,6 +292,7 @@ func (q *Queries) CreateVariant(ctx context.Context, arg CreateVariantParams) (V
 		&i.UpdatedAt,
 		&i.WholesaleMinQty,
 		&i.WholesaleMultiple,
+		&i.ArchivedAt,
 	)
 	return i, err
 }
@@ -458,7 +487,7 @@ func (q *Queries) GetTaxonBySlug(ctx context.Context, slug string) (Taxon, error
 }
 
 const getVariantByID = `-- name: GetVariantByID :one
-SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple FROM variants WHERE id = $1
+SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at FROM variants WHERE id = $1
 `
 
 func (q *Queries) GetVariantByID(ctx context.Context, id uuid.UUID) (Variant, error) {
@@ -477,12 +506,13 @@ func (q *Queries) GetVariantByID(ctx context.Context, id uuid.UUID) (Variant, er
 		&i.UpdatedAt,
 		&i.WholesaleMinQty,
 		&i.WholesaleMultiple,
+		&i.ArchivedAt,
 	)
 	return i, err
 }
 
 const getVariantBySKU = `-- name: GetVariantBySKU :one
-SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple FROM variants WHERE sku = $1
+SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at FROM variants WHERE sku = $1
 `
 
 func (q *Queries) GetVariantBySKU(ctx context.Context, sku string) (Variant, error) {
@@ -501,8 +531,49 @@ func (q *Queries) GetVariantBySKU(ctx context.Context, sku string) (Variant, err
 		&i.UpdatedAt,
 		&i.WholesaleMinQty,
 		&i.WholesaleMultiple,
+		&i.ArchivedAt,
 	)
 	return i, err
+}
+
+const listActiveVariantsByProduct = `-- name: ListActiveVariantsByProduct :many
+SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at FROM variants
+WHERE product_id = $1 AND archived_at IS NULL
+ORDER BY position
+`
+
+func (q *Queries) ListActiveVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]Variant, error) {
+	rows, err := q.db.Query(ctx, listActiveVariantsByProduct, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Variant{}
+	for rows.Next() {
+		var i Variant
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.Sku,
+			&i.Barcode,
+			&i.Position,
+			&i.IsDefault,
+			&i.WeightGrams,
+			&i.Metadata,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.WholesaleMinQty,
+			&i.WholesaleMultiple,
+			&i.ArchivedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listProductMediaByProduct = `-- name: ListProductMediaByProduct :many
@@ -693,7 +764,7 @@ func (q *Queries) ListVariantOptionValuesByVariant(ctx context.Context, variantI
 }
 
 const listVariantsByProduct = `-- name: ListVariantsByProduct :many
-SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple FROM variants
+SELECT id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at FROM variants
 WHERE product_id = $1
 ORDER BY position
 `
@@ -720,6 +791,7 @@ func (q *Queries) ListVariantsByProduct(ctx context.Context, productID uuid.UUID
 			&i.UpdatedAt,
 			&i.WholesaleMinQty,
 			&i.WholesaleMultiple,
+			&i.ArchivedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -729,6 +801,34 @@ func (q *Queries) ListVariantsByProduct(ctx context.Context, productID uuid.UUID
 		return nil, err
 	}
 	return items, nil
+}
+
+const unarchiveVariant = `-- name: UnarchiveVariant :one
+UPDATE variants
+SET archived_at = NULL, updated_at = now()
+WHERE id = $1
+RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at
+`
+
+func (q *Queries) UnarchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error) {
+	row := q.db.QueryRow(ctx, unarchiveVariant, id)
+	var i Variant
+	err := row.Scan(
+		&i.ID,
+		&i.ProductID,
+		&i.Sku,
+		&i.Barcode,
+		&i.Position,
+		&i.IsDefault,
+		&i.WeightGrams,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.WholesaleMinQty,
+		&i.WholesaleMultiple,
+		&i.ArchivedAt,
+	)
+	return i, err
 }
 
 const updateProduct = `-- name: UpdateProduct :one
@@ -985,7 +1085,7 @@ UPDATE variants
 SET sku = $2, barcode = $3, position = $4, is_default = $5, weight_grams = $6,
     metadata = $7, updated_at = now()
 WHERE id = $1
-RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple
+RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at
 `
 
 type UpdateVariantParams struct {
@@ -1022,6 +1122,7 @@ func (q *Queries) UpdateVariant(ctx context.Context, arg UpdateVariantParams) (V
 		&i.UpdatedAt,
 		&i.WholesaleMinQty,
 		&i.WholesaleMultiple,
+		&i.ArchivedAt,
 	)
 	return i, err
 }

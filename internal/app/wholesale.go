@@ -319,7 +319,7 @@ func (s *WholesaleService) QuickOrderCatalog(
 	productCtxs := make([]productCtx, 0, len(products))
 	allVariantIDs := make([]uuid.UUID, 0)
 	for _, p := range products {
-		variants, err := s.catalog.ListVariantsByProduct(ctx, tx, p.ID)
+		variants, err := s.catalog.ListActiveVariantsByProduct(ctx, tx, p.ID)
 		if err != nil {
 			return nil, fmt.Errorf("list variants for %s: %w", p.ID, err)
 		}

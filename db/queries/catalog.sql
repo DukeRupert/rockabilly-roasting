@@ -64,6 +64,11 @@ SELECT * FROM variants
 WHERE product_id = $1
 ORDER BY position;
 
+-- name: ListActiveVariantsByProduct :many
+SELECT * FROM variants
+WHERE product_id = $1 AND archived_at IS NULL
+ORDER BY position;
+
 -- name: ClearDefaultVariants :exec
 UPDATE variants SET is_default = false WHERE product_id = $1 AND is_default = true;
 
@@ -71,6 +76,18 @@ UPDATE variants SET is_default = false WHERE product_id = $1 AND is_default = tr
 UPDATE variants
 SET sku = $2, barcode = $3, position = $4, is_default = $5, weight_grams = $6,
     metadata = $7, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: ArchiveVariant :one
+UPDATE variants
+SET archived_at = now(), updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: UnarchiveVariant :one
+UPDATE variants
+SET archived_at = NULL, updated_at = now()
 WHERE id = $1
 RETURNING *;
 

@@ -448,11 +448,25 @@ func (s *CatalogStore) GetVariantBySKU(ctx context.Context, tx pgx.Tx, sku strin
 	return variantFromRow(row), nil
 }
 
-// ListVariantsByProduct returns all variants for a product.
+// ListVariantsByProduct returns all variants for a product, including archived ones.
+// Use ListActiveVariantsByProduct for storefront/customer-facing surfaces.
 func (s *CatalogStore) ListVariantsByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]domain.Variant, error) {
 	rows, err := sqlcgen.New(tx).ListVariantsByProduct(ctx, productID)
 	if err != nil {
 		return nil, fmt.Errorf("list variants: %w", err)
+	}
+	variants := make([]domain.Variant, len(rows))
+	for i, r := range rows {
+		variants[i] = *variantFromRow(r)
+	}
+	return variants, nil
+}
+
+// ListActiveVariantsByProduct returns only non-archived variants for a product.
+func (s *CatalogStore) ListActiveVariantsByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]domain.Variant, error) {
+	rows, err := sqlcgen.New(tx).ListActiveVariantsByProduct(ctx, productID)
+	if err != nil {
+		return nil, fmt.Errorf("list active variants: %w", err)
 	}
 	variants := make([]domain.Variant, len(rows))
 	for i, r := range rows {
@@ -506,6 +520,24 @@ func (s *CatalogStore) UpdateVariantWholesale(ctx context.Context, tx pgx.Tx, id
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update variant wholesale: %w", err)
+	}
+	return variantFromRow(row), nil
+}
+
+// ArchiveVariant sets archived_at = now() on the variant.
+func (s *CatalogStore) ArchiveVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Variant, error) {
+	row, err := sqlcgen.New(tx).ArchiveVariant(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("archive variant: %w", err)
+	}
+	return variantFromRow(row), nil
+}
+
+// UnarchiveVariant clears archived_at on the variant.
+func (s *CatalogStore) UnarchiveVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Variant, error) {
+	row, err := sqlcgen.New(tx).UnarchiveVariant(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("unarchive variant: %w", err)
 	}
 	return variantFromRow(row), nil
 }
@@ -860,6 +892,7 @@ func variantFromRow(r sqlcgen.Variant) *domain.Variant {
 		WholesaleMinQty:   int32PtrToIntPtr(r.WholesaleMinQty),
 		WholesaleMultiple: int32PtrToIntPtr(r.WholesaleMultiple),
 		Metadata:          metadataFromJSON(r.Metadata),
+		ArchivedAt:        timestampFromPG(r.ArchivedAt),
 		CreatedAt:         r.CreatedAt,
 		UpdatedAt:         r.UpdatedAt,
 	}

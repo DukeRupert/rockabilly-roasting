@@ -8,12 +8,17 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
 )
+
+// pgFKViolation is the SQLSTATE code Postgres returns when a DELETE or UPDATE
+// violates a foreign key constraint with ON DELETE RESTRICT/NO ACTION.
+const pgFKViolation = "23503"
 
 // CatalogService contains business logic for products, variants, and taxonomy.
 type CatalogService struct {
@@ -420,11 +425,22 @@ func (s *CatalogService) GetVariantBySKU(ctx context.Context, tx pgx.Tx, sku str
 	return v, nil
 }
 
-// ListVariants returns all variants for a product.
+// ListVariants returns all variants for a product, including archived ones.
+// Use ListActiveVariants for storefront/customer-facing surfaces.
 func (s *CatalogService) ListVariants(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]domain.Variant, error) {
 	variants, err := s.catalog.ListVariantsByProduct(ctx, tx, productID)
 	if err != nil {
 		return nil, fmt.Errorf("list variants: %w", err)
+	}
+	return variants, nil
+}
+
+// ListActiveVariants returns only non-archived variants for a product.
+// This is the right call for storefront and wholesale product surfaces.
+func (s *CatalogService) ListActiveVariants(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]domain.Variant, error) {
+	variants, err := s.catalog.ListActiveVariantsByProduct(ctx, tx, productID)
+	if err != nil {
+		return nil, fmt.Errorf("list active variants: %w", err)
 	}
 	return variants, nil
 }
@@ -477,9 +493,17 @@ func (s *CatalogService) UpdateVariant(ctx context.Context, tx pgx.Tx, id uuid.U
 	return variant, nil
 }
 
-// DeleteVariant removes a variant by ID and records an audit entry.
+// DeleteVariant hard-deletes a variant by ID and records an audit entry.
+// Returns ErrVariantInUse if a foreign key constraint blocks the delete
+// (line_items, subscriptions, etc.) — callers should offer ArchiveVariant
+// instead. Note: ErrVariantInUse aborts the transaction, so callers must
+// not continue writing in the same tx after this returns.
 func (s *CatalogService) DeleteVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
 	if err := s.catalog.DeleteVariant(ctx, tx, id); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgFKViolation {
+			return ErrVariantInUse
+		}
 		return fmt.Errorf("delete variant: %w", err)
 	}
 
@@ -495,6 +519,61 @@ func (s *CatalogService) DeleteVariant(ctx context.Context, tx pgx.Tx, id uuid.U
 	}
 
 	return nil
+}
+
+// ArchiveVariant soft-deletes a variant: it stays in the database (so order
+// history, invoices, and existing subscriptions keep resolving), but is
+// hidden from storefront/wholesale listings and rejected at add-to-cart.
+// Existing subscriptions on the variant continue to renew — archive does
+// not pause or cancel customer subscriptions. Use UpdateSubscriptionVariant
+// or cancel-and-recreate for those.
+func (s *CatalogService) ArchiveVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Variant, error) {
+	variant, err := s.catalog.ArchiveVariant(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrVariantNotFound
+		}
+		return nil, fmt.Errorf("archive variant: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditVariantArchived,
+		ResourceType: "variant",
+		ResourceID:   id,
+		After:        variant,
+	}); err != nil {
+		return nil, fmt.Errorf("audit variant archived: %w", err)
+	}
+
+	return variant, nil
+}
+
+// UnarchiveVariant clears archived_at so the variant is sellable again.
+func (s *CatalogService) UnarchiveVariant(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Variant, error) {
+	variant, err := s.catalog.UnarchiveVariant(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrVariantNotFound
+		}
+		return nil, fmt.Errorf("unarchive variant: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditVariantUnarchived,
+		ResourceType: "variant",
+		ResourceID:   id,
+		After:        variant,
+	}); err != nil {
+		return nil, fmt.Errorf("audit variant unarchived: %w", err)
+	}
+
+	return variant, nil
 }
 
 // --- Taxons ---

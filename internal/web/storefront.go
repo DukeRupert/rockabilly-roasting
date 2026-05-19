@@ -98,7 +98,7 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			variants, varErr := d.CatalogService.ListVariants(ctx, tx, p.ID)
+			variants, varErr := d.CatalogService.ListActiveVariants(ctx, tx, p.ID)
 			if varErr != nil {
 				return varErr
 			}
@@ -302,7 +302,7 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// Get price from default variant.
-			variants, varErr := d.CatalogService.ListVariants(ctx, tx, p.ID)
+			variants, varErr := d.CatalogService.ListActiveVariants(ctx, tx, p.ID)
 			if varErr != nil {
 				return varErr
 			}
@@ -425,7 +425,7 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 				cards[i].ThumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
 			}
 
-			variants, varErr := d.CatalogService.ListVariants(ctx, tx, p.ID)
+			variants, varErr := d.CatalogService.ListActiveVariants(ctx, tx, p.ID)
 			if varErr != nil {
 				return varErr
 			}
@@ -731,7 +731,7 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Get variants with prices.
-		variants, txErr = d.CatalogService.ListVariants(ctx, tx, product.ID)
+		variants, txErr = d.CatalogService.ListActiveVariants(ctx, tx, product.ID)
 		if txErr != nil {
 			return txErr
 		}

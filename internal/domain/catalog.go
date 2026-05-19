@@ -53,6 +53,10 @@ type Product struct {
 }
 
 // Variant represents a purchasable variant of a product.
+//
+// ArchivedAt soft-deletes the variant: when set, the variant is hidden from
+// storefront/wholesale listings and refused at add-to-cart, but order history,
+// invoices, and existing subscriptions on the variant remain functional.
 type Variant struct {
 	ID          uuid.UUID
 	ProductID   uuid.UUID
@@ -64,6 +68,7 @@ type Variant struct {
 	WholesaleMinQty    *int
 	WholesaleMultiple  *int
 	Metadata           map[string]any
+	ArchivedAt  *time.Time
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 }

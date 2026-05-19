@@ -8,55 +8,74 @@ type WholesaleProps struct {
 }
 
 templ WholesaleContent(props WholesaleProps) {
-	<div class="mx-auto max-w-3xl py-12">
-		<h1 class="font-display text-4xl text-rr-heading tracking-wide mb-4">WHOLESALE &amp; WHITE LABEL</h1>
-		<div class="w-16 h-1 bg-rr-red mx-auto sm:mx-0 mb-8 rounded-full"></div>
-		<p class="font-body text-lg text-rr-muted leading-relaxed mb-10">
-			Partner with us to bring specialty coffee to your business. We offer wholesale pricing for cafes,
-			restaurants, and retailers — plus white label roasting for brands that want their own custom coffee.
-		</p>
-		<!-- Two columns -->
-		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 mb-12">
-			<div class="rounded-sm border border-rr-border bg-rr-surface p-6">
-				<div class="mb-3 flex size-10 items-center justify-center rounded-full bg-rr-amber/10">
-					<svg class="size-5 text-rr-amber" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z"></path>
-					</svg>
-				</div>
-				<h2 class="label-font text-rr-heading text-xs mb-2">WHOLESALE</h2>
-				<p class="font-body text-sm text-rr-muted leading-relaxed">
-					Volume pricing for cafes, restaurants, offices, and retail shops. Fresh-roasted beans
-					delivered on your schedule with dedicated account support.
-				</p>
-			</div>
-			<div class="rounded-sm border border-rr-border bg-rr-surface p-6">
-				<div class="mb-3 flex size-10 items-center justify-center rounded-full bg-rr-teal/10">
-					<svg class="size-5 text-rr-teal" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"></path>
-						<path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z"></path>
-					</svg>
-				</div>
-				<h2 class="label-font text-rr-heading text-xs mb-2">WHITE LABEL</h2>
-				<p class="font-body text-sm text-rr-muted leading-relaxed">
-					Your brand, our beans. We roast, package, and ship custom-labeled coffee for your
-					business. Perfect for corporate gifts, branded merch, or launching your own line.
-				</p>
-			</div>
-		</div>
-		<!-- CTA -->
-		<div class="text-center sm:text-left">
-			<a
-				href="/wholesale/apply"
-				class="btn inline-block label-font px-6 py-3 rounded-sm text-white text-sm bg-rr-red glow-red hover:bg-rr-red-lt transition-colors"
-			>
-				APPLY NOW
-			</a>
-			<p class="font-body text-xs text-rr-muted mt-4">
-				Already have an account?
-				<a href="/wholesale/login" class="text-rr-red hover:text-rr-red-lt transition-colors">Sign in here</a>.
+	<!-- Hero: ink slab with stamped headline -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 -mt-8 relative bg-ink overflow-hidden">
+		<div class="absolute inset-0 texture-halftone-paper pointer-events-none"></div>
+		<div class="relative mx-auto max-w-5xl px-6 sm:px-10 lg:px-14 py-16 sm:py-20 text-center">
+			<p class="font-oswald font-semibold text-candle text-xs sm:text-sm" style="letter-spacing:0.3em; text-transform:uppercase;">
+				For the trade
+			</p>
+			<h1 class="font-slab text-paper uppercase leading-[0.92] mt-4" style="font-size: clamp(2.25rem, 6.5vw, 4.5rem); letter-spacing:-0.005em;">
+				Wholesale &amp;
+				<br class="hidden sm:inline"/>
+				white
+				<span class="font-script text-candle normal-case inline-block align-baseline" style="font-size:1.05em; letter-spacing:0;">label.</span>
+			</h1>
+			<p class="mt-6 font-oswald text-paper-warm text-base sm:text-lg leading-relaxed max-w-xl mx-auto">
+				Partner with us to bring small-batch specialty coffee to your business. Volume pricing for cafes, restaurants, and offices — plus white label roasting for brands that want their own line.
 			</p>
 		</div>
-	</div>
+		<div class="flame-stripe"></div>
+	</section>
+	<!-- Body: paper surface -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper">
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-4xl px-6 sm:px-10 lg:px-14 py-16 sm:py-20">
+			<!-- Two-up cards -->
+			<div class="grid grid-cols-1 gap-7 sm:grid-cols-2 mb-12">
+				<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-7">
+					<div class="mb-4 inline-flex size-11 items-center justify-center bg-candle border-2 border-ink">
+						<svg class="size-5 text-ink" fill="none" viewBox="0 0 24 24" stroke-width="2.25" stroke="currentColor" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349M3.75 21V9.349m0 0a3.001 3.001 0 0 0 3.75-.615A2.993 2.993 0 0 0 9.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 0 0 2.25 1.016c.896 0 1.7-.393 2.25-1.015a3.001 3.001 0 0 0 3.75.614m-16.5 0a3.004 3.004 0 0 1-.621-4.72l1.189-1.19A1.5 1.5 0 0 1 5.378 3h13.243a1.5 1.5 0 0 1 1.06.44l1.19 1.189a3 3 0 0 1-.621 4.72M6.75 18h3.75a.75.75 0 0 0 .75-.75V13.5a.75.75 0 0 0-.75-.75H6.75a.75.75 0 0 0-.75.75v3.75c0 .414.336.75.75.75Z"></path>
+						</svg>
+					</div>
+					<h2 class="font-oswald font-bold text-ink text-[11px] mb-3 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Wholesale</h2>
+					<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+						Volume pricing for cafes, restaurants, offices, and retail shops. Fresh-roasted beans delivered on your schedule with dedicated account support.
+					</p>
+				</div>
+				<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-7">
+					<div class="mb-4 inline-flex size-11 items-center justify-center bg-rust border-2 border-ink">
+						<svg class="size-5 text-paper" fill="none" viewBox="0 0 24 24" stroke-width="2.25" stroke="currentColor" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z"></path>
+							<path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z"></path>
+						</svg>
+					</div>
+					<h2 class="font-oswald font-bold text-ink text-[11px] mb-3 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">White Label</h2>
+					<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+						Your brand, our beans. We roast, package, and ship custom-labeled coffee for your business. Perfect for corporate gifts, branded merch, or launching your own line.
+					</p>
+				</div>
+			</div>
+			<!-- CTA -->
+			<div class="text-center pt-2">
+				<a
+					href="/wholesale/apply"
+					class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-8 py-3.5 font-oswald font-bold text-sm"
+					style="letter-spacing:0.16em; text-transform:uppercase;"
+				>
+					Apply now
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+					</svg>
+				</a>
+				<p class="font-oswald text-chrome-deep text-sm mt-5">
+					Already have an account?
+					<a href="/wholesale/login" class="font-bold text-rust hover:text-rust-deep underline underline-offset-2">Sign in here</a>.
+				</p>
+			</div>
+		</div>
+	</section>
 }
 
 templ WholesalePage(props WholesaleProps) {

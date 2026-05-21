@@ -86,16 +86,16 @@ func staffInitials(name string) string {
 
 func navItemClasses(active bool) string {
 	if active {
-		return "group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-red"
+		return "group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-heading"
 	}
-	return "group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red"
+	return "group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-medium text-rr-body hover:bg-rr-raised hover:text-rr-heading"
 }
 
 func navIconColor(active bool) string {
 	if active {
-		return "size-6 shrink-0 text-rr-red"
+		return "size-5 shrink-0 text-rr-heading"
 	}
-	return "size-6 shrink-0 text-rr-muted group-hover:text-rr-red"
+	return "size-5 shrink-0 text-rr-muted group-hover:text-rr-heading"
 }
 
 templ Admin(props AdminProps) {
@@ -112,31 +112,44 @@ templ Admin(props AdminProps) {
 			<link rel="manifest" href="/static/site.webmanifest"/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-			<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@400;500;600;700&family=Special+Elite&display=swap" rel="stylesheet"/>
+			<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Inter:wght@400;500;600;700&family=Special+Elite&display=swap" rel="stylesheet"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
 			<script defer src="/static/js/image-uploader.js"></script>
 			<script defer src="/static/js/alpine.min.js"></script>
 			<script src="/static/js/htmx.min.js"></script>
 			<style>[x-cloak] { display: none !important; }</style>
 			<style>
-				/* Admin — paper-and-ink light. Overrides the legacy rr-* tokens so
-				   existing utility classes (bg-rr-surface, text-rr-heading, etc.) pick
-				   up the new palette without per-page rewrites. */
+				/* Admin — warm professional. A working tool, not a brand showcase.
+				   Overrides the rr-* tokens so existing utility classes (bg-rr-surface,
+				   text-rr-heading, etc.) pick up the quieter palette without per-page
+				   rewrites. Rust/amber are kept as accent vars but reserved for
+				   primary CTAs and row affordances — never chrome. */
 				:root {
-					--color-rr-bg: #F6EFE1 !important;       /* paper */
-					--color-rr-surface: #FFFBF1 !important;  /* cream-hi elevated */
-					--color-rr-raised: #ECE0C6 !important;   /* paper-warm hover/rows */
-					--color-rr-border: #0E0D0C !important;   /* ink rules */
-					--color-rr-muted: #8E887D !important;    /* chrome-deep captions */
-					--color-rr-body: #3A332B !important;     /* soft ink body */
+					--color-rr-bg: #FAFAF6 !important;       /* warm off-white */
+					--color-rr-surface: #FFFFFF !important;  /* clean elevated */
+					--color-rr-raised: #F0EEE8 !important;   /* soft warm hover */
+					--color-rr-border: #E5E2DA !important;   /* hairline rule */
+					--color-rr-muted: #6B6862 !important;    /* muted text */
+					--color-rr-body: #1A1A1A !important;     /* soft ink body */
 					--color-rr-heading: #0E0D0C !important;  /* ink */
-					--color-rr-red: #B4351D !important;      /* rust CTA */
+					--color-rr-red: #B4351D !important;      /* rust — primary CTA only */
 					--color-rr-red-lt: #D4492D !important;   /* rust hover */
 					--color-rr-red-dark: #8A240F !important; /* rust pressed */
-					--color-rr-amber: #F2A03D !important;    /* candle */
-					--color-rr-brick: #8A4A30 !important;    /* kept for group labels */
+					--color-rr-amber: #F2A03D !important;    /* candle — row affordances */
+					--color-rr-brick: #8A4A30 !important;    /* unused in chrome */
+					/* Redirect the Oswald token to Inter inside admin — any existing
+					   `font-oswald` utility on an admin page renders as Inter without
+					   per-file rewrites. Storefront keeps the real Oswald. */
+					--font-oswald: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif !important;
 				}
-				body { font-family: 'Oswald', 'Arial Narrow', sans-serif; }
+				body { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+				/* label-font uses a hardcoded family in input.css; override inside admin. */
+				.label-font {
+					font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+					font-weight: 600 !important;
+					letter-spacing: 0.06em !important;
+					font-size: 0.6875rem !important;
+				}
 				/* Page title utility — Alfa Slab display, matches storefront headlines */
 				.admin-page-title {
 					font-family: 'Alfa Slab One', 'Rockwell', Georgia, serif;
@@ -285,7 +298,7 @@ templ Admin(props AdminProps) {
 							</button>
 						</div>
 						<!-- Mobile sidebar content -->
-						<div class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r-2 border-rr-border">
+						<div class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border">
 							<div class="flex h-16 shrink-0 items-center">
 								@adminLogo()
 							</div>
@@ -294,7 +307,7 @@ templ Admin(props AdminProps) {
 									for _, group := range adminNavGroups() {
 										<li>
 											if group.Label != "" {
-												<p class="label-font text-rr-brick mt-3 mb-0.5 px-2" style="font-size:0.6rem;">{ group.Label }</p>
+												<p class="label-font text-rr-muted mt-3 mb-0.5 px-2">{ group.Label }</p>
 											}
 											<ul role="list" class="-mx-2 space-y-0.5">
 												for _, item := range group.Items {
@@ -309,7 +322,7 @@ templ Admin(props AdminProps) {
 										</li>
 									}
 									<li>
-										<p class="label-font text-rr-brick mt-3 mb-0.5 px-2" style="font-size:0.6rem;">SETTINGS</p>
+										<p class="label-font text-rr-muted mt-3 mb-0.5 px-2">SETTINGS</p>
 										<ul role="list" class="-mx-2 space-y-0.5">
 											<li>
 												<a href="/admin/settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
@@ -330,7 +343,7 @@ templ Admin(props AdminProps) {
 			</div>
 			<!-- Desktop sidebar (expanded by default for desktop-first use) -->
 			<div id="desktop-sidebar" class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300">
-				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface border-r-2 border-rr-border px-6 pb-4 transition-all duration-300">
+				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface border-r border-rr-border px-6 pb-4 transition-all duration-300">
 					<div class="flex h-16 shrink-0 items-center">
 						@adminSidebarToggle()
 					</div>
@@ -339,7 +352,7 @@ templ Admin(props AdminProps) {
 							for _, group := range adminNavGroups() {
 								<li>
 									if group.Label != "" {
-										<p data-sidebar-label class="label-font text-rr-brick mt-3 mb-0.5 px-2 transition-opacity duration-200" style="font-size:0.6rem;">{ group.Label }</p>
+										<p data-sidebar-label class="label-font text-rr-muted mt-3 mb-0.5 px-2 transition-opacity duration-200">{ group.Label }</p>
 									}
 									<ul role="list" class="-mx-2 space-y-0.5">
 										for _, item := range group.Items {
@@ -354,7 +367,7 @@ templ Admin(props AdminProps) {
 								</li>
 							}
 							<li>
-								<p data-sidebar-label class="label-font text-rr-brick mt-3 mb-0.5 px-2 transition-opacity duration-200" style="font-size:0.6rem;">SETTINGS</p>
+								<p data-sidebar-label class="label-font text-rr-muted mt-3 mb-0.5 px-2 transition-opacity duration-200">SETTINGS</p>
 								<ul role="list" class="-mx-2 space-y-0.5">
 									<li>
 										<a href="/admin/settings" title="Settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
@@ -371,7 +384,7 @@ templ Admin(props AdminProps) {
 			<!-- Main content area -->
 			<div id="main-content-wrapper" class="lg:pl-72 transition-all duration-300 overflow-x-hidden">
 				<!-- Top bar -->
-				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b-2 border-rr-border bg-rr-surface px-4 sm:gap-x-6 sm:px-6 lg:px-8">
+				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 sm:gap-x-6 sm:px-6 lg:px-8">
 					<button type="button" id="mobile-menu-btn" class="-m-2.5 p-2.5 text-rr-body lg:hidden">
 						<span class="sr-only">Open sidebar</span>
 						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -405,7 +418,6 @@ templ Admin(props AdminProps) {
 						</div>
 					</div>
 				</div>
-				<div class="flame-stripe"></div>
 			<main class="py-10">
 					<div id="main-content" class="px-4 sm:px-6 lg:px-8">
 						{ children... }
@@ -515,10 +527,10 @@ templ Admin(props AdminProps) {
 						});
 					});
 				// Active nav highlighting after htmx navigation
-				var activeLink = 'group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-red';
-				var inactiveLink = 'group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red';
-				var activeIcon = 'size-6 shrink-0 text-rr-red';
-				var inactiveIcon = 'size-6 shrink-0 text-rr-muted group-hover:text-rr-red';
+				var activeLink = 'group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-heading';
+				var inactiveLink = 'group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-medium text-rr-body hover:bg-rr-raised hover:text-rr-heading';
+				var activeIcon = 'size-5 shrink-0 text-rr-heading';
+				var inactiveIcon = 'size-5 shrink-0 text-rr-muted group-hover:text-rr-heading';
 
 				function updateActiveNav() {
 					var path = window.location.pathname;

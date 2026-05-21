@@ -180,7 +180,7 @@ The brand is defined by the **Rockabilly Roasting Design System/** folder at the
 ### Users
 - **Retail customers:** Coffee drinkers browsing and buying online — one-time purchases and subscriptions. They arrive from search, social, or word-of-mouth. Context is casual (phone on the couch, quick desktop order at work). Job: find good coffee, buy it fast, maybe subscribe.
 - **Wholesale customers (B2B):** Cafes, restaurants, and offices placing bulk orders through a dedicated portal. Context is task-oriented — they know what they want and reorder regularly. Job: restock efficiently, manage account.
-- **Staff (admin panel):** Small team managing catalog, orders, fulfillment, and subscriptions. The admin panel uses "Hiri" branding and a separate light-mode design — it is not customer-facing.
+- **Staff (admin panel):** Small team managing catalog, orders, fulfillment, and subscriptions. The admin panel shares the paper-and-ink palette but uses a quieter, information-dense treatment and still says "Hiri" internally — it is not customer-facing. Details in *Admin panel (Hiri)* below.
 
 ### Brand Personality
 **Confident. Warm. Unpretentious.**
@@ -193,7 +193,7 @@ Rockabilly is texture, not costume. It shows up in product names, typographic ch
 Emotional goals: trust, quiet confidence, warmth without gushing. Never fake urgency. Exclamation points earned (one per page, tops). Em-dashes liberally. **No emoji, ever** — use unicode stars/dingbats (`★ ✦ ✧ ❖ ◆`) or brand illustrations instead.
 
 ### Aesthetic Direction
-- **Theme — paper and ink.** Storefront and marketing run on warm bone paper (`--paper` `#F6EFE1`), tattoo black strokes (`--ink` `#0E0D0C`), and candle amber accents (`--amber` `#F2A03D`). Never pure `#fff` or `#000`. Admin stays light with its existing Hiri palette.
+- **Theme — paper and ink.** Storefront, marketing, *and admin* all run on warm bone paper (`--paper` `#F6EFE1`), tattoo black strokes (`--ink` `#0E0D0C`), and candle amber accents (`--amber` `#F2A03D`). Never pure `#fff` or `#000`. The admin uses the same palette with a deliberately quieter treatment — see *Admin panel (Hiri)* below.
 - **Color semantics (locked):** `--rust` `#B4351D` = primary CTAs, links, and "open" signs. `--amber` `#F2A03D` = flame / highlight / "NEW · LIMITED · LIVE" callouts. `--ink` / `--paper` = text and surface. Never use neon gradients, pastels, purple, cyan, or "tech blue."
 - **Typography (Google Fonts stand-ins — flag for print/licensed work):**
   - **Alfa Slab One** — display signage / billboards. ALL CAPS, tracking 0.04–0.08em.
@@ -209,6 +209,19 @@ Emotional goals: trust, quiet confidence, warmth without gushing. Never fake urg
 - **Motion — analog restraint.** The signature interaction is the **stamp**: hover lifts `translate(-1px,-1px)` and grows shadow to `5px 5px`; press collapses to `translate(2px,2px)` with shadow flattening to `0 0`. Fades 200ms linear. Never parallax, never neon pulses, never scroll-tied particles.
 - **Layout:** Wide newspaper-style gutters, not edge-to-edge. Strong grid, but sticker/stamp elements may tilt `-2°` to `-6°` with hard shadows to feel pasted on. Tilts are intentional, never random.
 - **Anti-references:** Generic SaaS gradients, glass-morphism, iOS soft drops, pastel UIs, emoji decoration, "artisanal journey" copy, purple/cyan tech palettes.
+
+### Admin Panel (Hiri)
+The admin is a working tool for staff, not a brand showcase. It shares the storefront's paper-and-ink palette but turns the ornamental dial *way* down.
+
+- **Same palette, less load.** Uses the same `--color-rr-*` tokens (paper, ink, rust, amber, cream-hi `#FFFBF1` surfaces, paper-warm `#ECE0C6` raised rows). No textures, no halftones, no candle gradients, no tilts.
+- **Fonts:** Oswald body, Alfa Slab One for page titles via `.admin-page-title`, Special Elite for mono/captions. **No DM Serif, no Yellowtail in admin** — those are storefront-only.
+- **Density over drama.** Compact padding (buttons `0.5rem 0.75rem`, badges `0.2rem 0.6rem`, group labels `0.6rem` font-size). Information density wins over whitespace.
+- **Shadows go soft.** Admin trades the storefront stamp shadow for hairline outlines + soft `0 1px 2px rgba(0,0,0,0.05)` drops on buttons. The hard `4px 4px 0` stamp is reserved for marketing surfaces — using it in a 500-row order list would be visual noise.
+- **Status badges are pragmatic, not branded.** Admin breaks the locked rust/amber-only rule with a full semantic palette: `badge-green` (paid/active), `badge-amber` (pending), `badge-slate` (neutral status), `badge-teal` (info), `badge-red` (failure), `badge-grey` (archived), `badge-pastdue`, `badge-partial`, `badge-blue`, `badge-indigo`, `badge-neutral`. Staff need to scan dozens of rows — restricting them to two colors would hurt the job.
+- **Row affordances.** Clickable table rows (`row-link`) get an inset 4px amber bar on hover; "stale/waiting" rows get a *persistent* inset rust bar — the paper-and-ink equivalent of a sticky-note flag. Honors `prefers-reduced-motion`.
+- **Active nav.** Rust text + raised paper background. Group labels in brick (`--color-rr-brick` `#8A4A30`) with `label-font`. Navigation: Dashboard → Orders → Catalog → Customers → Subscriptions → System → Settings.
+- **Motion is utility, not theatre.** Sidebar collapse, dropdown toggles, toast slide-in (`translateX(100%) → 0`, 200ms). No stamp lift-and-press in admin. The storefront delights; the admin gets out of the way.
+- **Internal name.** The admin still says "Hiri" in nav/topbar — that's the platform codename and it's never customer-facing. Don't rename it without checking. Storefront and emails always say "Rockabilly Roasting Co."
 
 ### Design Principles
 1. **Paper, not white. Ink, not black.** Every surface is warm; every stroke is weighted. Pure `#fff`/`#000` is a bug.

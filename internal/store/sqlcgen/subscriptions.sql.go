@@ -422,6 +422,53 @@ func (q *Queries) UpdateSubscriptionPeriod(ctx context.Context, arg UpdateSubscr
 	return err
 }
 
+const updateSubscriptionPlan = `-- name: UpdateSubscriptionPlan :one
+UPDATE subscriptions
+SET plan_id = $2,
+    current_period_end = $3,
+    next_order_at = $4,
+    updated_at = now()
+WHERE id = $1
+RETURNING id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id
+`
+
+type UpdateSubscriptionPlanParams struct {
+	ID               uuid.UUID `json:"id"`
+	PlanID           uuid.UUID `json:"plan_id"`
+	CurrentPeriodEnd time.Time `json:"current_period_end"`
+	NextOrderAt      time.Time `json:"next_order_at"`
+}
+
+func (q *Queries) UpdateSubscriptionPlan(ctx context.Context, arg UpdateSubscriptionPlanParams) (Subscription, error) {
+	row := q.db.QueryRow(ctx, updateSubscriptionPlan,
+		arg.ID,
+		arg.PlanID,
+		arg.CurrentPeriodEnd,
+		arg.NextOrderAt,
+	)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.CustomerID,
+		&i.PlanID,
+		&i.Status,
+		&i.ShippingAddressID,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.NextOrderAt,
+		&i.CancelledAt,
+		&i.PauseUntil,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.VariantID,
+		&i.Quantity,
+		&i.EndsAt,
+		&i.StripePaymentMethodID,
+	)
+	return i, err
+}
+
 const updateSubscriptionPlanActive = `-- name: UpdateSubscriptionPlanActive :exec
 UPDATE subscription_plans SET is_active = $2 WHERE id = $1
 `

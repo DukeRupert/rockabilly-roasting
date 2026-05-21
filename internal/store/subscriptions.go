@@ -253,6 +253,23 @@ func (s *SubscriptionStore) UpdateVariant(ctx context.Context, tx pgx.Tx, id, va
 	return subscriptionFromRow(row), nil
 }
 
+// UpdatePlan swaps a subscription's plan and reschedules the current period.
+// Callers compute the new period_end and next_order_at to keep cadence logic
+// in the app layer.
+func (s *SubscriptionStore) UpdatePlan(ctx context.Context, tx pgx.Tx, id, planID uuid.UUID, currentPeriodEnd, nextOrderAt time.Time) (_ *domain.Subscription, err error) {
+	defer trackQuery(s.metrics, "subscriptions.update_plan", time.Now(), &err)
+	row, err := sqlcgen.New(tx).UpdateSubscriptionPlan(ctx, sqlcgen.UpdateSubscriptionPlanParams{
+		ID:               id,
+		PlanID:           planID,
+		CurrentPeriodEnd: currentPeriodEnd,
+		NextOrderAt:      nextOrderAt,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update subscription plan: %w", err)
+	}
+	return subscriptionFromRow(row), nil
+}
+
 // UpdatePauseUntil sets or clears the pause_until date.
 func (s *SubscriptionStore) UpdatePauseUntil(ctx context.Context, tx pgx.Tx, id uuid.UUID, pauseUntil *time.Time) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.update_pause_until", time.Now(), &err)

@@ -569,6 +569,74 @@ func (s *SubscriptionService) ChangeVariant(ctx context.Context, tx pgx.Tx, id, 
 	return updated, nil
 }
 
+// ChangePlan swaps a subscription onto a different active plan (e.g. Weekly →
+// Bi-Weekly). The current period's start date is preserved; current_period_end
+// and next_order_at are recomputed from current_period_start using the new
+// plan's interval, so the customer keeps the cadence they already paid into.
+// No-op if the subscription is already on the target plan.
+func (s *SubscriptionService) ChangePlan(ctx context.Context, tx pgx.Tx, id, newPlanID uuid.UUID, actor Actor) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for plan change: %w", err)
+	}
+	if !canEditSubscription(sub.Status) {
+		return nil, ErrSubscriptionNotEditable
+	}
+	if sub.PlanID == newPlanID {
+		return sub, nil
+	}
+
+	oldPlan, err := s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
+	if err != nil {
+		return nil, fmt.Errorf("get current plan: %w", err)
+	}
+	newPlan, err := s.subscriptions.GetPlanByID(ctx, tx, newPlanID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionPlanNotFound
+		}
+		return nil, fmt.Errorf("get new plan: %w", err)
+	}
+	if !newPlan.IsActive {
+		return nil, ErrSubscriptionPlanInactive
+	}
+
+	newPeriodEnd := nextPeriodEnd(sub.CurrentPeriodStart, newPlan.Interval, newPlan.IntervalCount)
+
+	updated, err := s.subscriptions.UpdatePlan(ctx, tx, id, newPlanID, newPeriodEnd, newPeriodEnd)
+	if err != nil {
+		return nil, fmt.Errorf("update subscription plan: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditSubscriptionPlanChanged,
+		ResourceType: "subscription",
+		ResourceID:   id,
+		After:        updated,
+		Metadata: map[string]any{
+			"old_plan_id":            oldPlan.ID,
+			"new_plan_id":            newPlan.ID,
+			"old_plan_name":          oldPlan.Name,
+			"new_plan_name":          newPlan.Name,
+			"old_interval":           string(oldPlan.Interval),
+			"new_interval":           string(newPlan.Interval),
+			"old_interval_count":     oldPlan.IntervalCount,
+			"new_interval_count":     newPlan.IntervalCount,
+			"new_current_period_end": newPeriodEnd,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit subscription plan changed: %w", err)
+	}
+
+	return updated, nil
+}
+
 // MarkPastDue transitions an active subscription to past_due after a payment failure.
 func (s *SubscriptionService) MarkPastDue(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
 	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)

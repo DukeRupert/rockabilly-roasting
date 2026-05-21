@@ -278,6 +278,7 @@ type Querier interface {
 	UpdateStockLocationActive(ctx context.Context, arg UpdateStockLocationActiveParams) error
 	UpdateSubscriptionPauseUntil(ctx context.Context, arg UpdateSubscriptionPauseUntilParams) error
 	UpdateSubscriptionPeriod(ctx context.Context, arg UpdateSubscriptionPeriodParams) error
+	UpdateSubscriptionPlan(ctx context.Context, arg UpdateSubscriptionPlanParams) (Subscription, error)
 	UpdateSubscriptionPlanActive(ctx context.Context, arg UpdateSubscriptionPlanActiveParams) error
 	UpdateSubscriptionPlanDiscount(ctx context.Context, arg UpdateSubscriptionPlanDiscountParams) error
 	UpdateSubscriptionStatus(ctx context.Context, arg UpdateSubscriptionStatusParams) (Subscription, error)

@@ -27,6 +27,10 @@ func subscriptionEventLabel(action string) string {
 		return "Renewal failed"
 	case audit.AuditEmailSubscriptionConfirmed:
 		return "Confirmation email sent"
+	case audit.AuditSubscriptionPlanChanged:
+		return "Plan changed"
+	case audit.AuditSubscriptionVariantChanged:
+		return "Grind changed"
 	}
 	parts := strings.SplitN(action, ".", 2)
 	if len(parts) == 2 {

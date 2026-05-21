@@ -355,6 +355,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/resume", deps.handleAdminSubscriptionResume)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/cancel", deps.handleAdminSubscriptionCancel)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/variant", deps.handleAdminSubscriptionVariantUpdate)
+	adminMux.HandleFunc("POST /admin/subscriptions/{id}/plan", deps.handleAdminSubscriptionPlanUpdate)
 
 	// Admin fulfillment & shipping
 	adminMux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)

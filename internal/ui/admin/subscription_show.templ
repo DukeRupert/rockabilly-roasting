@@ -19,6 +19,7 @@ type EnrichedSubOrder struct {
 type SubscriptionShowProps struct {
 	Subscription    *domain.Subscription
 	Plan            *domain.SubscriptionPlan
+	AvailablePlans  []domain.SubscriptionPlan
 	Customer        *domain.Customer
 	Product         *domain.Product
 	Variant         *domain.Variant
@@ -63,6 +64,16 @@ func planCadence(p *domain.SubscriptionPlan) string {
 	raw := strings.TrimPrefix(string(p.Interval), "every_")
 	raw = strings.ReplaceAll(raw, "_", " ")
 	return "every " + raw
+}
+
+// planOptionLabel renders a single plan as it appears in the change-plan
+// dropdown, e.g. "Bi-Weekly — every 14 days · 10% off".
+func planOptionLabel(p domain.SubscriptionPlan) string {
+	label := p.Name + " — " + planCadence(&p)
+	if p.DiscountPct > 0 {
+		label += " · " + fmt.Sprintf("%d", p.DiscountPct) + "% off"
+	}
+	return label
 }
 
 templ SubscriptionShowContent(props SubscriptionShowProps) {
@@ -208,6 +219,32 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 					<span class="ml-1">· { fmt.Sprintf("%d", props.Plan.DiscountPct) }% off</span>
 				}
 			</dd>
+			if canChangeSubscriptionVariant(props.Subscription.Status) && len(props.AvailablePlans) > 1 {
+				<form
+					method="POST"
+					action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/plan", props.Subscription.ID.String())) }
+					class="mt-3 flex flex-wrap items-center gap-2"
+				>
+					<label class="sr-only">Change plan</label>
+					<select
+						name="plan_id"
+						class="w-full border-2 border-rr-border bg-rr-surface px-2 py-1 text-xs text-rr-heading"
+					>
+						for _, ap := range props.AvailablePlans {
+							if ap.ID == props.Plan.ID {
+								<option value={ ap.ID.String() } selected>{ planOptionLabel(ap) }</option>
+							} else {
+								<option value={ ap.ID.String() }>{ planOptionLabel(ap) }</option>
+							}
+						}
+					</select>
+					<button
+						type="submit"
+						class="border-2 border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
+						onclick="return confirm('Change this subscription to the selected plan? The current period and next order date will be recalculated to match the new cadence.')"
+					>Save</button>
+				</form>
+			}
 		</div>
 		<div class="border-2 border-rr-border bg-rr-surface p-4">
 			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Next Order</dt>

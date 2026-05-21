@@ -55,6 +55,15 @@ SET variant_id = $2, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateSubscriptionPlan :one
+UPDATE subscriptions
+SET plan_id = $2,
+    current_period_end = $3,
+    next_order_at = $4,
+    updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: UpdateSubscriptionStripePaymentMethodID :exec
 UPDATE subscriptions
 SET stripe_payment_method_id = $2, updated_at = now()

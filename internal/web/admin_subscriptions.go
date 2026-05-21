@@ -143,6 +143,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 
 	var sub *domain.Subscription
 	var plan *domain.SubscriptionPlan
+	var availablePlans []domain.SubscriptionPlan
 	var customer *domain.Customer
 	var product *domain.Product
 	var variant *domain.Variant
@@ -164,6 +165,21 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		plan, txErr = d.SubscriptionService.GetPlan(ctx, tx, sub.PlanID)
 		if txErr != nil {
 			return txErr
+		}
+		availablePlans, txErr = d.SubscriptionService.ListActivePlans(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		// Ensure the current plan appears in the selector even if it's been deactivated.
+		foundCurrent := false
+		for _, p := range availablePlans {
+			if p.ID == plan.ID {
+				foundCurrent = true
+				break
+			}
+		}
+		if !foundCurrent {
+			availablePlans = append(availablePlans, *plan)
 		}
 		customer, txErr = d.CustomerService.GetCustomer(ctx, tx, sub.CustomerID)
 		if txErr != nil {
@@ -280,6 +296,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 	props := admin.SubscriptionShowProps{
 		Subscription:        sub,
 		Plan:                plan,
+		AvailablePlans:      availablePlans,
 		Customer:            customer,
 		Product:             product,
 		Variant:             variant,
@@ -374,6 +391,37 @@ func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Requ
 	}
 
 	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+cancelled", http.StatusSeeOther)
+}
+
+func (d *Deps) handleAdminSubscriptionPlanUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+	newPlanID, err := uuid.Parse(r.FormValue("plan_id"))
+	if err != nil {
+		Error(w, r, app.ErrSubscriptionPlanNotFound)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.SubscriptionService.ChangePlan(ctx, tx, id, newPlanID, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Plan+updated", http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminSubscriptionVariantUpdate(w http.ResponseWriter, r *http.Request) {

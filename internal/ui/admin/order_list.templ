@@ -217,9 +217,9 @@ func orderViewHref(view, search string) string {
 // surface — visually pasted on top of the row of inactive labels.
 func orderTabClass(active bool) string {
 	if active {
-		return "relative shrink-0 whitespace-nowrap inline-flex items-center gap-2 border-2 border-rr-border bg-rr-surface px-3.5 py-2 text-rr-heading shadow-[4px_4px_0_0_var(--color-rr-border)] z-10"
+		return "relative shrink-0 whitespace-nowrap inline-flex items-center gap-2 border border-rr-border bg-rr-surface px-3.5 py-2 text-rr-heading shadow-[4px_4px_0_0_var(--color-rr-border)] z-10"
 	}
-	return "shrink-0 whitespace-nowrap inline-flex items-center gap-2 border-2 border-transparent px-3.5 py-2 text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
+	return "shrink-0 whitespace-nowrap inline-flex items-center gap-2 border border-transparent px-3.5 py-2 text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
 }
 
 // orderEmptyBucketCopy returns the body copy shown when a tab has 0 rows
@@ -302,13 +302,13 @@ templ OrderListContent(props OrderListProps) {
 		if len(props.Rows) == 0 {
 			if props.Search != "" {
 				<!-- Empty: search returned no matches -->
-				<div class="border-2 border-rr-border bg-rr-surface px-6 py-14 text-center">
+				<div class="border border-rr-border bg-rr-surface px-6 py-14 text-center">
 					<h2 class="admin-page-title text-2xl">No match.</h2>
 					<p class="mt-3 text-sm text-rr-body">Nothing for &ldquo;{ props.Search }&rdquo;. Try a different angle &mdash; name, email, or order number.</p>
 				</div>
 			} else if props.Counts.All > 0 {
 				<!-- Empty: this bucket is empty but other tabs have orders. -->
-				<div class="border-2 border-rr-border bg-rr-surface px-6 py-14 text-center">
+				<div class="border border-rr-border bg-rr-surface px-6 py-14 text-center">
 					<h2 class="admin-page-title text-2xl">Nothing here.</h2>
 					<p class="mt-3 text-sm text-rr-body">{ orderEmptyBucketCopy(props.View) }</p>
 					if props.View != "all" {
@@ -319,9 +319,9 @@ templ OrderListContent(props OrderListProps) {
 				</div>
 			} else {
 				<!-- Empty: no orders ever — branded stamp -->
-				<div class="border-2 border-rr-border bg-rr-surface px-6 py-16 sm:py-20 text-center">
+				<div class="border border-rr-border bg-rr-surface px-6 py-16 sm:py-20 text-center">
 					<div
-						class="inline-block -rotate-2 border-2 border-rr-border bg-rr-raised px-8 py-3"
+						class="inline-block -rotate-2 border border-rr-border bg-rr-raised px-8 py-3"
 						style="box-shadow: 4px 4px 0 0 var(--color-rr-border);"
 					>
 						<h2 class="admin-page-title">Quiet shop</h2>
@@ -350,7 +350,7 @@ templ OrderListContent(props OrderListProps) {
 					x-transition:leave-end="opacity-0"
 					class="sticky top-16 z-20 mb-4"
 				>
-					<div class="flex items-center justify-between gap-3 border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm shadow-[4px_4px_0_0_#0E0D0C]">
+					<div class="flex items-center justify-between gap-3 border border-rr-border bg-rr-surface px-3 py-2 text-sm shadow-[4px_4px_0_0_#0E0D0C]">
 						<span class="text-rr-heading">
 							<span class="font-semibold tabular-nums" x-text="selected.length"></span> selected
 						</span>
@@ -371,7 +371,7 @@ templ OrderListContent(props OrderListProps) {
 								<input type="hidden" name="order_ids" :value="selected.join(',')"/>
 								<button
 									type="submit"
-									class="inline-flex items-center rounded-sm border-2 border-rr-ink bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-ink hover:bg-rr-raised"
+									class="inline-flex items-center rounded-sm border border-rr-ink bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-ink hover:bg-rr-raised"
 								>
 									Buy labels
 								</button>
@@ -379,7 +379,7 @@ templ OrderListContent(props OrderListProps) {
 							<button
 								type="button"
 								@click="selected = []"
-								class="inline-flex items-center rounded-sm border-2 border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised"
+								class="inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised"
 							>
 								Clear
 							</button>
@@ -392,7 +392,7 @@ templ OrderListContent(props OrderListProps) {
 						x-show="exportNotice"
 						x-cloak
 						x-transition.opacity
-						class="absolute right-0 top-full mt-2 w-80 max-w-[90vw] border-2 border-rr-ink bg-rr-paper p-4 text-sm text-rr-ink"
+						class="absolute right-0 top-full mt-2 w-80 max-w-[90vw] border border-rr-ink bg-rr-paper p-4 text-sm text-rr-ink"
 						style="box-shadow: 4px 4px 0 0 var(--color-rr-ink, #0E0D0C);"
 					>
 						<div class="flex items-start justify-between gap-3">
@@ -424,7 +424,7 @@ templ OrderListContent(props OrderListProps) {
 						</div>
 					</div>
 				</div>
-				<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">
+				<div class="overflow-hidden border border-rr-border bg-rr-surface">
 					<table class="min-w-full divide-y divide-rr-border">
 						<thead class="bg-rr-raised">
 							<tr>
@@ -510,12 +510,12 @@ templ OrderListContent(props OrderListProps) {
 }
 
 templ orderPagination(props OrderListProps) {
-	<nav class="flex items-center justify-between border-t-2 border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
+	<nav class="flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
 		<div class="-mt-px flex w-0 flex-1">
 			if props.Page > 1 {
 				<a
 					href={ templ.SafeURL(orderPageHref(props.Page-1, props.View, props.Search)) }
-					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 				>
 					Previous
 				</a>
@@ -530,7 +530,7 @@ templ orderPagination(props OrderListProps) {
 			if props.HasMore {
 				<a
 					href={ templ.SafeURL(orderPageHref(props.Page+1, props.View, props.Search)) }
-					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 				>
 					Next
 				</a>

@@ -135,7 +135,7 @@ func AttributesPanel(props AttributesPanelProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for _, set := range props.AssignedSets {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"border-2 border-rr-border bg-rr-surface mb-4\"><div class=\"px-4 py-3 sm:px-6 flex items-center justify-between bg-rr-raised border-b border-rr-border\"><h4 class=\"text-sm font-semibold text-rr-heading\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"border border-rr-border bg-rr-surface mb-4\"><div class=\"px-4 py-3 sm:px-6 flex items-center justify-between bg-rr-raised border-b border-rr-border\"><h4 class=\"text-sm font-semibold text-rr-heading\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -660,7 +660,7 @@ func AttributesPanel(props AttributesPanelProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<div class=\"border-2 border-dashed border-rr-border p-8 text-center mb-4\"><h3 class=\"text-sm font-semibold text-rr-heading\">No attribute sets assigned</h3><p class=\"mt-1 text-sm text-rr-muted\">Assign an attribute set below to start adding product attributes.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<div class=\"border border-dashed border-rr-border p-8 text-center mb-4\"><h3 class=\"text-sm font-semibold text-rr-heading\">No attribute sets assigned</h3><p class=\"mt-1 text-sm text-rr-muted\">Assign an attribute set below to start adding product attributes.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -670,7 +670,7 @@ func AttributesPanel(props AttributesPanelProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if available := unassignedSets(props.AllSets, props.AssignedSets); len(available) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<div class=\"mt-4 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-4 sm:px-6\"><form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<div class=\"mt-4 border border-rr-border bg-rr-surface\"><div class=\"px-4 py-4 sm:px-6\"><form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -754,7 +754,7 @@ func AttributesPanel(props AttributesPanelProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "</select></div></div><button type=\"submit\" class=\"rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border-2 border-rr-border hover:bg-rr-raised\">Assign</button></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "</select></div></div><button type=\"submit\" class=\"rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border border-rr-border hover:bg-rr-raised\">Assign</button></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -222,6 +222,7 @@ The admin is a working tool for staff, not a brand showcase. It shares the store
 - **Active nav.** Rust text + raised paper background. Group labels in brick (`--color-rr-brick` `#8A4A30`) with `label-font`. Navigation: Dashboard → Orders → Catalog → Customers → Subscriptions → System → Settings.
 - **Motion is utility, not theatre.** Sidebar collapse, dropdown toggles, toast slide-in (`translateX(100%) → 0`, 200ms). No stamp lift-and-press in admin. The storefront delights; the admin gets out of the way.
 - **Internal name.** The admin still says "Hiri" in nav/topbar — that's the platform codename and it's never customer-facing. Don't rename it without checking. Storefront and emails always say "Rockabilly Roasting Co."
+- **Enforced.** `docs/admin-ui.md` is the authoritative reference — the allowed `rr-*` token list, the banned storefront classes (paper-and-ink colors, brand fonts, stamp shadows, heavy borders), and the rationale for each. `mage checkAdminUI` (wired into `mage check`) fails the build if any admin templ reaches for a banned class. **Read `docs/admin-ui.md` before adding new admin UI.**
 
 ### Design Principles
 1. **Paper, not white. Ink, not black.** Every surface is warm; every stroke is weighted. Pure `#fff`/`#000` is a bug.

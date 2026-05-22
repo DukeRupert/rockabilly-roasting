@@ -5,6 +5,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/magefile/mage/mg"
@@ -95,9 +97,110 @@ func Clean() error {
 	return os.Remove("server")
 }
 
-// Check runs lint, scoping check, and tests together (CI-style gate).
+// Check runs lint, scoping check, admin UI lint, and tests together (CI-style gate).
 func Check() {
-	mg.Deps(Lint, CheckScoping, Test)
+	mg.Deps(Lint, CheckScoping, CheckAdminUI, Test)
+}
+
+// CheckAdminUI fails if any admin .templ file reaches for storefront/marketing
+// classes (paper-and-ink colors, stamp shadows, brand fonts, heavy borders, etc.).
+// The admin uses the rr-* token layer with a warm-professional override; direct
+// paper-and-ink utilities bypass that and lock you into the wrong palette.
+//
+// staff_login.templ is excluded — it's a standalone branded splash page using
+// its own layout and font import.
+//
+// See docs/admin-ui.md for the full allowed/banned class lists and rationale.
+func CheckAdminUI() error {
+	// Banned classes — listed exactly as they appear in templates (no prefix
+	// stripping). The regex below treats each as a whole class name and won't
+	// match prefixes of longer class names (e.g. `bg-ink` does NOT flag
+	// `bg-ink-soft`, which is listed separately).
+	bannedClasses := []string{
+		// Direct paper-and-ink color utilities — admin must go through rr-* tokens.
+		"bg-paper", "bg-paper-warm", "bg-paper-deep", "bg-cream-hi",
+		"bg-ink", "bg-ink-soft",
+		"bg-rust", "bg-rust-deep",
+		"bg-candle", "bg-candle-deep", "bg-candle-soft",
+		"bg-espresso", "bg-espresso-deep",
+		"bg-chrome", "bg-chrome-deep",
+		"bg-sage",
+		"text-paper", "text-paper-warm", "text-paper-deep", "text-cream-hi",
+		"text-ink", "text-ink-soft",
+		"text-rust", "text-rust-deep",
+		"text-candle", "text-candle-deep", "text-candle-soft",
+		"text-espresso", "text-espresso-deep",
+		"text-chrome", "text-chrome-deep",
+		"text-sage",
+		"border-paper", "border-paper-warm", "border-paper-deep",
+		"border-ink", "border-ink-soft",
+		"border-rust", "border-rust-deep",
+		"border-candle", "border-espresso", "border-chrome", "border-sage",
+		// Storefront display/script/typewriter font families.
+		"font-slab", "font-heritage", "font-script", "font-special", "font-oswald",
+		// Storefront stamp / texture / motion behaviors.
+		"btn-stamp", "btn-stamp-paper",
+		"shadow-stamp", "shadow-stamp-sm", "shadow-stamp-lg", "shadow-stamp-paper",
+		"texture-halftone-paper", "texture-dots", "texture-grid",
+		"flame-stripe", "candle-flicker", "marquee-inner",
+		"window-glow", "string-lights",
+		"product-card", "nav-link", "roast-dot", "cart-checkmark",
+		// Heavy border weights — admin uses 1px hairlines.
+		"border-2", "border-t-2", "border-r-2", "border-b-2", "border-l-2",
+		"border-4", "border-t-4", "border-r-4", "border-b-4", "border-l-4",
+	}
+
+	excluded := map[string]bool{
+		filepath.FromSlash("internal/ui/admin/staff_login.templ"): true,
+	}
+
+	// Match a banned class only when it appears as a complete token — bounded
+	// on each side by something other than a word char or hyphen. This rejects
+	// false-positives like `bg-ink-soft` for the pattern `bg-ink`.
+	re := regexp.MustCompile(`(^|[^\w-])(` + strings.Join(bannedClasses, `|`) + `)([^\w-]|$)`)
+
+	var violations []string
+
+	err := filepath.Walk("internal/ui/admin", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if !strings.HasSuffix(path, ".templ") {
+			return nil
+		}
+		if excluded[path] {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for lineNum, line := range strings.Split(string(data), "\n") {
+			matches := re.FindAllStringSubmatch(line, -1)
+			for _, m := range matches {
+				violations = append(violations, fmt.Sprintf(
+					"%s:%d: banned class %q — %s",
+					path, lineNum+1, m[2], strings.TrimSpace(line),
+				))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("walk admin templ files: %w", err)
+	}
+
+	if len(violations) > 0 {
+		for _, v := range violations {
+			fmt.Fprintln(os.Stderr, v)
+		}
+		return fmt.Errorf("%d admin UI lint violation(s) — see docs/admin-ui.md", len(violations))
+	}
+	return nil
 }
 
 // CheckScoping verifies customer-facing handlers don't call staff-only

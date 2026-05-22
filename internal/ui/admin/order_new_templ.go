@@ -83,12 +83,12 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">New manual order</h1><p class=\"mt-1 text-sm text-rr-muted\">For reconciliation, phone orders, or one-off entries. No tax or shipping is calculated — totals are accepted as entered.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/orders\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised\">Back to orders</a></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">New manual order</h1><p class=\"mt-1 text-sm text-rr-muted\">For reconciliation, phone orders, or one-off entries. No tax or shipping is calculated — totals are accepted as entered.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/orders\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised\">Back to orders</a></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.Banner != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"mt-6 border-2 border-red-300 bg-red-50 p-3 text-sm text-red-800\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"mt-6 border border-red-300 bg-red-50 p-3 text-sm text-red-800\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -665,7 +665,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\"><div class=\"flex items-center justify-between\"><div><h2 class=\"text-base/7 font-semibold text-rr-heading\">Line items</h2><p class=\"mt-1 text-sm/6 text-rr-muted\">Enter the SKU, quantity, and unit price (cents) for each line.</p></div><button type=\"button\" @click=\"add()\" class=\"inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised\">+ Add line</button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\"><div class=\"flex items-center justify-between\"><div><h2 class=\"text-base/7 font-semibold text-rr-heading\">Line items</h2><p class=\"mt-1 text-sm/6 text-rr-muted\">Enter the SKU, quantity, and unit price (cents) for each line.</p></div><button type=\"button\" @click=\"add()\" class=\"inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised\">+ Add line</button></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

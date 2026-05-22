@@ -138,7 +138,7 @@ func AttributeSetEditContent(props AttributeSetEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</h1><p class=\"mt-2 text-sm text-rr-muted\">Edit attribute set and manage its keys.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/attributes\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised\">Back to sets</a></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</h1><p class=\"mt-2 text-sm text-rr-muted\">Edit attribute set and manage its keys.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/attributes\" class=\"inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised\">Back to sets</a></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -161,7 +161,7 @@ func AttributeSetEditContent(props AttributeSetEditProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<!-- Edit set form --><div class=\"mt-8 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Set details</h3></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6\"><form method=\"post\" action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<!-- Edit set form --><div class=\"mt-8 border border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Set details</h3></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6\"><form method=\"post\" action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -279,7 +279,7 @@ func AttributeSetEditContent(props AttributeSetEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\"></div></div><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Save</button></form></div></div><!-- Keys list --><div class=\"mt-8 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Attribute keys</h3><p class=\"mt-1 text-sm text-rr-muted\">Keys define the individual attributes in this set (e.g. \"Origin\", \"Tasting Notes\").</p></div><div class=\"border-t border-rr-border\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\"></div></div><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Save</button></form></div></div><!-- Keys list --><div class=\"mt-8 border border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Attribute keys</h3><p class=\"mt-1 text-sm text-rr-muted\">Keys define the individual attributes in this set (e.g. \"Origin\", \"Tasting Notes\").</p></div><div class=\"border-t border-rr-border\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -495,7 +495,7 @@ func AttributeSetEditContent(props AttributeSetEditProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\"></div><p class=\"mt-1 text-xs text-rr-muted\">Comma-separated. Required for enum and multi enum types.</p></div><div><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Add key</button></div></form></div></div></div><!-- Danger zone --><div class=\"mt-8 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6 flex items-center justify-between\"><div><h3 class=\"text-sm font-medium text-rr-heading\">Delete attribute set</h3><p class=\"mt-0.5 text-sm text-rr-muted\">This will remove the set and all its keys. Product values using these keys will be lost.</p></div><form method=\"post\" action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\"></div><p class=\"mt-1 text-xs text-rr-muted\">Comma-separated. Required for enum and multi enum types.</p></div><div><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Add key</button></div></form></div></div></div><!-- Danger zone --><div class=\"mt-8 border border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6 flex items-center justify-between\"><div><h3 class=\"text-sm font-medium text-rr-heading\">Delete attribute set</h3><p class=\"mt-0.5 text-sm text-rr-muted\">This will remove the set and all its keys. Product values using these keys will be lost.</p></div><form method=\"post\" action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

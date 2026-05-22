@@ -152,7 +152,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Shipping section --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Shipping</h2><p class=\"mt-1 text-sm text-rr-muted\">Flat rate, free-shipping threshold, and local delivery zip codes.</p><div class=\"mt-4 overflow-hidden border-2 border-rr-border bg-rr-surface\"><form method=\"post\" action=\"/admin/settings/shipping\" class=\"divide-y divide-rr-border\"><div class=\"px-4 py-5 sm:px-6 grid gap-5 sm:grid-cols-2\"><div><label for=\"shipping-flat-rate\" class=\"block text-sm font-medium text-rr-heading\">Flat rate (USD)</label><div class=\"mt-1 flex items-center\"><span class=\"text-rr-muted pr-2\">$</span> <input id=\"shipping-flat-rate\" type=\"number\" name=\"flat_rate\" step=\"0.01\" min=\"0\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Shipping section --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Shipping</h2><p class=\"mt-1 text-sm text-rr-muted\">Flat rate, free-shipping threshold, and local delivery zip codes.</p><div class=\"mt-4 overflow-hidden border border-rr-border bg-rr-surface\"><form method=\"post\" action=\"/admin/settings/shipping\" class=\"divide-y divide-rr-border\"><div class=\"px-4 py-5 sm:px-6 grid gap-5 sm:grid-cols-2\"><div><label for=\"shipping-flat-rate\" class=\"block text-sm font-medium text-rr-heading\">Flat rate (USD)</label><div class=\"mt-1 flex items-center\"><span class=\"text-rr-muted pr-2\">$</span> <input id=\"shipping-flat-rate\" type=\"number\" name=\"flat_rate\" step=\"0.01\" min=\"0\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -165,7 +165,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" required class=\"w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><p class=\"mt-1 text-xs text-rr-muted\">Charged on non-local orders that don't meet the free-shipping threshold.</p></div><div><label for=\"shipping-threshold\" class=\"block text-sm font-medium text-rr-heading\">Free-shipping threshold (USD)</label><div class=\"mt-1 flex items-center\"><span class=\"text-rr-muted pr-2\">$</span> <input id=\"shipping-threshold\" type=\"number\" name=\"free_threshold\" step=\"0.01\" min=\"0\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" required class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><p class=\"mt-1 text-xs text-rr-muted\">Charged on non-local orders that don't meet the free-shipping threshold.</p></div><div><label for=\"shipping-threshold\" class=\"block text-sm font-medium text-rr-heading\">Free-shipping threshold (USD)</label><div class=\"mt-1 flex items-center\"><span class=\"text-rr-muted pr-2\">$</span> <input id=\"shipping-threshold\" type=\"number\" name=\"free_threshold\" step=\"0.01\" min=\"0\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -178,7 +178,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" placeholder=\"leave blank to disable\" class=\"w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><p class=\"mt-1 text-xs text-rr-muted\">Orders at or above this subtotal ship free. Blank = no threshold.</p></div></div><div class=\"px-4 py-5 sm:px-6\"><label for=\"shipping-zips\" class=\"block text-sm font-medium text-rr-heading\">Local zip codes</label> <textarea id=\"shipping-zips\" name=\"local_zip_codes\" rows=\"3\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\" placeholder=\"99336, 99337, 99338, …\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" placeholder=\"leave blank to disable\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><p class=\"mt-1 text-xs text-rr-muted\">Orders at or above this subtotal ship free. Blank = no threshold.</p></div></div><div class=\"px-4 py-5 sm:px-6\"><label for=\"shipping-zips\" class=\"block text-sm font-medium text-rr-heading\">Local zip codes</label> <textarea id=\"shipping-zips\" name=\"local_zip_codes\" rows=\"3\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\" placeholder=\"99336, 99337, 99338, …\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -201,7 +201,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, " class=\"mt-1 size-4 rounded-sm border-2 border-rr-border\"> <span><span class=\"block text-sm font-medium text-rr-heading\">Free local delivery</span> <span class=\"block text-xs text-rr-muted\">Customer's order is hand-delivered on the configured days.</span></span></label><div class=\"ml-7 sm:max-w-md\"><label for=\"local-delivery-days\" class=\"block text-sm font-medium text-rr-heading\">Delivery days (display string)</label> <input id=\"local-delivery-days\" type=\"text\" name=\"local_delivery_days\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, " class=\"mt-1 size-4 rounded-sm border border-rr-border\"> <span><span class=\"block text-sm font-medium text-rr-heading\">Free local delivery</span> <span class=\"block text-xs text-rr-muted\">Customer's order is hand-delivered on the configured days.</span></span></label><div class=\"ml-7 sm:max-w-md\"><label for=\"local-delivery-days\" class=\"block text-sm font-medium text-rr-heading\">Delivery days (display string)</label> <input id=\"local-delivery-days\" type=\"text\" name=\"local_delivery_days\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -214,7 +214,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" placeholder=\"Mondays and Thursdays\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm\"><p class=\"mt-1 text-xs text-rr-muted\">Shown to the customer on receipts and \"out for delivery\" emails. Cosmetic — staff still chooses when to dispatch.</p></div><label class=\"flex items-start gap-3\"><input type=\"checkbox\" name=\"local_pickup_enabled\" value=\"1\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" placeholder=\"Mondays and Thursdays\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><p class=\"mt-1 text-xs text-rr-muted\">Shown to the customer on receipts and \"out for delivery\" emails. Cosmetic — staff still chooses when to dispatch.</p></div><label class=\"flex items-start gap-3\"><input type=\"checkbox\" name=\"local_pickup_enabled\" value=\"1\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -224,7 +224,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, " class=\"mt-1 size-4 rounded-sm border-2 border-rr-border\"> <span><span class=\"block text-sm font-medium text-rr-heading\">Free pickup at the shop</span> <span class=\"block text-xs text-rr-muted\">Customer is notified by email when the order is ready and picks it up at the shop.</span></span></label><div class=\"ml-7\"><label for=\"local-pickup-instructions\" class=\"block text-sm font-medium text-rr-heading\">Pickup instructions</label> <textarea id=\"local-pickup-instructions\" name=\"local_pickup_instructions\" rows=\"3\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm\" placeholder=\"101 W Kennewick Ave, Tue–Sat 8a–4p\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, " class=\"mt-1 size-4 rounded-sm border border-rr-border\"> <span><span class=\"block text-sm font-medium text-rr-heading\">Free pickup at the shop</span> <span class=\"block text-xs text-rr-muted\">Customer is notified by email when the order is ready and picks it up at the shop.</span></span></label><div class=\"ml-7\"><label for=\"local-pickup-instructions\" class=\"block text-sm font-medium text-rr-heading\">Pickup instructions</label> <textarea id=\"local-pickup-instructions\" name=\"local_pickup_instructions\" rows=\"3\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\" placeholder=\"101 W Kennewick Ave, Tue–Sat 8a–4p\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -250,7 +250,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"origin-street1\" class=\"block text-sm font-medium text-rr-heading\">Street</label> <input id=\"origin-street1\" type=\"text\" name=\"origin_street1\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"origin-street1\" class=\"block text-sm font-medium text-rr-heading\">Street</label> <input id=\"origin-street1\" type=\"text\" name=\"origin_street1\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -263,7 +263,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"origin-street2\" class=\"block text-sm font-medium text-rr-heading\">Street (line 2)</label> <input id=\"origin-street2\" type=\"text\" name=\"origin_street2\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"origin-street2\" class=\"block text-sm font-medium text-rr-heading\">Street (line 2)</label> <input id=\"origin-street2\" type=\"text\" name=\"origin_street2\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -276,7 +276,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"origin-city\" class=\"block text-sm font-medium text-rr-heading\">City</label> <input id=\"origin-city\" type=\"text\" name=\"origin_city\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"origin-city\" class=\"block text-sm font-medium text-rr-heading\">City</label> <input id=\"origin-city\" type=\"text\" name=\"origin_city\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -289,7 +289,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div class=\"grid grid-cols-3 gap-3\"><div><label for=\"origin-state\" class=\"block text-sm font-medium text-rr-heading\">State</label> <input id=\"origin-state\" type=\"text\" name=\"origin_state\" maxlength=\"2\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div class=\"grid grid-cols-3 gap-3\"><div><label for=\"origin-state\" class=\"block text-sm font-medium text-rr-heading\">State</label> <input id=\"origin-state\" type=\"text\" name=\"origin_state\" maxlength=\"2\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -302,7 +302,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono\"></div><div><label for=\"origin-zip\" class=\"block text-sm font-medium text-rr-heading\">ZIP</label> <input id=\"origin-zip\" type=\"text\" name=\"origin_zip\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono\"></div><div><label for=\"origin-zip\" class=\"block text-sm font-medium text-rr-heading\">ZIP</label> <input id=\"origin-zip\" type=\"text\" name=\"origin_zip\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -315,7 +315,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"origin-country\" class=\"block text-sm font-medium text-rr-heading\">Country</label> <input id=\"origin-country\" type=\"text\" name=\"origin_country\" maxlength=\"2\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"origin-country\" class=\"block text-sm font-medium text-rr-heading\">Country</label> <input id=\"origin-country\" type=\"text\" name=\"origin_country\" maxlength=\"2\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -328,7 +328,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono\"></div></div><div><label for=\"origin-email\" class=\"block text-sm font-medium text-rr-heading\">Email</label> <input id=\"origin-email\" type=\"email\" name=\"origin_email\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono\"></div></div><div><label for=\"origin-email\" class=\"block text-sm font-medium text-rr-heading\">Email</label> <input id=\"origin-email\" type=\"email\" name=\"origin_email\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -341,7 +341,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"origin-phone\" class=\"block text-sm font-medium text-rr-heading\">Phone</label> <input id=\"origin-phone\" type=\"tel\" name=\"origin_phone\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"origin-phone\" class=\"block text-sm font-medium text-rr-heading\">Phone</label> <input id=\"origin-phone\" type=\"tel\" name=\"origin_phone\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -354,7 +354,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" placeholder=\"5095852320\" class=\"mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div></div></div><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-sm font-semibold text-rr-heading\">Packaging tare weight</h3><p class=\"mt-1 text-xs text-rr-muted\">Weight of an empty box plus dunnage (in ounces). Added to every Pirate Ship export row on top of the product weights.</p><div class=\"mt-3 sm:max-w-xs\"><label for=\"shipping-tare\" class=\"sr-only\">Tare weight (oz)</label><div class=\"mt-1 flex items-center\"><input id=\"shipping-tare\" type=\"number\" name=\"tare_weight_oz\" step=\"0.01\" min=\"0\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" placeholder=\"5095852320\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div></div></div><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-sm font-semibold text-rr-heading\">Packaging tare weight</h3><p class=\"mt-1 text-xs text-rr-muted\">Weight of an empty box plus dunnage (in ounces). Added to every Pirate Ship export row on top of the product weights.</p><div class=\"mt-3 sm:max-w-xs\"><label for=\"shipping-tare\" class=\"sr-only\">Tare weight (oz)</label><div class=\"mt-1 flex items-center\"><input id=\"shipping-tare\" type=\"number\" name=\"tare_weight_oz\" step=\"0.01\" min=\"0\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -367,7 +367,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\" class=\"w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"> <span class=\"text-rr-muted pl-2\">oz</span></div></div></div><div class=\"px-4 py-4 sm:px-6 flex justify-end\"><button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper shadow-xs hover:opacity-90\">Save shipping settings</button></div></form></div><!-- Box presets link --><div class=\"mt-4 border-2 border-rr-border bg-rr-surface px-4 py-4 sm:px-6 flex items-center justify-between\"><div><h3 class=\"text-sm font-semibold text-rr-heading\">Box presets</h3><p class=\"mt-1 text-xs text-rr-muted\">Named cartons used when buying shipping labels. The smallest preset that fits an order's weight is selected automatically.</p></div><a href=\"/admin/settings/box-presets\" class=\"rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Manage presets</a></div></div><!-- Integrations section --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Integrations</h2><p class=\"mt-1 text-sm text-rr-muted\">Connect external services for billing and payments.</p><div class=\"mt-4 space-y-4\"><!-- QuickBooks Online --><div class=\"overflow-hidden border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><!-- QB logo placeholder --><div class=\"flex size-10 items-center justify-center rounded-sm bg-green-50 ring-1 ring-green-600/20\"><svg class=\"size-6 text-green-600\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg></div><div><h3 class=\"text-sm font-semibold text-rr-heading\">QuickBooks Online</h3><p class=\"text-sm text-rr-muted\">B2B wholesale invoicing and ACH payment collection</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"> <span class=\"text-rr-muted pl-2\">oz</span></div></div></div><div class=\"px-4 py-4 sm:px-6 flex justify-end\"><button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper shadow-xs hover:opacity-90\">Save shipping settings</button></div></form></div><!-- Box presets link --><div class=\"mt-4 border border-rr-border bg-rr-surface px-4 py-4 sm:px-6 flex items-center justify-between\"><div><h3 class=\"text-sm font-semibold text-rr-heading\">Box presets</h3><p class=\"mt-1 text-xs text-rr-muted\">Named cartons used when buying shipping labels. The smallest preset that fits an order's weight is selected automatically.</p></div><a href=\"/admin/settings/box-presets\" class=\"rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Manage presets</a></div></div><!-- Integrations section --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Integrations</h2><p class=\"mt-1 text-sm text-rr-muted\">Connect external services for billing and payments.</p><div class=\"mt-4 space-y-4\"><!-- QuickBooks Online --><div class=\"overflow-hidden border border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><!-- QB logo placeholder --><div class=\"flex size-10 items-center justify-center rounded-sm bg-green-50 ring-1 ring-green-600/20\"><svg class=\"size-6 text-green-600\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg></div><div><h3 class=\"text-sm font-semibold text-rr-heading\">QuickBooks Online</h3><p class=\"text-sm text-rr-muted\">B2B wholesale invoicing and ACH payment collection</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -501,7 +501,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</dl></div><div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex items-center gap-3\"><a href=\"/admin/settings/integrations/quickbooks/connect\" class=\"inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border-2 border-rr-border hover:bg-rr-raised\">Reconnect</a><form method=\"post\" action=\"/admin/settings/integrations/quickbooks/disconnect\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Disconnect QuickBooks? This will stop all automated B2B invoicing until you reconnect.')\">Disconnect</button></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</dl></div><div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex items-center gap-3\"><a href=\"/admin/settings/integrations/quickbooks/connect\" class=\"inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border border-rr-border hover:bg-rr-raised\">Reconnect</a><form method=\"post\" action=\"/admin/settings/integrations/quickbooks/disconnect\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Disconnect QuickBooks? This will stop all automated B2B invoicing until you reconnect.')\">Disconnect</button></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

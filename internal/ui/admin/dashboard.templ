@@ -114,7 +114,7 @@ templ DashboardContent(props DashboardProps) {
 	<div class="flex items-baseline gap-3">
 		<h1 class="admin-page-title">Dashboard</h1>
 	</div>
-	<div class="mt-6 border-2 border-rr-border bg-rr-surface px-6 py-5">
+	<div class="mt-6 border border-rr-border bg-rr-surface px-6 py-5">
 		<p class="label-font text-rr-muted">Today</p>
 		<div class="mt-2 grid grid-cols-3 gap-x-6 gap-y-4">
 			<div>
@@ -131,7 +131,6 @@ templ DashboardContent(props DashboardProps) {
 			</div>
 		</div>
 	</div>
-	<div class="flame-stripe mt-8"></div>
 	<!-- Charts -->
 	<div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
 		@RevenueCard(props.Revenue)
@@ -140,7 +139,7 @@ templ DashboardContent(props DashboardProps) {
 	if !props.hasAnyAction() {
 		<!-- All caught up -->
 		<div class="mt-8">
-			<div class="border-2 border-dashed border-rr-border py-10 text-center">
+			<div class="border border-dashed border-rr-border py-10 text-center">
 				<svg class="mx-auto size-10 text-rr-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
 				</svg>
@@ -189,7 +188,7 @@ templ DashboardContent(props DashboardProps) {
 		if props.reviewCount() > 0 {
 			<div class={ bandSpacing(props.urgentCount()) }>
 				@bandHeader("Pending review", props.reviewCount(), "text-rr-amber")
-				<div class="mt-3 border-2 border-rr-border bg-rr-surface divide-y divide-rr-border">
+				<div class="mt-3 border border-rr-border bg-rr-surface divide-y divide-rr-border">
 					if props.PendingWholesale > 0 {
 						<a href="/admin/wholesale" class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
 							<div class="flex items-center gap-3 min-w-0">
@@ -227,7 +226,7 @@ templ DashboardContent(props DashboardProps) {
 // and a delta vs the equivalent prior window. htmx swaps the whole card on
 // toggle; the stable id makes #revenue-card the swap target.
 templ RevenueCard(props RevenueProps) {
-	<div id="revenue-card" class="border-2 border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
+	<div id="revenue-card" class="border border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
 		<div class="flex items-baseline justify-between gap-3">
 			<div class="min-w-0">
 				<p class="label-font text-rr-muted">{ fmt.Sprintf("Revenue · last %d days", props.Days) }</p>
@@ -251,14 +250,14 @@ templ RevenueCard(props RevenueProps) {
 
 templ revenuePeriodToggle(value, current int) {
 	if value == current {
-		<span class="px-2 py-1 border-2 border-rr-border bg-ink text-paper font-semibold uppercase tracking-wide" style="font-size:0.65rem;">{ fmt.Sprintf("%dd", value) }</span>
+		<span class="px-2 py-1 text-xs font-semibold uppercase tracking-wide bg-rr-heading text-rr-bg rounded-sm">{ fmt.Sprintf("%dd", value) }</span>
 	} else {
 		<a
 			href={ templ.SafeURL(fmt.Sprintf("/admin/dashboard/revenue?days=%d", value)) }
 			hx-get={ fmt.Sprintf("/admin/dashboard/revenue?days=%d", value) }
 			hx-target="#revenue-card"
 			hx-swap="outerHTML"
-			class="px-2 py-1 border-2 border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading font-semibold uppercase tracking-wide"
+			class="px-2 py-1 border border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading font-semibold uppercase tracking-wide"
 			style="font-size:0.65rem;"
 		>{ fmt.Sprintf("%dd", value) }</a>
 	}
@@ -309,7 +308,7 @@ templ TopSellersCard(data []charts.LabeledValue, by string) {
 			by = "units"
 		}
 	}}
-	<div id="top-sellers-card" class="border-2 border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
+	<div id="top-sellers-card" class="border border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
 		<div class="flex items-baseline justify-between gap-3">
 			<p class="label-font text-rr-muted">Top sellers · last 30 days</p>
 			<div class="flex items-center gap-1 text-xs">
@@ -325,14 +324,14 @@ templ TopSellersCard(data []charts.LabeledValue, by string) {
 
 templ topSellersToggle(value, label, current string) {
 	if value == current {
-		<span class="px-2 py-1 border-2 border-rr-border bg-ink text-paper font-semibold uppercase tracking-wide" style="font-size:0.65rem;">{ label }</span>
+		<span class="px-2 py-1 text-xs font-semibold uppercase tracking-wide bg-rr-heading text-rr-bg rounded-sm">{ label }</span>
 	} else {
 		<a
 			href={ templ.SafeURL(fmt.Sprintf("/admin/dashboard/top-sellers?by=%s", value)) }
 			hx-get={ fmt.Sprintf("/admin/dashboard/top-sellers?by=%s", value) }
 			hx-target="#top-sellers-card"
 			hx-swap="outerHTML"
-			class="px-2 py-1 border-2 border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading font-semibold uppercase tracking-wide"
+			class="px-2 py-1 border border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading font-semibold uppercase tracking-wide"
 			style="font-size:0.65rem;"
 		>{ label }</a>
 	}
@@ -342,7 +341,7 @@ templ topSellersToggle(value, label, current string) {
 templ bandHeader(label string, count int, accent string) {
 	<div class="flex items-baseline gap-3">
 		<h2 class={ "text-base font-bold tracking-wide uppercase", accent }>{ label }</h2>
-		<span class="inline-block border-2 border-rr-border bg-rr-surface px-2 py-0.5 text-xs font-semibold tabular-nums text-rr-heading">
+		<span class="inline-block border border-rr-border bg-rr-surface px-2 py-0.5 text-xs font-semibold tabular-nums text-rr-heading">
 			{ fmt.Sprintf("%d", count) }
 		</span>
 	</div>
@@ -352,7 +351,7 @@ templ bandHeader(label string, count int, accent string) {
 templ urgentCard(href, title, detail, cta string) {
 	<a
 		href={ templ.SafeURL(href) }
-		class="block border-2 border-rr-border bg-rr-surface p-4 hover:-translate-x-px hover:-translate-y-px transition-transform"
+		class="block border border-rr-border bg-rr-surface p-4 hover:-translate-x-px hover:-translate-y-px transition-transform"
 		style="box-shadow: 4px 4px 0 0 var(--color-rr-red);"
 	>
 		<div class="flex items-start justify-between gap-4">
@@ -372,7 +371,7 @@ templ urgentCard(href, title, detail, cta string) {
 templ urgentGroupLink(title, detail, href string) {
 	<a
 		href={ templ.SafeURL(href) }
-		class="block border-2 border-rr-border bg-rr-surface p-4 hover:-translate-x-px hover:-translate-y-px transition-transform"
+		class="block border border-rr-border bg-rr-surface p-4 hover:-translate-x-px hover:-translate-y-px transition-transform"
 		style="box-shadow: 4px 4px 0 0 var(--color-rr-red);"
 	>
 		<div class="flex items-start justify-between gap-4">
@@ -392,7 +391,7 @@ templ urgentGroupLink(title, detail, href string) {
 templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *time.Location) {
 	<a
 		href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) }
-		class={ "flex items-center justify-between gap-4 border-2 px-4 py-2.5 hover:bg-rr-raised transition-colors",
+		class={ "flex items-center justify-between gap-4 border px-4 py-2.5 hover:bg-rr-raised transition-colors",
 			templ.KV("border-rr-border bg-rr-surface", urgent),
 			templ.KV("border-rr-border bg-rr-surface", !urgent),
 		}
@@ -415,8 +414,8 @@ templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *t
 
 // pipelineGroup renders a named queue (Pack / Ship) with a count header and row list.
 templ pipelineGroup(label string, count int, rows []PipelineRow, viewAllHref, labelClass, dotClass string, loc *time.Location) {
-	<div class="border-2 border-rr-border bg-rr-surface">
-		<div class="flex items-baseline justify-between px-4 py-2.5 border-b-2 border-rr-border bg-rr-raised">
+	<div class="border border-rr-border bg-rr-surface">
+		<div class="flex items-baseline justify-between px-4 py-2.5 border-b border-rr-border bg-rr-raised">
 			<div class="flex items-baseline gap-2">
 				<span class={ "inline-block size-2 rounded-full", dotClass }></span>
 				<h3 class="text-sm font-bold uppercase tracking-wide text-rr-heading">{ label } queue</h3>

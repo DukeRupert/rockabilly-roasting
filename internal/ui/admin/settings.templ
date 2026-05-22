@@ -125,7 +125,7 @@ templ SettingsContent(props SettingsProps) {
 	<div class="mt-8">
 		<h2 class="text-sm font-semibold text-rr-heading">Shipping</h2>
 		<p class="mt-1 text-sm text-rr-muted">Flat rate, free-shipping threshold, and local delivery zip codes.</p>
-		<div class="mt-4 overflow-hidden border-2 border-rr-border bg-rr-surface">
+		<div class="mt-4 overflow-hidden border border-rr-border bg-rr-surface">
 			<form method="post" action="/admin/settings/shipping" class="divide-y divide-rr-border">
 				<div class="px-4 py-5 sm:px-6 grid gap-5 sm:grid-cols-2">
 					<div>
@@ -142,7 +142,7 @@ templ SettingsContent(props SettingsProps) {
 								min="0"
 								value={ centsToDollars(props.Shipping.FlatRateCents) }
 								required
-								class="w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+								class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
 							/>
 						</div>
 						<p class="mt-1 text-xs text-rr-muted">Charged on non-local orders that don't meet the free-shipping threshold.</p>
@@ -161,7 +161,7 @@ templ SettingsContent(props SettingsProps) {
 								min="0"
 								value={ centsPtrToDollars(props.Shipping.FreeShippingThreshold) }
 								placeholder="leave blank to disable"
-								class="w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+								class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
 							/>
 						</div>
 						<p class="mt-1 text-xs text-rr-muted">Orders at or above this subtotal ship free. Blank = no threshold.</p>
@@ -175,7 +175,7 @@ templ SettingsContent(props SettingsProps) {
 						id="shipping-zips"
 						name="local_zip_codes"
 						rows="3"
-						class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
 						placeholder="99336, 99337, 99338, …"
 					>{ zipCodesLine(props.Shipping.LocalZipCodes) }</textarea>
 					<p class="mt-1 text-xs text-rr-muted">
@@ -194,7 +194,7 @@ templ SettingsContent(props SettingsProps) {
 								name="local_delivery_enabled"
 								value="1"
 								checked?={ props.Shipping.LocalDeliveryEnabled }
-								class="mt-1 size-4 rounded-sm border-2 border-rr-border"
+								class="mt-1 size-4 rounded-sm border border-rr-border"
 							/>
 							<span>
 								<span class="block text-sm font-medium text-rr-heading">Free local delivery</span>
@@ -209,7 +209,7 @@ templ SettingsContent(props SettingsProps) {
 								name="local_delivery_days"
 								value={ props.Shipping.LocalDeliveryDays }
 								placeholder="Mondays and Thursdays"
-								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 							/>
 							<p class="mt-1 text-xs text-rr-muted">Shown to the customer on receipts and "out for delivery" emails. Cosmetic — staff still chooses when to dispatch.</p>
 						</div>
@@ -219,7 +219,7 @@ templ SettingsContent(props SettingsProps) {
 								name="local_pickup_enabled"
 								value="1"
 								checked?={ props.Shipping.LocalPickupEnabled }
-								class="mt-1 size-4 rounded-sm border-2 border-rr-border"
+								class="mt-1 size-4 rounded-sm border border-rr-border"
 							/>
 							<span>
 								<span class="block text-sm font-medium text-rr-heading">Free pickup at the shop</span>
@@ -232,7 +232,7 @@ templ SettingsContent(props SettingsProps) {
 								id="local-pickup-instructions"
 								name="local_pickup_instructions"
 								rows="3"
-								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 								placeholder="101 W Kennewick Ave, Tue–Sat 8a–4p"
 							>{ props.Shipping.LocalPickupInstructions }</textarea>
 							<p class="mt-1 text-xs text-rr-muted">Shown at checkout when pickup is selected and in the "ready for pickup" email.</p>
@@ -252,7 +252,7 @@ templ SettingsContent(props SettingsProps) {
 								type="text"
 								name="origin_name"
 								value={ props.Shipping.OriginName }
-								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 							/>
 						</div>
 						<div>
@@ -262,7 +262,7 @@ templ SettingsContent(props SettingsProps) {
 								type="text"
 								name="origin_street1"
 								value={ props.Shipping.OriginStreet1 }
-								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 							/>
 						</div>
 						<div>
@@ -272,7 +272,7 @@ templ SettingsContent(props SettingsProps) {
 								type="text"
 								name="origin_street2"
 								value={ props.Shipping.OriginStreet2 }
-								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 							/>
 						</div>
 						<div>
@@ -282,7 +282,7 @@ templ SettingsContent(props SettingsProps) {
 								type="text"
 								name="origin_city"
 								value={ props.Shipping.OriginCity }
-								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 							/>
 						</div>
 						<div class="grid grid-cols-3 gap-3">
@@ -294,7 +294,7 @@ templ SettingsContent(props SettingsProps) {
 									name="origin_state"
 									maxlength="2"
 									value={ props.Shipping.OriginState }
-									class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
+									class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
 								/>
 							</div>
 							<div>
@@ -304,7 +304,7 @@ templ SettingsContent(props SettingsProps) {
 									type="text"
 									name="origin_zip"
 									value={ props.Shipping.OriginZip }
-									class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+									class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
 								/>
 							</div>
 							<div>
@@ -315,7 +315,7 @@ templ SettingsContent(props SettingsProps) {
 									name="origin_country"
 									maxlength="2"
 									value={ props.Shipping.OriginCountry }
-									class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
+									class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
 								/>
 							</div>
 						</div>
@@ -326,7 +326,7 @@ templ SettingsContent(props SettingsProps) {
 								type="email"
 								name="origin_email"
 								value={ props.Shipping.OriginEmail }
-								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 							/>
 						</div>
 						<div>
@@ -337,7 +337,7 @@ templ SettingsContent(props SettingsProps) {
 								name="origin_phone"
 								value={ props.Shipping.OriginPhone }
 								placeholder="5095852320"
-								class="mt-1 w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
 							/>
 						</div>
 					</div>
@@ -357,7 +357,7 @@ templ SettingsContent(props SettingsProps) {
 								step="0.01"
 								min="0"
 								value={ formatTareOz(props.Shipping.TareWeightOz) }
-								class="w-full rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+								class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
 							/>
 							<span class="text-rr-muted pl-2">oz</span>
 						</div>
@@ -371,12 +371,12 @@ templ SettingsContent(props SettingsProps) {
 			</form>
 		</div>
 		<!-- Box presets link -->
-		<div class="mt-4 border-2 border-rr-border bg-rr-surface px-4 py-4 sm:px-6 flex items-center justify-between">
+		<div class="mt-4 border border-rr-border bg-rr-surface px-4 py-4 sm:px-6 flex items-center justify-between">
 			<div>
 				<h3 class="text-sm font-semibold text-rr-heading">Box presets</h3>
 				<p class="mt-1 text-xs text-rr-muted">Named cartons used when buying shipping labels. The smallest preset that fits an order's weight is selected automatically.</p>
 			</div>
-			<a href="/admin/settings/box-presets" class="rounded-sm border-2 border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised">
+			<a href="/admin/settings/box-presets" class="rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised">
 				Manage presets
 			</a>
 		</div>
@@ -387,7 +387,7 @@ templ SettingsContent(props SettingsProps) {
 		<p class="mt-1 text-sm text-rr-muted">Connect external services for billing and payments.</p>
 		<div class="mt-4 space-y-4">
 			<!-- QuickBooks Online -->
-			<div class="overflow-hidden border-2 border-rr-border bg-rr-surface">
+			<div class="overflow-hidden border border-rr-border bg-rr-surface">
 				<div class="px-4 py-5 sm:px-6">
 					<div class="flex items-center justify-between">
 						<div class="flex items-center gap-3">
@@ -452,7 +452,7 @@ templ SettingsContent(props SettingsProps) {
 						<div class="flex items-center gap-3">
 							<a
 								href="/admin/settings/integrations/quickbooks/connect"
-								class="inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border-2 border-rr-border hover:bg-rr-raised"
+								class="inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border border-rr-border hover:bg-rr-raised"
 							>
 								Reconnect
 							</a>

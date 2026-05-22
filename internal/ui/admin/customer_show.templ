@@ -61,7 +61,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 	</div>
 	<!-- Wholesale status banner -->
 	if props.Customer.AccountType == domain.AccountTypeWholesale && props.Customer.WholesaleStatus != nil {
-		<div class="mt-4 border-2 border-rr-border bg-rr-surface p-4">
+		<div class="mt-4 border border-rr-border bg-rr-surface p-4">
 			<div class="sm:flex sm:items-center sm:justify-between">
 				<div class="flex items-center gap-3">
 					<h3 class="text-sm font-medium text-rr-heading">Wholesale application</h3>
@@ -89,7 +89,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 	}
 	<!-- Info cards -->
 	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Email verified</dt>
 			<dd class="mt-1">
 				if props.Customer.EmailVerified {
@@ -99,13 +99,13 @@ templ CustomerShowContent(props CustomerShowProps) {
 				}
 			</dd>
 		</div>
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Account type</dt>
 			<dd class="mt-1 text-sm text-rr-heading capitalize">
 				{ string(props.Customer.AccountType) }
 			</dd>
 		</div>
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Tax exempt</dt>
 			<dd class="mt-1 text-sm text-rr-heading">
 				if props.Customer.TaxExempt {
@@ -135,7 +135,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 		if len(props.RecentOrders) == 0 {
 			<p class="mt-2 text-sm text-rr-muted">No orders placed yet.</p>
 		} else {
-			<div class="mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface">
+			<div class="mt-2 overflow-hidden border border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
@@ -181,7 +181,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 	<!-- Activity -->
 	@CustomerActivity(props.Activity, props.MerchantTZ)
 	<!-- Details -->
-	<div class="mt-8 border-2 border-rr-border bg-rr-surface">
+	<div class="mt-8 border border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6">
 			<h2 class="text-sm font-semibold text-rr-heading">Details</h2>
 		</div>
@@ -201,7 +201,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 		</div>
 	</div>
 	<!-- Fulfillment preferences -->
-	<div class="mt-8 border-2 border-rr-border bg-rr-surface">
+	<div class="mt-8 border border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6">
 			<h2 class="text-sm font-semibold text-rr-heading">Fulfillment preferences</h2>
 		</div>
@@ -237,7 +237,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 	</div>
 	<!-- Wholesale billing settings -->
 	if props.Customer.AccountType == domain.AccountTypeWholesale {
-		<div class="mt-8 border-2 border-rr-border bg-rr-surface">
+		<div class="mt-8 border border-rr-border bg-rr-surface">
 			<div class="px-4 py-5 sm:px-6">
 				<h2 class="text-sm font-semibold text-rr-heading">Billing Settings</h2>
 			</div>
@@ -388,7 +388,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 		} else {
 			<div class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
 				for _, addr := range props.Addresses {
-					<div class="border-2 border-rr-border bg-rr-surface p-4">
+					<div class="border border-rr-border bg-rr-surface p-4">
 						<p class="text-sm font-medium text-rr-heading">{ addr.FirstName } { addr.LastName }</p>
 						if addr.Company != nil {
 							<p class="text-sm text-rr-muted">{ *addr.Company }</p>

@@ -71,7 +71,7 @@ func AttributeSetListContent(props AttributeSetListProps) templ.Component {
 		}
 		if len(props.Sets) > 0 {
 			for _, set := range props.Sets {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-4 sm:px-6 flex items-center justify-between\"><div><a href=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"border border-rr-border bg-rr-surface\"><div class=\"px-4 py-4 sm:px-6 flex items-center justify-between\"><div><a href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -211,12 +211,12 @@ func AttributeSetListContent(props AttributeSetListProps) templ.Component {
 				}
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"border-2 border-dashed border-rr-border p-12 text-center\"><h3 class=\"mt-2 text-sm font-semibold text-rr-heading\">No attribute sets</h3><p class=\"mt-1 text-sm text-rr-muted\">Create your first attribute set to start defining product attributes.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"border border-dashed border-rr-border p-12 text-center\"><h3 class=\"mt-2 text-sm font-semibold text-rr-heading\">No attribute sets</h3><p class=\"mt-1 text-sm text-rr-muted\">Create your first attribute set to start defining product attributes.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><!-- Create form --><div class=\"mt-8 border-2 border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Create attribute set</h3></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6\"><form method=\"post\" action=\"/admin/attributes\" class=\"flex items-end gap-3 flex-wrap\"><div class=\"flex-1 min-w-[200px]\"><label for=\"set_name\" class=\"block text-sm/6 font-medium text-rr-heading\">Name</label><div class=\"mt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><!-- Create form --><div class=\"mt-8 border border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-base/7 font-semibold text-rr-heading\">Create attribute set</h3></div><div class=\"border-t border-rr-border px-4 py-5 sm:px-6\"><form method=\"post\" action=\"/admin/attributes\" class=\"flex items-end gap-3 flex-wrap\"><div class=\"flex-1 min-w-[200px]\"><label for=\"set_name\" class=\"block text-sm/6 font-medium text-rr-heading\">Name</label><div class=\"mt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -14,7 +14,7 @@ templ PirateShipExportButton() {
 			type="button"
 			x-on:click="runExport()"
 			x-bind:disabled="exporting"
-			class="inline-flex items-center justify-center gap-2 rounded-sm border-2 border-rr-ink bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-ink hover:bg-rr-raised disabled:opacity-60 disabled:cursor-wait"
+			class="inline-flex items-center justify-center gap-2 rounded-sm border border-rr-ink bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-ink hover:bg-rr-raised disabled:opacity-60 disabled:cursor-wait"
 		>
 			<svg class="size-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
 				<path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.69L6.78 8.97a.75.75 0 1 0-1.06 1.06l3.75 3.75a.75.75 0 0 0 1.06 0l3.75-3.75a.75.75 0 1 0-1.06-1.06l-2.47 2.47V2.75Z"></path>
@@ -30,7 +30,7 @@ templ PirateShipExportButton() {
 			x-show="notice"
 			x-cloak
 			x-transition.opacity
-			class="absolute right-0 top-full z-10 mt-2 w-80 max-w-[90vw] border-2 border-rr-ink bg-rr-paper p-4 text-sm text-rr-ink"
+			class="absolute right-0 top-full z-10 mt-2 w-80 max-w-[90vw] border border-rr-ink bg-rr-paper p-4 text-sm text-rr-ink"
 			style="box-shadow: 4px 4px 0 0 var(--color-rr-ink, #0E0D0C);"
 		>
 			<div class="flex items-start justify-between gap-3">

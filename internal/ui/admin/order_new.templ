@@ -64,12 +64,12 @@ templ OrderNewContent(props OrderNewProps) {
 		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
 			<a
 				href="/admin/orders"
-				class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+				class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 			>Back to orders</a>
 		</div>
 	</div>
 	if props.Banner != "" {
-		<div class="mt-6 border-2 border-red-300 bg-red-50 p-3 text-sm text-red-800">
+		<div class="mt-6 border border-red-300 bg-red-50 p-3 text-sm text-red-800">
 			{ props.Banner }
 		</div>
 	}
@@ -162,7 +162,7 @@ templ OrderNewContent(props OrderNewProps) {
 						<h2 class="text-base/7 font-semibold text-rr-heading">Line items</h2>
 						<p class="mt-1 text-sm/6 text-rr-muted">Enter the SKU, quantity, and unit price (cents) for each line.</p>
 					</div>
-					<button type="button" @click="add()" class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised">+ Add line</button>
+					<button type="button" @click="add()" class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised">+ Add line</button>
 				</div>
 				if msg := getError(props.FieldErrors, "items"); msg != "" {
 					<p class="mt-2 text-sm text-red-600">{ msg }</p>

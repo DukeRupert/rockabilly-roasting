@@ -105,7 +105,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 	</div>
 	<!-- State banners -->
 	if props.Subscription.CancelledAt != nil {
-		<div class="mt-6 border-2 border-rr-border bg-rr-raised p-4">
+		<div class="mt-6 border border-rr-border bg-rr-raised p-4">
 			<p class="text-sm text-rr-heading">
 				<span class="font-semibold">Cancelled</span>
 				<span class="text-rr-muted"> on { props.Subscription.CancelledAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM") }</span>
@@ -147,7 +147,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 	}
 	<!-- Product line -->
 	if props.Product != nil && props.Variant != nil {
-		<div class="mt-6 border-2 border-rr-border bg-rr-surface p-4">
+		<div class="mt-6 border border-rr-border bg-rr-surface p-4">
 			<div class="flex items-start gap-4">
 				if props.ThumbnailURL != "" {
 					<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", props.Product.ID.String())) } class="block shrink-0">
@@ -181,7 +181,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 								<label class="text-xs font-medium uppercase tracking-wide text-rr-muted">Grind</label>
 								<select
 									name="variant_id"
-									class="border-2 border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+									class="border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
 								>
 									for _, sv := range props.SiblingVariants {
 										if sv.ID == props.Variant.ID {
@@ -193,7 +193,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 								</select>
 								<button
 									type="submit"
-									class="border-2 border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
+									class="border border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
 									onclick="return confirm('Change grind on this subscription? Future renewals will use the new variant. The current pending order (if any) is not updated by this action.')"
 								>Save</button>
 								<span class="text-xs text-rr-muted">Applies to future renewals only.</span>
@@ -210,7 +210,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 	}
 	<!-- Schedule + plan stats -->
 	<div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Plan</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ props.Plan.Name }</dd>
 			<dd class="text-xs text-rr-muted">
@@ -228,7 +228,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 					<label class="sr-only">Change plan</label>
 					<select
 						name="plan_id"
-						class="w-full border-2 border-rr-border bg-rr-surface px-2 py-1 text-xs text-rr-heading"
+						class="w-full border border-rr-border bg-rr-surface px-2 py-1 text-xs text-rr-heading"
 					>
 						for _, ap := range props.AvailablePlans {
 							if ap.ID == props.Plan.ID {
@@ -240,24 +240,24 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 					</select>
 					<button
 						type="submit"
-						class="border-2 border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
+						class="border border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
 						onclick="return confirm('Change this subscription to the selected plan? The current period and next order date will be recalculated to match the new cadence.')"
 					>Save</button>
 				</form>
 			}
 		</div>
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Next Order</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">{ props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006") }</dd>
 			<dd class="text-xs text-rr-muted">{ props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Monday") }</dd>
 		</div>
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Current Period</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">
 				{ props.Subscription.CurrentPeriodStart.In(props.MerchantTZ).Format("Jan 2") } &ndash; { props.Subscription.CurrentPeriodEnd.In(props.MerchantTZ).Format("Jan 2, 2006") }
 			</dd>
 		</div>
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Payment</dt>
 			if props.Subscription.StripePaymentMethodID != nil && *props.Subscription.StripePaymentMethodID != "" {
 				<dd class="mt-1 text-sm font-semibold text-rr-heading">Card on file</dd>
@@ -270,7 +270,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 	</div>
 	<!-- Customer + shipping -->
 	<div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Customer</dt>
 			<dd class="mt-1 text-sm font-semibold text-rr-heading">
 				<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())) } class="text-rr-red hover:text-rr-red-lt">
@@ -282,7 +282,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 				<dd class="text-xs text-rr-muted">{ *props.Customer.Phone }</dd>
 			}
 		</div>
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Ship to</dt>
 			if props.ShippingAddress != nil {
 				<address class="mt-1 text-sm text-rr-heading not-italic">
@@ -307,7 +307,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 		if len(props.Orders) == 0 {
 			<p class="mt-2 text-sm text-rr-muted">No renewal orders yet.</p>
 		} else {
-			<div class="mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface">
+			<div class="mt-2 overflow-hidden border border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>

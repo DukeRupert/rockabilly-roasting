@@ -181,7 +181,7 @@ templ grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) {
 		>
 			<select
 				name="variant_id"
-				class="border-2 border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+				class="border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
 			>
 				for _, sv := range eli.SiblingVariants {
 					if sv.ID == eli.LineItem.VariantID {
@@ -193,7 +193,7 @@ templ grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) {
 			</select>
 			<button
 				type="submit"
-				class="border-2 border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
+				class="border border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
 			>Save</button>
 		</form>
 	} else {
@@ -227,7 +227,7 @@ templ OrderShowContent(props OrderShowProps) {
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/invoice", props.Order.ID.String())) }
 				target="_blank"
-				class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white border-2 border-rr-red hover:bg-rr-red-lt"
+				class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white border border-rr-red hover:bg-rr-red-lt"
 			>
 				<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18.75 12h.008v.008h-.008V12Zm-2.25 0h.008v.008H16.5V12Z"></path>
@@ -237,7 +237,7 @@ templ OrderShowContent(props OrderShowProps) {
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/packing-slip", props.Order.ID.String())) }
 				target="_blank"
-				class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+				class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 			>
 				<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18.75 12h.008v.008h-.008V12Zm-2.25 0h.008v.008H16.5V12Z"></path>
@@ -249,7 +249,7 @@ templ OrderShowContent(props OrderShowProps) {
 	</div>
 	<!-- Order progress bar -->
 	if orderPipelineStep(props.Order) >= 0 {
-		<div class="mt-6 border-2 border-rr-border bg-rr-surface p-6">
+		<div class="mt-6 border border-rr-border bg-rr-surface p-6">
 			<div class="flex items-center">
 				<!-- Step 1: Paid -->
 				<div class="flex flex-col items-center">
@@ -330,7 +330,7 @@ templ OrderShowContent(props OrderShowProps) {
 				<a
 					href={ templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/label", sh.ID.String())) }
 					target="_blank"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 				>
 					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
@@ -386,7 +386,7 @@ templ OrderShowContent(props OrderShowProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-fulfillment", props.Order.ID.String())) }>
 				<button
 					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 					onclick="return confirm('Revert this order back to unfulfilled? Use only if it was marked fulfilled by mistake.')"
 				>
 					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -400,7 +400,7 @@ templ OrderShowContent(props OrderShowProps) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-shipment", props.Order.ID.String())) }>
 				<button
 					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border-2 border-rr-border hover:bg-rr-raised"
+					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 					onclick="return confirm('Revert shipped status back to fulfilled? The shipping label and customer email will NOT be undone — handle that manually.')"
 				>
 					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -435,12 +435,12 @@ templ OrderShowContent(props OrderShowProps) {
 	</div>
 	<!-- Info cards: total, customer, shipping -->
 	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-		<div class="border-2 border-rr-border bg-rr-surface p-4">
+		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Total</dt>
 			<dd class="mt-1 text-lg font-semibold text-rr-heading tabular-nums">{ formatCents(props.Order.Total) }</dd>
 		</div>
 		if props.Customer != nil {
-			<div class="border-2 border-rr-border bg-rr-surface p-4">
+			<div class="border border-rr-border bg-rr-surface p-4">
 				<dt class="text-sm font-medium text-rr-muted">Customer</dt>
 				<dd class="mt-1 text-sm font-semibold text-rr-heading">
 					<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())) } class="text-rr-red hover:text-rr-red-lt">
@@ -451,7 +451,7 @@ templ OrderShowContent(props OrderShowProps) {
 			</div>
 		}
 		if props.ShippingAddress != nil {
-			<div class="border-2 border-rr-border bg-rr-surface p-4">
+			<div class="border border-rr-border bg-rr-surface p-4">
 				<dt class="text-sm font-medium text-rr-muted">Ship to</dt>
 				<dd class="mt-1">
 					<address class="text-sm text-rr-heading not-italic">
@@ -471,7 +471,7 @@ templ OrderShowContent(props OrderShowProps) {
 	</div>
 	<!-- Shipping method & delivery date -->
 	if props.Order.ShippingMethod != nil || props.Order.RequestedDeliveryDate != nil || (props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "") {
-		<div class="mt-4 border-2 border-rr-border bg-rr-surface p-4">
+		<div class="mt-4 border border-rr-border bg-rr-surface p-4">
 			<div class="flex flex-wrap items-center gap-4">
 				if props.Order.ShippingMethod != nil {
 					<div class="flex items-center gap-2">
@@ -496,7 +496,7 @@ templ OrderShowContent(props OrderShowProps) {
 	}
 	<!-- Stripe info -->
 	if props.Order.StripePaymentIntentID != nil && *props.Order.StripePaymentIntentID != "" {
-		<div class="mt-4 border-2 border-rr-border bg-rr-raised p-4">
+		<div class="mt-4 border border-rr-border bg-rr-raised p-4">
 			<p class="text-sm text-rr-muted">
 				<span class="font-medium">Stripe Payment Intent:</span>
 				<code class="ml-1 text-xs">{ *props.Order.StripePaymentIntentID }</code>
@@ -509,7 +509,7 @@ templ OrderShowContent(props OrderShowProps) {
 		if len(props.LineItems) == 0 {
 			<p class="mt-2 text-sm text-rr-muted">No line items.</p>
 		} else {
-			<div class="mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface">
+			<div class="mt-2 overflow-hidden border border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
@@ -558,7 +558,7 @@ templ OrderShowContent(props OrderShowProps) {
 		}
 	</div>
 	<!-- Order totals -->
-	<div class="mt-6 border-2 border-rr-border bg-rr-surface p-4">
+	<div class="mt-6 border border-rr-border bg-rr-surface p-4">
 		<dl class="space-y-2">
 			<div class="flex justify-between text-sm">
 				<dt class="text-rr-muted">Subtotal</dt>
@@ -588,7 +588,7 @@ templ OrderShowContent(props OrderShowProps) {
 	if len(props.Adjustments) > 0 {
 		<div class="mt-8">
 			<h2 class="text-sm font-semibold text-rr-heading">Adjustments</h2>
-			<div class="mt-2 overflow-hidden border-2 border-rr-border bg-rr-surface">
+			<div class="mt-2 overflow-hidden border border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>

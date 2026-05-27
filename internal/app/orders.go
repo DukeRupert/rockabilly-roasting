@@ -403,11 +403,11 @@ func (s *OrderService) FulfillOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID
 
 // ChangeLineItemVariant swaps a line item to a sibling variant on the same
 // product, e.g., switching grind from Whole Bean to Drip after the order has
-// been placed. The unit price and totals are preserved — the new variant
-// must have the same base price (in the order's currency) as the line item's
-// current unit price, otherwise the swap is rejected and the caller is told
-// to cancel and recreate the order. Records an audit entry capturing the old
-// and new variant IDs and SKUs.
+// been placed. The line item's unit price and totals are preserved — the new
+// variant must have the same base price (in the order's currency) as the
+// current variant, so any subscription/wholesale discount baked into the
+// existing unit price stays mathematically consistent. Records an audit
+// entry capturing the old and new variant IDs and SKUs.
 func (s *OrderService) ChangeLineItemVariant(ctx context.Context, tx pgx.Tx, orderID, lineItemID, newVariantID uuid.UUID, actor Actor) (*domain.LineItem, error) {
 	if s.catalog == nil || s.pricing == nil {
 		return nil, fmt.Errorf("change line item variant: service not wired with catalog/pricing")
@@ -456,6 +456,13 @@ func (s *OrderService) ChangeLineItemVariant(ctx context.Context, tx pgx.Tx, ord
 		return nil, ErrVariantArchived
 	}
 
+	oldPrice, err := s.pricing.GetBasePrice(ctx, tx, oldVariant.ID, order.CurrencyCode)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPriceNotFound
+		}
+		return nil, fmt.Errorf("get current variant price: %w", err)
+	}
 	newPrice, err := s.pricing.GetBasePrice(ctx, tx, newVariantID, order.CurrencyCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -463,7 +470,7 @@ func (s *OrderService) ChangeLineItemVariant(ctx context.Context, tx pgx.Tx, ord
 		}
 		return nil, fmt.Errorf("get new variant price: %w", err)
 	}
-	if newPrice.Amount != li.UnitPrice {
+	if newPrice.Amount != oldPrice.Amount {
 		return nil, ErrVariantPriceMismatch
 	}
 

@@ -292,6 +292,37 @@ func TestOrderService_ChangeLineItemVariant(t *testing.T) {
 		assert.ErrorIs(t, err, app.ErrOrderNotEditable)
 	})
 
+	t.Run("allows swap when line item unit price is discounted below base", func(t *testing.T) {
+		// Subscription renewals bake a plan discount into the line item's
+		// UnitPrice. The swap guard must compare base-to-base, not base to
+		// the (already discounted) UnitPrice — otherwise no subscription
+		// order would ever pass the price-match check.
+		tx := testutil.NewTestTx(t, pool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		product := testutil.CreateProduct(t, tx)
+		whole := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("WHOLE-12-SUB"))
+		drip := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("DRIP-12-SUB"))
+		testutil.SetBasePriceForVariant(t, tx, whole.ID, 1500, "USD")
+		testutil.SetBasePriceForVariant(t, tx, drip.ID, 1500, "USD")
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithOrderStatus(domain.OrderStatusConfirmed),
+			testutil.WithPaymentStatus(domain.PaymentStatusCaptured))
+		li, err := store.NewOrderStore(nil).CreateLineItem(ctx, tx, store.CreateLineItemParams{
+			OrderID:   order.ID,
+			VariantID: whole.ID,
+			Quantity:  1,
+			UnitPrice: 1350, // 10% subscription discount off 1500 base
+			Subtotal:  1350,
+			Total:     1350,
+		})
+		require.NoError(t, err)
+
+		updated, err := svc.ChangeLineItemVariant(ctx, tx, order.ID, li.ID, drip.ID, actor)
+		require.NoError(t, err)
+		assert.Equal(t, drip.ID, updated.VariantID)
+		assert.Equal(t, 1350, updated.UnitPrice, "discounted unit price preserved through swap")
+	})
+
 	t.Run("same-variant swap is a no-op", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, pool)
 		orderID, liID, _, _, _ := changeLineItemFixture(t, tx)

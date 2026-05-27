@@ -284,14 +284,23 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			}
 			enrichedItems[i].CurrentLabel = currentLabel
 
-			// Sibling variants (same product, same unit price). Always include
-			// the current variant so the select shows the active selection.
+			// Sibling variants (same product, same base price as the current
+			// variant). Comparing base-to-base — not against the line item's
+			// UnitPrice — keeps subscription-discounted orders swappable, since
+			// the discount math depends only on the base price.
 			allVariants, avErr := d.CatalogService.ListVariants(ctx, tx, product.ID)
 			if avErr != nil {
 				return avErr
 			}
+			currentBase, cbErr := d.PricingService.GetBasePrice(ctx, tx, li.VariantID, order.CurrencyCode)
+			if cbErr != nil && !errors.Is(cbErr, app.ErrPriceNotFound) {
+				return cbErr
+			}
 			for _, sv := range allVariants {
 				if sv.ID != li.VariantID {
+					if currentBase == nil {
+						continue
+					}
 					price, pErr := d.PricingService.GetBasePrice(ctx, tx, sv.ID, order.CurrencyCode)
 					if pErr != nil {
 						if errors.Is(pErr, app.ErrPriceNotFound) {
@@ -299,7 +308,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 						}
 						return pErr
 					}
-					if price.Amount != li.UnitPrice {
+					if price.Amount != currentBase.Amount {
 						continue
 					}
 				}

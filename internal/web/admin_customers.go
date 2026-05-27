@@ -234,6 +234,26 @@ func (d *Deps) handleAdminCustomerBillingMethod(w http.ResponseWriter, r *http.R
 	http.Redirect(w, r, fmt.Sprintf("/admin/customers/%s", id), http.StatusSeeOther)
 }
 
+// handleAdminCustomerSendPasswordSetup triggers a password setup/reset email
+// to a customer. Works whether the customer has a password set or not — the
+// email wording adapts. Used by staff when a customer reports trouble signing in.
+func (d *Deps) handleAdminCustomerSendPasswordSetup(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := d.AuthService.SendPasswordSetupEmail(ctx, d.Pool, id, staffActor(r)); err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/customers/%s", id), http.StatusSeeOther)
+}
+
 func (d *Deps) handleAdminCustomerLocalFulfillment(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

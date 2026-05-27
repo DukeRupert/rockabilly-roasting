@@ -129,6 +129,17 @@ type SubscriptionConfirmData struct {
 	AccountURL   string
 }
 
+// PasswordSetupData holds data for the admin-triggered password setup / reset
+// email. IsReset toggles the wording: false for accounts that have never had a
+// password (set), true for accounts that have one (reset).
+type PasswordSetupData struct {
+	CustomerName string
+	SetupURL     string
+	IsReset      bool
+	StoreName    string
+	StoreURL     string
+}
+
 // WholesaleApprovedData holds data for the wholesale approved welcome email.
 type WholesaleApprovedData struct {
 	CompanyName string

@@ -567,6 +567,80 @@ func (d *Deps) handleAccountLogout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// handleAccountPasswordSetupPage renders the public password-setup page using
+// the token from the email link. Reuses the wholesale setup-token mechanism but
+// presents a retail-branded page and redirects to /account/login on success.
+func (d *Deps) handleAccountPasswordSetupPage(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Redirect(w, r, "/account/login", http.StatusSeeOther)
+		return
+	}
+	props := storefront.AccountPasswordSetupProps{Token: token}
+	if IsHTMX(r) {
+		storefront.AccountPasswordSetupContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.AccountPasswordSetupPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleAccountPasswordSetup consumes the setup token and writes the new
+// password. Token is single-use and expires after 72 hours.
+func (d *Deps) handleAccountPasswordSetup(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	token := r.FormValue("token")
+	password := r.FormValue("password")
+	passwordConfirm := r.FormValue("password_confirm")
+
+	renderErr := func(msg string) {
+		props := storefront.AccountPasswordSetupProps{Token: token, Error: msg}
+		if IsHTMX(r) {
+			storefront.AccountPasswordSetupContent(props).Render(ctx, w) //nolint:errcheck
+			return
+		}
+		storefront.AccountPasswordSetupPage(props).Render(ctx, w) //nolint:errcheck
+	}
+
+	if token == "" {
+		http.Redirect(w, r, "/account/login", http.StatusSeeOther)
+		return
+	}
+
+	if password != passwordConfirm {
+		renderErr("Passwords do not match.")
+		return
+	}
+
+	if len(password) < 10 {
+		renderErr("Password must be at least 10 characters.")
+		return
+	}
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.AuthService.SetPasswordWithToken(ctx, tx, token, password)
+		return txErr
+	})
+	if err != nil {
+		if errors.Is(err, app.ErrSetupTokenExpired) {
+			renderErr("This link has expired or has already been used. Ask us to send a fresh one.")
+			return
+		}
+		if errors.Is(err, app.ErrPasswordTooShort) {
+			renderErr("Password must be at least 10 characters.")
+			return
+		}
+		Error(w, r, err)
+		return
+	}
+
+	props := storefront.AccountPasswordSetupProps{Success: true}
+	if IsHTMX(r) {
+		storefront.AccountPasswordSetupContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	storefront.AccountPasswordSetupPage(props).Render(ctx, w) //nolint:errcheck
+}
+
 // --- Wholesale Login / Logout handlers ---
 
 func (d *Deps) handleWholesaleLoginPage(w http.ResponseWriter, r *http.Request) {

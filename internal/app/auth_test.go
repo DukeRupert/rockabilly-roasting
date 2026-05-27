@@ -4,13 +4,17 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/store"
@@ -235,3 +239,104 @@ func TestSetPasswordWithToken_FlipsEmailVerified(t *testing.T) {
 	assert.Equal(t, string(domain.AuditActorTypeSystem), entry.ActorType)
 	assert.Equal(t, "setup_token_redeem", entry.ActorName)
 }
+
+// --- SendPasswordSetupEmail ---
+
+func newAuthServiceWithEmail(t *testing.T) (*app.AuthService, *email.TestSender) {
+	t.Helper()
+	renderer, err := emailtemplates.New()
+	require.NoError(t, err)
+	sender := email.NewTestSender()
+	svc := newAuthService().WithEmail(app.EmailEnv{
+		Mailer:    sender,
+		Renderer:  renderer,
+		FromAddr:  "test@example.com",
+		BaseURL:   "https://example.test",
+		StoreName: "Test Store",
+	})
+	return svc, sender
+}
+
+// createCommittedCustomer inserts a minimal customer using the pool (visible
+// across new transactions opened by service code) and registers a cleanup that
+// deletes the row + any audit + magic_link_tokens rows it accumulates.
+func createCommittedCustomer(t *testing.T, ctx context.Context, withPassword bool) uuid.UUID {
+	t.Helper()
+	id := uuid.New()
+	email := "test-" + id.String()[:8] + "@example.com"
+	var passwordHash *string
+	if withPassword {
+		hash, err := bcrypt.GenerateFromPassword([]byte("existingpassword"), bcrypt.DefaultCost)
+		require.NoError(t, err)
+		s := string(hash)
+		passwordHash = &s
+	}
+	_, err := testPool.Exec(ctx,
+		`INSERT INTO customers (id, email, first_name, last_name, password_hash)
+		 VALUES ($1, $2, 'Test', 'Customer', $3)`,
+		id, email, passwordHash,
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = testPool.Exec(context.Background(), `DELETE FROM customers WHERE id = $1`, id)
+	})
+	return id
+}
+
+func TestSendPasswordSetupEmail_NoExistingPassword(t *testing.T) {
+	ctx := context.Background()
+	svc, sender := newAuthServiceWithEmail(t)
+	customerID := createCommittedCustomer(t, ctx, false)
+
+	actor := testutil.TestActor()
+	require.NoError(t, svc.SendPasswordSetupEmail(ctx, testPool, customerID, actor))
+
+	require.Len(t, sender.Sent, 1)
+	msg := sender.Sent[0]
+	assert.Equal(t, "Set your password", msg.Subject)
+	assert.Contains(t, msg.HTML, "https://example.test/account/password-setup?token=")
+	assert.Contains(t, msg.HTML, "Set your password")
+	assert.NotContains(t, msg.HTML, "Pick a new password")
+
+	var (
+		actorType string
+		metaReset *bool
+	)
+	require.NoError(t, testPool.QueryRow(ctx,
+		`SELECT actor_type, (metadata->>'reset')::bool FROM audit_log
+		 WHERE resource_type = 'customer' AND resource_id = $1 AND action = $2
+		 ORDER BY created_at DESC LIMIT 1`,
+		customerID, audit.AuditEmailPasswordSetupSent,
+	).Scan(&actorType, &metaReset))
+	assert.Equal(t, string(actor.Type), actorType)
+	if assert.NotNil(t, metaReset) {
+		assert.False(t, *metaReset, "no password set -> reset=false")
+	}
+}
+
+func TestSendPasswordSetupEmail_ExistingPassword_FlagsReset(t *testing.T) {
+	ctx := context.Background()
+	svc, sender := newAuthServiceWithEmail(t)
+	customerID := createCommittedCustomer(t, ctx, true)
+
+	require.NoError(t, svc.SendPasswordSetupEmail(ctx, testPool, customerID, testutil.TestActor()))
+
+	require.Len(t, sender.Sent, 1)
+	msg := sender.Sent[0]
+	assert.Equal(t, "Reset your password", msg.Subject)
+	assert.Contains(t, msg.HTML, "Pick a new password")
+
+	var metaReset *bool
+	require.NoError(t, testPool.QueryRow(ctx,
+		`SELECT (metadata->>'reset')::bool FROM audit_log
+		 WHERE resource_type = 'customer' AND resource_id = $1 AND action = $2
+		 ORDER BY created_at DESC LIMIT 1`,
+		customerID, audit.AuditEmailPasswordSetupSent,
+	).Scan(&metaReset))
+	if assert.NotNil(t, metaReset) {
+		assert.True(t, *metaReset, "existing password -> reset=true")
+	}
+}
+
+// pgx is used implicitly via the auth service.
+var _ = pgx.ErrNoRows

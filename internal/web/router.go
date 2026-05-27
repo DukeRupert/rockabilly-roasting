@@ -170,6 +170,10 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /wholesale/setup", deps.handleWholesaleSetupPage)
 	mux.HandleFunc("POST /wholesale/setup", deps.handleWholesaleSetup)
 
+	// Generic password setup/reset (admin-triggered, retail or wholesale customer)
+	mux.HandleFunc("GET /account/password-setup", deps.handleAccountPasswordSetupPage)
+	mux.HandleFunc("POST /account/password-setup", deps.handleAccountPasswordSetup)
+
 	// Retail account auth routes (magic link, no session required)
 	magicLinkLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
 		return r.FormValue("email")
@@ -324,6 +328,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/customers/{id}/price-list", deps.handleAdminCustomerPriceList)
 	adminMux.HandleFunc("POST /admin/customers/{id}/billing-method", deps.handleAdminCustomerBillingMethod)
 	adminMux.HandleFunc("POST /admin/customers/{id}/local-fulfillment", deps.handleAdminCustomerLocalFulfillment)
+	adminMux.HandleFunc("POST /admin/customers/{id}/send-password-setup", deps.handleAdminCustomerSendPasswordSetup)
 
 	// Admin customer groups
 	adminMux.HandleFunc("GET /admin/groups", deps.handleAdminGroupList)

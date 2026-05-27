@@ -97,6 +97,34 @@ func TestRender_OrderShipped_OmitsTrackingCTAWhenURLEmpty(t *testing.T) {
 	assert.NotContains(t, html, "Track shipment")
 }
 
+func TestRender_PasswordSetup(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	setup := PasswordSetupData{
+		CustomerName: "John",
+		SetupURL:     "https://example.com/account/password-setup?token=abc123",
+		IsReset:      false,
+		StoreName:    "Test Store",
+		StoreURL:     "https://example.com",
+	}
+	html, text, err := r.Render("password_setup", setup)
+	require.NoError(t, err)
+	assert.Contains(t, html, "abc123")
+	assert.Contains(t, html, "Set your password")
+	assert.NotContains(t, html, "Pick a new password")
+	assert.Contains(t, text, "abc123")
+	assert.Contains(t, text, "SET YOUR PASSWORD")
+
+	reset := setup
+	reset.IsReset = true
+	html, text, err = r.Render("password_setup", reset)
+	require.NoError(t, err)
+	assert.Contains(t, html, "Pick a new password")
+	assert.Contains(t, html, "Reset Password")
+	assert.Contains(t, text, "PICK A NEW PASSWORD")
+}
+
 func TestRender_MagicLink(t *testing.T) {
 	r, err := New()
 	require.NoError(t, err)

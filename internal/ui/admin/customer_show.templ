@@ -91,12 +91,23 @@ templ CustomerShowContent(props CustomerShowProps) {
 	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
 		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Email verified</dt>
-			<dd class="mt-1">
+			<dd class="mt-1 flex items-center justify-between gap-2">
 				if props.Customer.EmailVerified {
 					<span class="badge badge-green">yes</span>
 				} else {
 					<span class="badge badge-amber">no</span>
 				}
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-password-setup", props.Customer.ID)) }>
+					if props.Customer.PasswordHash == nil {
+						<button type="submit" class="btn-confirm" style="padding:0.35rem 0.75rem;font-size:0.7rem;" onclick="return confirm('Email this customer a password setup link?')">
+							Send setup link
+						</button>
+					} else {
+						<button type="submit" class="btn-confirm" style="padding:0.35rem 0.75rem;font-size:0.7rem;" onclick="return confirm('Email this customer a password reset link? Their current password will keep working until they use the link.')">
+							Send reset link
+						</button>
+					}
+				</form>
 			</dd>
 		</div>
 		<div class="border border-rr-border bg-rr-surface p-4">

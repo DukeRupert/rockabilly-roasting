@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -44,6 +45,7 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 	var rows []admin.OrderRow
 	var totalCount int
 	var counts store.OrderViewCounts
+	var failedLabelIDs map[uuid.UUID]bool
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -63,6 +65,7 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 		// Enrich each order with customer display info. Bounded by perPage,
 		// so per-row lookup is acceptable here.
 		rows = make([]admin.OrderRow, 0, len(orders))
+		orderIDs := make([]uuid.UUID, 0, len(orders))
 		for _, o := range orders {
 			row := admin.OrderRow{
 				Order:        o,
@@ -81,6 +84,18 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			rows = append(rows, row)
+			orderIDs = append(orderIDs, o.ID)
+		}
+
+		// Single batched query for label-attempt failures across the page.
+		failedLabelIDs, txErr = d.FulfillmentService.ListOrdersWithFailedLabelAttempts(ctx, tx, orderIDs)
+		if txErr != nil {
+			return txErr
+		}
+		for i := range rows {
+			if failedLabelIDs[rows[i].Order.ID] {
+				rows[i].LabelFailed = true
+			}
 		}
 		return nil
 	})
@@ -198,6 +213,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var customer *domain.Customer
 	var shippingAddress *domain.Address
 	var shipments []domain.Shipment
+	var latestLabelAttempt *domain.LabelAttempt
 	var enrichedItems []admin.EnrichedLineItem
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -215,6 +231,10 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		shipments, txErr = d.FulfillmentService.ListShipmentsByOrder(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		latestLabelAttempt, txErr = d.FulfillmentService.GetLatestLabelAttempt(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
@@ -339,17 +359,18 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.OrderShowProps{
-		Order:            order,
-		LineItems:        enrichedItems,
-		Adjustments:      adjustments,
-		Customer:         customer,
-		ShippingAddress:  shippingAddress,
-		Shipments:        shipments,
-		Flash:            r.URL.Query().Get("flash"),
-		MerchantTZ:       d.MerchantTZ,
-		StaffName:        name,
-		StaffRole:        role,
-		CanEditLineItems: canEditOrderLineItemsView(order),
+		Order:              order,
+		LineItems:          enrichedItems,
+		Adjustments:        adjustments,
+		Customer:           customer,
+		ShippingAddress:    shippingAddress,
+		Shipments:          shipments,
+		LatestLabelAttempt: latestLabelAttempt,
+		Flash:              r.URL.Query().Get("flash"),
+		MerchantTZ:         d.MerchantTZ,
+		StaffName:          name,
+		StaffRole:          role,
+		CanEditLineItems:   canEditOrderLineItemsView(order),
 	}
 
 	if IsHTMX(r) {
@@ -658,59 +679,11 @@ func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var order *domain.Order
-	var lineItems []domain.LineItem
-	var customer *domain.Customer
-	var shippingAddress *domain.Address
-	var enrichedItems []admin.EnrichedLineItem
-
+	var props admin.PackingSlipProps
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		order, txErr = d.OrderService.GetOrderAsStaff(ctx, tx, id)
-		if txErr != nil {
-			return txErr
-		}
-		lineItems, txErr = d.OrderService.ListLineItems(ctx, tx, id)
-		if txErr != nil {
-			return txErr
-		}
-
-		if order.CustomerID != nil {
-			customer, txErr = d.CustomerService.GetCustomer(ctx, tx, *order.CustomerID)
-			if txErr != nil && !errors.Is(txErr, app.ErrCustomerNotFound) {
-				return txErr
-			}
-		}
-
-		shippingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
-		if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
-			return txErr
-		}
-
-		enrichedItems = make([]admin.EnrichedLineItem, len(lineItems))
-		for i, li := range lineItems {
-			enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
-
-			variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
-			if vErr != nil {
-				if errors.Is(vErr, app.ErrVariantNotFound) {
-					continue
-				}
-				return vErr
-			}
-			enrichedItems[i].VariantSKU = variant.SKU
-
-			product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
-			if pErr != nil {
-				if errors.Is(pErr, app.ErrProductNotFound) {
-					continue
-				}
-				return pErr
-			}
-			enrichedItems[i].ProductTitle = product.Title
-		}
-
-		return nil
+		props, txErr = d.loadPackingSlipProps(ctx, tx, id)
+		return txErr
 	})
 	if err != nil {
 		if errors.Is(err, app.ErrOrderNotFound) {
@@ -721,15 +694,66 @@ func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	props := admin.PackingSlipProps{
+	admin.PackingSlip(props).Render(ctx, w) //nolint:errcheck
+}
+
+// loadPackingSlipProps fetches everything needed to render a single packing
+// slip (order, line items + product/variant enrichment, customer, shipping
+// address). Pure read; safe to call multiple times in one tx for the batch
+// renderer.
+func (d *Deps) loadPackingSlipProps(ctx context.Context, tx pgx.Tx, id uuid.UUID) (admin.PackingSlipProps, error) {
+	order, err := d.OrderService.GetOrderAsStaff(ctx, tx, id)
+	if err != nil {
+		return admin.PackingSlipProps{}, err
+	}
+	lineItems, err := d.OrderService.ListLineItems(ctx, tx, id)
+	if err != nil {
+		return admin.PackingSlipProps{}, err
+	}
+
+	var customer *domain.Customer
+	if order.CustomerID != nil {
+		customer, err = d.CustomerService.GetCustomer(ctx, tx, *order.CustomerID)
+		if err != nil && !errors.Is(err, app.ErrCustomerNotFound) {
+			return admin.PackingSlipProps{}, err
+		}
+	}
+
+	shippingAddress, err := d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
+	if err != nil && !errors.Is(err, app.ErrAddressNotFound) {
+		return admin.PackingSlipProps{}, err
+	}
+
+	enrichedItems := make([]admin.EnrichedLineItem, len(lineItems))
+	for i, li := range lineItems {
+		enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
+
+		variant, vErr := d.CatalogService.GetVariant(ctx, tx, li.VariantID)
+		if vErr != nil {
+			if errors.Is(vErr, app.ErrVariantNotFound) {
+				continue
+			}
+			return admin.PackingSlipProps{}, vErr
+		}
+		enrichedItems[i].VariantSKU = variant.SKU
+
+		product, pErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+		if pErr != nil {
+			if errors.Is(pErr, app.ErrProductNotFound) {
+				continue
+			}
+			return admin.PackingSlipProps{}, pErr
+		}
+		enrichedItems[i].ProductTitle = product.Title
+	}
+
+	return admin.PackingSlipProps{
 		Order:           order,
 		LineItems:       enrichedItems,
 		Customer:        customer,
 		ShippingAddress: shippingAddress,
 		MerchantTZ:      d.MerchantTZ,
-	}
-
-	admin.PackingSlip(props).Render(ctx, w) //nolint:errcheck
+	}, nil
 }
 
 func (d *Deps) handleAdminOrderInvoice(w http.ResponseWriter, r *http.Request) {
@@ -823,6 +847,164 @@ func (d *Deps) handleAdminOrderInvoiceBatch(w http.ResponseWriter, r *http.Reque
 	}
 
 	admin.OrderInvoiceBatch(admin.OrderInvoiceBatchProps{Items: items}).Render(ctx, w) //nolint:errcheck
+}
+
+// maxBatchOrderIDs caps the bulk-fulfillment forms at the same size as the
+// invoice batch — 100 orders per action.
+const maxBatchOrderIDs = 100
+
+// maxFailuresInRedirect bounds the per-order failure list carried back in the
+// /admin/fulfillment redirect URL. Above this count, the rest are summarised
+// behind fail_truncated=1 so the URL stays well under typical 8KB limits.
+const maxFailuresInRedirect = 25
+
+// parseBatchOrderIDs parses a comma-separated list of order UUIDs from a bulk
+// action form field. Trims whitespace, dedupes, enforces maxBatchOrderIDs.
+// Returns (ids, 0, "") on success, or (nil, status, message) on failure that
+// the caller should write back as an HTTP error response.
+func parseBatchOrderIDs(raw string) ([]uuid.UUID, int, string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, http.StatusBadRequest, "no orders selected"
+	}
+	parts := strings.Split(raw, ",")
+	if len(parts) > maxBatchOrderIDs {
+		return nil, http.StatusBadRequest, fmt.Sprintf("too many orders (max %d per batch)", maxBatchOrderIDs)
+	}
+	ids := make([]uuid.UUID, 0, len(parts))
+	seen := make(map[uuid.UUID]struct{}, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		id, err := uuid.Parse(p)
+		if err != nil {
+			return nil, http.StatusBadRequest, "invalid order id: " + p
+		}
+		if _, dup := seen[id]; dup {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return nil, http.StatusBadRequest, "no orders selected"
+	}
+	return ids, 0, ""
+}
+
+// buildBatchResultRedirect constructs the /admin/fulfillment redirect URL
+// carrying the result of a just-completed bulk verb. Reasons are joined with
+// commas; failureReasonFor's output never contains commas today so the
+// receiver can split unambiguously.
+func buildBatchResultRedirect(verb string, outcome app.BatchOutcome) string {
+	v := url.Values{}
+	v.Set("batch_result", verb)
+	v.Set("ok", strconv.Itoa(len(outcome.Succeeded)))
+	v.Set("fail", strconv.Itoa(len(outcome.Failed)))
+	if len(outcome.Failed) > 0 {
+		n := len(outcome.Failed)
+		truncated := false
+		if n > maxFailuresInRedirect {
+			n = maxFailuresInRedirect
+			truncated = true
+		}
+		ids := make([]string, n)
+		reasons := make([]string, n)
+		for i := 0; i < n; i++ {
+			ids[i] = outcome.Failed[i].OrderID.String()
+			reasons[i] = outcome.Failed[i].Reason
+		}
+		v.Set("fail_ids", strings.Join(ids, ","))
+		v.Set("fail_reasons", strings.Join(reasons, ","))
+		if truncated {
+			v.Set("fail_truncated", "1")
+		}
+	}
+	return "/admin/fulfillment?" + v.Encode()
+}
+
+// handleAdminOrderPackingSlipBatch renders N packing slips in one print-ready
+// document. GET /admin/orders/batch/packing-slips?ids=uuid1,uuid2,... Mirrors
+// handleAdminOrderInvoiceBatch exactly — opens in a new tab from the
+// fulfillment bulk action bar and fires window.print() on load.
+func (d *Deps) handleAdminOrderPackingSlipBatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	ids, status, msg := parseBatchOrderIDs(r.URL.Query().Get("ids"))
+	if status != 0 {
+		http.Error(w, msg, status)
+		return
+	}
+
+	items := make([]admin.PackingSlipProps, 0, len(ids))
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		for _, id := range ids {
+			props, txErr := d.loadPackingSlipProps(ctx, tx, id)
+			if txErr != nil {
+				return txErr
+			}
+			items = append(items, props)
+		}
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, app.ErrOrderNotFound) {
+			http.NotFound(w, r)
+			return
+		}
+		Error(w, r, err)
+		return
+	}
+
+	admin.PackingSlipBatch(admin.PackingSlipBatchProps{Items: items}).Render(ctx, w) //nolint:errcheck
+}
+
+// handleAdminOrderPickedUpBatch applies MarkPickedUp to each order in the
+// posted order_ids list. POST /admin/orders/batch/picked-up. Always redirects
+// to /admin/fulfillment with a structured batch_result query string the
+// fulfillment list templ renders as the inline banner — including per-order
+// failure reasons so staff can fix the rejected rows.
+func (d *Deps) handleAdminOrderPickedUpBatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	ids, status, msg := parseBatchOrderIDs(r.FormValue("order_ids"))
+	if status != 0 {
+		http.Error(w, msg, status)
+		return
+	}
+	outcome, err := d.OrderService.MarkPickedUpBatch(ctx, d.Pool, ids, staffActor(r))
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	http.Redirect(w, r, buildBatchResultRedirect("picked-up", outcome), http.StatusSeeOther)
+}
+
+// handleAdminOrderOutForDeliveryBatch applies MarkOutForDelivery to each order
+// in the posted order_ids list. POST /admin/orders/batch/out-for-delivery.
+// Same redirect-with-banner shape as handleAdminOrderPickedUpBatch.
+func (d *Deps) handleAdminOrderOutForDeliveryBatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	ids, status, msg := parseBatchOrderIDs(r.FormValue("order_ids"))
+	if status != 0 {
+		http.Error(w, msg, status)
+		return
+	}
+	outcome, err := d.OrderService.MarkOutForDeliveryBatch(ctx, d.Pool, ids, staffActor(r))
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	http.Redirect(w, r, buildBatchResultRedirect("out-for-delivery", outcome), http.StatusSeeOther)
 }
 
 // loadOrderInvoiceProps fetches everything needed to render a single invoice

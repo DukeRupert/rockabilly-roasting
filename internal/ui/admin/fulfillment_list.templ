@@ -3,22 +3,195 @@ package admin
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
+// FulfillmentViewCounts holds tab counts for the fulfillment queue. Mirrors
+// store.FulfillmentViewCounts so the ui package stays free of store imports.
+type FulfillmentViewCounts struct {
+	NeedsAction int
+	ReadyToShip int
+	Shipped     int
+	Delivered   int
+	All         int
+}
+
+// FulfillmentGroup is a per-shipping-method bucket on the action views.
+// The group's Method drives which bulk verbs the action bar exposes — only
+// carrier shipments can be batch-labeled.
+type FulfillmentGroup struct {
+	Method *domain.ShippingMethod // nil = unset / other
+	Rows   []OrderRow
+}
+
 type FulfillmentListProps struct {
-	Orders     []domain.Order
-	Filter     string
+	View       string // needs_action | ready_to_ship | shipped | delivered | all
+	Counts     FulfillmentViewCounts
+	Groups     []FulfillmentGroup // populated on action views (needs_action, ready_to_ship)
+	Rows       []OrderRow         // populated on post-action views (shipped, delivered, all)
 	TotalCount int
 	Page       int
 	PerPage    int
 	HasMore    bool
 	MerchantTZ *time.Location
+	Now        time.Time
 	StaffName  string
 	StaffRole  string
+	// BatchResult is non-nil immediately after a bulk verb completes — the
+	// handler parses ?batch_result=… query params from the redirect and forwards
+	// them here for the banner partial to render. Nil on a normal page load.
+	BatchResult *BatchActionResult
+}
+
+// BatchActionResult is the staff-facing summary of a just-completed bulk
+// fulfillment operation. Verb names the operation ("picked-up",
+// "out-for-delivery"); Succeeded counts the orders that completed; Failures
+// carries per-order rejection details. Truncated is true when the redirect
+// URL's reason list was capped to fit within URL-length limits.
+type BatchActionResult struct {
+	Verb      string
+	Succeeded int
+	Failures  []BatchActionFailure
+	Truncated bool
+}
+
+// BatchActionFailure carries one row of the per-order failure list shown in
+// the banner. The order ID links the order detail page so staff can fix the
+// underlying problem; Reason is the short phrase produced by the service
+// layer's failureReasonFor.
+type BatchActionFailure struct {
+	OrderID uuid.UUID
+	Reason  string
+}
+
+// batchVerbLabel returns the human phrase for the banner header.
+func batchVerbLabel(verb string) string {
+	switch verb {
+	case "picked-up":
+		return "marked picked up"
+	case "out-for-delivery":
+		return "sent out for delivery"
+	}
+	return verb
+}
+
+// GroupRowsByShippingMethod partitions a page of rows into per-method groups
+// in stable display order: carrier (largest bulk-action surface) first, then
+// local delivery, pickup, and finally an "Other" bucket for rows with no
+// method set. Empty groups are dropped so the template doesn't render them.
+func GroupRowsByShippingMethod(rows []OrderRow) []FulfillmentGroup {
+	carrier := make([]OrderRow, 0, len(rows))
+	local := make([]OrderRow, 0)
+	pickup := make([]OrderRow, 0)
+	other := make([]OrderRow, 0)
+	for _, r := range rows {
+		if r.Order.ShippingMethod == nil {
+			other = append(other, r)
+			continue
+		}
+		switch *r.Order.ShippingMethod {
+		case domain.ShippingMethodShipped:
+			carrier = append(carrier, r)
+		case domain.ShippingMethodLocalDelivery:
+			local = append(local, r)
+		case domain.ShippingMethodPickup:
+			pickup = append(pickup, r)
+		default:
+			other = append(other, r)
+		}
+	}
+	groups := make([]FulfillmentGroup, 0, 4)
+	shipped := domain.ShippingMethodShipped
+	ld := domain.ShippingMethodLocalDelivery
+	pk := domain.ShippingMethodPickup
+	if len(carrier) > 0 {
+		groups = append(groups, FulfillmentGroup{Method: &shipped, Rows: carrier})
+	}
+	if len(local) > 0 {
+		groups = append(groups, FulfillmentGroup{Method: &ld, Rows: local})
+	}
+	if len(pickup) > 0 {
+		groups = append(groups, FulfillmentGroup{Method: &pk, Rows: pickup})
+	}
+	if len(other) > 0 {
+		groups = append(groups, FulfillmentGroup{Method: nil, Rows: other})
+	}
+	return groups
+}
+
+// fulfillmentGroupTitle returns the per-section heading text.
+func fulfillmentGroupTitle(method *domain.ShippingMethod) string {
+	if method == nil {
+		return "No shipping method"
+	}
+	switch *method {
+	case domain.ShippingMethodShipped:
+		return "Ship via carrier"
+	case domain.ShippingMethodLocalDelivery:
+		return "Local delivery"
+	case domain.ShippingMethodPickup:
+		return "Pickup"
+	}
+	return shippingMethodLabel(*method)
+}
+
+// fulfillmentGroupAlpineState builds a unique Alpine x-data scope per group
+// so each section tracks its own multi-select set without leaking across
+// groups. Uses the method key as a stable suffix.
+func fulfillmentGroupAlpineState(g FulfillmentGroup) string {
+	ids := make([]string, len(g.Rows))
+	for i, r := range g.Rows {
+		ids[i] = `"` + r.Order.ID.String() + `"`
+	}
+	return `{
+		selected: [],
+		allIds: [` + strings.Join(ids, ",") + `]
+	}`
+}
+
+// fulfillmentGroupAnchor is a stable per-method DOM id so screen readers and
+// in-page jumps can navigate between sections.
+func fulfillmentGroupAnchor(method *domain.ShippingMethod) string {
+	if method == nil {
+		return "group-other"
+	}
+	return "group-" + string(*method)
+}
+
+// fulfillmentGroupHintCopy is the affordance hint shown above a group's table
+// when nothing in it is selected — it names the bulk verb available for that
+// shipping method so staff know what the checkboxes unlock without clicking.
+func fulfillmentGroupHintCopy(method *domain.ShippingMethod) string {
+	if method == nil {
+		return "Select orders to print packing slips or invoices in bulk."
+	}
+	switch *method {
+	case domain.ShippingMethodShipped:
+		return "Select orders to print packing slips, print invoices, or buy labels in bulk."
+	case domain.ShippingMethodPickup:
+		return "Select orders to print packing slips or mark picked up in bulk."
+	case domain.ShippingMethodLocalDelivery:
+		return "Select orders to print packing slips or send out for delivery in bulk."
+	}
+	return "Select orders to print packing slips in bulk."
+}
+
+// fulfillmentViewTabs returns the tab definitions in display order, mirroring
+// the orders list's centralised tab list so we render with one range loop.
+func (p FulfillmentListProps) tabs() []orderViewTab {
+	return []orderViewTab{
+		{Key: "needs_action", Label: "Needs action", Count: p.Counts.NeedsAction},
+		{Key: "ready_to_ship", Label: "Ready to ship", Count: p.Counts.ReadyToShip},
+		{Key: "shipped", Label: "Shipped", Count: p.Counts.Shipped},
+		{Key: "delivered", Label: "Delivered", Count: p.Counts.Delivered},
+		{Key: "all", Label: "All", Count: p.Counts.All},
+	}
 }
 
 func (p FulfillmentListProps) showingStart() int {
@@ -36,114 +209,451 @@ func (p FulfillmentListProps) showingEnd() int {
 	return end
 }
 
-func fulfillmentTabHref(filter string) string {
-	if filter == "" || filter == "needs_action" {
+// fulfillmentViewHref builds a URL for switching tabs. "needs_action" is the
+// canonical default and renders as a bare /admin/fulfillment.
+func fulfillmentViewHref(view string) string {
+	if view == "" || view == "needs_action" {
 		return "/admin/fulfillment"
 	}
-	return "/admin/fulfillment?filter=" + url.QueryEscape(filter)
+	v := url.Values{}
+	v.Set("view", view)
+	return "/admin/fulfillment?" + v.Encode()
 }
 
-func fulfillmentTabClass(current, tab string) string {
-	active := current == tab || (tab == "needs_action" && (current == "" || current == "needs_action"))
-	return orderTabClass(active)
+// fulfillmentPageHref preserves the view when paginating a flat-list tab.
+func fulfillmentPageHref(page int, view string) string {
+	v := url.Values{}
+	v.Set("page", fmt.Sprintf("%d", page))
+	if view != "" && view != "needs_action" {
+		v.Set("view", view)
+	}
+	return "/admin/fulfillment?" + v.Encode()
+}
+
+// fulfillmentEmptyBucketCopy returns the body copy shown when a tab has 0 rows
+// but other buckets have orders. Per-view phrasing keeps the queue voice
+// closer to staff shorthand than a generic "no orders" line.
+func fulfillmentEmptyBucketCopy(view string) string {
+	switch view {
+	case "needs_action":
+		return "Inbox zero — nothing waiting to be packed."
+	case "ready_to_ship":
+		return "Nothing packed and waiting on labels."
+	case "shipped":
+		return "Nothing in transit."
+	case "delivered":
+		return "No deliveries confirmed yet."
+	}
+	return "No orders match this view."
 }
 
 templ FulfillmentListContent(props FulfillmentListProps) {
-	<!-- Page header -->
-	<div class="sm:flex sm:items-center">
-		<div class="sm:flex-auto">
-			<h1 class="admin-page-title">Fulfillment</h1>
-			<p class="mt-1 text-sm text-rr-muted">Pack and ship orders</p>
-		</div>
+	if props.BatchResult != nil {
+		@batchActionResultBanner(*props.BatchResult)
+	}
+	<!-- Page header — title plus a count summary so staff see the queue
+	     shape before scanning rows. No subtitle (it would just rephrase the
+	     title) and no right-rail CTA (the queue itself is the action). -->
+	<div>
+		<h1 class="admin-page-title">Fulfillment</h1>
+		<p class="mt-1 text-sm text-rr-muted tabular-nums">
+			<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%d", props.Counts.NeedsAction) }</span> need action
+			<span class="mx-1 text-rr-border" aria-hidden="true">·</span>
+			<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%d", props.Counts.ReadyToShip) }</span> ready to ship
+			<span class="mx-1 text-rr-border" aria-hidden="true">·</span>
+			<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%d", props.Counts.Shipped) }</span> in transit
+		</p>
 	</div>
-	<!-- Tab filters -->
-	<div class="mt-6">
-		<nav class="flex gap-0 border-b border-rr-border -mb-px overflow-x-auto">
-			<a href={ templ.SafeURL(fulfillmentTabHref("needs_action")) } class={ fulfillmentTabClass(props.Filter, "needs_action") }>Needs Action</a>
-			<a href={ templ.SafeURL(fulfillmentTabHref("unfulfilled")) } class={ fulfillmentTabClass(props.Filter, "unfulfilled") }>Unfulfilled</a>
-			<a href={ templ.SafeURL(fulfillmentTabHref("ready_to_ship")) } class={ fulfillmentTabClass(props.Filter, "ready_to_ship") }>Ready to Ship</a>
-			<a href={ templ.SafeURL(fulfillmentTabHref("shipped")) } class={ fulfillmentTabClass(props.Filter, "shipped") }>Shipped</a>
-			<a href={ templ.SafeURL(fulfillmentTabHref("delivered")) } class={ fulfillmentTabClass(props.Filter, "delivered") }>Delivered</a>
-			<a href={ templ.SafeURL(fulfillmentTabHref("all")) } class={ fulfillmentTabClass(props.Filter, "all") }>All</a>
+	<!-- View tabs — stamped active tab + rust count chip, matching the
+	     orders list. -->
+	<section class="mt-5" aria-label="Filter fulfillment queue">
+		<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Fulfillment views">
+			for _, tab := range props.tabs() {
+				<a href={ templ.SafeURL(fulfillmentViewHref(tab.Key)) } class={ orderTabClass(props.View == tab.Key) }>
+					<span>{ tab.Label }</span>
+					<span class={ orderTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
+				</a>
+			}
 		</nav>
-	</div>
-	<!-- Fulfillment table -->
+	</section>
 	<div class="mt-4">
-		if len(props.Orders) == 0 {
-			<div class="border border-dashed border-rr-border p-12 text-center">
-				<svg class="mx-auto size-12 text-rr-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
-				</svg>
-				<h3 class="mt-2 text-sm font-semibold text-rr-heading">All caught up</h3>
-				<p class="mt-1 text-sm text-rr-muted">No orders need fulfillment right now.</p>
-			</div>
+		if isFulfillmentActionView(props.View) {
+			@fulfillmentActionView(props)
 		} else {
-			<div class="overflow-hidden border border-rr-border bg-rr-surface">
-				<table class="min-w-full divide-y divide-rr-border">
-					<thead class="bg-rr-raised">
-						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Fulfillment</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Placed</th>
-							<th scope="col" class="hidden relative py-3.5 pl-3 pr-4 sm:table-cell sm:pr-6">
-								<span class="sr-only">View</span>
-							</th>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-rr-border bg-rr-surface">
-						for _, o := range props.Orders {
-							<tr class="row-link">
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
-										{ o.Number }
-									</a>
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									@FulfillmentStatusBadge(o.FulfillmentStatus)
-								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
-									{ o.PlacedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
-								</td>
-								<td class="hidden whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:table-cell sm:pr-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) } class="text-rr-red hover:text-rr-red-lt">
-										View<span class="sr-only">, { o.Number }</span>
-									</a>
-								</td>
-							</tr>
-						}
-					</tbody>
-				</table>
-			</div>
-			<!-- Pagination -->
-			<nav class="flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
-				<div class="-mt-px flex w-0 flex-1">
-					if props.Page > 1 {
-						<a
-							href={ templ.SafeURL(fmt.Sprintf("/admin/fulfillment?page=%d&filter=%s", props.Page-1, props.Filter)) }
-							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
-						>
-							Previous
-						</a>
-					}
-				</div>
-				if props.TotalCount > 0 {
-					<p class="text-sm text-rr-muted">
-						<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingStart()) }</span>–<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingEnd()) }</span> of <span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.TotalCount) }</span>
-					</p>
-				}
-				<div class="-mt-px flex w-0 flex-1 justify-end">
-					if props.HasMore {
-						<a
-							href={ templ.SafeURL(fmt.Sprintf("/admin/fulfillment?page=%d&filter=%s", props.Page+1, props.Filter)) }
-							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
-						>
-							Next
-						</a>
-					}
-				</div>
-			</nav>
+			@fulfillmentFlatView(props)
 		}
 	</div>
+}
+
+// fulfillmentActionView renders the daily working queues (Needs Action,
+// Ready to Ship) as per-shipping-method sections, each with its own bulk
+// action bar. This is the batch-shipment workspace — staff scan by method,
+// then act on a batch in one verb.
+templ fulfillmentActionView(props FulfillmentListProps) {
+	if len(props.Groups) == 0 {
+		@fulfillmentEmptyState(props)
+	} else {
+		<div class="space-y-8">
+			for _, group := range props.Groups {
+				@fulfillmentGroupSection(group, props)
+			}
+		</div>
+	}
+}
+
+templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps) {
+	<section id={ fulfillmentGroupAnchor(group.Method) } x-data={ fulfillmentGroupAlpineState(group) }>
+		<!-- Section header: method badge + row count, paired with the bulk
+		     action bar that animates in once any row in the group is selected. -->
+		<header class="flex flex-wrap items-end justify-between gap-3 mb-2">
+			<div class="flex items-baseline gap-3">
+				<h2 class="text-rr-heading font-semibold tracking-wide uppercase text-sm">
+					{ fulfillmentGroupTitle(group.Method) }
+				</h2>
+				<span class="text-xs text-rr-muted tabular-nums">{ fmt.Sprintf("%d", len(group.Rows)) }</span>
+			</div>
+			<p x-show="selected.length === 0" class="text-xs text-rr-muted">
+				{ fulfillmentGroupHintCopy(group.Method) }
+			</p>
+			<!-- Bulk action bar — per-method verbs. Print packing slips is the
+			     pack-and-ship workhorse and appears on every group; the
+			     state-changing verb (Buy labels / Mark picked up / Out for
+			     delivery) is method-specific. -->
+			<div
+				x-show="selected.length > 0"
+				x-cloak
+				x-transition:enter="transition ease-out duration-200"
+				x-transition:enter-start="opacity-0 -translate-y-1"
+				x-transition:enter-end="opacity-100 translate-y-0"
+				x-transition:leave="transition ease-in duration-150"
+				x-transition:leave-start="opacity-100"
+				x-transition:leave-end="opacity-0"
+				class="flex flex-wrap items-center gap-2"
+			>
+				<span class="text-sm text-rr-heading">
+					<span class="font-semibold tabular-nums" x-text="selected.length"></span> selected
+				</span>
+				<button
+					type="button"
+					@click="window.open('/admin/orders/batch/packing-slips?ids=' + selected.join(','), '_blank')"
+					class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+				>
+					Print packing slips
+				</button>
+				if group.Method != nil && *group.Method == domain.ShippingMethodShipped {
+					<button
+						type="button"
+						@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
+						class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+					>
+						Print invoices
+					</button>
+					<form
+						method="post"
+						action="/admin/orders/labels"
+						@submit="if (!confirm('Buy a label for ' + selected.length + ' order(s)? This will charge your Shippo account.')) { $event.preventDefault(); }"
+						class="contents"
+					>
+						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+						<label for={ "bulk-label-service-" + fulfillmentGroupAnchor(group.Method) } class="sr-only">Shipping service</label>
+						<select
+							id={ "bulk-label-service-" + fulfillmentGroupAnchor(group.Method) }
+							name="service_code"
+							class="rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+						>
+							for _, opt := range ShippoServiceOptions {
+								<option value={ opt.Token }>{ opt.Label }</option>
+							}
+						</select>
+						<button
+							type="submit"
+							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+						>
+							Buy labels
+						</button>
+					</form>
+				} else if group.Method != nil && *group.Method == domain.ShippingMethodPickup {
+					<form
+						method="post"
+						action="/admin/orders/batch/picked-up"
+						@submit="if (!confirm('Mark ' + selected.length + ' order(s) as picked up?')) { $event.preventDefault(); }"
+						class="contents"
+					>
+						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+						<button
+							type="submit"
+							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+						>
+							Mark picked up
+						</button>
+					</form>
+				} else if group.Method != nil && *group.Method == domain.ShippingMethodLocalDelivery {
+					<form
+						method="post"
+						action="/admin/orders/batch/out-for-delivery"
+						@submit="if (!confirm('Send delivery notification to ' + selected.length + ' customer(s) and mark out for delivery?')) { $event.preventDefault(); }"
+						class="contents"
+					>
+						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+						<button
+							type="submit"
+							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+						>
+							Out for delivery
+						</button>
+					</form>
+				} else {
+					<button
+						type="button"
+						@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
+						class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+					>
+						Print invoices
+					</button>
+				}
+				<button
+					type="button"
+					@click="selected = []"
+					class="inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised"
+				>
+					Clear
+				</button>
+			</div>
+		</header>
+		<div class="overflow-hidden border border-rr-border bg-rr-surface">
+			<table class="min-w-full divide-y divide-rr-border">
+				<thead class="bg-rr-raised">
+					<tr>
+						<th scope="col" class="relative w-10 px-3 py-3.5 sm:pl-6">
+							<input
+								type="checkbox"
+								aria-label={ "Select all " + fulfillmentGroupTitle(group.Method) + " orders" }
+								class="size-4 cursor-pointer accent-rr-red"
+								:checked="selected.length === allIds.length && allIds.length > 0"
+								:indeterminate="selected.length > 0 && selected.length < allIds.length"
+								@change="selected = $event.target.checked ? [...allIds] : []"
+							/>
+						</th>
+						<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">Order</th>
+						<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">State</th>
+						<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Placed</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-rr-border bg-rr-surface">
+					for _, row := range group.Rows {
+						@fulfillmentRow(row, props)
+					}
+				</tbody>
+			</table>
+		</div>
+	</section>
+}
+
+// fulfillmentFlatView renders post-handoff queues (Shipped / Delivered /
+// All) as a single table with pagination. No bulk action bar — the work is
+// already done; this view is for lookup.
+templ fulfillmentFlatView(props FulfillmentListProps) {
+	if len(props.Rows) == 0 {
+		@fulfillmentEmptyState(props)
+	} else {
+		<div class="overflow-hidden border border-rr-border bg-rr-surface">
+			<table class="min-w-full divide-y divide-rr-border">
+				<thead class="bg-rr-raised">
+					<tr>
+						<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Order</th>
+						<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">State</th>
+						<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Ship via</th>
+						<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Placed</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-rr-border bg-rr-surface">
+					for _, row := range props.Rows {
+						@fulfillmentFlatRow(row, props)
+					}
+				</tbody>
+			</table>
+		</div>
+		@fulfillmentPagination(props)
+	}
+}
+
+// fulfillmentRow is the action-view row: checkbox + order + state + placed.
+// Stale rows get the rust leading-edge flag so staff spot overdue items
+// without comparing dates by eye.
+templ fulfillmentRow(row OrderRow, props FulfillmentListProps) {
+	{{ stale := orderIsStale(row.Order, props.Now) }}
+	<tr class={ "row-link", templ.KV("row-link-stale", stale) }>
+		<td class="relative z-10 w-10 px-3 py-4 sm:pl-6" @click.stop>
+			<input
+				type="checkbox"
+				aria-label={ fmt.Sprintf("Select order %s", row.Order.Number) }
+				class="size-4 cursor-pointer accent-rr-red"
+				value={ row.Order.ID.String() }
+				x-model="selected"
+				@click.stop
+			/>
+		</td>
+		<td class="py-4 pl-4 pr-3 text-sm">
+			<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) } class="row-link-target block">
+				<div class="flex items-baseline gap-2 leading-none">
+					<span class="font-bold text-rr-heading tabular-nums tracking-wide uppercase" style="font-size:0.95rem;">{ row.Order.Number }</span>
+					if row.AccountType == domain.AccountTypeWholesale {
+						<span class="label-font text-[#0A5E5C]" title="Wholesale customer">Wholesale</span>
+					}
+				</div>
+				<div class="mt-1.5 text-sm text-rr-body">{ row.CustomerName }</div>
+				if row.CustomerEmail != "" {
+					<div class="mt-0.5 text-xs text-rr-muted truncate max-w-[22ch] md:max-w-none">{ row.CustomerEmail }</div>
+				}
+			</a>
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm">
+			<div class="flex flex-wrap items-center gap-1.5">
+				@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+				if row.LabelFailed {
+					<span class="badge badge-red" title="Most recent label purchase failed — open the order to retry.">Label failed</span>
+				}
+			</div>
+		</td>
+		<td class={ "hidden whitespace-nowrap px-3 py-4 text-sm tabular-nums md:table-cell", templ.KV("text-rr-red font-semibold", stale), templ.KV("text-rr-muted", !stale) }>
+			{ relativeOrderDate(row.Order.PlacedAt, props.MerchantTZ, props.Now) }
+		</td>
+	</tr>
+}
+
+// fulfillmentFlatRow is the post-handoff row: no checkbox (no bulk verbs
+// apply), but with a Ship-via column since the ship-method grouping that
+// answered that question on the action views is gone.
+templ fulfillmentFlatRow(row OrderRow, props FulfillmentListProps) {
+	<tr class="row-link">
+		<td class="py-4 pl-4 pr-3 text-sm sm:pl-6">
+			<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) } class="row-link-target block">
+				<div class="flex items-baseline gap-2 leading-none">
+					<span class="font-bold text-rr-heading tabular-nums tracking-wide uppercase" style="font-size:0.95rem;">{ row.Order.Number }</span>
+					if row.AccountType == domain.AccountTypeWholesale {
+						<span class="label-font text-[#0A5E5C]" title="Wholesale customer">Wholesale</span>
+					}
+				</div>
+				<div class="mt-1.5 text-sm text-rr-body">{ row.CustomerName }</div>
+				if row.CustomerEmail != "" {
+					<div class="mt-0.5 text-xs text-rr-muted truncate max-w-[22ch] md:max-w-none">{ row.CustomerEmail }</div>
+				}
+			</a>
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm">
+			@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+		</td>
+		<td class="hidden whitespace-nowrap px-3 py-4 text-sm lg:table-cell">
+			if row.Order.ShippingMethod != nil {
+				@ShippingMethodBadge(*row.Order.ShippingMethod)
+			} else {
+				<span class="text-rr-muted">&mdash;</span>
+			}
+		</td>
+		<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted tabular-nums md:table-cell">
+			{ relativeOrderDate(row.Order.PlacedAt, props.MerchantTZ, props.Now) }
+		</td>
+	</tr>
+}
+
+// batchActionResultBanner renders the staff-facing summary of a just-completed
+// bulk fulfillment operation. Sits above the page header so the result is the
+// first thing seen on the post-redirect page. Successes are stated as a single
+// count; per-order failures get a linked list so staff can jump to the order
+// detail and fix the underlying problem (wrong state, missing data, etc.).
+templ batchActionResultBanner(r BatchActionResult) {
+	<div class="mb-5 border border-rr-border bg-rr-surface px-4 py-3">
+		<div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+			if r.Succeeded > 0 {
+				<span class="text-sm">
+					<span class="font-semibold text-rr-heading tabular-nums">{ fmt.Sprintf("%d", r.Succeeded) }</span>
+					<span class="text-rr-body">{ " " + batchVerbLabel(r.Verb) }</span>
+				</span>
+			}
+			if len(r.Failures) > 0 {
+				if r.Succeeded > 0 {
+					<span class="text-rr-border" aria-hidden="true">·</span>
+				}
+				<span class="text-sm">
+					<span class="font-semibold text-rr-red tabular-nums">{ fmt.Sprintf("%d", len(r.Failures)) }</span>
+					<span class="text-rr-body"> skipped</span>
+				</span>
+			}
+		</div>
+		if len(r.Failures) > 0 {
+			<ul class="mt-2 space-y-1 text-xs">
+				for _, f := range r.Failures {
+					<li>
+						<a href={ templ.SafeURL("/admin/orders/" + f.OrderID.String()) } class="font-semibold text-rr-heading tabular-nums hover:text-rr-red">
+							{ f.OrderID.String()[:8] }
+						</a>
+						<span class="text-rr-muted"> — { f.Reason }</span>
+					</li>
+				}
+				if r.Truncated {
+					<li class="text-rr-muted italic">More failures than the URL could carry — open the orders for the full list.</li>
+				}
+			</ul>
+		}
+	</div>
+}
+
+// fulfillmentEmptyState picks between a per-tab note (other tabs have orders)
+// and the branded "Quiet shop" stamp (no orders anywhere) — mirroring the
+// orders-list empty-state hierarchy so the admin reads as one product.
+templ fulfillmentEmptyState(props FulfillmentListProps) {
+	if props.Counts.All > 0 {
+		<div class="border border-rr-border bg-rr-surface px-6 py-14 text-center">
+			<h2 class="admin-page-title text-2xl">Nothing here.</h2>
+			<p class="mt-3 text-sm text-rr-body">{ fulfillmentEmptyBucketCopy(props.View) }</p>
+			if props.View != "all" {
+				<a href={ templ.SafeURL(fulfillmentViewHref("all")) } class="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-rr-red hover:text-rr-red-lt">
+					View all orders &rarr;
+				</a>
+			}
+		</div>
+	} else {
+		<div class="border border-rr-border bg-rr-surface px-6 py-16 sm:py-20 text-center">
+			<div
+				class="inline-block -rotate-2 border border-rr-border bg-rr-raised px-8 py-3"
+				style="box-shadow: 4px 4px 0 0 var(--color-rr-border);"
+			>
+				<h2 class="admin-page-title">Quiet shop</h2>
+			</div>
+			<div class="mt-8 text-rr-amber tracking-[0.6em] text-lg select-none" aria-hidden="true">✦ ✦ ✦</div>
+			<p class="mt-4 text-base text-rr-body">No orders yet &mdash; they'll roll in when the first one lands.</p>
+		</div>
+	}
+}
+
+templ fulfillmentPagination(props FulfillmentListProps) {
+	<nav class="flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
+		<div class="-mt-px flex w-0 flex-1">
+			if props.Page > 1 {
+				<a
+					href={ templ.SafeURL(fulfillmentPageHref(props.Page-1, props.View)) }
+					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
+				>
+					Previous
+				</a>
+			}
+		</div>
+		if props.TotalCount > 0 {
+			<p class="text-sm text-rr-muted">
+				<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingStart()) }</span>–<span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.showingEnd()) }</span> of <span class="font-medium text-rr-heading">{ fmt.Sprintf("%d", props.TotalCount) }</span>
+			</p>
+		}
+		<div class="-mt-px flex w-0 flex-1 justify-end">
+			if props.HasMore {
+				<a
+					href={ templ.SafeURL(fulfillmentPageHref(props.Page+1, props.View)) }
+					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
+				>
+					Next
+				</a>
+			}
+		</div>
+	</nav>
 }
 
 templ FulfillmentList(props FulfillmentListProps) {
@@ -155,4 +665,11 @@ templ FulfillmentList(props FulfillmentListProps) {
 	}) {
 		@FulfillmentListContent(props)
 	}
+}
+
+// isFulfillmentActionView mirrors the handler-side helper of the same name so
+// the template can branch between the grouped workspace and the flat lookup
+// table without ferrying a redundant bool through props.
+func isFulfillmentActionView(view string) bool {
+	return view == "needs_action" || view == "ready_to_ship"
 }

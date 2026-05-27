@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
@@ -157,6 +159,15 @@ func (s *OrderService) CountOrdersByView(ctx context.Context, tx pgx.Tx, search 
 	c, err := s.orders.CountOrdersByView(ctx, tx, search)
 	if err != nil {
 		return store.OrderViewCounts{}, fmt.Errorf("count orders by view: %w", err)
+	}
+	return c, nil
+}
+
+// CountFulfillmentViews returns per-tab counts for the admin fulfillment queue.
+func (s *OrderService) CountFulfillmentViews(ctx context.Context, tx pgx.Tx) (store.FulfillmentViewCounts, error) {
+	c, err := s.orders.CountFulfillmentViews(ctx, tx)
+	if err != nil {
+		return store.FulfillmentViewCounts{}, fmt.Errorf("count fulfillment views: %w", err)
 	}
 	return c, nil
 }
@@ -779,6 +790,103 @@ func (s *OrderService) MarkOutForDelivery(ctx context.Context, tx pgx.Tx, id uui
 	}
 
 	return order, nil
+}
+
+// --- Bulk fulfillment verbs ---
+
+// BatchOutcome reports the result of a bulk order operation. Succeeded and
+// Failed together cover the full input ID set; their union has no duplicates.
+type BatchOutcome struct {
+	Succeeded []uuid.UUID
+	Failed    []BatchFailure
+}
+
+// BatchFailure carries one per-order rejection from a bulk operation. Reason
+// is human-readable and safe to surface to staff UI — short phrases like
+// "already shipped" or "wrong shipping method", not raw error strings.
+type BatchFailure struct {
+	OrderID uuid.UUID
+	Reason  string
+}
+
+// MarkPickedUpBatch applies MarkPickedUp to each ID independently. Each order
+// runs in its own transaction so one failure never poisons the rest; rejected
+// orders end up in Failed with a short staff-facing reason. Input order is
+// preserved in both Succeeded and Failed. An empty ids slice returns an empty
+// outcome and nil error.
+func (s *OrderService) MarkPickedUpBatch(ctx context.Context, pool *pgxpool.Pool, ids []uuid.UUID, actor Actor) (BatchOutcome, error) {
+	return s.runBulkOrderVerb(ctx, pool, ids, func(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+		_, err := s.MarkPickedUp(ctx, tx, id, actor)
+		return err
+	})
+}
+
+// MarkOutForDeliveryBatch applies MarkOutForDelivery to each ID independently.
+// Same per-order independence and ordering guarantees as MarkPickedUpBatch.
+func (s *OrderService) MarkOutForDeliveryBatch(ctx context.Context, pool *pgxpool.Pool, ids []uuid.UUID, actor Actor) (BatchOutcome, error) {
+	return s.runBulkOrderVerb(ctx, pool, ids, func(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+		_, err := s.MarkOutForDelivery(ctx, tx, id, actor)
+		return err
+	})
+}
+
+// runBulkOrderVerb is the shared loop body for the bulk fulfillment methods.
+// It walks ids in order, opens a fresh transaction per id, invokes the
+// per-order verb, and assembles a BatchOutcome. A single iteration's failure
+// becomes a BatchFailure with a translated reason; the loop never short-
+// circuits. The returned error is reserved for cases where the iteration
+// could not even be attempted (e.g., a context cancellation).
+func (s *OrderService) runBulkOrderVerb(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	ids []uuid.UUID,
+	verb func(ctx context.Context, tx pgx.Tx, id uuid.UUID) error,
+) (BatchOutcome, error) {
+	out := BatchOutcome{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	out.Succeeded = make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if err := ctx.Err(); err != nil {
+			return out, fmt.Errorf("bulk order verb: %w", err)
+		}
+		err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			return verb(ctx, tx, id)
+		})
+		if err != nil {
+			out.Failed = append(out.Failed, BatchFailure{
+				OrderID: id,
+				Reason:  failureReasonFor(err),
+			})
+			continue
+		}
+		out.Succeeded = append(out.Succeeded, id)
+	}
+	return out, nil
+}
+
+// failureReasonFor translates a service-layer error into a short, staff-
+// friendly phrase suitable for the batch-result UI. Known sentinels get
+// canonical phrases; wrapped ErrInvalidOrderStatus messages take their
+// human-readable prefix from the wrap (e.g., "order is not ready for
+// pickup"); unknown errors fall back to err.Error() so nothing is silently
+// swallowed.
+func failureReasonFor(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, ErrOrderNotFound) {
+		return "order not found"
+	}
+	if errors.Is(err, ErrInvalidOrderStatus) {
+		msg := err.Error()
+		if i := strings.Index(msg, ": "); i > 0 {
+			return msg[:i]
+		}
+		return "invalid status"
+	}
+	return err.Error()
 }
 
 // SwapLocalShippingMethod swaps an order's shipping method between

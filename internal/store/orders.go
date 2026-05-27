@@ -336,6 +336,9 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	if f.ExcludeUnconfirmed {
 		query += " AND NOT (status = 'pending' AND payment_status = 'awaiting')"
 	}
+	if f.ExcludeCancelledRefunded {
+		query += " AND status NOT IN ('cancelled', 'refunded')"
+	}
 
 	query += " ORDER BY placed_at DESC"
 
@@ -470,6 +473,9 @@ func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) 
 	if f.ExcludeUnconfirmed {
 		query += " AND NOT (status = 'pending' AND payment_status = 'awaiting')"
 	}
+	if f.ExcludeCancelledRefunded {
+		query += " AND status NOT IN ('cancelled', 'refunded')"
+	}
 
 	var count int
 	if err := tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {
@@ -514,6 +520,47 @@ func (s *OrderStore) CountOrdersByView(ctx context.Context, tx pgx.Tx, search st
 	var c OrderViewCounts
 	if err := tx.QueryRow(ctx, query, args...).Scan(&c.NeedsAction, &c.OnHold, &c.Shipped, &c.Archive, &c.All); err != nil {
 		return OrderViewCounts{}, fmt.Errorf("count orders by view: %w", err)
+	}
+	return c, nil
+}
+
+// FulfillmentViewCounts holds per-bucket totals for the admin fulfillment queue
+// tabs. Buckets are workflow-led, not raw status enums:
+//   - NeedsAction = unfulfilled + partially_fulfilled + fulfilled (anything
+//     pre-handoff that still wants staff attention), excluding unconfirmed
+//   - ReadyToShip = fulfilled only (packed, awaiting label or dispatch)
+//   - Shipped    = shipped + partially_shipped
+//   - Delivered  = delivered + partially_delivered
+//   - All        = every order excluding unconfirmed
+type FulfillmentViewCounts struct {
+	NeedsAction int
+	ReadyToShip int
+	Shipped     int
+	Delivered   int
+	All         int
+}
+
+// CountFulfillmentViews returns counts for every tab on the admin fulfillment
+// list in a single query. Unconfirmed orders (status=pending+payment=awaiting)
+// are excluded from every bucket — they don't belong in a pack-and-ship queue.
+func (s *OrderStore) CountFulfillmentViews(ctx context.Context, tx pgx.Tx) (_ FulfillmentViewCounts, err error) {
+	defer trackQuery(s.metrics, "orders.count_fulfillment_views", time.Now(), &err)
+	// NeedsAction and ReadyToShip exclude cancelled/refunded — those orders'
+	// fulfillment_status often lingers at 'unfulfilled' from before they were
+	// cancelled, so a fulfillment-status-only filter leaks them into the
+	// working queue where staff can't act on them anyway. Shipped/Delivered
+	// keep the broader set so a cancelled-after-shipping case still surfaces.
+	const query = `SELECT
+		COUNT(*) FILTER (WHERE fulfillment_status IN ('unfulfilled', 'partially_fulfilled', 'fulfilled', 'ready_for_pickup') AND status NOT IN ('cancelled', 'refunded')) AS needs_action,
+		COUNT(*) FILTER (WHERE fulfillment_status = 'fulfilled' AND status NOT IN ('cancelled', 'refunded'))                                                              AS ready_to_ship,
+		COUNT(*) FILTER (WHERE fulfillment_status IN ('shipped', 'partially_shipped'))                                                                                    AS shipped,
+		COUNT(*) FILTER (WHERE fulfillment_status IN ('delivered', 'partially_delivered'))                                                                                AS delivered,
+		COUNT(*)                                                                                                                                                          AS total
+	FROM orders
+	WHERE NOT (status = 'pending' AND payment_status = 'awaiting')`
+	var c FulfillmentViewCounts
+	if err := tx.QueryRow(ctx, query).Scan(&c.NeedsAction, &c.ReadyToShip, &c.Shipped, &c.Delivered, &c.All); err != nil {
+		return FulfillmentViewCounts{}, fmt.Errorf("count fulfillment views: %w", err)
 	}
 	return c, nil
 }

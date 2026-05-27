@@ -42,8 +42,6 @@ type Deps struct {
 	CatalogService       *app.CatalogService
 	CheckoutService      *app.CheckoutService
 	FulfillmentService    *app.FulfillmentService
-	ShippingExportService *app.ShippingExportService
-	ShippingImportService *app.ShippingImportService
 	SubscriptionService  *app.SubscriptionService
 	DiscountService      *app.DiscountService
 	AuthService          *app.AuthService
@@ -296,11 +294,12 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin orders
 	adminMux.HandleFunc("GET /admin/orders", deps.handleAdminOrderList)
-	adminMux.HandleFunc("GET /admin/orders/export.csv", deps.handleAdminOrdersExportCSV)
-	adminMux.HandleFunc("POST /admin/orders/import-tracking", deps.handleAdminOrdersImportTracking)
 	adminMux.HandleFunc("GET /admin/orders/new", deps.handleAdminOrderNew)
 	adminMux.HandleFunc("POST /admin/orders/new", deps.handleAdminOrderCreate)
 	adminMux.HandleFunc("GET /admin/orders/batch/invoices", deps.handleAdminOrderInvoiceBatch)
+	adminMux.HandleFunc("GET /admin/orders/batch/packing-slips", deps.handleAdminOrderPackingSlipBatch)
+	adminMux.HandleFunc("POST /admin/orders/batch/picked-up", deps.handleAdminOrderPickedUpBatch)
+	adminMux.HandleFunc("POST /admin/orders/batch/out-for-delivery", deps.handleAdminOrderOutForDeliveryBatch)
 	adminMux.HandleFunc("GET /admin/orders/{id}", deps.handleAdminOrderShow)
 	adminMux.HandleFunc("POST /admin/orders/{id}/cancel", deps.handleAdminOrderCancel)
 	adminMux.HandleFunc("POST /admin/orders/{id}/refund", deps.handleAdminOrderRefund)

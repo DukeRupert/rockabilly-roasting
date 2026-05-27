@@ -302,7 +302,7 @@ templ Admin(props AdminProps) {
 							<div class="flex h-16 shrink-0 items-center">
 								@adminLogo()
 							</div>
-							<nav class="flex flex-1 flex-col">
+							<nav data-admin-sidebar-nav class="flex flex-1 flex-col">
 								<ul role="list" class="flex flex-1 flex-col gap-y-0.5">
 									for _, group := range adminNavGroups() {
 										<li>
@@ -347,7 +347,7 @@ templ Admin(props AdminProps) {
 					<div class="flex h-16 shrink-0 items-center">
 						@adminSidebarToggle()
 					</div>
-					<nav class="flex flex-1 flex-col">
+					<nav data-admin-sidebar-nav class="flex flex-1 flex-col">
 						<ul role="list" class="flex flex-1 flex-col gap-y-1">
 							for _, group := range adminNavGroups() {
 								<li>
@@ -534,7 +534,9 @@ templ Admin(props AdminProps) {
 
 				function updateActiveNav() {
 					var path = window.location.pathname;
-					document.querySelectorAll('nav a[href^="/admin"]').forEach(function(a) {
+					// Scoped to the sidebar so we don't trample page-level tab navs
+					// (e.g. orders/fulfillment view tabs) that also link to /admin/*.
+					document.querySelectorAll('nav[data-admin-sidebar-nav] a[href^="/admin"]').forEach(function(a) {
 						var href = a.getAttribute('href');
 						var isActive = (href === '/admin' && path === '/admin') ||
 							(href !== '/admin' && path.startsWith(href));

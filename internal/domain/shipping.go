@@ -143,9 +143,36 @@ func SelectBoxForWeight(presets []BoxPreset, weightOz float64) (*BoxPreset, bool
 	return &presets[len(presets)-1], false
 }
 
+// LabelAttemptStatus summarizes the most recent BuyLabel job for an order
+// for staff-facing UI. The underlying job state lives in River; this type
+// collapses River's seven states into the two that matter to operators.
+type LabelAttemptStatus string
+
+const (
+	// LabelAttemptStatusQueued means a buy is in flight: pending, scheduled,
+	// available, running, or about to be retried. Staff should wait.
+	LabelAttemptStatusQueued LabelAttemptStatus = "queued"
+
+	// LabelAttemptStatusFailed means a buy was given up on: cancelled (by
+	// the worker on deterministic failure) or discarded (retries exhausted).
+	// Staff need to act — fix the underlying data and retry, or skip the order.
+	LabelAttemptStatusFailed LabelAttemptStatus = "failed"
+)
+
+// LabelAttempt is the latest non-successful BuyLabel job for an order,
+// surfaced to staff so they can see why a label hasn't appeared yet.
+// Successful attempts aren't returned — those show up as Shipment rows.
+type LabelAttempt struct {
+	JobID       int64
+	Status      LabelAttemptStatus
+	Attempt     int
+	MaxAttempts int
+	LastError   string // empty for queued attempts; populated for failed
+}
+
 // Shipment represents a physical shipment with tracking. Several fields are
-// pointer-typed because Pirate Ship CSV imports do not carry a label artifact
-// or box dimensions — only EasyPost-purchased shipments populate them.
+// pointer-typed because not every shipment source carries a label artifact
+// or box dimensions — only carrier label purchases populate them.
 type Shipment struct {
 	ID             uuid.UUID
 	OrderID        uuid.UUID

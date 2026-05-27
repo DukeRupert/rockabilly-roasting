@@ -70,6 +70,28 @@ func (s *FulfillmentService) ListShipmentsByOrder(ctx context.Context, tx pgx.Tx
 	return shipments, nil
 }
 
+// GetLatestLabelAttempt returns the most recent in-flight or failed BuyLabel
+// job for an order. Returns nil if none is pending and no recent failure is
+// recorded. Successful attempts are surfaced as shipment rows, not here.
+func (s *FulfillmentService) GetLatestLabelAttempt(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (*domain.LabelAttempt, error) {
+	attempt, err := s.shipments.GetLatestLabelAttempt(ctx, tx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("get latest label attempt: %w", err)
+	}
+	return attempt, nil
+}
+
+// ListOrdersWithFailedLabelAttempts returns the subset of the given orders
+// whose latest BuyLabel job ended in failure. Used by the order list to
+// flag rows that need operator attention.
+func (s *FulfillmentService) ListOrdersWithFailedLabelAttempts(ctx context.Context, tx pgx.Tx, orderIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	ids, err := s.shipments.ListOrdersWithFailedLabelAttempts(ctx, tx, orderIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list orders with failed label attempts: %w", err)
+	}
+	return ids, nil
+}
+
 // CreateShipmentLabel calls the external label provider to create a shipping
 // label, then persists the shipment record in the database. The external API
 // call happens BEFORE the transaction — if it fails, nothing is written.
@@ -174,9 +196,7 @@ func (s *FulfillmentService) PrepareLabelRequest(
 		return zero, fmt.Errorf("list line items: %w", err)
 	}
 
-	// Filter to physical items and gather weights. Mirrors the export
-	// pipeline (see shipping_export.go buildRow) so a Pirate Ship export
-	// and a Shippo label compute the same weight for the same order.
+	// Filter to physical items and gather weights.
 	physical := make([]domain.LineItem, 0, len(items))
 	weights := make(map[uuid.UUID]*int, len(items))
 	for _, item := range items {
@@ -451,4 +471,14 @@ func (s *FulfillmentService) DeleteBoxPreset(ctx context.Context, tx pgx.Tx, id 
 		return fmt.Errorf("audit box preset deleted: %w", err)
 	}
 	return nil
+}
+
+func joinName(first, last string) string {
+	if first == "" {
+		return last
+	}
+	if last == "" {
+		return first
+	}
+	return first + " " + last
 }

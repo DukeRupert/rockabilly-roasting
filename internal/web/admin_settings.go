@@ -88,9 +88,8 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 // handleAdminShippingSettingsUpdate persists the edited shipping config and
 // records the audit event inside the same transaction.
 //
-// TODO: origin fields are informational today (Pirate Ship has its own origin
-// config). When a live-rate provider starts consuming them, tighten state +
-// zip + country validation here.
+// TODO: when the live-rate provider starts consuming the origin fields,
+// tighten state + zip + country validation here.
 func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

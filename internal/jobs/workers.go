@@ -279,8 +279,7 @@ type SubscriptionCancelledArgs struct {
 func (SubscriptionCancelledArgs) Kind() string { return "email:subscription_cancelled" }
 
 // OrderShippedEmailArgs sends an "order shipped" notification with tracking.
-// Enqueued in the same transaction as the shipment insert during a Pirate
-// Ship CSV tracking import.
+// Enqueued in the same transaction as the shipment insert that triggered it.
 type OrderShippedEmailArgs struct {
 	OrderID    uuid.UUID `json:"order_id"`
 	CustomerID uuid.UUID `json:"customer_id"`

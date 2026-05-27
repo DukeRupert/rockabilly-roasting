@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -85,8 +87,8 @@ func (s *ShippingStore) UpdateConfig(ctx context.Context, tx pgx.Tx, cfg domain.
 // --- Shipments ---
 
 // CreateShipmentParams holds the fields needed to create a shipment.
-// LabelURL and the box dimensions are pointer-typed because Pirate Ship CSV
-// imports omit them; EasyPost callers always provide them.
+// LabelURL and the box dimensions are pointer-typed because not every
+// shipment source supplies them — only carrier label purchases do.
 type CreateShipmentParams struct {
 	OrderID        uuid.UUID
 	Status         domain.ShipmentStatus
@@ -206,6 +208,128 @@ func (s *ShippingStore) GetShipmentLabelKey(ctx context.Context, tx pgx.Tx, id u
 		return nil, fmt.Errorf("get shipment label key: %w", err)
 	}
 	return key, nil
+}
+
+// --- Label attempts ---
+
+// GetLatestLabelAttempt returns the most recent non-successful BuyLabel job
+// for an order, or nil if none is in flight or recently failed. A successful
+// attempt is communicated via the shipment row, not here — so completed
+// states are filtered out.
+//
+// This reads River's river_job table directly. The columns referenced (kind,
+// args, state, attempt, max_attempts, errors) are stable across River
+// versions; the table layout is part of River's documented contract.
+func (s *ShippingStore) GetLatestLabelAttempt(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (*domain.LabelAttempt, error) {
+	const query = `
+		SELECT id, state, attempt, max_attempts, errors
+		FROM river_job
+		WHERE kind = 'buy_label'
+		  AND (args->>'order_id') = $1
+		  AND state <> 'completed'
+		ORDER BY id DESC
+		LIMIT 1`
+
+	var (
+		id            int64
+		state         string
+		attempt       int
+		maxAttempts   int
+		errorsJSON    []byte
+	)
+	err := tx.QueryRow(ctx, query, orderID.String()).Scan(&id, &state, &attempt, &maxAttempts, &errorsJSON)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get latest label attempt: %w", err)
+	}
+
+	out := &domain.LabelAttempt{
+		JobID:       id,
+		Attempt:     attempt,
+		MaxAttempts: maxAttempts,
+		Status:      labelAttemptStatusFromRiverState(state),
+	}
+	if out.Status == domain.LabelAttemptStatusFailed && len(errorsJSON) > 0 {
+		out.LastError = lastErrorMessage(errorsJSON)
+	}
+	return out, nil
+}
+
+// ListOrdersWithFailedLabelAttempts returns the subset of orderIDs whose
+// latest BuyLabel job ended in a terminal failure state (cancelled or
+// discarded). Used by the order list to flag rows that need operator
+// attention. Orders with a queued/running attempt are NOT included — those
+// resolve on their own.
+func (s *ShippingStore) ListOrdersWithFailedLabelAttempts(ctx context.Context, tx pgx.Tx, orderIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	out := make(map[uuid.UUID]bool)
+	if len(orderIDs) == 0 {
+		return out, nil
+	}
+
+	idStrs := make([]string, len(orderIDs))
+	for i, id := range orderIDs {
+		idStrs[i] = id.String()
+	}
+
+	const query = `
+		SELECT DISTINCT ON ((args->>'order_id'))
+		       (args->>'order_id') AS order_id,
+		       state
+		FROM river_job
+		WHERE kind = 'buy_label'
+		  AND (args->>'order_id') = ANY($1::text[])
+		ORDER BY (args->>'order_id'), id DESC`
+
+	rows, err := tx.Query(ctx, query, idStrs)
+	if err != nil {
+		return nil, fmt.Errorf("list orders with failed label attempts: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var orderIDStr, state string
+		if err := rows.Scan(&orderIDStr, &state); err != nil {
+			return nil, fmt.Errorf("scan label attempt row: %w", err)
+		}
+		if state != "cancelled" && state != "discarded" {
+			continue
+		}
+		id, parseErr := uuid.Parse(orderIDStr)
+		if parseErr != nil {
+			continue
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// labelAttemptStatusFromRiverState collapses River's seven job states into
+// the two we surface in the UI. "cancelled" + "discarded" are terminal
+// failures; everything else (available, scheduled, running, retryable,
+// pending) is in-flight. "completed" is filtered out at the query level.
+func labelAttemptStatusFromRiverState(state string) domain.LabelAttemptStatus {
+	switch state {
+	case "cancelled", "discarded":
+		return domain.LabelAttemptStatusFailed
+	default:
+		return domain.LabelAttemptStatusQueued
+	}
+}
+
+// lastErrorMessage extracts the error string of the last AttemptError in
+// River's errors JSONB column. Returns empty string if the JSON is malformed
+// or empty — the UI handles that gracefully with a generic copy.
+func lastErrorMessage(b []byte) string {
+	type attemptError struct {
+		Error string `json:"error"`
+	}
+	var attempts []attemptError
+	if err := json.Unmarshal(b, &attempts); err != nil || len(attempts) == 0 {
+		return ""
+	}
+	return attempts[len(attempts)-1].Error
 }
 
 // --- Row converters ---

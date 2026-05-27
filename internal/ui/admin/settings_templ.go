@@ -354,7 +354,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" placeholder=\"5095852320\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div></div></div><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-sm font-semibold text-rr-heading\">Packaging tare weight</h3><p class=\"mt-1 text-xs text-rr-muted\">Weight of an empty box plus dunnage (in ounces). Added to every Pirate Ship export row on top of the product weights.</p><div class=\"mt-3 sm:max-w-xs\"><label for=\"shipping-tare\" class=\"sr-only\">Tare weight (oz)</label><div class=\"mt-1 flex items-center\"><input id=\"shipping-tare\" type=\"number\" name=\"tare_weight_oz\" step=\"0.01\" min=\"0\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" placeholder=\"5095852320\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div></div></div><div class=\"px-4 py-5 sm:px-6\"><h3 class=\"text-sm font-semibold text-rr-heading\">Packaging tare weight</h3><p class=\"mt-1 text-xs text-rr-muted\">Weight of an empty box plus dunnage (in ounces). Added to every shipment on top of the product weights.</p><div class=\"mt-3 sm:max-w-xs\"><label for=\"shipping-tare\" class=\"sr-only\">Tare weight (oz)</label><div class=\"mt-1 flex items-center\"><input id=\"shipping-tare\" type=\"number\" name=\"tare_weight_oz\" step=\"0.01\" min=\"0\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -13,11 +13,16 @@ import (
 // OrderRow bundles an order with the customer summary fields the list needs
 // to render at a glance: display name, email, and account type. Built in the
 // handler from per-order customer lookups (bounded by page size).
+//
+// LabelFailed is true when the most recent BuyLabel job for this order ended
+// in cancelled/discarded state — surfaced as an inline badge so staff can
+// spot blocked orders without opening each row.
 type OrderRow struct {
 	Order         domain.Order
 	CustomerName  string
 	CustomerEmail string
 	AccountType   domain.AccountType
+	LabelFailed   bool
 }
 
 // showOrderStatusOverFulfillment decides which badge to show in the single
@@ -51,49 +56,12 @@ func orderListIDsJSON(rows []OrderRow) string {
 }
 
 // orderListAlpineState builds the inline x-data for the bulk-action bar.
-// Carries the multi-select state (`selected` / `allIds`) plus the
-// Pirate-Ship batch-export logic (`exporting`, `exportNotice`, runExport).
-// Export needs to own the fetch — we read X-Hiri-Export-Skipped-* headers
-// before triggering the download, which the browser's native handling
-// can't expose.
+// Carries multi-select state: `selected` (currently checked row IDs) and
+// `allIds` (the visible page's IDs, used by the select-all header checkbox).
 func orderListAlpineState(rows []OrderRow) string {
 	return `{
 		selected: [],
-		allIds: ` + orderListIDsJSON(rows) + `,
-		exporting: false,
-		exportNotice: null,
-		async runExport() {
-			if (this.selected.length === 0 || this.exporting) return;
-			this.exporting = true;
-			this.exportNotice = null;
-			try {
-				const url = '/admin/orders/export.csv?ids=' + this.selected.join(',');
-				const res = await fetch(url, { credentials: 'same-origin' });
-				if (!res.ok) throw new Error('HTTP ' + res.status);
-				const skippedCount = parseInt(res.headers.get('X-Hiri-Export-Skipped-Count') || '0', 10);
-				const skippedNumbers = res.headers.get('X-Hiri-Export-Skipped-Order-Numbers') || '';
-				const truncated = res.headers.get('X-Hiri-Export-Skipped-Truncated') === 'true';
-				const cd = res.headers.get('Content-Disposition') || '';
-				const m = cd.match(/filename="([^"]+)"/);
-				const filename = m ? m[1] : 'hiri-orders.csv';
-				const blob = await res.blob();
-				const blobUrl = URL.createObjectURL(blob);
-				const a = document.createElement('a');
-				a.href = blobUrl;
-				a.download = filename;
-				document.body.appendChild(a);
-				a.click();
-				a.remove();
-				URL.revokeObjectURL(blobUrl);
-				if (skippedCount > 0) {
-					this.exportNotice = { kind: 'skipped', count: skippedCount, numbers: skippedNumbers, truncated: truncated };
-				}
-			} catch (e) {
-				this.exportNotice = { kind: 'error', message: (e && e.message) ? e.message : String(e) };
-			} finally {
-				this.exporting = false;
-			}
-		}
+		allIds: ` + orderListIDsJSON(rows) + `
 	}`
 }
 
@@ -217,7 +185,7 @@ func orderViewHref(view, search string) string {
 // surface — visually pasted on top of the row of inactive labels.
 func orderTabClass(active bool) string {
 	if active {
-		return "relative shrink-0 whitespace-nowrap inline-flex items-center gap-2 border border-rr-border bg-rr-surface px-3.5 py-2 text-rr-heading shadow-[4px_4px_0_0_var(--color-rr-border)] z-10"
+		return "relative shrink-0 whitespace-nowrap inline-flex items-center gap-2 border border-rr-border bg-rr-surface px-3.5 py-2 font-semibold text-rr-heading shadow-sm z-10"
 	}
 	return "shrink-0 whitespace-nowrap inline-flex items-center gap-2 border border-transparent px-3.5 py-2 text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
 }
@@ -254,17 +222,16 @@ templ OrderListContent(props OrderListProps) {
 	<div class="sm:flex sm:items-end sm:justify-between">
 		<div>
 			<h1 class="admin-page-title">Orders</h1>
-			<p class="mt-2 label-font text-rr-amber" style="font-size:0.65rem;">✦ The daybook</p>
 		</div>
 		<div class="mt-4 sm:mt-0 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
 			<a href="/admin/orders/new" class="inline-flex items-center justify-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">+ New manual order</a>
 		</div>
 	</div>
-	<!-- Filter masthead — newspaper-style section break holding the view tabs
-	     and search as one composable unit. Edge-to-edge ink rules top/bottom
-	     bind them visually; on desktop tabs live left, search lives right;
-	     on mobile they stack with tabs on top (col-reverse). -->
-	<section class="mt-6 border-y-2 border-rr-border py-3" aria-label="Filter orders">
+	<!-- Filter masthead — tabs + search. Sits under the page header as a lighter
+	     control strip (no border rules) so it doesn't compete with the H1 band.
+	     On desktop tabs live left, search lives right; on mobile they stack
+	     with tabs on top (col-reverse). -->
+	<section class="mt-4" aria-label="Filter orders">
 		<div class="flex flex-col-reverse items-stretch gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
 			<!-- View tabs — workflow-led buckets with counts. Active tab is stamped
 			     (ink border + hard offset shadow) so the current bucket is unmissable. -->
@@ -338,7 +305,16 @@ templ OrderListContent(props OrderListProps) {
 			}
 		} else {
 			<div x-data={ orderListAlpineState(props.Rows) }>
-				<!-- Bulk action bar — stamps in below the admin top bar when rows are selected. -->
+				<!-- Affordance hint — surfaces what bulk actions exist for staff who
+				     haven't tried the checkboxes yet. Disappears the moment any row
+				     is selected; the action bar takes over the same vertical slot. -->
+				<p
+					x-show="selected.length === 0"
+					class="mb-3 text-xs text-rr-muted"
+				>
+					Select orders to print invoices or buy labels in bulk.
+				</p>
+				<!-- Bulk action bar — slides in when rows are selected. -->
 				<div
 					x-show="selected.length > 0"
 					x-cloak
@@ -350,7 +326,7 @@ templ OrderListContent(props OrderListProps) {
 					x-transition:leave-end="opacity-0"
 					class="sticky top-16 z-20 mb-4"
 				>
-					<div class="flex items-center justify-between gap-3 border border-rr-border bg-rr-surface px-3 py-2 text-sm shadow-[4px_4px_0_0_#0E0D0C]">
+					<div class="flex items-center justify-between gap-3 border border-rr-border bg-rr-surface px-3 py-2 text-sm shadow-sm">
 						<span class="text-rr-heading">
 							<span class="font-semibold tabular-nums" x-text="selected.length"></span> selected
 						</span>
@@ -369,6 +345,16 @@ templ OrderListContent(props OrderListProps) {
 								class="contents"
 							>
 								<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+								<label for="bulk-label-service" class="sr-only">Shipping service</label>
+								<select
+									id="bulk-label-service"
+									name="service_code"
+									class="rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+								>
+									for _, opt := range ShippoServiceOptions {
+										<option value={ opt.Token }>{ opt.Label }</option>
+									}
+								</select>
 								<button
 									type="submit"
 									class="inline-flex items-center rounded-sm border border-rr-ink bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-ink hover:bg-rr-raised"
@@ -382,44 +368,6 @@ templ OrderListContent(props OrderListProps) {
 								class="inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised"
 							>
 								Clear
-							</button>
-						</div>
-					</div>
-					<!-- Skipped-orders / error notice — same paper-and-ink stamp treatment
-					     as the page-level export button. Anchored under the action bar so
-					     it travels with the sticky position. -->
-					<div
-						x-show="exportNotice"
-						x-cloak
-						x-transition.opacity
-						class="absolute right-0 top-full mt-2 w-80 max-w-[90vw] border border-rr-ink bg-rr-paper p-4 text-sm text-rr-ink"
-						style="box-shadow: 4px 4px 0 0 var(--color-rr-ink, #0E0D0C);"
-					>
-						<div class="flex items-start justify-between gap-3">
-							<div>
-								<template x-if="exportNotice && exportNotice.kind === 'skipped'">
-									<div>
-										<p class="font-semibold">
-											<span x-text="exportNotice.count"></span>
-											<span x-text="exportNotice.count === 1 ? 'order' : 'orders'"></span>
-											skipped
-										</p>
-										<p class="mt-1 text-rr-body">Missing variant weight or shipping address. Fix and re-export.</p>
-										<p class="mt-2 break-all font-mono text-xs" x-text="exportNotice.numbers"></p>
-										<template x-if="exportNotice.truncated">
-											<p class="mt-1 text-xs text-rr-muted">… more not shown</p>
-										</template>
-									</div>
-								</template>
-								<template x-if="exportNotice && exportNotice.kind === 'error'">
-									<div>
-										<p class="font-semibold text-red-700">Export failed</p>
-										<p class="mt-1" x-text="exportNotice.message"></p>
-									</div>
-								</template>
-							</div>
-							<button type="button" @click="exportNotice = null" aria-label="Dismiss" class="text-rr-muted hover:text-rr-ink">
-								<svg class="size-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"></path></svg>
 							</button>
 						</div>
 					</div>
@@ -439,7 +387,7 @@ templ OrderListContent(props OrderListProps) {
 									/>
 								</th>
 								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">Order</th>
-								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">State</th>
 								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Shipping</th>
 								<th scope="col" class="px-3 py-3.5 pr-4 sm:pr-6 text-right text-sm font-semibold text-rr-heading">Total</th>
 								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Placed</th>
@@ -474,11 +422,16 @@ templ OrderListContent(props OrderListProps) {
 										</a>
 									</td>
 									<td class="whitespace-nowrap px-3 py-4 text-sm">
-										if showOrderStatusOverFulfillment(row.Order.Status) {
-											@OrderStatusBadge(row.Order.Status)
-										} else {
-											@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
-										}
+										<div class="flex flex-wrap items-center gap-1.5">
+											if showOrderStatusOverFulfillment(row.Order.Status) {
+												@OrderStatusBadge(row.Order.Status)
+											} else {
+												@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+											}
+											if row.LabelFailed {
+												<span class="badge badge-red" title="Most recent label purchase failed — open the order to retry.">Label failed</span>
+											}
+										</div>
 									</td>
 									<td class="hidden whitespace-nowrap px-3 py-4 text-sm lg:table-cell">
 										if row.Order.ShippingMethod != nil {

@@ -248,7 +248,6 @@ func run() error {
 		WithEmail(emailEnv, customerStore, catalogStore).
 		WithCatalog(catalogStore, pricingStore)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
-	shippingExportSvc := app.NewShippingExportService(orderStore, customerStore, catalogStore, fulfillmentStore, shippingStore)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg)
 	pricingSvc := app.NewPricingService(pricingStore, customerStore)
@@ -340,10 +339,6 @@ func run() error {
 	checkoutSvc.WithCheckoutConfirmDeps(cartStore, enqueuer)
 	orderSvc.WithEnqueuer(enqueuer)
 
-	// Pirate Ship CSV tracking import depends on the enqueuer to fire the
-	// "your order has shipped" email atomically with the per-row write.
-	shippingImportSvc := app.NewShippingImportService(orderStore, shippingStore, auditWriter, metricsReg, enqueuer, pool)
-
 	// Register scheduler worker (needs the client for transactional inserts)
 	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient, metricsReg))
 
@@ -400,8 +395,6 @@ func run() error {
 		CatalogService:       catalogSvc,
 		CheckoutService:      checkoutSvc,
 		FulfillmentService:    fulfillmentSvc,
-		ShippingExportService: shippingExportSvc,
-		ShippingImportService: shippingImportSvc,
 		SubscriptionService:  subscriptionSvc,
 		DiscountService:      discountSvc,
 		AuthService:          authSvc,

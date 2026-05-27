@@ -6,9 +6,9 @@ import (
 )
 
 // trackingURL returns the carrier's public tracking page for a tracking
-// number, or an empty string if we can't recognize the carrier. The carrier
-// name as Pirate Ship reports it is normalized loosely (USPS, "USPS Ground
-// Advantage", "U.S.P.S." all match the USPS branch).
+// number, or an empty string if we can't recognize the carrier. Carrier
+// names are normalized loosely (USPS, "USPS Ground Advantage", "U.S.P.S."
+// all match the USPS branch).
 func trackingURL(carrier, trackingNumber string) string {
 	t := strings.TrimSpace(trackingNumber)
 	if t == "" {

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,24 +29,98 @@ type SiblingVariant struct {
 }
 
 type OrderShowProps struct {
-	Order            *domain.Order
-	LineItems        []EnrichedLineItem
-	Adjustments      []domain.Adjustment
-	Customer         *domain.Customer
-	ShippingAddress  *domain.Address
-	Shipments        []domain.Shipment
-	Flash            string
-	MerchantTZ       *time.Location
-	StaffName        string
-	StaffRole        string
-	CanEditLineItems bool
+	Order               *domain.Order
+	LineItems           []EnrichedLineItem
+	Adjustments         []domain.Adjustment
+	Customer            *domain.Customer
+	ShippingAddress     *domain.Address
+	Shipments           []domain.Shipment
+	LatestLabelAttempt  *domain.LabelAttempt
+	Flash               string
+	MerchantTZ          *time.Location
+	StaffName           string
+	StaffRole           string
+	CanEditLineItems    bool
+}
+
+// LabelAttemptMessage maps a LabelAttempt to short staff-facing copy.
+// Returns ("", "") when there's nothing to show (nil attempt). For
+// "queued" attempts the second value is empty.
+//
+// The error mapper handles the common deterministic failures with specific
+// copy; everything else falls back to "Label failed" plus the first ~80
+// chars of the underlying error for triage.
+func LabelAttemptMessage(a *domain.LabelAttempt) (headline string, detail string) {
+	if a == nil {
+		return "", ""
+	}
+	if a.Status == domain.LabelAttemptStatusQueued {
+		if a.Attempt > 1 {
+			return fmt.Sprintf("Label retrying (attempt %d of %d)", a.Attempt, a.MaxAttempts), ""
+		}
+		return "Label queued", ""
+	}
+	return "Label failed", labelFailureDetail(a.LastError)
+}
+
+// labelFailureDetail returns a one-line plain-English summary of a buy_label
+// worker error. Matches on substrings of the raw error string from River's
+// errors column; falls back to a truncated raw error when no pattern matches.
+func labelFailureDetail(raw string) string {
+	if raw == "" {
+		return "No error detail recorded."
+	}
+	low := strings.ToLower(raw)
+	switch {
+	case strings.Contains(low, "no box preset"):
+		return "No box preset configured. Add one in Settings → Box presets."
+	case strings.Contains(low, "no physical items"), strings.Contains(low, "shippable items"):
+		return "Order has no shippable items."
+	case strings.Contains(low, "weight"):
+		return "A variant in this order is missing its weight."
+	case strings.Contains(low, "no rate for service"):
+		return "Selected service unavailable for this parcel. Try Priority or Priority Express."
+	case strings.Contains(low, "no rates returned"):
+		return "Shippo returned no rates for this address."
+	case strings.Contains(low, "address"):
+		return "Address rejected by USPS. Verify the ship-to address and try again."
+	case strings.Contains(low, "seller info missing"), strings.Contains(low, "email or phone"):
+		return "Origin email/phone missing — fill them in under Settings → Shipping."
+	}
+	const max = 160
+	if len(raw) > max {
+		return raw[:max] + "…"
+	}
+	return raw
+}
+
+// ShippoServiceOption is one selectable carrier service in the Buy Label
+// form. Token must match a Shippo servicelevel.token — see
+// internal/platform/shipping/shippo.go.
+type ShippoServiceOption struct {
+	Token string
+	Label string
+}
+
+// ShippoServiceOptions is the menu shown in the Buy Label dropdown. Order is
+// significant: the first entry is the default selection (cheapest USPS
+// ground service for retail orders).
+var ShippoServiceOptions = []ShippoServiceOption{
+	{Token: "usps_ground_advantage", Label: "USPS Ground Advantage"},
+	{Token: "usps_priority", Label: "USPS Priority"},
+	{Token: "usps_priority_express", Label: "USPS Priority Express"},
 }
 
 // canBuyLabel reports whether the "Buy Label" button should be shown.
-// Eligible when: order is paid, fulfilled, shipping out via the standard
-// "shipped" channel (not pickup/local delivery), not cancelled/refunded,
-// and no shipment row already exists for it.
-func canBuyLabel(order *domain.Order, shipments []domain.Shipment) bool {
+// Eligible when: order is paid, shipping out via the standard "shipped"
+// channel (not pickup/local delivery), not cancelled/refunded, no shipment
+// row already exists, and no buy attempt is currently in flight. A failed
+// previous attempt does NOT suppress the button — the same form re-enqueues
+// a fresh attempt, so it acts as a Retry.
+func canBuyLabel(order *domain.Order, shipments []domain.Shipment, attempt *domain.LabelAttempt) bool {
+	if attempt != nil && attempt.Status == domain.LabelAttemptStatusQueued {
+		return false
+	}
 	if order.PaymentStatus != domain.PaymentStatusCaptured {
 		return false
 	}
@@ -332,6 +407,24 @@ templ OrderShowContent(props OrderShowProps) {
 			</div>
 		</div>
 	}
+	if props.LatestLabelAttempt != nil {
+		{{ headline, detail := LabelAttemptMessage(props.LatestLabelAttempt) }}
+		if headline != "" {
+			<div class="mt-6">
+				if props.LatestLabelAttempt.Status == domain.LabelAttemptStatusFailed {
+					<div class="flex items-start gap-2 border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+						<span class="badge badge-red mt-0.5">{ headline }</span>
+						<span class="text-rr-body">{ detail }</span>
+					</div>
+				} else {
+					<div class="flex items-center gap-2 text-sm">
+						<span class="badge badge-amber">{ headline }</span>
+						<span class="text-rr-muted">Worker is processing this label — refresh in a moment.</span>
+					</div>
+				}
+			</div>
+		}
+	}
 	<!-- Guided actions -->
 	<div class="mt-6 flex flex-wrap gap-3">
 		if canFulfillOrder(props.Order) {
@@ -347,16 +440,30 @@ templ OrderShowContent(props OrderShowProps) {
 				</button>
 			</form>
 		}
-		if canBuyLabel(props.Order, props.Shipments) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/label", props.Order.ID.String())) }>
+		if canBuyLabel(props.Order, props.Shipments, props.LatestLabelAttempt) {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/label", props.Order.ID.String())) } class="inline-flex items-stretch gap-2">
+				<label for="buy-label-service" class="sr-only">Shipping service</label>
+				<select
+					id="buy-label-service"
+					name="service_code"
+					class="rounded-sm border border-rr-border bg-rr-surface px-3 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+				>
+					for _, opt := range ShippoServiceOptions {
+						<option value={ opt.Token }>{ opt.Label }</option>
+					}
+				</select>
 				<button
 					type="submit"
 					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
 				>
 					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z"></path>
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z"></path>
 					</svg>
-					Buy Label
+					if props.LatestLabelAttempt != nil && props.LatestLabelAttempt.Status == domain.LabelAttemptStatusFailed {
+						Retry Buy Label
+					} else {
+						Buy Label
+					}
 				</button>
 			</form>
 		}

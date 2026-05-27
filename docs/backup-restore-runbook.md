@@ -17,8 +17,8 @@ Production Postgres for Rockabilly Roasting runs in the `rr-postgres` Docker con
 
 Quick status checks:
 ```bash
-ssh hiri-deploy 'sudo systemctl list-timers rr-backup.timer'
-ssh hiri-deploy 'sudo journalctl -u rr-backup.service --since "24 hours ago" --no-pager'
+ssh rr-deploy 'sudo systemctl list-timers rr-backup.timer'
+ssh rr-deploy 'sudo journalctl -u rr-backup.service --since "24 hours ago" --no-pager'
 ```
 
 ## Verify a backup is healthy
@@ -26,7 +26,7 @@ ssh hiri-deploy 'sudo journalctl -u rr-backup.service --since "24 hours ago" --n
 ### 1. Confirm today's dump landed in R2
 
 ```bash
-ssh hiri-deploy '
+ssh rr-deploy '
   set -a; source /opt/rockabilly-roasting/backup.env; set +a
   rclone --bind 5.161.245.139 lsl r2backups:rockabilly-roasting-db/daily/ | tail -5
 '
@@ -39,7 +39,7 @@ Size should be non-trivial (hundreds of KB at 2026-04 scale; grows with data).
 The only way to know a backup is actually good is to restore it. Do this monthly.
 
 ```bash
-ssh hiri-deploy '
+ssh rr-deploy '
   set -e
   DUMP=$(ls -1t /var/backups/rockabilly-roasting/rr-*.dump | head -1)
   echo "restoring $DUMP"
@@ -64,7 +64,7 @@ ssh hiri-deploy '
 
 Compare against production:
 ```bash
-ssh hiri-deploy 'docker exec rr-postgres psql -U rr -d rr -tAc \
+ssh rr-deploy 'docker exec rr-postgres psql -U rr -d rr -tAc \
   "SELECT (SELECT COUNT(*) FROM customers), (SELECT COUNT(*) FROM subscriptions), (SELECT COUNT(*) FROM orders);"'
 ```
 
@@ -74,7 +74,7 @@ Counts should match (allowing for rows written between dump time and now).
 
 From the VPS (IP-allowlisted, will just work):
 ```bash
-ssh hiri-deploy '
+ssh rr-deploy '
   set -a; source /opt/rockabilly-roasting/backup.env; set +a
   rclone --bind 5.161.245.139 copy r2backups:rockabilly-roasting-db/daily/rr-YYYYMMDDTHHMMSSZ.dump /tmp/
 '
@@ -113,7 +113,7 @@ docker exec rr-postgres psql -U rr -d postgres -c "DROP DATABASE rr_restore;"
 #### B.1 Stop the app
 
 ```bash
-ssh hiri-deploy 'cd /opt/rockabilly-roasting && sudo docker compose stop app'
+ssh rr-deploy 'cd /opt/rockabilly-roasting && sudo docker compose stop app'
 ```
 
 This prevents the app from writing to Postgres while you restore, and avoids the app handing out stale sessions mid-restore.
@@ -121,7 +121,7 @@ This prevents the app from writing to Postgres while you restore, and avoids the
 #### B.2 Grab the most recent good dump
 
 ```bash
-ssh hiri-deploy '
+ssh rr-deploy '
   set -a; source /opt/rockabilly-roasting/backup.env; set +a
   # Local copies first (fastest, last 3 dumps)
   ls -lt /var/backups/rockabilly-roasting/rr-*.dump | head
@@ -134,8 +134,8 @@ ssh hiri-deploy '
 #### B.3 Drop and recreate the `rr` database
 
 ```bash
-ssh hiri-deploy 'docker exec rr-postgres psql -U rr -d postgres -c "DROP DATABASE rr;"'
-ssh hiri-deploy 'docker exec rr-postgres psql -U rr -d postgres -c "CREATE DATABASE rr OWNER rr;"'
+ssh rr-deploy 'docker exec rr-postgres psql -U rr -d postgres -c "DROP DATABASE rr;"'
+ssh rr-deploy 'docker exec rr-postgres psql -U rr -d postgres -c "CREATE DATABASE rr OWNER rr;"'
 ```
 
 If this fails with "database is being accessed by other users", the app didn't fully shut down. Re-run `docker compose stop app` and try again.
@@ -143,7 +143,7 @@ If this fails with "database is being accessed by other users", the app didn't f
 #### B.4 Restore
 
 ```bash
-ssh hiri-deploy '
+ssh rr-deploy '
   DUMP=/var/backups/rockabilly-roasting/rr-YYYYMMDDTHHMMSSZ.dump
   docker cp "$DUMP" rr-postgres:/tmp/dump
   docker exec rr-postgres pg_restore --no-owner --no-privileges -U rr -d rr /tmp/dump
@@ -156,7 +156,7 @@ ssh hiri-deploy '
 #### B.5 Verify
 
 ```bash
-ssh hiri-deploy 'docker exec rr-postgres psql -U rr -d rr -tAc \
+ssh rr-deploy 'docker exec rr-postgres psql -U rr -d rr -tAc \
   "SELECT (SELECT COUNT(*) FROM customers), (SELECT COUNT(*) FROM subscriptions), (SELECT COUNT(*) FROM orders);"'
 ```
 
@@ -165,8 +165,8 @@ Expected: roughly the row counts from the moment the dump was taken.
 #### B.6 Restart the app
 
 ```bash
-ssh hiri-deploy 'cd /opt/rockabilly-roasting && sudo docker compose up -d app'
-ssh hiri-deploy 'sudo docker logs --tail 50 rr-app'
+ssh rr-deploy 'cd /opt/rockabilly-roasting && sudo docker compose up -d app'
+ssh rr-deploy 'sudo docker logs --tail 50 rr-app'
 ```
 
 Watch for migration success and no connection errors. Hit `https://rockabillyroasting.com/healthz` (or whatever the health endpoint is) to confirm.
@@ -194,14 +194,14 @@ For a small gap (hours), reconciling manually from Stripe's dashboard is usually
 
 ### Timer didn't fire
 ```bash
-ssh hiri-deploy 'sudo systemctl status rr-backup.timer'
-ssh hiri-deploy 'sudo systemctl list-timers rr-backup.timer'
+ssh rr-deploy 'sudo systemctl status rr-backup.timer'
+ssh rr-deploy 'sudo systemctl list-timers rr-backup.timer'
 ```
 If it's inactive, `sudo systemctl enable --now rr-backup.timer`.
 
 ### Last run failed
 ```bash
-ssh hiri-deploy 'sudo journalctl -u rr-backup.service -n 200 --no-pager'
+ssh rr-deploy 'sudo journalctl -u rr-backup.service -n 200 --no-pager'
 ```
 
 Common failures:
@@ -212,13 +212,13 @@ Common failures:
 
 ### Manual run
 ```bash
-ssh hiri-deploy 'sudo systemctl start rr-backup.service && sudo journalctl -u rr-backup.service -f'
+ssh rr-deploy 'sudo systemctl start rr-backup.service && sudo journalctl -u rr-backup.service -f'
 ```
 
 ### Rotating R2 credentials
 1. Cloudflare dashboard → mint new scoped token for `rockabilly-roasting-db`.
-2. `ssh hiri-deploy 'sudo nano /opt/rockabilly-roasting/backup.env'` — update `RCLONE_CONFIG_R2BACKUPS_ACCESS_KEY_ID` + `RCLONE_CONFIG_R2BACKUPS_SECRET_ACCESS_KEY`.
-3. `ssh hiri-deploy 'sudo systemctl start rr-backup.service'` to verify the new token works.
+2. `ssh rr-deploy 'sudo nano /opt/rockabilly-roasting/backup.env'` — update `RCLONE_CONFIG_R2BACKUPS_ACCESS_KEY_ID` + `RCLONE_CONFIG_R2BACKUPS_SECRET_ACCESS_KEY`.
+3. `ssh rr-deploy 'sudo systemctl start rr-backup.service'` to verify the new token works.
 4. Revoke the old token in the Cloudflare dashboard.
 
 ## Future hardening (not implemented)

@@ -612,6 +612,43 @@ func (d *Deps) handleAdminOrderOutForDelivery(w http.ResponseWriter, r *http.Req
 	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Out+for+local+delivery", http.StatusSeeOther)
 }
 
+// handleAdminOrderShippingMethod swaps a local-fulfillment order between
+// pickup and local_delivery. Valid only before the order has shipped/been
+// picked up; rejects other methods at the service layer.
+func (d *Deps) handleAdminOrderShippingMethod(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	target := domain.ShippingMethod(r.FormValue("method"))
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.SwapLocalShippingMethod(ctx, tx, id, target, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	var flash string
+	switch target {
+	case domain.ShippingMethodPickup:
+		flash = "Shipping+method+changed+to+local+pickup"
+	case domain.ShippingMethodLocalDelivery:
+		flash = "Shipping+method+changed+to+local+delivery"
+	default:
+		flash = "Shipping+method+updated"
+	}
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+}
+
 func (d *Deps) handleAdminOrderPackingSlip(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

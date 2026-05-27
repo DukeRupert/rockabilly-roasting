@@ -153,6 +153,20 @@ func (s *OrderStore) UpdateOrderFulfillmentStatus(ctx context.Context, tx pgx.Tx
 	return orderFromRow(row), nil
 }
 
+// UpdateOrderShippingMethod sets the shipping method on an order and returns it.
+func (s *OrderStore) UpdateOrderShippingMethod(ctx context.Context, tx pgx.Tx, id uuid.UUID, method domain.ShippingMethod) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.update_shipping_method", time.Now(), &err)
+	m := string(method)
+	row, err := sqlcgen.New(tx).UpdateOrderShippingMethod(ctx, sqlcgen.UpdateOrderShippingMethodParams{
+		ID:             id,
+		ShippingMethod: &m,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update order shipping method: %w", err)
+	}
+	return orderFromRow(row), nil
+}
+
 // UpdateOrderStripePaymentIntentID sets the Stripe PaymentIntent ID on an order.
 func (s *OrderStore) UpdateOrderStripePaymentIntentID(ctx context.Context, tx pgx.Tx, id uuid.UUID, intentID string) (_ *domain.Order, err error) {
 	defer trackQuery(s.metrics, "orders.update_stripe_payment_intent_id", time.Now(), &err)

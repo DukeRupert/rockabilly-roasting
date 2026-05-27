@@ -132,6 +132,33 @@ func canMarkOutForDelivery(order *domain.Order) bool {
 		order.FulfillmentStatus == domain.FulfillmentStatusFulfilled
 }
 
+// canSwapShippingMethod gates the pickup↔local-delivery swap button: only
+// while the bag is still in the shop (unfulfilled or fulfilled) and the
+// order isn't terminated.
+func canSwapShippingMethod(order *domain.Order) bool {
+	if order.ShippingMethod == nil {
+		return false
+	}
+	if *order.ShippingMethod != domain.ShippingMethodPickup &&
+		*order.ShippingMethod != domain.ShippingMethodLocalDelivery {
+		return false
+	}
+	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
+		return false
+	}
+	return order.FulfillmentStatus == domain.FulfillmentStatusUnfulfilled ||
+		order.FulfillmentStatus == domain.FulfillmentStatusFulfilled
+}
+
+// swapShippingTarget returns the "other" local method — what the swap button
+// will switch the order to.
+func swapShippingTarget(current domain.ShippingMethod) (domain.ShippingMethod, string) {
+	if current == domain.ShippingMethodLocalDelivery {
+		return domain.ShippingMethodPickup, "Switch to local pickup"
+	}
+	return domain.ShippingMethodLocalDelivery, "Switch to local delivery"
+}
+
 // orderPipelineStep returns 0-3 for the progress bar position.
 // cancelled/refunded orders get a special -1 value.
 func orderPipelineStep(order *domain.Order) int {
@@ -170,6 +197,14 @@ func stepLabelClasses(current int, step int) string {
 		return "text-xs font-medium text-rr-red"
 	}
 	return "text-xs text-rr-border"
+}
+
+templ shippingMethodSwap(orderID uuid.UUID, current domain.ShippingMethod) {
+	{{ target, label := swapShippingTarget(current) }}
+	<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/shipping-method", orderID.String())) } class="inline">
+		<input type="hidden" name="method" value={ string(target) }/>
+		<button type="submit" class="btn-secondary text-xs">{ label }</button>
+	</form>
 }
 
 templ grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) {
@@ -477,6 +512,9 @@ templ OrderShowContent(props OrderShowProps) {
 					<div class="flex items-center gap-2">
 						<span class="text-sm font-medium text-rr-muted">Shipping:</span>
 						@ShippingMethodBadge(*props.Order.ShippingMethod)
+						if canSwapShippingMethod(props.Order) {
+							@shippingMethodSwap(props.Order.ID, *props.Order.ShippingMethod)
+						}
 					</div>
 				}
 				if props.Order.RequestedDeliveryDate != nil {

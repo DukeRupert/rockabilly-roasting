@@ -781,6 +781,73 @@ func (s *OrderService) MarkOutForDelivery(ctx context.Context, tx pgx.Tx, id uui
 	return order, nil
 }
 
+// SwapLocalShippingMethod swaps an order's shipping method between
+// local_delivery and local_pickup. Used when a customer changes their mind
+// after placing the order ("I'll come pick it up instead of you delivering").
+//
+// Allowed only while the order hasn't physically left the shop yet — i.e.
+// fulfillment status is unfulfilled or fulfilled, and the order isn't
+// cancelled or refunded. Cross-method swaps to/from shipped are rejected;
+// the carrier flow has its own label/tracking concerns and isn't safe to
+// flip in a single click.
+//
+// No customer email is sent — staff are doing this because they already
+// talked to the customer.
+func (s *OrderService) SwapLocalShippingMethod(ctx context.Context, tx pgx.Tx, id uuid.UUID, target domain.ShippingMethod, actor Actor) (*domain.Order, error) {
+	if target != domain.ShippingMethodPickup && target != domain.ShippingMethodLocalDelivery {
+		return nil, fmt.Errorf("target must be pickup or local_delivery: %w", ErrInvalidOrderStatus)
+	}
+
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for shipping-method swap: %w", err)
+	}
+
+	if order.ShippingMethod == nil ||
+		(*order.ShippingMethod != domain.ShippingMethodPickup && *order.ShippingMethod != domain.ShippingMethodLocalDelivery) {
+		return nil, fmt.Errorf("order is not a local fulfillment order: %w", ErrInvalidOrderStatus)
+	}
+	if *order.ShippingMethod == target {
+		return order, nil
+	}
+	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
+		return nil, fmt.Errorf("cannot swap shipping method on cancelled/refunded order: %w", ErrInvalidOrderStatus)
+	}
+	switch order.FulfillmentStatus {
+	case domain.FulfillmentStatusUnfulfilled, domain.FulfillmentStatusFulfilled:
+		// allowed
+	default:
+		return nil, fmt.Errorf("order has already left the shop: %w", ErrInvalidOrderStatus)
+	}
+
+	previous := *order.ShippingMethod
+	order, err = s.orders.UpdateOrderShippingMethod(ctx, tx, id, target)
+	if err != nil {
+		return nil, fmt.Errorf("set shipping method: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderShippingMethodChanged,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+		Metadata: map[string]any{
+			"from": string(previous),
+			"to":   string(target),
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit shipping-method swap: %w", err)
+	}
+
+	return order, nil
+}
+
 // UpdateFulfillmentStatus updates an order's fulfillment status.
 func (s *OrderService) UpdateFulfillmentStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.FulfillmentStatus, actor Actor) (*domain.Order, error) {
 	order, err := s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, status)

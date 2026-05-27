@@ -1,0 +1,17 @@
+[Unit]
+Description=Rockabilly Roasting Postgres backup to R2
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+ExecStart=/usr/local/sbin/rr-backup.sh
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=30m
+
+[Install]
+WantedBy=multi-user.target

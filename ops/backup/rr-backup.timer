@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily rr-backup.service trigger
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 UTC
+Persistent=true
+RandomizedDelaySec=5min
+Unit=rr-backup.service
+
+[Install]
+WantedBy=timers.target

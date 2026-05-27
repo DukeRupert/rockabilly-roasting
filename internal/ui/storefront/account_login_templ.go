@@ -38,7 +38,7 @@ func AccountLoginContent(props AccountLoginProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Full-bleed paper surface --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)] flex items-center\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-md w-full px-6 sm:px-10 lg:px-14 py-14 sm:py-20\"><!-- Page heading --><div class=\"text-center mb-8\"><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Welcome back</p><h1 class=\"font-slab text-ink uppercase leading-[0.92] mt-2\" style=\"font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;\">Sign <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">in.</span></h1><p class=\"font-oswald text-ink-soft text-sm mt-3 max-w-xs mx-auto leading-relaxed\">Enter your email. Add your password to sign in directly, or leave it blank and we'll email you a one-tap link.</p></div><!-- Card --><div class=\"border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Full-bleed paper surface --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)] flex items-center\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-md lg:max-w-xl w-full px-6 sm:px-10 lg:px-14 py-14 sm:py-20\"><!-- Daily Grind migration notice (temporary — remove ~2026-09-24) --><aside class=\"mb-6 border border-ink/40 bg-paper-warm px-4 py-3\" role=\"note\" aria-label=\"Daily Grind member notice\"><p class=\"font-oswald text-ink text-xs leading-relaxed\" style=\"letter-spacing:0.02em;\"><span class=\"font-bold uppercase\" style=\"letter-spacing:0.14em;\">Daily Grind:</span> only subscribers active on <span class=\"font-bold whitespace-nowrap\">March 24, 2026</span> carried over. Everyone else, place an order &mdash; checkout creates your account.</p></aside><!-- Page heading --><div class=\"text-center mb-8\"><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Welcome back</p><h1 class=\"font-slab text-ink uppercase leading-[0.92] mt-2\" style=\"font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;\">Sign <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">in.</span></h1><p class=\"font-oswald text-ink-soft text-sm mt-3 max-w-xs mx-auto leading-relaxed\">Enter your email. Add your password to sign in directly, or leave it blank and we'll email you a one-tap link.</p></div><!-- Card --><div class=\"border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -50,7 +50,7 @@ func AccountLoginContent(props AccountLoginProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account_login.templ`, Line: 35, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account_login.templ`, Line: 42, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -69,7 +69,7 @@ func AccountLoginContent(props AccountLoginProps) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Success)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account_login.templ`, Line: 44, Col: 97}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account_login.templ`, Line: 51, Col: 97}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -92,7 +92,7 @@ func AccountLoginContent(props AccountLoginProps) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Next)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account_login.templ`, Line: 49, Col: 58}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account_login.templ`, Line: 56, Col: 58}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 				if templ_7745c5c3_Err != nil {
@@ -110,7 +110,7 @@ func AccountLoginContent(props AccountLoginProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account_login.templ`, Line: 59, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account_login.templ`, Line: 66, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -121,7 +121,7 @@ func AccountLoginContent(props AccountLoginProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div><p class=\"mt-6 text-center font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.06em;\">Sign in with your password — or get a one-tap link by email.</p></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -14,7 +14,14 @@ templ AccountLoginContent(props AccountLoginProps) {
 	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)] flex items-center">
 		<!-- Paper grain overlay -->
 		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
-		<div class="relative mx-auto max-w-md w-full px-6 sm:px-10 lg:px-14 py-14 sm:py-20">
+		<div class="relative mx-auto max-w-md lg:max-w-xl w-full px-6 sm:px-10 lg:px-14 py-14 sm:py-20">
+			<!-- Daily Grind migration notice (temporary — remove ~2026-09-24) -->
+			<aside class="mb-6 border border-ink/40 bg-paper-warm px-4 py-3" role="note" aria-label="Daily Grind member notice">
+				<p class="font-oswald text-ink text-xs leading-relaxed" style="letter-spacing:0.02em;">
+					<span class="font-bold uppercase" style="letter-spacing:0.14em;">Daily Grind:</span>
+					only subscribers active on <span class="font-bold whitespace-nowrap">March 24, 2026</span> carried over. Everyone else, place an order &mdash; checkout creates your account.
+				</p>
+			</aside>
 			<!-- Page heading -->
 			<div class="text-center mb-8">
 				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
@@ -89,9 +96,6 @@ templ AccountLoginContent(props AccountLoginProps) {
 					</form>
 				}
 			</div>
-			<p class="mt-6 text-center font-oswald text-chrome-deep text-xs" style="letter-spacing:0.06em;">
-				Sign in with your password — or get a one-tap link by email.
-			</p>
 		</div>
 	</section>
 }

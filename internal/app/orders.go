@@ -809,6 +809,16 @@ type BatchFailure struct {
 	Reason  string
 }
 
+// MarkReadyForPickupBatch applies MarkReadyForPickup to each ID independently.
+// Same per-order independence and ordering guarantees as MarkPickedUpBatch.
+// Each successful row enqueues a "your order is ready" email in its own tx.
+func (s *OrderService) MarkReadyForPickupBatch(ctx context.Context, pool *pgxpool.Pool, ids []uuid.UUID, actor Actor) (BatchOutcome, error) {
+	return s.runBulkOrderVerb(ctx, pool, ids, func(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
+		_, err := s.MarkReadyForPickup(ctx, tx, id, actor)
+		return err
+	})
+}
+
 // MarkPickedUpBatch applies MarkPickedUp to each ID independently. Each order
 // runs in its own transaction so one failure never poisons the rest; rejected
 // orders end up in Failed with a short staff-facing reason. Input order is

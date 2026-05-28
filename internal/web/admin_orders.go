@@ -961,6 +961,29 @@ func (d *Deps) handleAdminOrderPackingSlipBatch(w http.ResponseWriter, r *http.R
 	admin.PackingSlipBatch(admin.PackingSlipBatchProps{Items: items}).Render(ctx, w) //nolint:errcheck
 }
 
+// handleAdminOrderReadyForPickupBatch applies MarkReadyForPickup to each order
+// in the posted order_ids list. POST /admin/orders/batch/ready-for-pickup.
+// Same redirect-with-banner shape as handleAdminOrderPickedUpBatch. Each
+// successful row enqueues a "your order is ready" email.
+func (d *Deps) handleAdminOrderReadyForPickupBatch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	ids, status, msg := parseBatchOrderIDs(r.FormValue("order_ids"))
+	if status != 0 {
+		http.Error(w, msg, status)
+		return
+	}
+	outcome, err := d.OrderService.MarkReadyForPickupBatch(ctx, d.Pool, ids, staffActor(r))
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	http.Redirect(w, r, buildBatchResultRedirect("ready-for-pickup", outcome), http.StatusSeeOther)
+}
+
 // handleAdminOrderPickedUpBatch applies MarkPickedUp to each order in the
 // posted order_ids list. POST /admin/orders/batch/picked-up. Always redirects
 // to /admin/fulfillment with a structured batch_result query string the

@@ -216,7 +216,7 @@ func parseBatchResultQuery(q url.Values) *admin.BatchActionResult {
 		return nil
 	}
 	switch verb {
-	case "picked-up", "out-for-delivery":
+	case "ready-for-pickup", "picked-up", "out-for-delivery":
 	default:
 		return nil
 	}

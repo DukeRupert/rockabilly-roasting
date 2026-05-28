@@ -50,10 +50,11 @@ type FulfillmentListProps struct {
 }
 
 // BatchActionResult is the staff-facing summary of a just-completed bulk
-// fulfillment operation. Verb names the operation ("picked-up",
-// "out-for-delivery"); Succeeded counts the orders that completed; Failures
-// carries per-order rejection details. Truncated is true when the redirect
-// URL's reason list was capped to fit within URL-length limits.
+// fulfillment operation. Verb names the operation ("ready-for-pickup",
+// "picked-up", "out-for-delivery"); Succeeded counts the orders that
+// completed; Failures carries per-order rejection details. Truncated is true
+// when the redirect URL's reason list was capped to fit within URL-length
+// limits.
 type BatchActionResult struct {
 	Verb      string
 	Succeeded int
@@ -73,6 +74,8 @@ type BatchActionFailure struct {
 // batchVerbLabel returns the human phrase for the banner header.
 func batchVerbLabel(verb string) string {
 	switch verb {
+	case "ready-for-pickup":
+		return "marked ready for pickup"
 	case "picked-up":
 		return "marked picked up"
 	case "out-for-delivery":
@@ -175,7 +178,7 @@ func fulfillmentGroupHintCopy(method *domain.ShippingMethod) string {
 	case domain.ShippingMethodShipped:
 		return "Select orders to print packing slips, print invoices, or buy labels in bulk."
 	case domain.ShippingMethodPickup:
-		return "Select orders to print packing slips or mark picked up in bulk."
+		return "Select orders to print packing slips, mark ready for pickup, or mark picked up in bulk."
 	case domain.ShippingMethodLocalDelivery:
 		return "Select orders to print packing slips or send out for delivery in bulk."
 	}
@@ -377,6 +380,21 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 						</button>
 					</form>
 				} else if group.Method != nil && *group.Method == domain.ShippingMethodPickup {
+					<form
+						method="post"
+						action="/admin/orders/batch/ready-for-pickup"
+						@submit="if (!confirm('Mark ' + selected.length + ' order(s) ready for pickup and email each customer?')) { $event.preventDefault(); }"
+						class="contents"
+					>
+						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+						<button
+							type="submit"
+							title="Mark each selected order ready for pickup and email the customer."
+							class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+						>
+							Mark ready for pickup
+						</button>
+					</form>
 					<form
 						method="post"
 						action="/admin/orders/batch/picked-up"

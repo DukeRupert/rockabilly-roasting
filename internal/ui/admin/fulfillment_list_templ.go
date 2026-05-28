@@ -569,19 +569,19 @@ func fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</p><!-- Bulk action bar — per-method verbs. Print packing slips is the\n\t\t\t     pack-and-ship workhorse and appears on every group; the\n\t\t\t     state-changing verb (Buy labels / Mark picked up / Out for\n\t\t\t     delivery) is method-specific. --><div x-show=\"selected.length > 0\" x-cloak x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0 -translate-y-1\" x-transition:enter-end=\"opacity-100 translate-y-0\" x-transition:leave=\"transition ease-in duration-150\" x-transition:leave-start=\"opacity-100\" x-transition:leave-end=\"opacity-0\" class=\"flex flex-wrap items-center gap-2\"><span class=\"text-sm text-rr-heading\"><span class=\"font-semibold tabular-nums\" x-text=\"selected.length\"></span> selected</span> <button type=\"button\" @click=\"window.open('/admin/orders/batch/packing-slips?ids=' + selected.join(','), '_blank')\" class=\"inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Print packing slips</button> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</p><!-- Bulk action bar — per-method verbs. Print packing slips is the\n\t\t\t     pack-and-ship workhorse and appears on every group; the\n\t\t\t     state-changing verb (Buy labels / Mark picked up / Out for\n\t\t\t     delivery) is method-specific. --><div x-show=\"selected.length > 0\" x-cloak x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0 -translate-y-1\" x-transition:enter-end=\"opacity-100 translate-y-0\" x-transition:leave=\"transition ease-in duration-150\" x-transition:leave-start=\"opacity-100\" x-transition:leave-end=\"opacity-0\" class=\"flex flex-wrap items-center gap-2\"><span class=\"text-sm text-rr-heading\"><span class=\"font-semibold tabular-nums\" x-text=\"selected.length\"></span> selected</span> <button type=\"button\" title=\"Open print-ready packing slips for each selected order in a new tab.\" @click=\"window.open('/admin/orders/batch/packing-slips?ids=' + selected.join(','), '_blank')\" class=\"inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Print packing slips</button> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if group.Method != nil && *group.Method == domain.ShippingMethodShipped {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<button type=\"button\" @click=\"window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')\" class=\"inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Print invoices</button><form method=\"post\" action=\"/admin/orders/labels\" @submit=\"if (!confirm('Buy a label for ' + selected.length + ' order(s)? This will charge your Shippo account.')) { $event.preventDefault(); }\" class=\"contents\"><input type=\"hidden\" name=\"order_ids\" :value=\"selected.join(',')\"> <label for=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<button type=\"button\" title=\"Open a print-ready invoice for each selected order in a new tab.\" @click=\"window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')\" class=\"inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Print invoices</button><form method=\"post\" action=\"/admin/orders/labels\" @submit=\"if (!confirm('Buy a label for ' + selected.length + ' order(s)? This will charge your Shippo account.')) { $event.preventDefault(); }\" class=\"contents\"><input type=\"hidden\" name=\"order_ids\" :value=\"selected.join(',')\"> <label for=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue("bulk-label-service-" + fulfillmentGroupAnchor(group.Method))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 358, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 360, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 			if templ_7745c5c3_Err != nil {
@@ -594,13 +594,13 @@ func fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps)
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.ResolveAttributeValue("bulk-label-service-" + fulfillmentGroupAnchor(group.Method))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 360, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 362, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" name=\"service_code\" class=\"rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" name=\"service_code\" title=\"Carrier service used when buying labels in bulk.\" class=\"rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -612,7 +612,7 @@ func fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps)
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(opt.Token)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 365, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 368, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 				if templ_7745c5c3_Err != nil {
@@ -625,7 +625,7 @@ func fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps)
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(opt.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 365, Col: 47}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 368, Col: 47}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -636,34 +636,34 @@ func fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps)
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</select> <button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90\">Buy labels</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</select> <button type=\"submit\" title=\"Buy a Shippo label for each selected order. Charges your Shippo account.\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90\">Buy labels</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if group.Method != nil && *group.Method == domain.ShippingMethodPickup {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<form method=\"post\" action=\"/admin/orders/batch/picked-up\" @submit=\"if (!confirm('Mark ' + selected.length + ' order(s) as picked up?')) { $event.preventDefault(); }\" class=\"contents\"><input type=\"hidden\" name=\"order_ids\" :value=\"selected.join(',')\"> <button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90\">Mark picked up</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<form method=\"post\" action=\"/admin/orders/batch/picked-up\" @submit=\"if (!confirm('Mark ' + selected.length + ' order(s) as picked up?')) { $event.preventDefault(); }\" class=\"contents\"><input type=\"hidden\" name=\"order_ids\" :value=\"selected.join(',')\"> <button type=\"submit\" title=\"Mark each selected order as picked up by the customer.\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90\">Mark picked up</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if group.Method != nil && *group.Method == domain.ShippingMethodLocalDelivery {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<form method=\"post\" action=\"/admin/orders/batch/out-for-delivery\" @submit=\"if (!confirm('Send delivery notification to ' + selected.length + ' customer(s) and mark out for delivery?')) { $event.preventDefault(); }\" class=\"contents\"><input type=\"hidden\" name=\"order_ids\" :value=\"selected.join(',')\"> <button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90\">Out for delivery</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<form method=\"post\" action=\"/admin/orders/batch/out-for-delivery\" @submit=\"if (!confirm('Send delivery notification to ' + selected.length + ' customer(s) and mark out for delivery?')) { $event.preventDefault(); }\" class=\"contents\"><input type=\"hidden\" name=\"order_ids\" :value=\"selected.join(',')\"> <button type=\"submit\" title=\"Email a delivery notification to each customer and mark the orders out for delivery.\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90\">Out for delivery</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<button type=\"button\" @click=\"window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')\" class=\"inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Print invoices</button> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<button type=\"button\" title=\"Open a print-ready invoice for each selected order in a new tab.\" @click=\"window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')\" class=\"inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Print invoices</button> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<button type=\"button\" @click=\"selected = []\" class=\"inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised\">Clear</button></div></header><div class=\"overflow-hidden border border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"relative w-10 px-3 py-3.5 sm:pl-6\"><input type=\"checkbox\" aria-label=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<button type=\"button\" title=\"Deselect all rows.\" @click=\"selected = []\" class=\"inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised\">Clear</button></div></header><div class=\"overflow-hidden border border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"relative w-10 px-3 py-3.5 sm:pl-6\"><input type=\"checkbox\" aria-label=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue("Select all " + fulfillmentGroupTitle(group.Method) + " orders")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 430, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 438, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 		if templ_7745c5c3_Err != nil {
@@ -790,7 +790,7 @@ func fulfillmentRow(row OrderRow, props FulfillmentListProps) templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("Select order %s", row.Order.Number))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 489, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 497, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var28)
 		if templ_7745c5c3_Err != nil {
@@ -803,7 +803,7 @@ func fulfillmentRow(row OrderRow, props FulfillmentListProps) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(row.Order.ID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 491, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 499, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 		if templ_7745c5c3_Err != nil {
@@ -816,7 +816,7 @@ func fulfillmentRow(row OrderRow, props FulfillmentListProps) templ.Component {
 		var templ_7745c5c3_Var30 templ.SafeURL
 		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 497, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 505, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
@@ -829,7 +829,7 @@ func fulfillmentRow(row OrderRow, props FulfillmentListProps) templ.Component {
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(row.Order.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 499, Col: 127}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 507, Col: 127}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
@@ -852,7 +852,7 @@ func fulfillmentRow(row OrderRow, props FulfillmentListProps) templ.Component {
 		var templ_7745c5c3_Var32 string
 		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(row.CustomerName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 504, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 512, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 		if templ_7745c5c3_Err != nil {
@@ -870,7 +870,7 @@ func fulfillmentRow(row OrderRow, props FulfillmentListProps) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(row.CustomerEmail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 506, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 514, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -924,7 +924,7 @@ func fulfillmentRow(row OrderRow, props FulfillmentListProps) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(relativeOrderDate(row.Order.PlacedAt, props.MerchantTZ, props.Now))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 519, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 527, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -969,7 +969,7 @@ func fulfillmentFlatRow(row OrderRow, props FulfillmentListProps) templ.Componen
 		var templ_7745c5c3_Var38 templ.SafeURL
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 530, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 538, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -982,7 +982,7 @@ func fulfillmentFlatRow(row OrderRow, props FulfillmentListProps) templ.Componen
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(row.Order.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 532, Col: 127}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 540, Col: 127}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -1005,7 +1005,7 @@ func fulfillmentFlatRow(row OrderRow, props FulfillmentListProps) templ.Componen
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(row.CustomerName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 537, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 545, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -1023,7 +1023,7 @@ func fulfillmentFlatRow(row OrderRow, props FulfillmentListProps) templ.Componen
 			var templ_7745c5c3_Var41 string
 			templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(row.CustomerEmail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 539, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 547, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 			if templ_7745c5c3_Err != nil {
@@ -1064,7 +1064,7 @@ func fulfillmentFlatRow(row OrderRow, props FulfillmentListProps) templ.Componen
 		var templ_7745c5c3_Var42 string
 		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(relativeOrderDate(row.Order.PlacedAt, props.MerchantTZ, props.Now))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 554, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 562, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 		if templ_7745c5c3_Err != nil {
@@ -1116,7 +1116,7 @@ func batchActionResultBanner(r BatchActionResult) templ.Component {
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", r.Succeeded))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 569, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 577, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 			if templ_7745c5c3_Err != nil {
@@ -1129,7 +1129,7 @@ func batchActionResultBanner(r BatchActionResult) templ.Component {
 			var templ_7745c5c3_Var45 string
 			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(" " + batchVerbLabel(r.Verb))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 570, Col: 62}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 578, Col: 62}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 			if templ_7745c5c3_Err != nil {
@@ -1154,7 +1154,7 @@ func batchActionResultBanner(r BatchActionResult) templ.Component {
 			var templ_7745c5c3_Var46 string
 			templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(r.Failures)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 578, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 586, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 			if templ_7745c5c3_Err != nil {
@@ -1182,7 +1182,7 @@ func batchActionResultBanner(r BatchActionResult) templ.Component {
 				var templ_7745c5c3_Var47 templ.SafeURL
 				templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/orders/" + f.OrderID.String()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 587, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 595, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 				if templ_7745c5c3_Err != nil {
@@ -1195,7 +1195,7 @@ func batchActionResultBanner(r BatchActionResult) templ.Component {
 				var templ_7745c5c3_Var48 string
 				templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(f.OrderID.String()[:8])
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 588, Col: 31}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 596, Col: 31}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 				if templ_7745c5c3_Err != nil {
@@ -1208,7 +1208,7 @@ func batchActionResultBanner(r BatchActionResult) templ.Component {
 				var templ_7745c5c3_Var49 string
 				templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(f.Reason)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 590, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 598, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 				if templ_7745c5c3_Err != nil {
@@ -1270,7 +1270,7 @@ func fulfillmentEmptyState(props FulfillmentListProps) templ.Component {
 			var templ_7745c5c3_Var51 string
 			templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(fulfillmentEmptyBucketCopy(props.View))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 608, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 616, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 			if templ_7745c5c3_Err != nil {
@@ -1288,7 +1288,7 @@ func fulfillmentEmptyState(props FulfillmentListProps) templ.Component {
 				var templ_7745c5c3_Var52 templ.SafeURL
 				templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fulfillmentViewHref("all")))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 610, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 618, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 				if templ_7745c5c3_Err != nil {
@@ -1346,7 +1346,7 @@ func fulfillmentPagination(props FulfillmentListProps) templ.Component {
 			var templ_7745c5c3_Var54 templ.SafeURL
 			templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fulfillmentPageHref(props.Page-1, props.View)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 634, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 642, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 			if templ_7745c5c3_Err != nil {
@@ -1369,7 +1369,7 @@ func fulfillmentPagination(props FulfillmentListProps) templ.Component {
 			var templ_7745c5c3_Var55 string
 			templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.showingStart()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 643, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 651, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 			if templ_7745c5c3_Err != nil {
@@ -1382,7 +1382,7 @@ func fulfillmentPagination(props FulfillmentListProps) templ.Component {
 			var templ_7745c5c3_Var56 string
 			templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.showingEnd()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 643, Col: 180}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 651, Col: 180}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 			if templ_7745c5c3_Err != nil {
@@ -1395,7 +1395,7 @@ func fulfillmentPagination(props FulfillmentListProps) templ.Component {
 			var templ_7745c5c3_Var57 string
 			templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.TotalCount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 643, Col: 272}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 651, Col: 272}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 			if templ_7745c5c3_Err != nil {
@@ -1418,7 +1418,7 @@ func fulfillmentPagination(props FulfillmentListProps) templ.Component {
 			var templ_7745c5c3_Var58 templ.SafeURL
 			templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fulfillmentPageHref(props.Page+1, props.View)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 649, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_list.templ`, Line: 657, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 			if templ_7745c5c3_Err != nil {

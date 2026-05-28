@@ -54,6 +54,58 @@ func PaymentStatusLabel(s domain.PaymentStatus) string {
 	return string(s)
 }
 
+// OrderStatusTooltip returns a one-line description of an order status,
+// rendered as the native browser `title=` tooltip on every OrderStatusBadge.
+// Keeps badge cells scannable while answering "what does this state mean?"
+// without leaving the page.
+func OrderStatusTooltip(s domain.OrderStatus) string {
+	switch s {
+	case domain.OrderStatusPending:
+		return "Payment not confirmed yet."
+	case domain.OrderStatusConfirmed:
+		return "Payment captured. Ready to pack."
+	case domain.OrderStatusProcessing:
+		return "Being packed or awaiting label."
+	case domain.OrderStatusOnHold:
+		return "Paused — waiting on a fix before fulfillment."
+	case domain.OrderStatusComplete:
+		return "Fulfilled and closed out."
+	case domain.OrderStatusCancelled:
+		return "Cancelled before fulfillment."
+	case domain.OrderStatusRefunded:
+		return "Payment returned to the customer."
+	}
+	return ""
+}
+
+// PaymentStatusTooltip returns a one-line description of a payment status,
+// used by both PaymentStatusBadge and the compact PaymentChip beside totals.
+func PaymentStatusTooltip(s domain.PaymentStatus) string {
+	switch s {
+	case domain.PaymentStatusAwaiting:
+		return "Payment not received yet."
+	case domain.PaymentStatusAuthorized:
+		return "Card authorized; capture pending."
+	case domain.PaymentStatusCaptured:
+		return "Paid in full."
+	case domain.PaymentStatusPartial, domain.PaymentStatusPartiallyPaid:
+		return "Part of the total has been paid."
+	case domain.PaymentStatusRefunded:
+		return "Payment returned to the customer."
+	case domain.PaymentStatusFailed:
+		return "Charge attempt failed."
+	case domain.PaymentStatusVoided:
+		return "Authorization released without capture."
+	case domain.PaymentStatusPendingInvoice:
+		return "Invoice not yet sent."
+	case domain.PaymentStatusInvoiced:
+		return "Invoice sent; awaiting payment."
+	case domain.PaymentStatusOverdue:
+		return "Invoice past its due date."
+	}
+	return ""
+}
+
 // FulfillmentStatusLabel returns a human-readable label for a fulfillment status.
 func FulfillmentStatusLabel(s domain.FulfillmentStatus) string {
 	switch s {
@@ -79,6 +131,47 @@ func FulfillmentStatusLabel(s domain.FulfillmentStatus) string {
 	return string(s)
 }
 
+// FulfillmentStatusTooltip returns a one-line description of a fulfillment
+// status, used as the native title attr on FulfillmentStatusBadge so staff
+// can disambiguate the partial/* states without leaving the row.
+func FulfillmentStatusTooltip(s domain.FulfillmentStatus) string {
+	switch s {
+	case domain.FulfillmentStatusUnfulfilled:
+		return "Not yet packed."
+	case domain.FulfillmentStatusPartiallyFulfilled:
+		return "Some items packed; rest pending."
+	case domain.FulfillmentStatusFulfilled:
+		return "Packed and ready for handoff."
+	case domain.FulfillmentStatusReadyForPickup:
+		return "Packed and waiting for the customer to pick up."
+	case domain.FulfillmentStatusPartiallyShipped:
+		return "Some items shipped; rest pending."
+	case domain.FulfillmentStatusShipped:
+		return "Handed off to the carrier."
+	case domain.FulfillmentStatusPartiallyDelivered:
+		return "Some items delivered; rest in transit."
+	case domain.FulfillmentStatusDelivered:
+		return "Confirmed delivered."
+	case domain.FulfillmentStatusReturned:
+		return "Returned to the shop."
+	}
+	return ""
+}
+
+// ShippingMethodTooltip returns a one-line description of a shipping method,
+// used as the title attr on ShippingMethodBadge.
+func ShippingMethodTooltip(method domain.ShippingMethod) string {
+	switch method {
+	case domain.ShippingMethodPickup:
+		return "Customer picks up at the shop."
+	case domain.ShippingMethodLocalDelivery:
+		return "Hand-delivered in the local area."
+	case domain.ShippingMethodShipped:
+		return "Ships via carrier."
+	}
+	return ""
+}
+
 func orderStatusBadgeClasses(status domain.OrderStatus) string {
 	switch status {
 	case domain.OrderStatusComplete:
@@ -99,7 +192,7 @@ func orderStatusBadgeClasses(status domain.OrderStatus) string {
 }
 
 templ OrderStatusBadge(status domain.OrderStatus) {
-	<span class={ orderStatusBadgeClasses(status) }>
+	<span class={ orderStatusBadgeClasses(status) } title={ OrderStatusTooltip(status) }>
 		{ OrderStatusLabel(status) }
 	</span>
 }
@@ -120,7 +213,7 @@ func paymentStatusBadgeClasses(status domain.PaymentStatus) string {
 }
 
 templ PaymentStatusBadge(status domain.PaymentStatus) {
-	<span class={ paymentStatusBadgeClasses(status) }>
+	<span class={ paymentStatusBadgeClasses(status) } title={ PaymentStatusTooltip(status) }>
 		{ PaymentStatusLabel(status) }
 	</span>
 }
@@ -172,7 +265,7 @@ func paymentChipText(s domain.PaymentStatus) string {
 // PaymentChip is a compact inline label (Oswald uppercase, semantic color)
 // designed to sit next to a money amount: "$48.00 · PAID".
 templ PaymentChip(status domain.PaymentStatus) {
-	<span class={ paymentChipClasses(status) }>{ paymentChipText(status) }</span>
+	<span class={ paymentChipClasses(status) } title={ PaymentStatusTooltip(status) }>{ paymentChipText(status) }</span>
 }
 
 func fulfillmentStatusBadgeClasses(status domain.FulfillmentStatus) string {
@@ -193,7 +286,7 @@ func fulfillmentStatusBadgeClasses(status domain.FulfillmentStatus) string {
 }
 
 templ FulfillmentStatusBadge(status domain.FulfillmentStatus) {
-	<span class={ fulfillmentStatusBadgeClasses(status) }>
+	<span class={ fulfillmentStatusBadgeClasses(status) } title={ FulfillmentStatusTooltip(status) }>
 		{ FulfillmentStatusLabel(status) }
 	</span>
 }
@@ -297,7 +390,7 @@ func shippingMethodLabel(method domain.ShippingMethod) string {
 }
 
 templ ShippingMethodBadge(method domain.ShippingMethod) {
-	<span class={ shippingMethodBadgeClasses(method) }>
+	<span class={ shippingMethodBadgeClasses(method) } title={ ShippingMethodTooltip(method) }>
 		{ shippingMethodLabel(method) }
 	</span>
 }

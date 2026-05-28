@@ -335,6 +335,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 				</span>
 				<button
 					type="button"
+					title="Open print-ready packing slips for each selected order in a new tab."
 					@click="window.open('/admin/orders/batch/packing-slips?ids=' + selected.join(','), '_blank')"
 					class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
 				>
@@ -343,6 +344,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 				if group.Method != nil && *group.Method == domain.ShippingMethodShipped {
 					<button
 						type="button"
+						title="Open a print-ready invoice for each selected order in a new tab."
 						@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
 						class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
 					>
@@ -359,6 +361,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 						<select
 							id={ "bulk-label-service-" + fulfillmentGroupAnchor(group.Method) }
 							name="service_code"
+							title="Carrier service used when buying labels in bulk."
 							class="rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
 						>
 							for _, opt := range ShippoServiceOptions {
@@ -367,6 +370,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 						</select>
 						<button
 							type="submit"
+							title="Buy a Shippo label for each selected order. Charges your Shippo account."
 							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
 						>
 							Buy labels
@@ -382,6 +386,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
 						<button
 							type="submit"
+							title="Mark each selected order as picked up by the customer."
 							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
 						>
 							Mark picked up
@@ -397,6 +402,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
 						<button
 							type="submit"
+							title="Email a delivery notification to each customer and mark the orders out for delivery."
 							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
 						>
 							Out for delivery
@@ -405,6 +411,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 				} else {
 					<button
 						type="button"
+						title="Open a print-ready invoice for each selected order in a new tab."
 						@click="window.open('/admin/orders/batch/invoices?ids=' + selected.join(','), '_blank')"
 						class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
 					>
@@ -413,6 +420,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 				}
 				<button
 					type="button"
+					title="Deselect all rows."
 					@click="selected = []"
 					class="inline-flex items-center rounded-sm border border-rr-border px-3 py-1.5 text-sm font-medium text-rr-heading hover:bg-rr-raised"
 				>

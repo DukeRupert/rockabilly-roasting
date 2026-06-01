@@ -41,6 +41,31 @@ type OrderShowProps struct {
 	StaffName           string
 	StaffRole           string
 	CanEditLineItems    bool
+	// PollCount is the auto-refresh tick number for the label poller — 0 on a
+	// normal load, incremented by each self-refresh while a BuyLabel attempt is
+	// queued. Caps the loop at maxLabelPolls. See shouldPollLabel.
+	PollCount int
+}
+
+// maxLabelPolls bounds the auto-refresh that runs after a label is queued: the
+// order page re-fetches itself every ~2s while the BuyLabel worker runs, then
+// gives up so a stuck or slow job can't poll forever. ~10 ticks ≈ 20s, well
+// past the typical 1–3s purchase; after that staff refresh manually.
+const maxLabelPolls = 10
+
+// shouldPollLabel reports whether to emit the self-refresh poller: only while
+// the latest attempt is still queued and we're under the poll ceiling.
+func shouldPollLabel(props OrderShowProps) bool {
+	return props.LatestLabelAttempt != nil &&
+		props.LatestLabelAttempt.Status == domain.LabelAttemptStatusQueued &&
+		props.PollCount < maxLabelPolls
+}
+
+// nextLabelPollURL is the order-page URL for the next poll tick, carrying an
+// incremented counter so the server can enforce maxLabelPolls. Deliberately
+// omits the flash param so the "Label queued" toast doesn't re-fire each tick.
+func nextLabelPollURL(props OrderShowProps) string {
+	return fmt.Sprintf("/admin/orders/%s?poll=%d", props.Order.ID.String(), props.PollCount+1)
 }
 
 // LabelAttemptMessage maps a LabelAttempt to short staff-facing copy.
@@ -419,11 +444,31 @@ templ OrderShowContent(props OrderShowProps) {
 				} else {
 					<div class="flex items-center gap-2 text-sm">
 						<span class="badge badge-amber">{ headline }</span>
-						<span class="text-rr-muted">Worker is processing this label — refresh in a moment.</span>
+						if shouldPollLabel(props) {
+							<span class="text-rr-muted">Worker is buying this label — this page updates on its own.</span>
+						} else {
+							<span class="text-rr-muted">Worker is processing this label — refresh in a moment.</span>
+						}
 					</div>
 				}
 			</div>
 		}
+	}
+	if shouldPollLabel(props) {
+		<!-- Label auto-refresh. While the BuyLabel worker runs, this element
+		     re-fetches the order content into #main-content every ~2s. Each
+		     swapped-in response carries the next poll counter, so the loop
+		     chains itself until the shipment/label appears (poller no longer
+		     rendered) or maxLabelPolls is hit. innerHTML swap (no show:) keeps
+		     the scroll position steady across ticks instead of jumping to top. -->
+		<div
+			hx-get={ nextLabelPollURL(props) }
+			hx-trigger="load delay:2s"
+			hx-target="#main-content"
+			hx-swap="innerHTML"
+			class="hidden"
+			aria-hidden="true"
+		></div>
 	}
 	<!-- Guided actions -->
 	<div class="mt-6 flex flex-wrap gap-3">

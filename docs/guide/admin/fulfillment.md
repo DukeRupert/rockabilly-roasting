@@ -6,32 +6,40 @@ This guide covers the fulfillment workflow: packing orders, creating shipping la
 
 Navigate to **Fulfillment** in the admin sidebar (`/admin/fulfillment`).
 
-The fulfillment page is a focused view of orders filtered by their fulfillment state. It is separate from the main Orders page and designed for the daily pack-and-ship workflow.
+The Fulfillment page is the **pack-and-ship workspace** — it filters orders by their *fulfillment* state (warehouse dimension) rather than order status (billing/lifecycle dimension), and it carries the state-advancing bulk verbs the [Orders](orders.md) page does not: buy labels, mark ready for pickup, mark picked up, out for delivery. The header shows a one-line queue summary ("N need action · N ready to ship · N in transit") so you see the shape of the work before scanning rows. There is no "new order" button here — the queue itself is the action.
 
 ### Tab Filters
 
+Each tab shows a live count; the active tab is "stamped" (ink border + offset shadow).
+
 | Tab | What it shows |
 |-----|---------------|
-| **Needs Action** | Orders that are unfulfilled, partially fulfilled, or fulfilled but not yet shipped. This is the default view and represents your working queue. |
-| **Unfulfilled** | Orders with fulfillment status "unfulfilled" only. |
-| **Ready to Ship** | Orders that have been fulfilled (packed) but not yet shipped. |
-| **Shipped** | Orders that have been handed to a carrier. |
-| **Delivered** | Orders confirmed as delivered. |
-| **All** | Every order regardless of fulfillment status. |
+| **Needs action** | Orders that still need packing or shipping: unfulfilled, partially fulfilled, fulfilled, or ready-for-pickup. Default view and primary working queue. |
+| **Ready to ship** | Orders that have been packed (fulfilled) but not yet handed off. |
+| **Shipped** | Orders handed to a carrier (shipped / partially shipped). |
+| **Delivered** | Orders confirmed delivered (delivered / partially delivered). |
+| **All** | Every order regardless of fulfillment status (still excludes unconfirmed intents). |
 
-### Table Columns
+### Two View Modes
 
-The fulfillment table is streamlined compared to the order list:
+**Action views** (Needs action, Ready to ship) render as a **grouped workspace**, not a flat list. Rows are split into sections by shipping method — *Ship via carrier*, *Local delivery*, *Pickup*, *No shipping method* — because each method needs a different verb. Each section has its own checkboxes and its own bulk action bar. Columns per section: checkbox · **Order** (number, Wholesale tag, customer name + email) · **State** (fulfillment badge, plus a red **Label failed** badge if a label purchase failed) · **Placed** (relative date; stale 48h+ rows flag rust). Up to 100 orders per page.
 
-| Column | Description |
-|--------|-------------|
-| **Order** | Order number. Click to open the order detail page. |
-| **Fulfillment** | Current fulfillment status badge. |
-| **Placed** | Date the order was placed. Hidden on small screens. |
+The bulk verbs available depend on the section's shipping method:
+
+| Section | Bulk verbs |
+|---------|-----------|
+| **Ship via carrier** | Print packing slips · Print invoices · pick a carrier service and **Buy labels** (charges your Shippo account) |
+| **Pickup** | Print packing slips · **Mark ready for pickup** (emails the customer) · **Mark picked up** |
+| **Local delivery** | Print packing slips · **Out for delivery** (emails the customer) |
+| **No shipping method** | Print packing slips · Print invoices |
+
+After a bulk verb runs, a banner at the top of the page summarizes the result — how many succeeded, and a linked per-order list of any that were skipped (with the reason) so you can jump in and fix them.
+
+**Flat views** (Shipped, Delivered, All) are post-handoff lookup only — a single paginated table, no checkboxes or bulk bar, with a **Ship via** column (since the method grouping is gone). 25 per page.
 
 ### Pagination
 
-Results display 25 per page with Previous/Next navigation.
+Action views show up to 100 grouped orders per page; flat lookup views show 25 per page. Both use Previous/Next navigation.
 
 ---
 
@@ -51,6 +59,8 @@ Results display 25 per page with Previous/Next navigation.
 ---
 
 ## Daily Fulfillment Workflow
+
+For volume, work straight from the grouped queue: select a batch within a shipping-method section and use that section's bulk verb (Buy labels, Mark ready for pickup, Mark picked up, Out for delivery). The per-order steps below describe the same transitions from an individual order's detail page — useful for one-offs or when you need to review an order before acting.
 
 The typical order fulfillment process follows these steps:
 
@@ -86,35 +96,36 @@ Once items are packed, click **Fulfill Order** on the order detail page.
 - An audit record is created
 - The progress bar advances to step 2 (Fulfilled)
 
-### 5. Create a Shipping Label
+### 5. Buy a Shipping Label
 
-For orders with shipping method "Shipped", you can create a shipping label directly from the admin panel.
+For orders with shipping method "Shipped", buy a label directly from the order detail page. There is **no dimensions form** — you only pick a carrier service; weight, box size, and addresses are all derived server-side.
 
-**To create a label:**
+**To buy a label:**
 
-The label creation form (`POST /admin/orders/{id}/label`) requires:
+In the "Buy Label" control, choose a service from the dropdown and submit (`POST /admin/orders/{id}/label`):
 
-- **Package dimensions:** weight (oz), length, width, height (inches)
-- **Service code:** the carrier service level (e.g., USPS Priority Mail)
-- **From address:** your warehouse/shop address
-- **To address:** the customer's shipping address (pre-filled from the order)
+- **USPS Ground Advantage** (default)
+- **USPS Priority**
+- **USPS Priority Express**
 
-After submission:
-- The shipping label is created through the external shipping provider
-- A background job stores the label PDF in cloud storage (R2)
-- You are redirected back to the order detail page
+That single `service_code` is the only label-shaping input you provide. The system derives the rest:
+
+- **Weight** — summed from each physical line item's variant weight plus a configured tare (packaging) weight.
+- **Box dimensions** — chosen automatically from your configured box presets based on the computed weight. (If no box preset is configured, the label fails with a non-retryable error — set up presets in shipping settings first.)
+- **Ship-from address** — from your shipping configuration, not the form.
+- **Ship-to address** — from the order's shipping address.
+
+Buying a label is **asynchronous**. Submitting enqueues a background job and immediately returns with a "Label queued" flash; the job calls the shipping provider, then a second job stores the label PDF in cloud storage (R2). While the worker runs (typically 1–3s) the order page **refreshes itself automatically** — the shipment row, tracking number, and download link appear on their own once the label is bought, no manual reload needed. (The auto-refresh gives up after ~20s; if a label is still queued past that, refresh manually.) If the purchase fails, the button changes to **Retry Buy Label**.
+
+Pickup and Local Delivery orders don't get this control — no label is needed.
 
 ### 6. Download a Shipping Label
 
-Once a label has been created and stored, you can download it.
-
-**To download:**
-
-Visit `/admin/shipments/{shipment_id}/label`. This generates a temporary signed URL and redirects your browser to download the label PDF. The signed URL expires after 5 minutes.
+Once a label has been bought and stored, a **Label ({tracking number})** link appears for that shipment on the order detail page (`GET /admin/shipments/{shipment_id}/label`). Clicking it generates a temporary signed URL and redirects your browser to download the label PDF. The signed URL expires after 5 minutes.
 
 ### 7. Mark as Shipped
 
-After attaching the shipping label and handing the package to the carrier, click **Mark Shipped** on the order detail page.
+After attaching the shipping label and handing the package to the carrier, click **Mark Shipped** on the order detail page (`POST /admin/orders/{id}/ship`). This button appears only for carrier ("Shipped") orders — pickup and local-delivery orders use their own verbs instead (see [Non-Shipped Orders](#fulfillment-for-non-shipped-orders) below).
 
 **Requirements for marking shipped:**
 - Fulfillment status must be **fulfilled**
@@ -125,34 +136,41 @@ After attaching the shipping label and handing the package to the carrier, click
 - Order status changes to `complete`
 - An audit record is created
 - The progress bar advances to step 3 (Shipped)
-- The order moves from the "Needs Action" tab to the "Shipped" tab in the fulfillment queue
+- The order moves from the "Needs action" tab to the "Shipped" tab in the fulfillment queue
+
+> Made a mistake? The detail page also offers **Revert Fulfillment** and **Revert Shipment** to step an order back when a transition was applied in error.
 
 ---
 
 ## Fulfillment for Non-Shipped Orders
 
+Pickup and local-delivery orders don't use "Mark Shipped" or shipping labels. They have their own verbs, available both as single-order buttons on the detail page (gated by the order's shipping method) and as bulk verbs in the matching section of the fulfillment queue.
+
 ### Pickup Orders
 
 For orders with shipping method "Pickup":
-- Follow the same Fulfill -> Ship workflow
-- "Mark Shipped" in this context means the customer has picked up their order
-- No shipping label is needed
+- No shipping label is needed.
+- **Mark Ready for Pickup** — sets fulfillment to "ready for pickup" and emails the customer that their order is ready.
+- **Mark Picked Up** — records that the customer has collected the order (available once it's ready for pickup).
 
 ### Local Delivery Orders
 
 For orders with shipping method "Local Delivery":
-- Follow the same Fulfill -> Ship workflow
-- "Mark Shipped" means the delivery has been completed
-- No shipping label is needed unless you use a delivery service
+- No shipping label is needed.
+- **Out for Local Delivery** — emails the customer a delivery notification and marks the order out for delivery.
 
 ---
 
 ## Quick Reference
 
-| Action | Button | Result |
-|--------|--------|--------|
+| Action | Button / control | Result |
+|--------|------------------|--------|
 | Pack an order | Fulfill Order | Status: processing, Fulfillment: fulfilled |
-| Ship an order | Mark Shipped | Status: complete, Fulfillment: shipped |
-| Create label | POST form on order page | Label created via shipping provider, stored in R2 |
-| Download label | Link on shipment | Temporary signed URL, auto-downloads PDF |
+| Ship a carrier order | Mark Shipped | Status: complete, Fulfillment: shipped |
+| Buy a label | Service dropdown + Buy Label | Enqueues a background job; shipment + label appear on next render. No dimensions form — weight/box/addresses are derived |
+| Download a label | Label ({tracking}) link on shipment | Temporary signed URL (5 min), auto-downloads PDF |
+| Ready a pickup order | Mark Ready for Pickup | Fulfillment: ready for pickup; customer emailed |
+| Complete a pickup | Mark Picked Up | Customer has collected the order |
+| Hand off a local delivery | Out for Local Delivery | Out for delivery; customer emailed |
+| Undo a transition | Revert Fulfillment / Revert Shipment | Steps the order back one stage |
 | Print packing slip | Packing Slip button | Opens printable page in new tab |

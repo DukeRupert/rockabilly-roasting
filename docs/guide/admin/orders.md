@@ -6,37 +6,43 @@ This guide covers how to view, manage, and act on customer orders in the admin p
 
 Navigate to **Orders** in the admin sidebar (`/admin/orders`).
 
+The Orders page is the record-and-lookup surface for **every** order: search it, scan totals and payment state, and manage the order lifecycle. The physical pack-and-ship work lives on the separate [Fulfillment](fulfillment.md) page — including buying shipping labels in bulk. An order can legitimately appear on both pages at once; that's by design (one tracks billing/lifecycle, the other tracks the warehouse).
+
 ### Columns
 
 The order table displays:
 
 | Column | Description |
 |--------|-------------|
-| **Order** | The order number (e.g., `RR-10042`). Click to open the order detail page. |
-| **Order Status** | Current lifecycle status (see [Order Statuses](#order-statuses) below). |
-| **Fulfillment** | Fulfillment status -- whether the order has been packed and shipped. |
-| **Shipping** | Shipping method: Pickup, Local Delivery, or Shipped. Hidden on small screens. |
-| **Total** | Order total in dollars. |
-| **Date** | Date the order was placed. Hidden on small screens. |
+| **Order** | Order number (e.g., `RR-10042`), a **Wholesale** tag for B2B accounts, and the customer's name and email. Click anywhere in the row to open the order detail page. |
+| **State** | A single status badge. For cancelled, refunded, on-hold, and pending orders it shows the **order status**; otherwise it shows the **fulfillment status** (the actionable signal). A red **Label failed** badge appears if the most recent label purchase failed. |
+| **Shipping** | Shipping method: Pickup, Local Delivery, or Shipped. Hidden below large screens. |
+| **Total** | Order total plus a payment-status chip (paid, awaiting, refunded, etc.). |
+| **Placed** | Relative date the order was placed ("Today 3:04 PM", "Yesterday", "3d ago"). Non-terminal orders sitting 48h+ turn rust with a flag on the row's leading edge. Hidden on small screens. |
 
-### Filtering by Status
+### Filtering
 
-Use the tab bar above the table to filter orders by status:
+Use the tab bar above the table to filter orders into workflow buckets (these group several raw statuses, they are not one-tab-per-status). Each tab shows a live count, and the active tab is "stamped" (ink border + offset shadow) rather than underlined.
 
+- **Open** (default) -- orders that need attention: confirmed or processing, excluding unconfirmed intents
+- **On hold** -- orders manually paused (stock issue, customer request)
+- **Shipped** -- completed orders
+- **Archive** -- cancelled or refunded orders
 - **All** -- every order regardless of status
-- **Pending** -- orders awaiting payment confirmation
-- **Confirmed** -- payment confirmed, not yet being processed
-- **Processing** -- order is being fulfilled
-- **On Hold** -- order paused (e.g., stock issue, customer request)
-- **Complete** -- order shipped and finished
-- **Cancelled** -- order was cancelled
-- **Refunded** -- order was refunded
 
-Filters are preserved across page navigation. The active tab is highlighted with a red underline.
+Filters and search are preserved across page navigation.
 
 ### Search
 
-The search box at the top accepts order numbers, customer names, or email addresses. Results appear as you type (debounced 300ms). The search query is preserved when switching status tabs.
+The search box (to the right of the tabs on desktop, above them on mobile) accepts order numbers, customer names, or email addresses. Results appear as you type (debounced 300ms). The search query is preserved when switching tabs.
+
+### Bulk Actions
+
+Tick the checkboxes on one or more rows (or the header checkbox to select the whole page) and an action bar slides in:
+
+- **Print invoices** -- opens a print-ready invoice for each selected order in a new tab.
+
+Buying shipping labels in bulk is **not** here — it lives on the [Fulfillment](fulfillment.md) page, grouped by shipping method. The Orders bulk bar is for documents and lookup only.
 
 ### Pagination
 
@@ -50,8 +56,9 @@ Click any order number to open its detail view (`/admin/orders/{id}`).
 
 ### Header
 
-Shows the order number, date placed, and a status badge if the order is cancelled or refunded. Two action links appear in the top-right:
+Shows the order number, date placed, and a status badge if the order is cancelled or refunded. Action links appear in the top-right:
 
+- **Print Invoice** -- opens a printable invoice in a new tab
 - **Packing Slip** -- opens a printable packing slip in a new tab
 - **Back to orders** -- returns to the order list
 
@@ -67,12 +74,17 @@ Completed steps show a red checkmark. The progress bar is hidden for cancelled a
 
 ### Action Buttons
 
-The available actions depend on the order's current state:
+The detail page has a "Guided actions" block; which buttons appear depends on the order's state and shipping method. The shipping/fulfillment verbs are documented in full in the [Fulfillment guide](fulfillment.md) — this is the summary.
 
 | Button | When it appears | What it does |
 |--------|----------------|--------------|
-| **Fulfill Order** | Payment captured, fulfillment is "unfulfilled", order not cancelled/refunded | Marks the order as fulfilled and changes order status to "processing" |
-| **Mark Shipped** | Fulfillment is "fulfilled", order not cancelled/refunded | Marks the order as shipped and changes order status to "complete" |
+| **Fulfill Order** | Payment captured, fulfillment is "unfulfilled", order not cancelled/refunded | Marks the order fulfilled and changes order status to "processing" |
+| **Buy Label** / **Retry Buy Label** | Carrier ("Shipped") order, payment captured, no existing shipment/in-flight attempt | Pick a USPS service and enqueue a label-purchase job (no dimensions form; see Fulfillment guide). "Retry" shows after a failed attempt |
+| **Mark Shipped** | Carrier order, fulfillment is "fulfilled", not cancelled/refunded | Marks the order shipped and changes order status to "complete" |
+| **Mark Ready for Pickup** | Pickup order, unfulfilled or fulfilled | Sets fulfillment to "ready for pickup" and emails the customer |
+| **Mark Picked Up** | Pickup order already marked ready for pickup | Records the customer collected the order |
+| **Out for Local Delivery** | Local-delivery order, unfulfilled or fulfilled | Marks out for delivery and emails the customer |
+| **Revert Fulfillment** / **Revert Shipment** | After the corresponding transition | Steps the order back one stage when a transition was applied in error |
 | **Cancel Order** | Order status is "pending" or "confirmed" | Cancels the order (confirmation dialog appears first) |
 | **Refund Order** | Order status is "confirmed" or "complete" AND payment is "captured" | Refunds the order (confirmation dialog appears first) |
 

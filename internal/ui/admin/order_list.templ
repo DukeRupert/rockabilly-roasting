@@ -141,7 +141,7 @@ type orderViewTab struct {
 
 func (p OrderListProps) tabs() []orderViewTab {
 	return []orderViewTab{
-		{Key: "needs_action", Label: "Needs action", Count: p.Counts.NeedsAction},
+		{Key: "needs_action", Label: "Open", Count: p.Counts.NeedsAction},
 		{Key: "on_hold", Label: "On hold", Count: p.Counts.OnHold},
 		{Key: "shipped", Label: "Shipped", Count: p.Counts.Shipped},
 		{Key: "archive", Label: "Archive", Count: p.Counts.Archive},
@@ -222,6 +222,7 @@ templ OrderListContent(props OrderListProps) {
 	<div class="sm:flex sm:items-end sm:justify-between">
 		<div>
 			<h1 class="admin-page-title">Orders</h1>
+			<p class="mt-1 text-sm text-rr-muted">Every order — search, look up, and manage the order lifecycle.</p>
 		</div>
 		<div class="mt-4 sm:mt-0 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
 			<a href="/admin/orders/new" class="inline-flex items-center justify-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white hover:bg-rr-red/90">+ New manual order</a>
@@ -312,7 +313,7 @@ templ OrderListContent(props OrderListProps) {
 					x-show="selected.length === 0"
 					class="mb-3 text-xs text-rr-muted"
 				>
-					Select orders to print invoices or buy labels in bulk.
+					Select orders to print invoices in bulk. Buying labels lives in Fulfillment.
 				</p>
 				<!-- Bulk action bar — slides in when rows are selected. -->
 				<div
@@ -339,32 +340,6 @@ templ OrderListContent(props OrderListProps) {
 							>
 								Print invoices
 							</button>
-							<form
-								method="post"
-								action="/admin/orders/labels"
-								@submit="if (!confirm('Buy a label for ' + selected.length + ' order(s)? This will charge your Shippo account.')) { $event.preventDefault(); }"
-								class="contents"
-							>
-								<input type="hidden" name="order_ids" :value="selected.join(',')"/>
-								<label for="bulk-label-service" class="sr-only">Shipping service</label>
-								<select
-									id="bulk-label-service"
-									name="service_code"
-									title="Carrier service used when buying labels in bulk."
-									class="rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
-								>
-									for _, opt := range ShippoServiceOptions {
-										<option value={ opt.Token }>{ opt.Label }</option>
-									}
-								</select>
-								<button
-									type="submit"
-									title="Buy a Shippo label for each selected order. Charges your Shippo account."
-									class="inline-flex items-center rounded-sm border border-rr-ink bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-ink hover:bg-rr-raised"
-								>
-									Buy labels
-								</button>
-							</form>
 							<button
 								type="button"
 								title="Deselect all rows."

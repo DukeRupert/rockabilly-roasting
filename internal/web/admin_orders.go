@@ -357,6 +357,16 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// pollCount drives the label auto-refresh: while a BuyLabel attempt is
+	// queued, the order page re-fetches itself every ~2s and carries an
+	// incremented ?poll= so the template can stop the loop after a ceiling.
+	pollCount := 0
+	if p := r.URL.Query().Get("poll"); p != "" {
+		if n, perr := strconv.Atoi(p); perr == nil && n > 0 {
+			pollCount = n
+		}
+	}
+
 	name, role := staffNameRole(r)
 	props := admin.OrderShowProps{
 		Order:              order,
@@ -371,6 +381,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		StaffName:          name,
 		StaffRole:          role,
 		CanEditLineItems:   canEditOrderLineItemsView(order),
+		PollCount:          pollCount,
 	}
 
 	if IsHTMX(r) {

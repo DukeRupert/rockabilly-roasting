@@ -51,19 +51,19 @@ templ BoxPresetsContent(props BoxPresetsProps) {
 			</div>
 			<div>
 				<label for="new-length" class="block text-xs font-medium text-rr-heading">Length (in)</label>
-				<input id="new-length" type="number" name="length_in" step="0.25" min="0.01" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"/>
+				<input id="new-length" type="number" name="length_in" step="0.25" min="0.25" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"/>
 			</div>
 			<div>
 				<label for="new-width" class="block text-xs font-medium text-rr-heading">Width (in)</label>
-				<input id="new-width" type="number" name="width_in" step="0.25" min="0.01" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"/>
+				<input id="new-width" type="number" name="width_in" step="0.25" min="0.25" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"/>
 			</div>
 			<div>
 				<label for="new-height" class="block text-xs font-medium text-rr-heading">Height (in)</label>
-				<input id="new-height" type="number" name="height_in" step="0.25" min="0.01" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"/>
+				<input id="new-height" type="number" name="height_in" step="0.25" min="0.25" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"/>
 			</div>
 			<div>
 				<label for="new-max-weight" class="block text-xs font-medium text-rr-heading">Max weight (oz)</label>
-				<input id="new-max-weight" type="number" name="max_weight_oz" step="0.1" min="0.01" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"/>
+				<input id="new-max-weight" type="number" name="max_weight_oz" step="0.1" min="0.1" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"/>
 			</div>
 			<div class="sm:col-span-6 flex justify-end">
 				<button type="submit" class="rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper hover:opacity-90">
@@ -102,16 +102,16 @@ templ BoxPresetsContent(props BoxPresetsProps) {
 										</div>
 										<div class="sm:col-span-2">
 											<label class="sr-only">Length</label>
-											<input type="number" name="length_in" step="0.25" min="0.01" required value={ formatInches(p.LengthIn) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>
+											<input type="number" name="length_in" step="0.25" min="0.25" required value={ formatInches(p.LengthIn) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>
 										</div>
 										<div class="sm:col-span-1">
-											<input type="number" name="width_in" step="0.25" min="0.01" required value={ formatInches(p.WidthIn) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>
+											<input type="number" name="width_in" step="0.25" min="0.25" required value={ formatInches(p.WidthIn) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>
 										</div>
 										<div class="sm:col-span-1">
-											<input type="number" name="height_in" step="0.25" min="0.01" required value={ formatInches(p.HeightIn) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>
+											<input type="number" name="height_in" step="0.25" min="0.25" required value={ formatInches(p.HeightIn) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>
 										</div>
 										<div class="sm:col-span-2">
-											<input type="number" name="max_weight_oz" step="0.1" min="0.01" required value={ formatOz(p.MaxWeightOz) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>
+											<input type="number" name="max_weight_oz" step="0.1" min="0.1" required value={ formatOz(p.MaxWeightOz) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>
 										</div>
 										<div class="sm:col-span-1">
 											<input type="number" name="sort_order" step="1" value={ fmt.Sprintf("%d", p.SortOrder) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>

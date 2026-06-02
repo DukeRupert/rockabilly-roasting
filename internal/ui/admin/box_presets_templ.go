@@ -73,7 +73,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Create form --><div class=\"mt-6 border border-rr-border bg-rr-surface p-4 sm:p-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Add a preset</h2><form method=\"post\" action=\"/admin/settings/box-presets\" class=\"mt-3 grid grid-cols-1 gap-3 sm:grid-cols-6\"><div class=\"sm:col-span-2\"><label for=\"new-name\" class=\"block text-xs font-medium text-rr-heading\">Name</label> <input id=\"new-name\" type=\"text\" name=\"name\" required placeholder=\"12oz bag box\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"new-length\" class=\"block text-xs font-medium text-rr-heading\">Length (in)</label> <input id=\"new-length\" type=\"number\" name=\"length_in\" step=\"0.25\" min=\"0.01\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-width\" class=\"block text-xs font-medium text-rr-heading\">Width (in)</label> <input id=\"new-width\" type=\"number\" name=\"width_in\" step=\"0.25\" min=\"0.01\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-height\" class=\"block text-xs font-medium text-rr-heading\">Height (in)</label> <input id=\"new-height\" type=\"number\" name=\"height_in\" step=\"0.25\" min=\"0.01\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-max-weight\" class=\"block text-xs font-medium text-rr-heading\">Max weight (oz)</label> <input id=\"new-max-weight\" type=\"number\" name=\"max_weight_oz\" step=\"0.1\" min=\"0.01\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div class=\"sm:col-span-6 flex justify-end\"><button type=\"submit\" class=\"rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper hover:opacity-90\">Add preset</button></div></form></div><!-- Existing presets --><div class=\"mt-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Create form --><div class=\"mt-6 border border-rr-border bg-rr-surface p-4 sm:p-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Add a preset</h2><form method=\"post\" action=\"/admin/settings/box-presets\" class=\"mt-3 grid grid-cols-1 gap-3 sm:grid-cols-6\"><div class=\"sm:col-span-2\"><label for=\"new-name\" class=\"block text-xs font-medium text-rr-heading\">Name</label> <input id=\"new-name\" type=\"text\" name=\"name\" required placeholder=\"12oz bag box\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"new-length\" class=\"block text-xs font-medium text-rr-heading\">Length (in)</label> <input id=\"new-length\" type=\"number\" name=\"length_in\" step=\"0.25\" min=\"0.25\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-width\" class=\"block text-xs font-medium text-rr-heading\">Width (in)</label> <input id=\"new-width\" type=\"number\" name=\"width_in\" step=\"0.25\" min=\"0.25\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-height\" class=\"block text-xs font-medium text-rr-heading\">Height (in)</label> <input id=\"new-height\" type=\"number\" name=\"height_in\" step=\"0.25\" min=\"0.25\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-max-weight\" class=\"block text-xs font-medium text-rr-heading\">Max weight (oz)</label> <input id=\"new-max-weight\" type=\"number\" name=\"max_weight_oz\" step=\"0.1\" min=\"0.1\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div class=\"sm:col-span-6 flex justify-end\"><button type=\"submit\" class=\"rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper hover:opacity-90\">Add preset</button></div></form></div><!-- Existing presets --><div class=\"mt-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -114,7 +114,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm\"></div><div class=\"sm:col-span-2\"><label class=\"sr-only\">Length</label> <input type=\"number\" name=\"length_in\" step=\"0.25\" min=\"0.01\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm\"></div><div class=\"sm:col-span-2\"><label class=\"sr-only\">Length</label> <input type=\"number\" name=\"length_in\" step=\"0.25\" min=\"0.25\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -127,7 +127,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"width_in\" step=\"0.25\" min=\"0.01\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"width_in\" step=\"0.25\" min=\"0.25\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -140,7 +140,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"height_in\" step=\"0.25\" min=\"0.01\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"height_in\" step=\"0.25\" min=\"0.25\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -153,14 +153,14 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-2\"><input type=\"number\" name=\"max_weight_oz\" step=\"0.1\" min=\"0.01\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-2\"><input type=\"number\" name=\"max_weight_oz\" step=\"0.1\" min=\"0.1\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatOz(p.MaxWeightOz))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 114, Col: 115}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 114, Col: 114}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {

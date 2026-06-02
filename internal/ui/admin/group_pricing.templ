@@ -20,8 +20,8 @@ type ProductPricingGroup struct {
 }
 
 type VariantPricing struct {
-	Variant    domain.Variant
-	PriceCents *int
+	Variant     domain.Variant
+	PriceCents  *int
 	GroupPrices map[uuid.UUID]int
 }
 
@@ -31,7 +31,7 @@ templ GroupPricingContent(props GroupPricingProps) {
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">Group Pricing</h1>
 			<p class="mt-1 text-sm text-rr-muted">
-				Set base and group-specific prices for all variants.
+				Edit base and group prices, then save each product in one go.
 				if len(props.Groups) == 0 {
 					<a href="/admin/groups" class="text-rr-red hover:text-rr-red-lt">Create customer groups</a> to enable group pricing.
 				}
@@ -55,34 +55,49 @@ templ GroupPricingContent(props GroupPricingProps) {
 		<div class="mt-8 space-y-10">
 			for _, pg := range props.Products {
 				if len(pg.Variants) > 0 {
-					<div>
+					<!-- One form per product: base + all group prices save together -->
+					<form
+						method="post"
+						action={ templ.SafeURL("/admin/groups/prices/bulk") }
+						hx-post="/admin/groups/prices/bulk"
+						hx-target="#pricing-content"
+						hx-swap="innerHTML"
+					>
 						<!-- Product heading -->
 						<div class="flex items-center justify-between mb-4">
 							<h2 class="text-sm font-semibold text-rr-heading">{ pg.Product.Title }</h2>
-							<a
-								href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", pg.Product.ID)) }
-								class="text-xs text-rr-red hover:text-rr-red-lt"
-							>
-								Edit product
-							</a>
+							<div class="flex items-center gap-4">
+								<a
+									href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", pg.Product.ID)) }
+									class="text-xs text-rr-red hover:text-rr-red-lt"
+								>
+									Edit product
+								</a>
+								<button
+									type="submit"
+									class="rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt"
+								>
+									Save changes
+								</button>
+							</div>
 						</div>
 						<!-- Stacked price tables: base + one per group -->
 						<div class="space-y-4">
 							<!-- Base Prices -->
-							@pricingCard("Base Prices", "", pg, nil, props)
+							@pricingCard("Base Prices", pg, nil)
 							<!-- Group Prices -->
 							for _, g := range props.Groups {
-								@pricingCard(g.Name+" Prices", g.Name, pg, &g, props)
+								@pricingCard(g.Name+" Prices", pg, &g)
 							}
 						</div>
-					</div>
+					</form>
 				}
 			}
 		</div>
 	}
 }
 
-templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group *domain.CustomerGroup, props GroupPricingProps) {
+templ pricingCard(title string, pg ProductPricingGroup, group *domain.CustomerGroup) {
 	<div class="overflow-hidden border border-rr-border bg-rr-surface">
 		<div class="border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6">
 			if group != nil {
@@ -108,22 +123,13 @@ templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group
 							}
 						</td>
 						<td class="whitespace-nowrap px-3 py-2.5 text-sm">
-							if group == nil {
-								<!-- Base price form -->
-								<form
-									method="post"
-									action={ templ.SafeURL("/admin/groups/prices/base") }
-									hx-post="/admin/groups/prices/base"
-									hx-target="#pricing-content"
-									hx-swap="innerHTML"
-									class="flex items-center gap-1"
-								>
-									<input type="hidden" name="product_id" value={ pg.Product.ID.String() }/>
-									<input type="hidden" name="variant_id" value={ vp.Variant.ID.String() }/>
-									<span class="text-rr-muted">$</span>
+							<div class="flex items-center gap-1">
+								<span class="text-rr-muted">$</span>
+								if group == nil {
+									<!-- Base price input -->
 									<input
 										type="number"
-										name="price"
+										name={ "base:" + vp.Variant.ID.String() }
 										step="0.01"
 										min="0"
 										placeholder="0.00"
@@ -132,27 +138,12 @@ templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group
 										}
 										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
-									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt">
-										Save
-									</button>
-								</form>
-							} else {
-								<!-- Group price form -->
-								<form
-									method="post"
-									action={ templ.SafeURL("/admin/groups/prices/group") }
-									hx-post="/admin/groups/prices/group"
-									hx-target="#pricing-content"
-									hx-swap="innerHTML"
-									class="flex items-center gap-1"
-								>
-									<input type="hidden" name="product_id" value={ pg.Product.ID.String() }/>
-									<input type="hidden" name="variant_id" value={ vp.Variant.ID.String() }/>
-									<input type="hidden" name="group_id" value={ group.ID.String() }/>
-									<span class="text-rr-muted">$</span>
+									<input type="hidden" name={ "base_prev:" + vp.Variant.ID.String() } value={ priceToDollarsPtr(vp.PriceCents) }/>
+								} else {
+									<!-- Group price input -->
 									<input
 										type="number"
-										name="price"
+										name={ "group:" + group.ID.String() + ":" + vp.Variant.ID.String() }
 										step="0.01"
 										min="0"
 										placeholder="0.00"
@@ -161,11 +152,9 @@ templ pricingCard(title string, groupLabel string, pg ProductPricingGroup, group
 										}
 										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 									/>
-									<button type="submit" class="rounded px-1.5 py-1 text-xs font-medium text-rr-red hover:text-rr-red-lt">
-										Save
-									</button>
-								</form>
-							}
+									<input type="hidden" name={ "group_prev:" + group.ID.String() + ":" + vp.Variant.ID.String() } value={ groupPriceDollars(vp.GroupPrices, group.ID) }/>
+								}
+							</div>
 						</td>
 					</tr>
 				}
@@ -185,4 +174,20 @@ templ GroupPricing(props GroupPricingProps) {
 			@GroupPricingContent(props)
 		</div>
 	}
+}
+
+// priceToDollarsPtr renders a nil-able cents pointer as a dollar string, or "" when unset.
+func priceToDollarsPtr(cents *int) string {
+	if cents == nil {
+		return ""
+	}
+	return priceToDollars(*cents)
+}
+
+// groupPriceDollars renders the group price for a group ID as a dollar string, or "" when unset.
+func groupPriceDollars(prices map[uuid.UUID]int, groupID uuid.UUID) string {
+	if cents, ok := prices[groupID]; ok {
+		return priceToDollars(cents)
+	}
+	return ""
 }

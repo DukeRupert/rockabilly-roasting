@@ -1,9 +1,8 @@
 package web
 
 import (
-	"math"
 	"net/http"
-	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -217,41 +216,20 @@ func (d *Deps) handleAdminPriceListPrices(w http.ResponseWriter, r *http.Request
 	admin.PriceListPricing(props).Render(ctx, w) //nolint:errcheck
 }
 
-func (d *Deps) handleAdminPriceListPriceUpdate(w http.ResponseWriter, r *http.Request) {
+// handleAdminPriceListPriceBulkUpdate applies every changed list override in a single
+// product's form in one transaction. Each cell submits a current value plus a hidden
+// "list_prev" value; only changed cells are written, and a cleared cell deletes that
+// list's override (falling back to the base price).
+func (d *Deps) handleAdminPriceListPriceBulkUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	variantID, err := uuid.Parse(r.FormValue("variant_id"))
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
 
-	listID, err := uuid.Parse(r.FormValue("price_list_id"))
+	ops, err := parsePriceListForm(r)
 	if err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	priceStr := r.FormValue("price")
-
-	if priceStr == "" {
-		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-			return d.PricingService.DeletePriceListPrice(ctx, tx, variantID, listID, "USD")
-		})
-		if err != nil {
-			Error(w, r, err)
-			return
-		}
-		if IsHTMX(r) {
-			d.handleAdminPriceListPrices(w, r)
-			return
-		}
-		http.Redirect(w, r, "/admin/price-lists/prices", http.StatusSeeOther)
-		return
-	}
-
-	dollars, err := strconv.ParseFloat(priceStr, 64)
-	if err != nil || dollars < 0 {
 		if IsHTMX(r) {
 			d.handleAdminPriceListPrices(w, r)
 			toast.Toast(toast.VariantError, "Please enter a valid price").Render(ctx, w) //nolint:errcheck
@@ -261,11 +239,28 @@ func (d *Deps) handleAdminPriceListPriceUpdate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	cents := int(math.Round(dollars * 100))
+	if len(ops) == 0 {
+		if IsHTMX(r) {
+			d.handleAdminPriceListPrices(w, r)
+			return
+		}
+		http.Redirect(w, r, "/admin/price-lists/prices", http.StatusSeeOther)
+		return
+	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.PricingService.SetPriceListPrice(ctx, tx, variantID, listID, cents, "USD")
-		return txErr
+		for _, op := range ops {
+			var txErr error
+			if op.kind == opGroupDelete {
+				txErr = d.PricingService.DeletePriceListPrice(ctx, tx, op.variantID, op.groupID, "USD")
+			} else {
+				_, txErr = d.PricingService.SetPriceListPrice(ctx, tx, op.variantID, op.groupID, op.cents, "USD")
+			}
+			if txErr != nil {
+				return txErr
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		if IsHTMX(r) {
@@ -283,4 +278,36 @@ func (d *Deps) handleAdminPriceListPriceUpdate(w http.ResponseWriter, r *http.Re
 		return
 	}
 	http.Redirect(w, r, "/admin/price-lists/prices", http.StatusSeeOther)
+}
+
+// parsePriceListForm turns a submitted price-list form into the list of changed cells.
+// The groupID field on each priceOp carries the price list ID. Returns an error if any
+// submitted price is malformed or negative.
+func parsePriceListForm(r *http.Request) ([]priceOp, error) {
+	var ops []priceOp
+
+	for key := range r.PostForm {
+		if !strings.HasPrefix(key, "list:") {
+			continue
+		}
+		listID, variantID, ok := splitGroupKey(strings.TrimPrefix(key, "list:"))
+		if !ok {
+			continue
+		}
+		cur, err := parseDollarCents(r.PostForm.Get(key))
+		if err != nil {
+			return nil, err
+		}
+		prev, _ := parseDollarCents(r.PostForm.Get("list_prev:" + listID.String() + ":" + variantID.String()))
+		if centsEqual(cur, prev) {
+			continue
+		}
+		if cur == nil {
+			ops = append(ops, priceOp{kind: opGroupDelete, variantID: variantID, groupID: listID})
+		} else {
+			ops = append(ops, priceOp{kind: opGroupSet, variantID: variantID, groupID: listID, cents: *cur})
+		}
+	}
+
+	return ops, nil
 }

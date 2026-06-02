@@ -1,9 +1,11 @@
 package web
 
 import (
+	"errors"
 	"math"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -171,17 +173,36 @@ func (d *Deps) handleAdminGroupPrices(w http.ResponseWriter, r *http.Request) {
 	admin.GroupPricing(props).Render(ctx, w) //nolint:errcheck
 }
 
-func (d *Deps) handleAdminGroupPriceBaseUpdate(w http.ResponseWriter, r *http.Request) {
+// priceOpKind enumerates the mutations a bulk price save can apply to one cell.
+type priceOpKind int
+
+const (
+	opBaseSet priceOpKind = iota
+	opGroupSet
+	opGroupDelete
+)
+
+type priceOp struct {
+	kind      priceOpKind
+	variantID uuid.UUID
+	groupID   uuid.UUID
+	cents     int
+}
+
+// handleAdminGroupPriceBulkUpdate applies every changed price in a single product's
+// form (base prices plus all group prices) in one transaction. Each cell submits a
+// current value plus a hidden "_prev" value; only cells whose value actually changed
+// are written, and a cleared group cell deletes that group's override.
+func (d *Deps) handleAdminGroupPriceBulkUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	variantID, err := uuid.Parse(r.FormValue("variant_id"))
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
 
-	dollars, err := strconv.ParseFloat(r.FormValue("price"), 64)
-	if err != nil || dollars < 0 {
+	ops, err := parseGroupPriceForm(r)
+	if err != nil {
 		if IsHTMX(r) {
 			d.handleAdminGroupPrices(w, r)
 			toast.Toast(toast.VariantError, "Please enter a valid price").Render(ctx, w) //nolint:errcheck
@@ -191,11 +212,32 @@ func (d *Deps) handleAdminGroupPriceBaseUpdate(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	cents := int(math.Round(dollars * 100))
+	if len(ops) == 0 {
+		// Nothing changed — just re-render the current state.
+		if IsHTMX(r) {
+			d.handleAdminGroupPrices(w, r)
+			return
+		}
+		http.Redirect(w, r, "/admin/groups/prices", http.StatusSeeOther)
+		return
+	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.PricingService.SetBasePrice(ctx, tx, variantID, cents, "USD")
-		return txErr
+		for _, op := range ops {
+			var txErr error
+			switch op.kind {
+			case opBaseSet:
+				_, txErr = d.PricingService.SetBasePrice(ctx, tx, op.variantID, op.cents, "USD")
+			case opGroupSet:
+				_, txErr = d.PricingService.SetGroupPrice(ctx, tx, op.variantID, op.groupID, op.cents, "USD")
+			case opGroupDelete:
+				txErr = d.PricingService.DeleteGroupPrice(ctx, tx, op.variantID, op.groupID, "USD")
+			}
+			if txErr != nil {
+				return txErr
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		if IsHTMX(r) {
@@ -215,73 +257,89 @@ func (d *Deps) handleAdminGroupPriceBaseUpdate(w http.ResponseWriter, r *http.Re
 	http.Redirect(w, r, "/admin/groups/prices", http.StatusSeeOther)
 }
 
-func (d *Deps) handleAdminGroupPriceGroupUpdate(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+// parseGroupPriceForm turns a submitted group-pricing form into the list of changed
+// cells. Returns an error if any submitted price is malformed or negative.
+func parseGroupPriceForm(r *http.Request) ([]priceOp, error) {
+	var ops []priceOp
 
-	variantID, err := uuid.Parse(r.FormValue("variant_id"))
-	if err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
+	for key := range r.PostForm {
+		switch {
+		case strings.HasPrefix(key, "base:"):
+			variantID, err := uuid.Parse(strings.TrimPrefix(key, "base:"))
+			if err != nil {
+				continue
+			}
+			cur, err := parseDollarCents(r.PostForm.Get(key))
+			if err != nil {
+				return nil, err
+			}
+			prev, _ := parseDollarCents(r.PostForm.Get("base_prev:" + variantID.String()))
+			if centsEqual(cur, prev) || cur == nil {
+				// Unchanged, or empty (there is no clear-base operation).
+				continue
+			}
+			ops = append(ops, priceOp{kind: opBaseSet, variantID: variantID, cents: *cur})
 
-	groupID, err := uuid.Parse(r.FormValue("group_id"))
-	if err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	priceStr := r.FormValue("price")
-
-	// Empty price = delete group price
-	if priceStr == "" {
-		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-			return d.PricingService.DeleteGroupPrice(ctx, tx, variantID, groupID, "USD")
-		})
-		if err != nil {
-			Error(w, r, err)
-			return
+		case strings.HasPrefix(key, "group:"):
+			gid, vid, ok := splitGroupKey(strings.TrimPrefix(key, "group:"))
+			if !ok {
+				continue
+			}
+			cur, err := parseDollarCents(r.PostForm.Get(key))
+			if err != nil {
+				return nil, err
+			}
+			prev, _ := parseDollarCents(r.PostForm.Get("group_prev:" + gid.String() + ":" + vid.String()))
+			if centsEqual(cur, prev) {
+				continue
+			}
+			if cur == nil {
+				ops = append(ops, priceOp{kind: opGroupDelete, variantID: vid, groupID: gid})
+			} else {
+				ops = append(ops, priceOp{kind: opGroupSet, variantID: vid, groupID: gid, cents: *cur})
+			}
 		}
-		if IsHTMX(r) {
-			d.handleAdminGroupPrices(w, r)
-			return
-		}
-		http.Redirect(w, r, "/admin/groups/prices", http.StatusSeeOther)
-		return
 	}
 
-	dollars, err := strconv.ParseFloat(priceStr, 64)
+	return ops, nil
+}
+
+// splitGroupKey splits a "<groupID>:<variantID>" form key into its two UUIDs.
+func splitGroupKey(s string) (groupID, variantID uuid.UUID, ok bool) {
+	parts := strings.SplitN(s, ":", 2)
+	if len(parts) != 2 {
+		return uuid.Nil, uuid.Nil, false
+	}
+	gid, err := uuid.Parse(parts[0])
+	if err != nil {
+		return uuid.Nil, uuid.Nil, false
+	}
+	vid, err := uuid.Parse(parts[1])
+	if err != nil {
+		return uuid.Nil, uuid.Nil, false
+	}
+	return gid, vid, true
+}
+
+// parseDollarCents parses a dollar string into cents. An empty string yields a nil
+// pointer (meaning "unset"); a malformed or negative value yields an error.
+func parseDollarCents(s string) (*int, error) {
+	if strings.TrimSpace(s) == "" {
+		return nil, nil
+	}
+	dollars, err := strconv.ParseFloat(s, 64)
 	if err != nil || dollars < 0 {
-		if IsHTMX(r) {
-			d.handleAdminGroupPrices(w, r)
-			toast.Toast(toast.VariantError, "Please enter a valid price").Render(ctx, w) //nolint:errcheck
-			return
-		}
-		http.Error(w, "invalid price", http.StatusBadRequest)
-		return
+		return nil, errors.New("invalid price")
 	}
-
 	cents := int(math.Round(dollars * 100))
+	return &cents, nil
+}
 
-	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.PricingService.SetGroupPrice(ctx, tx, variantID, groupID, cents, "USD")
-		return txErr
-	})
-	if err != nil {
-		if IsHTMX(r) {
-			d.handleAdminGroupPrices(w, r)
-			_, msg := mapError(err)
-			toast.Toast(toast.VariantError, msg).Render(ctx, w) //nolint:errcheck
-			return
-		}
-		Error(w, r, err)
-		return
+func centsEqual(a, b *int) bool {
+	if a == nil || b == nil {
+		return a == b
 	}
-
-	if IsHTMX(r) {
-		d.handleAdminGroupPrices(w, r)
-		return
-	}
-	http.Redirect(w, r, "/admin/groups/prices", http.StatusSeeOther)
+	return *a == *b
 }
 
 // handleAdminCustomerGroupAdd adds a customer to a group.

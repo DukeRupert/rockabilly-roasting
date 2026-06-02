@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"math"
 	"net/http"
@@ -111,51 +112,20 @@ func (d *Deps) handleAdminGroupPrices(w http.ResponseWriter, r *http.Request) {
 	// Build product pricing groups
 	pgs := make([]admin.ProductPricingGroup, 0, len(products))
 	for _, p := range products {
-		var variants []domain.Variant
-		var basePrices map[uuid.UUID]int
-		var groupPrices map[uuid.UUID]map[uuid.UUID]int
-
+		var pg admin.ProductPricingGroup
 		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 			var txErr error
-			variants, txErr = d.CatalogService.ListVariants(ctx, tx, p.ID)
-			if txErr != nil {
-				return txErr
-			}
-			basePrices, txErr = d.PricingService.ListBasePricesByProduct(ctx, tx, p.ID, "USD")
-			if txErr != nil {
-				return txErr
-			}
-			groupPrices, txErr = d.PricingService.ListGroupPricesByProduct(ctx, tx, p.ID, "USD")
+			pg, txErr = d.buildGroupPricingProduct(ctx, tx, p)
 			return txErr
 		})
 		if err != nil {
 			Error(w, r, err)
 			return
 		}
-
-		if len(variants) == 0 {
+		if len(pg.Variants) == 0 {
 			continue
 		}
-
-		vps := make([]admin.VariantPricing, len(variants))
-		for i, v := range variants {
-			vp := admin.VariantPricing{
-				Variant:    v,
-				GroupPrices: groupPrices[v.ID],
-			}
-			if cents, ok := basePrices[v.ID]; ok {
-				vp.PriceCents = &cents
-			}
-			if vp.GroupPrices == nil {
-				vp.GroupPrices = make(map[uuid.UUID]int)
-			}
-			vps[i] = vp
-		}
-
-		pgs = append(pgs, admin.ProductPricingGroup{
-			Product:  p,
-			Variants: vps,
-		})
+		pgs = append(pgs, pg)
 	}
 
 	name, role := staffNameRole(r)
@@ -255,6 +225,40 @@ func (d *Deps) handleAdminGroupPriceBulkUpdate(w http.ResponseWriter, r *http.Re
 		return
 	}
 	http.Redirect(w, r, "/admin/groups/prices", http.StatusSeeOther)
+}
+
+// buildGroupPricingProduct assembles one product's variants and their base + group
+// prices for rendering. The caller supplies the transaction.
+func (d *Deps) buildGroupPricingProduct(ctx context.Context, tx pgx.Tx, p domain.Product) (admin.ProductPricingGroup, error) {
+	variants, err := d.CatalogService.ListVariants(ctx, tx, p.ID)
+	if err != nil {
+		return admin.ProductPricingGroup{}, err
+	}
+	basePrices, err := d.PricingService.ListBasePricesByProduct(ctx, tx, p.ID, "USD")
+	if err != nil {
+		return admin.ProductPricingGroup{}, err
+	}
+	groupPrices, err := d.PricingService.ListGroupPricesByProduct(ctx, tx, p.ID, "USD")
+	if err != nil {
+		return admin.ProductPricingGroup{}, err
+	}
+
+	vps := make([]admin.VariantPricing, len(variants))
+	for i, v := range variants {
+		vp := admin.VariantPricing{
+			Variant:     v,
+			GroupPrices: groupPrices[v.ID],
+		}
+		if cents, ok := basePrices[v.ID]; ok {
+			c := cents
+			vp.PriceCents = &c
+		}
+		if vp.GroupPrices == nil {
+			vp.GroupPrices = make(map[uuid.UUID]int)
+		}
+		vps[i] = vp
+	}
+	return admin.ProductPricingGroup{Product: p, Variants: vps}, nil
 }
 
 // parseGroupPriceForm turns a submitted group-pricing form into the list of changed

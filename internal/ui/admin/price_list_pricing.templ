@@ -26,78 +26,87 @@ type VariantPriceListPricing struct {
 }
 
 templ PriceListPricingContent(props PriceListPricingProps) {
-	<!-- Page header -->
-	<div class="sm:flex sm:items-center">
-		<div class="sm:flex-auto">
-			<h1 class="admin-page-title">Price List Pricing</h1>
-			<p class="mt-1 text-sm text-rr-muted">
-				Set per-list overrides for any variant. Empty cells fall back to the base price.
-				if len(props.Lists) == 0 {
-					<a href="/admin/price-lists" class="text-rr-red hover:text-rr-red-lt">Create a price list</a> to enable list pricing.
+	<!-- One page-wide form: a single Save button writes every product's changed cells in one transaction -->
+	<form
+		method="post"
+		action={ templ.SafeURL("/admin/price-lists/prices/bulk") }
+		hx-post="/admin/price-lists/prices/bulk"
+		hx-target="#price-list-pricing-content"
+		hx-swap="innerHTML"
+	>
+		<!-- Page header -->
+		<div class="sm:flex sm:items-center">
+			<div class="sm:flex-auto">
+				<h1 class="admin-page-title">Price List Pricing</h1>
+				<p class="mt-1 text-sm text-rr-muted">
+					Set per-list overrides for any variant. Empty cells fall back to the base price.
+					if len(props.Lists) == 0 {
+						<a href="/admin/price-lists" class="text-rr-red hover:text-rr-red-lt">Create a price list</a> to enable list pricing.
+					}
+				</p>
+			</div>
+			<div class="mt-4 flex items-center gap-3 sm:ml-16 sm:mt-0 sm:flex-none">
+				<a
+					href="/admin/price-lists"
+					class="block rounded-sm bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading shadow-xs border border-rr-border hover:bg-rr-raised"
+				>
+					Manage lists
+				</a>
+				if len(props.Products) > 0 && len(props.Lists) > 0 {
+					<button
+						type="submit"
+						class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt"
+					>
+						Save changes
+					</button>
 				}
-			</p>
+			</div>
 		</div>
-		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+		if len(props.Products) == 0 {
+			<div class="mt-8 border border-dashed border-rr-border p-12 text-center">
+				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No products with variants</h3>
+				<p class="mt-1 text-sm text-rr-muted">Create products and add variants to start setting prices.</p>
+			</div>
+		} else if len(props.Lists) == 0 {
+			<div class="mt-8 border border-dashed border-rr-border p-12 text-center">
+				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No price lists</h3>
+				<p class="mt-1 text-sm text-rr-muted">Create a price list before setting overrides.</p>
+			</div>
+		} else {
+			<div class="mt-8 space-y-10">
+				for _, pp := range props.Products {
+					if len(pp.Variants) > 0 {
+						@priceListProductBlock(props.Lists, pp)
+					}
+				}
+			</div>
+		}
+	</form>
+}
+
+// priceListProductBlock renders one product's price tables inside the page-wide form.
+// It carries no form or Save button of its own — the single Save button in the header
+// submits every product's changed cells together.
+templ priceListProductBlock(lists []domain.PriceList, pp ProductPriceListPricing) {
+	<div>
+		<!-- Product heading -->
+		<div class="flex items-center justify-between mb-4">
+			<h2 class="text-sm font-semibold text-rr-heading">{ pp.Product.Title }</h2>
 			<a
-				href="/admin/price-lists"
-				class="block rounded-sm bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading shadow-xs border border-rr-border hover:bg-rr-raised"
+				href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", pp.Product.ID)) }
+				class="text-xs text-rr-red hover:text-rr-red-lt"
 			>
-				Manage lists
+				Edit product
 			</a>
 		</div>
-	</div>
-	if len(props.Products) == 0 {
-		<div class="mt-8 border border-dashed border-rr-border p-12 text-center">
-			<h3 class="mt-2 text-sm font-semibold text-rr-heading">No products with variants</h3>
-			<p class="mt-1 text-sm text-rr-muted">Create products and add variants to start setting prices.</p>
-		</div>
-	} else if len(props.Lists) == 0 {
-		<div class="mt-8 border border-dashed border-rr-border p-12 text-center">
-			<h3 class="mt-2 text-sm font-semibold text-rr-heading">No price lists</h3>
-			<p class="mt-1 text-sm text-rr-muted">Create a price list before setting overrides.</p>
-		</div>
-	} else {
-		<div class="mt-8 space-y-10">
-			for _, pp := range props.Products {
-				if len(pp.Variants) > 0 {
-					<!-- One form per product: every list override saves together -->
-					<form
-						method="post"
-						action={ templ.SafeURL("/admin/price-lists/prices/bulk") }
-						hx-post="/admin/price-lists/prices/bulk"
-						hx-target="#price-list-pricing-content"
-						hx-swap="innerHTML"
-					>
-						<!-- Product heading -->
-						<div class="flex items-center justify-between mb-4">
-							<h2 class="text-sm font-semibold text-rr-heading">{ pp.Product.Title }</h2>
-							<div class="flex items-center gap-4">
-								<a
-									href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", pp.Product.ID)) }
-									class="text-xs text-rr-red hover:text-rr-red-lt"
-								>
-									Edit product
-								</a>
-								<button
-									type="submit"
-									class="rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt"
-								>
-									Save changes
-								</button>
-							</div>
-						</div>
-						<!-- Stacked price tables: base (read-only) + one per list -->
-						<div class="space-y-4">
-							@priceListBaseCard(pp)
-							for _, list := range props.Lists {
-								@priceListPricingCard(list, pp)
-							}
-						</div>
-					</form>
-				}
+		<!-- Stacked price tables: base (read-only) + one per list -->
+		<div class="space-y-4">
+			@priceListBaseCard(pp)
+			for _, list := range lists {
+				@priceListPricingCard(list, pp)
 			}
 		</div>
-	}
+	</div>
 }
 
 templ priceListBaseCard(pp ProductPriceListPricing) {

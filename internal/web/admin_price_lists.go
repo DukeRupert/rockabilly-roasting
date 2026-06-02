@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
@@ -154,51 +155,20 @@ func (d *Deps) handleAdminPriceListPrices(w http.ResponseWriter, r *http.Request
 
 	pgs := make([]admin.ProductPriceListPricing, 0, len(products))
 	for _, p := range products {
-		var variants []domain.Variant
-		var basePrices map[uuid.UUID]int
-		var listPrices map[uuid.UUID]map[uuid.UUID]int
-
+		var pp admin.ProductPriceListPricing
 		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 			var txErr error
-			variants, txErr = d.CatalogService.ListVariants(ctx, tx, p.ID)
-			if txErr != nil {
-				return txErr
-			}
-			basePrices, txErr = d.PricingService.ListBasePricesByProduct(ctx, tx, p.ID, "USD")
-			if txErr != nil {
-				return txErr
-			}
-			listPrices, txErr = d.PricingService.ListPriceListPricesByProduct(ctx, tx, p.ID, "USD")
+			pp, txErr = d.buildPriceListProduct(ctx, tx, p)
 			return txErr
 		})
 		if err != nil {
 			Error(w, r, err)
 			return
 		}
-
-		if len(variants) == 0 {
+		if len(pp.Variants) == 0 {
 			continue
 		}
-
-		vps := make([]admin.VariantPriceListPricing, len(variants))
-		for i, v := range variants {
-			vp := admin.VariantPriceListPricing{
-				Variant:    v,
-				ListPrices: listPrices[v.ID],
-			}
-			if cents, ok := basePrices[v.ID]; ok {
-				vp.PriceCents = &cents
-			}
-			if vp.ListPrices == nil {
-				vp.ListPrices = make(map[uuid.UUID]int)
-			}
-			vps[i] = vp
-		}
-
-		pgs = append(pgs, admin.ProductPriceListPricing{
-			Product:  p,
-			Variants: vps,
-		})
+		pgs = append(pgs, pp)
 	}
 
 	name, role := staffNameRole(r)
@@ -278,6 +248,40 @@ func (d *Deps) handleAdminPriceListPriceBulkUpdate(w http.ResponseWriter, r *htt
 		return
 	}
 	http.Redirect(w, r, "/admin/price-lists/prices", http.StatusSeeOther)
+}
+
+// buildPriceListProduct assembles one product's variants and their base + price-list
+// prices for rendering. The caller supplies the transaction.
+func (d *Deps) buildPriceListProduct(ctx context.Context, tx pgx.Tx, p domain.Product) (admin.ProductPriceListPricing, error) {
+	variants, err := d.CatalogService.ListVariants(ctx, tx, p.ID)
+	if err != nil {
+		return admin.ProductPriceListPricing{}, err
+	}
+	basePrices, err := d.PricingService.ListBasePricesByProduct(ctx, tx, p.ID, "USD")
+	if err != nil {
+		return admin.ProductPriceListPricing{}, err
+	}
+	listPrices, err := d.PricingService.ListPriceListPricesByProduct(ctx, tx, p.ID, "USD")
+	if err != nil {
+		return admin.ProductPriceListPricing{}, err
+	}
+
+	vps := make([]admin.VariantPriceListPricing, len(variants))
+	for i, v := range variants {
+		vp := admin.VariantPriceListPricing{
+			Variant:    v,
+			ListPrices: listPrices[v.ID],
+		}
+		if cents, ok := basePrices[v.ID]; ok {
+			c := cents
+			vp.PriceCents = &c
+		}
+		if vp.ListPrices == nil {
+			vp.ListPrices = make(map[uuid.UUID]int)
+		}
+		vps[i] = vp
+	}
+	return admin.ProductPriceListPricing{Product: p, Variants: vps}, nil
 }
 
 // parsePriceListForm turns a submitted price-list form into the list of changed cells.

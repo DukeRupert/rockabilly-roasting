@@ -56,7 +56,10 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrTaxonNotFound),
 		errors.Is(err, app.ErrPriceNotFound),
 		errors.Is(err, app.ErrLineItemNotFound),
-		errors.Is(err, app.ErrInvoiceNotFound):
+		errors.Is(err, app.ErrInvoiceNotFound),
+		// Access denial is surfaced as 404 so we never confirm a restricted
+		// product/SKU exists to a viewer who may not see it.
+		errors.Is(err, app.ErrProductNotAccessible):
 		return http.StatusNotFound, "not found"
 
 	case errors.Is(err, app.ErrInvalidCredentials):

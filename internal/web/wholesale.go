@@ -238,15 +238,15 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 		companyName = *customer.CompanyName
 	}
 
-	var groupIDs []uuid.UUID
-	if customer.CustomerGroupID != nil {
-		groupIDs = []uuid.UUID{*customer.CustomerGroupID}
-	}
-
 	var products []app.QuickOrderProduct
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		var txErr error
-		products, txErr = d.WholesaleService.QuickOrderCatalog(ctx, tx, groupIDs, customer.ID, d.PricingService, "USD")
+		// Access identity comes from the membership join (the source of truth), not the
+		// deprecated customer.customer_group_id column.
+		viewer, txErr := d.CatalogService.ResolveViewer(ctx, tx, customer.ID)
+		if txErr != nil {
+			return txErr
+		}
+		products, txErr = d.WholesaleService.QuickOrderCatalog(ctx, tx, viewer.GroupIDs, customer.ID, d.PricingService, "USD")
 		return txErr
 	})
 	if err != nil {

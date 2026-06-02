@@ -22,6 +22,9 @@ var (
 	ErrCartExpired   = errors.New("cart has expired")
 	ErrCartEmpty     = errors.New("cart is empty")
 
+	// Product access errors
+	ErrProductNotAccessible = errors.New("product is not available to this customer")
+
 	// Customer errors
 	ErrCustomerNotFound     = errors.New("customer not found")
 	ErrEmailAlreadyExists   = errors.New("email already exists")

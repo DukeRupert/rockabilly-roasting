@@ -14,7 +14,7 @@ import (
 
 func newCartService() *app.CartService {
 	pricing := newPricingService()
-	return app.NewCartService(store.NewCartStore(), store.NewCatalogStore(), pricing)
+	return app.NewCartService(store.NewCartStore(), store.NewCatalogStore(), pricing, newCatalogService())
 }
 
 func TestAddItemForCustomer_UsesPriceListPrice(t *testing.T) {

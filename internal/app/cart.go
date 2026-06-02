@@ -13,16 +13,26 @@ import (
 	"github.com/dukerupert/hiri/internal/store"
 )
 
+// productAccessChecker enforces product visibility at cart-write time. *CatalogService
+// satisfies it. The cart owns the invariant ("you cannot add what you cannot access")
+// but not the predicate — that lives in CatalogService so list, detail, and add-to-cart
+// can never disagree.
+type productAccessChecker interface {
+	ResolveViewer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (domain.ProductViewer, error)
+	CanAccessVariant(ctx context.Context, tx pgx.Tx, v domain.ProductViewer, variantID uuid.UUID) (bool, error)
+}
+
 // CartService contains business logic for shopping carts.
 type CartService struct {
 	carts   *store.CartStore
 	catalog *store.CatalogStore
 	pricing *PricingService
+	access  productAccessChecker
 }
 
 // NewCartService creates a new CartService.
-func NewCartService(carts *store.CartStore, catalog *store.CatalogStore, pricing *PricingService) *CartService {
-	return &CartService{carts: carts, catalog: catalog, pricing: pricing}
+func NewCartService(carts *store.CartStore, catalog *store.CatalogStore, pricing *PricingService, access productAccessChecker) *CartService {
+	return &CartService{carts: carts, catalog: catalog, pricing: pricing, access: access}
 }
 
 // GetCart returns a cart by ID.
@@ -68,6 +78,12 @@ func (s *CartService) AddItem(ctx context.Context, tx pgx.Tx, cartID, variantID 
 		return nil, err
 	}
 
+	// Anonymous/retail add path: enforce against the public-only retail viewer so a
+	// guessed variant ID for a wholesale/restricted product cannot be added.
+	if err := s.assertVariantAccessible(ctx, tx, domain.ProductViewer{}, variantID); err != nil {
+		return nil, err
+	}
+
 	price, err := s.pricing.GetBasePrice(ctx, tx, variantID, "USD")
 	if err != nil {
 		return nil, err
@@ -89,6 +105,16 @@ func (s *CartService) AddItemForCustomer(ctx context.Context, tx pgx.Tx, cartID,
 	}
 
 	if err := s.assertVariantPurchasable(ctx, tx, variantID); err != nil {
+		return nil, err
+	}
+
+	// Enforce product access against the customer's resolved viewer — this is the one
+	// authoritative gate; handlers must not pre-check and must not bypass it.
+	viewer, err := s.access.ResolveViewer(ctx, tx, customerID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.assertVariantAccessible(ctx, tx, viewer, variantID); err != nil {
 		return nil, err
 	}
 
@@ -116,6 +142,19 @@ func (s *CartService) assertVariantPurchasable(ctx context.Context, tx pgx.Tx, v
 	}
 	if v.ArchivedAt != nil {
 		return ErrVariantArchived
+	}
+	return nil
+}
+
+// assertVariantAccessible returns ErrProductNotAccessible if the variant's product is
+// not visible to the given viewer.
+func (s *CartService) assertVariantAccessible(ctx context.Context, tx pgx.Tx, v domain.ProductViewer, variantID uuid.UUID) error {
+	ok, err := s.access.CanAccessVariant(ctx, tx, v, variantID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return ErrProductNotAccessible
 	}
 	return nil
 }

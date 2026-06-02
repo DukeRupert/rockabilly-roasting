@@ -20,20 +20,176 @@ import (
 // violates a foreign key constraint with ON DELETE RESTRICT/NO ACTION.
 const pgFKViolation = "23503"
 
+// catalogCustomerReader reads a customer for access-identity resolution.
+// *store.CustomerStore satisfies it.
+type catalogCustomerReader interface {
+	GetByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Customer, error)
+}
+
+// catalogGroupReader lists the groups a customer belongs to — the access source of
+// truth (customer_group_memberships). *store.CustomerGroupStore satisfies it.
+type catalogGroupReader interface {
+	ListByCustomer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) ([]domain.CustomerGroup, error)
+}
+
 // CatalogService contains business logic for products, variants, and taxonomy.
 type CatalogService struct {
-	catalog *store.CatalogStore
-	audit   *audit.AuditWriter
-	metrics *metrics.Registry
+	catalog   *store.CatalogStore
+	customers catalogCustomerReader
+	groups    catalogGroupReader
+	audit     *audit.AuditWriter
+	metrics   *metrics.Registry
 }
 
 // NewCatalogService creates a new CatalogService.
-func NewCatalogService(catalog *store.CatalogStore, audit *audit.AuditWriter, metrics *metrics.Registry) *CatalogService {
+func NewCatalogService(catalog *store.CatalogStore, customers catalogCustomerReader, groups catalogGroupReader, audit *audit.AuditWriter, metrics *metrics.Registry) *CatalogService {
 	return &CatalogService{
-		catalog: catalog,
-		audit:   audit,
-		metrics: metrics,
+		catalog:   catalog,
+		customers: customers,
+		groups:    groups,
+		audit:     audit,
+		metrics:   metrics,
 	}
+}
+
+// --- Product access (visibility + group grants) ---
+
+// ResolveViewer builds the access identity for a customer from the
+// customer_group_memberships join table (the source of truth) — never from the
+// deprecated customer.customer_group_id column.
+func (s *CatalogService) ResolveViewer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (domain.ProductViewer, error) {
+	customer, err := s.customers.GetByID(ctx, tx, customerID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ProductViewer{}, ErrCustomerNotFound
+		}
+		return domain.ProductViewer{}, fmt.Errorf("resolve viewer customer: %w", err)
+	}
+
+	groups, err := s.groups.ListByCustomer(ctx, tx, customerID)
+	if err != nil {
+		return domain.ProductViewer{}, fmt.Errorf("resolve viewer groups: %w", err)
+	}
+
+	groupIDs := make([]uuid.UUID, len(groups))
+	for i, g := range groups {
+		groupIDs[i] = g.ID
+	}
+
+	return domain.ProductViewer{
+		IsWholesale: customer.IsApprovedWholesale(),
+		GroupIDs:    groupIDs,
+	}, nil
+}
+
+// AccessibleFilter maps a viewer to the store visibility filter used for list reads.
+// The retail/anonymous zero-value viewer yields a public-only filter.
+func (s *CatalogService) AccessibleFilter(v domain.ProductViewer) store.VisibilityContext {
+	return store.VisibilityContext{IsWholesale: v.IsWholesale, GroupIDs: v.GroupIDs}
+}
+
+// CanAccessProduct reports whether the viewer may see/purchase the product. It uses the
+// same predicate as AccessibleFilter, so list and scalar checks never disagree.
+func (s *CatalogService) CanAccessProduct(ctx context.Context, tx pgx.Tx, v domain.ProductViewer, productID uuid.UUID) (bool, error) {
+	ok, err := s.catalog.IsProductAccessible(ctx, tx, productID, s.AccessibleFilter(v))
+	if err != nil {
+		return false, fmt.Errorf("can access product: %w", err)
+	}
+	return ok, nil
+}
+
+// CanAccessVariant reports whether the viewer may purchase the variant, using the same
+// access predicate as CanAccessProduct.
+func (s *CatalogService) CanAccessVariant(ctx context.Context, tx pgx.Tx, v domain.ProductViewer, variantID uuid.UUID) (bool, error) {
+	ok, err := s.catalog.IsVariantAccessible(ctx, tx, variantID, s.AccessibleFilter(v))
+	if err != nil {
+		return false, fmt.Errorf("can access variant: %w", err)
+	}
+	return ok, nil
+}
+
+// UpdateProductVisibility sets a product's visibility tier.
+func (s *CatalogService) UpdateProductVisibility(ctx context.Context, tx pgx.Tx, id uuid.UUID, vis domain.ProductVisibility, actor Actor) (*domain.Product, error) {
+	product, err := s.catalog.UpdateProductVisibility(ctx, tx, id, vis)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrProductNotFound
+		}
+		return nil, fmt.Errorf("update product visibility: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditProductVisibilityUpdated,
+		ResourceType: "product",
+		ResourceID:   product.ID,
+		After:        product,
+	}); err != nil {
+		return nil, fmt.Errorf("audit product visibility: %w", err)
+	}
+
+	return product, nil
+}
+
+// SetProductGroupAccess replaces the product's entire group-access set with groupIDs
+// (declarative — the caller submits desired state, not deltas). Passing an empty slice
+// clears all grants. Records one audit entry capturing the new set, with the previous
+// set in metadata.
+func (s *CatalogService) SetProductGroupAccess(ctx context.Context, tx pgx.Tx, productID uuid.UUID, groupIDs []uuid.UUID, actor Actor) error {
+	current, err := s.catalog.ListProductGroupVisibility(ctx, tx, productID)
+	if err != nil {
+		return fmt.Errorf("list current group access: %w", err)
+	}
+
+	desired := make(map[uuid.UUID]bool, len(groupIDs))
+	for _, id := range groupIDs {
+		desired[id] = true
+	}
+	existing := make(map[uuid.UUID]bool, len(current))
+	for _, id := range current {
+		existing[id] = true
+	}
+
+	for id := range desired {
+		if !existing[id] {
+			if err := s.catalog.SetProductGroupVisibility(ctx, tx, productID, id); err != nil {
+				return fmt.Errorf("grant group access: %w", err)
+			}
+		}
+	}
+	for id := range existing {
+		if !desired[id] {
+			if err := s.catalog.RemoveProductGroupVisibility(ctx, tx, productID, id); err != nil {
+				return fmt.Errorf("revoke group access: %w", err)
+			}
+		}
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditProductGroupAccessUpdated,
+		ResourceType: "product",
+		ResourceID:   productID,
+		After:        groupIDs,
+		Metadata:     map[string]any{"previous_group_ids": current},
+	}); err != nil {
+		return fmt.Errorf("audit group access: %w", err)
+	}
+
+	return nil
+}
+
+// ListProductGroupAccess returns the group IDs granted access to a restricted product.
+func (s *CatalogService) ListProductGroupAccess(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]uuid.UUID, error) {
+	ids, err := s.catalog.ListProductGroupVisibility(ctx, tx, productID)
+	if err != nil {
+		return nil, fmt.Errorf("list product group access: %w", err)
+	}
+	return ids, nil
 }
 
 // --- Products ---

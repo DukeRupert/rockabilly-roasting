@@ -237,7 +237,7 @@ func run() error {
 	}
 
 	// Services. Those that send email have email-capable variants attached via WithEmail.
-	catalogSvc := app.NewCatalogService(catalogStore, auditWriter, metricsReg)
+	catalogSvc := app.NewCatalogService(catalogStore, customerStore, customerGroupStore, auditWriter, metricsReg)
 	orderSvc := app.NewOrderService(orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore, subscriptionStore).
 		WithShipments(shippingStore).
@@ -251,7 +251,7 @@ func run() error {
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg)
 	pricingSvc := app.NewPricingService(pricingStore, customerStore)
-	cartSvc := app.NewCartService(cartStore, catalogStore, pricingSvc)
+	cartSvc := app.NewCartService(cartStore, catalogStore, pricingSvc, catalogSvc)
 	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg).
 		WithEmail(emailEnv)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, shippingStore, paymentProvider, auditWriter, metricsReg)

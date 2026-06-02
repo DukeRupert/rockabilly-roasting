@@ -109,7 +109,8 @@ const (
 	AuditWholesaleAccountReactivated  = "wholesale.account_reactivated"
 
 	// Product visibility actions
-	AuditProductVisibilityUpdated = "product.visibility_updated"
+	AuditProductVisibilityUpdated  = "product.visibility_updated"
+	AuditProductGroupAccessUpdated = "product.group_access_updated"
 
 	// Product media actions
 	AuditProductMediaAdded   = "product_media.added"

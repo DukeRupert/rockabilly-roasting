@@ -20,6 +20,14 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
 
+// retailVisibility restricts a storefront product query to the public tier. The retail
+// storefront never shows wholesale or restricted products; the rule is owned by
+// CatalogService.AccessibleFilter (retail = the zero-value viewer), not rebuilt here.
+func (d *Deps) retailVisibility() *store.VisibilityContext {
+	vc := d.CatalogService.AccessibleFilter(domain.ProductViewer{})
+	return &vc
+}
+
 // handleStorefrontHome renders the landing page with featured products.
 func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -29,14 +37,16 @@ func (d *Deps) handleStorefrontHome(w http.ResponseWriter, r *http.Request) {
 	activeStatus := domain.ProductStatusActive
 	isFeatured := true
 	filter := store.ProductFilter{
-		Limit:  5,
-		Offset: 0,
-		Status: &activeStatus,
+		Limit:      5,
+		Offset:     0,
+		Status:     &activeStatus,
+		Visibility: d.retailVisibility(),
 	}
 	featuredFilter := store.ProductFilter{
 		Limit:      1,
 		Status:     &activeStatus,
 		IsFeatured: &isFeatured,
+		Visibility: d.retailVisibility(),
 	}
 
 	var products []domain.Product
@@ -162,9 +172,10 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	filter := store.ProductFilter{
-		Limit:  catalogPageSize,
-		Offset: (page - 1) * catalogPageSize,
-		Search: search,
+		Limit:      catalogPageSize,
+		Offset:     (page - 1) * catalogPageSize,
+		Search:     search,
+		Visibility: d.retailVisibility(),
 	}
 	// Only show active products on the storefront.
 	activeStatus := domain.ProductStatusActive
@@ -382,6 +393,7 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 		Status:       &activeStatus,
 		Subscribable: &subscribable,
 		Limit:        50,
+		Visibility:   d.retailVisibility(),
 	}
 
 	var products []domain.Product
@@ -669,6 +681,12 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// The retail storefront only serves public products. Non-public
+		// (wholesale/restricted) products 404 here so we never confirm the slug exists.
+		if product.Visibility != domain.ProductVisibilityPublic {
+			return app.ErrProductNotFound
+		}
+
 		// Get media.
 		media, txErr = d.CatalogService.ListProductMedia(ctx, tx, product.ID)
 		if txErr != nil {
@@ -698,8 +716,9 @@ func (d *Deps) handleStorefrontProduct(w http.ResponseWriter, r *http.Request) {
 		if prevNav == nil || nextNav == nil {
 			activeStatus := domain.ProductStatusActive
 			siblings, sibErr := d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{
-				Status: &activeStatus,
-				Limit:  500,
+				Status:     &activeStatus,
+				Limit:      500,
+				Visibility: d.retailVisibility(),
 			})
 			if sibErr != nil {
 				return sibErr
@@ -916,8 +935,9 @@ func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
 	// Active product pages
 	activeStatus := domain.ProductStatusActive
 	filter := store.ProductFilter{
-		Status: &activeStatus,
-		Limit:  500,
+		Status:     &activeStatus,
+		Limit:      500,
+		Visibility: d.retailVisibility(),
 	}
 	var products []domain.Product
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -988,6 +1008,7 @@ func findRoastNeighbors(ctx context.Context, tx pgx.Tx, d *Deps, currentID uuid.
 			Status:     &activeStatus,
 			Limit:      10,
 			Attributes: []store.AttributeFilter{{KeySlug: "roast-level", Value: level}},
+			Visibility: d.retailVisibility(),
 		})
 		if err != nil {
 			return nil

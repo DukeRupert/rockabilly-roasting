@@ -265,6 +265,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var variants []admin.VariantWithOptions
 	var options []admin.OptionWithValues
 	var groups []domain.CustomerGroup
+	var groupAccessIDs []uuid.UUID
 	var mediaList []domain.ProductMedia
 	var assignedSets []domain.AttributeSet
 	var allSets []domain.AttributeSet
@@ -284,6 +285,15 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		switch tab {
 		case "details":
 			taxons, txErr = d.CatalogService.ListRootTaxons(ctx, tx)
+			if txErr != nil {
+				return txErr
+			}
+			// Groups + current grants drive the visibility/access panel.
+			groups, txErr = d.CustomerGroupService.List(ctx, tx)
+			if txErr != nil {
+				return txErr
+			}
+			groupAccessIDs, txErr = d.CatalogService.ListProductGroupAccess(ctx, tx, id)
 			return txErr
 
 		case "media":
@@ -350,6 +360,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		Variants:        variants,
 		Options:         options,
 		Groups:          groups,
+		GroupAccessIDs:  groupAccessIDs,
 		Media:           mediaList,
 		MediaConfig:     d.MediaConfig,
 		TaxonName:       taxonName,
@@ -531,6 +542,58 @@ func (d *Deps) handleAdminProductStatusUpdate(w http.ResponseWriter, r *http.Req
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Status+updated", id), http.StatusSeeOther)
+}
+
+// handleAdminProductVisibilityUpdate sets a product's visibility tier and, when the tier
+// is restricted, the set of customer groups granted access. Both writes happen in one
+// transaction; switching away from restricted clears any existing grants.
+func (d *Deps) handleAdminProductVisibilityUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	visibility := domain.ProductVisibility(r.FormValue("visibility"))
+	switch visibility {
+	case domain.ProductVisibilityPublic, domain.ProductVisibilityWholesale, domain.ProductVisibilityRestricted:
+		// valid
+	default:
+		http.Error(w, "invalid visibility", http.StatusBadRequest)
+		return
+	}
+
+	// Group grants only apply to restricted products; any other tier clears them.
+	var groupIDs []uuid.UUID
+	if visibility == domain.ProductVisibilityRestricted {
+		for _, raw := range r.Form["group_ids"] {
+			gid, parseErr := uuid.Parse(raw)
+			if parseErr != nil {
+				continue
+			}
+			groupIDs = append(groupIDs, gid)
+		}
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		if _, txErr := d.CatalogService.UpdateProductVisibility(ctx, tx, id, visibility, staffActor(r)); txErr != nil {
+			return txErr
+		}
+		return d.CatalogService.SetProductGroupAccess(ctx, tx, id, groupIDs, staffActor(r))
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Visibility+updated", id), http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminProductSubscribableUpdate(w http.ResponseWriter, r *http.Request) {

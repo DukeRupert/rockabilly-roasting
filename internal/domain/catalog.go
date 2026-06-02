@@ -15,6 +15,19 @@ const (
 	ProductVisibilityRestricted ProductVisibility = "restricted"
 )
 
+// ProductViewer is the resolved access identity of whoever is asking — the wholesale
+// flag plus the customer groups they belong to. It carries no pricing or currency.
+//
+// The zero value (ProductViewer{}) is the retail/anonymous viewer: not wholesale, no
+// groups, and therefore restricted to public products by construction. Callers with no
+// authenticated customer use the zero value directly; for an authenticated wholesale
+// customer, obtain the viewer from CatalogService.ResolveViewer — never hand-assemble
+// GroupIDs in a handler.
+type ProductViewer struct {
+	IsWholesale bool
+	GroupIDs    []uuid.UUID
+}
+
 // ProductStatus represents the lifecycle state of a product.
 type ProductStatus string
 

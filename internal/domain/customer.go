@@ -70,6 +70,14 @@ type Customer struct {
 	UpdatedAt        time.Time
 }
 
+// IsApprovedWholesale reports whether the customer is a wholesale account in good
+// standing — i.e. eligible for wholesale catalog visibility and pricing.
+func (c *Customer) IsApprovedWholesale() bool {
+	return c.AccountType == AccountTypeWholesale &&
+		c.WholesaleStatus != nil &&
+		*c.WholesaleStatus == WholesaleStatusApproved
+}
+
 // Address represents a shipping or billing address.
 type Address struct {
 	ID          uuid.UUID

@@ -29,6 +29,7 @@ type ProductEditProps struct {
 	Variants       []VariantWithOptions
 	Options        []OptionWithValues
 	Groups         []domain.CustomerGroup
+	GroupAccessIDs []uuid.UUID // customer groups granted access to a restricted product
 	Media          []domain.ProductMedia
 	MediaConfig    *media.Config
 	TaxonName      string
@@ -177,6 +178,7 @@ templ productDetailsTab(props ProductEditProps) {
 				@StatusToggle(props.Product)
 				@SubscribableToggle(props.Product)
 				@FeaturedToggle(props.Product)
+				@VisibilityPanel(props)
 				<!-- Destructive actions -->
 				<div class="flex items-center justify-between border-t border-rr-border pt-6">
 					<div>
@@ -709,6 +711,62 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 				</script>
 			</div>
 		</div>
+	</div>
+}
+
+// containsUUID reports whether id is present in ids.
+func containsUUID(ids []uuid.UUID, id uuid.UUID) bool {
+	for _, x := range ids {
+		if x == id {
+			return true
+		}
+	}
+	return false
+}
+
+// VisibilityPanel controls a product's storefront visibility tier and, when restricted,
+// which customer groups may access it. Tier and group grants submit together in one POST.
+templ VisibilityPanel(props ProductEditProps) {
+	<div x-data={ "{ vis: '" + string(props.Product.Visibility) + "' }" } class="border-t border-rr-border pt-6">
+		<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/visibility", props.Product.ID)) } class="space-y-4">
+			<div>
+				<p class="text-sm font-medium text-rr-heading">Storefront visibility</p>
+				<p class="text-sm text-rr-muted">Who can see and buy this product.</p>
+				<select
+					name="visibility"
+					x-model="vis"
+					class="mt-2 block w-full max-w-sm rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:ring-2 focus:ring-inset focus:ring-rr-red"
+				>
+					<option value="public" selected?={ props.Product.Visibility == domain.ProductVisibilityPublic }>Public — everyone</option>
+					<option value="wholesale" selected?={ props.Product.Visibility == domain.ProductVisibilityWholesale }>Wholesale — all approved wholesale customers</option>
+					<option value="restricted" selected?={ props.Product.Visibility == domain.ProductVisibilityRestricted }>Restricted — only selected groups</option>
+				</select>
+			</div>
+			<div x-show="vis === 'restricted'" x-cloak class="space-y-2">
+				<p class="text-sm font-medium text-rr-heading">Groups with access</p>
+				if len(props.Groups) == 0 {
+					<p class="text-sm text-rr-muted">
+						<a href="/admin/groups" class="text-rr-red hover:text-rr-red-lt">Create customer groups</a> to grant access.
+					</p>
+				} else {
+					for _, g := range props.Groups {
+						<label class="flex items-center gap-2 text-sm text-rr-body">
+							<input
+								type="checkbox"
+								name="group_ids"
+								value={ g.ID.String() }
+								checked?={ containsUUID(props.GroupAccessIDs, g.ID) }
+								class="rounded-sm border-rr-border text-rr-red focus:ring-rr-red"
+							/>
+							{ g.Name }
+						</label>
+					}
+				}
+			</div>
+			<button type="submit" class="rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+				Save visibility
+			</button>
+		</form>
 	</div>
 }
 

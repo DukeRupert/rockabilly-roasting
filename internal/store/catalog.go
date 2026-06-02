@@ -250,6 +250,64 @@ type ProductFilter struct {
 	Offset       int
 }
 
+// visibilityClause returns the SQL predicate restricting products to those the given
+// viewer may access, with positional params starting at argStart. It is the single
+// source of truth for the access rule — shared by productFilterWhere (set reads) and
+// the IsProductAccessible/IsVariantAccessible single-row checks, so a listing and a
+// scalar check can never disagree.
+//
+// The fragment references the products table by name (products.visibility, products.id),
+// so any query embedding it MUST expose the products table unaliased.
+func visibilityClause(vc *VisibilityContext, argStart int) (string, []any) {
+	if vc == nil {
+		return "", nil
+	}
+	if !vc.IsWholesale {
+		return " AND products.visibility = 'public'", nil
+	}
+	if len(vc.GroupIDs) == 0 {
+		// wholesale tier is open to every authenticated wholesale customer;
+		// only 'restricted' is group-gated.
+		return " AND products.visibility IN ('public', 'wholesale')", nil
+	}
+	clause := fmt.Sprintf(` AND (
+		products.visibility IN ('public', 'wholesale')
+		OR (products.visibility = 'restricted' AND EXISTS (
+			SELECT 1 FROM product_group_visibility pgv
+			WHERE pgv.product_id = products.id
+			AND pgv.customer_group_id = ANY($%d)
+		))
+	)`, argStart)
+	return clause, []any{vc.GroupIDs}
+}
+
+// IsProductAccessible reports whether the product is visible to the given viewer.
+// It returns true iff the product would appear in a ListProducts filtered by the same
+// VisibilityContext (shared predicate via visibilityClause).
+func (s *CatalogStore) IsProductAccessible(ctx context.Context, tx pgx.Tx, productID uuid.UUID, vc VisibilityContext) (bool, error) {
+	clause, visArgs := visibilityClause(&vc, 2)
+	query := "SELECT EXISTS(SELECT 1 FROM products WHERE id = $1" + clause + ")"
+	args := append([]any{productID}, visArgs...)
+	var ok bool
+	if err := tx.QueryRow(ctx, query, args...).Scan(&ok); err != nil {
+		return false, fmt.Errorf("is product accessible: %w", err)
+	}
+	return ok, nil
+}
+
+// IsVariantAccessible reports whether the variant's product is visible to the given
+// viewer, using the same access predicate as IsProductAccessible.
+func (s *CatalogStore) IsVariantAccessible(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, vc VisibilityContext) (bool, error) {
+	clause, visArgs := visibilityClause(&vc, 2)
+	query := "SELECT EXISTS(SELECT 1 FROM products JOIN variants v ON v.product_id = products.id WHERE v.id = $1" + clause + ")"
+	args := append([]any{variantID}, visArgs...)
+	var ok bool
+	if err := tx.QueryRow(ctx, query, args...).Scan(&ok); err != nil {
+		return false, fmt.Errorf("is variant accessible: %w", err)
+	}
+	return ok, nil
+}
+
 // productFilterWhere builds the shared WHERE clause for product listing and counting.
 // Returns the clause fragment (starting with " AND ...") and the positional args.
 func productFilterWhere(f ProductFilter) (string, []any, int) {
@@ -283,23 +341,10 @@ func productFilterWhere(f ProductFilter) (string, []any, int) {
 		argN++
 	}
 	if f.Visibility != nil {
-		vis := f.Visibility
-		if !vis.IsWholesale {
-			where += " AND visibility = 'public'"
-		} else if len(vis.GroupIDs) == 0 {
-			where += " AND visibility IN ('public', 'wholesale')"
-		} else {
-			where += fmt.Sprintf(` AND (
-				visibility IN ('public', 'wholesale')
-				OR (visibility = 'restricted' AND EXISTS (
-					SELECT 1 FROM product_group_visibility pgv
-					WHERE pgv.product_id = products.id
-					AND pgv.customer_group_id = ANY($%d)
-				))
-			)`, argN)
-			args = append(args, vis.GroupIDs)
-			argN++
-		}
+		clause, visArgs := visibilityClause(f.Visibility, argN)
+		where += clause
+		args = append(args, visArgs...)
+		argN += len(visArgs)
 	}
 	for _, af := range f.Attributes {
 		if len(af.Values) > 0 {

@@ -45,11 +45,6 @@ UPDATE customers
 SET tax_exempt = $2, tax_exempt_reason = $3, updated_at = now()
 WHERE id = $1;
 
--- name: UpdateCustomerGroup :exec
-UPDATE customers
-SET customer_group_id = $2, updated_at = now()
-WHERE id = $1;
-
 -- name: UpdateCustomerPriceList :exec
 UPDATE customers
 SET price_list_id = $2, updated_at = now()

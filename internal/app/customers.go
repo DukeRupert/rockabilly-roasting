@@ -164,27 +164,6 @@ func (s *CustomerService) GetAddressByIDAsStaff(ctx context.Context, tx pgx.Tx, 
 
 // --- Staff-initiated methods (audited) ---
 
-// UpdateCustomerGroup updates a customer's group and records an audit entry.
-func (s *CustomerService) UpdateCustomerGroup(ctx context.Context, tx pgx.Tx, id uuid.UUID, groupID *uuid.UUID, actor Actor) error {
-	if err := s.customers.UpdateCustomerGroup(ctx, tx, id, groupID); err != nil {
-		return fmt.Errorf("update customer group: %w", err)
-	}
-
-	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
-		ActorType:    actor.Type,
-		ActorID:      actor.ID,
-		ActorName:    actor.Name,
-		Action:       audit.AuditCustomerGroupChanged,
-		ResourceType: "customer",
-		ResourceID:   id,
-		After:        map[string]any{"customer_group_id": groupID},
-	}); err != nil {
-		return fmt.Errorf("audit customer group changed: %w", err)
-	}
-
-	return nil
-}
-
 // UpdatePriceList sets a customer's assigned price list and records an audit
 // entry. Pass nil to clear the assignment (falls back to base pricing).
 func (s *CustomerService) UpdatePriceList(ctx context.Context, tx pgx.Tx, id uuid.UUID, priceListID *uuid.UUID, actor Actor) error {

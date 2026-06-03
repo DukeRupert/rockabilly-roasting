@@ -68,7 +68,6 @@ func (s *CustomerStore) GetByEmail(ctx context.Context, tx pgx.Tx, email string)
 
 // CustomerFilter holds optional filters for listing customers.
 type CustomerFilter struct {
-	CustomerGroupID *uuid.UUID
 	AccountType     *domain.AccountType
 	WholesaleStatus *domain.WholesaleStatus
 	Search          string // ILIKE on name or email
@@ -81,7 +80,7 @@ type CustomerFilter struct {
 func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) ([]domain.Customer, error) {
 	query := `SELECT id, email, email_verified, password_hash, first_name, last_name, phone,
 	                 tax_exempt, tax_exempt_reason, stripe_customer_id,
-	                 customer_group_id, price_list_id, account_type, wholesale_status, company_name,
+	                 price_list_id, account_type, wholesale_status, company_name,
 	                 website, wholesale_notes, approved_at, approved_by,
 	                 payment_terms_days, billing_method,
 	                 two_fa_enabled, two_fa_method,
@@ -91,11 +90,6 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	args := []any{}
 	argN := 1
 
-	if f.CustomerGroupID != nil {
-		query += fmt.Sprintf(" AND customer_group_id = $%d", argN)
-		args = append(args, *f.CustomerGroupID)
-		argN++
-	}
 	if f.AccountType != nil {
 		query += fmt.Sprintf(" AND account_type = $%d", argN)
 		args = append(args, string(*f.AccountType))
@@ -146,7 +140,7 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 		if err := rows.Scan(
 			&c.ID, &c.Email, &c.EmailVerified, &c.PasswordHash, &c.FirstName, &c.LastName, &c.Phone,
 			&c.TaxExempt, &c.TaxExemptReason, &c.StripeCustomerID,
-			&c.CustomerGroupID, &c.PriceListID, &accountType, &wholesaleStatus, &c.CompanyName,
+			&c.PriceListID, &accountType, &wholesaleStatus, &c.CompanyName,
 			&c.Website, &c.WholesaleNotes, &approvedAt, &c.ApprovedBy,
 			&paymentTermsDays, &billingMethod,
 			&c.TwoFAEnabled, &c.TwoFAMethod,
@@ -182,11 +176,6 @@ func (s *CustomerStore) CountCustomers(ctx context.Context, tx pgx.Tx, f Custome
 	args := []any{}
 	argN := 1
 
-	if f.CustomerGroupID != nil {
-		query += fmt.Sprintf(" AND customer_group_id = $%d", argN)
-		args = append(args, *f.CustomerGroupID)
-		argN++
-	}
 	if f.AccountType != nil {
 		query += fmt.Sprintf(" AND account_type = $%d", argN)
 		args = append(args, string(*f.AccountType))
@@ -280,18 +269,6 @@ func (s *CustomerStore) UpdateTaxExempt(ctx context.Context, tx pgx.Tx, id uuid.
 	})
 	if err != nil {
 		return fmt.Errorf("update customer tax_exempt: %w", err)
-	}
-	return nil
-}
-
-// UpdateCustomerGroup sets a customer's customer group.
-func (s *CustomerStore) UpdateCustomerGroup(ctx context.Context, tx pgx.Tx, id uuid.UUID, groupID *uuid.UUID) error {
-	err := sqlcgen.New(tx).UpdateCustomerGroup(ctx, sqlcgen.UpdateCustomerGroupParams{
-		ID:              id,
-		CustomerGroupID: groupID,
-	})
-	if err != nil {
-		return fmt.Errorf("update customer group: %w", err)
 	}
 	return nil
 }
@@ -637,7 +614,7 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 	rows, err := tx.Query(ctx,
 		`SELECT id, email, email_verified, password_hash, first_name, last_name, phone,
 		        tax_exempt, tax_exempt_reason, stripe_customer_id,
-		        customer_group_id, price_list_id, account_type, wholesale_status, company_name,
+		        price_list_id, account_type, wholesale_status, company_name,
 		        website, wholesale_notes, approved_at, approved_by,
 		        payment_terms_days, billing_method,
 		        qb_customer_id, qb_synced_at,
@@ -666,7 +643,7 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 		if err := rows.Scan(
 			&c.ID, &c.Email, &c.EmailVerified, &c.PasswordHash, &c.FirstName, &c.LastName, &c.Phone,
 			&c.TaxExempt, &c.TaxExemptReason, &c.StripeCustomerID,
-			&c.CustomerGroupID, &c.PriceListID, &accountType, &wholesaleStatus, &c.CompanyName,
+			&c.PriceListID, &accountType, &wholesaleStatus, &c.CompanyName,
 			&c.Website, &c.WholesaleNotes, &approvedAt, &c.ApprovedBy,
 			&paymentTermsDays, &billingMethod,
 			&c.QBCustomerID, &qbSyncedAt,
@@ -712,7 +689,6 @@ func customerFromRow(r sqlcgen.Customer) *domain.Customer {
 		TaxExempt:        r.TaxExempt,
 		TaxExemptReason:  r.TaxExemptReason,
 		StripeCustomerID: r.StripeCustomerID,
-		CustomerGroupID:  r.CustomerGroupID,
 		PriceListID:      r.PriceListID,
 		AccountType:      domain.AccountType(r.AccountType),
 		CompanyName:      r.CompanyName,

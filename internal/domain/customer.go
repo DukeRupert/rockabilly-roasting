@@ -45,7 +45,6 @@ type Customer struct {
 	TaxExempt       bool
 	TaxExemptReason *string
 	StripeCustomerID *string
-	CustomerGroupID  *uuid.UUID
 	AccountType      AccountType
 	WholesaleStatus  *WholesaleStatus
 	CompanyName      *string

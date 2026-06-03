@@ -176,7 +176,6 @@ type Customer struct {
 	Phone                     *string            `json:"phone"`
 	TaxExempt                 bool               `json:"tax_exempt"`
 	TaxExemptReason           *string            `json:"tax_exempt_reason"`
-	CustomerGroupID           *uuid.UUID         `json:"customer_group_id"`
 	Metadata                  json.RawMessage    `json:"metadata"`
 	CreatedAt                 time.Time          `json:"created_at"`
 	UpdatedAt                 time.Time          `json:"updated_at"`

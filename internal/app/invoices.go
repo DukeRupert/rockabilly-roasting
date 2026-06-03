@@ -63,6 +63,10 @@ func (s *InvoiceService) CreateFromOrder(
 		return nil, fmt.Errorf("get order: %w", err)
 	}
 
+	if order.QBInvoiceID != nil {
+		return nil, ErrOrderQBManaged
+	}
+
 	if order.PaymentStatus != domain.PaymentStatusPendingInvoice {
 		return nil, ErrOrderNotInvoiceable
 	}
@@ -135,6 +139,10 @@ func (s *InvoiceService) MarkSent(ctx context.Context, tx pgx.Tx, invoiceID uuid
 		return nil, fmt.Errorf("get invoice: %w", err)
 	}
 
+	if err := s.ensureOrderNotQBManaged(ctx, tx, invoice.OrderID); err != nil {
+		return nil, err
+	}
+
 	if invoice.Status != domain.InvoiceStatusDraft {
 		return nil, ErrInvoiceNotSendable
 	}
@@ -182,6 +190,10 @@ func (s *InvoiceService) RecordPayment(
 			return nil, ErrInvoiceNotFound
 		}
 		return nil, fmt.Errorf("get invoice: %w", err)
+	}
+
+	if err := s.ensureOrderNotQBManaged(ctx, tx, invoice.OrderID); err != nil {
+		return nil, err
 	}
 
 	if invoice.Status == domain.InvoiceStatusPaid || invoice.Status == domain.InvoiceStatusVoid {
@@ -243,6 +255,10 @@ func (s *InvoiceService) VoidInvoice(ctx context.Context, tx pgx.Tx, invoiceID u
 			return nil, ErrInvoiceNotFound
 		}
 		return nil, fmt.Errorf("get invoice: %w", err)
+	}
+
+	if err := s.ensureOrderNotQBManaged(ctx, tx, invoice.OrderID); err != nil {
+		return nil, err
 	}
 
 	if invoice.Status == domain.InvoiceStatusPaid || invoice.Status == domain.InvoiceStatusVoid {
@@ -312,4 +328,19 @@ func (s *InvoiceService) ListInvoicePayments(ctx context.Context, tx pgx.Tx, inv
 		return nil, fmt.Errorf("list invoice payments: %w", err)
 	}
 	return payments, nil
+}
+
+// ensureOrderNotQBManaged blocks manual invoice operations on a QB-owned order.
+// The presence of qb_invoice_id is the ownership discriminator: such orders are
+// reconciled solely by the QuickBooks path, so the manual invoice flow must not
+// touch their payment status.
+func (s *InvoiceService) ensureOrderNotQBManaged(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) error {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
+	if err != nil {
+		return fmt.Errorf("get order: %w", err)
+	}
+	if order.QBInvoiceID != nil {
+		return ErrOrderQBManaged
+	}
+	return nil
 }

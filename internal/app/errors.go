@@ -129,6 +129,10 @@ var (
 	ErrInvoiceNotPayable  = errors.New("invoice cannot accept payments")
 	ErrInvoiceNotSendable = errors.New("invoice is not in draft status")
 	ErrInvoiceNotVoidable = errors.New("invoice cannot be voided")
+	// ErrOrderQBManaged guards the manual invoice path: an order whose invoice
+	// lives in QuickBooks (qb_invoice_id set) is reconciled solely by the QB
+	// path, so the manual InvoiceService must not write its payment status.
+	ErrOrderQBManaged = errors.New("order is managed by QuickBooks; use the QuickBooks invoice flow")
 
 	// Box preset errors
 	ErrBoxPresetNameRequired      = errors.New("box preset name is required")

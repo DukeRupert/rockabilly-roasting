@@ -123,7 +123,7 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	invoice, err := w.qb.CreateInvoice(ctx, quickbooks.InvoiceParams{
 		CustomerID: job.Args.QBCustomerID,
 		DocNumber:  formatOrderRef(order.Number),
-		DueDate:    order.PlacedAt.Add(7 * 24 * time.Hour),
+		DueDate:    order.PlacedAt.Add(qbNetTermsDays * 24 * time.Hour),
 		Lines:      lines,
 		Shipping:   order.ShippingTotal,
 	})

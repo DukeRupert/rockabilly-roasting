@@ -79,3 +79,28 @@ func (e *Enqueuer) EnqueueOrderOutForDelivery(ctx context.Context, tx pgx.Tx, or
 	}, nil)
 	return err
 }
+
+// EnqueueInvoicePaid enqueues a payment-confirmation email for a paid QB/ACH
+// wholesale invoice, in tx so it rides on the reconcile's commit.
+func (e *Enqueuer) EnqueueInvoicePaid(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error {
+	_, err := e.client.InsertTx(ctx, tx, EmailInvoicePaidArgs{
+		OrderID:    orderID,
+		CustomerID: customerID,
+	}, nil)
+	return err
+}
+
+// EnqueueInvoicePastDue enqueues a past-due reminder for an overdue wholesale
+// invoice at the given milestone (days since placed). UniqueOpts keys on the
+// full args so the same (order, stage) reminder can't double-send even if a
+// reconcile is retried.
+func (e *Enqueuer) EnqueueInvoicePastDue(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID, stage int) error {
+	_, err := e.client.InsertTx(ctx, tx, EmailInvoicePastDueArgs{
+		OrderID:    orderID,
+		CustomerID: customerID,
+		Stage:      stage,
+	}, &river.InsertOpts{
+		UniqueOpts: river.UniqueOpts{ByArgs: true},
+	})
+	return err
+}

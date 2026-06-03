@@ -2,49 +2,43 @@ package jobs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
-	"github.com/dukerupert/hiri/internal/domain"
-	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
-	"github.com/dukerupert/hiri/internal/store"
 )
 
-// ProcessQBInvoiceUpdateWorker handles a QB webhook notification about an invoice update.
-// It fetches the invoice from QB, checks if fully paid, and updates the order.
+// ProcessQBInvoiceUpdateWorker handles a QB webhook notification about an
+// invoice update. It fetches the invoice from QB (outside any transaction) and
+// hands the facts to the reconcile seam, which is the single writer of the
+// order's payment status. The worker stays thin: fetch, reconcile, log.
 type ProcessQBInvoiceUpdateWorker struct {
 	river.WorkerDefaults[ProcessQBInvoiceUpdateArgs]
-	orders      *store.OrderStore
-	qb          quickbooks.Client
-	audit       *audit.AuditWriter
-	pool        *pgxpool.Pool
-	riverClient *river.Client[pgx.Tx]
-	metrics     *metrics.Registry
+	orders  *app.OrderService
+	qb      quickbooks.Client
+	pool    *pgxpool.Pool
+	metrics *metrics.Registry
 }
 
 // NewProcessQBInvoiceUpdateWorker creates a new ProcessQBInvoiceUpdateWorker.
 func NewProcessQBInvoiceUpdateWorker(
-	orders *store.OrderStore,
+	orders *app.OrderService,
 	qb quickbooks.Client,
-	auditWriter *audit.AuditWriter,
 	pool *pgxpool.Pool,
-	riverClient *river.Client[pgx.Tx],
 	m *metrics.Registry,
 ) *ProcessQBInvoiceUpdateWorker {
 	return &ProcessQBInvoiceUpdateWorker{
-		orders:      orders,
-		qb:          qb,
-		audit:       auditWriter,
-		pool:        pool,
-		riverClient: riverClient,
-		metrics:     m,
+		orders:  orders,
+		qb:      qb,
+		pool:    pool,
+		metrics: m,
 	}
 }
 
@@ -70,66 +64,28 @@ func (w *ProcessQBInvoiceUpdateWorker) Work(ctx context.Context, job *river.Job[
 }
 
 func (w *ProcessQBInvoiceUpdateWorker) work(ctx context.Context, job *river.Job[ProcessQBInvoiceUpdateArgs]) error {
-	// Fetch current invoice state from QB to confirm it's actually paid
-	invoice, err := w.qb.GetInvoice(ctx, job.Args.QBInvoiceID)
-	if err != nil {
-		return fmt.Errorf("qb fetch invoice: %w", err)
-	}
-
-	if invoice.Balance != 0 {
-		// Not fully paid yet — partial payment or other update, ignore
-		slog.InfoContext(ctx, "qb invoice not fully paid, skipping",
-			"qb_invoice_id", job.Args.QBInvoiceID,
-			"balance", invoice.Balance,
-		)
-		return nil
-	}
-
-	// Look up Hiri order by QB invoice ID
-	var order *domain.Order
-	err = store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
-		var txErr error
-		order, txErr = w.orders.GetOrderByQBInvoiceIDAsStaff(ctx, tx, job.Args.QBInvoiceID)
-		return txErr
-	})
-	if err != nil {
-		return fmt.Errorf("qb order lookup by invoice id: %w", err)
-	}
-
-	// Idempotency: already marked paid
-	if order.PaymentStatus == domain.PaymentStatusCaptured {
-		return nil
-	}
-
-	// Update order payment status in a transaction with audit record
-	err = store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
-		if _, txErr := w.orders.UpdateOrderPaymentStatus(ctx, tx, order.ID, domain.PaymentStatusCaptured); txErr != nil {
-			return txErr
-		}
-
-		return w.audit.Record(ctx, tx, audit.AuditEntry{
-			ActorType:    domain.AuditActorTypeSystem,
-			ActorName:    "qb_webhook",
-			Action:       audit.AuditOrderPaymentCaptured,
-			ResourceType: "order",
-			ResourceID:   order.ID,
-			Metadata: map[string]any{
-				"qb_invoice_id":  job.Args.QBInvoiceID,
-				"payment_method": "ach",
-				"river_job_id":   job.ID,
-			},
-		})
-	})
+	facts, err := fetchQBInvoiceFacts(ctx, w.qb, job.Args.QBInvoiceID)
 	if err != nil {
 		return err
 	}
 
-	// Notify customer — enqueue email job
-	return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
-		_, txErr := w.riverClient.InsertTx(ctx, tx, EmailInvoicePaidArgs{
-			OrderID:    order.ID,
-			CustomerID: *order.CustomerID,
-		}, nil)
-		return txErr
-	})
+	transition, err := w.orders.ReconcileQBInvoiceByID(ctx, w.pool, job.Args.QBInvoiceID, facts, time.Now())
+	if err != nil {
+		// A webhook can arrive for an invoice we didn't create (or one whose
+		// order was purged). Nothing to reconcile — don't retry forever.
+		if errors.Is(err, app.ErrOrderNotFound) {
+			slog.WarnContext(ctx, "qb webhook: no order for invoice, skipping",
+				"qb_invoice_id", job.Args.QBInvoiceID)
+			return nil
+		}
+		return fmt.Errorf("reconcile qb invoice: %w", err)
+	}
+
+	if transition != app.ReconcileNone {
+		slog.InfoContext(ctx, "qb invoice reconciled",
+			"qb_invoice_id", job.Args.QBInvoiceID,
+			"transition", string(transition),
+		)
+	}
+	return nil
 }

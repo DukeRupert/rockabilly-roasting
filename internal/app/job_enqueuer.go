@@ -19,4 +19,6 @@ type JobEnqueuer interface {
 	EnqueueOrderShipped(ctx context.Context, tx pgx.Tx, orderID, customerID, shipmentID uuid.UUID) error
 	EnqueueOrderReadyForPickup(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error
 	EnqueueOrderOutForDelivery(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error
+	EnqueueInvoicePaid(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error
+	EnqueueInvoicePastDue(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID, stage int) error
 }

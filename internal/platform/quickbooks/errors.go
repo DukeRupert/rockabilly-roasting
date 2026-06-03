@@ -13,6 +13,7 @@ var (
 	ErrRateLimited      = errors.New("quickbooks: rate limited")
 	ErrServerError      = errors.New("quickbooks: server error")
 	ErrInvalidSignature = errors.New("quickbooks: invalid webhook signature")
+	ErrNotFound         = errors.New("quickbooks: resource not found")
 )
 
 // APIError represents an error response from the QBO API.
@@ -28,6 +29,9 @@ func (e *APIError) Error() string {
 
 // IsRetryable returns true if the error is transient and the operation should be retried.
 func IsRetryable(err error) bool {
+	if errors.Is(err, ErrNotFound) {
+		return false // a missing/deleted resource won't reappear on retry
+	}
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) {
 		return true // network errors are retryable

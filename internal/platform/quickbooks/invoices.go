@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 )
 
 // qbInvoiceRequest is the JSON body for creating a QB invoice.
@@ -36,8 +37,29 @@ type qbInvoiceResponse struct {
 		ID        string  `json:"Id"`
 		DocNumber string  `json:"DocNumber"`
 		Balance   float64 `json:"Balance"`
+		TotalAmt  float64 `json:"TotalAmt"`
+		DueDate   string  `json:"DueDate"` // YYYY-MM-DD
 		SyncToken string  `json:"SyncToken"`
 	} `json:"Invoice"`
+}
+
+// invoiceFromResponse maps a decoded QB invoice payload to the domain-facing
+// Invoice, parsing the YYYY-MM-DD due date (best-effort; a zero time signals
+// "unknown" to callers).
+func invoiceFromResponse(resp qbInvoiceResponse) *Invoice {
+	var dueDate time.Time
+	if resp.Invoice.DueDate != "" {
+		if d, err := time.Parse("2006-01-02", resp.Invoice.DueDate); err == nil {
+			dueDate = d
+		}
+	}
+	return &Invoice{
+		ID:        resp.Invoice.ID,
+		DocNumber: resp.Invoice.DocNumber,
+		Balance:   resp.Invoice.Balance,
+		TotalAmt:  resp.Invoice.TotalAmt,
+		DueDate:   dueDate,
+	}
 }
 
 // CreateInvoice creates an invoice in QBO.
@@ -86,11 +108,7 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 		return nil, fmt.Errorf("unmarshal QB invoice response: %w", err)
 	}
 
-	return &Invoice{
-		ID:        resp.Invoice.ID,
-		DocNumber: resp.Invoice.DocNumber,
-		Balance:   resp.Invoice.Balance,
-	}, nil
+	return invoiceFromResponse(resp), nil
 }
 
 // GetInvoice fetches the current state of an invoice from QBO.
@@ -105,11 +123,7 @@ func (c *QBClient) GetInvoice(ctx context.Context, qbInvoiceID string) (*Invoice
 		return nil, fmt.Errorf("unmarshal QB invoice: %w", err)
 	}
 
-	return &Invoice{
-		ID:        resp.Invoice.ID,
-		DocNumber: resp.Invoice.DocNumber,
-		Balance:   resp.Invoice.Balance,
-	}, nil
+	return invoiceFromResponse(resp), nil
 }
 
 // centsToFloat converts an amount in cents to a float64 dollar amount.

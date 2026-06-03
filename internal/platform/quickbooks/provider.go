@@ -2,6 +2,7 @@ package quickbooks
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -26,9 +27,26 @@ type InvoiceLine struct {
 
 // Invoice represents a QuickBooks invoice.
 type Invoice struct {
-	ID        string  // QB internal invoice ID
-	DocNumber string  // human-readable invoice number
-	Balance   float64 // remaining balance (0 = fully paid)
+	ID        string    // QB internal invoice ID
+	DocNumber string    // human-readable invoice number
+	Balance   float64   // remaining balance in dollars (0 = fully paid)
+	TotalAmt  float64   // invoice total in dollars; 0 on a voided invoice
+	DueDate   time.Time // payment due date (net terms); zero if QB omitted it
+}
+
+// BalanceCents returns the remaining balance in integer cents, rounded to the
+// nearest cent. QB carries money as float dollars; callers compare in cents.
+func (i Invoice) BalanceCents() int { return dollarsToCents(i.Balance) }
+
+// TotalCents returns the invoice total in integer cents, rounded to the nearest
+// cent. A voided QB invoice zeroes its amounts, so TotalCents() <= 0 is the
+// signal that an invoice is no longer a live bill.
+func (i Invoice) TotalCents() int { return dollarsToCents(i.TotalAmt) }
+
+// dollarsToCents converts QB's float dollars to integer cents. Rounding (not
+// truncation) avoids float artifacts like 0.999999 collapsing to 99 cents.
+func dollarsToCents(dollars float64) int {
+	return int(math.Round(dollars * 100))
 }
 
 // QBCustomer represents a customer record returned from a QBO query.

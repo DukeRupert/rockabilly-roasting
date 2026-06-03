@@ -219,6 +219,14 @@ type ProcessQBInvoiceUpdateArgs struct {
 // Kind returns the job kind identifier.
 func (ProcessQBInvoiceUpdateArgs) Kind() string { return "qb_process_invoice_update" }
 
+// ReconcileQBInvoicesArgs triggers a sweep of open wholesale QB invoices: the
+// safety net for missed webhooks plus the overdue detector. Enqueued by a daily
+// periodic job; carries no payload.
+type ReconcileQBInvoicesArgs struct{}
+
+// Kind returns the job kind identifier.
+func (ReconcileQBInvoicesArgs) Kind() string { return "qb_reconcile_invoices" }
+
 // SyncQBCustomerArgs syncs customer details to QB (triggered by profile updates).
 type SyncQBCustomerArgs struct {
 	CustomerID uuid.UUID `json:"customer_id"`
@@ -247,6 +255,19 @@ type EmailInvoicePaidArgs struct {
 
 // Kind returns the job kind identifier.
 func (EmailInvoicePaidArgs) Kind() string { return "email:invoice_paid" }
+
+// EmailInvoicePastDueArgs sends a past-due reminder for an overdue wholesale
+// invoice. Stage is the milestone (days since the order was placed: 7/14/21/30)
+// the reminder is for; it is part of the args so the reconcile's ByArgs
+// uniqueness guarantees one email per milestone.
+type EmailInvoicePastDueArgs struct {
+	OrderID    uuid.UUID `json:"order_id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+	Stage      int       `json:"stage"`
+}
+
+// Kind returns the job kind identifier.
+func (EmailInvoicePastDueArgs) Kind() string { return "email:invoice_past_due" }
 
 // SubscriptionRenewalReceiptArgs sends a renewal receipt for a subscription
 // renewal order — fires after the off-session charge succeeds and the order

@@ -98,6 +98,34 @@ type InvoiceSentData struct {
 	StoreURL      string
 }
 
+// InvoicePaidData holds data for the wholesale invoice payment-confirmation
+// email, sent when a QuickBooks invoice is paid in full.
+type InvoicePaidData struct {
+	CustomerName  string
+	InvoiceNumber string
+	OrderNumber   string
+	AmountPaid    int // cents paid in full
+	StoreName     string
+	StoreURL      string
+	AccountURL    string
+}
+
+// InvoicePastDueData holds data for a wholesale past-due reminder. Stage is the
+// milestone (days since the order was placed) that triggered the reminder.
+// NOTE: copy for the 7/14/21/30 milestones is still to be finalized — see
+// docs/qb-overdue-reminders-TODO.md.
+type InvoicePastDueData struct {
+	CustomerName  string
+	InvoiceNumber string
+	OrderNumber   string
+	AmountDue     int        // cents still owed (invoice total)
+	DueDate       *time.Time // net-terms due date
+	Stage         int        // reminder milestone in days-since-placed (7/14/21/30)
+	PaymentURL    string
+	StoreName     string
+	StoreURL      string
+}
+
 // MagicLinkData holds data for the magic link email.
 type MagicLinkData struct {
 	CustomerName string

@@ -1,0 +1,36 @@
+{{define "invoice_past_due.html"}}<!DOCTYPE html>
+<!-- PLACEHOLDER COPY — milestone-specific wording (7/14/21/30) to be finalized.
+     See docs/qb-overdue-reminders-TODO.md. -->
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:0;background-color:#F5F0E6;font-family:Arial,Helvetica,sans-serif;color:#1A1612;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F0E6;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background-color:#1A1612;padding:24px;text-align:center;">
+    <span style="color:#F5F0E6;font-size:20px;font-weight:bold;">{{.StoreName}}</span>
+  </td></tr>
+  <tr><td style="padding:32px 24px;">
+    <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Invoice {{.InvoiceNumber}} is past due</h1>
+    <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
+    <p style="margin:0 0 24px;">A quick heads-up — invoice <strong>{{.InvoiceNumber}}</strong> for order <strong>{{.OrderNumber}}</strong> is past due. Settle up when you get a minute and we'll keep the coffee moving.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr><td style="padding:4px 12px;font-weight:bold;">Amount Due</td><td style="padding:4px 12px;text-align:right;font-size:20px;font-weight:bold;">{{cents .AmountDue}}</td></tr>
+      {{if .DueDate}}<tr><td style="padding:4px 12px;font-weight:bold;">Was Due</td><td style="padding:4px 12px;text-align:right;">{{date .DueDate}}</td></tr>{{end}}
+    </table>
+
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+      <tr><td style="background-color:#C0271D;border-radius:6px;padding:12px 32px;text-align:center;">
+        <a href="{{.PaymentURL}}" style="color:#ffffff;text-decoration:none;font-weight:bold;font-size:16px;">View &amp; Pay Invoice</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="background-color:#F5F0E6;padding:16px 24px;text-align:center;font-size:12px;color:#666;">
+    {{.StoreName}} &middot; <a href="{{.StoreURL}}" style="color:#C0271D;">{{.StoreURL}}</a>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>{{end}}

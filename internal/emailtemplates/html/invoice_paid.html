@@ -1,0 +1,33 @@
+{{define "invoice_paid.html"}}<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:0;background-color:#F5F0E6;font-family:Arial,Helvetica,sans-serif;color:#1A1612;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F0E6;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background-color:#1A1612;padding:24px;text-align:center;">
+    <span style="color:#F5F0E6;font-size:20px;font-weight:bold;">{{.StoreName}}</span>
+  </td></tr>
+  <tr><td style="padding:32px 24px;">
+    <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Payment received</h1>
+    <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
+    <p style="margin:0 0 24px;">Thanks — we got your payment for invoice <strong>{{.InvoiceNumber}}</strong> on order <strong>{{.OrderNumber}}</strong>. You're all squared up.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr><td style="padding:4px 12px;font-weight:bold;">Amount Paid</td><td style="padding:4px 12px;text-align:right;font-size:20px;font-weight:bold;">{{cents .AmountPaid}}</td></tr>
+    </table>
+
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+      <tr><td style="background-color:#C0271D;border-radius:6px;padding:12px 32px;text-align:center;">
+        <a href="{{.AccountURL}}" style="color:#ffffff;text-decoration:none;font-weight:bold;font-size:16px;">View Order</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="background-color:#F5F0E6;padding:16px 24px;text-align:center;font-size:12px;color:#666;">
+    {{.StoreName}} &middot; <a href="{{.StoreURL}}" style="color:#C0271D;">{{.StoreURL}}</a>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>{{end}}

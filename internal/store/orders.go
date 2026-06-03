@@ -762,26 +762,30 @@ func (s *OrderStore) SetQBInvoice(ctx context.Context, tx pgx.Tx, id uuid.UUID, 
 	return nil
 }
 
-// GetOrderByQBInvoiceIDAsStaff returns an order by its QB invoice ID.
-func (s *OrderStore) GetOrderByQBInvoiceIDAsStaff(ctx context.Context, tx pgx.Tx, qbInvoiceID string) (_ *domain.Order, err error) {
-	defer trackQuery(s.metrics, "orders.get_by_qb_invoice_id", time.Now(), &err)
+// qbOrderColumns is the full column list scanned by scanQBOrder. It includes
+// overdue_reminder_stage, which the QB reconciliation path reads but the
+// sqlc-generated order reads do not. Kept in sync with scanQBOrder's Scan order.
+const qbOrderColumns = `id, number, customer_id, status, payment_status, fulfillment_status,
+	        currency_code, subtotal, discount_total, shipping_total, tax_total, total,
+	        shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
+	        tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
+	        shipping_method, requested_delivery_date,
+	        qb_invoice_id, qb_invoice_no, qb_synced_at,
+	        customer_po_number, internal_note,
+	        notes, metadata, overdue_reminder_stage, placed_at, created_at, updated_at`
+
+// scanQBOrder scans a row selected with qbOrderColumns into a domain.Order. It
+// accepts pgx.Row, which both single-row QueryRow results and pgx.Rows satisfy
+// (both expose Scan(dest ...any) error).
+func scanQBOrder(row pgx.Row) (*domain.Order, error) {
 	var o domain.Order
 	var status, paymentStatus, fulfillmentStatus string
 	var shippingMethod *string
 	var requestedDeliveryDate pgtype.Timestamptz
 	var subtotal, discountTotal, shippingTotal, taxTotal, total int32
+	var overdueReminderStage int16
 	var metadata json.RawMessage
-	err = tx.QueryRow(ctx,
-		`SELECT id, number, customer_id, status, payment_status, fulfillment_status,
-		        currency_code, subtotal, discount_total, shipping_total, tax_total, total,
-		        shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
-		        tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
-		        shipping_method, requested_delivery_date,
-		        qb_invoice_id, qb_invoice_no, qb_synced_at,
-		        customer_po_number, internal_note,
-		        notes, metadata, placed_at, created_at, updated_at
-		 FROM orders WHERE qb_invoice_id = $1`, qbInvoiceID,
-	).Scan(
+	if err := row.Scan(
 		&o.ID, &o.Number, &o.CustomerID, &status, &paymentStatus, &fulfillmentStatus,
 		&o.CurrencyCode, &subtotal, &discountTotal, &shippingTotal, &taxTotal, &total,
 		&o.ShippingAddressID, &o.BillingAddressID, &o.SubscriptionID, &o.DraftByUserID,
@@ -789,10 +793,9 @@ func (s *OrderStore) GetOrderByQBInvoiceIDAsStaff(ctx context.Context, tx pgx.Tx
 		&shippingMethod, &requestedDeliveryDate,
 		&o.QBInvoiceID, &o.QBInvoiceNo, &o.QBSyncedAt,
 		&o.CustomerPONumber, &o.InternalNote,
-		&o.Notes, &metadata, &o.PlacedAt, &o.CreatedAt, &o.UpdatedAt,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("get order by qb invoice id: %w", err)
+		&o.Notes, &metadata, &overdueReminderStage, &o.PlacedAt, &o.CreatedAt, &o.UpdatedAt,
+	); err != nil {
+		return nil, err
 	}
 	o.Status = domain.OrderStatus(status)
 	o.PaymentStatus = domain.PaymentStatus(paymentStatus)
@@ -802,6 +805,7 @@ func (s *OrderStore) GetOrderByQBInvoiceIDAsStaff(ctx context.Context, tx pgx.Tx
 	o.ShippingTotal = int(shippingTotal)
 	o.TaxTotal = int(taxTotal)
 	o.Total = int(total)
+	o.OverdueReminderStage = int(overdueReminderStage)
 	if shippingMethod != nil {
 		sm := domain.ShippingMethod(*shippingMethod)
 		o.ShippingMethod = &sm
@@ -809,6 +813,79 @@ func (s *OrderStore) GetOrderByQBInvoiceIDAsStaff(ctx context.Context, tx pgx.Tx
 	o.RequestedDeliveryDate = timestampFromPG(requestedDeliveryDate)
 	o.Metadata = metadataFromJSON(metadata)
 	return &o, nil
+}
+
+// GetOrderByQBInvoiceIDAsStaff returns an order by its QB invoice ID.
+func (s *OrderStore) GetOrderByQBInvoiceIDAsStaff(ctx context.Context, tx pgx.Tx, qbInvoiceID string) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.get_by_qb_invoice_id", time.Now(), &err)
+	row := tx.QueryRow(ctx,
+		`SELECT `+qbOrderColumns+` FROM orders WHERE qb_invoice_id = $1`, qbInvoiceID)
+	o, err := scanQBOrder(row)
+	if err != nil {
+		return nil, fmt.Errorf("get order by qb invoice id: %w", err)
+	}
+	return o, nil
+}
+
+// GetOrderByQBInvoiceIDForUpdate returns an order by its QB invoice ID and takes
+// a row-level lock. Concurrent reconciles on the same order serialize: the
+// second tx waits for the first to commit and then sees the post-transition
+// state, so the conditional payment-status transitions (and the emails gated on
+// them) don't double-fire when the webhook and the poll race.
+func (s *OrderStore) GetOrderByQBInvoiceIDForUpdate(ctx context.Context, tx pgx.Tx, qbInvoiceID string) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.get_by_qb_invoice_id_for_update", time.Now(), &err)
+	row := tx.QueryRow(ctx,
+		`SELECT `+qbOrderColumns+` FROM orders WHERE qb_invoice_id = $1 FOR UPDATE`, qbInvoiceID)
+	o, err := scanQBOrder(row)
+	if err != nil {
+		return nil, fmt.Errorf("get order by qb invoice id (for update): %w", err)
+	}
+	return o, nil
+}
+
+// ListWholesaleOpenInvoiceOrders returns QB-owned orders whose payment status is
+// not yet terminal — the candidate set for the reconciliation poll. Ordered by
+// placed_at so the oldest invoices reconcile first; bounded by limit.
+func (s *OrderStore) ListWholesaleOpenInvoiceOrders(ctx context.Context, tx pgx.Tx, limit int) (_ []domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.list_wholesale_open_invoice", time.Now(), &err)
+	rows, err := tx.Query(ctx,
+		`SELECT `+qbOrderColumns+`
+		 FROM orders
+		 WHERE qb_invoice_id IS NOT NULL
+		   AND payment_status IN ('pending_invoice', 'invoiced', 'partially_paid', 'overdue')
+		 ORDER BY placed_at
+		 LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list wholesale open invoice orders: %w", err)
+	}
+	defer rows.Close()
+
+	var orders []domain.Order
+	for rows.Next() {
+		o, scanErr := scanQBOrder(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan wholesale open invoice order: %w", scanErr)
+		}
+		orders = append(orders, *o)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate wholesale open invoice orders: %w", err)
+	}
+	return orders, nil
+}
+
+// SetOverdueReminderStage records the highest past-due reminder milestone (days
+// since placed) already notified for an order, so the poll never re-sends one.
+func (s *OrderStore) SetOverdueReminderStage(ctx context.Context, tx pgx.Tx, id uuid.UUID, stage int) (err error) {
+	defer trackQuery(s.metrics, "orders.set_overdue_reminder_stage", time.Now(), &err)
+	_, err = tx.Exec(ctx,
+		`UPDATE orders SET overdue_reminder_stage = $2, updated_at = now() WHERE id = $1`,
+		id, int16(stage),
+	)
+	if err != nil {
+		return fmt.Errorf("set overdue reminder stage: %w", err)
+	}
+	return nil
 }
 
 // --- Carts ---
@@ -1082,6 +1159,9 @@ func orderFromRow(r sqlcgen.Order) *domain.Order {
 		TaxExemptReason:   r.TaxExemptReason,
 		StripeTaxID:              r.StripeTaxID,
 		StripePaymentIntentID:    r.StripePaymentIntentID,
+		QBInvoiceID:              r.QbInvoiceID,
+		QBInvoiceNo:              r.QbInvoiceNo,
+		QBSyncedAt:               timestampFromPG(r.QbSyncedAt),
 		RequestedDeliveryDate:    timestampFromPG(r.RequestedDeliveryDate),
 		CustomerPONumber:         r.CustomerPoNumber,
 		InternalNote:             r.InternalNote,

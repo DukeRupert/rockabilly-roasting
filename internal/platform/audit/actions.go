@@ -130,7 +130,11 @@ const (
 	AuditQBPaymentSynced      = "qb.payment_synced"
 	AuditQBConnected          = "qb.connected"
 	AuditQBDisconnected       = "qb.disconnected"
-	AuditOrderPaymentCaptured = "order.payment_captured"
+	AuditQBInvoiceVoided      = "qb.invoice_voided"
+	AuditOrderPaymentCaptured      = "order.payment_captured"
+	AuditOrderPaymentInvoiced      = "order.payment_invoiced"
+	AuditOrderPaymentPartiallyPaid = "order.payment_partially_paid"
+	AuditOrderPaymentOverdue       = "order.payment_overdue"
 
 	// Email actions (audited on successful send)
 	AuditEmailMagicLinkSent                 = "email.magic_link_sent"
@@ -143,6 +147,8 @@ const (
 	AuditEmailSubscriptionCancelled         = "email.subscription_cancelled"
 	AuditEmailRefundIssued                  = "email.refund_issued"
 	AuditEmailInvoiceSent                   = "email.invoice_sent"
+	AuditEmailInvoicePaid                   = "email.invoice_paid"
+	AuditEmailInvoicePastDue                = "email.invoice_past_due"
 	AuditEmailWholesaleApplicationReceived  = "email.wholesale_application_received"
 	AuditEmailWholesaleApproved             = "email.wholesale_approved"
 	AuditEmailWholesaleSuspended            = "email.wholesale_suspended"

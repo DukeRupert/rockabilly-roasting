@@ -1,0 +1,13 @@
+{{define "invoice_paid.txt"}}Payment received
+
+Hi {{.CustomerName}},
+
+Thanks — we got your payment for invoice {{.InvoiceNumber}} on order {{.OrderNumber}}. You're all squared up.
+
+Amount Paid: {{cents .AmountPaid}}
+
+View order: {{.AccountURL}}
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

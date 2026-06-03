@@ -119,6 +119,12 @@ type Order struct {
 	CustomerPONumber       *string
 	InternalNote           *string
 	Notes                  *string
+	// OverdueReminderStage is the highest past-due reminder milestone (in days
+	// since PlacedAt) already notified for this order's QB invoice. It is the
+	// dedup ledger for the reconciliation poll so each milestone (7/14/21/30)
+	// emails exactly once. Only populated by the QB-path order reads
+	// (GetOrderByQBInvoiceID*, ListWholesaleOpenInvoiceOrders); zero elsewhere.
+	OverdueReminderStage   int
 	Metadata               map[string]any
 	PlacedAt          time.Time
 	CreatedAt         time.Time

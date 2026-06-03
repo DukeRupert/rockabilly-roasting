@@ -284,6 +284,8 @@ func run() error {
 	river.AddWorker(workers, jobs.NewOrderShippedEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderReadyForPickupEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderOutForDeliveryEmailWorker(orderSvc, pool))
+	river.AddWorker(workers, jobs.NewInvoicePaidEmailWorker(orderSvc, pool))
+	river.AddWorker(workers, jobs.NewInvoicePastDueEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
 	river.AddWorker(workers, jobs.NewAbandonedOrderCleanupWorker(orderSvc, pool))
@@ -291,41 +293,60 @@ func run() error {
 	// QB workers are registered after the river client is created (they need it for job chaining)
 	// See below after riverClient creation.
 
+	// Periodic jobs.
+	periodicJobs := []*river.PeriodicJob{
+		river.NewPeriodicJob(
+			river.PeriodicInterval(1*time.Minute),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.RenewalSchedulerArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 1 * time.Minute,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: true},
+		),
+		// Cancel orders that were pre-created at PI time but never had
+		// payment confirmed (customer closed browser, etc.). Stripe auto-
+		// cancels most async PIs at 48h via the canceled webhook; this
+		// catches card-path orders that Stripe leaves in
+		// requires_payment_method indefinitely.
+		river.NewPeriodicJob(
+			river.PeriodicInterval(1*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.AbandonedOrderCleanupArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 1 * time.Hour,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
+		),
+	}
+	if qbClient != nil {
+		// Reconcile open wholesale QB invoices daily. This is the safety net for
+		// missed Intuit webhooks and the detector that flips unpaid invoices to
+		// overdue and sends the milestone past-due reminders.
+		periodicJobs = append(periodicJobs, river.NewPeriodicJob(
+			river.PeriodicInterval(24*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.ReconcileQBInvoicesArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 24 * time.Hour,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
+		))
+	}
+
 	// River client — we create it first, then pass it to the scheduler worker
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Queues: map[string]river.QueueConfig{
 			river.QueueDefault: {MaxWorkers: 10},
 		},
-		Workers: workers,
-		PeriodicJobs: []*river.PeriodicJob{
-			river.NewPeriodicJob(
-				river.PeriodicInterval(1*time.Minute),
-				func() (river.JobArgs, *river.InsertOpts) {
-					return jobs.RenewalSchedulerArgs{}, &river.InsertOpts{
-						UniqueOpts: river.UniqueOpts{
-							ByPeriod: 1 * time.Minute,
-						},
-					}
-				},
-				&river.PeriodicJobOpts{RunOnStart: true},
-			),
-			// Cancel orders that were pre-created at PI time but never had
-			// payment confirmed (customer closed browser, etc.). Stripe auto-
-			// cancels most async PIs at 48h via the canceled webhook; this
-			// catches card-path orders that Stripe leaves in
-			// requires_payment_method indefinitely.
-			river.NewPeriodicJob(
-				river.PeriodicInterval(1*time.Hour),
-				func() (river.JobArgs, *river.InsertOpts) {
-					return jobs.AbandonedOrderCleanupArgs{}, &river.InsertOpts{
-						UniqueOpts: river.UniqueOpts{
-							ByPeriod: 1 * time.Hour,
-						},
-					}
-				},
-				&river.PeriodicJobOpts{RunOnStart: false},
-			),
-		},
+		Workers:      workers,
+		PeriodicJobs: periodicJobs,
 	})
 	if err != nil {
 		return fmt.Errorf("create river client: %w", err)
@@ -350,7 +371,8 @@ func run() error {
 	if qbClient != nil {
 		river.AddWorker(workers, jobs.NewEnsureQBCustomerWorker(customerStore, qbClient, auditWriter, pool, riverClient, metricsReg))
 		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, catalogStore, qbClient, auditWriter, pool, metricsReg))
-		river.AddWorker(workers, jobs.NewProcessQBInvoiceUpdateWorker(orderStore, qbClient, auditWriter, pool, riverClient, metricsReg))
+		river.AddWorker(workers, jobs.NewProcessQBInvoiceUpdateWorker(orderSvc, qbClient, pool, metricsReg))
+		river.AddWorker(workers, jobs.NewReconcileQBInvoicesWorker(orderSvc, qbClient, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewSyncQBCustomerWorker(customerStore, qbClient, auditWriter, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewSyncQBPaymentWorker(orderStore, customerStore, qbClient, auditWriter, pool, metricsReg))
 		logger.Info("quickbooks workers registered")

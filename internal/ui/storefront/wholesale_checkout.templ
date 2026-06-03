@@ -3,6 +3,7 @@ package storefront
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
@@ -23,6 +24,21 @@ type WholesaleCheckoutProps struct {
 	Error             string
 	CartCount         int
 	PriceChangeBanner bool
+	Addresses         []domain.Address
+	// DefaultAddressID preselects a saved address for shipping; empty means
+	// the "new address" form is shown by default (e.g. customer has none).
+	DefaultAddressID string
+}
+
+// wholesaleAddrXData seeds the Alpine state for the checkout address step:
+// shipMode is a saved address ID or "new", billing defaults to "same as
+// shipping", and the billing selector starts on the new-address form.
+func wholesaleAddrXData(props WholesaleCheckoutProps) string {
+	ship := "new"
+	if props.DefaultAddressID != "" {
+		ship = props.DefaultAddressID
+	}
+	return fmt.Sprintf("{ shipMode: '%s', billSame: true, billMode: 'new' }", ship)
 }
 
 templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
@@ -111,7 +127,56 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 					</tfoot>
 				</table>
 			</div>
-			<form method="post" action="/wholesale/checkout/confirm" class="space-y-4">
+			<form method="post" action="/wholesale/checkout/confirm" class="space-y-4" x-data={ wholesaleAddrXData(props) }>
+				<div class="rounded-sm border border-rr-border bg-rr-surface p-6 space-y-4">
+					<div>
+						<h2 class="font-display text-lg tracking-wide text-rr-heading">SHIPPING ADDRESS</h2>
+						<p class="mt-1 text-sm text-rr-muted">Where should we deliver this order?</p>
+					</div>
+					if len(props.Addresses) > 0 {
+						<div class="space-y-2">
+							for _, addr := range props.Addresses {
+								<label class="flex items-start gap-3 rounded-sm border border-rr-border bg-rr-bg p-3 cursor-pointer">
+									<input type="radio" name="shipping_address_id" value={ addr.ID.String() } x-model="shipMode" class="mt-1 text-rr-red focus:ring-rr-red"/>
+									@wholesaleAddrLabel(addr)
+								</label>
+							}
+							<label class="flex items-center gap-3 rounded-sm border border-rr-border bg-rr-bg p-3 cursor-pointer">
+								<input type="radio" name="shipping_address_id" value="new" x-model="shipMode" class="text-rr-red focus:ring-rr-red"/>
+								<span class="text-sm font-medium text-rr-heading">Ship to a new address</span>
+							</label>
+						</div>
+					}
+					<div x-show="shipMode === 'new'" x-cloak>
+						@wholesaleAddressFields("ship", "shipMode === 'new'")
+					</div>
+				</div>
+				<div class="rounded-sm border border-rr-border bg-rr-surface p-6 space-y-4">
+					<h2 class="font-display text-lg tracking-wide text-rr-heading">BILLING ADDRESS</h2>
+					<label class="flex items-center gap-3 cursor-pointer">
+						<input type="checkbox" name="billing_same" x-model="billSame" checked class="rounded-sm text-rr-red focus:ring-rr-red"/>
+						<span class="text-sm text-rr-heading">Billing address same as shipping</span>
+					</label>
+					<div x-show="!billSame" x-cloak class="space-y-4">
+						if len(props.Addresses) > 0 {
+							<div class="space-y-2">
+								for _, addr := range props.Addresses {
+									<label class="flex items-start gap-3 rounded-sm border border-rr-border bg-rr-bg p-3 cursor-pointer">
+										<input type="radio" name="billing_address_id" value={ addr.ID.String() } x-model="billMode" class="mt-1 text-rr-red focus:ring-rr-red"/>
+										@wholesaleAddrLabel(addr)
+									</label>
+								}
+								<label class="flex items-center gap-3 rounded-sm border border-rr-border bg-rr-bg p-3 cursor-pointer">
+									<input type="radio" name="billing_address_id" value="new" x-model="billMode" class="text-rr-red focus:ring-rr-red"/>
+									<span class="text-sm font-medium text-rr-heading">Use a new billing address</span>
+								</label>
+							</div>
+						}
+						<div x-show="billMode === 'new'" x-cloak>
+							@wholesaleAddressFields("bill", "!billSame && billMode === 'new'")
+						</div>
+					</div>
+				</div>
 				<div class="rounded-sm border border-rr-border bg-rr-surface p-6 space-y-4">
 					<div>
 						<label for="po_number" class="block text-sm font-medium text-rr-heading">PO Number (optional)</label>
@@ -150,6 +215,73 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 				</p>
 			</form>
 		}
+	</div>
+}
+
+// wholesaleAddrLabel renders a one-line summary of a saved address for the
+// shipping/billing radio selectors.
+templ wholesaleAddrLabel(addr domain.Address) {
+	<span class="text-sm text-rr-heading">
+		if addr.FirstName != "" || addr.LastName != "" {
+			<span class="font-medium">{ addr.FirstName } { addr.LastName }</span>
+			<br/>
+		}
+		if addr.Company != nil {
+			<span class="text-rr-muted">{ *addr.Company }</span>
+			<br/>
+		}
+		{ addr.Line1 }
+		if addr.Line2 != nil {
+			{ ", " + *addr.Line2 }
+		}
+		<br/>
+		{ fmt.Sprintf("%s, %s %s", addr.City, addr.State, addr.PostalCode) }
+	</span>
+}
+
+// wholesaleAddressFields renders the new-address inputs for a checkout section.
+// Field names are namespaced by prefix ("ship"/"bill"). requiredExpr is an
+// Alpine expression bound to required so the inputs only block submission while
+// their section is visible.
+templ wholesaleAddressFields(prefix string, requiredExpr string) {
+	<div class="space-y-3">
+		<input type="hidden" name={ prefix + "_country_code" } value="US"/>
+		<div class="grid grid-cols-2 gap-3">
+			<div>
+				<label class="block text-xs font-medium uppercase tracking-wider text-rr-muted">First name</label>
+				<input type="text" name={ prefix + "_first_name" } class="rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading focus:outline-none sm:text-sm"/>
+			</div>
+			<div>
+				<label class="block text-xs font-medium uppercase tracking-wider text-rr-muted">Last name</label>
+				<input type="text" name={ prefix + "_last_name" } class="rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading focus:outline-none sm:text-sm"/>
+			</div>
+		</div>
+		<div>
+			<label class="block text-xs font-medium uppercase tracking-wider text-rr-muted">Company (optional)</label>
+			<input type="text" name={ prefix + "_company" } class="rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading focus:outline-none sm:text-sm"/>
+		</div>
+		<div>
+			<label class="block text-xs font-medium uppercase tracking-wider text-rr-muted">Address</label>
+			<input type="text" name={ prefix + "_line1" } x-bind:required={ requiredExpr } class="rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading focus:outline-none sm:text-sm"/>
+		</div>
+		<div>
+			<label class="block text-xs font-medium uppercase tracking-wider text-rr-muted">Apt, suite, etc. (optional)</label>
+			<input type="text" name={ prefix + "_line2" } class="rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading focus:outline-none sm:text-sm"/>
+		</div>
+		<div class="grid grid-cols-3 gap-3">
+			<div>
+				<label class="block text-xs font-medium uppercase tracking-wider text-rr-muted">City</label>
+				<input type="text" name={ prefix + "_city" } x-bind:required={ requiredExpr } class="rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading focus:outline-none sm:text-sm"/>
+			</div>
+			<div>
+				<label class="block text-xs font-medium uppercase tracking-wider text-rr-muted">State</label>
+				<input type="text" name={ prefix + "_state" } x-bind:required={ requiredExpr } class="rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading focus:outline-none sm:text-sm"/>
+			</div>
+			<div>
+				<label class="block text-xs font-medium uppercase tracking-wider text-rr-muted">ZIP</label>
+				<input type="text" name={ prefix + "_postal_code" } x-bind:required={ requiredExpr } class="rr-input mt-1 block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-2 text-rr-heading focus:outline-none sm:text-sm"/>
+			</div>
+		</div>
 	</div>
 }
 

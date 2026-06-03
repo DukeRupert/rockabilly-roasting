@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -366,12 +367,13 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
 		return
 	}
-	d.renderWholesaleCheckout(w, r, customer, false, 0)
+	d.renderWholesaleCheckout(w, r, customer, false, "", 0)
 }
 
 // renderWholesaleCheckout renders the wholesale checkout page. If banner is true,
-// the price-change banner is shown and the response uses status. status=0 means 200.
-func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, customer *domain.Customer, banner bool, status int) {
+// the price-change banner is shown. errMsg, when non-empty, is surfaced as an
+// inline error. status=0 means 200.
+func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, customer *domain.Customer, banner bool, errMsg string, status int) {
 	ctx := r.Context()
 
 	companyName := ""
@@ -381,47 +383,63 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 
 	cartID := getWholesaleCartID(r)
 	var checkoutItems []storefront.WholesaleCheckoutItem
+	var addresses []domain.Address
 	subtotal := 0
 
-	if cartID != nil {
-		err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-			cart, txErr := d.CartService.GetOrCreateCart(ctx, tx, cartID)
-			if txErr != nil {
-				return txErr
-			}
-			cartItems, txErr := d.CartService.ListItems(ctx, tx, cart.ID)
-			if txErr != nil {
-				return txErr
-			}
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		addrs, txErr := d.CustomerService.ListAddresses(ctx, tx, customer.ID)
+		if txErr != nil {
+			return txErr
+		}
+		addresses = addrs
 
-			for _, ci := range cartItems {
-				variant, txErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
-				if txErr != nil {
-					return txErr
-				}
-				product, txErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
-				if txErr != nil {
-					return txErr
-				}
-
-				lineTotal := ci.UnitPrice * ci.Quantity
-				subtotal += lineTotal
-
-				checkoutItems = append(checkoutItems, storefront.WholesaleCheckoutItem{
-					ItemID:      ci.ID,
-					VariantID:   ci.VariantID,
-					ProductName: product.Title,
-					SKU:         variant.SKU,
-					Quantity:    ci.Quantity,
-					UnitPrice:   ci.UnitPrice,
-					LineTotal:   lineTotal,
-				})
-			}
+		if cartID == nil {
 			return nil
-		})
-		if err != nil {
-			Error(w, r, err)
-			return
+		}
+		cart, txErr := d.CartService.GetOrCreateCart(ctx, tx, cartID)
+		if txErr != nil {
+			return txErr
+		}
+		cartItems, txErr := d.CartService.ListItems(ctx, tx, cart.ID)
+		if txErr != nil {
+			return txErr
+		}
+
+		for _, ci := range cartItems {
+			variant, txErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
+			if txErr != nil {
+				return txErr
+			}
+			product, txErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+			if txErr != nil {
+				return txErr
+			}
+
+			lineTotal := ci.UnitPrice * ci.Quantity
+			subtotal += lineTotal
+
+			checkoutItems = append(checkoutItems, storefront.WholesaleCheckoutItem{
+				ItemID:      ci.ID,
+				VariantID:   ci.VariantID,
+				ProductName: product.Title,
+				SKU:         variant.SKU,
+				Quantity:    ci.Quantity,
+				UnitPrice:   ci.UnitPrice,
+				LineTotal:   lineTotal,
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	defaultAddressID := ""
+	for _, a := range addresses {
+		if a.IsDefault {
+			defaultAddressID = a.ID.String()
+			break
 		}
 	}
 
@@ -429,8 +447,11 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 		CompanyName:       companyName,
 		Items:             checkoutItems,
 		Subtotal:          subtotal,
+		Error:             errMsg,
 		CartCount:         d.wholesaleCartItemCount(r),
 		PriceChangeBanner: banner,
+		Addresses:         addresses,
+		DefaultAddressID:  defaultAddressID,
 	}
 
 	if status != 0 && !IsHTMX(r) {
@@ -461,6 +482,26 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
 		return
 	}
+
+	// Address selection: a saved address ID, or "new"/empty for the inline form.
+	shipSel := r.FormValue("shipping_address_id")
+	billSame := r.FormValue("billing_same") != ""
+	billSel := r.FormValue("billing_address_id")
+
+	// Validate new-address completeness up front (no DB) so we can re-render the
+	// form with a friendly message instead of failing the order transaction.
+	if isNewWholesaleAddr(shipSel) && !wholesaleNewAddrComplete(r, "ship") {
+		d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "address_incomplete").Inc()
+		d.renderWholesaleCheckout(w, r, customer, false, "Please enter a complete shipping address — street, city, state, and ZIP.", http.StatusBadRequest)
+		return
+	}
+	if !billSame && isNewWholesaleAddr(billSel) && !wholesaleNewAddrComplete(r, "bill") {
+		d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "address_incomplete").Inc()
+		d.renderWholesaleCheckout(w, r, customer, false, "Please enter a complete billing address — street, city, state, and ZIP.", http.StatusBadRequest)
+		return
+	}
+
+	actor := customerActor(r)
 
 	var stale bool
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -505,13 +546,29 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			})
 		}
 
+		// Resolve the shipping address (creating it if the customer entered a
+		// new one), then billing — defaulting to the shipping address.
+		shipID, txErr := d.resolveWholesaleAddress(ctx, tx, customer, r, shipSel, "ship", actor)
+		if txErr != nil {
+			return txErr
+		}
+		billID := shipID
+		if !billSame {
+			billID, txErr = d.resolveWholesaleAddress(ctx, tx, customer, r, billSel, "bill", actor)
+			if txErr != nil {
+				return txErr
+			}
+		}
+
 		orderParams := app.PlaceWholesaleOrderParams{
 			CustomerID:   customer.ID,
 			Items:        items,
 			CurrencyCode: "USD",
 			// Wholesale is invoiced; shipping is negotiated offline and billed
 			// on the invoice, not calculated at checkout.
-			ShippingCents: 0,
+			ShippingCents:     0,
+			ShippingAddressID: shipID,
+			BillingAddressID:  billID,
 		}
 		if poNumber != "" {
 			orderParams.CustomerPONumber = &poNumber
@@ -520,7 +577,6 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			orderParams.Notes = &notes
 		}
 
-		actor := customerActor(r)
 		order, txErr := d.WholesaleService.PlaceWholesaleOrder(ctx, tx, orderParams, actor)
 		if txErr != nil {
 			return txErr
@@ -549,7 +605,7 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 
 	if stale {
 		d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "prices_stale").Inc()
-		d.renderWholesaleCheckout(w, r, customer, true, http.StatusConflict)
+		d.renderWholesaleCheckout(w, r, customer, true, "", http.StatusConflict)
 		return
 	}
 
@@ -564,6 +620,66 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 	})
 
 	http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
+}
+
+// isNewWholesaleAddr reports whether an address selection means "enter a new
+// address" rather than referencing a saved one.
+func isNewWholesaleAddr(sel string) bool {
+	return sel == "" || sel == "new"
+}
+
+// wholesaleNewAddrComplete checks the minimum required fields for a new address
+// submitted under the given form prefix ("ship"/"bill").
+func wholesaleNewAddrComplete(r *http.Request, prefix string) bool {
+	return strings.TrimSpace(r.FormValue(prefix+"_line1")) != "" &&
+		strings.TrimSpace(r.FormValue(prefix+"_city")) != "" &&
+		strings.TrimSpace(r.FormValue(prefix+"_state")) != "" &&
+		strings.TrimSpace(r.FormValue(prefix+"_postal_code")) != ""
+}
+
+// resolveWholesaleAddress turns an address selection into an address ID. A saved
+// selection is validated against the customer's own addresses; "new"/empty
+// creates an address from the prefixed form fields within the same transaction
+// so it commits atomically with the order. Completeness is validated by the
+// caller before the transaction starts.
+func (d *Deps) resolveWholesaleAddress(ctx context.Context, tx pgx.Tx, customer *domain.Customer, r *http.Request, sel, prefix string, actor app.Actor) (uuid.UUID, error) {
+	if !isNewWholesaleAddr(sel) {
+		id, err := uuid.Parse(sel)
+		if err != nil {
+			return uuid.Nil, app.ErrAddressNotFound
+		}
+		addr, err := d.CustomerService.GetAddress(ctx, tx, id, customer.ID)
+		if err != nil {
+			return uuid.Nil, err
+		}
+		return addr.ID, nil
+	}
+
+	p := store.CreateAddressParams{
+		CustomerID:  &customer.ID,
+		FirstName:   strings.TrimSpace(r.FormValue(prefix + "_first_name")),
+		LastName:    strings.TrimSpace(r.FormValue(prefix + "_last_name")),
+		Line1:       strings.TrimSpace(r.FormValue(prefix + "_line1")),
+		City:        strings.TrimSpace(r.FormValue(prefix + "_city")),
+		State:       strings.TrimSpace(r.FormValue(prefix + "_state")),
+		PostalCode:  strings.TrimSpace(r.FormValue(prefix + "_postal_code")),
+		CountryCode: strings.TrimSpace(r.FormValue(prefix + "_country_code")),
+	}
+	if p.CountryCode == "" {
+		p.CountryCode = "US"
+	}
+	if v := strings.TrimSpace(r.FormValue(prefix + "_line2")); v != "" {
+		p.Line2 = &v
+	}
+	if v := strings.TrimSpace(r.FormValue(prefix + "_company")); v != "" {
+		p.Company = &v
+	}
+
+	addr, err := d.CustomerService.CreateAddress(ctx, tx, p, actor)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return addr.ID, nil
 }
 
 // handleWholesaleCartUpdate updates the quantity of a cart item inline.

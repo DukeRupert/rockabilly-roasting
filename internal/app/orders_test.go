@@ -47,6 +47,69 @@ func TestOrderService_GetOrder(t *testing.T) {
 	assert.ErrorIs(t, err, app.ErrOrderNotFound)
 }
 
+// TestOrderService_ListOrders_ChannelScoping proves the retail and wholesale
+// admin order pages see only their own channel: the Channel filter and the
+// per-view tab counts are both scoped, so a wholesale order never leaks onto
+// the retail list (and vice versa).
+func TestOrderService_ListOrders_ChannelScoping(t *testing.T) {
+	pool := testPool
+	tx := testutil.NewTestTx(t, pool)
+	svc := newOrderService()
+	ctx := context.Background()
+
+	custID, shipID, billID := orderFixtures(t, tx)
+
+	// Two retail orders, one wholesale order — all "Open" (confirmed).
+	retailA := testutil.CreateOrder(t, tx, custID, shipID, billID,
+		testutil.WithOrderChannel(domain.OrderChannelRetail),
+		testutil.WithOrderStatus(domain.OrderStatusConfirmed))
+	retailB := testutil.CreateOrder(t, tx, custID, shipID, billID,
+		testutil.WithOrderChannel(domain.OrderChannelRetail),
+		testutil.WithOrderStatus(domain.OrderStatusConfirmed))
+	wholesale := testutil.CreateOrder(t, tx, custID, shipID, billID,
+		testutil.WithOrderChannel(domain.OrderChannelWholesale),
+		testutil.WithOrderStatus(domain.OrderStatusConfirmed))
+
+	retailCh := domain.OrderChannelRetail
+	wholesaleCh := domain.OrderChannelWholesale
+
+	// Retail list excludes the wholesale order.
+	retailOrders, err := svc.ListOrders(ctx, tx, store.OrderFilter{Channel: &retailCh})
+	require.NoError(t, err)
+	retailIDs := orderIDSet(retailOrders)
+	assert.Contains(t, retailIDs, retailA.ID)
+	assert.Contains(t, retailIDs, retailB.ID)
+	assert.NotContains(t, retailIDs, wholesale.ID)
+	for _, o := range retailOrders {
+		assert.Equal(t, domain.OrderChannelRetail, o.Channel)
+	}
+
+	// Wholesale list contains only the wholesale order.
+	wholesaleOrders, err := svc.ListOrders(ctx, tx, store.OrderFilter{Channel: &wholesaleCh})
+	require.NoError(t, err)
+	wholesaleIDs := orderIDSet(wholesaleOrders)
+	assert.Contains(t, wholesaleIDs, wholesale.ID)
+	assert.NotContains(t, wholesaleIDs, retailA.ID)
+	assert.NotContains(t, wholesaleIDs, retailB.ID)
+
+	// Per-view tab counts are channel-scoped: 2 open retail, 1 open wholesale.
+	retailCounts, err := svc.CountOrdersByView(ctx, tx, "", &retailCh)
+	require.NoError(t, err)
+	assert.Equal(t, 2, retailCounts.NeedsAction)
+
+	wholesaleCounts, err := svc.CountOrdersByView(ctx, tx, "", &wholesaleCh)
+	require.NoError(t, err)
+	assert.Equal(t, 1, wholesaleCounts.NeedsAction)
+}
+
+func orderIDSet(orders []domain.Order) map[uuid.UUID]bool {
+	s := make(map[uuid.UUID]bool, len(orders))
+	for _, o := range orders {
+		s[o.ID] = true
+	}
+	return s
+}
+
 func TestOrderService_CancelOrder(t *testing.T) {
 	pool := testPool
 	ctx := context.Background()

@@ -477,6 +477,7 @@ func (s *WholesaleService) PlaceWholesaleOrder(ctx context.Context, tx pgx.Tx, p
 	order, err := s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
 		Number:            orderNumber,
 		CustomerID:        &customerID,
+		Channel:           domain.OrderChannelWholesale,
 		Status:            domain.OrderStatusConfirmed,
 		PaymentStatus:     domain.PaymentStatusPendingInvoice,
 		FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,

@@ -154,9 +154,10 @@ func (s *OrderService) CountOrders(ctx context.Context, tx pgx.Tx, f store.Order
 	return count, nil
 }
 
-// CountOrdersByView returns per-tab counts for the admin orders list.
-func (s *OrderService) CountOrdersByView(ctx context.Context, tx pgx.Tx, search string) (store.OrderViewCounts, error) {
-	c, err := s.orders.CountOrdersByView(ctx, tx, search)
+// CountOrdersByView returns per-tab counts for the admin orders list. A non-nil
+// channel scopes the counts to that sales channel (retail or wholesale).
+func (s *OrderService) CountOrdersByView(ctx context.Context, tx pgx.Tx, search string, channel *domain.OrderChannel) (store.OrderViewCounts, error) {
+	c, err := s.orders.CountOrdersByView(ctx, tx, search, channel)
 	if err != nil {
 		return store.OrderViewCounts{}, fmt.Errorf("count orders by view: %w", err)
 	}

@@ -416,6 +416,10 @@ func WithOrderStatus(status domain.OrderStatus) OrderOption {
 	return func(p *sqlcgen.CreateOrderParams) { p.Status = string(status) }
 }
 
+func WithOrderChannel(channel domain.OrderChannel) OrderOption {
+	return func(p *sqlcgen.CreateOrderParams) { p.Channel = string(channel) }
+}
+
 func WithPaymentStatus(status domain.PaymentStatus) OrderOption {
 	return func(p *sqlcgen.CreateOrderParams) { p.PaymentStatus = string(status) }
 }
@@ -447,6 +451,7 @@ func CreateOrder(t *testing.T, tx pgx.Tx, customerID, shippingAddrID, billingAdd
 		ID:                uuid.New(),
 		Number:            fmt.Sprintf("ORD-TEST-%s", uuid.New().String()[:8]),
 		CustomerID:        &customerID,
+		Channel:           string(domain.OrderChannelRetail),
 		Status:            string(domain.OrderStatusConfirmed),
 		PaymentStatus:     string(domain.PaymentStatusCaptured),
 		FulfillmentStatus: string(domain.FulfillmentStatusUnfulfilled),
@@ -472,6 +477,7 @@ func CreateOrder(t *testing.T, tx pgx.Tx, customerID, shippingAddrID, billingAdd
 		ID:                row.ID,
 		Number:            row.Number,
 		CustomerID:        row.CustomerID,
+		Channel:           domain.OrderChannel(row.Channel),
 		Status:            domain.OrderStatus(row.Status),
 		PaymentStatus:     domain.PaymentStatus(row.PaymentStatus),
 		FulfillmentStatus: domain.FulfillmentStatus(row.FulfillmentStatus),

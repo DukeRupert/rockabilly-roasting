@@ -6,6 +6,17 @@ import (
 	"github.com/google/uuid"
 )
 
+// OrderChannel records the sales channel an order was placed through, frozen at
+// placement time. It is a property of the order — not derived live from the
+// customer's account_type — so the order keeps its original channel even if the
+// customer is later converted, suspended, or deleted.
+type OrderChannel string
+
+const (
+	OrderChannelRetail    OrderChannel = "retail"
+	OrderChannelWholesale OrderChannel = "wholesale"
+)
+
 // OrderStatus represents the lifecycle state of an order.
 type OrderStatus string
 
@@ -94,6 +105,7 @@ type Order struct {
 	ID                uuid.UUID
 	Number            string
 	CustomerID        *uuid.UUID
+	Channel           OrderChannel
 	Status            OrderStatus
 	PaymentStatus     PaymentStatus
 	FulfillmentStatus FulfillmentStatus

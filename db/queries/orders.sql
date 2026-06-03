@@ -3,8 +3,8 @@ INSERT INTO orders (id, number, customer_id, status, payment_status, fulfillment
                     currency_code, subtotal, discount_total, shipping_total, tax_total, total,
                     shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
                     tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at,
-                    shipping_method, requested_delivery_date)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+                    shipping_method, requested_delivery_date, channel)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
 RETURNING *;
 
 -- name: GetOrderByID :one

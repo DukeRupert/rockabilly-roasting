@@ -357,6 +357,8 @@ type Order struct {
 	QbSyncedAt            pgtype.Timestamptz `json:"qb_synced_at"`
 	ShippingMethod        *string            `json:"shipping_method"`
 	RequestedDeliveryDate pgtype.Timestamptz `json:"requested_delivery_date"`
+	OverdueReminderStage  int16              `json:"overdue_reminder_stage"`
+	Channel               string             `json:"channel"`
 }
 
 type Price struct {

@@ -21,8 +21,33 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
 
+// handleAdminOrderList renders the retail (direct-to-consumer) orders list.
 func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
+	d.renderOrderList(w, r, domain.OrderChannelRetail)
+}
+
+// handleAdminWholesaleOrderList renders the wholesale account orders list. It
+// shares the retail list's machinery — same workflow buckets, search, and
+// pagination — but scopes every query to the wholesale channel and links back
+// to /admin/orders/wholesale.
+func (d *Deps) handleAdminWholesaleOrderList(w http.ResponseWriter, r *http.Request) {
+	d.renderOrderList(w, r, domain.OrderChannelWholesale)
+}
+
+// renderOrderList is the shared body for both order list pages. The channel
+// scopes the listing, counts, and tab totals; it also selects the base path,
+// page title, and active nav entry so the two pages stay independent.
+func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel domain.OrderChannel) {
 	ctx := r.Context()
+
+	basePath := "/admin/orders"
+	title := "Orders"
+	subtitle := "Every order — search, look up, and manage the order lifecycle."
+	if channel == domain.OrderChannelWholesale {
+		basePath = "/admin/orders/wholesale"
+		title = "Wholesale orders"
+		subtitle = "Wholesale account orders — invoiced, with PO numbers and negotiated shipping."
+	}
 
 	view := normalizeOrderView(r.URL.Query().Get("view"))
 	search := r.URL.Query().Get("q")
@@ -35,9 +60,10 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 
 	perPage := 25
 	filter := store.OrderFilter{
-		Search: search,
-		Limit:  perPage + 1,
-		Offset: (page - 1) * perPage,
+		Channel: &channel,
+		Search:  search,
+		Limit:   perPage + 1,
+		Offset:  (page - 1) * perPage,
 	}
 	applyOrderViewFilter(view, &filter)
 
@@ -57,7 +83,7 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
-		counts, txErr = d.OrderService.CountOrdersByView(ctx, tx, search)
+		counts, txErr = d.OrderService.CountOrdersByView(ctx, tx, search, &channel)
 		if txErr != nil {
 			return txErr
 		}
@@ -111,8 +137,11 @@ func (d *Deps) handleAdminOrderList(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.OrderListProps{
-		Rows: rows,
-		View: view,
+		BasePath: basePath,
+		Title:    title,
+		Subtitle: subtitle,
+		Rows:     rows,
+		View:     view,
 		Counts: admin.OrderViewCounts{
 			NeedsAction: counts.NeedsAction,
 			OnHold:      counts.OnHold,

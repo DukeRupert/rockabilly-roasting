@@ -31,6 +31,7 @@ func NewOrderStore(metrics QueryRecorder) *OrderStore {
 type CreateOrderParams struct {
 	Number                string
 	CustomerID            *uuid.UUID
+	Channel               domain.OrderChannel
 	Status                domain.OrderStatus
 	PaymentStatus         domain.PaymentStatus
 	FulfillmentStatus     domain.FulfillmentStatus
@@ -62,10 +63,17 @@ func (s *OrderStore) CreateOrder(ctx context.Context, tx pgx.Tx, p CreateOrderPa
 		s := string(*p.ShippingMethod)
 		shippingMethod = &s
 	}
+	// Default to retail so callers that don't care about channel (and the DB
+	// DEFAULT) stay consistent; the CHECK constraint rejects an empty string.
+	channel := p.Channel
+	if channel == "" {
+		channel = domain.OrderChannelRetail
+	}
 	row, err := sqlcgen.New(tx).CreateOrder(ctx, sqlcgen.CreateOrderParams{
 		ID:                    uuid.New(),
 		Number:                p.Number,
 		CustomerID:            p.CustomerID,
+		Channel:               string(channel),
 		Status:                string(p.Status),
 		PaymentStatus:         string(p.PaymentStatus),
 		FulfillmentStatus:     string(p.FulfillmentStatus),
@@ -233,7 +241,10 @@ type OrderFilter struct {
 	FulfillmentStatus   *domain.FulfillmentStatus
 	FulfillmentStatuses []domain.FulfillmentStatus // IN filter (takes precedence over singular)
 	PaymentStatuses     []domain.PaymentStatus     // IN filter; empty = no constraint
-	CustomerID          *uuid.UUID
+	// Channel narrows to a single sales channel (retail / wholesale). Nil leaves
+	// the channel unconstrained — dashboards and revenue counts span both.
+	Channel    *domain.OrderChannel
+	CustomerID *uuid.UUID
 	PlacedFrom          *time.Time
 	PlacedTo            *time.Time
 	Search              string // ILIKE on order number or customer name/email
@@ -258,7 +269,7 @@ type OrderFilter struct {
 // ListOrders returns orders matching the given filter (hand-written for dynamic WHERE).
 func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (_ []domain.Order, err error) {
 	defer trackQuery(s.metrics, "orders.list", time.Now(), &err)
-	query := `SELECT id, number, customer_id, status, payment_status, fulfillment_status,
+	query := `SELECT id, number, customer_id, channel, status, payment_status, fulfillment_status,
 	                 currency_code, subtotal, discount_total, shipping_total, tax_total, total,
 	                 shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
 	                 tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
@@ -269,6 +280,11 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	args := []any{}
 	argN := 1
 
+	if f.Channel != nil {
+		query += fmt.Sprintf(" AND channel = $%d", argN)
+		args = append(args, string(*f.Channel))
+		argN++
+	}
 	if len(f.Statuses) > 0 {
 		query += " AND status IN ("
 		for i, s := range f.Statuses {
@@ -364,13 +380,13 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	var orders []domain.Order
 	for rows.Next() {
 		var o domain.Order
-		var status, paymentStatus, fulfillmentStatus string
+		var channel, status, paymentStatus, fulfillmentStatus string
 		var shippingMethod *string
 		var requestedDeliveryDate pgtype.Timestamptz
 		var subtotal, discountTotal, shippingTotal, taxTotal, total int32
 		var metadata json.RawMessage
 		if err := rows.Scan(
-			&o.ID, &o.Number, &o.CustomerID, &status, &paymentStatus, &fulfillmentStatus,
+			&o.ID, &o.Number, &o.CustomerID, &channel, &status, &paymentStatus, &fulfillmentStatus,
 			&o.CurrencyCode, &subtotal, &discountTotal, &shippingTotal, &taxTotal, &total,
 			&o.ShippingAddressID, &o.BillingAddressID, &o.SubscriptionID, &o.DraftByUserID,
 			&o.TaxExempt, &o.TaxExemptReason, &o.StripeTaxID, &o.StripePaymentIntentID,
@@ -380,6 +396,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 		); err != nil {
 			return nil, fmt.Errorf("scan order: %w", err)
 		}
+		o.Channel = domain.OrderChannel(channel)
 		o.Status = domain.OrderStatus(status)
 		o.PaymentStatus = domain.PaymentStatus(paymentStatus)
 		o.FulfillmentStatus = domain.FulfillmentStatus(fulfillmentStatus)
@@ -406,6 +423,11 @@ func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) 
 	args := []any{}
 	argN := 1
 
+	if f.Channel != nil {
+		query += fmt.Sprintf(" AND channel = $%d", argN)
+		args = append(args, string(*f.Channel))
+		argN++
+	}
 	if len(f.Statuses) > 0 {
 		query += " AND status IN ("
 		for i, s := range f.Statuses {
@@ -501,8 +523,9 @@ type OrderViewCounts struct {
 
 // CountOrdersByView returns counts for each tab on the admin orders list in
 // one query. Search applies to all buckets so tab counts reflect the active
-// search term.
-func (s *OrderStore) CountOrdersByView(ctx context.Context, tx pgx.Tx, search string) (_ OrderViewCounts, err error) {
+// search term. A non-nil channel scopes every bucket to that sales channel so
+// the retail and wholesale order pages each show their own tab counts.
+func (s *OrderStore) CountOrdersByView(ctx context.Context, tx pgx.Tx, search string, channel *domain.OrderChannel) (_ OrderViewCounts, err error) {
 	defer trackQuery(s.metrics, "orders.count_by_view", time.Now(), &err)
 	query := `SELECT
 		COUNT(*) FILTER (WHERE status IN ('confirmed', 'processing') AND NOT (status = 'pending' AND payment_status = 'awaiting')) AS needs_action,
@@ -512,8 +535,14 @@ func (s *OrderStore) CountOrdersByView(ctx context.Context, tx pgx.Tx, search st
 		COUNT(*)                                                                                                                  AS total
 	FROM orders WHERE true`
 	args := []any{}
+	argN := 1
+	if channel != nil {
+		query += fmt.Sprintf(" AND channel = $%d", argN)
+		args = append(args, string(*channel))
+		argN++
+	}
 	if search != "" {
-		query += ` AND (number ILIKE $1 OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.first_name || ' ' || c.last_name ILIKE $1 OR c.email ILIKE $1)))`
+		query += fmt.Sprintf(" AND (number ILIKE $%d OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.first_name || ' ' || c.last_name ILIKE $%d OR c.email ILIKE $%d)))", argN, argN, argN)
 		args = append(args, "%"+search+"%")
 	}
 
@@ -1142,6 +1171,7 @@ func orderFromRow(r sqlcgen.Order) *domain.Order {
 		ID:                r.ID,
 		Number:            r.Number,
 		CustomerID:        r.CustomerID,
+		Channel:           domain.OrderChannel(r.Channel),
 		Status:            domain.OrderStatus(r.Status),
 		PaymentStatus:     domain.PaymentStatus(r.PaymentStatus),
 		FulfillmentStatus: domain.FulfillmentStatus(r.FulfillmentStatus),

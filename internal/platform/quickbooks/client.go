@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -72,26 +73,26 @@ func NewQBClient(config ClientConfig, tenantID uuid.UUID, credStore CredentialSt
 	}
 }
 
-// ValidToken returns a valid access token, refreshing if needed.
-// Acquires a DB-level advisory lock to prevent concurrent refresh races.
+// readCredentials reads the current stored credentials in a short read-only tx.
+func (c *QBClient) readCredentials(ctx context.Context) (*domain.QBCredentials, error) {
+	tx, err := c.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	creds, err := c.credStore.GetByTenantID(ctx, tx, c.tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("get QB credentials: %w", err)
+	}
+	return creds, tx.Commit(ctx)
+}
+
+// ValidToken returns a valid access token, refreshing if it is within the
+// refresh buffer of expiry. Acquires a DB-level advisory lock to prevent
+// concurrent refresh races.
 func (c *QBClient) ValidToken(ctx context.Context) (string, string, error) {
-	var creds *domain.QBCredentials
-	var err error
-
-	// Read current credentials
-	err = func() error {
-		tx, txErr := c.pool.Begin(ctx)
-		if txErr != nil {
-			return txErr
-		}
-		defer tx.Rollback(ctx) //nolint:errcheck
-
-		creds, txErr = c.credStore.GetByTenantID(ctx, tx, c.tenantID)
-		if txErr != nil {
-			return fmt.Errorf("get QB credentials: %w", txErr)
-		}
-		return tx.Commit(ctx)
-	}()
+	creds, err := c.readCredentials(ctx)
 	if err != nil {
 		return "", "", err
 	}
@@ -106,7 +107,7 @@ func (c *QBClient) ValidToken(ctx context.Context) (string, string, error) {
 	}
 
 	// Need to refresh — use advisory lock to prevent races
-	creds, err = c.refreshTokenWithLock(ctx, creds)
+	creds, err = c.refreshTokenWithLock(ctx, creds, false)
 	if err != nil {
 		return "", "", err
 	}
@@ -118,8 +119,31 @@ func (c *QBClient) ValidToken(ctx context.Context) (string, string, error) {
 	return token, creds.RealmID, nil
 }
 
-// refreshTokenWithLock refreshes the access token while holding an advisory lock.
-func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *domain.QBCredentials) (*domain.QBCredentials, error) {
+// forceRefresh refreshes the access token regardless of the clock-based buffer
+// check. It is used when Intuit rejects a token that ValidToken considered
+// fresh (clock skew, out-of-band revocation) — the only fix is to mint a new
+// one. Serialized by the same advisory lock as the proactive refresh path.
+func (c *QBClient) forceRefresh(ctx context.Context) (string, string, error) {
+	creds, err := c.readCredentials(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	creds, err = c.refreshTokenWithLock(ctx, creds, true)
+	if err != nil {
+		return "", "", err
+	}
+	token, err := c.decrypt(creds.AccessToken)
+	if err != nil {
+		return "", "", fmt.Errorf("decrypt access token: %w", err)
+	}
+	return token, creds.RealmID, nil
+}
+
+// refreshTokenWithLock refreshes the access token while holding an advisory
+// lock. When force is false it skips the refresh if another worker already
+// renewed the token (the common proactive-refresh case); when force is true it
+// refreshes unconditionally as long as the refresh token is still valid.
+func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *domain.QBCredentials, force bool) (*domain.QBCredentials, error) {
 	tx, err := c.pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin refresh tx: %w", err)
@@ -138,7 +162,7 @@ func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *domain.QBCre
 		return nil, err
 	}
 
-	if time.Until(creds.AccessExpiresAt) >= tokenRefreshBuffer {
+	if !force && time.Until(creds.AccessExpiresAt) >= tokenRefreshBuffer {
 		// Already refreshed by another worker
 		if err := tx.Commit(ctx); err != nil {
 			return nil, err
@@ -195,27 +219,58 @@ func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *domain.QBCre
 	return creds, nil
 }
 
-// doAPI makes an authenticated API request to QBO.
+// doAPI makes an authenticated API request to QBO. On a 401 it forces a single
+// token refresh and retries once, covering the case where Intuit rejects a
+// token that the proactive-refresh check considered still valid (clock skew or
+// out-of-band revocation).
 func (c *QBClient) doAPI(ctx context.Context, method, path string, body any) ([]byte, error) {
 	token, realmID, err := c.ValidToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	respBody, status, err := c.sendAPI(ctx, method, path, realmID, token, body)
+	if err != nil {
+		return nil, err
+	}
+
+	if status == http.StatusUnauthorized {
+		slog.Warn("qb: 401 on a valid-looking token, forcing refresh and retrying", "tenant_id", c.tenantID)
+		token, realmID, err = c.forceRefresh(ctx)
+		if err != nil {
+			return nil, err
+		}
+		respBody, status, err = c.sendAPI(ctx, method, path, realmID, token, body)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if status >= 400 {
+		return nil, classifyError(status, respBody)
+	}
+
+	return respBody, nil
+}
+
+// sendAPI builds and executes a single authenticated QBO request, returning the
+// raw body and HTTP status. It does not classify error statuses — doAPI owns
+// retry/classification so it can act on a 401 before the error is finalized.
+func (c *QBClient) sendAPI(ctx context.Context, method, path, realmID, token string, body any) ([]byte, int, error) {
 	url := fmt.Sprintf("%s/v3/company/%s%s", c.baseURL, realmID, path)
 
 	var reqBody io.Reader
 	if body != nil {
-		b, marshalErr := json.Marshal(body)
-		if marshalErr != nil {
-			return nil, fmt.Errorf("marshal request: %w", marshalErr)
+		b, err := json.Marshal(body)
+		if err != nil {
+			return nil, 0, fmt.Errorf("marshal request: %w", err)
 		}
 		reqBody = bytes.NewReader(b)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
+		return nil, 0, fmt.Errorf("create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -226,20 +281,16 @@ func (c *QBClient) doAPI(ctx context.Context, method, path string, body any) ([]
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("qb api call: %w", err)
+		return nil, 0, fmt.Errorf("qb api call: %w", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1MB limit
 	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
+		return nil, 0, fmt.Errorf("read response: %w", err)
 	}
 
-	if resp.StatusCode >= 400 {
-		return nil, classifyError(resp.StatusCode, respBody)
-	}
-
-	return respBody, nil
+	return respBody, resp.StatusCode, nil
 }
 
 // classifyError converts an HTTP error response into the appropriate error type.
@@ -255,6 +306,11 @@ func classifyError(statusCode int, body []byte) error {
 		return fmt.Errorf("%w: %s", ErrBadRequest, apiErr.Error())
 	case 401:
 		return fmt.Errorf("%w: %s", ErrTokenExpired, apiErr.Error())
+	case 404:
+		// Join so callers get both errors.Is(err, ErrNotFound) for the
+		// reconcile (invoice deleted in QB) and errors.As(*APIError) so
+		// IsRetryable still sees the 404 and treats it as permanent.
+		return errors.Join(ErrNotFound, apiErr)
 	case 429:
 		return fmt.Errorf("%w: %s", ErrRateLimited, apiErr.Error())
 	default:
@@ -279,6 +335,11 @@ func (c *QBClient) Encrypt(plaintext string) (string, error) {
 	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
+
+// Decrypt decrypts a base64-encoded AES-256-GCM ciphertext produced by Encrypt.
+// Exported for the OAuth manager, which decrypts the stored refresh token in
+// order to revoke it on disconnect.
+func (c *QBClient) Decrypt(encoded string) (string, error) { return c.decrypt(encoded) }
 
 // decrypt decrypts a base64-encoded AES-256-GCM ciphertext.
 func (c *QBClient) decrypt(encoded string) (string, error) {

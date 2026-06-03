@@ -136,7 +136,35 @@ func (m *OAuthManager) SaveCredentials(ctx context.Context, tx pgx.Tx, creds *do
 	return nil
 }
 
-// Disconnect removes the stored credentials for this tenant.
+// RefreshTokenForRevoke reads and decrypts the stored refresh token so the
+// caller can revoke it with Intuit before deleting the local credential. It
+// uses the provided (read-only) tx. Returns "" with no error when no
+// credential is stored — there is nothing to revoke.
+func (m *OAuthManager) RefreshTokenForRevoke(ctx context.Context, tx pgx.Tx) (string, error) {
+	creds, err := m.credStore.GetByTenantID(ctx, tx, m.tenantID)
+	if err != nil {
+		// Not connected (or no rows) — nothing to revoke. Caller proceeds to
+		// the local delete, which is a no-op.
+		return "", nil //nolint:nilerr
+	}
+	token, err := m.encrypter.Decrypt(creds.RefreshToken)
+	if err != nil {
+		return "", fmt.Errorf("qb oauth: decrypt refresh token: %w", err)
+	}
+	return token, nil
+}
+
+// Revoke revokes the given refresh token with Intuit, terminating the grant
+// server-side. It performs an external HTTP call and must run OUTSIDE any
+// database transaction. Callers should treat this as best-effort: a revoke
+// failure must not block deleting the local credential.
+func (m *OAuthManager) Revoke(ctx context.Context, refreshToken string) error {
+	return RevokeToken(ctx, m.httpClient, m.config.ClientID, m.config.ClientSecret, refreshToken)
+}
+
+// Disconnect removes the stored credentials for this tenant. This is the local
+// half of disconnection only — call Revoke first (outside the tx) to terminate
+// the grant on Intuit's side.
 func (m *OAuthManager) Disconnect(ctx context.Context, tx pgx.Tx) error {
 	if err := m.credStore.Delete(ctx, tx, m.tenantID); err != nil {
 		return fmt.Errorf("qb oauth: disconnect: %w", err)

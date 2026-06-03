@@ -289,6 +289,30 @@ func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	actor := staffActor(r)
+
+	// Phase 1 (read tx): fetch + decrypt the refresh token so we can revoke it
+	// with Intuit before forgetting it locally.
+	var refreshToken string
+	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		rt, err := d.QBOAuthManager.RefreshTokenForRevoke(ctx, tx)
+		refreshToken = rt
+		return err
+	}); err != nil {
+		// Non-fatal: log and fall through to the local delete so the admin can
+		// still disconnect even if reading the token failed.
+		slog.Error("qb: read token for revoke", "error", err)
+	}
+
+	// Phase 2 (no tx): revoke the grant on Intuit's side. Best-effort — a
+	// revoke failure (Intuit down, token already revoked) must not block the
+	// local disconnect below.
+	if refreshToken != "" {
+		if err := d.QBOAuthManager.Revoke(ctx, refreshToken); err != nil {
+			slog.Warn("qb: token revoke failed, disconnecting locally anyway", "error", err)
+		}
+	}
+
+	// Phase 3 (write tx): delete the local credential and audit, atomically.
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		if err := d.QBOAuthManager.Disconnect(ctx, tx); err != nil {
 			return err

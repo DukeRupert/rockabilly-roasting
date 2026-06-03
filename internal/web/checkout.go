@@ -893,6 +893,9 @@ func (d *Deps) handleCheckoutConfirm(w http.ResponseWriter, r *http.Request) {
 		// land on the confirmation page; that page is tolerant of orders
 		// still in flight.
 		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			// scoping: guest checkout has no customerID to scope by; the Stripe
+			// PaymentIntent ID is a server-issued secret the buyer's browser
+			// just received, so it acts as the ownership token here.
 			order, txErr := d.OrderService.GetOrderByStripePaymentIntentIDAsStaff(ctx, tx, req.PaymentIntentID)
 			if txErr != nil {
 				return fmt.Errorf("get order for processing pi: %w", txErr)
@@ -1019,6 +1022,9 @@ func (d *Deps) loadOrderAnalytics(ctx context.Context, orderNumber string) (*sto
 	var analytics storefront.OrderConfirmedAnalytics
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		// scoping: guest-safe by design — the caller (handleOrderConfirmed) only
+		// invokes this when the single-use rr_last_order cookie matches the order
+		// number, so access is gated by the cookie rather than query scoping.
 		order, txErr := d.OrderService.GetOrderByNumberAsStaff(ctx, tx, orderNumber)
 		if txErr != nil {
 			return fmt.Errorf("get order: %w", txErr)

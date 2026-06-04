@@ -219,7 +219,7 @@ func (d *Deps) handleAccountOrderShow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var order *domain.Order
-	var lineItems []domain.LineItem
+	var lineItems []storefront.OrderLineItemView
 	var shipments []domain.Shipment
 	var shippingAddr *domain.Address
 
@@ -234,7 +234,11 @@ func (d *Deps) handleAccountOrderShow(w http.ResponseWriter, r *http.Request) {
 		if order.CustomerID == nil || *order.CustomerID != customer.ID {
 			return app.ErrOrderNotFound
 		}
-		lineItems, txErr = d.OrderService.ListLineItems(ctx, tx, id)
+		items, txErr := d.OrderService.ListLineItems(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		lineItems, txErr = d.enrichOrderLineItems(ctx, tx, items)
 		if txErr != nil {
 			return txErr
 		}

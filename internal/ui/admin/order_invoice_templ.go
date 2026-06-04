@@ -82,7 +82,7 @@ func orderInvoiceStyles() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<style>\n\t\t* { margin: 0; padding: 0; box-sizing: border-box; }\n\t\t:root {\n\t\t\t--paper: #F6EFE1;\n\t\t\t--ink: #0E0D0C;\n\t\t\t--amber: #F2A03D;\n\t\t\t--rust: #B4351D;\n\t\t\t--muted: #6B6258;\n\t\t\t--rule: #0E0D0C;\n\t\t}\n\t\tbody {\n\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n\t\t\tfont-size: 12px;\n\t\t\tline-height: 1.55;\n\t\t\tcolor: var(--ink);\n\t\t\tbackground: var(--paper);\n\t\t\tpadding: 32px 36px;\n\t\t}\n\t\t.sheet { max-width: 780px; margin: 0 auto; }\n\t\t.sheet + .sheet { margin-top: 48px; padding-top: 48px; border-top: 2px dashed var(--muted); page-break-before: always; }\n\n\t\t.masthead {\n\t\t\tdisplay: flex;\n\t\t\tjustify-content: space-between;\n\t\t\talign-items: flex-start;\n\t\t\tborder-bottom: 3px solid var(--ink);\n\t\t\tpadding-bottom: 16px;\n\t\t\tmargin-bottom: 20px;\n\t\t\tgap: 24px;\n\t\t}\n\t\t.brand { display: flex; gap: 14px; align-items: flex-start; }\n\t\t.brand .badge-mark {\n\t\t\twidth: 72px;\n\t\t\theight: 72px;\n\t\t\tobject-fit: contain;\n\t\t\tflex-shrink: 0;\n\t\t}\n\t\t.brand .mark {\n\t\t\tfont-weight: 900;\n\t\t\tfont-size: 22px;\n\t\t\tletter-spacing: 0.04em;\n\t\t\ttext-transform: uppercase;\n\t\t\tline-height: 1;\n\t\t}\n\t\t.brand .mark .accent { color: var(--rust); }\n\t\t.brand .tagline {\n\t\t\tmargin-top: 6px;\n\t\t\tfont-size: 10px;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.14em;\n\t\t\tcolor: var(--muted);\n\t\t}\n\t\t.brand .contact {\n\t\t\tmargin-top: 10px;\n\t\t\tfont-size: 11px;\n\t\t\tcolor: var(--muted);\n\t\t\tline-height: 1.5;\n\t\t}\n\n\t\t.doc-meta { text-align: right; }\n\t\t.doc-meta .kind {\n\t\t\tdisplay: inline-block;\n\t\t\tfont-family: \"Impact\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n\t\t\tfont-weight: 900;\n\t\t\tfont-size: 34px;\n\t\t\tletter-spacing: 0.06em;\n\t\t\ttext-transform: uppercase;\n\t\t\tpadding: 4px 14px;\n\t\t\tbackground: var(--ink);\n\t\t\tcolor: var(--paper);\n\t\t\tline-height: 1;\n\t\t}\n\t\t.doc-meta .number {\n\t\t\tmargin-top: 10px;\n\t\t\tfont-size: 13px;\n\t\t\tfont-weight: 700;\n\t\t}\n\t\t.doc-meta .date { margin-top: 2px; font-size: 11px; color: var(--muted); }\n\t\t.doc-meta .badge {\n\t\t\tdisplay: inline-block;\n\t\t\tmargin-top: 10px;\n\t\t\tpadding: 3px 8px;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tbackground: var(--amber);\n\t\t\tcolor: var(--ink);\n\t\t\tfont-size: 10px;\n\t\t\tfont-weight: 700;\n\t\t\tletter-spacing: 0.08em;\n\t\t\ttext-transform: uppercase;\n\t\t}\n\n\t\t.status-strip {\n\t\t\tdisplay: flex;\n\t\t\tjustify-content: space-between;\n\t\t\talign-items: center;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tpadding: 10px 14px;\n\t\t\tmargin-bottom: 20px;\n\t\t\tbackground: #FFFFFF;\n\t\t}\n\t\t.status-strip .label {\n\t\t\tfont-size: 10px;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.12em;\n\t\t\tcolor: var(--muted);\n\t\t}\n\t\t.status-strip .value {\n\t\t\tfont-size: 13px;\n\t\t\tfont-weight: 700;\n\t\t\tmargin-top: 2px;\n\t\t}\n\t\t.status-strip .value.due { color: var(--rust); }\n\t\t.status-strip .value.paid { color: #2E7D32; }\n\n\t\t.addresses {\n\t\t\tdisplay: flex;\n\t\t\tgap: 36px;\n\t\t\tmargin-bottom: 22px;\n\t\t}\n\t\t.addr {\n\t\t\tflex: 1;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tpadding: 12px 14px;\n\t\t\tbackground: #FFFFFF;\n\t\t}\n\t\t.addr h3 {\n\t\t\tfont-size: 10px;\n\t\t\tfont-weight: 700;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.12em;\n\t\t\tcolor: var(--muted);\n\t\t\tmargin-bottom: 6px;\n\t\t}\n\t\t.addr p { line-height: 1.5; font-size: 12px; }\n\t\t.addr .name { font-weight: 700; }\n\n\t\t.detail-row {\n\t\t\tdisplay: flex;\n\t\t\tgap: 24px;\n\t\t\tmargin-bottom: 20px;\n\t\t\tfont-size: 11px;\n\t\t}\n\t\t.detail-row .item {\n\t\t\tpadding: 6px 10px;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tbackground: #FFFFFF;\n\t\t}\n\t\t.detail-row .item .lbl {\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.1em;\n\t\t\tcolor: var(--muted);\n\t\t\tfont-size: 10px;\n\t\t}\n\t\t.detail-row .item .val { font-weight: 700; }\n\n\t\ttable { width: 100%; border-collapse: collapse; margin-bottom: 20px; }\n\t\tthead th {\n\t\t\ttext-align: left;\n\t\t\tfont-size: 10px;\n\t\t\tfont-weight: 700;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.08em;\n\t\t\tcolor: var(--paper);\n\t\t\tbackground: var(--ink);\n\t\t\tpadding: 8px 10px;\n\t\t}\n\t\tthead th.right { text-align: right; }\n\t\ttbody td {\n\t\t\tpadding: 10px;\n\t\t\tborder-bottom: 1px solid var(--ink);\n\t\t\tvertical-align: top;\n\t\t}\n\t\ttbody td.right { text-align: right; font-variant-numeric: tabular-nums; }\n\t\ttbody td .sku { color: var(--muted); font-size: 10px; margin-top: 2px; }\n\n\t\t.totals-wrap { display: flex; justify-content: flex-end; }\n\t\t.totals {\n\t\t\twidth: 280px;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tbackground: #FFFFFF;\n\t\t\tpadding: 10px 14px;\n\t\t}\n\t\t.totals .row {\n\t\t\tdisplay: flex;\n\t\t\tjustify-content: space-between;\n\t\t\tpadding: 3px 0;\n\t\t\tfont-size: 12px;\n\t\t\tfont-variant-numeric: tabular-nums;\n\t\t}\n\t\t.totals .row.muted { color: var(--muted); }\n\t\t.totals .row.subtotal { border-top: 1px solid var(--ink); padding-top: 6px; margin-top: 4px; }\n\t\t.totals .row.grand {\n\t\t\tborder-top: 2px solid var(--ink);\n\t\t\tpadding-top: 8px;\n\t\t\tmargin-top: 6px;\n\t\t\tfont-weight: 700;\n\t\t\tfont-size: 15px;\n\t\t}\n\t\t.totals .row.due {\n\t\t\tbackground: var(--amber);\n\t\t\tmargin: 6px -14px -10px -14px;\n\t\t\tpadding: 10px 14px;\n\t\t\tfont-weight: 700;\n\t\t\tfont-size: 14px;\n\t\t\tborder-top: 2px solid var(--ink);\n\t\t}\n\n\t\t.notes {\n\t\t\tmargin-top: 22px;\n\t\t\tpadding: 12px 14px;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tbackground: #FFFFFF;\n\t\t}\n\t\t.notes h4 {\n\t\t\tfont-size: 10px;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.12em;\n\t\t\tcolor: var(--muted);\n\t\t\tmargin-bottom: 4px;\n\t\t}\n\n\t\t.footer {\n\t\t\tmargin-top: 28px;\n\t\t\tpadding-top: 14px;\n\t\t\tborder-top: 2px solid var(--ink);\n\t\t\tdisplay: flex;\n\t\t\tjustify-content: space-between;\n\t\t\talign-items: flex-end;\n\t\t\tfont-size: 10px;\n\t\t\tcolor: var(--muted);\n\t\t}\n\t\t.footer .thanks {\n\t\t\tfont-family: \"Georgia\", \"Times New Roman\", serif;\n\t\t\tfont-style: italic;\n\t\t\tfont-size: 14px;\n\t\t\tcolor: var(--ink);\n\t\t}\n\n\t\t@media print {\n\t\t\tbody { background: #FFFFFF; padding: 0; }\n\t\t\t.sheet { max-width: none; }\n\t\t\t.sheet + .sheet { border-top: none; margin-top: 0; padding-top: 0; }\n\t\t\t@page { margin: 0.5in; }\n\t\t}\n\t</style>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<style>\n\t\t* { margin: 0; padding: 0; box-sizing: border-box; }\n\t\t:root {\n\t\t\t--paper: #F6EFE1;\n\t\t\t--ink: #0E0D0C;\n\t\t\t--amber: #F2A03D;\n\t\t\t--rust: #B4351D;\n\t\t\t--muted: #6B6258;\n\t\t\t--rule: #0E0D0C;\n\t\t}\n\t\tbody {\n\t\t\tfont-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n\t\t\tfont-size: 12px;\n\t\t\tline-height: 1.55;\n\t\t\tcolor: var(--ink);\n\t\t\tbackground: var(--paper);\n\t\t\tpadding: 32px 36px;\n\t\t}\n\t\t.sheet { max-width: 780px; margin: 0 auto; }\n\t\t.sheet + .sheet { margin-top: 48px; padding-top: 48px; border-top: 2px dashed var(--muted); page-break-before: always; }\n\n\t\t.masthead {\n\t\t\tdisplay: flex;\n\t\t\tjustify-content: space-between;\n\t\t\talign-items: flex-start;\n\t\t\tborder-bottom: 3px solid var(--ink);\n\t\t\tpadding-bottom: 16px;\n\t\t\tmargin-bottom: 20px;\n\t\t\tgap: 24px;\n\t\t}\n\t\t.brand { display: flex; gap: 14px; align-items: flex-start; }\n\t\t.brand .badge-mark {\n\t\t\twidth: 72px;\n\t\t\theight: 72px;\n\t\t\tobject-fit: contain;\n\t\t\tflex-shrink: 0;\n\t\t}\n\t\t.brand .mark {\n\t\t\tfont-weight: 900;\n\t\t\tfont-size: 22px;\n\t\t\tletter-spacing: 0.04em;\n\t\t\ttext-transform: uppercase;\n\t\t\tline-height: 1;\n\t\t}\n\t\t.brand .mark .accent { color: var(--rust); }\n\t\t.brand .tagline {\n\t\t\tmargin-top: 6px;\n\t\t\tfont-size: 10px;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.14em;\n\t\t\tcolor: var(--muted);\n\t\t}\n\t\t.brand .contact {\n\t\t\tmargin-top: 10px;\n\t\t\tfont-size: 11px;\n\t\t\tcolor: var(--muted);\n\t\t\tline-height: 1.5;\n\t\t}\n\n\t\t.doc-meta { text-align: right; }\n\t\t.doc-meta .kind {\n\t\t\tdisplay: inline-block;\n\t\t\tfont-family: \"Impact\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n\t\t\tfont-weight: 900;\n\t\t\tfont-size: 34px;\n\t\t\tletter-spacing: 0.06em;\n\t\t\ttext-transform: uppercase;\n\t\t\tpadding: 4px 14px;\n\t\t\tbackground: var(--ink);\n\t\t\tcolor: var(--paper);\n\t\t\tline-height: 1;\n\t\t}\n\t\t.doc-meta .number {\n\t\t\tmargin-top: 10px;\n\t\t\tfont-size: 13px;\n\t\t\tfont-weight: 700;\n\t\t}\n\t\t.doc-meta .date { margin-top: 2px; font-size: 11px; color: var(--muted); }\n\t\t.doc-meta .badge {\n\t\t\tdisplay: inline-block;\n\t\t\tmargin-top: 10px;\n\t\t\tpadding: 3px 8px;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tbackground: var(--amber);\n\t\t\tcolor: var(--ink);\n\t\t\tfont-size: 10px;\n\t\t\tfont-weight: 700;\n\t\t\tletter-spacing: 0.08em;\n\t\t\ttext-transform: uppercase;\n\t\t}\n\n\t\t.status-strip {\n\t\t\tdisplay: flex;\n\t\t\tjustify-content: space-between;\n\t\t\talign-items: center;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tpadding: 10px 14px;\n\t\t\tmargin-bottom: 20px;\n\t\t\tbackground: #FFFFFF;\n\t\t}\n\t\t.status-strip .label {\n\t\t\tfont-size: 10px;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.12em;\n\t\t\tcolor: var(--muted);\n\t\t}\n\t\t.status-strip .value {\n\t\t\tfont-size: 13px;\n\t\t\tfont-weight: 700;\n\t\t\tmargin-top: 2px;\n\t\t}\n\t\t.status-strip .value.due { color: var(--rust); }\n\t\t.status-strip .value.paid { color: #2E7D32; }\n\n\t\t.addresses {\n\t\t\tdisplay: flex;\n\t\t\tgap: 36px;\n\t\t\tmargin-bottom: 22px;\n\t\t}\n\t\t.addr {\n\t\t\tflex: 1;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tpadding: 12px 14px;\n\t\t\tbackground: #FFFFFF;\n\t\t}\n\t\t.addr h3 {\n\t\t\tfont-size: 10px;\n\t\t\tfont-weight: 700;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.12em;\n\t\t\tcolor: var(--muted);\n\t\t\tmargin-bottom: 6px;\n\t\t}\n\t\t.addr p { line-height: 1.5; font-size: 12px; }\n\t\t.addr .name { font-weight: 700; }\n\n\t\t.detail-row {\n\t\t\tdisplay: flex;\n\t\t\tgap: 24px;\n\t\t\tmargin-bottom: 20px;\n\t\t\tfont-size: 11px;\n\t\t}\n\t\t.detail-row .item {\n\t\t\tpadding: 6px 10px;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tbackground: #FFFFFF;\n\t\t}\n\t\t.detail-row .item .lbl {\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.1em;\n\t\t\tcolor: var(--muted);\n\t\t\tfont-size: 10px;\n\t\t}\n\t\t.detail-row .item .val { font-weight: 700; }\n\n\t\ttable { width: 100%; border-collapse: collapse; margin-bottom: 20px; }\n\t\tthead th {\n\t\t\ttext-align: left;\n\t\t\tfont-size: 10px;\n\t\t\tfont-weight: 700;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.08em;\n\t\t\tcolor: var(--paper);\n\t\t\tbackground: var(--ink);\n\t\t\tpadding: 8px 10px;\n\t\t}\n\t\tthead th.right { text-align: right; }\n\t\ttbody td {\n\t\t\tpadding: 10px;\n\t\t\tborder-bottom: 1px solid var(--ink);\n\t\t\tvertical-align: top;\n\t\t}\n\t\ttbody td.right { text-align: right; font-variant-numeric: tabular-nums; }\n\t\ttbody td .variant { font-size: 11px; margin-top: 2px; }\n\t\ttbody td .sku { color: var(--muted); font-size: 10px; margin-top: 2px; }\n\n\t\t.totals-wrap { display: flex; justify-content: flex-end; }\n\t\t.totals {\n\t\t\twidth: 280px;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tbackground: #FFFFFF;\n\t\t\tpadding: 10px 14px;\n\t\t}\n\t\t.totals .row {\n\t\t\tdisplay: flex;\n\t\t\tjustify-content: space-between;\n\t\t\tpadding: 3px 0;\n\t\t\tfont-size: 12px;\n\t\t\tfont-variant-numeric: tabular-nums;\n\t\t}\n\t\t.totals .row.muted { color: var(--muted); }\n\t\t.totals .row.subtotal { border-top: 1px solid var(--ink); padding-top: 6px; margin-top: 4px; }\n\t\t.totals .row.grand {\n\t\t\tborder-top: 2px solid var(--ink);\n\t\t\tpadding-top: 8px;\n\t\t\tmargin-top: 6px;\n\t\t\tfont-weight: 700;\n\t\t\tfont-size: 15px;\n\t\t}\n\t\t.totals .row.due {\n\t\t\tbackground: var(--amber);\n\t\t\tmargin: 6px -14px -10px -14px;\n\t\t\tpadding: 10px 14px;\n\t\t\tfont-weight: 700;\n\t\t\tfont-size: 14px;\n\t\t\tborder-top: 2px solid var(--ink);\n\t\t}\n\n\t\t.notes {\n\t\t\tmargin-top: 22px;\n\t\t\tpadding: 12px 14px;\n\t\t\tborder: 2px solid var(--ink);\n\t\t\tbackground: #FFFFFF;\n\t\t}\n\t\t.notes h4 {\n\t\t\tfont-size: 10px;\n\t\t\ttext-transform: uppercase;\n\t\t\tletter-spacing: 0.12em;\n\t\t\tcolor: var(--muted);\n\t\t\tmargin-bottom: 4px;\n\t\t}\n\n\t\t.footer {\n\t\t\tmargin-top: 28px;\n\t\t\tpadding-top: 14px;\n\t\t\tborder-top: 2px solid var(--ink);\n\t\t\tdisplay: flex;\n\t\t\tjustify-content: space-between;\n\t\t\talign-items: flex-end;\n\t\t\tfont-size: 10px;\n\t\t\tcolor: var(--muted);\n\t\t}\n\t\t.footer .thanks {\n\t\t\tfont-family: \"Georgia\", \"Times New Roman\", serif;\n\t\t\tfont-style: italic;\n\t\t\tfont-size: 14px;\n\t\t\tcolor: var(--ink);\n\t\t}\n\n\t\t@media print {\n\t\t\tbody { background: #FFFFFF; padding: 0; }\n\t\t\t.sheet { max-width: none; }\n\t\t\t.sheet + .sheet { border-top: none; margin-top: 0; padding-top: 0; }\n\t\t\t@page { margin: 0.5in; }\n\t\t}\n\t</style>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -120,7 +120,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 322, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 323, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -133,7 +133,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.PlacedAt.In(props.MerchantTZ).Format("January 2, 2006"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 323, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 324, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -161,7 +161,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(invoicePaymentLabel(props.Order.PaymentStatus))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 333, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 334, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -179,7 +179,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(invoicePaymentLabel(props.Order.PaymentStatus))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 335, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 336, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -202,7 +202,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(0))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 341, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 342, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -220,7 +220,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(invoiceAmountDue(props.Order)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 343, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 344, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -243,7 +243,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.BillingAddress.FirstName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 352, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 353, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -256,7 +256,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(props.BillingAddress.LastName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 352, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 353, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -274,7 +274,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(*props.BillingAddress.Company)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 355, Col: 38}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 356, Col: 38}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -288,7 +288,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(props.BillingAddress.Line1)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 358, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 359, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -306,7 +306,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(*props.BillingAddress.Line2)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 361, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 362, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -320,7 +320,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(props.BillingAddress.City)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 364, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 365, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -333,7 +333,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(props.BillingAddress.State)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 364, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 365, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -346,7 +346,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(props.BillingAddress.PostalCode)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 364, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 365, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -364,7 +364,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.Email)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 367, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 368, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -387,7 +387,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.FirstName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 372, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 373, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -400,7 +400,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.LastName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 372, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 373, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -413,7 +413,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 374, Col: 63}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 375, Col: 63}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -441,7 +441,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.FirstName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 384, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 385, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -454,7 +454,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.LastName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 384, Col: 93}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 385, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -472,7 +472,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(*props.ShippingAddress.Company)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 387, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 388, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {
@@ -486,7 +486,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.Line1)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 390, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 391, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -504,7 +504,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var25 string
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(*props.ShippingAddress.Line2)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 393, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 394, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
@@ -518,7 +518,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.City)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 396, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 397, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -531,7 +531,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.State)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 396, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 397, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
@@ -544,7 +544,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 			var templ_7745c5c3_Var28 string
 			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.PostalCode)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 396, Col: 104}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 397, Col: 104}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 			if templ_7745c5c3_Err != nil {
@@ -572,7 +572,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(string(*props.Order.ShippingMethod))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 406, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 407, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 				if templ_7745c5c3_Err != nil {
@@ -591,7 +591,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var30 string
 				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.RequestedDeliveryDate.In(props.MerchantTZ).Format("Jan 2, 2006"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 412, Col: 101}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 413, Col: 101}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 				if templ_7745c5c3_Err != nil {
@@ -610,7 +610,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var31 string
 				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Order.CustomerPONumber)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 418, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 419, Col: 54}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 				if templ_7745c5c3_Err != nil {
@@ -643,7 +643,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var32 string
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(eli.ProductTitle)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 437, Col: 70}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 438, Col: 70}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {
@@ -661,7 +661,7 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(eli.LineItem.VariantID.String()[:8])
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 439, Col: 89}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 440, Col: 89}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {
@@ -672,15 +672,15 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			if eli.VariantSKU != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<div class=\"sku\">SKU ")
+			if eli.CurrentLabel != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "<div class=\"variant\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var34 string
-				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(eli.VariantSKU)
+				templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(eli.CurrentLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 442, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 443, Col: 47}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 				if templ_7745c5c3_Err != nil {
@@ -691,172 +691,191 @@ func orderInvoiceSheet(props OrderInvoiceProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</td><td class=\"right\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var35 string
-			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", eli.LineItem.Quantity))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 445, Col: 66}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</td><td class=\"right\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var36 string
-			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(eli.LineItem.UnitPrice))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 446, Col: 61}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
+			if eli.VariantSKU != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "<div class=\"sku\">SKU ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var35 string
+				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(eli.VariantSKU)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 446, Col: 45}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "</td><td class=\"right\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var37 string
-			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(eli.LineItem.Total))
+			var templ_7745c5c3_Var36 string
+			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", eli.LineItem.Quantity))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 447, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 449, Col: 66}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "</td><td class=\"right\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var37 string
+			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(eli.LineItem.UnitPrice))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 450, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "</td></tr>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "</td><td class=\"right\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var38 string
+			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(eli.LineItem.Total))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 451, Col: 57}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</td></tr>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "</tbody></table><div class=\"totals-wrap\"><div class=\"totals\"><div class=\"row muted\"><span>Subtotal</span> <span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</tbody></table><div class=\"totals-wrap\"><div class=\"totals\"><div class=\"row muted\"><span>Subtotal</span> <span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var38 string
-		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.Subtotal))
+		var templ_7745c5c3_Var39 string
+		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.Subtotal))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 456, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 460, Col: 46}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.Order.DiscountTotal > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "<div class=\"row muted\"><span>Discounts</span> <span>&minus;")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "<div class=\"row muted\"><span>Discounts</span> <span>&minus;")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var39 string
-			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.DiscountTotal))
+			var templ_7745c5c3_Var40 string
+			templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.DiscountTotal))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 461, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 465, Col: 59}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</span></div>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "</span></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "<div class=\"row muted\"><span>Shipping</span> <span>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var40 string
-		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.ShippingTotal))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 466, Col: 51}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "</span></div><div class=\"row muted\"><span>Tax</span> <span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<div class=\"row muted\"><span>Shipping</span> <span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var41 string
-		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.TaxTotal))
+		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.ShippingTotal))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 470, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 470, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "</span></div><div class=\"row grand\"><span>Total</span> <span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "</span></div><div class=\"row muted\"><span>Tax</span> <span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var42 string
-		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.Total))
+		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.TaxTotal))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 474, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 474, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "</span></div><div class=\"row grand\"><span>Total</span> <span>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var43 string
+		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Order.Total))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 478, Col: 43}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if invoiceAmountDue(props.Order) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<div class=\"row due\"><span>Amount Due</span> <span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var43 string
-			templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(invoiceAmountDue(props.Order)))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 479, Col: 56}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "</span></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "</div></div>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if props.Order.Notes != nil && *props.Order.Notes != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<div class=\"notes\"><h4>Notes</h4><p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "<div class=\"row due\"><span>Amount Due</span> <span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var44 string
-			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Order.Notes)
+			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(invoiceAmountDue(props.Order)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 487, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 483, Col: 56}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "</span></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "<div class=\"footer\"><div class=\"thanks\">Thanks for drinking with us.</div><div>Questions? info@rockabillyroasting.com &middot; (509) 585&ndash;2320</div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "</div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if props.Order.Notes != nil && *props.Order.Notes != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "<div class=\"notes\"><h4>Notes</h4><p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var45 string
+			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Order.Notes)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 491, Col: 27}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "</p></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "<div class=\"footer\"><div class=\"thanks\">Thanks for drinking with us.</div><div>Questions? info@rockabillyroasting.com &middot; (509) 585&ndash;2320</div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -880,25 +899,25 @@ func OrderInvoice(props OrderInvoiceProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var45 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var45 == nil {
-			templ_7745c5c3_Var45 = templ.NopComponent
+		templ_7745c5c3_Var46 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var46 == nil {
+			templ_7745c5c3_Var46 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Invoice &mdash; ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Invoice &mdash; ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var46 string
-		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.Number)
+		var templ_7745c5c3_Var47 string
+		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(props.Order.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 505, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 509, Col: 46}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "</title>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "</title>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -906,7 +925,7 @@ func OrderInvoice(props OrderInvoiceProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "</head><body onload=\"window.print()\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "</head><body onload=\"window.print()\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -914,7 +933,7 @@ func OrderInvoice(props OrderInvoiceProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "</body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "</body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -938,25 +957,25 @@ func OrderInvoiceBatch(props OrderInvoiceBatchProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var47 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var47 == nil {
-			templ_7745c5c3_Var47 = templ.NopComponent
+		templ_7745c5c3_Var48 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var48 == nil {
+			templ_7745c5c3_Var48 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Invoices &mdash; ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Invoices &mdash; ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var48 string
-		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d order(s)", len(props.Items)))
+		var templ_7745c5c3_Var49 string
+		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d order(s)", len(props.Items)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 520, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_invoice.templ`, Line: 524, Col: 73}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "</title>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</title>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -964,7 +983,7 @@ func OrderInvoiceBatch(props OrderInvoiceBatchProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "</head><body onload=\"window.print()\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "</head><body onload=\"window.print()\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -974,7 +993,7 @@ func OrderInvoiceBatch(props OrderInvoiceBatchProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "</body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -62,7 +62,33 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 			</a>
 		</div>
 		<!-- Quick order form -->
-		<form method="post" action="/wholesale/portal/bulk-add" class="space-y-6">
+		<!--
+			Live order summary: each qty input carries its unit price in
+			data-price and pings recompute() on input, so the sticky bar shows a
+			running unit count + subtotal client-side as the buyer stacks the
+			order — no server round-trip. Prices match the catalog the page was
+			rendered with; checkout re-resolves and flags any drift.
+		-->
+		<form
+			method="post"
+			action="/wholesale/portal/bulk-add"
+			class="space-y-6"
+			x-data="{
+				units: 0,
+				cents: 0,
+				recompute() {
+					let units = 0, cents = 0;
+					this.$root.querySelectorAll('input[data-price]').forEach(el => {
+						const q = parseInt(el.value, 10) || 0;
+						if (q > 0) { units += q; cents += q * (parseInt(el.dataset.price, 10) || 0); }
+					});
+					this.units = units;
+					this.cents = cents;
+				},
+				money(c) { return '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+			}"
+			x-init="recompute()"
+		>
 			if len(props.Products) == 0 {
 				<div class="border-2 border-ink bg-cream-hi p-12 text-center" style="box-shadow: var(--shadow-stamp);">
 					<p class="font-slab text-ink text-xl uppercase">The shelf's empty</p>
@@ -146,6 +172,8 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 												}
 												placeholder="0"
 												aria-label={ "Quantity for " + variant.SKU }
+												data-price={ fmt.Sprint(variant.UnitPrice) }
+												x-on:input="recompute()"
 												class="w-20 border-2 border-ink bg-cream-hi px-2 py-1.5 text-center font-special text-sm text-ink focus:outline-none focus:bg-paper [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 												style="box-shadow: var(--shadow-stamp-sm);"
 											/>
@@ -170,11 +198,18 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 				</div>
 			}
 			if len(props.Products) > 0 {
-				<!-- Sticky bottom bar -->
-				<div class="sticky bottom-4 flex items-center justify-end gap-4 border-2 border-ink bg-paper-warm px-6 py-4" style="box-shadow: var(--shadow-stamp);">
+				<!-- Sticky bottom bar — running total updates as quantities change -->
+				<div class="sticky bottom-4 flex items-center justify-between gap-4 border-2 border-ink bg-paper-warm px-5 sm:px-6 py-4" style="box-shadow: var(--shadow-stamp);">
+					<div class="min-w-0">
+						<p class="font-oswald text-chrome-deep text-sm" x-show="cents === 0">Enter quantities to build your order.</p>
+						<div class="flex items-baseline gap-2" x-show="cents > 0" x-cloak>
+							<span class="font-special text-ink text-xl sm:text-2xl" x-text="money(cents)"></span>
+							<span class="font-oswald font-bold text-chrome-deep text-[11px] uppercase" style="letter-spacing:0.14em;" x-text="units + (units === 1 ? ' unit' : ' units')"></span>
+						</div>
+					</div>
 					<button
 						type="submit"
-						class="btn-stamp inline-flex items-center border-2 border-ink bg-rust text-paper px-6 py-3 font-oswald font-bold text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rust"
+						class="btn-stamp inline-flex shrink-0 items-center border-2 border-ink bg-rust text-paper px-6 py-3 font-oswald font-bold text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rust"
 						style="letter-spacing:0.16em; text-transform:uppercase;"
 					>
 						Add to Order

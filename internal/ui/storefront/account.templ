@@ -348,10 +348,23 @@ templ orderStatusBadge(status domain.OrderStatus, fulfillment domain.Fulfillment
 
 // --- Order Detail ---
 
+// OrderLineItemView is a customer-facing line item enriched with the product
+// name and variant option label (e.g. "Rebel Blend" + "Whole Bean / 12 oz") so
+// order history shows what was bought rather than a raw variant ID. Shared by
+// the retail and wholesale order-detail screens.
+type OrderLineItemView struct {
+	ProductName  string
+	VariantLabel string
+	SKU          string
+	Quantity     int
+	UnitPrice    int
+	Total        int
+}
+
 type AccountOrderShowProps struct {
 	Customer  *domain.Customer
 	Order     *domain.Order
-	LineItems []domain.LineItem
+	LineItems []OrderLineItemView
 	Shipments []domain.Shipment
 	Address   *domain.Address
 	CartCount int
@@ -391,7 +404,12 @@ templ AccountOrderShowContent(props AccountOrderShowProps) {
 					<tbody class="divide-y-2 divide-ink/30">
 						for _, item := range props.LineItems {
 							<tr>
-								<td class="px-4 sm:px-5 py-3 font-oswald text-ink text-sm" style="letter-spacing:0.02em;">{ item.VariantID.String()[:8] }…</td>
+								<td class="px-4 sm:px-5 py-3">
+									<span class="block font-oswald font-bold text-ink text-sm" style="letter-spacing:0.02em;">{ item.ProductName }</span>
+									if item.VariantLabel != "" {
+										<span class="block font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">{ item.VariantLabel }</span>
+									}
+								</td>
 								<td class="px-3 py-3 font-special text-ink text-sm text-right">{ fmt.Sprintf("%d", item.Quantity) }</td>
 								<td class="px-3 py-3 font-special text-ink-soft text-sm text-right">{ formatCents(item.UnitPrice) }</td>
 								<td class="px-4 sm:px-5 py-3 font-special text-ink text-sm text-right">{ formatCents(item.Total) }</td>

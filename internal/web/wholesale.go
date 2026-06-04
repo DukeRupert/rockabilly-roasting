@@ -362,6 +362,117 @@ func (d *Deps) handleWholesaleBulkAdd(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/wholesale/checkout", http.StatusSeeOther)
 }
 
+// handleWholesaleReorder re-adds every line item from a past order to the
+// wholesale cart at current pricing, then sends the buyer to checkout to review.
+// Reordering is the core wholesale job — restocking the same lineup on a regular
+// cadence — so this is one click from order history.
+//
+// Items whose variant has since been archived, hidden from wholesale, or lost
+// its price are skipped and counted rather than failing the whole reorder, so a
+// café restocking last month's order is told what changed instead of silently
+// shorted. Current prices apply, so the checkout's existing price-change review
+// still governs the final amount.
+func (d *Deps) handleWholesaleReorder(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	customer, ok := auth.CustomerFromContext(ctx)
+	if !ok {
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+		return
+	}
+
+	orderID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	cartID := getWholesaleCartID(r)
+	var resultCartID uuid.UUID
+	var added, skipped int
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		// scoping: AsStaff is safe — ownership is enforced immediately below.
+		order, txErr := d.OrderService.GetOrderAsStaff(ctx, tx, orderID)
+		if txErr != nil {
+			return txErr
+		}
+		if order.CustomerID == nil || *order.CustomerID != customer.ID {
+			return app.ErrOrderNotFound
+		}
+		items, txErr := d.OrderService.ListLineItems(ctx, tx, orderID)
+		if txErr != nil {
+			return txErr
+		}
+
+		cart, txErr := d.CartService.GetOrCreateCart(ctx, tx, cartID)
+		if txErr != nil {
+			return txErr
+		}
+		resultCartID = cart.ID
+
+		for _, li := range items {
+			if li.Quantity <= 0 {
+				continue
+			}
+			_, addErr := d.CartService.AddItemForCustomer(ctx, tx, cart.ID, li.VariantID, li.Quantity, customer.ID, order.CurrencyCode)
+			switch {
+			case addErr == nil:
+				added++
+			case errors.Is(addErr, app.ErrVariantArchived),
+				errors.Is(addErr, app.ErrVariantNotFound),
+				errors.Is(addErr, app.ErrVariantNotInChannel),
+				errors.Is(addErr, app.ErrProductNotAccessible),
+				errors.Is(addErr, app.ErrPriceNotFound):
+				// Variant retired or no longer sold to this customer — leave it
+				// off and tell them, rather than failing the whole reorder.
+				skipped++
+			default:
+				return addErr
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	setWholesaleCartCookie(w, resultCartID)
+
+	dest := fmt.Sprintf("/wholesale/checkout?reordered=%d", added)
+	if skipped > 0 {
+		dest += fmt.Sprintf("&skipped=%d", skipped)
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
+
+// reorderNotice builds the informational banner shown on checkout after a
+// reorder, from the ?reordered / ?skipped counts set by handleWholesaleReorder.
+// Empty when the buyer didn't arrive via reorder.
+func reorderNotice(r *http.Request) string {
+	reordered, _ := strconv.Atoi(r.URL.Query().Get("reordered"))
+	skipped, _ := strconv.Atoi(r.URL.Query().Get("skipped"))
+	if reordered <= 0 && skipped <= 0 {
+		return ""
+	}
+	switch {
+	case reordered == 0:
+		return "None of the items from that order are available anymore, so nothing was added. Give us a shout and we'll sort it out."
+	case skipped == 0:
+		return fmt.Sprintf("Loaded %s from your past order — look it over and send it our way.", itemCount(reordered))
+	default:
+		return fmt.Sprintf("Loaded %s from your past order. %s aren't available anymore and were left off.", itemCount(reordered), itemCount(skipped))
+	}
+}
+
+// itemCount renders "1 item" / "N items".
+func itemCount(n int) string {
+	if n == 1 {
+		return "1 item"
+	}
+	return fmt.Sprintf("%d items", n)
+}
+
 func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	customer, ok := auth.CustomerFromContext(ctx)
@@ -450,6 +561,7 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 		Items:             checkoutItems,
 		Subtotal:          subtotal,
 		Error:             errMsg,
+		Notice:            reorderNotice(r),
 		CartCount:         d.wholesaleCartItemCount(r),
 		PriceChangeBanner: banner,
 		Addresses:         addresses,
@@ -604,6 +716,19 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		return d.CartService.DeleteCart(ctx, tx, cart.ID)
 	})
 	if err != nil {
+		// Address problems are fixable on this page — re-render the checkout
+		// with a plain-language message and the form intact rather than bouncing
+		// the buyer to a generic error toast.
+		switch {
+		case errors.Is(err, app.ErrAddressIncomplete):
+			d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "address_incomplete").Inc()
+			d.renderWholesaleCheckout(w, r, customer, false, "That address is missing its street, city, state, or ZIP. Pick another saved address or enter a new one below.", http.StatusUnprocessableEntity)
+			return
+		case errors.Is(err, app.ErrAddressNotFound):
+			d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "address_incomplete").Inc()
+			d.renderWholesaleCheckout(w, r, customer, false, "That saved address is no longer available. Pick another or enter a new one below.", http.StatusUnprocessableEntity)
+			return
+		}
 		reason := classifyCheckoutError(err)
 		d.Metrics.CheckoutFailed.WithLabelValues("wholesale", reason).Inc()
 		Error(w, r, err)
@@ -698,6 +823,12 @@ func (d *Deps) resolveWholesaleAddress(ctx context.Context, tx pgx.Tx, customer 
 		addr, err := d.CustomerService.GetAddress(ctx, tx, id, customer.ID)
 		if err != nil {
 			return uuid.Nil, err
+		}
+		// A saved address (e.g. imported from a prior system) can be missing the
+		// fields we need to ship. Catch it here so the buyer gets a fix-it
+		// message rather than a downstream failure.
+		if !addressShippable(addr) {
+			return uuid.Nil, app.ErrAddressIncomplete
 		}
 		return addr.ID, nil
 	}

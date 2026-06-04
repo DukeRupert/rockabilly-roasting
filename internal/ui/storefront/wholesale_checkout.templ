@@ -22,6 +22,9 @@ type WholesaleCheckoutProps struct {
 	Items             []WholesaleCheckoutItem
 	Subtotal          int
 	Error             string
+	// Notice is an informational (non-error) banner, e.g. the reorder summary
+	// telling the buyer how many items were loaded and how many were skipped.
+	Notice            string
 	CartCount         int
 	PriceChangeBanner bool
 	Addresses         []domain.Address
@@ -54,6 +57,14 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 		if props.Error != "" {
 			<div class="border-2 border-rust bg-paper-warm p-4">
 				<p class="font-oswald font-semibold text-sm text-rust">{ props.Error }</p>
+			</div>
+		}
+		if props.Notice != "" {
+			<div class="flex items-start gap-3 border-2 border-ink bg-candle-soft p-4">
+				<svg class="size-5 shrink-0 text-ink" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+					<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+				</svg>
+				<p class="font-oswald text-sm text-ink">{ props.Notice }</p>
 			</div>
 		}
 		if props.PriceChangeBanner {

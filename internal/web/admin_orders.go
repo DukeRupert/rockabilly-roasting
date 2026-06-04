@@ -149,7 +149,7 @@ func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel d
 			Archive:     counts.Archive,
 			All:         counts.All,
 		},
-		Search: search,
+		Search:     search,
 		TotalCount: totalCount,
 		Page:       page,
 		PerPage:    perPage,
@@ -194,6 +194,33 @@ func applyOrderViewFilter(view string, f *store.OrderFilter) {
 	case "archive":
 		f.Statuses = []domain.OrderStatus{domain.OrderStatusCancelled, domain.OrderStatusRefunded}
 	}
+}
+
+// variantLabelCached resolves a variant's option label ("Whole Bean / 12oz"),
+// caching each product's option-value names in labelCache so a multi-line order
+// doesn't re-query options per item. Shared by the order detail screen and the
+// packing-slip / invoice documents so they all identify the exact variant, not
+// just the product.
+func (d *Deps) variantLabelCached(ctx context.Context, tx pgx.Tx, productID, variantID uuid.UUID, labelCache map[uuid.UUID]map[uuid.UUID]string) (string, error) {
+	labels, ok := labelCache[productID]
+	if !ok {
+		labels = map[uuid.UUID]string{}
+		opts, err := d.CatalogService.ListProductOptions(ctx, tx, productID)
+		if err != nil {
+			return "", err
+		}
+		for _, opt := range opts {
+			vals, err := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
+			if err != nil {
+				return "", err
+			}
+			for _, val := range vals {
+				labels[val.ID] = val.Value
+			}
+		}
+		labelCache[productID] = labels
+	}
+	return buildVariantLabel(ctx, tx, d, variantID, labels)
 }
 
 // buildVariantLabel joins the variant's option values (e.g., "Whole Bean / 12oz")
@@ -798,6 +825,7 @@ func (d *Deps) loadPackingSlipProps(ctx context.Context, tx pgx.Tx, id uuid.UUID
 	}
 
 	enrichedItems := make([]admin.EnrichedLineItem, len(lineItems))
+	optionLabelByProduct := map[uuid.UUID]map[uuid.UUID]string{}
 	for i, li := range lineItems {
 		enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
 
@@ -818,6 +846,12 @@ func (d *Deps) loadPackingSlipProps(ctx context.Context, tx pgx.Tx, id uuid.UUID
 			return admin.PackingSlipProps{}, pErr
 		}
 		enrichedItems[i].ProductTitle = product.Title
+
+		label, lErr := d.variantLabelCached(ctx, tx, product.ID, variant.ID, optionLabelByProduct)
+		if lErr != nil {
+			return admin.PackingSlipProps{}, lErr
+		}
+		enrichedItems[i].CurrentLabel = label
 	}
 
 	return admin.PackingSlipProps{
@@ -1153,6 +1187,7 @@ func (d *Deps) loadOrderInvoiceProps(ctx context.Context, tx pgx.Tx, id uuid.UUI
 	}
 
 	enrichedItems := make([]admin.EnrichedLineItem, len(lineItems))
+	optionLabelByProduct := map[uuid.UUID]map[uuid.UUID]string{}
 	for i, li := range lineItems {
 		enrichedItems[i] = admin.EnrichedLineItem{LineItem: li}
 
@@ -1173,6 +1208,12 @@ func (d *Deps) loadOrderInvoiceProps(ctx context.Context, tx pgx.Tx, id uuid.UUI
 			return admin.OrderInvoiceProps{}, pErr
 		}
 		enrichedItems[i].ProductTitle = product.Title
+
+		label, lErr := d.variantLabelCached(ctx, tx, product.ID, variant.ID, optionLabelByProduct)
+		if lErr != nil {
+			return admin.OrderInvoiceProps{}, lErr
+		}
+		enrichedItems[i].CurrentLabel = label
 	}
 
 	return admin.OrderInvoiceProps{
@@ -1489,4 +1530,3 @@ func parseCents(s string) (int, bool) {
 	}
 	return n, true
 }
-

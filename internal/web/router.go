@@ -33,46 +33,46 @@ import (
 // to data that isn't covered by an existing service, extend the service rather
 // than reaching into the store.
 type Deps struct {
-	Pool                 *pgxpool.Pool
-	Logger               *slog.Logger
-	Metrics              *metrics.Registry
-	Sessions             *sessions.Manager
-	OrderService         *app.OrderService
-	CustomerService      *app.CustomerService
-	CatalogService       *app.CatalogService
-	CheckoutService      *app.CheckoutService
-	FulfillmentService    *app.FulfillmentService
-	SubscriptionService  *app.SubscriptionService
-	DiscountService      *app.DiscountService
-	AuthService          *app.AuthService
-	PricingService       *app.PricingService
-	CartService          *app.CartService
-	WholesaleService     *app.WholesaleService
-	AttributeService     *app.AttributeService
-	InvoiceService       *app.InvoiceService
-	CustomerGroupService *app.CustomerGroupService
-	PriceListService     *app.PriceListService
-	AuditQueryService    *app.AuditQueryService
-	WebhookService       *app.WebhookService
-	AuditWriter          *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
-	PaymentProvider      payments.Provider
-	RiverClient          *river.Client[pgx.Tx]
-	R2Client             *media.R2Client
-	MediaConfig          *media.Config
-	QBClient             quickbooks.Client
-	QBOAuthManager       *quickbooks.OAuthManager // nil when QuickBooks is not configured
+	Pool                   *pgxpool.Pool
+	Logger                 *slog.Logger
+	Metrics                *metrics.Registry
+	Sessions               *sessions.Manager
+	OrderService           *app.OrderService
+	CustomerService        *app.CustomerService
+	CatalogService         *app.CatalogService
+	CheckoutService        *app.CheckoutService
+	FulfillmentService     *app.FulfillmentService
+	SubscriptionService    *app.SubscriptionService
+	DiscountService        *app.DiscountService
+	AuthService            *app.AuthService
+	PricingService         *app.PricingService
+	CartService            *app.CartService
+	WholesaleService       *app.WholesaleService
+	AttributeService       *app.AttributeService
+	InvoiceService         *app.InvoiceService
+	CustomerGroupService   *app.CustomerGroupService
+	PriceListService       *app.PriceListService
+	AuditQueryService      *app.AuditQueryService
+	WebhookService         *app.WebhookService
+	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
+	PaymentProvider        payments.Provider
+	RiverClient            *river.Client[pgx.Tx]
+	R2Client               *media.R2Client
+	MediaConfig            *media.Config
+	QBClient               quickbooks.Client
+	QBOAuthManager         *quickbooks.OAuthManager // nil when QuickBooks is not configured
 	QBWebhookVerifierToken string
-	QBHTTPClient         *http.Client
-	HelpRegistry         *help.Registry
-	RateLimiter          *ratelimit.Limiter
-	TurnstileVerifier    *turnstile.Verifier // verifies Cloudflare Turnstile tokens; no-op when no secret configured
-	TurnstileSiteKey     string              // public site key embedded in widget; empty disables widget
-	SecureCookies        bool
-	BaseURL              string // public site URL, e.g. "https://rockabillyroasting.com"
-	Mailer               email.Sender
-	EmailFrom            string // sender address for transactional emails
-	StaffEmail           string // staff notification recipient
-	MerchantTZ           *time.Location // local timezone for day-bounded queries (e.g. "today's revenue")
+	QBHTTPClient           *http.Client
+	HelpRegistry           *help.Registry
+	RateLimiter            *ratelimit.Limiter
+	TurnstileVerifier      *turnstile.Verifier // verifies Cloudflare Turnstile tokens; no-op when no secret configured
+	TurnstileSiteKey       string              // public site key embedded in widget; empty disables widget
+	SecureCookies          bool
+	BaseURL                string // public site URL, e.g. "https://rockabillyroasting.com"
+	Mailer                 email.Sender
+	EmailFrom              string         // sender address for transactional emails
+	StaffEmail             string         // staff notification recipient
+	MerchantTZ             *time.Location // local timezone for day-bounded queries (e.g. "today's revenue")
 }
 
 // MetricsMux returns a handler for the internal metrics listener.
@@ -238,6 +238,22 @@ func NewRouter(deps *Deps) http.Handler {
 	wholesaleMux.HandleFunc("POST /wholesale/cart/remove", deps.handleWholesaleCartRemove)
 	wholesaleMux.HandleFunc("GET /wholesale/help", deps.handleWholesaleHelpIndex)
 	wholesaleMux.HandleFunc("GET /wholesale/help/{slug}", deps.handleWholesaleHelpArticle)
+	// Wholesale account area (history, settings, addresses, security)
+	wholesaleMux.HandleFunc("GET /wholesale/account", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/wholesale/account/orders", http.StatusSeeOther)
+	})
+	wholesaleMux.HandleFunc("GET /wholesale/account/orders", deps.handleWholesaleAccountOrders)
+	wholesaleMux.HandleFunc("GET /wholesale/account/orders/{id}", deps.handleWholesaleAccountOrderShow)
+	wholesaleMux.HandleFunc("GET /wholesale/account/settings", deps.handleWholesaleAccountSettings)
+	wholesaleMux.HandleFunc("POST /wholesale/account/settings", deps.handleWholesaleAccountSettingsUpdate)
+	wholesaleMux.HandleFunc("GET /wholesale/account/addresses", deps.handleWholesaleAccountAddresses)
+	wholesaleMux.HandleFunc("POST /wholesale/account/addresses", deps.handleWholesaleAccountAddressCreate)
+	wholesaleMux.HandleFunc("POST /wholesale/account/addresses/{id}", deps.handleWholesaleAccountAddressUpdate)
+	wholesaleMux.HandleFunc("POST /wholesale/account/addresses/{id}/delete", deps.handleWholesaleAccountAddressDelete)
+	wholesaleMux.HandleFunc("POST /wholesale/account/addresses/{id}/default", deps.handleWholesaleAccountAddressSetDefault)
+	wholesaleMux.HandleFunc("GET /wholesale/account/security", deps.handleWholesaleAccountSecurity)
+	wholesaleMux.HandleFunc("POST /wholesale/account/security/set", deps.handleWholesaleAccountPasswordSet)
+	wholesaleMux.HandleFunc("POST /wholesale/account/security/change", deps.handleWholesaleAccountPasswordChange)
 	mux.Handle("GET /wholesale/portal", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("GET /wholesale/portal/", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("POST /wholesale/portal/{path...}", deps.requireApprovedWholesale(wholesaleMux))
@@ -248,6 +264,9 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("POST /wholesale/cart/{path...}", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("GET /wholesale/help", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("GET /wholesale/help/{slug}", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/account", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/account/{path...}", deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("POST /wholesale/account/{path...}", deps.requireApprovedWholesale(wholesaleMux))
 
 	// Staff auth routes (no session required)
 	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {

@@ -258,15 +258,34 @@ func (s *OrderService) MarkWholesaleOrderPaid(ctx context.Context, tx pgx.Tx, id
 
 // orderManuallyPayable reports whether an order is eligible for the admin
 // "mark as paid" override. Mirrored by canMarkOrderPaid in the order detail UI.
+//
+// Two cases qualify:
+//   - QB-owned orders (QBInvoiceID set): the original fallback for when the QB
+//     reconciliation poll fails to settle a live invoice. Eligible only in an
+//     unsettled invoice state (invoiced / overdue / partially_paid).
+//   - Non-QB wholesale orders: while the QuickBooks integration isn't wired up,
+//     invoicing is handled externally (in QuickBooks directly), so staff confirm
+//     payment by flipping the order straight to captured. These sit in
+//     pending_invoice from placement, so that state qualifies too. Retail orders
+//     settle via Stripe and never use this path.
 func orderManuallyPayable(o *domain.Order) bool {
-	if o.QBInvoiceID == nil {
-		return false
-	}
 	if o.Status == domain.OrderStatusCancelled || o.Status == domain.OrderStatusRefunded {
 		return false
 	}
+	if o.QBInvoiceID != nil {
+		switch o.PaymentStatus {
+		case domain.PaymentStatusInvoiced, domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
+			return true
+		default:
+			return false
+		}
+	}
+	if o.Channel != domain.OrderChannelWholesale {
+		return false
+	}
 	switch o.PaymentStatus {
-	case domain.PaymentStatusInvoiced, domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
+	case domain.PaymentStatusPendingInvoice, domain.PaymentStatusInvoiced,
+		domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
 		return true
 	default:
 		return false

@@ -169,18 +169,28 @@ func canRefundOrder(status domain.OrderStatus, paymentStatus domain.PaymentStatu
 		paymentStatus == domain.PaymentStatusCaptured
 }
 
-// canMarkOrderPaid gates the manual "mark as paid" override — a fallback for
-// when QuickBooks doesn't reconcile a wholesale invoice payment. Mirrors
-// app.orderManuallyPayable: QB-owned orders with a live, unsettled invoice only.
+// canMarkOrderPaid gates the manual "mark as paid" override. Mirrors
+// app.orderManuallyPayable: QB-owned orders in a live, unsettled invoice state,
+// plus non-QB wholesale orders (invoiced externally until the QuickBooks
+// integration is wired up) which sit in pending_invoice from placement.
 func canMarkOrderPaid(o *domain.Order) bool {
-	if o.QBInvoiceID == nil {
-		return false
-	}
 	if o.Status == domain.OrderStatusCancelled || o.Status == domain.OrderStatusRefunded {
 		return false
 	}
+	if o.QBInvoiceID != nil {
+		switch o.PaymentStatus {
+		case domain.PaymentStatusInvoiced, domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
+			return true
+		default:
+			return false
+		}
+	}
+	if o.Channel != domain.OrderChannelWholesale {
+		return false
+	}
 	switch o.PaymentStatus {
-	case domain.PaymentStatusInvoiced, domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
+	case domain.PaymentStatusPendingInvoice, domain.PaymentStatusInvoiced,
+		domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
 		return true
 	default:
 		return false

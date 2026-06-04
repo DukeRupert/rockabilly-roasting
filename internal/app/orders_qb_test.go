@@ -292,6 +292,28 @@ func TestMarkWholesaleOrderPaid(t *testing.T) {
 		_, err := svc.MarkWholesaleOrderPaid(ctx, tx, order.ID, false, actor)
 		assert.ErrorIs(t, err, app.ErrOrderNotPayable)
 	})
+
+	t.Run("non-QB wholesale order in pending_invoice is captured and emails when opted in", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		enq := &fakeEnqueuer{}
+		svc, st := newReconcileService(enq)
+		cust := testutil.CreateCustomer(t, tx)
+		addr := testutil.CreateAddress(t, tx, cust.ID)
+		order := testutil.CreateOrder(t, tx, cust.ID, addr.ID, addr.ID,
+			testutil.WithOrderChannel(domain.OrderChannelWholesale),
+			testutil.WithOrderStatus(domain.OrderStatusConfirmed),
+			testutil.WithPaymentStatus(domain.PaymentStatusPendingInvoice),
+		)
+
+		got, err := svc.MarkWholesaleOrderPaid(ctx, tx, order.ID, true, actor)
+		require.NoError(t, err)
+		assert.Equal(t, domain.PaymentStatusCaptured, got.PaymentStatus)
+
+		reread, err := st.GetOrderByIDForUpdate(ctx, tx, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.PaymentStatusCaptured, reread.PaymentStatus, "persisted")
+		assert.Equal(t, []uuid.UUID{order.ID}, enq.paid, "confirmation email enqueued")
+	})
 }
 
 func TestReconcileWholesalePayment_ReminderCadence(t *testing.T) {

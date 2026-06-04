@@ -331,50 +331,30 @@ func Storefront(props StorefrontProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" class=\"btn inline-flex items-center gap-2 bg-candle text-ink border-2 border-paper px-3 py-1.5 font-oswald font-bold text-xs hover:bg-candle-deep hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\"><svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.25\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z\"></path></svg> <span>Cart ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" class=\"btn inline-flex items-center gap-2 bg-candle text-ink border-2 border-paper px-3 py-1.5 font-oswald font-bold text-xs hover:bg-candle-deep hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\"><svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.25\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z\"></path></svg> <span>Cart")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if props.CartCount > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<span id=\"cart-badge\">· ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var15 string
-			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.CartCount))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 291, Col: 71}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<span id=\"cart-badge\" class=\"sr-only\">empty</span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
+		templ_7745c5c3_Err = CartBadge(props.CartCount).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</span></a><!-- Mobile menu button --><button type=\"button\" id=\"sf-mobile-menu-btn\" class=\"sm:hidden -m-2.5 p-2.5 text-paper\" aria-expanded=\"false\" aria-controls=\"sf-mobile-menu\"><span class=\"sr-only\">Open menu</span> <svg id=\"sf-menu-icon-open\" class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg> <svg id=\"sf-menu-icon-close\" class=\"size-6 hidden\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></div></nav><!-- Mobile menu --><div id=\"sf-mobile-menu\" class=\"hidden sm:hidden border-t border-ink-soft\"><div class=\"space-y-1 px-4 py-3 bg-ink\"><a href=\"/catalog\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Coffee</a> <a href=\"/subscriptions\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Daily Grind</a> <a href=\"/about\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Story</a><div class=\"border-t border-ink-soft mt-2 pt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</span></a><!-- Mobile menu button --><button type=\"button\" id=\"sf-mobile-menu-btn\" class=\"sm:hidden -m-2.5 p-2.5 text-paper\" aria-expanded=\"false\" aria-controls=\"sf-mobile-menu\"><span class=\"sr-only\">Open menu</span> <svg id=\"sf-menu-icon-open\" class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg> <svg id=\"sf-menu-icon-close\" class=\"size-6 hidden\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div></div></nav><!-- Mobile menu --><div id=\"sf-mobile-menu\" class=\"hidden sm:hidden border-t border-ink-soft\"><div class=\"space-y-1 px-4 py-3 bg-ink\"><a href=\"/catalog\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Coffee</a> <a href=\"/subscriptions\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Daily Grind</a> <a href=\"/about\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Story</a><div class=\"border-t border-ink-soft mt-2 pt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if _, ok := auth.CustomerFromContext(ctx); ok {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<a href=\"/account\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Account</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<a href=\"/account\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Account</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<a href=\"/account/login\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Log In</a>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<a href=\"/account/login\" class=\"block px-3 py-2 font-oswald font-bold text-sm text-paper hover:bg-ink-soft hover:text-candle\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Log In</a>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</div></div></div></header><!-- Main content --><main><div id=\"main-content\" class=\"mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div></div></div></header><!-- Main content --><main><div id=\"main-content\" class=\"mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -382,24 +362,127 @@ func Storefront(props StorefrontProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"polite\"></div><!-- Footer --><div class=\"flame-stripe\"></div><footer class=\"relative bg-ink\"><!-- Paper grain overlay (dim, on ink) --><div class=\"absolute inset-0 opacity-[0.04] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(246,239,225,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16\"><div class=\"grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4\"><!-- Logo column --><div><div class=\"flex items-center gap-3 mb-4\"><img src=\"/static/badge-white.png\" alt=\"Rockabilly Roasting Co.\" class=\"h-12 w-auto flex-shrink-0\"><div><p class=\"font-slab text-paper text-[13px] uppercase leading-[1.05] whitespace-nowrap\" style=\"letter-spacing:0.02em;\">ROCKABILLY ROASTING <span class=\"text-candle\">CO.</span></p><p class=\"font-oswald text-chrome-deep text-[10px] mt-1\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Est. 2014 &middot; Kennewick WA</p></div></div><p class=\"font-oswald text-paper-warm text-sm leading-relaxed\">101 W. Kennewick Ave.<br>Kennewick, WA &middot; 509-585-2320</p></div><!-- Shop links --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Shop</p><ul class=\"space-y-2\"><li><a href=\"/catalog\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Coffee</a></li><li><a href=\"/subscriptions\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">The Daily Grind</a></li><li><a href=\"/wholesale\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Wholesale</a></li>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"polite\"></div><!-- Footer --><div class=\"flame-stripe\"></div><footer class=\"relative bg-ink\"><!-- Paper grain overlay (dim, on ink) --><div class=\"absolute inset-0 opacity-[0.04] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(246,239,225,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16\"><div class=\"grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4\"><!-- Logo column --><div><div class=\"flex items-center gap-3 mb-4\"><img src=\"/static/badge-white.png\" alt=\"Rockabilly Roasting Co.\" class=\"h-12 w-auto flex-shrink-0\"><div><p class=\"font-slab text-paper text-[13px] uppercase leading-[1.05] whitespace-nowrap\" style=\"letter-spacing:0.02em;\">ROCKABILLY ROASTING <span class=\"text-candle\">CO.</span></p><p class=\"font-oswald text-chrome-deep text-[10px] mt-1\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Est. 2014 &middot; Kennewick WA</p></div></div><p class=\"font-oswald text-paper-warm text-sm leading-relaxed\">101 W. Kennewick Ave.<br>Kennewick, WA &middot; 509-585-2320</p></div><!-- Shop links --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Shop</p><ul class=\"space-y-2\"><li><a href=\"/catalog\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Coffee</a></li><li><a href=\"/subscriptions\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">The Daily Grind</a></li><li><a href=\"/wholesale\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Wholesale</a></li>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if _, ok := auth.CustomerFromContext(ctx); ok {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<li><a href=\"/account\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">My Account</a></li>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<li><a href=\"/account\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">My Account</a></li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<li><a href=\"/account/login\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">My Account</a></li>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<li><a href=\"/account/login\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">My Account</a></li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</ul></div><!-- Cafe hours --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Cafe Hours</p><dl class=\"space-y-1.5\"><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Mon &ndash; Thu</dt><dd class=\"font-special text-paper-warm text-sm\">7a &ndash; 2p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Friday</dt><dd class=\"font-special text-paper-warm text-sm\">7a &ndash; 4p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Saturday</dt><dd class=\"font-special text-paper-warm text-sm\">8a &ndash; 4p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-chrome-deep text-sm\" style=\"letter-spacing:0.04em;\">Sunday</dt><dd class=\"font-special text-chrome-deep text-sm\">Closed</dd></div></dl><div class=\"flex gap-4 mt-5 pt-4 border-t border-ink-soft\"><a href=\"https://www.facebook.com/rockabillyroasting/\" class=\"font-oswald font-bold text-paper text-[11px] hover:text-candle transition-colors\" style=\"letter-spacing:0.2em; text-transform:uppercase;\" rel=\"noopener noreferrer\">Facebook</a> <a href=\"https://www.instagram.com/rockabillyroasting/\" class=\"font-oswald font-bold text-paper text-[11px] hover:text-candle transition-colors\" style=\"letter-spacing:0.2em; text-transform:uppercase;\" rel=\"noopener noreferrer\">Instagram</a></div></div><!-- Newsletter --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Stay In The Loop</p><p class=\"font-oswald text-paper-warm text-sm mb-4 leading-relaxed\">Roast drops, fresh deals, nothing else. No spam — just the good stuff.</p><form method=\"post\" action=\"https://broadwave.fireflysoftware.dev/api/subscribe\" hx-target=\"#newsletter-status\" hx-swap=\"innerHTML\" class=\"flex flex-col gap-2\"><input type=\"hidden\" name=\"api_key\" value=\"bw_1ae328f598638462f357e01d43adf6d6\"> <input type=\"hidden\" name=\"list\" value=\"rockabilly-roasting-newsletter\"> <input type=\"hidden\" name=\"redirect\" value=\"https://rockabillyroasting.com/newsletter/thanks\"> <label for=\"newsletter-email\" class=\"sr-only\">Email address</label> <input type=\"email\" id=\"newsletter-email\" name=\"email\" required placeholder=\"name@example.com\" class=\"paper-input w-full border-2 border-paper bg-cream-hi px-3 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none\" style=\"letter-spacing:0.04em;\"> <input type=\"text\" name=\"website\" tabindex=\"-1\" autocomplete=\"off\" style=\"position:absolute; left:-9999px; width:1px; height:1px;\" aria-hidden=\"true\"> <button type=\"submit\" class=\"btn-stamp-paper w-full bg-rust text-paper border-2 border-paper px-4 py-2.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Join the list</button><div id=\"newsletter-status\" class=\"font-oswald text-paper-warm text-sm\" aria-live=\"polite\"></div></form></div></div><!-- Copyright bar --><div class=\"mt-14 pt-6 border-t-2 border-ink-soft flex flex-col sm:flex-row justify-between gap-3\"><p class=\"font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.08em;\">&copy; 2026 Rockabilly Roasting Co. &middot; Roasted in Kennewick.</p><div class=\"flex flex-wrap gap-x-5 gap-y-1\"><a href=\"/shipping\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shipping &amp; Returns</a> <a href=\"/privacy\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Privacy</a> <a href=\"/terms\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Terms</a> <a href=\"/help\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Help</a> <span class=\"font-special text-chrome-deep text-xs\">Powered by Hiri</span></div></div></div></footer><!-- Back to top — paper stamp on ink --><button id=\"back-to-top\" type=\"button\" aria-label=\"Back to top\" class=\"fixed bottom-6 right-6 z-40 hidden size-11 items-center justify-center bg-paper border-2 border-ink text-ink hover:bg-candle transition-colors\" style=\"box-shadow: var(--shadow-stamp-sm);\"><svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 15.75l7.5-7.5 7.5 7.5\"></path></svg></button><script>\n\t\t\t\t(function() {\n\t\t\t\t\t// Back to top button\n\t\t\t\t\tvar btt = document.getElementById('back-to-top');\n\t\t\t\t\tif (btt) {\n\t\t\t\t\t\tvar shown = false;\n\t\t\t\t\t\twindow.addEventListener('scroll', function() {\n\t\t\t\t\t\t\tif (window.scrollY > 400 && !shown) {\n\t\t\t\t\t\t\t\tbtt.classList.remove('hidden');\n\t\t\t\t\t\t\t\tbtt.classList.add('flex');\n\t\t\t\t\t\t\t\tshown = true;\n\t\t\t\t\t\t\t} else if (window.scrollY <= 400 && shown) {\n\t\t\t\t\t\t\t\tbtt.classList.add('hidden');\n\t\t\t\t\t\t\t\tbtt.classList.remove('flex');\n\t\t\t\t\t\t\t\tshown = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}, { passive: true });\n\t\t\t\t\t\tbtt.addEventListener('click', function() {\n\t\t\t\t\t\t\twindow.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile menu toggle\n\t\t\t\t\tvar btn = document.getElementById('sf-mobile-menu-btn');\n\t\t\t\t\tvar menu = document.getElementById('sf-mobile-menu');\n\t\t\t\t\tvar iconOpen = document.getElementById('sf-menu-icon-open');\n\t\t\t\t\tvar iconClose = document.getElementById('sf-menu-icon-close');\n\t\t\t\t\tif (btn && menu) {\n\t\t\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\t\t\tvar expanded = menu.classList.toggle('hidden') === false;\n\t\t\t\t\t\t\tbtn.setAttribute('aria-expanded', String(expanded));\n\t\t\t\t\t\t\tif (iconOpen && iconClose) {\n\t\t\t\t\t\t\t\ticonOpen.classList.toggle('hidden', expanded);\n\t\t\t\t\t\t\t\ticonClose.classList.toggle('hidden', !expanded);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t\t}\n\n\t\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t\t});\n\t\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\t\tvar closeBtn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</ul></div><!-- Cafe hours --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Cafe Hours</p><dl class=\"space-y-1.5\"><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Mon &ndash; Thu</dt><dd class=\"font-special text-paper-warm text-sm\">7a &ndash; 2p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Friday</dt><dd class=\"font-special text-paper-warm text-sm\">7a &ndash; 4p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-paper text-sm\" style=\"letter-spacing:0.04em;\">Saturday</dt><dd class=\"font-special text-paper-warm text-sm\">8a &ndash; 4p</dd></div><div class=\"flex justify-between gap-3\"><dt class=\"font-oswald text-chrome-deep text-sm\" style=\"letter-spacing:0.04em;\">Sunday</dt><dd class=\"font-special text-chrome-deep text-sm\">Closed</dd></div></dl><div class=\"flex gap-4 mt-5 pt-4 border-t border-ink-soft\"><a href=\"https://www.facebook.com/rockabillyroasting/\" class=\"font-oswald font-bold text-paper text-[11px] hover:text-candle transition-colors\" style=\"letter-spacing:0.2em; text-transform:uppercase;\" rel=\"noopener noreferrer\">Facebook</a> <a href=\"https://www.instagram.com/rockabillyroasting/\" class=\"font-oswald font-bold text-paper text-[11px] hover:text-candle transition-colors\" style=\"letter-spacing:0.2em; text-transform:uppercase;\" rel=\"noopener noreferrer\">Instagram</a></div></div><!-- Newsletter --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Stay In The Loop</p><p class=\"font-oswald text-paper-warm text-sm mb-4 leading-relaxed\">Roast drops, fresh deals, nothing else. No spam — just the good stuff.</p><form method=\"post\" action=\"https://broadwave.fireflysoftware.dev/api/subscribe\" hx-target=\"#newsletter-status\" hx-swap=\"innerHTML\" class=\"flex flex-col gap-2\"><input type=\"hidden\" name=\"api_key\" value=\"bw_1ae328f598638462f357e01d43adf6d6\"> <input type=\"hidden\" name=\"list\" value=\"rockabilly-roasting-newsletter\"> <input type=\"hidden\" name=\"redirect\" value=\"https://rockabillyroasting.com/newsletter/thanks\"> <label for=\"newsletter-email\" class=\"sr-only\">Email address</label> <input type=\"email\" id=\"newsletter-email\" name=\"email\" required placeholder=\"name@example.com\" class=\"paper-input w-full border-2 border-paper bg-cream-hi px-3 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none\" style=\"letter-spacing:0.04em;\"> <input type=\"text\" name=\"website\" tabindex=\"-1\" autocomplete=\"off\" style=\"position:absolute; left:-9999px; width:1px; height:1px;\" aria-hidden=\"true\"> <button type=\"submit\" class=\"btn-stamp-paper w-full bg-rust text-paper border-2 border-paper px-4 py-2.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Join the list</button><div id=\"newsletter-status\" class=\"font-oswald text-paper-warm text-sm\" aria-live=\"polite\"></div></form></div></div><!-- Copyright bar --><div class=\"mt-14 pt-6 border-t-2 border-ink-soft flex flex-col sm:flex-row justify-between gap-3\"><p class=\"font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.08em;\">&copy; 2026 Rockabilly Roasting Co. &middot; Roasted in Kennewick.</p><div class=\"flex flex-wrap gap-x-5 gap-y-1\"><a href=\"/shipping\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shipping &amp; Returns</a> <a href=\"/privacy\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Privacy</a> <a href=\"/terms\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Terms</a> <a href=\"/help\" class=\"font-oswald text-chrome-deep text-xs hover:text-candle transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Help</a> <span class=\"font-special text-chrome-deep text-xs\">Powered by Hiri</span></div></div></div></footer><!-- Back to top — paper stamp on ink --><button id=\"back-to-top\" type=\"button\" aria-label=\"Back to top\" class=\"fixed bottom-6 right-6 z-40 hidden size-11 items-center justify-center bg-paper border-2 border-ink text-ink hover:bg-candle transition-colors\" style=\"box-shadow: var(--shadow-stamp-sm);\"><svg class=\"size-5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M4.5 15.75l7.5-7.5 7.5 7.5\"></path></svg></button><script>\n\t\t\t\t(function() {\n\t\t\t\t\t// Back to top button\n\t\t\t\t\tvar btt = document.getElementById('back-to-top');\n\t\t\t\t\tif (btt) {\n\t\t\t\t\t\tvar shown = false;\n\t\t\t\t\t\twindow.addEventListener('scroll', function() {\n\t\t\t\t\t\t\tif (window.scrollY > 400 && !shown) {\n\t\t\t\t\t\t\t\tbtt.classList.remove('hidden');\n\t\t\t\t\t\t\t\tbtt.classList.add('flex');\n\t\t\t\t\t\t\t\tshown = true;\n\t\t\t\t\t\t\t} else if (window.scrollY <= 400 && shown) {\n\t\t\t\t\t\t\t\tbtt.classList.add('hidden');\n\t\t\t\t\t\t\t\tbtt.classList.remove('flex');\n\t\t\t\t\t\t\t\tshown = false;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}, { passive: true });\n\t\t\t\t\t\tbtt.addEventListener('click', function() {\n\t\t\t\t\t\t\twindow.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile menu toggle\n\t\t\t\t\tvar btn = document.getElementById('sf-mobile-menu-btn');\n\t\t\t\t\tvar menu = document.getElementById('sf-mobile-menu');\n\t\t\t\t\tvar iconOpen = document.getElementById('sf-menu-icon-open');\n\t\t\t\t\tvar iconClose = document.getElementById('sf-menu-icon-close');\n\t\t\t\t\tif (btn && menu) {\n\t\t\t\t\t\tbtn.addEventListener('click', function() {\n\t\t\t\t\t\t\tvar expanded = menu.classList.toggle('hidden') === false;\n\t\t\t\t\t\t\tbtn.setAttribute('aria-expanded', String(expanded));\n\t\t\t\t\t\t\tif (iconOpen && iconClose) {\n\t\t\t\t\t\t\t\ticonOpen.classList.toggle('hidden', expanded);\n\t\t\t\t\t\t\t\ticonClose.classList.toggle('hidden', !expanded);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t\t}\n\n\t\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t\t});\n\t\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\t\tvar closeBtn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// CartBadge renders the header cart count chip. Count 0 collapses to a
+// screen-reader-only "empty" so the badge never shows "· 0".
+func CartBadge(count int) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var15 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var15 == nil {
+			templ_7745c5c3_Var15 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		if count > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<span id=\"cart-badge\">· ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var16 string
+			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 528, Col: 53}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<span id=\"cart-badge\" class=\"sr-only\">empty</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		return nil
+	})
+}
+
+// CartBadgeOOB is the same chip marked for an htmx out-of-band swap. Append it
+// to any htmx response that mutates the cart so the header count stays in sync
+// even when the main swap targets a different element (e.g. #wholesale-checkout).
+func CartBadgeOOB(count int) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var17 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var17 == nil {
+			templ_7745c5c3_Var17 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		if count > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<span id=\"cart-badge\" hx-swap-oob=\"true\">· ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var18 string
+			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 539, Col: 72}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<span id=\"cart-badge\" class=\"sr-only\" hx-swap-oob=\"true\">empty</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
 		return nil
 	})

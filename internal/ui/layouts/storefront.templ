@@ -287,11 +287,7 @@ templ Storefront(props StorefrontProps) {
 								</svg>
 								<span>
 									Cart
-									if props.CartCount > 0 {
-										<span id="cart-badge">· { fmt.Sprintf("%d", props.CartCount) }</span>
-									} else {
-										<span id="cart-badge" class="sr-only">empty</span>
-									}
+									@CartBadge(props.CartCount)
 								</span>
 							</a>
 							<!-- Mobile menu button -->
@@ -523,4 +519,25 @@ templ Storefront(props StorefrontProps) {
 			</script>
 		</body>
 	</html>
+}
+
+// CartBadge renders the header cart count chip. Count 0 collapses to a
+// screen-reader-only "empty" so the badge never shows "· 0".
+templ CartBadge(count int) {
+	if count > 0 {
+		<span id="cart-badge">· { fmt.Sprintf("%d", count) }</span>
+	} else {
+		<span id="cart-badge" class="sr-only">empty</span>
+	}
+}
+
+// CartBadgeOOB is the same chip marked for an htmx out-of-band swap. Append it
+// to any htmx response that mutates the cart so the header count stays in sync
+// even when the main swap targets a different element (e.g. #wholesale-checkout).
+templ CartBadgeOOB(count int) {
+	if count > 0 {
+		<span id="cart-badge" hx-swap-oob="true">· { fmt.Sprintf("%d", count) }</span>
+	} else {
+		<span id="cart-badge" class="sr-only" hx-swap-oob="true">empty</span>
+	}
 }

@@ -1,0 +1,62 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+type WholesaleOrderConfirmedProps struct {
+	CompanyName string
+	OrderNumber string
+	CartCount   int
+}
+
+templ WholesaleOrderConfirmedContent(props WholesaleOrderConfirmedProps) {
+	<div class="mx-auto max-w-2xl py-12 sm:py-16">
+		<div class="border-2 border-ink bg-cream-hi p-8 sm:p-12 text-center" style="box-shadow: var(--shadow-stamp-lg);">
+			<!-- Stamped check -->
+			<div class="mx-auto flex size-16 items-center justify-center border-2 border-ink bg-candle" style="box-shadow: var(--shadow-stamp-sm);">
+				<svg class="size-8 text-ink" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"></path>
+				</svg>
+			</div>
+			<p class="mt-6 font-oswald font-semibold text-chrome-deep text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Order Received</p>
+			<h1 class="font-slab text-ink uppercase leading-[0.95] mt-2" style="font-size: clamp(1.75rem, 4vw, 2.5rem);">You're all set</h1>
+			if props.OrderNumber != "" {
+				<p class="mt-4 font-oswald text-ink-soft text-base leading-relaxed">
+					Order <span class="font-special text-ink">#{ props.OrderNumber }</span> is in — we'll get the roast moving.
+				</p>
+			} else {
+				<p class="mt-4 font-oswald text-ink-soft text-base leading-relaxed">
+					Your order is in — we'll get the roast moving.
+				</p>
+			}
+			<p class="mt-2 font-oswald text-chrome-deep text-sm">
+				An invoice will be sent to your email shortly. No payment is collected now.
+			</p>
+			<div class="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+				<a
+					href="/wholesale/portal"
+					class="btn-stamp inline-flex items-center border-2 border-ink bg-rust text-paper px-6 py-3 font-oswald font-bold text-sm"
+					style="letter-spacing:0.16em; text-transform:uppercase;"
+				>
+					Place Another Order
+				</a>
+				<a
+					href="/wholesale/help"
+					class="font-oswald font-bold text-xs text-rust hover:text-rust-deep"
+					style="letter-spacing:0.16em; text-transform:uppercase;"
+				>
+					Need a hand?
+				</a>
+			</div>
+		</div>
+	</div>
+}
+
+templ WholesaleOrderConfirmedPage(props WholesaleOrderConfirmedProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:     "Order Received",
+		CartURL:   "/wholesale/checkout",
+		CartCount: props.CartCount,
+	}) {
+		@WholesaleOrderConfirmedContent(props)
+	}
+}

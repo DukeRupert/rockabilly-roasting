@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/mail"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/turnstile"
 	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
 
@@ -459,6 +461,9 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 	}
 	if IsHTMX(r) {
 		storefront.WholesaleCheckoutContent(props).Render(ctx, w) //nolint:errcheck
+		// Keep the header cart badge in sync — the main swap only replaces
+		// #wholesale-checkout, so the count chip is updated out-of-band.
+		layouts.CartBadgeOOB(props.CartCount).Render(ctx, w) //nolint:errcheck
 		return
 	}
 	storefront.WholesaleCheckoutPage(props).Render(ctx, w) //nolint:errcheck
@@ -504,6 +509,7 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 	actor := customerActor(r)
 
 	var stale bool
+	var orderNumber string
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		cart, txErr := d.CartService.GetOrCreateCart(ctx, tx, cartID)
 		if txErr != nil {
@@ -581,6 +587,7 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		if txErr != nil {
 			return txErr
 		}
+		orderNumber = order.Number
 
 		// Enqueue QB customer + invoice chain if QB is connected.
 		if d.QBClient != nil {
@@ -619,7 +626,47 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		MaxAge: -1,
 	})
 
-	http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
+	// Send the buyer to a confirmation page. For htmx (the form is hx-boosted),
+	// HX-Redirect triggers a full browser navigation rather than a content swap —
+	// that re-renders the layout header so the cart badge clears (a boosted swap
+	// only replaces #main-content and would leave the stale count behind).
+	confirmURL := "/wholesale/order-confirmed"
+	if orderNumber != "" {
+		confirmURL += "?number=" + url.QueryEscape(orderNumber)
+	}
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", confirmURL)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, confirmURL, http.StatusSeeOther)
+}
+
+// handleWholesaleOrderConfirmed renders the post-checkout success page. The cart
+// has already been cleared by the confirm handler, so CartCount is always 0.
+func (d *Deps) handleWholesaleOrderConfirmed(w http.ResponseWriter, r *http.Request) {
+	customer, ok := auth.CustomerFromContext(r.Context())
+	if !ok {
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+		return
+	}
+
+	companyName := ""
+	if customer.CompanyName != nil {
+		companyName = *customer.CompanyName
+	}
+
+	props := storefront.WholesaleOrderConfirmedProps{
+		CompanyName: companyName,
+		OrderNumber: r.URL.Query().Get("number"),
+		CartCount:   0,
+	}
+
+	if IsHTMX(r) {
+		storefront.WholesaleOrderConfirmedContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.WholesaleOrderConfirmedPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
 // isNewWholesaleAddr reports whether an address selection means "enter a new

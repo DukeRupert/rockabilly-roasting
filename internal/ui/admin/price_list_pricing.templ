@@ -93,13 +93,19 @@ templ PriceListPricingContent(props PriceListPricingProps) {
 	</form>
 }
 
-// priceListProductBlock renders one product's price tables inside the page-wide form.
-// It carries no form or Save button of its own — the single Save button in the header
-// submits every product's changed cells together.
+// priceListProductBlock renders one product as a single table: one row per
+// variant, with a read-only Base column followed by one editable column per
+// price list. This keeps every override comparable at a glance and sits next to
+// the base it falls back to. It carries no form or Save button of its own — the
+// single Save button in the header submits every product's changed cells together.
+//
+// The input name/id scheme (list:<list>:<variant>, list_prev:<list>:<variant>,
+// id plprev-<list>-<variant>) is unchanged, so the bulk-save handler and its
+// success OOB updates keep working without modification.
 templ priceListProductBlock(lists []domain.PriceList, pp ProductPriceListPricing) {
 	<div>
 		<!-- Product heading -->
-		<div class="flex items-center justify-between mb-4">
+		<div class="flex items-center justify-between mb-3">
 			<h2 class="text-sm font-semibold text-rr-heading">{ pp.Product.Title }</h2>
 			<a
 				href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", pp.Product.ID)) }
@@ -108,102 +114,65 @@ templ priceListProductBlock(lists []domain.PriceList, pp ProductPriceListPricing
 				Edit product
 			</a>
 		</div>
-		<!-- Stacked price tables: base (read-only) + one per list -->
-		<div class="space-y-4">
-			@priceListBaseCard(pp)
-			for _, list := range lists {
-				@priceListPricingCard(list, pp)
-			}
-		</div>
-	</div>
-}
-
-templ priceListBaseCard(pp ProductPriceListPricing) {
-	<div class="overflow-hidden border border-rr-border bg-rr-surface">
-		<div class="border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6">
-			<h3 class="text-sm font-medium text-rr-body">
-				Base Prices
-				<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", pp.Product.ID)) } class="text-xs text-rr-red hover:text-rr-red-lt font-normal">(edit on the product page)</a>
-			</h3>
-		</div>
-		<table class="min-w-full divide-y divide-rr-border">
-			<thead class="bg-rr-raised">
-				<tr>
-					<th scope="col" class="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-rr-heading sm:pl-6">SKU</th>
-					<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-rr-heading">Unit Price</th>
-				</tr>
-			</thead>
-			<tbody class="divide-y divide-rr-border bg-rr-surface">
-				for _, vp := range pp.Variants {
+		<!-- One table: SKU | Base (read-only) | one editable column per price list -->
+		<div class="overflow-x-auto border border-rr-border bg-rr-surface">
+			<table class="min-w-full divide-y divide-rr-border">
+				<thead class="bg-rr-raised">
 					<tr>
-						<td class="whitespace-nowrap py-2.5 pl-4 pr-3 text-sm sm:pl-6">
-							<span class="font-mono font-medium text-rr-heading">{ vp.Variant.SKU }</span>
-							if vp.Variant.IsDefault {
-								<span class="badge badge-green ml-1.5">Default</span>
-							}
-						</td>
-						<td class="whitespace-nowrap px-3 py-2.5 text-sm text-rr-body">
-							if vp.PriceCents != nil {
-								<span class="text-rr-muted">$</span>
-								<span class="font-mono">{ priceToDollars(*vp.PriceCents) }</span>
-							} else {
-								<span class="text-rr-muted italic">no base price</span>
-							}
-						</td>
+						<th scope="col" class="sticky left-0 z-10 bg-rr-raised py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-rr-heading sm:pl-6">SKU</th>
+						<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-rr-heading">Base</th>
+						for _, list := range lists {
+							<th scope="col" class="whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold text-rr-teal">
+								{ list.Name }
+								if list.Status != domain.PriceListStatusActive {
+									<span class="ml-1 font-normal text-rr-muted">({ string(list.Status) })</span>
+								}
+							</th>
+						}
 					</tr>
-				}
-			</tbody>
-		</table>
-	</div>
-}
-
-templ priceListPricingCard(list domain.PriceList, pp ProductPriceListPricing) {
-	<div class="overflow-hidden border border-rr-border bg-rr-surface">
-		<div class="border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6">
-			<h3 class="text-sm font-medium text-rr-teal">
-				{ list.Name } Prices
-				if list.Status != domain.PriceListStatusActive {
-					<span class="ml-2 text-xs text-rr-muted">({ string(list.Status) })</span>
-				}
-			</h3>
+				</thead>
+				<tbody class="divide-y divide-rr-border bg-rr-surface">
+					for _, vp := range pp.Variants {
+						<tr>
+							<td class="sticky left-0 z-10 whitespace-nowrap bg-rr-surface py-2.5 pl-4 pr-3 text-sm sm:pl-6">
+								<span class="font-mono font-medium text-rr-heading">{ vp.Variant.SKU }</span>
+								if vp.Variant.IsDefault {
+									<span class="badge badge-green ml-1.5">Default</span>
+								}
+							</td>
+							<!-- Base price (read-only — edit via the product page) -->
+							<td class="whitespace-nowrap px-3 py-2.5 text-sm text-rr-muted">
+								if vp.PriceCents != nil {
+									<span class="font-mono">${ priceToDollars(*vp.PriceCents) }</span>
+								} else {
+									<span class="italic">&mdash;</span>
+								}
+							</td>
+							<!-- One editable override per price list -->
+							for _, list := range lists {
+								<td class="whitespace-nowrap px-3 py-2.5 text-sm">
+									<div class="flex items-center gap-1">
+										<span class="text-rr-muted">$</span>
+										<input
+											type="number"
+											name={ "list:" + list.ID.String() + ":" + vp.Variant.ID.String() }
+											step="0.01"
+											min="0"
+											placeholder="base"
+											if cents, ok := vp.ListPrices[list.ID]; ok {
+												value={ priceToDollars(cents) }
+											}
+											class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
+										/>
+										<input type="hidden" id={ "plprev-" + list.ID.String() + "-" + vp.Variant.ID.String() } name={ "list_prev:" + list.ID.String() + ":" + vp.Variant.ID.String() } value={ priceListDollars(vp.ListPrices, list.ID) }/>
+									</div>
+								</td>
+							}
+						</tr>
+					}
+				</tbody>
+			</table>
 		</div>
-		<table class="min-w-full divide-y divide-rr-border">
-			<thead class="bg-rr-raised">
-				<tr>
-					<th scope="col" class="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-rr-heading sm:pl-6">SKU</th>
-					<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-rr-heading">Unit Price</th>
-				</tr>
-			</thead>
-			<tbody class="divide-y divide-rr-border bg-rr-surface">
-				for _, vp := range pp.Variants {
-					<tr>
-						<td class="whitespace-nowrap py-2.5 pl-4 pr-3 text-sm sm:pl-6">
-							<span class="font-mono font-medium text-rr-heading">{ vp.Variant.SKU }</span>
-							if vp.Variant.IsDefault {
-								<span class="badge badge-green ml-1.5">Default</span>
-							}
-						</td>
-						<td class="whitespace-nowrap px-3 py-2.5 text-sm">
-							<div class="flex items-center gap-1">
-								<span class="text-rr-muted">$</span>
-								<input
-									type="number"
-									name={ "list:" + list.ID.String() + ":" + vp.Variant.ID.String() }
-									step="0.01"
-									min="0"
-									placeholder="base"
-									if cents, ok := vp.ListPrices[list.ID]; ok {
-										value={ priceToDollars(cents) }
-									}
-									class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
-								/>
-								<input type="hidden" id={ "plprev-" + list.ID.String() + "-" + vp.Variant.ID.String() } name={ "list_prev:" + list.ID.String() + ":" + vp.Variant.ID.String() } value={ priceListDollars(vp.ListPrices, list.ID) }/>
-							</div>
-						</td>
-					</tr>
-				}
-			</tbody>
-		</table>
 	</div>
 }
 

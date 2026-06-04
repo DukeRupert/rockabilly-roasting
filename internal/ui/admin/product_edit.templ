@@ -534,24 +534,7 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
-									<form
-										method="post"
-										action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/channels", product.ID, vwo.Variant.ID)) }
-										hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/channels", product.ID, vwo.Variant.ID) }
-										hx-trigger="change"
-										hx-target="#variants-panel"
-										hx-swap="outerHTML"
-										class="flex flex-col gap-1"
-									>
-										<label class="inline-flex items-center gap-1.5 text-xs text-rr-body">
-											<input type="checkbox" name="retail_available" value="true" checked?={ vwo.Variant.RetailAvailable } class="size-3.5 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
-											Retail
-										</label>
-										<label class="inline-flex items-center gap-1.5 text-xs text-rr-body">
-											<input type="checkbox" name="wholesale_available" value="true" checked?={ vwo.Variant.WholesaleAvailable } class="size-3.5 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
-											Wholesale
-										</label>
-									</form>
+									@VariantChannelToggles(product.ID, vwo.Variant)
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-3">
 									if !vwo.Variant.IsDefault && vwo.Variant.ArchivedAt == nil {
@@ -729,6 +712,42 @@ func containsUUID(ids []uuid.UUID, id uuid.UUID) bool {
 		}
 	}
 	return false
+}
+
+// VariantChannelToggles renders the per-channel availability switches (retail/wholesale)
+// for a single variant. Both switches live in one form so a change posts both states
+// atomically; the form targets itself (hx-target="this"), so toggling swaps only this
+// fragment and never re-renders or reflows the rest of the variant table.
+templ VariantChannelToggles(productID uuid.UUID, variant domain.Variant) {
+	<form
+		id={ "variant-channels-" + variant.ID.String() }
+		method="post"
+		action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/channels", productID, variant.ID)) }
+		hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/channels", productID, variant.ID) }
+		hx-trigger="change"
+		hx-target="this"
+		hx-swap="outerHTML"
+		class="flex flex-col gap-2"
+	>
+		<div class="flex items-center gap-2">
+			@switchcomp.Switch(switchcomp.Props{
+				ID:      "retail-" + variant.ID.String(),
+				Name:    "retail_available",
+				Value:   "true",
+				Checked: variant.RetailAvailable,
+			})
+			<span class="text-xs text-rr-muted">Retail</span>
+		</div>
+		<div class="flex items-center gap-2">
+			@switchcomp.Switch(switchcomp.Props{
+				ID:      "wholesale-" + variant.ID.String(),
+				Name:    "wholesale_available",
+				Value:   "true",
+				Checked: variant.WholesaleAvailable,
+			})
+			<span class="text-xs text-rr-muted">Wholesale</span>
+		</div>
+	</form>
 }
 
 // VisibilityPanel controls a product's storefront visibility tier and, when restricted,

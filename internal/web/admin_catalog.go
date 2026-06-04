@@ -1162,8 +1162,10 @@ func (d *Deps) handleAdminVariantChannels(w http.ResponseWriter, r *http.Request
 	retail := r.FormValue("retail_available") == "true"
 	wholesale := r.FormValue("wholesale_available") == "true"
 
+	var variant *domain.Variant
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CatalogService.UpdateVariantChannels(ctx, tx, variantID, retail, wholesale, staffActor(r))
+		var txErr error
+		variant, txErr = d.CatalogService.UpdateVariantChannels(ctx, tx, variantID, retail, wholesale, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -1171,8 +1173,10 @@ func (d *Deps) handleAdminVariantChannels(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Re-render only this variant's toggle fragment (hx-target="this"), so the rest of
+	// the variant table never re-renders or reflows.
 	if IsHTMX(r) {
-		d.renderVariantsPanel(w, r, productID)
+		admin.VariantChannelToggles(productID, *variant).Render(ctx, w) //nolint:errcheck
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+updated", productID), http.StatusSeeOther)

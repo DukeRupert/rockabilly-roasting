@@ -8,72 +8,86 @@ type WholesaleLoginProps struct {
 }
 
 templ WholesaleLoginContent(props WholesaleLoginProps) {
-	<div class="flex min-h-full flex-col justify-center py-12 sm:px-6 lg:px-8">
-		<div class="sm:mx-auto sm:w-full sm:max-w-md">
-			<h2 class="text-center font-display text-2xl tracking-widest text-rr-heading">WHOLESALE SIGN IN</h2>
-			<p class="mt-2 text-center text-sm/6 text-rr-muted">
-				Sign in to your wholesale account to place orders.
-			</p>
-		</div>
-		<div class="mt-10 sm:mx-auto sm:w-full sm:max-w-[480px]">
-			<div class="bg-rr-surface px-6 py-12 shadow-sm sm:rounded-sm sm:px-12">
+	<!-- Full-bleed paper surface -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)] flex items-center">
+		<!-- Paper grain overlay -->
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-md lg:max-w-xl w-full px-6 sm:px-10 lg:px-14 py-14 sm:py-20">
+			<!-- Page heading -->
+			<div class="text-center mb-8">
+				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+					For the trade
+				</p>
+				<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;">
+					Wholesale
+					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">sign in.</span>
+				</h1>
+				<p class="font-oswald text-ink-soft text-sm mt-3 max-w-xs mx-auto leading-relaxed">
+					Sign in to your account to place orders and manage your business.
+				</p>
+			</div>
+			<!-- Card -->
+			<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8">
 				if props.Error != "" {
-					<div class="mb-6 rounded-sm bg-rr-red/10 border border-rr-red/20 p-3">
-						<p class="text-sm/6 font-body text-rr-red-lt">{ props.Error }</p>
+					<div class="mb-5 border-2 border-rust bg-paper p-3 text-center">
+						<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">{ props.Error }</p>
 					</div>
 				}
-				<form method="post" action="/wholesale/login" class="space-y-6">
+				<form method="post" action="/wholesale/login" class="space-y-5">
 					<div>
-						<label for="email" class="block text-sm/6 font-medium text-rr-body">Email address</label>
-						<div class="mt-2">
-							<input
-								type="email"
-								name="email"
-								id="email"
-								required
-								autocomplete="email"
-								value={ props.Email }
-								class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6"
-							/>
-						</div>
-					</div>
-					<div>
-						<label for="password" class="block text-sm/6 font-medium text-rr-body">Password</label>
-						<div class="mt-2">
-							<input
-								type="password"
-								name="password"
-								id="password"
-								required
-								autocomplete="current-password"
-								class="rr-input block w-full rounded-sm border border-rr-border bg-rr-bg px-3 py-1.5 text-base text-rr-heading placeholder:text-rr-faint focus:outline-none sm:text-sm/6"
-							/>
-						</div>
-					</div>
-					<div class="flex items-center justify-between">
-						<div class="flex gap-3">
-							<div class="flex h-6 shrink-0 items-center">
-								<input type="checkbox" name="remember_me" id="remember_me" class="size-4 rounded-sm border border-rr-border bg-rr-bg checked:border-rr-red checked:bg-rr-red focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"/>
-							</div>
-							<label for="remember_me" class="block text-sm/6 text-rr-body">Remember me</label>
-						</div>
+						<label for="email" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Email address</label>
+						<input
+							type="email"
+							name="email"
+							id="email"
+							required
+							autocomplete="email"
+							value={ props.Email }
+							placeholder="you@example.com"
+							class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none"
+							style="letter-spacing:0.04em;"
+						/>
 					</div>
 					<div>
-						<button
-							type="submit"
-							class="btn flex w-full justify-center rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
-						>
-							Sign in
-						</button>
+						<label for="password" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Password</label>
+						<input
+							type="password"
+							name="password"
+							id="password"
+							required
+							autocomplete="current-password"
+							class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none"
+							style="letter-spacing:0.04em;"
+						/>
 					</div>
+					<label for="remember_me" class="flex items-center gap-2.5 cursor-pointer">
+						<input
+							type="checkbox"
+							name="remember_me"
+							id="remember_me"
+							class="size-4 border-2 border-ink bg-paper focus:outline-none"
+							style="accent-color: var(--color-rust);"
+						/>
+						<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Remember me</span>
+					</label>
+					<button
+						type="submit"
+						class="btn-stamp w-full inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm"
+						style="letter-spacing:0.16em; text-transform:uppercase;"
+					>
+						Sign in
+						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"></path>
+						</svg>
+					</button>
 				</form>
 			</div>
-			<p class="mt-10 text-center text-sm/6 text-rr-muted">
+			<p class="mt-6 text-center font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
 				Don't have a wholesale account?
-				<a href="/wholesale/apply" class="font-semibold text-rr-red hover:text-rr-red-lt">Apply here</a>
+				<a href="/wholesale/apply" class="font-bold text-rust hover:text-rust-deep underline underline-offset-2">Apply here</a>.
 			</p>
 		</div>
-	</div>
+	</section>
 }
 
 templ WholesaleLoginPage(props WholesaleLoginProps) {

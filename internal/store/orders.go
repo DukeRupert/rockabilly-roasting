@@ -112,6 +112,18 @@ func (s *OrderStore) GetOrderByIDAsStaff(ctx context.Context, tx pgx.Tx, id uuid
 	return orderFromRow(row), nil
 }
 
+// GetOrderByIDForUpdate returns an order by ID and takes a row-level lock so a
+// manual payment override serializes against a concurrent QB reconcile on the
+// same order (mirrors GetOrderByQBInvoiceIDForUpdate, but keyed by order id).
+func (s *OrderStore) GetOrderByIDForUpdate(ctx context.Context, tx pgx.Tx, id uuid.UUID) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.get_by_id_for_update", time.Now(), &err)
+	row, err := sqlcgen.New(tx).GetOrderByIDForUpdate(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get order %s (for update): %w", id, err)
+	}
+	return orderFromRow(row), nil
+}
+
 // GetOrderByNumberAsStaff returns an order by its number.
 func (s *OrderStore) GetOrderByNumberAsStaff(ctx context.Context, tx pgx.Tx, number string) (_ *domain.Order, err error) {
 	defer trackQuery(s.metrics, "orders.get_by_number", time.Now(), &err)
@@ -572,14 +584,14 @@ type FulfillmentViewCounts struct {
 // CountFulfillmentViews returns counts for every tab on the admin fulfillment
 // list in a single query. Unconfirmed orders (status=pending+payment=awaiting)
 // are excluded from every bucket — they don't belong in a pack-and-ship queue.
-func (s *OrderStore) CountFulfillmentViews(ctx context.Context, tx pgx.Tx) (_ FulfillmentViewCounts, err error) {
+func (s *OrderStore) CountFulfillmentViews(ctx context.Context, tx pgx.Tx, channel *domain.OrderChannel) (_ FulfillmentViewCounts, err error) {
 	defer trackQuery(s.metrics, "orders.count_fulfillment_views", time.Now(), &err)
 	// NeedsAction and ReadyToShip exclude cancelled/refunded — those orders'
 	// fulfillment_status often lingers at 'unfulfilled' from before they were
 	// cancelled, so a fulfillment-status-only filter leaks them into the
 	// working queue where staff can't act on them anyway. Shipped/Delivered
 	// keep the broader set so a cancelled-after-shipping case still surfaces.
-	const query = `SELECT
+	query := `SELECT
 		COUNT(*) FILTER (WHERE fulfillment_status IN ('unfulfilled', 'partially_fulfilled', 'fulfilled', 'ready_for_pickup') AND status NOT IN ('cancelled', 'refunded')) AS needs_action,
 		COUNT(*) FILTER (WHERE fulfillment_status = 'fulfilled' AND status NOT IN ('cancelled', 'refunded'))                                                              AS ready_to_ship,
 		COUNT(*) FILTER (WHERE fulfillment_status IN ('shipped', 'partially_shipped'))                                                                                    AS shipped,
@@ -587,8 +599,15 @@ func (s *OrderStore) CountFulfillmentViews(ctx context.Context, tx pgx.Tx) (_ Fu
 		COUNT(*)                                                                                                                                                          AS total
 	FROM orders
 	WHERE NOT (status = 'pending' AND payment_status = 'awaiting')`
+	args := []any{}
+	// Scope to a single channel when asked, so the retail and wholesale
+	// fulfillment queues show counts that match their own rows.
+	if channel != nil {
+		query += " AND channel = $1"
+		args = append(args, string(*channel))
+	}
 	var c FulfillmentViewCounts
-	if err := tx.QueryRow(ctx, query).Scan(&c.NeedsAction, &c.ReadyToShip, &c.Shipped, &c.Delivered, &c.All); err != nil {
+	if err := tx.QueryRow(ctx, query, args...).Scan(&c.NeedsAction, &c.ReadyToShip, &c.Shipped, &c.Delivered, &c.All); err != nil {
 		return FulfillmentViewCounts{}, fmt.Errorf("count fulfillment views: %w", err)
 	}
 	return c, nil

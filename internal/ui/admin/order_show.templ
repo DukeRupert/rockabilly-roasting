@@ -169,6 +169,24 @@ func canRefundOrder(status domain.OrderStatus, paymentStatus domain.PaymentStatu
 		paymentStatus == domain.PaymentStatusCaptured
 }
 
+// canMarkOrderPaid gates the manual "mark as paid" override — a fallback for
+// when QuickBooks doesn't reconcile a wholesale invoice payment. Mirrors
+// app.orderManuallyPayable: QB-owned orders with a live, unsettled invoice only.
+func canMarkOrderPaid(o *domain.Order) bool {
+	if o.QBInvoiceID == nil {
+		return false
+	}
+	if o.Status == domain.OrderStatusCancelled || o.Status == domain.OrderStatusRefunded {
+		return false
+	}
+	switch o.PaymentStatus {
+	case domain.PaymentStatusInvoiced, domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
+		return true
+	default:
+		return false
+	}
+}
+
 func canFulfillOrder(order *domain.Order) bool {
 	return order.PaymentStatus == domain.PaymentStatusCaptured &&
 		order.FulfillmentStatus == domain.FulfillmentStatusUnfulfilled &&
@@ -340,7 +358,20 @@ templ grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) {
 	}
 }
 
+// orderShowActivePath returns the sidebar nav path that should highlight for
+// this order. The detail page is served at the same /admin/orders/{id} URL for
+// both channels, so we key off the order's frozen channel rather than the URL.
+func orderShowActivePath(o *domain.Order) string {
+	if o.Channel == domain.OrderChannelWholesale {
+		return "/admin/orders/wholesale"
+	}
+	return "/admin/orders"
+}
+
 templ OrderShowContent(props OrderShowProps) {
+	// Marker the sidebar's updateActiveNav() reads after an htmx swap to pick the
+	// right nav item — the URL alone can't distinguish retail from wholesale here.
+	<div data-active-path={ orderShowActivePath(props.Order) } class="hidden"></div>
 	if props.Flash != "" {
 		@flashToast(props.Flash)
 	}
@@ -597,6 +628,24 @@ templ OrderShowContent(props OrderShowProps) {
 				</button>
 			</form>
 		}
+		if canMarkOrderPaid(props.Order) {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/mark-paid", props.Order.ID.String())) } class="inline-flex items-center gap-3">
+				<label class="inline-flex items-center gap-1.5 text-sm text-rr-body">
+					<input type="checkbox" name="send_email" class="size-4 rounded-sm border-rr-border text-rr-red focus:ring-rr-red"/>
+					Email the customer a payment confirmation
+				</label>
+				<button
+					type="submit"
+					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+					onclick="return confirm('Mark this order as paid? Only do this after confirming the wholesale payment cleared.')"
+				>
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+					</svg>
+					Mark as Paid
+				</button>
+			</form>
+		}
 		if canCancelOrder(props.Order.Status) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/cancel", props.Order.ID.String())) }>
 				<button
@@ -812,7 +861,7 @@ templ OrderShowContent(props OrderShowProps) {
 templ OrderShow(props OrderShowProps) {
 	@layouts.Admin(layouts.AdminProps{
 		Title:      fmt.Sprintf("Order %s", props.Order.Number),
-		ActivePath: "/admin/orders",
+		ActivePath: orderShowActivePath(props.Order),
 		StaffName:  props.StaffName,
 		StaffRole:  props.StaffRole,
 	}) {

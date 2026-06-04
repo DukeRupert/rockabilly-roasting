@@ -77,6 +77,7 @@ func mapError(err error) (int, string) {
 		return http.StatusConflict, "already exists"
 
 	case errors.Is(err, app.ErrOrderNotRefundable),
+		errors.Is(err, app.ErrOrderNotPayable),
 		errors.Is(err, app.ErrOrderNotCancellable),
 		errors.Is(err, app.ErrOrderAlreadyFulfilled),
 		errors.Is(err, app.ErrOrderFulfillmentNotRevertible),

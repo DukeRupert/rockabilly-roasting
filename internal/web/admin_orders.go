@@ -441,6 +441,39 @@ func (d *Deps) handleAdminOrderCancel(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash=Order+cancelled", http.StatusSeeOther)
 }
 
+// handleAdminOrderMarkPaid is the manual fallback for capturing a wholesale
+// invoice payment QuickBooks didn't reconcile. It flips the order to paid
+// (captured); the optional send_email checkbox opts into the same customer
+// payment-confirmation email the automatic QB capture sends. Eligibility is
+// enforced in the service (QB-owned, unsettled invoice) — ineligible orders
+// return ErrOrderNotPayable (422).
+func (d *Deps) handleAdminOrderMarkPaid(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	sendEmail := r.FormValue("send_email") == "on"
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.MarkWholesaleOrderPaid(ctx, tx, id, sendEmail, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	flash := "Order+marked+as+paid"
+	if sendEmail {
+		flash = "Order+marked+as+paid+%E2%80%94+confirmation+emailed"
+	}
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+}
+
 func (d *Deps) handleAdminOrderRefund(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	logger := logging.FromContext(ctx)
@@ -934,11 +967,24 @@ func parseBatchOrderIDs(raw string) ([]uuid.UUID, int, string) {
 	return ids, 0, ""
 }
 
-// buildBatchResultRedirect constructs the /admin/fulfillment redirect URL
-// carrying the result of a just-completed bulk verb. Reasons are joined with
+// fulfillmentReturnPath resolves the queue a batch action should redirect back
+// to from its return_to form field, so an action started on the wholesale queue
+// lands back there instead of the retail queue. Validated against the known
+// queue paths (defaulting to retail) so a forged return_to can't bounce staff
+// off to an arbitrary URL.
+func fulfillmentReturnPath(r *http.Request) string {
+	if r.FormValue("return_to") == "/admin/wholesale/fulfillment" {
+		return "/admin/wholesale/fulfillment"
+	}
+	return "/admin/fulfillment"
+}
+
+// buildBatchResultRedirect constructs the fulfillment-queue redirect URL
+// carrying the result of a just-completed bulk verb. basePath is the queue the
+// action was launched from (see fulfillmentReturnPath). Reasons are joined with
 // commas; failureReasonFor's output never contains commas today so the
 // receiver can split unambiguously.
-func buildBatchResultRedirect(verb string, outcome app.BatchOutcome) string {
+func buildBatchResultRedirect(basePath, verb string, outcome app.BatchOutcome) string {
 	v := url.Values{}
 	v.Set("batch_result", verb)
 	v.Set("ok", strconv.Itoa(len(outcome.Succeeded)))
@@ -962,7 +1008,7 @@ func buildBatchResultRedirect(verb string, outcome app.BatchOutcome) string {
 			v.Set("fail_truncated", "1")
 		}
 	}
-	return "/admin/fulfillment?" + v.Encode()
+	return basePath + "?" + v.Encode()
 }
 
 // handleAdminOrderPackingSlipBatch renders N packing slips in one print-ready
@@ -1021,7 +1067,7 @@ func (d *Deps) handleAdminOrderReadyForPickupBatch(w http.ResponseWriter, r *htt
 		Error(w, r, err)
 		return
 	}
-	http.Redirect(w, r, buildBatchResultRedirect("ready-for-pickup", outcome), http.StatusSeeOther)
+	http.Redirect(w, r, buildBatchResultRedirect(fulfillmentReturnPath(r), "ready-for-pickup", outcome), http.StatusSeeOther)
 }
 
 // handleAdminOrderPickedUpBatch applies MarkPickedUp to each order in the
@@ -1045,7 +1091,7 @@ func (d *Deps) handleAdminOrderPickedUpBatch(w http.ResponseWriter, r *http.Requ
 		Error(w, r, err)
 		return
 	}
-	http.Redirect(w, r, buildBatchResultRedirect("picked-up", outcome), http.StatusSeeOther)
+	http.Redirect(w, r, buildBatchResultRedirect(fulfillmentReturnPath(r), "picked-up", outcome), http.StatusSeeOther)
 }
 
 // handleAdminOrderOutForDeliveryBatch applies MarkOutForDelivery to each order
@@ -1067,7 +1113,7 @@ func (d *Deps) handleAdminOrderOutForDeliveryBatch(w http.ResponseWriter, r *htt
 		Error(w, r, err)
 		return
 	}
-	http.Redirect(w, r, buildBatchResultRedirect("out-for-delivery", outcome), http.StatusSeeOther)
+	http.Redirect(w, r, buildBatchResultRedirect(fulfillmentReturnPath(r), "out-for-delivery", outcome), http.StatusSeeOther)
 }
 
 // loadOrderInvoiceProps fetches everything needed to render a single invoice

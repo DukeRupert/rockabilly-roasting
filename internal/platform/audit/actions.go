@@ -135,6 +135,10 @@ const (
 	AuditOrderPaymentInvoiced      = "order.payment_invoiced"
 	AuditOrderPaymentPartiallyPaid = "order.payment_partially_paid"
 	AuditOrderPaymentOverdue       = "order.payment_overdue"
+	// AuditOrderMarkedPaid is a staff manual override capturing payment outside
+	// the automated QB reconcile path (AuditOrderPaymentCaptured); kept distinct
+	// so manual money-state changes are greppable in the audit log.
+	AuditOrderMarkedPaid = "order.marked_paid"
 
 	// Email actions (audited on successful send)
 	AuditEmailMagicLinkSent                 = "email.magic_link_sent"

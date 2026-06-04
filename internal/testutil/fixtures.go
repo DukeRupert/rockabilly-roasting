@@ -379,6 +379,15 @@ func WithSKU(sku string) VariantOption {
 	return func(p *sqlcgen.CreateVariantParams) { p.Sku = sku }
 }
 
+// WithChannelAvailability overrides a variant's per-channel availability. By default
+// CreateVariant makes a variant available on both retail and wholesale.
+func WithChannelAvailability(retail, wholesale bool) VariantOption {
+	return func(p *sqlcgen.CreateVariantParams) {
+		p.RetailAvailable = retail
+		p.WholesaleAvailable = wholesale
+	}
+}
+
 func CreateVariant(t *testing.T, tx pgx.Tx, productID uuid.UUID, opts ...VariantOption) *domain.Variant {
 	t.Helper()
 	p := sqlcgen.CreateVariantParams{
@@ -387,7 +396,10 @@ func CreateVariant(t *testing.T, tx pgx.Tx, productID uuid.UUID, opts ...Variant
 		Sku:       fmt.Sprintf("SKU-%s", uuid.New().String()[:8]),
 		Position:  0,
 		IsDefault: true,
-		Metadata:  json.RawMessage(`{}`),
+		// Default to available on both channels so existing tests behave as before.
+		RetailAvailable:    true,
+		WholesaleAvailable: true,
+		Metadata:           json.RawMessage(`{}`),
 	}
 	for _, o := range opts {
 		o(&p)
@@ -397,14 +409,28 @@ func CreateVariant(t *testing.T, tx pgx.Tx, productID uuid.UUID, opts ...Variant
 		t.Fatalf("create variant fixture: %v", err)
 	}
 	return &domain.Variant{
-		ID:        row.ID,
-		ProductID: row.ProductID,
-		SKU:       row.Sku,
-		Barcode:   row.Barcode,
-		Position:  int(row.Position),
-		IsDefault: row.IsDefault,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		ID:                 row.ID,
+		ProductID:          row.ProductID,
+		SKU:                row.Sku,
+		Barcode:            row.Barcode,
+		Position:           int(row.Position),
+		IsDefault:          row.IsDefault,
+		RetailAvailable:    row.RetailAvailable,
+		WholesaleAvailable: row.WholesaleAvailable,
+		CreatedAt:          row.CreatedAt,
+		UpdatedAt:          row.UpdatedAt,
+	}
+}
+
+// AddProductCustomerVisibility grants a customer access to a private (white-label)
+// product — the per-customer equivalent of AddProductGroupVisibility.
+func AddProductCustomerVisibility(t *testing.T, tx pgx.Tx, productID, customerID uuid.UUID) {
+	t.Helper()
+	if err := sqlcgen.New(tx).SetProductCustomerVisibility(context.Background(), sqlcgen.SetProductCustomerVisibilityParams{
+		ProductID:  productID,
+		CustomerID: customerID,
+	}); err != nil {
+		t.Fatalf("add product customer visibility fixture: %v", err)
 	}
 }
 

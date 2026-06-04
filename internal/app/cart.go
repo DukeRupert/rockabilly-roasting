@@ -83,6 +83,9 @@ func (s *CartService) AddItem(ctx context.Context, tx pgx.Tx, cartID, variantID 
 	if err := s.assertVariantAccessible(ctx, tx, domain.ProductViewer{}, variantID); err != nil {
 		return nil, err
 	}
+	if err := s.assertVariantInChannel(ctx, tx, variantID, domain.ChannelRetail); err != nil {
+		return nil, err
+	}
 
 	price, err := s.pricing.GetBasePrice(ctx, tx, variantID, "USD")
 	if err != nil {
@@ -117,6 +120,11 @@ func (s *CartService) AddItemForCustomer(ctx context.Context, tx pgx.Tx, cartID,
 	if err := s.assertVariantAccessible(ctx, tx, viewer, variantID); err != nil {
 		return nil, err
 	}
+	// Enforce the variant is sold on the viewer's channel (e.g. a 1lb variant marked
+	// wholesale_available=false cannot be added by a wholesale customer).
+	if err := s.assertVariantInChannel(ctx, tx, variantID, domain.ChannelFor(viewer)); err != nil {
+		return nil, err
+	}
 
 	price, err := s.pricing.ResolveForCustomer(ctx, tx, variantID, customerID, currencyCode)
 	if err != nil {
@@ -142,6 +150,23 @@ func (s *CartService) assertVariantPurchasable(ctx context.Context, tx pgx.Tx, v
 	}
 	if v.ArchivedAt != nil {
 		return ErrVariantArchived
+	}
+	return nil
+}
+
+// assertVariantInChannel returns ErrVariantNotInChannel if the variant is not available
+// on the given sales channel (e.g. a wholesale-hidden size added by a wholesale customer),
+// or ErrVariantNotFound if it doesn't exist.
+func (s *CartService) assertVariantInChannel(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, channel domain.SalesChannel) error {
+	v, err := s.catalog.GetVariantByID(ctx, tx, variantID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrVariantNotFound
+		}
+		return fmt.Errorf("check variant channel: %w", err)
+	}
+	if !v.Available(channel) {
+		return ErrVariantNotInChannel
 	}
 	return nil
 }

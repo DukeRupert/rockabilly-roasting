@@ -79,13 +79,14 @@ func (s *CatalogService) ResolveViewer(ctx context.Context, tx pgx.Tx, customerI
 	return domain.ProductViewer{
 		IsWholesale: customer.IsApprovedWholesale(),
 		GroupIDs:    groupIDs,
+		CustomerID:  &customer.ID,
 	}, nil
 }
 
 // AccessibleFilter maps a viewer to the store visibility filter used for list reads.
 // The retail/anonymous zero-value viewer yields a public-only filter.
 func (s *CatalogService) AccessibleFilter(v domain.ProductViewer) store.VisibilityContext {
-	return store.VisibilityContext{IsWholesale: v.IsWholesale, GroupIDs: v.GroupIDs}
+	return store.VisibilityContext{IsWholesale: v.IsWholesale, GroupIDs: v.GroupIDs, CustomerID: v.CustomerID}
 }
 
 // CanAccessProduct reports whether the viewer may see/purchase the product. It uses the
@@ -188,6 +189,66 @@ func (s *CatalogService) ListProductGroupAccess(ctx context.Context, tx pgx.Tx, 
 	ids, err := s.catalog.ListProductGroupVisibility(ctx, tx, productID)
 	if err != nil {
 		return nil, fmt.Errorf("list product group access: %w", err)
+	}
+	return ids, nil
+}
+
+// SetProductCustomerAccess replaces the product's entire per-customer access set with
+// customerIDs (declarative — desired state, not deltas). This is the grant set for a
+// 'private' white-labelled product; passing an empty slice clears all grants. Records
+// one audit entry capturing the new set, with the previous set in metadata. Mirrors
+// SetProductGroupAccess.
+func (s *CatalogService) SetProductCustomerAccess(ctx context.Context, tx pgx.Tx, productID uuid.UUID, customerIDs []uuid.UUID, actor Actor) error {
+	current, err := s.catalog.ListProductCustomerVisibility(ctx, tx, productID)
+	if err != nil {
+		return fmt.Errorf("list current customer access: %w", err)
+	}
+
+	desired := make(map[uuid.UUID]bool, len(customerIDs))
+	for _, id := range customerIDs {
+		desired[id] = true
+	}
+	existing := make(map[uuid.UUID]bool, len(current))
+	for _, id := range current {
+		existing[id] = true
+	}
+
+	for id := range desired {
+		if !existing[id] {
+			if err := s.catalog.SetProductCustomerVisibility(ctx, tx, productID, id); err != nil {
+				return fmt.Errorf("grant customer access: %w", err)
+			}
+		}
+	}
+	for id := range existing {
+		if !desired[id] {
+			if err := s.catalog.RemoveProductCustomerVisibility(ctx, tx, productID, id); err != nil {
+				return fmt.Errorf("revoke customer access: %w", err)
+			}
+		}
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditProductCustomerAccessUpdated,
+		ResourceType: "product",
+		ResourceID:   productID,
+		After:        customerIDs,
+		Metadata:     map[string]any{"previous_customer_ids": current},
+	}); err != nil {
+		return fmt.Errorf("audit customer access: %w", err)
+	}
+
+	return nil
+}
+
+// ListProductCustomerAccess returns the customer IDs granted access to a private product.
+func (s *CatalogService) ListProductCustomerAccess(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]uuid.UUID, error) {
+	ids, err := s.catalog.ListProductCustomerVisibility(ctx, tx, productID)
+	if err != nil {
+		return nil, fmt.Errorf("list product customer access: %w", err)
 	}
 	return ids, nil
 }
@@ -579,14 +640,27 @@ func (s *CatalogService) ListVariants(ctx context.Context, tx pgx.Tx, productID 
 	return variants, nil
 }
 
-// ListActiveVariants returns only non-archived variants for a product.
-// This is the right call for storefront and wholesale product surfaces.
+// ListActiveVariants returns all non-archived variants for a product, regardless of
+// channel availability. Admin/internal surfaces want every active variant; for
+// customer-facing storefront/wholesale surfaces use ListActiveVariantsForChannel so
+// channel-hidden variants are excluded.
 func (s *CatalogService) ListActiveVariants(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]domain.Variant, error) {
 	variants, err := s.catalog.ListActiveVariantsByProduct(ctx, tx, productID)
 	if err != nil {
 		return nil, fmt.Errorf("list active variants: %w", err)
 	}
 	return variants, nil
+}
+
+// ListActiveVariantsForChannel returns the non-archived variants orderable on the given
+// sales channel. This is the right call for customer-facing storefront (retail) and
+// wholesale catalog surfaces.
+func (s *CatalogService) ListActiveVariantsForChannel(ctx context.Context, tx pgx.Tx, productID uuid.UUID, channel domain.SalesChannel) ([]domain.Variant, error) {
+	variants, err := s.ListActiveVariants(ctx, tx, productID)
+	if err != nil {
+		return nil, err
+	}
+	return domain.FilterVariantsForChannel(variants, channel), nil
 }
 
 // UpdateVariant updates a variant after checking SKU uniqueness if changed and records an audit entry.
@@ -632,6 +706,33 @@ func (s *CatalogService) UpdateVariant(ctx context.Context, tx pgx.Tx, id uuid.U
 		After:        variant,
 	}); err != nil {
 		return nil, fmt.Errorf("audit variant updated: %w", err)
+	}
+
+	return variant, nil
+}
+
+// UpdateVariantChannels sets a variant's per-channel availability (retail/wholesale)
+// and records an audit entry. This is a focused partial update — it does not touch SKU,
+// weight, or default status — so toggling availability never disturbs other fields.
+func (s *CatalogService) UpdateVariantChannels(ctx context.Context, tx pgx.Tx, id uuid.UUID, retail, wholesale bool, actor Actor) (*domain.Variant, error) {
+	variant, err := s.catalog.UpdateVariantChannels(ctx, tx, id, retail, wholesale)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrVariantNotFound
+		}
+		return nil, fmt.Errorf("update variant channels: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditVariantUpdated,
+		ResourceType: "variant",
+		ResourceID:   id,
+		After:        variant,
+	}); err != nil {
+		return nil, fmt.Errorf("audit variant channels: %w", err)
 	}
 
 	return variant, nil

@@ -18,6 +18,17 @@ func gramsToOz(g int) string {
 	return s
 }
 
+// whiteLabelCustomerLabel renders a customer for the private-product picker: company
+// name when present (wholesale accounts), otherwise the full name, with the email for
+// disambiguation.
+func whiteLabelCustomerLabel(c domain.Customer) string {
+	name := c.FirstName + " " + c.LastName
+	if c.CompanyName != nil && *c.CompanyName != "" {
+		name = *c.CompanyName
+	}
+	return fmt.Sprintf("%s (%s)", name, c.Email)
+}
+
 type OptionWithValues struct {
 	Option domain.ProductOption
 	Values []domain.ProductOptionValue
@@ -30,6 +41,8 @@ type ProductEditProps struct {
 	Options        []OptionWithValues
 	Groups         []domain.CustomerGroup
 	GroupAccessIDs []uuid.UUID // customer groups granted access to a restricted product
+	WholesaleCustomers []domain.Customer // candidates for a private (white-label) product
+	CustomerAccessIDs  []uuid.UUID       // customers granted access to a private product
 	Media          []domain.ProductMedia
 	MediaConfig    *media.Config
 	TaxonName      string
@@ -469,6 +482,7 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Options</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Base Price</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Weight (oz)</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Channels</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
 							</th>
@@ -519,6 +533,26 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 										<span class="text-rr-border">&mdash;</span>
 									}
 								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+									<form
+										method="post"
+										action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/channels", product.ID, vwo.Variant.ID)) }
+										hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/channels", product.ID, vwo.Variant.ID) }
+										hx-trigger="change"
+										hx-target="#variants-panel"
+										hx-swap="outerHTML"
+										class="flex flex-col gap-1"
+									>
+										<label class="inline-flex items-center gap-1.5 text-xs text-rr-body">
+											<input type="checkbox" name="retail_available" value="true" checked?={ vwo.Variant.RetailAvailable } class="size-3.5 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
+											Retail
+										</label>
+										<label class="inline-flex items-center gap-1.5 text-xs text-rr-body">
+											<input type="checkbox" name="wholesale_available" value="true" checked?={ vwo.Variant.WholesaleAvailable } class="size-3.5 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
+											Wholesale
+										</label>
+									</form>
+								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-3">
 									if !vwo.Variant.IsDefault && vwo.Variant.ArchivedAt == nil {
 										<form
@@ -531,6 +565,12 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 										>
 											<input type="hidden" name="sku" value={ vwo.Variant.SKU }/>
 											<input type="hidden" name="is_default" value="true"/>
+											if vwo.Variant.RetailAvailable {
+												<input type="hidden" name="retail_available" value="true"/>
+											}
+											if vwo.Variant.WholesaleAvailable {
+												<input type="hidden" name="wholesale_available" value="true"/>
+											}
 											<button type="submit" class="text-rr-muted hover:text-rr-heading">Set default</button>
 										</form>
 									}
@@ -625,6 +665,16 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 						<input type="checkbox" id="variant_default" name="is_default" value="true" class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
 						<label for="variant_default" class="text-sm font-medium text-rr-heading">Default</label>
 					</div>
+					<div class="flex flex-col gap-1 pb-1">
+						<label class="inline-flex items-center gap-1.5 text-sm font-medium text-rr-heading">
+							<input type="checkbox" name="retail_available" value="true" checked class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
+							Retail
+						</label>
+						<label class="inline-flex items-center gap-1.5 text-sm font-medium text-rr-heading">
+							<input type="checkbox" name="wholesale_available" value="true" checked class="size-4 rounded border-rr-border text-rr-red focus:ring-rr-red"/>
+							Wholesale
+						</label>
+					</div>
 					<button type="submit" class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
 						Add
 					</button>
@@ -697,7 +747,29 @@ templ VisibilityPanel(props ProductEditProps) {
 					<option value="public" selected?={ props.Product.Visibility == domain.ProductVisibilityPublic }>Public — everyone</option>
 					<option value="wholesale" selected?={ props.Product.Visibility == domain.ProductVisibilityWholesale }>Wholesale — all approved wholesale customers</option>
 					<option value="restricted" selected?={ props.Product.Visibility == domain.ProductVisibilityRestricted }>Restricted — only selected groups</option>
+					<option value="private" selected?={ props.Product.Visibility == domain.ProductVisibilityPrivate }>Private — only selected customers (white-label)</option>
 				</select>
+			</div>
+			<div x-show="vis === 'private'" x-cloak class="space-y-2">
+				<p class="text-sm font-medium text-rr-heading">Customers with access</p>
+				if len(props.WholesaleCustomers) == 0 {
+					<p class="text-sm text-rr-muted">No approved wholesale customers yet.</p>
+				} else {
+					<div class="max-h-64 overflow-y-auto space-y-1 border border-rr-border rounded-sm p-2 max-w-sm">
+						for _, c := range props.WholesaleCustomers {
+							<label class="flex items-center gap-2 text-sm text-rr-body">
+								<input
+									type="checkbox"
+									name="customer_ids"
+									value={ c.ID.String() }
+									checked?={ containsUUID(props.CustomerAccessIDs, c.ID) }
+									class="rounded-sm border-rr-border text-rr-red focus:ring-rr-red"
+								/>
+								{ whiteLabelCustomerLabel(c) }
+							</label>
+						}
+					</div>
+				}
 			</div>
 			<div x-show="vis === 'restricted'" x-cloak class="space-y-2">
 				<p class="text-sm font-medium text-rr-heading">Groups with access</p>

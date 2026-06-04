@@ -303,6 +303,8 @@ func (s *WholesaleService) QuickOrderCatalog(
 		Visibility: &store.VisibilityContext{
 			IsWholesale: true,
 			GroupIDs:    groupIDs,
+			// Include 'private' white-label products granted to this customer.
+			CustomerID: &customerID,
 		},
 	})
 	if err != nil {
@@ -323,6 +325,9 @@ func (s *WholesaleService) QuickOrderCatalog(
 		if err != nil {
 			return nil, fmt.Errorf("list variants for %s: %w", p.ID, err)
 		}
+		// Hide variants not available on the wholesale channel (e.g. 1lb retail-only).
+		// A product whose variants are all wholesale-hidden drops out entirely.
+		variants = domain.FilterVariantsForChannel(variants, domain.ChannelWholesale)
 		if len(variants) == 0 {
 			continue
 		}

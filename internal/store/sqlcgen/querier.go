@@ -180,6 +180,7 @@ type Querier interface {
 	ListPriceListPricesByVariants(ctx context.Context, arg ListPriceListPricesByVariantsParams) ([]ListPriceListPricesByVariantsRow, error)
 	ListPriceLists(ctx context.Context) ([]PriceList, error)
 	ListProductAttributeSets(ctx context.Context, productID uuid.UUID) ([]AttributeSet, error)
+	ListProductCustomerVisibility(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
 	ListProductGroupVisibility(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
 	ListProductMediaByProduct(ctx context.Context, productID uuid.UUID) ([]ProductMedium, error)
 	ListProductOptionValuesByOption(ctx context.Context, productOptionID uuid.UUID) ([]ProductOptionValue, error)
@@ -216,12 +217,14 @@ type Querier interface {
 	ReleaseReservation(ctx context.Context, arg ReleaseReservationParams) (StockLevel, error)
 	RemoveAttributeSetFromProduct(ctx context.Context, arg RemoveAttributeSetFromProductParams) error
 	RemoveCustomerGroupMembership(ctx context.Context, arg RemoveCustomerGroupMembershipParams) error
+	RemoveProductCustomerVisibility(ctx context.Context, arg RemoveProductCustomerVisibilityParams) error
 	RemoveProductGroupVisibility(ctx context.Context, arg RemoveProductGroupVisibilityParams) error
 	ReserveStock(ctx context.Context, arg ReserveStockParams) (StockLevel, error)
 	RevokeAllSessionsForActor(ctx context.Context, arg RevokeAllSessionsForActorParams) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
 	SetCartItemQuantity(ctx context.Context, arg SetCartItemQuantityParams) (CartItem, error)
 	SetDefaultAddress(ctx context.Context, arg SetDefaultAddressParams) error
+	SetProductCustomerVisibility(ctx context.Context, arg SetProductCustomerVisibilityParams) error
 	SetProductGroupVisibility(ctx context.Context, arg SetProductGroupVisibilityParams) error
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)
 	SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error)
@@ -288,6 +291,7 @@ type Querier interface {
 	UpdateTaxConfig(ctx context.Context, arg UpdateTaxConfigParams) (StoreSetting, error)
 	UpdateTaxon(ctx context.Context, arg UpdateTaxonParams) (Taxon, error)
 	UpdateVariant(ctx context.Context, arg UpdateVariantParams) (Variant, error)
+	UpdateVariantChannels(ctx context.Context, arg UpdateVariantChannelsParams) (Variant, error)
 	UpdateVariantWholesale(ctx context.Context, arg UpdateVariantWholesaleParams) (Variant, error)
 	UpdateWholesaleNotes(ctx context.Context, arg UpdateWholesaleNotesParams) error
 	UpsertBasePrice(ctx context.Context, arg UpsertBasePriceParams) (Price, error)

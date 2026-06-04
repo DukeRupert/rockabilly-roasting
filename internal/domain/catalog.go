@@ -13,7 +13,28 @@ const (
 	ProductVisibilityPublic     ProductVisibility = "public"
 	ProductVisibilityWholesale  ProductVisibility = "wholesale"
 	ProductVisibilityRestricted ProductVisibility = "restricted"
+	// ProductVisibilityPrivate is a white-labelled product visible/orderable only by
+	// the specific customers granted access (product_customer_visibility).
+	ProductVisibilityPrivate ProductVisibility = "private"
 )
+
+// SalesChannel identifies a purchasing surface. Variants carry per-channel
+// availability so a size can be sold retail-only or wholesale-only.
+type SalesChannel string
+
+const (
+	ChannelRetail    SalesChannel = "retail"
+	ChannelWholesale SalesChannel = "wholesale"
+)
+
+// ChannelFor maps a viewer to the channel they purchase through: an approved
+// wholesale viewer buys on the wholesale channel, everyone else on retail.
+func ChannelFor(v ProductViewer) SalesChannel {
+	if v.IsWholesale {
+		return ChannelWholesale
+	}
+	return ChannelRetail
+}
 
 // ProductViewer is the resolved access identity of whoever is asking — the wholesale
 // flag plus the customer groups they belong to. It carries no pricing or currency.
@@ -23,9 +44,14 @@ const (
 // authenticated customer use the zero value directly; for an authenticated wholesale
 // customer, obtain the viewer from CatalogService.ResolveViewer — never hand-assemble
 // GroupIDs in a handler.
+//
+// CustomerID is the authenticated customer's ID (nil for the anonymous/retail-browse
+// viewer). It gates 'private' products: only customers explicitly granted a private
+// product may see or order it. A nil CustomerID never sees private products.
 type ProductViewer struct {
 	IsWholesale bool
 	GroupIDs    []uuid.UUID
+	CustomerID  *uuid.UUID
 }
 
 // ProductStatus represents the lifecycle state of a product.
@@ -71,19 +97,47 @@ type Product struct {
 // storefront/wholesale listings and refused at add-to-cart, but order history,
 // invoices, and existing subscriptions on the variant remain functional.
 type Variant struct {
-	ID          uuid.UUID
-	ProductID   uuid.UUID
-	SKU         string
-	Barcode     *string
-	Position    int
-	IsDefault   bool
-	WeightGrams        *int
-	WholesaleMinQty    *int
-	WholesaleMultiple  *int
+	ID                uuid.UUID
+	ProductID         uuid.UUID
+	SKU               string
+	Barcode           *string
+	Position          int
+	IsDefault         bool
+	WeightGrams       *int
+	WholesaleMinQty   *int
+	WholesaleMultiple *int
+	// RetailAvailable / WholesaleAvailable gate which sales channels may order this
+	// variant. Both default true. A variant hidden from a channel is dropped from that
+	// channel's catalog listings and refused at add-to-cart.
+	RetailAvailable    bool
+	WholesaleAvailable bool
 	Metadata           map[string]any
-	ArchivedAt  *time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ArchivedAt         *time.Time
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+}
+
+// Available reports whether the variant may be ordered on the given sales channel.
+func (v Variant) Available(c SalesChannel) bool {
+	switch c {
+	case ChannelWholesale:
+		return v.WholesaleAvailable
+	default:
+		return v.RetailAvailable
+	}
+}
+
+// FilterVariantsForChannel returns only the variants orderable on the given channel,
+// preserving order. Used by customer-facing storefront/wholesale surfaces so a variant
+// hidden from a channel never renders or gets priced there.
+func FilterVariantsForChannel(vs []Variant, c SalesChannel) []Variant {
+	out := make([]Variant, 0, len(vs))
+	for _, v := range vs {
+		if v.Available(c) {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // ProductOption represents a configurable option for a product (e.g., "Roast Level").

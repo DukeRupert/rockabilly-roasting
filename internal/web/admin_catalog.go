@@ -266,6 +266,8 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var options []admin.OptionWithValues
 	var groups []domain.CustomerGroup
 	var groupAccessIDs []uuid.UUID
+	var wholesaleCustomers []domain.Customer
+	var customerAccessIDs []uuid.UUID
 	var mediaList []domain.ProductMedia
 	var assignedSets []domain.AttributeSet
 	var allSets []domain.AttributeSet
@@ -288,12 +290,25 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 			if txErr != nil {
 				return txErr
 			}
-			// Groups + current grants drive the visibility/access panel.
+			// Groups + current grants drive the restricted-visibility panel.
 			groups, txErr = d.CustomerGroupService.List(ctx, tx)
 			if txErr != nil {
 				return txErr
 			}
 			groupAccessIDs, txErr = d.CatalogService.ListProductGroupAccess(ctx, tx, id)
+			if txErr != nil {
+				return txErr
+			}
+			// Approved wholesale customers + current grants drive the private (white-label) panel.
+			wholesaleCustomers, txErr = d.CustomerService.ListCustomers(ctx, tx, store.CustomerFilter{
+				AccountType:     ptrTo(domain.AccountTypeWholesale),
+				WholesaleStatus: ptrTo(domain.WholesaleStatusApproved),
+				Limit:           500,
+			})
+			if txErr != nil {
+				return txErr
+			}
+			customerAccessIDs, txErr = d.CatalogService.ListProductCustomerAccess(ctx, tx, id)
 			return txErr
 
 		case "media":
@@ -355,22 +370,24 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.ProductEditProps{
-		Product:         product,
-		Taxons:          taxons,
-		Variants:        variants,
-		Options:         options,
-		Groups:          groups,
-		GroupAccessIDs:  groupAccessIDs,
-		Media:           mediaList,
-		MediaConfig:     d.MediaConfig,
-		TaxonName:       taxonName,
-		Flash:           r.URL.Query().Get("flash"),
-		StaffName:       name,
-		StaffRole:       role,
-		AssignedSets:    assignedSets,
-		AllSets:         allSets,
-		AttributeValues: attrValues,
-		ActiveTab:       tab,
+		Product:            product,
+		Taxons:             taxons,
+		Variants:           variants,
+		Options:            options,
+		Groups:             groups,
+		GroupAccessIDs:     groupAccessIDs,
+		WholesaleCustomers: wholesaleCustomers,
+		CustomerAccessIDs:  customerAccessIDs,
+		Media:              mediaList,
+		MediaConfig:        d.MediaConfig,
+		TaxonName:          taxonName,
+		Flash:              r.URL.Query().Get("flash"),
+		StaffName:          name,
+		StaffRole:          role,
+		AssignedSets:       assignedSets,
+		AllSets:            allSets,
+		AttributeValues:    attrValues,
+		ActiveTab:          tab,
 	}
 
 	// htmx request (sidebar nav or tab click via hx-boost): return page content
@@ -558,7 +575,7 @@ func (d *Deps) handleAdminProductVisibilityUpdate(w http.ResponseWriter, r *http
 
 	visibility := domain.ProductVisibility(r.FormValue("visibility"))
 	switch visibility {
-	case domain.ProductVisibilityPublic, domain.ProductVisibilityWholesale, domain.ProductVisibilityRestricted:
+	case domain.ProductVisibilityPublic, domain.ProductVisibilityWholesale, domain.ProductVisibilityRestricted, domain.ProductVisibilityPrivate:
 		// valid
 	default:
 		http.Error(w, "invalid visibility", http.StatusBadRequest)
@@ -577,11 +594,26 @@ func (d *Deps) handleAdminProductVisibilityUpdate(w http.ResponseWriter, r *http
 		}
 	}
 
+	// Customer grants only apply to private products; any other tier clears them.
+	var customerIDs []uuid.UUID
+	if visibility == domain.ProductVisibilityPrivate {
+		for _, raw := range r.Form["customer_ids"] {
+			cid, parseErr := uuid.Parse(raw)
+			if parseErr != nil {
+				continue
+			}
+			customerIDs = append(customerIDs, cid)
+		}
+	}
+
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		if _, txErr := d.CatalogService.UpdateProductVisibility(ctx, tx, id, visibility, staffActor(r)); txErr != nil {
 			return txErr
 		}
-		return d.CatalogService.SetProductGroupAccess(ctx, tx, id, groupIDs, staffActor(r))
+		if txErr := d.CatalogService.SetProductGroupAccess(ctx, tx, id, groupIDs, staffActor(r)); txErr != nil {
+			return txErr
+		}
+		return d.CatalogService.SetProductCustomerAccess(ctx, tx, id, customerIDs, staffActor(r))
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -929,9 +961,11 @@ func (d *Deps) handleAdminVariantCreate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	params := store.CreateVariantParams{
-		ProductID: productID,
-		SKU:       r.FormValue("sku"),
-		IsDefault: r.FormValue("is_default") == "true",
+		ProductID:          productID,
+		SKU:                r.FormValue("sku"),
+		IsDefault:          r.FormValue("is_default") == "true",
+		RetailAvailable:    r.FormValue("retail_available") == "true",
+		WholesaleAvailable: r.FormValue("wholesale_available") == "true",
 	}
 
 	if barcode := r.FormValue("barcode"); barcode != "" {
@@ -1010,9 +1044,11 @@ func (d *Deps) handleAdminVariantUpdate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	params := store.UpdateVariantParams{
-		ID:        variantID,
-		SKU:       r.FormValue("sku"),
-		IsDefault: r.FormValue("is_default") == "true",
+		ID:                 variantID,
+		SKU:                r.FormValue("sku"),
+		IsDefault:          r.FormValue("is_default") == "true",
+		RetailAvailable:    r.FormValue("retail_available") == "true",
+		WholesaleAvailable: r.FormValue("wholesale_available") == "true",
 	}
 
 	if barcode := r.FormValue("barcode"); barcode != "" {
@@ -1098,6 +1134,48 @@ func (d *Deps) handleAdminVariantArchive(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+archived", productID), http.StatusSeeOther)
+}
+
+// handleAdminVariantChannels toggles a variant's per-channel availability
+// (retail/wholesale). It is a focused partial update so it never disturbs SKU, weight,
+// or default status — unlike the full variant update.
+func (d *Deps) handleAdminVariantChannels(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	productID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	variantID, err := uuid.Parse(r.PathValue("variantID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	retail := r.FormValue("retail_available") == "true"
+	wholesale := r.FormValue("wholesale_available") == "true"
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.CatalogService.UpdateVariantChannels(ctx, tx, variantID, retail, wholesale, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	if IsHTMX(r) {
+		d.renderVariantsPanel(w, r, productID)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+updated", productID), http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminVariantUnarchive(w http.ResponseWriter, r *http.Request) {

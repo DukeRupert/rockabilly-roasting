@@ -49,8 +49,8 @@ WHERE is_featured = true AND id <> $1;
 DELETE FROM products WHERE id = $1;
 
 -- name: CreateVariant :one
-INSERT INTO variants (id, product_id, sku, barcode, position, is_default, weight_grams, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO variants (id, product_id, sku, barcode, position, is_default, weight_grams, metadata, retail_available, wholesale_available)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 RETURNING *;
 
 -- name: GetVariantByID :one
@@ -75,7 +75,13 @@ UPDATE variants SET is_default = false WHERE product_id = $1 AND is_default = tr
 -- name: UpdateVariant :one
 UPDATE variants
 SET sku = $2, barcode = $3, position = $4, is_default = $5, weight_grams = $6,
-    metadata = $7, updated_at = now()
+    metadata = $7, retail_available = $8, wholesale_available = $9, updated_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateVariantChannels :one
+UPDATE variants
+SET retail_available = $2, wholesale_available = $3, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
@@ -179,3 +185,16 @@ RETURNING *;
 
 -- name: DeleteTaxon :exec
 DELETE FROM taxons WHERE id = $1;
+
+-- name: SetProductCustomerVisibility :exec
+INSERT INTO product_customer_visibility (product_id, customer_id)
+VALUES ($1, $2)
+ON CONFLICT DO NOTHING;
+
+-- name: RemoveProductCustomerVisibility :exec
+DELETE FROM product_customer_visibility
+WHERE product_id = $1 AND customer_id = $2;
+
+-- name: ListProductCustomerVisibility :many
+SELECT customer_id FROM product_customer_visibility
+WHERE product_id = $1;

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -181,6 +182,37 @@ func (s *CatalogStore) ListProductGroupVisibility(ctx context.Context, tx pgx.Tx
 	return ids, nil
 }
 
+// SetProductCustomerVisibility grants a customer access to a private product.
+func (s *CatalogStore) SetProductCustomerVisibility(ctx context.Context, tx pgx.Tx, productID, customerID uuid.UUID) error {
+	if err := sqlcgen.New(tx).SetProductCustomerVisibility(ctx, sqlcgen.SetProductCustomerVisibilityParams{
+		ProductID:  productID,
+		CustomerID: customerID,
+	}); err != nil {
+		return fmt.Errorf("set product customer visibility: %w", err)
+	}
+	return nil
+}
+
+// RemoveProductCustomerVisibility revokes a customer's access to a private product.
+func (s *CatalogStore) RemoveProductCustomerVisibility(ctx context.Context, tx pgx.Tx, productID, customerID uuid.UUID) error {
+	if err := sqlcgen.New(tx).RemoveProductCustomerVisibility(ctx, sqlcgen.RemoveProductCustomerVisibilityParams{
+		ProductID:  productID,
+		CustomerID: customerID,
+	}); err != nil {
+		return fmt.Errorf("remove product customer visibility: %w", err)
+	}
+	return nil
+}
+
+// ListProductCustomerVisibility returns the customer IDs granted access to a private product.
+func (s *CatalogStore) ListProductCustomerVisibility(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]uuid.UUID, error) {
+	ids, err := sqlcgen.New(tx).ListProductCustomerVisibility(ctx, productID)
+	if err != nil {
+		return nil, fmt.Errorf("list product customer visibility: %w", err)
+	}
+	return ids, nil
+}
+
 // UpdateProductTaxExempt updates whether a product is tax exempt.
 func (s *CatalogStore) UpdateProductTaxExempt(ctx context.Context, tx pgx.Tx, id uuid.UUID, taxExempt bool) (*domain.Product, error) {
 	row, err := sqlcgen.New(tx).UpdateProductTaxExempt(ctx, sqlcgen.UpdateProductTaxExemptParams{
@@ -223,9 +255,12 @@ func (s *CatalogStore) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUI
 }
 
 // VisibilityContext holds the viewer's context for product visibility filtering.
+// CustomerID (nil for anonymous viewers) gates 'private' products: a private product
+// is visible only to the customers explicitly granted access.
 type VisibilityContext struct {
 	IsWholesale bool
 	GroupIDs    []uuid.UUID
+	CustomerID  *uuid.UUID
 }
 
 // ProductFilter holds optional filters for listing products.
@@ -258,27 +293,50 @@ type ProductFilter struct {
 //
 // The fragment references the products table by name (products.visibility, products.id),
 // so any query embedding it MUST expose the products table unaliased.
+//
+// The predicate is the OR of: public always; wholesale (+ group-gated restricted) when
+// the viewer is wholesale; and group of private products granted to the viewer's
+// CustomerID. Positional params are allocated starting at argStart in the order they are
+// appended to the returned args slice.
 func visibilityClause(vc *VisibilityContext, argStart int) (string, []any) {
 	if vc == nil {
 		return "", nil
 	}
-	if !vc.IsWholesale {
-		return " AND products.visibility = 'public'", nil
-	}
-	if len(vc.GroupIDs) == 0 {
-		// wholesale tier is open to every authenticated wholesale customer;
-		// only 'restricted' is group-gated.
-		return " AND products.visibility IN ('public', 'wholesale')", nil
-	}
-	clause := fmt.Sprintf(` AND (
-		products.visibility IN ('public', 'wholesale')
-		OR (products.visibility = 'restricted' AND EXISTS (
+
+	preds := []string{"products.visibility = 'public'"}
+	var args []any
+	argN := argStart
+
+	if vc.IsWholesale {
+		preds = append(preds, "products.visibility = 'wholesale'")
+		if len(vc.GroupIDs) > 0 {
+			// 'restricted' is group-gated; wholesale tier itself is open to every
+			// authenticated wholesale customer.
+			preds = append(preds, fmt.Sprintf(`(products.visibility = 'restricted' AND EXISTS (
 			SELECT 1 FROM product_group_visibility pgv
 			WHERE pgv.product_id = products.id
 			AND pgv.customer_group_id = ANY($%d)
-		))
-	)`, argStart)
-	return clause, []any{vc.GroupIDs}
+		))`, argN))
+			args = append(args, vc.GroupIDs)
+			argN++
+		}
+	}
+
+	if vc.CustomerID != nil {
+		// 'private' products are visible only to customers explicitly granted access.
+		preds = append(preds, fmt.Sprintf(`(products.visibility = 'private' AND EXISTS (
+			SELECT 1 FROM product_customer_visibility pcv
+			WHERE pcv.product_id = products.id
+			AND pcv.customer_id = $%d
+		))`, argN))
+		args = append(args, *vc.CustomerID)
+		argN++
+	}
+
+	if len(preds) == 1 {
+		return " AND products.visibility = 'public'", args
+	}
+	return " AND (\n\t\t" + strings.Join(preds, "\n\t\tOR ") + "\n\t)", args
 }
 
 // IsProductAccessible reports whether the product is visible to the given viewer.
@@ -448,26 +506,30 @@ func (s *CatalogStore) CountProducts(ctx context.Context, tx pgx.Tx, f ProductFi
 
 // CreateVariantParams holds the fields needed to create a variant.
 type CreateVariantParams struct {
-	ProductID   uuid.UUID
-	SKU         string
-	Barcode     *string
-	Position    int
-	IsDefault   bool
-	WeightGrams *int
-	Metadata    map[string]any
+	ProductID          uuid.UUID
+	SKU                string
+	Barcode            *string
+	Position           int
+	IsDefault          bool
+	WeightGrams        *int
+	RetailAvailable    bool
+	WholesaleAvailable bool
+	Metadata           map[string]any
 }
 
 // CreateVariant inserts a new variant and returns it.
 func (s *CatalogStore) CreateVariant(ctx context.Context, tx pgx.Tx, p CreateVariantParams) (*domain.Variant, error) {
 	row, err := sqlcgen.New(tx).CreateVariant(ctx, sqlcgen.CreateVariantParams{
-		ID:          uuid.New(),
-		ProductID:   p.ProductID,
-		Sku:         p.SKU,
-		Barcode:     p.Barcode,
-		Position:    int32(p.Position),
-		IsDefault:   p.IsDefault,
-		WeightGrams: intPtrToInt32Ptr(p.WeightGrams),
-		Metadata:    metadataToJSON(p.Metadata),
+		ID:                 uuid.New(),
+		ProductID:          p.ProductID,
+		Sku:                p.SKU,
+		Barcode:            p.Barcode,
+		Position:           int32(p.Position),
+		IsDefault:          p.IsDefault,
+		WeightGrams:        intPtrToInt32Ptr(p.WeightGrams),
+		RetailAvailable:    p.RetailAvailable,
+		WholesaleAvailable: p.WholesaleAvailable,
+		Metadata:           metadataToJSON(p.Metadata),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert variant: %w", err)
@@ -522,13 +584,15 @@ func (s *CatalogStore) ListActiveVariantsByProduct(ctx context.Context, tx pgx.T
 
 // UpdateVariantParams holds the fields to update a variant.
 type UpdateVariantParams struct {
-	ID          uuid.UUID
-	SKU         string
-	Barcode     *string
-	Position    int
-	IsDefault   bool
-	WeightGrams *int
-	Metadata    map[string]any
+	ID                 uuid.UUID
+	SKU                string
+	Barcode            *string
+	Position           int
+	IsDefault          bool
+	WeightGrams        *int
+	RetailAvailable    bool
+	WholesaleAvailable bool
+	Metadata           map[string]any
 }
 
 // ClearDefaultVariants clears the is_default flag on all variants for a product.
@@ -542,16 +606,31 @@ func (s *CatalogStore) ClearDefaultVariants(ctx context.Context, tx pgx.Tx, prod
 // UpdateVariant updates a variant and returns it.
 func (s *CatalogStore) UpdateVariant(ctx context.Context, tx pgx.Tx, p UpdateVariantParams) (*domain.Variant, error) {
 	row, err := sqlcgen.New(tx).UpdateVariant(ctx, sqlcgen.UpdateVariantParams{
-		ID:          p.ID,
-		Sku:         p.SKU,
-		Barcode:     p.Barcode,
-		Position:    int32(p.Position),
-		IsDefault:   p.IsDefault,
-		WeightGrams: intPtrToInt32Ptr(p.WeightGrams),
-		Metadata:    metadataToJSON(p.Metadata),
+		ID:                 p.ID,
+		Sku:                p.SKU,
+		Barcode:            p.Barcode,
+		Position:           int32(p.Position),
+		IsDefault:          p.IsDefault,
+		WeightGrams:        intPtrToInt32Ptr(p.WeightGrams),
+		RetailAvailable:    p.RetailAvailable,
+		WholesaleAvailable: p.WholesaleAvailable,
+		Metadata:           metadataToJSON(p.Metadata),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update variant: %w", err)
+	}
+	return variantFromRow(row), nil
+}
+
+// UpdateVariantChannels updates a variant's per-channel availability flags.
+func (s *CatalogStore) UpdateVariantChannels(ctx context.Context, tx pgx.Tx, id uuid.UUID, retail, wholesale bool) (*domain.Variant, error) {
+	row, err := sqlcgen.New(tx).UpdateVariantChannels(ctx, sqlcgen.UpdateVariantChannelsParams{
+		ID:                 id,
+		RetailAvailable:    retail,
+		WholesaleAvailable: wholesale,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update variant channels: %w", err)
 	}
 	return variantFromRow(row), nil
 }
@@ -927,19 +1006,21 @@ func productFromRow(r sqlcgen.Product) *domain.Product {
 
 func variantFromRow(r sqlcgen.Variant) *domain.Variant {
 	return &domain.Variant{
-		ID:                r.ID,
-		ProductID:         r.ProductID,
-		SKU:               r.Sku,
-		Barcode:           r.Barcode,
-		Position:          int(r.Position),
-		IsDefault:         r.IsDefault,
-		WeightGrams:       int32PtrToIntPtr(r.WeightGrams),
-		WholesaleMinQty:   int32PtrToIntPtr(r.WholesaleMinQty),
-		WholesaleMultiple: int32PtrToIntPtr(r.WholesaleMultiple),
-		Metadata:          metadataFromJSON(r.Metadata),
-		ArchivedAt:        timestampFromPG(r.ArchivedAt),
-		CreatedAt:         r.CreatedAt,
-		UpdatedAt:         r.UpdatedAt,
+		ID:                 r.ID,
+		ProductID:          r.ProductID,
+		SKU:                r.Sku,
+		Barcode:            r.Barcode,
+		Position:           int(r.Position),
+		IsDefault:          r.IsDefault,
+		WeightGrams:        int32PtrToIntPtr(r.WeightGrams),
+		WholesaleMinQty:    int32PtrToIntPtr(r.WholesaleMinQty),
+		WholesaleMultiple:  int32PtrToIntPtr(r.WholesaleMultiple),
+		RetailAvailable:    r.RetailAvailable,
+		WholesaleAvailable: r.WholesaleAvailable,
+		Metadata:           metadataFromJSON(r.Metadata),
+		ArchivedAt:         timestampFromPG(r.ArchivedAt),
+		CreatedAt:          r.CreatedAt,
+		UpdatedAt:          r.UpdatedAt,
 	}
 }
 

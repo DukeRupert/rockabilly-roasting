@@ -419,6 +419,11 @@ type ProductAttributeValue struct {
 	Values         []byte    `json:"values"`
 }
 
+type ProductCustomerVisibility struct {
+	ProductID  uuid.UUID `json:"product_id"`
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
 type ProductGroupVisibility struct {
 	ProductID       uuid.UUID `json:"product_id"`
 	CustomerGroupID uuid.UUID `json:"customer_group_id"`
@@ -610,19 +615,21 @@ type Taxon struct {
 }
 
 type Variant struct {
-	ID                uuid.UUID          `json:"id"`
-	ProductID         uuid.UUID          `json:"product_id"`
-	Sku               string             `json:"sku"`
-	Barcode           *string            `json:"barcode"`
-	Position          int32              `json:"position"`
-	IsDefault         bool               `json:"is_default"`
-	WeightGrams       *int32             `json:"weight_grams"`
-	Metadata          json.RawMessage    `json:"metadata"`
-	CreatedAt         time.Time          `json:"created_at"`
-	UpdatedAt         time.Time          `json:"updated_at"`
-	WholesaleMinQty   *int32             `json:"wholesale_min_qty"`
-	WholesaleMultiple *int32             `json:"wholesale_multiple"`
-	ArchivedAt        pgtype.Timestamptz `json:"archived_at"`
+	ID                 uuid.UUID          `json:"id"`
+	ProductID          uuid.UUID          `json:"product_id"`
+	Sku                string             `json:"sku"`
+	Barcode            *string            `json:"barcode"`
+	Position           int32              `json:"position"`
+	IsDefault          bool               `json:"is_default"`
+	WeightGrams        *int32             `json:"weight_grams"`
+	Metadata           json.RawMessage    `json:"metadata"`
+	CreatedAt          time.Time          `json:"created_at"`
+	UpdatedAt          time.Time          `json:"updated_at"`
+	WholesaleMinQty    *int32             `json:"wholesale_min_qty"`
+	WholesaleMultiple  *int32             `json:"wholesale_multiple"`
+	ArchivedAt         pgtype.Timestamptz `json:"archived_at"`
+	RetailAvailable    bool               `json:"retail_available"`
+	WholesaleAvailable bool               `json:"wholesale_available"`
 }
 
 type VariantOptionValue struct {

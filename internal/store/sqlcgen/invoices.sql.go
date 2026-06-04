@@ -717,7 +717,7 @@ const updateVariantWholesale = `-- name: UpdateVariantWholesale :one
 UPDATE variants
 SET wholesale_min_qty = $2, wholesale_multiple = $3, updated_at = now()
 WHERE id = $1
-RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at
+RETURNING id, product_id, sku, barcode, position, is_default, weight_grams, metadata, created_at, updated_at, wholesale_min_qty, wholesale_multiple, archived_at, retail_available, wholesale_available
 `
 
 type UpdateVariantWholesaleParams struct {
@@ -743,6 +743,8 @@ func (q *Queries) UpdateVariantWholesale(ctx context.Context, arg UpdateVariantW
 		&i.WholesaleMinQty,
 		&i.WholesaleMultiple,
 		&i.ArchivedAt,
+		&i.RetailAvailable,
+		&i.WholesaleAvailable,
 	)
 	return i, err
 }

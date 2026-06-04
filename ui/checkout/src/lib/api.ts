@@ -74,14 +74,49 @@ export interface ConfirmResponse {
   redirect: string;
 }
 
+// ApiError carries the full shape of a failed checkout API response so callers
+// can react beyond the message string: `errors` is the per-field validation map
+// the address endpoint returns on 422, and `code` is a stable machine tag (e.g.
+// "address_incomplete") the payment step uses to route the buyer back to the
+// step that can fix the problem.
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  errors?: Record<string, string>;
+
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    errors?: Record<string, string>,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.errors = errors;
+  }
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
-  const data = await res.json();
+
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {
+    // Non-JSON body (e.g. a proxy/gateway error page). Fall through to a
+    // generic message keyed off the status code below.
+  }
+
   if (!res.ok) {
-    throw new Error(data.error || `Request failed: ${res.status}`);
+    const message =
+      (data && data.error) ||
+      `Something went wrong (error ${res.status}). Please try again.`;
+    throw new ApiError(message, res.status, data?.code, data?.errors);
   }
   return data as T;
 }

@@ -651,6 +651,14 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			return fmt.Errorf("get address: %w", txErr)
 		}
 
+		// Guard the fields tax + shipping depend on. A blank state means tax
+		// can't be computed and a blank ZIP breaks shipping/local eligibility —
+		// surface that as a fixable error pointing back to the address step
+		// instead of failing the calculation with an opaque 500 downstream.
+		if !addressShippable(shippingAddr) {
+			return app.ErrAddressIncomplete
+		}
+
 		isWholesale := customer.AccountType == domain.AccountTypeWholesale
 		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLineItems, customer.TaxExempt, isWholesale, shippingAddr.State)
 		if txErr != nil {
@@ -678,11 +686,31 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 	})
 	if err != nil {
 		logger.Error("checkout payment-intent: phase 1", "error", err)
-		if errors.Is(err, app.ErrCartEmpty) {
-			JSON(w, http.StatusUnprocessableEntity, map[string]string{"error": "cart is empty"})
-			return
+		switch {
+		case errors.Is(err, app.ErrCartEmpty):
+			d.Metrics.CheckoutFailed.WithLabelValues("retail", "validation_error").Inc()
+			JSON(w, http.StatusUnprocessableEntity, map[string]string{
+				"error": "Your cart is empty. Add something before checking out.",
+				"code":  "cart_empty",
+			})
+		case errors.Is(err, app.ErrAddressIncomplete):
+			d.Metrics.CheckoutFailed.WithLabelValues("retail", "address_incomplete").Inc()
+			JSON(w, http.StatusUnprocessableEntity, map[string]string{
+				"error": "Your shipping address is missing its street, city, state, or ZIP. Go back and finish it so we can price shipping and tax.",
+				"code":  "address_incomplete",
+			})
+		case errors.Is(err, app.ErrAddressNotFound):
+			d.Metrics.CheckoutFailed.WithLabelValues("retail", "address_incomplete").Inc()
+			JSON(w, http.StatusUnprocessableEntity, map[string]string{
+				"error": "We couldn't find that shipping address. Go back and re-enter it.",
+				"code":  "address_incomplete",
+			})
+		default:
+			d.Metrics.CheckoutFailed.WithLabelValues("retail", "internal_error").Inc()
+			JSON(w, http.StatusInternalServerError, map[string]string{
+				"error": "Something went wrong preparing your payment. Please try again — if it keeps happening, your cart is saved.",
+			})
 		}
-		JSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to prepare payment"})
 		return
 	}
 
@@ -1101,6 +1129,20 @@ func ptrToString(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// addressShippable reports whether an address carries every field checkout
+// needs to price the order: a street line, city, state, and ZIP. A returning
+// customer can have an older address row missing one of these, and tax/shipping
+// fail unhelpfully without them — we'd rather send the buyer back to fix it.
+func addressShippable(a *domain.Address) bool {
+	if a == nil {
+		return false
+	}
+	return strings.TrimSpace(a.Line1) != "" &&
+		strings.TrimSpace(a.City) != "" &&
+		strings.TrimSpace(a.State) != "" &&
+		strings.TrimSpace(a.PostalCode) != ""
 }
 
 // classifyCheckoutError maps checkout errors to failure_reason metric labels.

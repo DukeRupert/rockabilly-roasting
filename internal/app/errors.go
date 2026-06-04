@@ -95,6 +95,10 @@ var (
 	// Address errors
 	ErrAddressNotFound = errors.New("address not found")
 	ErrLastAddress     = errors.New("cannot delete the only address")
+	// ErrAddressIncomplete signals a checkout address is missing one of the
+	// fields required to price + ship an order (street, city, state, ZIP).
+	// Surfaced to the buyer with a fix-it message rather than an opaque 500.
+	ErrAddressIncomplete = errors.New("address is missing required fields")
 
 	// Status errors
 	ErrInvalidOrderStatus = errors.New("invalid order status transition")

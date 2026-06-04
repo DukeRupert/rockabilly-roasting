@@ -110,6 +110,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrInvoiceNotSendable),
 		errors.Is(err, app.ErrInvoiceNotVoidable),
 		errors.Is(err, app.ErrLastAddress),
+		errors.Is(err, app.ErrAddressIncomplete),
 		errors.Is(err, app.ErrAttributeValueNotAllowed),
 		errors.Is(err, app.ErrAttributeAllowedValuesRequired),
 		errors.Is(err, app.ErrVariantInUse),

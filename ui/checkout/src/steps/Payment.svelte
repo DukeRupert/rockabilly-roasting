@@ -49,6 +49,11 @@
   let processing = $state(false);
   let error = $state('');
   let clientSecret = $state('');
+  // Set when the payment intent can't be prepared (e.g. the saved address is
+  // missing a state/ZIP). We hide the dead payment form and show a recovery
+  // panel that sends the buyer back to the step that can fix it.
+  let initFailed = $state(false);
+  let initNeedsAddress = $state(false);
 
   // Track the method the current PI was created for. When the user toggles
   // the radio, we tear down the Stripe element and re-create the PI so the
@@ -84,6 +89,8 @@
     if (!stripe) return;
     loading = true;
     error = '';
+    initFailed = false;
+    initNeedsAddress = false;
     try {
       const piResponse = await createPaymentIntent({
         cart_id: cart.cart_id,
@@ -108,7 +115,9 @@
       const paymentElement = elements.create('payment');
       paymentElement.mount('#stripe-payment-element');
     } catch (e: any) {
-      error = e.message || 'Failed to initialize payment';
+      error = e.message || 'We couldn’t set up payment. Please try again.';
+      initFailed = true;
+      initNeedsAddress = e?.code === 'address_incomplete';
       loading = false;
     }
   }
@@ -170,7 +179,7 @@
     Payment
   </h2>
 
-  {#if error}
+  {#if error && !initFailed}
     <div class="mb-5 border-2 border-rust bg-cream-hi p-3 text-center">
       <p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">
         {error}
@@ -236,6 +245,56 @@
       <p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
         Preparing payment…
       </p>
+    </div>
+  {:else if initFailed}
+    <!--
+      Payment couldn't be prepared. Rather than leave a dead, unmountable
+      Stripe form on screen, show what went wrong and the action that fixes it:
+      back to shipping when the address is the problem, otherwise a retry.
+    -->
+    <div class="border-2 border-rust bg-cream-hi p-6 text-center space-y-5">
+      <p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">
+        {error}
+      </p>
+      {#if initNeedsAddress}
+        <button
+          type="button"
+          onclick={onBack}
+          class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm"
+          style="letter-spacing:0.16em; text-transform:uppercase;"
+        >
+          <svg
+            class="size-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke-width="2.5"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          Back to shipping info
+        </button>
+      {:else}
+        <div class="flex items-center justify-center gap-4">
+          <button
+            type="button"
+            onclick={initializePayment}
+            class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm"
+            style="letter-spacing:0.16em; text-transform:uppercase;"
+          >
+            Try again
+          </button>
+          <button
+            type="button"
+            onclick={onBack}
+            class="inline-flex items-center gap-1.5 font-oswald font-bold text-[11px] text-ink hover:text-rust transition-colors"
+            style="letter-spacing:0.2em; text-transform:uppercase;"
+          >
+            Back
+          </button>
+        </div>
+      {/if}
     </div>
   {:else}
     <form onsubmit={handleSubmit} class="space-y-6">

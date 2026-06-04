@@ -17,6 +17,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/auth"
+	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/platform/turnstile"
 	"github.com/dukerupert/hiri/internal/store"
@@ -274,10 +275,14 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 				InStock:      v.InStock,
 			}
 		}
+		imageURL := ""
+		if p.ImageURL != "" {
+			imageURL = d.MediaConfig.ProductImageURL(p.ImageURL, mediapkg.VariantCard)
+		}
 		templateProducts[i] = storefront.QuickOrderProduct{
 			ID:       p.ID,
 			Title:    p.Title,
-			ImageURL: p.ImageURL,
+			ImageURL: imageURL,
 			Options:  p.Options,
 			Variants: variants,
 		}
@@ -702,6 +707,17 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			return txErr
 		}
 		orderNumber = order.Number
+
+		// Send the buyer an order confirmation with line items, mirroring retail
+		// checkout. The order_confirm job/template is channel-agnostic — wholesale
+		// reuses it as-is. Rides on this tx so no email goes if the order rolls back.
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.OrderConfirmEmailArgs{
+			OrderID:    order.ID,
+			CustomerID: customer.ID,
+		}, nil)
+		if txErr != nil {
+			return txErr
+		}
 
 		// Enqueue QB customer + invoice chain if QB is connected.
 		if d.QBClient != nil {

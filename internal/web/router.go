@@ -311,6 +311,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/orders/batch/out-for-delivery", deps.handleAdminOrderOutForDeliveryBatch)
 	adminMux.HandleFunc("GET /admin/orders/{id}", deps.handleAdminOrderShow)
 	adminMux.HandleFunc("POST /admin/orders/{id}/cancel", deps.handleAdminOrderCancel)
+	adminMux.HandleFunc("POST /admin/orders/{id}/mark-paid", deps.handleAdminOrderMarkPaid)
 	adminMux.HandleFunc("POST /admin/orders/{id}/refund", deps.handleAdminOrderRefund)
 	adminMux.HandleFunc("POST /admin/orders/{id}/fulfill", deps.handleAdminOrderFulfill)
 	adminMux.HandleFunc("POST /admin/orders/{id}/ship", deps.handleAdminOrderShip)
@@ -368,6 +369,7 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin fulfillment & shipping
 	adminMux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)
+	adminMux.HandleFunc("GET /admin/wholesale/fulfillment", deps.handleAdminWholesaleFulfillmentList)
 	adminMux.HandleFunc("POST /admin/orders/{id}/label", deps.handleAdminShipmentLabelCreate)
 	adminMux.HandleFunc("POST /admin/orders/labels", deps.handleAdminShipmentBulkLabelCreate)
 	adminMux.HandleFunc("GET /admin/shipments/{id}/label", deps.handleAdminShipmentLabelDownload)

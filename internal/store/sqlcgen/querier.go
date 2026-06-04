@@ -118,6 +118,10 @@ type Querier interface {
 	GetInvoiceByID(ctx context.Context, id uuid.UUID) (Invoice, error)
 	GetLineItem(ctx context.Context, id uuid.UUID) (LineItem, error)
 	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
+	// Same as GetOrderByID but takes a row-level lock, so a manual payment-status
+	// override (admin "mark as paid") serializes against a concurrent QB reconcile
+	// on the same order — the second tx waits and sees the post-transition state.
+	GetOrderByIDForUpdate(ctx context.Context, id uuid.UUID) (Order, error)
 	GetOrderByNumber(ctx context.Context, number string) (Order, error)
 	GetOrderByStripePaymentIntentID(ctx context.Context, stripePaymentIntentID *string) (Order, error)
 	// Same as GetOrderByStripePaymentIntentID but takes a row-level lock.

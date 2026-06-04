@@ -81,8 +81,32 @@ func isFulfillmentActionView(view string) bool {
 	return view == "needs_action" || view == "ready_to_ship"
 }
 
+// handleAdminFulfillmentList renders the retail (direct-to-consumer)
+// fulfillment queue.
 func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request) {
+	d.renderFulfillmentList(w, r, domain.OrderChannelRetail)
+}
+
+// handleAdminWholesaleFulfillmentList renders the wholesale fulfillment queue.
+// It shares the retail queue's machinery — same view buckets, grouping, and
+// batch actions — but scopes every query to the wholesale channel and links
+// back to /admin/wholesale/fulfillment.
+func (d *Deps) handleAdminWholesaleFulfillmentList(w http.ResponseWriter, r *http.Request) {
+	d.renderFulfillmentList(w, r, domain.OrderChannelWholesale)
+}
+
+// renderFulfillmentList is the shared body for both fulfillment queues. The
+// channel scopes the listing and the per-tab counts; it also selects the base
+// path, page title, and active nav entry so the two queues stay independent.
+func (d *Deps) renderFulfillmentList(w http.ResponseWriter, r *http.Request, channel domain.OrderChannel) {
 	ctx := r.Context()
+
+	basePath := "/admin/fulfillment"
+	title := "Fulfillment"
+	if channel == domain.OrderChannelWholesale {
+		basePath = "/admin/wholesale/fulfillment"
+		title = "Wholesale fulfillment"
+	}
 
 	view := normalizeFulfillmentView(r.URL.Query().Get("view"))
 	pageStr := r.URL.Query().Get("page")
@@ -100,8 +124,9 @@ func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request
 	}
 
 	filter := store.OrderFilter{
-		Limit:  perPage + 1,
-		Offset: (page - 1) * perPage,
+		Channel: &channel,
+		Limit:   perPage + 1,
+		Offset:  (page - 1) * perPage,
 	}
 	applyFulfillmentViewFilter(view, &filter)
 
@@ -121,7 +146,7 @@ func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request
 		if txErr != nil {
 			return txErr
 		}
-		counts, txErr = d.OrderService.CountFulfillmentViews(ctx, tx)
+		counts, txErr = d.OrderService.CountFulfillmentViews(ctx, tx, &channel)
 		if txErr != nil {
 			return txErr
 		}
@@ -172,7 +197,9 @@ func (d *Deps) handleAdminFulfillmentList(w http.ResponseWriter, r *http.Request
 
 	name, role := staffNameRole(r)
 	props := admin.FulfillmentListProps{
-		View: view,
+		BasePath: basePath,
+		Title:    title,
+		View:     view,
 		Counts: admin.FulfillmentViewCounts{
 			NeedsAction: counts.NeedsAction,
 			ReadyToShip: counts.ReadyToShip,

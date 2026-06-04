@@ -10,6 +10,12 @@ RETURNING *;
 -- name: GetOrderByID :one
 SELECT * FROM orders WHERE id = $1;
 
+-- name: GetOrderByIDForUpdate :one
+-- Same as GetOrderByID but takes a row-level lock, so a manual payment-status
+-- override (admin "mark as paid") serializes against a concurrent QB reconcile
+-- on the same order — the second tx waits and sees the post-transition state.
+SELECT * FROM orders WHERE id = $1 FOR UPDATE;
+
 -- name: GetOrderByNumber :one
 SELECT * FROM orders WHERE number = $1;
 

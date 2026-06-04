@@ -7,6 +7,7 @@ var (
 	// Order errors
 	ErrOrderNotFound      = errors.New("order not found")
 	ErrOrderNotRefundable = errors.New("order is not refundable")
+	ErrOrderNotPayable    = errors.New("order cannot be manually marked paid")
 	ErrOrderNotCancellable = errors.New("order is not cancellable")
 	ErrOrderAlreadyFulfilled = errors.New("order is already fulfilled")
 	ErrOrderFulfillmentNotRevertible = errors.New("order fulfillment cannot be reverted")

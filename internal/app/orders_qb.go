@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -192,6 +193,84 @@ func (s *OrderService) captureInvoicePayment(ctx context.Context, tx pgx.Tx, ord
 		}
 	}
 	return ReconcileCaptured, nil
+}
+
+// MarkWholesaleOrderPaid is the staff manual override for capturing a wholesale
+// invoice payment when QuickBooks reconciliation didn't (missed webhook, an
+// out-of-band deposit QB never matched, etc.). It mirrors captureInvoicePayment
+// — flips the order to captured and records audit — but is driven by a staff
+// actor and only enqueues the customer payment-confirmation email when the
+// caller opts in. The order is read FOR UPDATE so it serializes against a
+// concurrent QB reconcile on the same invoice.
+//
+// Eligible only for QB-owned orders in a live-but-unsettled invoice state
+// (invoiced / overdue / partially_paid) that aren't cancelled/refunded; anything
+// else returns ErrOrderNotPayable. An already-captured order is not eligible, so
+// a double submit is rejected rather than re-emailing the customer.
+func (s *OrderService) MarkWholesaleOrderPaid(ctx context.Context, tx pgx.Tx, id uuid.UUID, sendConfirmation bool, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDForUpdate(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for mark paid: %w", err)
+	}
+
+	if !orderManuallyPayable(order) {
+		return nil, ErrOrderNotPayable
+	}
+
+	previousStatus := order.PaymentStatus
+
+	updated, err := s.orders.UpdateOrderPaymentStatus(ctx, tx, id, domain.PaymentStatusCaptured)
+	if err != nil {
+		return nil, fmt.Errorf("update payment status: %w", err)
+	}
+
+	meta := map[string]any{
+		"previous_payment_status": string(previousStatus),
+		"emailed":                 sendConfirmation,
+	}
+	if order.QBInvoiceID != nil {
+		meta["qb_invoice_id"] = *order.QBInvoiceID
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderMarkedPaid,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        updated,
+		Metadata:     meta,
+	}); err != nil {
+		return nil, fmt.Errorf("audit order marked paid: %w", err)
+	}
+
+	if sendConfirmation && s.enqueuer != nil && order.CustomerID != nil {
+		if err := s.enqueuer.EnqueueInvoicePaid(ctx, tx, order.ID, *order.CustomerID); err != nil {
+			return nil, fmt.Errorf("enqueue invoice paid email: %w", err)
+		}
+	}
+
+	return updated, nil
+}
+
+// orderManuallyPayable reports whether an order is eligible for the admin
+// "mark as paid" override. Mirrored by canMarkOrderPaid in the order detail UI.
+func orderManuallyPayable(o *domain.Order) bool {
+	if o.QBInvoiceID == nil {
+		return false
+	}
+	if o.Status == domain.OrderStatusCancelled || o.Status == domain.OrderStatusRefunded {
+		return false
+	}
+	switch o.PaymentStatus {
+	case domain.PaymentStatusInvoiced, domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
+		return true
+	default:
+		return false
+	}
 }
 
 // markInvoiceOverdue flips the order to overdue (on first crossing) and sends at

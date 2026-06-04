@@ -231,6 +231,69 @@ func TestReconcileWholesalePayment_Idempotent(t *testing.T) {
 	assert.Equal(t, domain.PaymentStatusOverdue, reread.PaymentStatus)
 }
 
+func TestMarkWholesaleOrderPaid(t *testing.T) {
+	ctx := context.Background()
+	now := time.Now()
+	actor := app.Actor{Type: domain.AuditActorTypeStaff, Name: "tester"}
+
+	t.Run("invoiced order is captured and emails customer when opted in", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		enq := &fakeEnqueuer{}
+		svc, st := newReconcileService(enq)
+		order, _ := makeQBOrder(t, tx, st, domain.PaymentStatusInvoiced, now, 0)
+
+		got, err := svc.MarkWholesaleOrderPaid(ctx, tx, order.ID, true, actor)
+		require.NoError(t, err)
+		assert.Equal(t, domain.PaymentStatusCaptured, got.PaymentStatus)
+
+		reread, err := st.GetOrderByIDForUpdate(ctx, tx, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.PaymentStatusCaptured, reread.PaymentStatus, "persisted")
+		assert.Equal(t, []uuid.UUID{order.ID}, enq.paid, "confirmation email enqueued")
+	})
+
+	t.Run("overdue order is captured silently when not opted in", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		enq := &fakeEnqueuer{}
+		svc, st := newReconcileService(enq)
+		order, _ := makeQBOrder(t, tx, st, domain.PaymentStatusOverdue, now, 0)
+
+		_, err := svc.MarkWholesaleOrderPaid(ctx, tx, order.ID, false, actor)
+		require.NoError(t, err)
+
+		reread, err := st.GetOrderByIDForUpdate(ctx, tx, order.ID)
+		require.NoError(t, err)
+		assert.Equal(t, domain.PaymentStatusCaptured, reread.PaymentStatus, "persisted")
+		assert.Empty(t, enq.paid, "no email when staff did not opt in")
+	})
+
+	t.Run("already-captured order is rejected", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		enq := &fakeEnqueuer{}
+		svc, st := newReconcileService(enq)
+		order, _ := makeQBOrder(t, tx, st, domain.PaymentStatusCaptured, now, 0)
+
+		_, err := svc.MarkWholesaleOrderPaid(ctx, tx, order.ID, false, actor)
+		assert.ErrorIs(t, err, app.ErrOrderNotPayable)
+		assert.Empty(t, enq.paid)
+	})
+
+	t.Run("retail order without a QB invoice is rejected", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		enq := &fakeEnqueuer{}
+		svc, _ := newReconcileService(enq)
+		cust := testutil.CreateCustomer(t, tx)
+		addr := testutil.CreateAddress(t, tx, cust.ID)
+		order := testutil.CreateOrder(t, tx, cust.ID, addr.ID, addr.ID,
+			testutil.WithOrderStatus(domain.OrderStatusConfirmed),
+			testutil.WithPaymentStatus(domain.PaymentStatusInvoiced),
+		)
+
+		_, err := svc.MarkWholesaleOrderPaid(ctx, tx, order.ID, false, actor)
+		assert.ErrorIs(t, err, app.ErrOrderNotPayable)
+	})
+}
+
 func TestReconcileWholesalePayment_ReminderCadence(t *testing.T) {
 	ctx := context.Background()
 	placedAt := time.Now().Add(-60 * 24 * time.Hour) // long ago; we drive "now" explicitly

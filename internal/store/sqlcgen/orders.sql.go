@@ -407,6 +407,55 @@ func (q *Queries) GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 	return i, err
 }
 
+const getOrderByIDForUpdate = `-- name: GetOrderByIDForUpdate :one
+SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at, shipping_method, requested_delivery_date, overdue_reminder_stage, channel FROM orders WHERE id = $1 FOR UPDATE
+`
+
+// Same as GetOrderByID but takes a row-level lock, so a manual payment-status
+// override (admin "mark as paid") serializes against a concurrent QB reconcile
+// on the same order — the second tx waits and sees the post-transition state.
+func (q *Queries) GetOrderByIDForUpdate(ctx context.Context, id uuid.UUID) (Order, error) {
+	row := q.db.QueryRow(ctx, getOrderByIDForUpdate, id)
+	var i Order
+	err := row.Scan(
+		&i.ID,
+		&i.Number,
+		&i.CustomerID,
+		&i.Status,
+		&i.PaymentStatus,
+		&i.FulfillmentStatus,
+		&i.CurrencyCode,
+		&i.Subtotal,
+		&i.DiscountTotal,
+		&i.ShippingTotal,
+		&i.TaxTotal,
+		&i.Total,
+		&i.ShippingAddressID,
+		&i.BillingAddressID,
+		&i.SubscriptionID,
+		&i.DraftByUserID,
+		&i.TaxExempt,
+		&i.TaxExemptReason,
+		&i.StripeTaxID,
+		&i.Notes,
+		&i.Metadata,
+		&i.PlacedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.StripePaymentIntentID,
+		&i.CustomerPoNumber,
+		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
+		&i.ShippingMethod,
+		&i.RequestedDeliveryDate,
+		&i.OverdueReminderStage,
+		&i.Channel,
+	)
+	return i, err
+}
+
 const getOrderByNumber = `-- name: GetOrderByNumber :one
 SELECT id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at, shipping_method, requested_delivery_date, overdue_reminder_stage, channel FROM orders WHERE number = $1
 `

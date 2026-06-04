@@ -32,11 +32,18 @@ func adminNavGroups() []navGroup {
 			},
 		},
 		{
-			Label: "ORDERS",
+			Label: "RETAIL",
 			Items: []navItem{
 				{Label: "Orders", Href: "/admin/orders", IconFn: icon.ShoppingCart},
-				{Label: "Wholesale Orders", Href: "/admin/orders/wholesale", IconFn: icon.ReceiptText},
 				{Label: "Fulfillment", Href: "/admin/fulfillment", IconFn: icon.Truck},
+			},
+		},
+		{
+			Label: "WHOLESALE",
+			Items: []navItem{
+				{Label: "Accounts", Href: "/admin/wholesale", IconFn: icon.Building},
+				{Label: "Orders", Href: "/admin/orders/wholesale", IconFn: icon.ReceiptText},
+				{Label: "Fulfillment", Href: "/admin/wholesale/fulfillment", IconFn: icon.Truck},
 			},
 		},
 		{
@@ -53,7 +60,6 @@ func adminNavGroups() []navGroup {
 				{Label: "Customers", Href: "/admin/customers", IconFn: icon.Users},
 				{Label: "Groups", Href: "/admin/groups", IconFn: icon.Group},
 				{Label: "Price Lists", Href: "/admin/price-lists", IconFn: icon.BadgeDollarSign},
-				{Label: "Wholesale", Href: "/admin/wholesale", IconFn: icon.Building},
 			},
 		},
 		{
@@ -534,13 +540,32 @@ templ Admin(props AdminProps) {
 				var inactiveIcon = 'size-5 shrink-0 text-rr-muted group-hover:text-rr-heading';
 
 				function updateActiveNav() {
-					var path = window.location.pathname;
+					// Prefer an explicit marker the swapped content may carry. The order
+					// detail page lives at the same /admin/orders/{id} URL for both
+					// channels, so the path alone can't say which nav item is right — the
+					// marker disambiguates (e.g. "/admin/orders/wholesale").
+					var marker = document.querySelector('#main-content [data-active-path]');
+					var path = marker ? marker.getAttribute('data-active-path') : window.location.pathname;
 					// Scoped to the sidebar so we don't trample page-level tab navs
 					// (e.g. orders/fulfillment view tabs) that also link to /admin/*.
-					document.querySelectorAll('nav[data-admin-sidebar-nav] a[href^="/admin"]').forEach(function(a) {
+					var links = document.querySelectorAll('nav[data-admin-sidebar-nav] a[href^="/admin"]');
+					// Pick the single longest href the path matches. Prefix matches must
+					// land on a path boundary so /admin/orders never claims
+					// /admin/orders/wholesale, and so /admin/orders/{id} resolves to the
+					// most specific group rather than every ancestor.
+					var best = null, bestLen = -1;
+					links.forEach(function(a) {
 						var href = a.getAttribute('href');
-						var isActive = (href === '/admin' && path === '/admin') ||
-							(href !== '/admin' && path.startsWith(href));
+						var matches = (href === '/admin')
+							? (path === '/admin')
+							: (path === href || path.indexOf(href + '/') === 0);
+						if (matches && href.length > bestLen) {
+							best = a;
+							bestLen = href.length;
+						}
+					});
+					links.forEach(function(a) {
+						var isActive = a === best;
 						a.className = isActive ? activeLink : inactiveLink;
 						var icon = a.querySelector('svg');
 						if (icon) icon.className = isActive ? activeIcon : inactiveIcon;

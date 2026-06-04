@@ -31,6 +31,13 @@ type FulfillmentGroup struct {
 }
 
 type FulfillmentListProps struct {
+	// BasePath is the queue's own URL ("/admin/fulfillment" for retail,
+	// "/admin/wholesale/fulfillment" for wholesale). Tab links, pagination, the
+	// active nav entry, and the batch-action return path all derive from it so
+	// the two channel queues stay independent.
+	BasePath   string
+	Title      string // page heading ("Fulfillment" / "Wholesale fulfillment")
+	Subtitle   string
 	View       string // needs_action | ready_to_ship | shipped | delivered | all
 	Counts     FulfillmentViewCounts
 	Groups     []FulfillmentGroup // populated on action views (needs_action, ready_to_ship)
@@ -213,24 +220,24 @@ func (p FulfillmentListProps) showingEnd() int {
 }
 
 // fulfillmentViewHref builds a URL for switching tabs. "needs_action" is the
-// canonical default and renders as a bare /admin/fulfillment.
-func fulfillmentViewHref(view string) string {
+// canonical default and renders as a bare base path.
+func fulfillmentViewHref(basePath, view string) string {
 	if view == "" || view == "needs_action" {
-		return "/admin/fulfillment"
+		return basePath
 	}
 	v := url.Values{}
 	v.Set("view", view)
-	return "/admin/fulfillment?" + v.Encode()
+	return basePath + "?" + v.Encode()
 }
 
 // fulfillmentPageHref preserves the view when paginating a flat-list tab.
-func fulfillmentPageHref(page int, view string) string {
+func fulfillmentPageHref(basePath string, page int, view string) string {
 	v := url.Values{}
 	v.Set("page", fmt.Sprintf("%d", page))
 	if view != "" && view != "needs_action" {
 		v.Set("view", view)
 	}
-	return "/admin/fulfillment?" + v.Encode()
+	return basePath + "?" + v.Encode()
 }
 
 // fulfillmentEmptyBucketCopy returns the body copy shown when a tab has 0 rows
@@ -258,7 +265,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 	     shape before scanning rows. No subtitle (it would just rephrase the
 	     title) and no right-rail CTA (the queue itself is the action). -->
 	<div>
-		<h1 class="admin-page-title">Fulfillment</h1>
+		<h1 class="admin-page-title">{ props.Title }</h1>
 		<p class="mt-1 text-sm text-rr-muted tabular-nums">
 			<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%d", props.Counts.NeedsAction) }</span> need action
 			<span class="mx-1 text-rr-border" aria-hidden="true">·</span>
@@ -272,7 +279,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 	<section class="mt-5" aria-label="Filter fulfillment queue">
 		<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Fulfillment views">
 			for _, tab := range props.tabs() {
-				<a href={ templ.SafeURL(fulfillmentViewHref(tab.Key)) } class={ orderTabClass(props.View == tab.Key) }>
+				<a href={ templ.SafeURL(fulfillmentViewHref(props.BasePath, tab.Key)) } class={ orderTabClass(props.View == tab.Key) }>
 					<span>{ tab.Label }</span>
 					<span class={ orderTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
 				</a>
@@ -387,6 +394,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 						class="contents"
 					>
 						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+						<input type="hidden" name="return_to" value={ props.BasePath }/>
 						<button
 							type="submit"
 							title="Mark each selected order ready for pickup and email the customer."
@@ -402,6 +410,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 						class="contents"
 					>
 						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+						<input type="hidden" name="return_to" value={ props.BasePath }/>
 						<button
 							type="submit"
 							title="Mark each selected order as picked up by the customer."
@@ -418,6 +427,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 						class="contents"
 					>
 						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
+						<input type="hidden" name="return_to" value={ props.BasePath }/>
 						<button
 							type="submit"
 							title="Email a delivery notification to each customer and mark the orders out for delivery."
@@ -633,7 +643,7 @@ templ fulfillmentEmptyState(props FulfillmentListProps) {
 			<h2 class="admin-page-title text-2xl">Nothing here.</h2>
 			<p class="mt-3 text-sm text-rr-body">{ fulfillmentEmptyBucketCopy(props.View) }</p>
 			if props.View != "all" {
-				<a href={ templ.SafeURL(fulfillmentViewHref("all")) } class="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-rr-red hover:text-rr-red-lt">
+				<a href={ templ.SafeURL(fulfillmentViewHref(props.BasePath, "all")) } class="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-rr-red hover:text-rr-red-lt">
 					View all orders &rarr;
 				</a>
 			}
@@ -657,7 +667,7 @@ templ fulfillmentPagination(props FulfillmentListProps) {
 		<div class="-mt-px flex w-0 flex-1">
 			if props.Page > 1 {
 				<a
-					href={ templ.SafeURL(fulfillmentPageHref(props.Page-1, props.View)) }
+					href={ templ.SafeURL(fulfillmentPageHref(props.BasePath, props.Page-1, props.View)) }
 					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 				>
 					Previous
@@ -672,7 +682,7 @@ templ fulfillmentPagination(props FulfillmentListProps) {
 		<div class="-mt-px flex w-0 flex-1 justify-end">
 			if props.HasMore {
 				<a
-					href={ templ.SafeURL(fulfillmentPageHref(props.Page+1, props.View)) }
+					href={ templ.SafeURL(fulfillmentPageHref(props.BasePath, props.Page+1, props.View)) }
 					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 				>
 					Next
@@ -684,8 +694,8 @@ templ fulfillmentPagination(props FulfillmentListProps) {
 
 templ FulfillmentList(props FulfillmentListProps) {
 	@layouts.Admin(layouts.AdminProps{
-		Title:      "Fulfillment",
-		ActivePath: "/admin/fulfillment",
+		Title:      props.Title,
+		ActivePath: props.BasePath,
 		StaffName:  props.StaffName,
 		StaffRole:  props.StaffRole,
 	}) {

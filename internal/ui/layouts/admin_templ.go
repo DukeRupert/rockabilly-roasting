@@ -40,11 +40,18 @@ func adminNavGroups() []navGroup {
 			},
 		},
 		{
-			Label: "ORDERS",
+			Label: "RETAIL",
 			Items: []navItem{
 				{Label: "Orders", Href: "/admin/orders", IconFn: icon.ShoppingCart},
-				{Label: "Wholesale Orders", Href: "/admin/orders/wholesale", IconFn: icon.ReceiptText},
 				{Label: "Fulfillment", Href: "/admin/fulfillment", IconFn: icon.Truck},
+			},
+		},
+		{
+			Label: "WHOLESALE",
+			Items: []navItem{
+				{Label: "Accounts", Href: "/admin/wholesale", IconFn: icon.Building},
+				{Label: "Orders", Href: "/admin/orders/wholesale", IconFn: icon.ReceiptText},
+				{Label: "Fulfillment", Href: "/admin/wholesale/fulfillment", IconFn: icon.Truck},
 			},
 		},
 		{
@@ -61,7 +68,6 @@ func adminNavGroups() []navGroup {
 				{Label: "Customers", Href: "/admin/customers", IconFn: icon.Users},
 				{Label: "Groups", Href: "/admin/groups", IconFn: icon.Group},
 				{Label: "Price Lists", Href: "/admin/price-lists", IconFn: icon.BadgeDollarSign},
-				{Label: "Wholesale", Href: "/admin/wholesale", IconFn: icon.Building},
 			},
 		},
 		{
@@ -135,7 +141,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 108, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 114, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -166,7 +172,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(group.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 311, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 317, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -198,7 +204,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var5 templ.SafeURL
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 316, Col: 48}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 322, Col: 48}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -228,7 +234,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 318, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 324, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -307,7 +313,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(group.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 356, Col: 127}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 362, Col: 127}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -339,7 +345,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var12 templ.SafeURL
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 361, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 367, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -352,7 +358,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(item.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 361, Col: 67}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 367, Col: 67}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 				if templ_7745c5c3_Err != nil {
@@ -386,7 +392,7 @@ func Admin(props AdminProps) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 363, Col: 90}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 369, Col: 90}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -439,7 +445,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 405, Col: 87}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 411, Col: 87}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -452,7 +458,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 408, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 414, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -466,7 +472,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"assertive\"></div></div><script>\n\t\t\t\t// Desktop sidebar toggle\n\t\t\t\tfunction toggleSidebar() {\n\t\t\t\t\tvar sb = document.getElementById('desktop-sidebar');\n\t\t\t\t\tvar inner = document.getElementById('desktop-sidebar-inner');\n\t\t\t\t\tvar wrapper = document.getElementById('main-content-wrapper');\n\t\t\t\t\tvar labels = document.querySelectorAll('[data-sidebar-label]');\n\t\t\t\t\tvar menuIcon = document.getElementById('sidebar-menu-icon');\n\t\t\t\t\tvar logoIcon = document.getElementById('sidebar-logo-icon');\n\t\t\t\t\tvar expanded = sb.classList.contains('lg:w-72');\n\n\t\t\t\t\tif (expanded) {\n\t\t\t\t\t\t// Collapse\n\t\t\t\t\t\tsb.classList.remove('lg:w-72');\n\t\t\t\t\t\tsb.classList.add('lg:w-16');\n\t\t\t\t\t\tinner.classList.remove('px-6');\n\t\t\t\t\t\tinner.classList.add('px-2');\n\t\t\t\t\t\twrapper.classList.remove('lg:pl-72');\n\t\t\t\t\t\twrapper.classList.add('lg:pl-16');\n\t\t\t\t\t\tmenuIcon.classList.remove('hidden');\n\t\t\t\t\t\tlogoIcon.classList.add('hidden');\n\t\t\t\t\t\tlabels.forEach(function(el) {\n\t\t\t\t\t\t\tel.classList.add('opacity-0');\n\t\t\t\t\t\t\tsetTimeout(function() { el.classList.add('hidden'); }, 200);\n\t\t\t\t\t\t});\n\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'true');\n\t\t\t\t\t} else {\n\t\t\t\t\t\t// Expand\n\t\t\t\t\t\tsb.classList.remove('lg:w-16');\n\t\t\t\t\t\tsb.classList.add('lg:w-72');\n\t\t\t\t\t\tinner.classList.remove('px-2');\n\t\t\t\t\t\tinner.classList.add('px-6');\n\t\t\t\t\t\twrapper.classList.remove('lg:pl-16');\n\t\t\t\t\t\twrapper.classList.add('lg:pl-72');\n\t\t\t\t\t\tmenuIcon.classList.add('hidden');\n\t\t\t\t\t\tlogoIcon.classList.remove('hidden');\n\t\t\t\t\t\tlabels.forEach(function(el) {\n\t\t\t\t\t\t\tel.classList.remove('hidden');\n\t\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\t\tel.classList.remove('opacity-0');\n\t\t\t\t\t\t\t\tel.classList.add('opacity-100');\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t});\n\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'false');\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t(function() {\n\t\t\t\t\t// Restore sidebar state from localStorage (default: expanded)\n\t\t\t\t\tvar collapsed = localStorage.getItem('sidebar-collapsed');\n\t\t\t\t\tif (collapsed === 'true') {\n\t\t\t\t\t\ttoggleSidebar(); // collapse from default expanded\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile sidebar\n\t\t\t\t\tvar sidebar = document.getElementById('mobile-sidebar');\n\t\t\t\t\tvar openBtn = document.getElementById('mobile-menu-btn');\n\t\t\t\t\tvar closeBtn = document.getElementById('mobile-sidebar-close');\n\t\t\t\t\tvar backdrop = document.getElementById('mobile-sidebar-backdrop');\n\n\t\t\t\t\tfunction openSidebar() {\n\t\t\t\t\t\tsidebar.classList.remove('hidden');\n\t\t\t\t\t}\n\t\t\t\t\tfunction closeSidebar() {\n\t\t\t\t\t\tsidebar.classList.add('hidden');\n\t\t\t\t\t}\n\n\t\t\t\t\tif (openBtn) openBtn.addEventListener('click', openSidebar);\n\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', closeSidebar);\n\t\t\t\t\tif (backdrop) backdrop.addEventListener('click', closeSidebar);\n\n\t\t\t\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\t\t\t\tif (e.key === 'Escape') closeSidebar();\n\t\t\t\t\t});\n\n\t\t\t\t\t// Dropdown menus\n\t\t\t\t\tdocument.querySelectorAll('[data-dropdown]').forEach(function(dropdown) {\n\t\t\t\t\t\tvar trigger = dropdown.querySelector('[data-dropdown-trigger]');\n\t\t\t\t\t\tvar menu = dropdown.querySelector('[data-dropdown-menu]');\n\n\t\t\t\t\t\tif (trigger && menu) {\n\t\t\t\t\t\t\ttrigger.addEventListener('click', function(e) {\n\t\t\t\t\t\t\t\te.stopPropagation();\n\t\t\t\t\t\t\t\tvar isOpen = !menu.classList.contains('hidden');\n\t\t\t\t\t\t\t\t// Close all other dropdowns\n\t\t\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\tif (!isOpen) {\n\t\t\t\t\t\t\t\t\tmenu.classList.remove('hidden');\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\n\t\t\t\t\tdocument.addEventListener('click', function() {\n\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t// Active nav highlighting after htmx navigation\n\t\t\t\tvar activeLink = 'group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-heading';\n\t\t\t\tvar inactiveLink = 'group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-medium text-rr-body hover:bg-rr-raised hover:text-rr-heading';\n\t\t\t\tvar activeIcon = 'size-5 shrink-0 text-rr-heading';\n\t\t\t\tvar inactiveIcon = 'size-5 shrink-0 text-rr-muted group-hover:text-rr-heading';\n\n\t\t\t\tfunction updateActiveNav() {\n\t\t\t\t\tvar path = window.location.pathname;\n\t\t\t\t\t// Scoped to the sidebar so we don't trample page-level tab navs\n\t\t\t\t\t// (e.g. orders/fulfillment view tabs) that also link to /admin/*.\n\t\t\t\t\tdocument.querySelectorAll('nav[data-admin-sidebar-nav] a[href^=\"/admin\"]').forEach(function(a) {\n\t\t\t\t\t\tvar href = a.getAttribute('href');\n\t\t\t\t\t\tvar isActive = (href === '/admin' && path === '/admin') ||\n\t\t\t\t\t\t\t(href !== '/admin' && path.startsWith(href));\n\t\t\t\t\t\ta.className = isActive ? activeLink : inactiveLink;\n\t\t\t\t\t\tvar icon = a.querySelector('svg');\n\t\t\t\t\t\tif (icon) icon.className = isActive ? activeIcon : inactiveIcon;\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:afterSettle', updateActiveNav);\n\n\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t// Force initial off-screen state, then slide in on next frame\n\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t});\n\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\tvar btn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\tif (btn) btn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"assertive\"></div></div><script>\n\t\t\t\t// Desktop sidebar toggle\n\t\t\t\tfunction toggleSidebar() {\n\t\t\t\t\tvar sb = document.getElementById('desktop-sidebar');\n\t\t\t\t\tvar inner = document.getElementById('desktop-sidebar-inner');\n\t\t\t\t\tvar wrapper = document.getElementById('main-content-wrapper');\n\t\t\t\t\tvar labels = document.querySelectorAll('[data-sidebar-label]');\n\t\t\t\t\tvar menuIcon = document.getElementById('sidebar-menu-icon');\n\t\t\t\t\tvar logoIcon = document.getElementById('sidebar-logo-icon');\n\t\t\t\t\tvar expanded = sb.classList.contains('lg:w-72');\n\n\t\t\t\t\tif (expanded) {\n\t\t\t\t\t\t// Collapse\n\t\t\t\t\t\tsb.classList.remove('lg:w-72');\n\t\t\t\t\t\tsb.classList.add('lg:w-16');\n\t\t\t\t\t\tinner.classList.remove('px-6');\n\t\t\t\t\t\tinner.classList.add('px-2');\n\t\t\t\t\t\twrapper.classList.remove('lg:pl-72');\n\t\t\t\t\t\twrapper.classList.add('lg:pl-16');\n\t\t\t\t\t\tmenuIcon.classList.remove('hidden');\n\t\t\t\t\t\tlogoIcon.classList.add('hidden');\n\t\t\t\t\t\tlabels.forEach(function(el) {\n\t\t\t\t\t\t\tel.classList.add('opacity-0');\n\t\t\t\t\t\t\tsetTimeout(function() { el.classList.add('hidden'); }, 200);\n\t\t\t\t\t\t});\n\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'true');\n\t\t\t\t\t} else {\n\t\t\t\t\t\t// Expand\n\t\t\t\t\t\tsb.classList.remove('lg:w-16');\n\t\t\t\t\t\tsb.classList.add('lg:w-72');\n\t\t\t\t\t\tinner.classList.remove('px-2');\n\t\t\t\t\t\tinner.classList.add('px-6');\n\t\t\t\t\t\twrapper.classList.remove('lg:pl-16');\n\t\t\t\t\t\twrapper.classList.add('lg:pl-72');\n\t\t\t\t\t\tmenuIcon.classList.add('hidden');\n\t\t\t\t\t\tlogoIcon.classList.remove('hidden');\n\t\t\t\t\t\tlabels.forEach(function(el) {\n\t\t\t\t\t\t\tel.classList.remove('hidden');\n\t\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\t\tel.classList.remove('opacity-0');\n\t\t\t\t\t\t\t\tel.classList.add('opacity-100');\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t});\n\t\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', 'false');\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t(function() {\n\t\t\t\t\t// Restore sidebar state from localStorage (default: expanded)\n\t\t\t\t\tvar collapsed = localStorage.getItem('sidebar-collapsed');\n\t\t\t\t\tif (collapsed === 'true') {\n\t\t\t\t\t\ttoggleSidebar(); // collapse from default expanded\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile sidebar\n\t\t\t\t\tvar sidebar = document.getElementById('mobile-sidebar');\n\t\t\t\t\tvar openBtn = document.getElementById('mobile-menu-btn');\n\t\t\t\t\tvar closeBtn = document.getElementById('mobile-sidebar-close');\n\t\t\t\t\tvar backdrop = document.getElementById('mobile-sidebar-backdrop');\n\n\t\t\t\t\tfunction openSidebar() {\n\t\t\t\t\t\tsidebar.classList.remove('hidden');\n\t\t\t\t\t}\n\t\t\t\t\tfunction closeSidebar() {\n\t\t\t\t\t\tsidebar.classList.add('hidden');\n\t\t\t\t\t}\n\n\t\t\t\t\tif (openBtn) openBtn.addEventListener('click', openSidebar);\n\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', closeSidebar);\n\t\t\t\t\tif (backdrop) backdrop.addEventListener('click', closeSidebar);\n\n\t\t\t\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\t\t\t\tif (e.key === 'Escape') closeSidebar();\n\t\t\t\t\t});\n\n\t\t\t\t\t// Dropdown menus\n\t\t\t\t\tdocument.querySelectorAll('[data-dropdown]').forEach(function(dropdown) {\n\t\t\t\t\t\tvar trigger = dropdown.querySelector('[data-dropdown-trigger]');\n\t\t\t\t\t\tvar menu = dropdown.querySelector('[data-dropdown-menu]');\n\n\t\t\t\t\t\tif (trigger && menu) {\n\t\t\t\t\t\t\ttrigger.addEventListener('click', function(e) {\n\t\t\t\t\t\t\t\te.stopPropagation();\n\t\t\t\t\t\t\t\tvar isOpen = !menu.classList.contains('hidden');\n\t\t\t\t\t\t\t\t// Close all other dropdowns\n\t\t\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\tif (!isOpen) {\n\t\t\t\t\t\t\t\t\tmenu.classList.remove('hidden');\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\n\t\t\t\t\tdocument.addEventListener('click', function() {\n\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t// Active nav highlighting after htmx navigation\n\t\t\t\tvar activeLink = 'group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-heading';\n\t\t\t\tvar inactiveLink = 'group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-medium text-rr-body hover:bg-rr-raised hover:text-rr-heading';\n\t\t\t\tvar activeIcon = 'size-5 shrink-0 text-rr-heading';\n\t\t\t\tvar inactiveIcon = 'size-5 shrink-0 text-rr-muted group-hover:text-rr-heading';\n\n\t\t\t\tfunction updateActiveNav() {\n\t\t\t\t\t// Prefer an explicit marker the swapped content may carry. The order\n\t\t\t\t\t// detail page lives at the same /admin/orders/{id} URL for both\n\t\t\t\t\t// channels, so the path alone can't say which nav item is right — the\n\t\t\t\t\t// marker disambiguates (e.g. \"/admin/orders/wholesale\").\n\t\t\t\t\tvar marker = document.querySelector('#main-content [data-active-path]');\n\t\t\t\t\tvar path = marker ? marker.getAttribute('data-active-path') : window.location.pathname;\n\t\t\t\t\t// Scoped to the sidebar so we don't trample page-level tab navs\n\t\t\t\t\t// (e.g. orders/fulfillment view tabs) that also link to /admin/*.\n\t\t\t\t\tvar links = document.querySelectorAll('nav[data-admin-sidebar-nav] a[href^=\"/admin\"]');\n\t\t\t\t\t// Pick the single longest href the path matches. Prefix matches must\n\t\t\t\t\t// land on a path boundary so /admin/orders never claims\n\t\t\t\t\t// /admin/orders/wholesale, and so /admin/orders/{id} resolves to the\n\t\t\t\t\t// most specific group rather than every ancestor.\n\t\t\t\t\tvar best = null, bestLen = -1;\n\t\t\t\t\tlinks.forEach(function(a) {\n\t\t\t\t\t\tvar href = a.getAttribute('href');\n\t\t\t\t\t\tvar matches = (href === '/admin')\n\t\t\t\t\t\t\t? (path === '/admin')\n\t\t\t\t\t\t\t: (path === href || path.indexOf(href + '/') === 0);\n\t\t\t\t\t\tif (matches && href.length > bestLen) {\n\t\t\t\t\t\t\tbest = a;\n\t\t\t\t\t\t\tbestLen = href.length;\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\t\t\t\t\tlinks.forEach(function(a) {\n\t\t\t\t\t\tvar isActive = a === best;\n\t\t\t\t\t\ta.className = isActive ? activeLink : inactiveLink;\n\t\t\t\t\t\tvar icon = a.querySelector('svg');\n\t\t\t\t\t\tif (icon) icon.className = isActive ? activeIcon : inactiveIcon;\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:afterSettle', updateActiveNav);\n\n\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t// Force initial off-screen state, then slide in on next frame\n\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t});\n\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\tvar btn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\tif (btn) btn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -560,7 +566,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var23 string
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 604, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 629, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
@@ -573,7 +579,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 607, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 632, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -586,7 +592,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 608, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 633, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {

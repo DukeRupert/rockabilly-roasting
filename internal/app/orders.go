@@ -165,8 +165,10 @@ func (s *OrderService) CountOrdersByView(ctx context.Context, tx pgx.Tx, search 
 }
 
 // CountFulfillmentViews returns per-tab counts for the admin fulfillment queue.
-func (s *OrderService) CountFulfillmentViews(ctx context.Context, tx pgx.Tx) (store.FulfillmentViewCounts, error) {
-	c, err := s.orders.CountFulfillmentViews(ctx, tx)
+// A nil channel spans both channels; pass a channel to scope the counts to the
+// retail or wholesale fulfillment queue.
+func (s *OrderService) CountFulfillmentViews(ctx context.Context, tx pgx.Tx, channel *domain.OrderChannel) (store.FulfillmentViewCounts, error) {
+	c, err := s.orders.CountFulfillmentViews(ctx, tx, channel)
 	if err != nil {
 		return store.FulfillmentViewCounts{}, fmt.Errorf("count fulfillment views: %w", err)
 	}

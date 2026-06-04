@@ -68,14 +68,16 @@ func (d *Deps) wholesaleCartItemCount(r *http.Request) int {
 
 // --- Wholesale application (public) ---
 
-// orderspaceSignupURL is where wholesale signups are temporarily redirected while
-// applications are handled through Orderspace rather than the in-app form.
-const orderspaceSignupURL = "https://rockabillyroasting.orderspace.com/signup"
-
 func (d *Deps) handleWholesaleApplyPage(w http.ResponseWriter, r *http.Request) {
-	// Wholesale signups are routed through Orderspace for now. Redirect any
-	// bookmarked or stale links to the external signup page.
-	http.Redirect(w, r, orderspaceSignupURL, http.StatusSeeOther)
+	props := storefront.WholesaleApplyProps{
+		CartCount:        d.cartItemCountFromCookie(r),
+		TurnstileSiteKey: d.TurnstileSiteKey,
+	}
+	if IsHTMX(r) {
+		storefront.WholesaleApplyContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.WholesaleApplyPage(props).Render(r.Context(), w) //nolint:errcheck
 }
 
 func (d *Deps) handleWholesaleApply(w http.ResponseWriter, r *http.Request) {

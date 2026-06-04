@@ -79,7 +79,6 @@ type Querier interface {
 	DeleteCustomerGroup(ctx context.Context, id uuid.UUID) error
 	DeleteDiscount(ctx context.Context, id uuid.UUID) error
 	DeleteExpiredMagicLinkTokens(ctx context.Context) error
-	DeleteGroupPrice(ctx context.Context, arg DeleteGroupPriceParams) error
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteLineItemsByOrder(ctx context.Context, orderID uuid.UUID) error
 	DeleteOrder(ctx context.Context, id uuid.UUID) error
@@ -112,7 +111,6 @@ type Querier interface {
 	GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, error)
 	GetEmailVerificationByTokenHash(ctx context.Context, tokenHash string) (EmailVerification, error)
 	GetFulfillmentByID(ctx context.Context, id uuid.UUID) (Fulfillment, error)
-	GetGroupPrice(ctx context.Context, arg GetGroupPriceParams) (Price, error)
 	GetInventoryItemByID(ctx context.Context, id uuid.UUID) (InventoryItem, error)
 	GetInventoryItemByVariantID(ctx context.Context, variantID uuid.UUID) (InventoryItem, error)
 	GetInvoiceByID(ctx context.Context, id uuid.UUID) (Invoice, error)
@@ -174,7 +172,6 @@ type Querier interface {
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListFulfillmentItemsByFulfillment(ctx context.Context, fulfillmentID uuid.UUID) ([]FulfillmentItem, error)
 	ListFulfillmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Fulfillment, error)
-	ListGroupPricesByProduct(ctx context.Context, arg ListGroupPricesByProductParams) ([]ListGroupPricesByProductRow, error)
 	ListInvoiceLinesByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceLine, error)
 	ListInvoicePaymentsByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoicePayment, error)
 	ListInvoicesByOrder(ctx context.Context, orderID uuid.UUID) ([]Invoice, error)
@@ -295,7 +292,6 @@ type Querier interface {
 	UpdateWholesaleNotes(ctx context.Context, arg UpdateWholesaleNotesParams) error
 	UpsertBasePrice(ctx context.Context, arg UpsertBasePriceParams) (Price, error)
 	UpsertCartItem(ctx context.Context, arg UpsertCartItemParams) (CartItem, error)
-	UpsertGroupPrice(ctx context.Context, arg UpsertGroupPriceParams) (Price, error)
 	UpsertPriceListPrice(ctx context.Context, arg UpsertPriceListPriceParams) (Price, error)
 	UpsertProductAttributeValue(ctx context.Context, arg UpsertProductAttributeValueParams) error
 }

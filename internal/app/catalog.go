@@ -430,15 +430,10 @@ func (s *CatalogService) CloneProduct(ctx context.Context, tx pgx.Tx, sourceID u
 
 	// Pre-fetch prices for all source variants
 	var basePrices map[uuid.UUID]int
-	var groupPrices map[uuid.UUID]map[uuid.UUID]int
 	if pricing != nil {
 		basePrices, err = pricing.ListBasePricesByProduct(ctx, tx, sourceID, "USD")
 		if err != nil {
 			return nil, fmt.Errorf("list source base prices: %w", err)
-		}
-		groupPrices, err = pricing.ListGroupPricesByProduct(ctx, tx, sourceID, "USD")
-		if err != nil {
-			return nil, fmt.Errorf("list source group prices: %w", err)
 		}
 	}
 
@@ -471,18 +466,11 @@ func (s *CatalogService) CloneProduct(ctx context.Context, tx pgx.Tx, sourceID u
 			}
 		}
 
-		// Clone prices
+		// Clone base price
 		if pricing != nil {
 			if cents, ok := basePrices[v.ID]; ok {
 				if _, err := pricing.SetBasePrice(ctx, tx, newVariant.ID, cents, "USD"); err != nil {
 					return nil, fmt.Errorf("clone base price: %w", err)
-				}
-			}
-			if gp, ok := groupPrices[v.ID]; ok {
-				for groupID, cents := range gp {
-					if _, err := pricing.SetGroupPrice(ctx, tx, newVariant.ID, groupID, cents, "USD"); err != nil {
-						return nil, fmt.Errorf("clone group price: %w", err)
-					}
 				}
 			}
 		}

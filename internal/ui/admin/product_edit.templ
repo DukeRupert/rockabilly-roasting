@@ -260,10 +260,8 @@ templ productVariantsTab(props ProductEditProps) {
 templ productPricingTab(props ProductEditProps) {
 	<div id="pricing-panel" class="space-y-4">
 		<p class="text-sm text-rr-muted">
-			Set base and group-specific prices for this product's variants.
-			if len(props.Groups) == 0 {
-				<a href="/admin/groups" class="text-rr-red hover:text-rr-red-lt">Create customer groups</a> to enable group pricing.
-			}
+			Set base prices for this product's variants. Wholesale pricing is managed under
+			<a href="/admin/price-lists" class="text-rr-red hover:text-rr-red-lt">Price lists</a>.
 		</p>
 		if len(props.Variants) == 0 {
 			<div class="border border-dashed border-rr-border p-12 text-center">
@@ -271,24 +269,17 @@ templ productPricingTab(props ProductEditProps) {
 				<p class="mt-1 text-sm text-rr-muted">Add variants on the Variants tab first.</p>
 			</div>
 		} else {
-			<!-- Base Prices -->
-			@productPricingCard("Base Prices", nil, props)
-			<!-- Group Prices -->
-			for _, g := range props.Groups {
-				@productPricingCard(g.Name+" Prices", &g, props)
-			}
+			@productPricingCard(props)
 		}
 	</div>
 }
 
 // PricingPanel renders the pricing tab content as a standalone partial for htmx swaps.
-templ PricingPanel(product *domain.Product, variants []VariantWithOptions, groups []domain.CustomerGroup) {
+templ PricingPanel(product *domain.Product, variants []VariantWithOptions) {
 	<div id="pricing-panel" class="space-y-4">
 		<p class="text-sm text-rr-muted">
-			Set base and group-specific prices for this product's variants.
-			if len(groups) == 0 {
-				<a href="/admin/groups" class="text-rr-red hover:text-rr-red-lt">Create customer groups</a> to enable group pricing.
-			}
+			Set base prices for this product's variants. Wholesale pricing is managed under
+			<a href="/admin/price-lists" class="text-rr-red hover:text-rr-red-lt">Price lists</a>.
 		</p>
 		if len(variants) == 0 {
 			<div class="border border-dashed border-rr-border p-12 text-center">
@@ -296,22 +287,15 @@ templ PricingPanel(product *domain.Product, variants []VariantWithOptions, group
 				<p class="mt-1 text-sm text-rr-muted">Add variants on the Variants tab first.</p>
 			</div>
 		} else {
-			@productPricingCard("Base Prices", nil, ProductEditProps{Product: product, Variants: variants, Groups: groups})
-			for _, g := range groups {
-				@productPricingCard(g.Name+" Prices", &g, ProductEditProps{Product: product, Variants: variants, Groups: groups})
-			}
+			@productPricingCard(ProductEditProps{Product: product, Variants: variants})
 		}
 	</div>
 }
 
-templ productPricingCard(title string, group *domain.CustomerGroup, props ProductEditProps) {
+templ productPricingCard(props ProductEditProps) {
 	<div class="overflow-hidden border border-rr-border bg-rr-surface">
 		<div class="border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6">
-			if group != nil {
-				<h3 class="text-sm font-medium text-rr-teal">{ title }</h3>
-			} else {
-				<h3 class="text-sm font-medium text-rr-body">{ title }</h3>
-			}
+			<h3 class="text-sm font-medium text-rr-body">Base Prices</h3>
 		</div>
 		<table class="min-w-full divide-y divide-rr-border">
 			<thead class="bg-rr-raised">
@@ -330,54 +314,28 @@ templ productPricingCard(title string, group *domain.CustomerGroup, props Produc
 							}
 						</td>
 						<td class="whitespace-nowrap px-3 py-2.5 text-sm">
-							if group == nil {
-								<form
-									method="post"
-									action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID)) }
-									hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID) }
-									hx-target="#pricing-panel"
-									hx-swap="outerHTML"
-									hx-trigger="change from:find input"
-									class="flex items-center gap-1"
-								>
-									<span class="text-rr-muted">$</span>
-									<input
-										type="number"
-										name="price"
-										step="0.01"
-										min="0"
-										placeholder="0.00"
-										if vwo.PriceCents != nil {
-											value={ priceToDollars(*vwo.PriceCents) }
-										}
-										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
-									/>
-								</form>
-							} else {
-								<form
-									method="post"
-									action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/group-price", props.Product.ID, vwo.Variant.ID)) }
-									hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/group-price", props.Product.ID, vwo.Variant.ID) }
-									hx-target="#pricing-panel"
-									hx-swap="outerHTML"
-									hx-trigger="change from:find input[name=price]"
-									class="flex items-center gap-1"
-								>
-									<input type="hidden" name="group_id" value={ group.ID.String() }/>
-									<span class="text-rr-muted">$</span>
-									<input
-										type="number"
-										name="price"
-										step="0.01"
-										min="0"
-										placeholder="0.00"
-										if cents, ok := vwo.GroupPrices[group.ID]; ok {
-											value={ priceToDollars(cents) }
-										}
-										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
-									/>
-								</form>
-							}
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID)) }
+								hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID) }
+								hx-target="#pricing-panel"
+								hx-swap="outerHTML"
+								hx-trigger="change from:find input"
+								class="flex items-center gap-1"
+							>
+								<span class="text-rr-muted">$</span>
+								<input
+									type="number"
+									name="price"
+									step="0.01"
+									min="0"
+									placeholder="0.00"
+									if vwo.PriceCents != nil {
+										value={ priceToDollars(*vwo.PriceCents) }
+									}
+									class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
+								/>
+							</form>
 						</td>
 					</tr>
 				}
@@ -482,9 +440,8 @@ templ OptionsPanel(product *domain.Product, options []OptionWithValues) {
 // VariantWithOptionValues pairs a variant with its selected option value names for display.
 type VariantWithOptions struct {
 	Variant      domain.Variant
-	OptionValues []string          // e.g. ["Medium", "Dark Roast"]
-	PriceCents   *int              // base price in cents, nil = not set
-	GroupPrices  map[uuid.UUID]int // customerGroupID -> cents
+	OptionValues []string // e.g. ["Medium", "Dark Roast"]
+	PriceCents   *int     // base price in cents, nil = not set
 }
 
 // formatPrice formats cents as dollars (e.g. 1299 -> "$12.99").

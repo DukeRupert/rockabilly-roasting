@@ -14,7 +14,8 @@ import (
 )
 
 // CustomerGroupService manages customer groups and memberships.
-// Groups are used for wholesale tiers and for retail group-price assignments.
+// Groups gate access to restricted products (storefront visibility); pricing is
+// handled separately by price lists.
 type CustomerGroupService struct {
 	groups  *store.CustomerGroupStore
 	audit   *audit.AuditWriter

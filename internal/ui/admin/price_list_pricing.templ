@@ -25,6 +25,15 @@ type VariantPriceListPricing struct {
 	ListPrices map[uuid.UUID]int
 }
 
+// priceListDollars renders the price for a given list ID as a dollar string, or
+// "" when unset. Used to seed the hidden "previous value" inputs.
+func priceListDollars(prices map[uuid.UUID]int, listID uuid.UUID) string {
+	if cents, ok := prices[listID]; ok {
+		return priceToDollars(cents)
+	}
+	return ""
+}
+
 templ PriceListPricingContent(props PriceListPricingProps) {
 	<!-- One page-wide form: a single Save button writes every product's changed cells in one transaction -->
 	<form
@@ -185,7 +194,7 @@ templ priceListPricingCard(list domain.PriceList, pp ProductPriceListPricing) {
 									}
 									class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 								/>
-								<input type="hidden" name={ "list_prev:" + list.ID.String() + ":" + vp.Variant.ID.String() } value={ groupPriceDollars(vp.ListPrices, list.ID) }/>
+								<input type="hidden" name={ "list_prev:" + list.ID.String() + ":" + vp.Variant.ID.String() } value={ priceListDollars(vp.ListPrices, list.ID) }/>
 							</div>
 						</td>
 					</tr>

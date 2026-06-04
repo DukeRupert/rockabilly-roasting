@@ -38,6 +38,10 @@ type DashboardProps struct {
 	// Pending review
 	PendingWholesale int
 
+	// Wholesale orders awaiting fulfillment — surfaced on its own so wholesale
+	// work never hides inside the retail Pack/Ship pipeline.
+	WholesaleToFulfill int
+
 	// Urgent action queues
 	OnHold             []domain.Order
 	OnHoldCount        int
@@ -82,8 +86,12 @@ func (p DashboardProps) pipelineCount() int {
 	return p.ToFulfillCount + p.ToShipCount
 }
 
+func (p DashboardProps) wholesaleCount() int {
+	return p.WholesaleToFulfill
+}
+
 func (p DashboardProps) hasAnyAction() bool {
-	return p.urgentCount() > 0 || p.reviewCount() > 0 || p.pipelineCount() > 0
+	return p.urgentCount() > 0 || p.reviewCount() > 0 || p.wholesaleCount() > 0 || p.pipelineCount() > 0
 }
 
 // ageLabel returns a compact "Nm / Nh / Nd ago" string for a timestamp.
@@ -209,13 +217,22 @@ templ DashboardContent(props DashboardProps) {
 				</div>
 			</div>
 		}
-		<!-- Pipeline band -->
-		if props.pipelineCount() > 0 {
+		<!-- Wholesale orders band — kept distinct from the retail pipeline so B2B work isn't missed -->
+		if props.wholesaleCount() > 0 {
 			<div class={ bandSpacing(props.urgentCount() + props.reviewCount()) }>
-				@bandHeader("Pipeline", props.pipelineCount(), "text-rr-heading")
+				@bandHeader("Wholesale orders", props.wholesaleCount(), "text-rr-amber")
+				<div class="mt-3">
+					@wholesaleOrdersCard(props.wholesaleCount())
+				</div>
+			</div>
+		}
+		<!-- Retail pipeline band -->
+		if props.pipelineCount() > 0 {
+			<div class={ bandSpacing(props.urgentCount() + props.reviewCount() + props.wholesaleCount()) }>
+				@bandHeader("Retail pipeline", props.pipelineCount(), "text-rr-heading")
 				<div class="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-					@pipelineGroup("Pack", props.ToFulfillCount, props.ToFulfill, "/admin/orders?fulfillment=unfulfilled", "text-rr-red", "bg-rr-red", props.MerchantTZ)
-					@pipelineGroup("Ship", props.ToShipCount, props.ToShip, "/admin/orders?fulfillment=fulfilled", "text-rr-teal", "bg-rr-teal", props.MerchantTZ)
+					@pipelineGroup("Pack", props.ToFulfillCount, props.ToFulfill, "/admin/fulfillment?view=needs_action", "text-rr-red", "bg-rr-red", props.MerchantTZ)
+					@pipelineGroup("Ship", props.ToShipCount, props.ToShip, "/admin/fulfillment?view=ready_to_ship", "text-rr-teal", "bg-rr-teal", props.MerchantTZ)
 				</div>
 			</div>
 		}
@@ -381,6 +398,30 @@ templ urgentGroupLink(title, detail, href string) {
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
 				<span class="label-font text-rr-red" style="font-size:0.65rem;">Open list</span>
+				@chevronRight()
+			</div>
+		</div>
+	</a>
+}
+
+// wholesaleOrdersCard is the dashboard entry point into the wholesale
+// fulfillment queue. Amber stamp shadow marks it as a highlight (B2B work to
+// pick up), distinct from the red urgent cards and the retail pipeline below.
+templ wholesaleOrdersCard(count int) {
+	<a
+		href="/admin/wholesale/fulfillment"
+		class="block border border-rr-border bg-rr-surface p-4 hover:-translate-x-px hover:-translate-y-px transition-transform"
+		style="box-shadow: 4px 4px 0 0 var(--color-rr-amber);"
+	>
+		<div class="flex items-start justify-between gap-4">
+			<div class="min-w-0">
+				<p class="text-sm font-bold text-rr-heading">
+					{ fmt.Sprintf("%d wholesale order%s to fulfill", count, pluralS(count)) }
+				</p>
+				<p class="mt-1 text-xs text-rr-muted">Handled in the wholesale queue — separate from retail pack &amp; ship.</p>
+			</div>
+			<div class="flex items-center gap-2 shrink-0">
+				<span class="label-font text-rr-amber" style="font-size:0.65rem;">Open wholesale queue</span>
 				@chevronRight()
 			</div>
 		</div>

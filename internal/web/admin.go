@@ -52,9 +52,16 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// Retail channel scoping for the pipeline queues. Wholesale orders run
+		// through their own queue (/admin/wholesale/fulfillment) and are
+		// surfaced separately below — keeping them out of the retail Pack/Ship
+		// pipeline so neither channel's work gets buried in the other's.
+		retailChannel := domain.OrderChannelRetail
+
 		// Orders needing fulfillment (paid but unfulfilled)
 		toFulfillStatus := domain.FulfillmentStatusUnfulfilled
 		toFulfillOrders, txErr := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+			Channel:           &retailChannel,
 			FulfillmentStatus: &toFulfillStatus,
 			Limit:             10,
 		})
@@ -79,6 +86,7 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		// Orders ready to ship (fulfilled but not yet shipped)
 		toShipStatus := domain.FulfillmentStatusFulfilled
 		toShipOrders, txErr := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+			Channel:           &retailChannel,
 			FulfillmentStatus: &toShipStatus,
 			Limit:             10,
 		})
@@ -145,6 +153,17 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
+
+		// Wholesale orders awaiting fulfillment — counted from the wholesale
+		// channel's own NeedsAction bucket (matches the wholesale fulfillment
+		// queue's tab count) so staff see exactly how many wholesale orders
+		// need work without them hiding in the retail pipeline above.
+		wholesaleChannel := domain.OrderChannelWholesale
+		wholesaleViews, txErr := d.OrderService.CountFulfillmentViews(ctx, tx, &wholesaleChannel)
+		if txErr != nil {
+			return txErr
+		}
+		props.WholesaleToFulfill = wholesaleViews.NeedsAction
 
 		// Revenue trend — period from ?days= (7/30/90), defaults to 30
 		props.Revenue, txErr = d.buildRevenueProps(ctx, tx, revenueDays(r), todayStart)

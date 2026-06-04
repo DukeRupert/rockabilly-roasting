@@ -250,7 +250,8 @@ func run() error {
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg)
-	pricingSvc := app.NewPricingService(pricingStore, customerStore)
+	pricingSvc := app.NewPricingService(pricingStore, customerStore).
+		WithSettings(settingsStore)
 	cartSvc := app.NewCartService(cartStore, catalogStore, pricingSvc, catalogSvc)
 	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg).
 		WithEmail(emailEnv)
@@ -261,7 +262,8 @@ func run() error {
 	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore)
 	customerGroupSvc := app.NewCustomerGroupService(customerGroupStore, auditWriter, metricsReg)
-	priceListSvc := app.NewPriceListService(priceListStore, auditWriter, metricsReg)
+	priceListSvc := app.NewPriceListService(priceListStore, auditWriter, metricsReg).
+		WithSettings(settingsStore)
 	auditQuerySvc := app.NewAuditQueryService(auditStore)
 	webhookSvc := app.NewWebhookService(webhookStore)
 

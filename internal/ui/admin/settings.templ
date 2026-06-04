@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"github.com/google/uuid"
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
@@ -46,13 +48,15 @@ func formatTareOz(oz float64) string {
 }
 
 type SettingsProps struct {
-	QB         QBConnectionStatus
-	QBEnabled  bool // true if QB_CLIENT_ID is configured
-	Shipping   ShippingSettings
-	Flash      string
-	MerchantTZ *time.Location
-	StaffName  string
-	StaffRole  string
+	QB                 QBConnectionStatus
+	QBEnabled          bool // true if QB_CLIENT_ID is configured
+	Shipping           ShippingSettings
+	PriceLists         []domain.PriceList // all price lists, for the default-wholesale selector
+	DefaultPriceListID *uuid.UUID         // current store-wide default wholesale list, nil = base prices
+	Flash              string
+	MerchantTZ         *time.Location
+	StaffName          string
+	StaffRole          string
 }
 
 // centsToDollars formats integer cents as a dollar string with no symbol, e.g.
@@ -379,6 +383,44 @@ templ SettingsContent(props SettingsProps) {
 			<a href="/admin/settings/box-presets" class="rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised">
 				Manage presets
 			</a>
+		</div>
+	</div>
+	<!-- Wholesale pricing section -->
+	<div class="mt-8">
+		<h2 class="text-sm font-semibold text-rr-heading">Wholesale pricing</h2>
+		<p class="mt-1 text-sm text-rr-muted">The default price list every approved wholesale account sees — unless a specific list is assigned on their profile.</p>
+		<div class="mt-4 overflow-hidden border border-rr-border bg-rr-surface">
+			<form method="post" action="/admin/settings/default-price-list" class="px-4 py-5 sm:px-6">
+				<label for="default-price-list" class="block text-sm font-medium text-rr-heading">
+					Default wholesale price list
+				</label>
+				<div class="mt-1 flex items-center gap-3">
+					<select
+						id="default-price-list"
+						name="default_price_list_id"
+						class="w-full max-w-md rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					>
+						<option value="" selected?={ props.DefaultPriceListID == nil }>Base prices (no default)</option>
+						for _, pl := range props.PriceLists {
+							<option
+								value={ pl.ID.String() }
+								selected?={ props.DefaultPriceListID != nil && *props.DefaultPriceListID == pl.ID }
+							>
+								{ pl.Name }
+								if pl.Status != domain.PriceListStatusActive {
+									({ string(pl.Status) })
+								}
+							</option>
+						}
+					</select>
+					<button type="submit" class="rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised whitespace-nowrap">
+						Save
+					</button>
+				</div>
+				<p class="mt-2 text-xs text-rr-muted">
+					Applies only to wholesale accounts with no list set on their own profile. Change it here and every unassigned wholesale account updates immediately. Retail customers are unaffected.
+				</p>
+			</form>
 		</div>
 	</div>
 	<!-- Integrations section -->

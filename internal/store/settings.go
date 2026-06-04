@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -57,6 +58,26 @@ func (s *SettingsStore) UpdateTaxConfig(ctx context.Context, tx pgx.Tx, p Update
 		Rate:  numericToFloat64(row.TaxRate),
 		Label: ptrToStr(row.TaxLabel),
 	}, nil
+}
+
+// GetDefaultWholesalePriceListID returns the store-wide default price list for
+// wholesale accounts, or nil if none is configured (callers fall back to base
+// prices).
+func (s *SettingsStore) GetDefaultWholesalePriceListID(ctx context.Context, tx pgx.Tx) (*uuid.UUID, error) {
+	row, err := sqlcgen.New(tx).GetStoreSettings(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get store settings: %w", err)
+	}
+	return row.DefaultWholesalePriceListID, nil
+}
+
+// SetDefaultWholesalePriceListID sets (or clears, when id is nil) the store-wide
+// default wholesale price list.
+func (s *SettingsStore) SetDefaultWholesalePriceListID(ctx context.Context, tx pgx.Tx, id *uuid.UUID) error {
+	if _, err := sqlcgen.New(tx).UpdateDefaultWholesalePriceList(ctx, id); err != nil {
+		return fmt.Errorf("update default wholesale price list: %w", err)
+	}
+	return nil
 }
 
 func ptrToStr(s *string) string {

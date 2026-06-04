@@ -137,6 +137,102 @@ func TestQuickOrderCatalog_PricesFallBackToBase(t *testing.T) {
 	testutil.AssertResolvedPrice(t, 1500, products[0].Variants[0].UnitPrice)
 }
 
+// TestResolveForCustomer_WholesaleUsesDefaultList proves that an approved
+// wholesale customer with NO price list of their own resolves against the
+// store-wide default wholesale price list, not the base price.
+func TestResolveForCustomer_WholesaleUsesDefaultList(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	pricing := newPricingService()
+	ctx := context.Background()
+
+	priceList := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx) // no explicit price list
+	approveWholesaleCustomer(t, tx, customer.ID)
+
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+	testutil.CreatePriceListPrice(t, tx, priceList.ID, variant.ID, 1100, "USD")
+
+	// Set the store-wide default.
+	require.NoError(t, store.NewSettingsStore().SetDefaultWholesalePriceListID(ctx, tx, &priceList.ID))
+
+	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1100), got, "wholesale customer should see the default list price")
+}
+
+// TestResolveForCustomer_DefaultListFallsBackToBaseForMissingVariant proves the
+// default list only overrides variants it actually prices; everything else still
+// falls back to base.
+func TestResolveForCustomer_DefaultListFallsBackToBaseForMissingVariant(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	pricing := newPricingService()
+	ctx := context.Background()
+
+	priceList := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx)
+	approveWholesaleCustomer(t, tx, customer.ID)
+
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+	// No price-list entry for this variant.
+
+	require.NoError(t, store.NewSettingsStore().SetDefaultWholesalePriceListID(ctx, tx, &priceList.ID))
+
+	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1500), got, "variant not on the default list should fall back to base")
+}
+
+// TestResolveForCustomer_DefaultListIgnoredForRetail proves the default wholesale
+// list does NOT apply to retail customers — they keep seeing base prices.
+func TestResolveForCustomer_DefaultListIgnoredForRetail(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	pricing := newPricingService()
+	ctx := context.Background()
+
+	priceList := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx) // retail, no price list
+
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+	testutil.CreatePriceListPrice(t, tx, priceList.ID, variant.ID, 1100, "USD")
+
+	require.NoError(t, store.NewSettingsStore().SetDefaultWholesalePriceListID(ctx, tx, &priceList.ID))
+
+	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1500), got, "retail customer should ignore the default wholesale list")
+}
+
+// TestResolveForCustomer_ExplicitListOverridesDefault proves a customer's own
+// assigned list wins over the store-wide default.
+func TestResolveForCustomer_ExplicitListOverridesDefault(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	pricing := newPricingService()
+	ctx := context.Background()
+
+	defaultList := testutil.CreatePriceList(t, tx)
+	ownList := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx, testutil.WithPriceList(ownList.ID))
+	approveWholesaleCustomer(t, tx, customer.ID)
+
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+	testutil.CreatePriceListPrice(t, tx, defaultList.ID, variant.ID, 1100, "USD")
+	testutil.CreatePriceListPrice(t, tx, ownList.ID, variant.ID, 900, "USD")
+
+	require.NoError(t, store.NewSettingsStore().SetDefaultWholesalePriceListID(ctx, tx, &defaultList.ID))
+
+	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(900), got, "customer's own list should win over the default")
+}
+
 // TestPlaceWholesaleOrder_DenormalizesCartPrice proves the cart price is the contract:
 // PlaceWholesaleOrder writes CartItem.UnitPrice verbatim to the line item with no
 // internal re-resolve.

@@ -14,7 +14,8 @@ import (
 )
 
 func newPricingService() *app.PricingService {
-	return app.NewPricingService(store.NewPricingStore(), store.NewCustomerStore())
+	return app.NewPricingService(store.NewPricingStore(), store.NewCustomerStore()).
+		WithSettings(store.NewSettingsStore())
 }
 
 func TestResolveForCustomer_BaseWhenNoList(t *testing.T) {

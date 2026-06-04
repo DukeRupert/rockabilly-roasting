@@ -8,11 +8,12 @@ package sqlcgen
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getStoreSettings = `-- name: GetStoreSettings :one
-SELECT id, tax_mode, tax_rate, tax_label, created_at, updated_at FROM store_settings WHERE id = true
+SELECT id, tax_mode, tax_rate, tax_label, created_at, updated_at, default_wholesale_price_list_id FROM store_settings WHERE id = true
 `
 
 func (q *Queries) GetStoreSettings(ctx context.Context) (StoreSetting, error) {
@@ -25,6 +26,30 @@ func (q *Queries) GetStoreSettings(ctx context.Context) (StoreSetting, error) {
 		&i.TaxLabel,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultWholesalePriceListID,
+	)
+	return i, err
+}
+
+const updateDefaultWholesalePriceList = `-- name: UpdateDefaultWholesalePriceList :one
+UPDATE store_settings
+SET default_wholesale_price_list_id = $1,
+    updated_at = now()
+WHERE id = true
+RETURNING id, tax_mode, tax_rate, tax_label, created_at, updated_at, default_wholesale_price_list_id
+`
+
+func (q *Queries) UpdateDefaultWholesalePriceList(ctx context.Context, defaultWholesalePriceListID *uuid.UUID) (StoreSetting, error) {
+	row := q.db.QueryRow(ctx, updateDefaultWholesalePriceList, defaultWholesalePriceListID)
+	var i StoreSetting
+	err := row.Scan(
+		&i.ID,
+		&i.TaxMode,
+		&i.TaxRate,
+		&i.TaxLabel,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultWholesalePriceListID,
 	)
 	return i, err
 }
@@ -36,7 +61,7 @@ SET tax_mode   = $1,
     tax_label  = $3,
     updated_at = now()
 WHERE id = true
-RETURNING id, tax_mode, tax_rate, tax_label, created_at, updated_at
+RETURNING id, tax_mode, tax_rate, tax_label, created_at, updated_at, default_wholesale_price_list_id
 `
 
 type UpdateTaxConfigParams struct {
@@ -55,6 +80,7 @@ func (q *Queries) UpdateTaxConfig(ctx context.Context, arg UpdateTaxConfigParams
 		&i.TaxLabel,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DefaultWholesalePriceListID,
 	)
 	return i, err
 }

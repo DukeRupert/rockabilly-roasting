@@ -65,9 +65,10 @@ const (
 	AuditCustomerGroupMemberRemoved = "customer_group.member_removed"
 
 	// Price list actions
-	AuditPriceListCreated = "price_list.created"
-	AuditPriceListUpdated = "price_list.updated"
-	AuditPriceListDeleted = "price_list.deleted"
+	AuditPriceListCreated                 = "price_list.created"
+	AuditPriceListUpdated                 = "price_list.updated"
+	AuditPriceListDeleted                 = "price_list.deleted"
+	AuditDefaultWholesalePriceListUpdated = "price_list.default_wholesale_updated"
 
 	// Customer auth actions
 	AuditCustomerLogin           = "customer.login"

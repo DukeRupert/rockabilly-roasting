@@ -9,3 +9,10 @@ SET tax_mode   = $1,
     updated_at = now()
 WHERE id = true
 RETURNING *;
+
+-- name: UpdateDefaultWholesalePriceList :one
+UPDATE store_settings
+SET default_wholesale_price_list_id = $1,
+    updated_at = now()
+WHERE id = true
+RETURNING *;

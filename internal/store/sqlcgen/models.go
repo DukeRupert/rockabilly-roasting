@@ -555,12 +555,13 @@ type StockLocation struct {
 }
 
 type StoreSetting struct {
-	ID        bool           `json:"id"`
-	TaxMode   string         `json:"tax_mode"`
-	TaxRate   pgtype.Numeric `json:"tax_rate"`
-	TaxLabel  *string        `json:"tax_label"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
+	ID                          bool           `json:"id"`
+	TaxMode                     string         `json:"tax_mode"`
+	TaxRate                     pgtype.Numeric `json:"tax_rate"`
+	TaxLabel                    *string        `json:"tax_label"`
+	CreatedAt                   time.Time      `json:"created_at"`
+	UpdatedAt                   time.Time      `json:"updated_at"`
+	DefaultWholesalePriceListID *uuid.UUID     `json:"default_wholesale_price_list_id"`
 }
 
 type Subscription struct {

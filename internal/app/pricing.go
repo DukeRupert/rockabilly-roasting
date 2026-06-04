@@ -18,15 +18,51 @@ type customerPricingReader interface {
 	GetByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Customer, error)
 }
 
+// settingsPricingReader is the slice of SettingsStore that PricingService needs
+// to look up the store-wide default wholesale price list. *store.SettingsStore
+// satisfies it. Optional — when unset, the default-list fallback is skipped and
+// unassigned customers resolve to base prices.
+type settingsPricingReader interface {
+	GetDefaultWholesalePriceListID(ctx context.Context, tx pgx.Tx) (*uuid.UUID, error)
+}
+
 // PricingService contains business logic for pricing.
 type PricingService struct {
 	pricing   *store.PricingStore
 	customers customerPricingReader
+	settings  settingsPricingReader
 }
 
 // NewPricingService creates a new PricingService.
 func NewPricingService(pricing *store.PricingStore, customers customerPricingReader) *PricingService {
 	return &PricingService{pricing: pricing, customers: customers}
+}
+
+// WithSettings enables the default-wholesale-price-list fallback. When wired, a
+// wholesale customer with no explicitly-assigned price list resolves against the
+// store's default list (if configured) instead of base prices.
+func (s *PricingService) WithSettings(settings settingsPricingReader) *PricingService {
+	s.settings = settings
+	return s
+}
+
+// effectivePriceListID returns the price list a customer's prices should resolve
+// against: their explicitly-assigned list if any, otherwise the store-wide
+// default wholesale list (wholesale accounts only). A nil result means "no list —
+// use base prices". Missing entries on whichever list is chosen still fall back
+// to base prices at the call site.
+func (s *PricingService) effectivePriceListID(ctx context.Context, tx pgx.Tx, customer *domain.Customer) (*uuid.UUID, error) {
+	if customer.PriceListID != nil {
+		return customer.PriceListID, nil
+	}
+	if s.settings == nil || customer.AccountType != domain.AccountTypeWholesale {
+		return nil, nil
+	}
+	defaultID, err := s.settings.GetDefaultWholesalePriceListID(ctx, tx)
+	if err != nil {
+		return nil, fmt.Errorf("get default wholesale price list: %w", err)
+	}
+	return defaultID, nil
 }
 
 // GetBasePrice returns the base price for a variant in a given currency.
@@ -161,8 +197,9 @@ func (s *PricingService) ListPriceListPricesByProduct(ctx context.Context, tx pg
 }
 
 // ResolveForCustomer returns the effective price (in cents) for a variant given a customer.
-// If the customer has a price list assigned, that list is consulted first; missing entries
-// fall back to the base price. Returns ErrCustomerNotFound or ErrPriceNotFound on miss.
+// The customer's effective price list (explicit assignment, else the store's default
+// wholesale list) is consulted first; missing entries fall back to the base price.
+// Returns ErrCustomerNotFound or ErrPriceNotFound on miss.
 func (s *PricingService) ResolveForCustomer(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, customerID uuid.UUID, currencyCode string) (int64, error) {
 	customer, err := s.customers.GetByID(ctx, tx, customerID)
 	if err != nil {
@@ -172,8 +209,13 @@ func (s *PricingService) ResolveForCustomer(ctx context.Context, tx pgx.Tx, vari
 		return 0, fmt.Errorf("get customer for pricing: %w", err)
 	}
 
-	if customer.PriceListID != nil {
-		price, err := s.pricing.GetPriceListPrice(ctx, tx, variantID, *customer.PriceListID, currencyCode)
+	listID, err := s.effectivePriceListID(ctx, tx, customer)
+	if err != nil {
+		return 0, err
+	}
+
+	if listID != nil {
+		price, err := s.pricing.GetPriceListPrice(ctx, tx, variantID, *listID, currencyCode)
 		if err == nil {
 			return int64(price.Amount), nil
 		}
@@ -193,8 +235,9 @@ func (s *PricingService) ResolveForCustomer(ctx context.Context, tx pgx.Tx, vari
 }
 
 // ResolveForCustomerBatch returns effective prices for the given variants keyed by variant ID.
-// Missing entries on the customer's price list fall back to the base price; variants with no
-// base price are simply omitted from the returned map (consumer reads zero-value).
+// Missing entries on the customer's effective price list (explicit assignment, else the
+// store's default wholesale list) fall back to the base price; variants with no base price
+// are simply omitted from the returned map (consumer reads zero-value).
 func (s *PricingService) ResolveForCustomerBatch(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, variantIDs []uuid.UUID, currencyCode string) (map[uuid.UUID]int, error) {
 	customer, err := s.customers.GetByID(ctx, tx, customerID)
 	if err != nil {
@@ -208,7 +251,12 @@ func (s *PricingService) ResolveForCustomerBatch(ctx context.Context, tx pgx.Tx,
 		return map[uuid.UUID]int{}, nil
 	}
 
-	if customer.PriceListID == nil {
+	listID, err := s.effectivePriceListID(ctx, tx, customer)
+	if err != nil {
+		return nil, err
+	}
+
+	if listID == nil {
 		basePrices, err := s.pricing.ListBasePricesByVariants(ctx, tx, variantIDs, currencyCode)
 		if err != nil {
 			return nil, fmt.Errorf("list base prices: %w", err)
@@ -216,7 +264,7 @@ func (s *PricingService) ResolveForCustomerBatch(ctx context.Context, tx pgx.Tx,
 		return basePrices, nil
 	}
 
-	listPrices, err := s.pricing.ListPriceListPricesByVariants(ctx, tx, variantIDs, *customer.PriceListID, currencyCode)
+	listPrices, err := s.pricing.ListPriceListPricesByVariants(ctx, tx, variantIDs, *listID, currencyCode)
 	if err != nil {
 		return nil, fmt.Errorf("list price list prices: %w", err)
 	}

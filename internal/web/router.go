@@ -429,6 +429,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// Admin settings / integrations
 	adminMux.HandleFunc("GET /admin/settings", deps.handleAdminSettings)
 	adminMux.HandleFunc("POST /admin/settings/shipping", deps.handleAdminShippingSettingsUpdate)
+	adminMux.HandleFunc("POST /admin/settings/default-price-list", deps.handleAdminDefaultPriceListUpdate)
 	adminMux.HandleFunc("GET /admin/settings/box-presets", deps.handleAdminBoxPresets)
 	adminMux.HandleFunc("POST /admin/settings/box-presets", deps.handleAdminBoxPresetCreate)
 	adminMux.HandleFunc("POST /admin/settings/box-presets/{id}", deps.handleAdminBoxPresetUpdate)

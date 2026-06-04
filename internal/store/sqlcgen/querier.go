@@ -246,6 +246,7 @@ type Querier interface {
 	UpdateCustomerPriceList(ctx context.Context, arg UpdateCustomerPriceListParams) error
 	UpdateCustomerStripeCustomerID(ctx context.Context, arg UpdateCustomerStripeCustomerIDParams) (Customer, error)
 	UpdateCustomerTaxExempt(ctx context.Context, arg UpdateCustomerTaxExemptParams) error
+	UpdateDefaultWholesalePriceList(ctx context.Context, defaultWholesalePriceListID *uuid.UUID) (StoreSetting, error)
 	UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) (Discount, error)
 	UpdateFulfillmentStatus(ctx context.Context, arg UpdateFulfillmentStatusParams) (Fulfillment, error)
 	UpdateFulfillmentTracking(ctx context.Context, arg UpdateFulfillmentTrackingParams) (Fulfillment, error)

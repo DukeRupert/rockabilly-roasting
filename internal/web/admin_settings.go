@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -25,6 +26,8 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 	qbStatus := admin.QBConnectionStatus{}
 	qbEnabled := d.QBOAuthManager != nil
 	var shipping admin.ShippingSettings
+	var priceLists []domain.PriceList
+	var defaultPriceListID *uuid.UUID
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		if qbEnabled {
@@ -34,6 +37,18 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 				qbStatus.RefreshExpiresAt = status.RefreshExpiresAt
 			}
 		}
+
+		lists, listErr := d.PriceListService.List(ctx, tx)
+		if listErr != nil {
+			return listErr
+		}
+		priceLists = lists
+
+		defaultID, defErr := d.PriceListService.GetDefaultWholesale(ctx, tx)
+		if defErr != nil {
+			return defErr
+		}
+		defaultPriceListID = defaultID
 
 		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
 		if cfgErr != nil {
@@ -69,13 +84,15 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.SettingsProps{
-		QB:         qbStatus,
-		QBEnabled:  qbEnabled,
-		Shipping:   shipping,
-		Flash:      r.URL.Query().Get("flash"),
-		MerchantTZ: d.MerchantTZ,
-		StaffName:  name,
-		StaffRole:  role,
+		QB:                 qbStatus,
+		QBEnabled:          qbEnabled,
+		Shipping:           shipping,
+		PriceLists:         priceLists,
+		DefaultPriceListID: defaultPriceListID,
+		Flash:              r.URL.Query().Get("flash"),
+		MerchantTZ:         d.MerchantTZ,
+		StaffName:          name,
+		StaffRole:          role,
 	}
 
 	if IsHTMX(r) {
@@ -156,6 +173,35 @@ func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.
 	}
 
 	http.Redirect(w, r, "/admin/settings?flash=Shipping+settings+saved", http.StatusSeeOther)
+}
+
+// handleAdminDefaultPriceListUpdate sets the store-wide default wholesale price
+// list. An empty selection clears the default (wholesale customers without an
+// assigned list fall back to base prices).
+func (d *Deps) handleAdminDefaultPriceListUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var priceListID *uuid.UUID
+	if v := strings.TrimSpace(r.FormValue("default_price_list_id")); v != "" {
+		parsed, err := uuid.Parse(v)
+		if err != nil {
+			http.Redirect(w, r, "/admin/settings?flash=Invalid+price+list", http.StatusSeeOther)
+			return
+		}
+		priceListID = &parsed
+	}
+
+	actor := staffActor(r)
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.PriceListService.SetDefaultWholesale(ctx, tx, priceListID, actor)
+	})
+	if err != nil {
+		slog.Error("admin settings: update default price list", "error", err)
+		http.Redirect(w, r, "/admin/settings?flash=Failed+to+save+default+price+list", http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/settings?flash=Default+wholesale+price+list+saved", http.StatusSeeOther)
 }
 
 // parseDollarsCents converts a dollar amount (e.g. "6.00", "6", "6.5") into

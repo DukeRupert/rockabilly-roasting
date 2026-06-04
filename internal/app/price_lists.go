@@ -14,11 +14,20 @@ import (
 	"github.com/dukerupert/hiri/internal/store"
 )
 
+// defaultPriceListSettings is the slice of SettingsStore that PriceListService
+// needs to read and write the store-wide default wholesale price list.
+// *store.SettingsStore satisfies it.
+type defaultPriceListSettings interface {
+	GetDefaultWholesalePriceListID(ctx context.Context, tx pgx.Tx) (*uuid.UUID, error)
+	SetDefaultWholesalePriceListID(ctx context.Context, tx pgx.Tx, id *uuid.UUID) error
+}
+
 // PriceListService manages price lists.
 type PriceListService struct {
-	lists   *store.PriceListStore
-	audit   *audit.AuditWriter
-	metrics *metrics.Registry
+	lists    *store.PriceListStore
+	settings defaultPriceListSettings
+	audit    *audit.AuditWriter
+	metrics  *metrics.Registry
 }
 
 // NewPriceListService creates a new PriceListService.
@@ -28,6 +37,13 @@ func NewPriceListService(lists *store.PriceListStore, auditWriter *audit.AuditWr
 		audit:   auditWriter,
 		metrics: m,
 	}
+}
+
+// WithSettings wires the store-settings dependency, enabling the default
+// wholesale price list getter/setter.
+func (s *PriceListService) WithSettings(settings defaultPriceListSettings) *PriceListService {
+	s.settings = settings
+	return s
 }
 
 // --- Reads ---
@@ -62,7 +78,57 @@ func (s *PriceListService) CountCustomers(ctx context.Context, tx pgx.Tx, id uui
 	return n, nil
 }
 
+// GetDefaultWholesale returns the store-wide default wholesale price list, or nil
+// if none is configured. Wholesale customers without an explicitly-assigned list
+// resolve their prices against this default.
+func (s *PriceListService) GetDefaultWholesale(ctx context.Context, tx pgx.Tx) (*uuid.UUID, error) {
+	if s.settings == nil {
+		return nil, nil
+	}
+	id, err := s.settings.GetDefaultWholesalePriceListID(ctx, tx)
+	if err != nil {
+		return nil, fmt.Errorf("get default wholesale price list: %w", err)
+	}
+	return id, nil
+}
+
 // --- Writes ---
+
+// SetDefaultWholesale sets (or clears, when id is nil) the store-wide default
+// wholesale price list and records an audit entry. A non-nil id must reference an
+// existing price list; otherwise ErrPriceListNotFound is returned.
+func (s *PriceListService) SetDefaultWholesale(ctx context.Context, tx pgx.Tx, id *uuid.UUID, actor Actor) error {
+	if s.settings == nil {
+		return fmt.Errorf("set default wholesale price list: settings not configured")
+	}
+
+	if id != nil {
+		if _, err := s.lists.GetByID(ctx, tx, *id); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrPriceListNotFound
+			}
+			return fmt.Errorf("verify price list exists: %w", err)
+		}
+	}
+
+	if err := s.settings.SetDefaultWholesalePriceListID(ctx, tx, id); err != nil {
+		return fmt.Errorf("set default wholesale price list: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditDefaultWholesalePriceListUpdated,
+		ResourceType: "store_settings",
+		ResourceID:   uuid.Nil,
+		After:        map[string]any{"default_wholesale_price_list_id": id},
+	}); err != nil {
+		return fmt.Errorf("audit default wholesale price list updated: %w", err)
+	}
+
+	return nil
+}
 
 // Create creates a new price list and records an audit entry.
 func (s *PriceListService) Create(ctx context.Context, tx pgx.Tx, name string, listType domain.PriceListType, status domain.PriceListStatus, actor Actor) (*domain.PriceList, error) {

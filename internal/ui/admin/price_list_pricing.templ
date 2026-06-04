@@ -121,7 +121,10 @@ templ priceListProductBlock(lists []domain.PriceList, pp ProductPriceListPricing
 templ priceListBaseCard(pp ProductPriceListPricing) {
 	<div class="overflow-hidden border border-rr-border bg-rr-surface">
 		<div class="border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6">
-			<h3 class="text-sm font-medium text-rr-body">Base Prices <span class="text-xs text-rr-muted font-normal">(edit on Group Pricing page)</span></h3>
+			<h3 class="text-sm font-medium text-rr-body">
+				Base Prices
+				<a href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", pp.Product.ID)) } class="text-xs text-rr-red hover:text-rr-red-lt font-normal">(edit on the product page)</a>
+			</h3>
 		</div>
 		<table class="min-w-full divide-y divide-rr-border">
 			<thead class="bg-rr-raised">
@@ -194,7 +197,7 @@ templ priceListPricingCard(list domain.PriceList, pp ProductPriceListPricing) {
 									}
 									class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 								/>
-								<input type="hidden" name={ "list_prev:" + list.ID.String() + ":" + vp.Variant.ID.String() } value={ priceListDollars(vp.ListPrices, list.ID) }/>
+								<input type="hidden" id={ "plprev-" + list.ID.String() + "-" + vp.Variant.ID.String() } name={ "list_prev:" + list.ID.String() + ":" + vp.Variant.ID.String() } value={ priceListDollars(vp.ListPrices, list.ID) }/>
 							</div>
 						</td>
 					</tr>
@@ -215,4 +218,18 @@ templ PriceListPricing(props PriceListPricingProps) {
 			@PriceListPricingContent(props)
 		</div>
 	}
+}
+
+// PriceListPrevOOB updates a single cell's hidden "previous value" input after a
+// successful save, via an out-of-band swap. This keeps the on-page diff accurate
+// without re-rendering the whole table: the next save compares the user's input
+// against the value we just persisted (empty string when the override was cleared).
+templ PriceListPrevOOB(listID, variantID uuid.UUID, value string) {
+	<input
+		type="hidden"
+		id={ "plprev-" + listID.String() + "-" + variantID.String() }
+		name={ "list_prev:" + listID.String() + ":" + variantID.String() }
+		value={ value }
+		hx-swap-oob="true"
+	/>
 }

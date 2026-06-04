@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -200,8 +201,10 @@ func (d *Deps) handleAdminPriceListPriceBulkUpdate(w http.ResponseWriter, r *htt
 
 	ops, err := parsePriceListForm(r)
 	if err != nil {
+		// Don't re-render the table — that would discard the value the user is
+		// in the middle of fixing. Just surface the error.
 		if IsHTMX(r) {
-			d.handleAdminPriceListPrices(w, r)
+			w.Header().Set("HX-Reswap", "none")
 			toast.Toast(toast.VariantError, "Please enter a valid price").Render(ctx, w) //nolint:errcheck
 			return
 		}
@@ -211,7 +214,8 @@ func (d *Deps) handleAdminPriceListPriceBulkUpdate(w http.ResponseWriter, r *htt
 
 	if len(ops) == 0 {
 		if IsHTMX(r) {
-			d.handleAdminPriceListPrices(w, r)
+			w.Header().Set("HX-Reswap", "none")
+			toast.Toast(toast.VariantWarning, "No changes to save").Render(ctx, w) //nolint:errcheck
 			return
 		}
 		http.Redirect(w, r, "/admin/price-lists/prices", http.StatusSeeOther)
@@ -234,7 +238,7 @@ func (d *Deps) handleAdminPriceListPriceBulkUpdate(w http.ResponseWriter, r *htt
 	})
 	if err != nil {
 		if IsHTMX(r) {
-			d.handleAdminPriceListPrices(w, r)
+			w.Header().Set("HX-Reswap", "none")
 			_, msg := mapError(err)
 			toast.Toast(toast.VariantError, msg).Render(ctx, w) //nolint:errcheck
 			return
@@ -244,10 +248,30 @@ func (d *Deps) handleAdminPriceListPriceBulkUpdate(w http.ResponseWriter, r *htt
 	}
 
 	if IsHTMX(r) {
-		d.handleAdminPriceListPrices(w, r)
+		// Success: leave the user's table exactly as it is (no full re-render, so
+		// scroll position and focus are preserved). Confirm with a toast, and
+		// OOB-update each saved cell's hidden "previous value" so the next save's
+		// change-detection compares against what we just persisted.
+		w.Header().Set("HX-Reswap", "none")
+		toast.Toast(toast.VariantSuccess, savedPricesMessage(len(ops))).Render(ctx, w) //nolint:errcheck
+		for _, op := range ops {
+			newPrev := ""
+			if op.kind != opGroupDelete {
+				newPrev = fmt.Sprintf("%.2f", float64(op.cents)/100)
+			}
+			admin.PriceListPrevOOB(op.groupID, op.variantID, newPrev).Render(ctx, w) //nolint:errcheck
+		}
 		return
 	}
 	http.Redirect(w, r, "/admin/price-lists/prices", http.StatusSeeOther)
+}
+
+// savedPricesMessage builds the success-toast text for a bulk price save.
+func savedPricesMessage(n int) string {
+	if n == 1 {
+		return "Saved 1 price"
+	}
+	return fmt.Sprintf("Saved %d prices", n)
 }
 
 // buildPriceListProduct assembles one product's variants and their base + price-list

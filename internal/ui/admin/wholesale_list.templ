@@ -29,6 +29,7 @@ type WholesaleListProps struct {
 	Customers    []domain.Customer
 	PriceLists   []domain.PriceList // available lists for the per-applicant pricing selector
 	StatusFilter string
+	Counts       map[string]int // per-status counts for the filter-bar badges, keyed by status (plus "all")
 	Page         int
 	HasMore      bool
 	MerchantTZ   *time.Location
@@ -36,11 +37,30 @@ type WholesaleListProps struct {
 	StaffRole    string
 }
 
+// wholesaleFilter is one entry in the status filter bar.
+type wholesaleFilter struct {
+	Value string
+	Label string
+}
+
+// wholesaleFilters lists the filter pills in display order. "all" leads as the
+// default overview; the rest narrow to a single wholesale status.
+var wholesaleFilters = []wholesaleFilter{
+	{"all", "All"},
+	{"pending", "Pending"},
+	{"approved", "Approved"},
+	{"suspended", "Suspended"},
+	{"declined", "Declined"},
+}
+
+// wholesaleFilterClasses styles a filter pill. The active pill echoes the admin
+// active-nav convention (raised paper + rust text) rather than a solid red fill
+// — red is reserved for actions (Approve/Decline/Suspend), not "which tab am I on".
 func wholesaleFilterClasses(current, filter string) string {
 	if current == filter {
-		return "inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm"
+		return "inline-flex items-center gap-1.5 rounded-sm bg-rr-raised px-3 py-2 text-sm font-semibold text-rr-red border border-rr-border"
 	}
-	return "inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
+	return "inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 }
 
 templ WholesaleListContent(props WholesaleListProps) {
@@ -52,19 +72,19 @@ templ WholesaleListContent(props WholesaleListProps) {
 		</div>
 	</div>
 	<!-- Status filters -->
-	<div class="mt-4 flex gap-2">
-		<a href="/admin/wholesale?status=pending" class={ wholesaleFilterClasses(props.StatusFilter, "pending") }>
-			Pending
-		</a>
-		<a href="/admin/wholesale?status=approved" class={ wholesaleFilterClasses(props.StatusFilter, "approved") }>
-			Approved
-		</a>
-		<a href="/admin/wholesale?status=suspended" class={ wholesaleFilterClasses(props.StatusFilter, "suspended") }>
-			Suspended
-		</a>
-		<a href="/admin/wholesale?status=declined" class={ wholesaleFilterClasses(props.StatusFilter, "declined") }>
-			Declined
-		</a>
+	<div class="mt-4 flex flex-wrap gap-2">
+		for _, f := range wholesaleFilters {
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/admin/wholesale?status=%s", f.Value)) }
+				class={ wholesaleFilterClasses(props.StatusFilter, f.Value) }
+				if props.StatusFilter == f.Value {
+					aria-current="page"
+				}
+			>
+				{ f.Label }
+				<span class="text-xs font-normal text-rr-muted tabular-nums">{ fmt.Sprintf("%d", props.Counts[f.Value]) }</span>
+			</a>
+		}
 	</div>
 	<!-- Applications table -->
 	<div class="mt-6">
@@ -73,14 +93,24 @@ templ WholesaleListContent(props WholesaleListProps) {
 				<svg class="mx-auto size-12 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"></path>
 				</svg>
-				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No { props.StatusFilter } applications</h3>
-				<p class="mt-1 text-sm text-rr-muted">
-					if props.StatusFilter == "pending" {
-						New wholesale applications will appear here.
-					} else {
-						No wholesale accounts with this status.
-					}
-				</p>
+				switch props.StatusFilter {
+					case "all":
+						<h3 class="mt-2 text-sm font-semibold text-rr-heading">No wholesale accounts yet</h3>
+						<p class="mt-1 text-sm text-rr-muted">Applications will appear here as cafes and offices apply.</p>
+					case "pending":
+						<h3 class="mt-2 text-sm font-semibold text-rr-heading">No applications waiting</h3>
+						<p class="mt-1 text-sm text-rr-muted">Inbox zero. New wholesale applications land here for review.</p>
+						if props.Counts["all"] > 0 {
+							<a href="/admin/wholesale?status=all" class="mt-3 inline-block text-sm font-semibold text-rr-red hover:text-rr-red-lt">
+								{ fmt.Sprintf("View all %d wholesale accounts", props.Counts["all"]) } &rarr;
+							</a>
+						}
+					default:
+						<h3 class="mt-2 text-sm font-semibold text-rr-heading">No { props.StatusFilter } accounts</h3>
+						<a href="/admin/wholesale?status=all" class="mt-3 inline-block text-sm font-semibold text-rr-red hover:text-rr-red-lt">
+							{ fmt.Sprintf("View all %d wholesale accounts", props.Counts["all"]) } &rarr;
+						</a>
+				}
 			</div>
 		} else {
 			<div class="overflow-visible border border-rr-border bg-rr-surface">
@@ -93,7 +123,9 @@ templ WholesaleListContent(props WholesaleListProps) {
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Terms</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading 2xl:table-cell">Applied</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Price list</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+							if props.StatusFilter == "all" {
+								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+							}
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
 							</th>
@@ -128,11 +160,13 @@ templ WholesaleListContent(props WholesaleListProps) {
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									@wholesalePriceListCell(c, props.PriceLists, props.StatusFilter)
 								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm">
-									if c.WholesaleStatus != nil {
-										@WholesaleStatusBadge(*c.WholesaleStatus)
-									}
-								</td>
+								if props.StatusFilter == "all" {
+									<td class="whitespace-nowrap px-3 py-4 text-sm">
+										if c.WholesaleStatus != nil {
+											@WholesaleStatusBadge(*c.WholesaleStatus)
+										}
+									</td>
+								}
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 									@wholesaleRowActions(c)
 								</td>

@@ -16,10 +16,10 @@ import (
 func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	statusFilter := r.URL.Query().Get("status")
-	if statusFilter == "" {
-		statusFilter = "pending"
-	}
+	// Default to the "all" overview rather than a single status: it's the front
+	// door to the page (roster + applications), and the per-pill counts below
+	// give staff the scent to route themselves to wherever the work is.
+	statusFilter := wholesaleStatusFilter(r.URL.Query().Get("status"))
 	pageStr := r.URL.Query().Get("page")
 	page := 1
 	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
@@ -27,16 +27,20 @@ func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) 
 	}
 
 	perPage := 25
-	ws := domain.WholesaleStatus(statusFilter)
 	filter := store.CustomerFilter{
-		AccountType:     ptrTo(domain.AccountTypeWholesale),
-		WholesaleStatus: &ws,
-		Limit:           perPage + 1,
-		Offset:          (page - 1) * perPage,
+		AccountType: ptrTo(domain.AccountTypeWholesale),
+		Limit:       perPage + 1,
+		Offset:      (page - 1) * perPage,
+	}
+	// "all" leaves WholesaleStatus unset so every wholesale account is listed.
+	if statusFilter != "all" {
+		ws := domain.WholesaleStatus(statusFilter)
+		filter.WholesaleStatus = &ws
 	}
 
 	var customers []domain.Customer
 	var priceLists []domain.PriceList
+	counts := map[string]int{}
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -45,7 +49,31 @@ func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) 
 			return txErr
 		}
 		priceLists, txErr = d.PriceListService.List(ctx, tx)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+		// Per-status counts power the filter-bar badges (and the "all" total),
+		// turning the filter row into a lightweight dashboard.
+		base := store.CustomerFilter{AccountType: ptrTo(domain.AccountTypeWholesale)}
+		counts["all"], txErr = d.CustomerService.CountCustomers(ctx, tx, base)
+		if txErr != nil {
+			return txErr
+		}
+		for _, st := range []domain.WholesaleStatus{
+			domain.WholesaleStatusPending,
+			domain.WholesaleStatusApproved,
+			domain.WholesaleStatusSuspended,
+			domain.WholesaleStatusDeclined,
+		} {
+			f := base
+			ws := st
+			f.WholesaleStatus = &ws
+			counts[string(st)], txErr = d.CustomerService.CountCustomers(ctx, tx, f)
+			if txErr != nil {
+				return txErr
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -62,6 +90,7 @@ func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) 
 		Customers:    customers,
 		PriceLists:   priceLists,
 		StatusFilter: statusFilter,
+		Counts:       counts,
 		Page:         page,
 		HasMore:      hasMore,
 		MerchantTZ:   d.MerchantTZ,
@@ -110,15 +139,15 @@ func (d *Deps) handleAdminWholesalePriceList(w http.ResponseWriter, r *http.Requ
 	http.Redirect(w, r, "/admin/wholesale?status="+wholesaleStatusFilter(r.FormValue("status")), http.StatusSeeOther)
 }
 
-// wholesaleStatusFilter sanitizes a status filter value coming from a form,
-// falling back to "pending" for anything unrecognized so the redirect target is
-// always a known view.
+// wholesaleStatusFilter sanitizes a status filter value (from the query string
+// or a form), falling back to the "all" overview for anything unrecognized so
+// the view/redirect target is always a known one.
 func wholesaleStatusFilter(s string) string {
 	switch s {
-	case "pending", "approved", "suspended", "declined":
+	case "all", "pending", "approved", "suspended", "declined":
 		return s
 	default:
-		return "pending"
+		return "all"
 	}
 }
 

@@ -398,6 +398,7 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin wholesale
 	adminMux.HandleFunc("GET /admin/wholesale", deps.handleAdminWholesaleList)
+	adminMux.HandleFunc("POST /admin/wholesale/{id}/price-list", deps.handleAdminWholesalePriceList)
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/approve", deps.handleAdminWholesaleApprove)
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/decline", deps.handleAdminWholesaleDecline)
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/suspend", deps.handleAdminWholesaleSuspend)

@@ -36,10 +36,15 @@ func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var customers []domain.Customer
+	var priceLists []domain.PriceList
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		customers, txErr = d.CustomerService.ListCustomers(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+		priceLists, txErr = d.PriceListService.List(ctx, tx)
 		return txErr
 	})
 	if err != nil {
@@ -55,6 +60,7 @@ func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) 
 	name, role := staffNameRole(r)
 	props := admin.WholesaleListProps{
 		Customers:    customers,
+		PriceLists:   priceLists,
 		StatusFilter: statusFilter,
 		Page:         page,
 		HasMore:      hasMore,
@@ -68,6 +74,52 @@ func (d *Deps) handleAdminWholesaleList(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	admin.WholesaleList(props).Render(ctx, w) //nolint:errcheck
+}
+
+// handleAdminWholesalePriceList assigns (or clears) a wholesale applicant's price
+// list from the wholesale review screen, so staff can set pricing before approving.
+// It reuses the customer-scoped UpdatePriceList service method and redirects back
+// to the wholesale list, preserving the active status filter.
+func (d *Deps) handleAdminWholesalePriceList(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var priceListID *uuid.UUID
+	if v := r.FormValue("price_list_id"); v != "" {
+		parsed, parseErr := uuid.Parse(v)
+		if parseErr != nil {
+			http.Error(w, "Invalid price list", http.StatusBadRequest)
+			return
+		}
+		priceListID = &parsed
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.CustomerService.UpdatePriceList(ctx, tx, id, priceListID, staffActor(r))
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/wholesale?status="+wholesaleStatusFilter(r.FormValue("status")), http.StatusSeeOther)
+}
+
+// wholesaleStatusFilter sanitizes a status filter value coming from a form,
+// falling back to "pending" for anything unrecognized so the redirect target is
+// always a known view.
+func wholesaleStatusFilter(s string) string {
+	switch s {
+	case "pending", "approved", "suspended", "declined":
+		return s
+	default:
+		return "pending"
+	}
 }
 
 func (d *Deps) handleAdminWholesaleApprove(w http.ResponseWriter, r *http.Request) {

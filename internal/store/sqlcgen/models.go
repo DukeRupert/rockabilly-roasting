@@ -362,16 +362,15 @@ type Order struct {
 }
 
 type Price struct {
-	ID              uuid.UUID          `json:"id"`
-	PriceSetID      uuid.UUID          `json:"price_set_id"`
-	Amount          int32              `json:"amount"`
-	CurrencyCode    string             `json:"currency_code"`
-	MinQuantity     *int32             `json:"min_quantity"`
-	MaxQuantity     *int32             `json:"max_quantity"`
-	CustomerGroupID *uuid.UUID         `json:"customer_group_id"`
-	PriceListID     *uuid.UUID         `json:"price_list_id"`
-	StartsAt        pgtype.Timestamptz `json:"starts_at"`
-	EndsAt          pgtype.Timestamptz `json:"ends_at"`
+	ID           uuid.UUID          `json:"id"`
+	PriceSetID   uuid.UUID          `json:"price_set_id"`
+	Amount       int32              `json:"amount"`
+	CurrencyCode string             `json:"currency_code"`
+	MinQuantity  *int32             `json:"min_quantity"`
+	MaxQuantity  *int32             `json:"max_quantity"`
+	PriceListID  *uuid.UUID         `json:"price_list_id"`
+	StartsAt     pgtype.Timestamptz `json:"starts_at"`
+	EndsAt       pgtype.Timestamptz `json:"ends_at"`
 }
 
 type PriceList struct {

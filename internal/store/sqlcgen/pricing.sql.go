@@ -77,9 +77,7 @@ const deleteBasePrice = `-- name: DeleteBasePrice :exec
 DELETE FROM prices
 WHERE price_set_id = $1
   AND currency_code = $2
-  AND price_list_id IS NULL
-  AND customer_group_id IS NULL
-  AND min_quantity IS NULL
+  AND price_list_id IS NULL  AND min_quantity IS NULL
 `
 
 type DeleteBasePriceParams struct {
@@ -105,9 +103,7 @@ const deletePriceListPrice = `-- name: DeletePriceListPrice :exec
 DELETE FROM prices
 WHERE price_set_id = $1
   AND currency_code = $2
-  AND price_list_id = $3
-  AND customer_group_id IS NULL
-  AND min_quantity IS NULL
+  AND price_list_id = $3  AND min_quantity IS NULL
 `
 
 type DeletePriceListPriceParams struct {
@@ -123,15 +119,13 @@ func (q *Queries) DeletePriceListPrice(ctx context.Context, arg DeletePriceListP
 
 const getBasePrice = `-- name: GetBasePrice :one
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
-       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.min_quantity, p.max_quantity,
        p.price_list_id, p.starts_at, p.ends_at
 FROM price_sets ps
 JOIN prices p ON p.price_set_id = ps.id
 WHERE ps.variant_id = $1
   AND p.currency_code = $2
-  AND p.price_list_id IS NULL
-  AND p.customer_group_id IS NULL
-  AND p.min_quantity IS NULL
+  AND p.price_list_id IS NULL  AND p.min_quantity IS NULL
 LIMIT 1
 `
 
@@ -150,7 +144,6 @@ func (q *Queries) GetBasePrice(ctx context.Context, arg GetBasePriceParams) (Pri
 		&i.CurrencyCode,
 		&i.MinQuantity,
 		&i.MaxQuantity,
-		&i.CustomerGroupID,
 		&i.PriceListID,
 		&i.StartsAt,
 		&i.EndsAt,
@@ -178,15 +171,13 @@ func (q *Queries) GetPriceListByID(ctx context.Context, id uuid.UUID) (PriceList
 
 const getPriceListPrice = `-- name: GetPriceListPrice :one
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
-       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.min_quantity, p.max_quantity,
        p.price_list_id, p.starts_at, p.ends_at
 FROM price_sets ps
 JOIN prices p ON p.price_set_id = ps.id
 WHERE ps.variant_id = $1
   AND p.currency_code = $2
-  AND p.price_list_id = $3
-  AND p.customer_group_id IS NULL
-  AND p.min_quantity IS NULL
+  AND p.price_list_id = $3  AND p.min_quantity IS NULL
 LIMIT 1
 `
 
@@ -206,7 +197,6 @@ func (q *Queries) GetPriceListPrice(ctx context.Context, arg GetPriceListPricePa
 		&i.CurrencyCode,
 		&i.MinQuantity,
 		&i.MaxQuantity,
-		&i.CustomerGroupID,
 		&i.PriceListID,
 		&i.StartsAt,
 		&i.EndsAt,
@@ -227,7 +217,7 @@ func (q *Queries) GetPriceSetByVariant(ctx context.Context, variantID uuid.UUID)
 
 const listBasePricesByProduct = `-- name: ListBasePricesByProduct :many
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
-       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.min_quantity, p.max_quantity,
        p.price_list_id, p.starts_at, p.ends_at,
        ps.variant_id
 FROM variants v
@@ -235,9 +225,7 @@ JOIN price_sets ps ON ps.variant_id = v.id
 JOIN prices p ON p.price_set_id = ps.id
 WHERE v.product_id = $1
   AND p.currency_code = $2
-  AND p.price_list_id IS NULL
-  AND p.customer_group_id IS NULL
-  AND p.min_quantity IS NULL
+  AND p.price_list_id IS NULL  AND p.min_quantity IS NULL
 `
 
 type ListBasePricesByProductParams struct {
@@ -246,17 +234,16 @@ type ListBasePricesByProductParams struct {
 }
 
 type ListBasePricesByProductRow struct {
-	ID              uuid.UUID          `json:"id"`
-	PriceSetID      uuid.UUID          `json:"price_set_id"`
-	Amount          int32              `json:"amount"`
-	CurrencyCode    string             `json:"currency_code"`
-	MinQuantity     *int32             `json:"min_quantity"`
-	MaxQuantity     *int32             `json:"max_quantity"`
-	CustomerGroupID *uuid.UUID         `json:"customer_group_id"`
-	PriceListID     *uuid.UUID         `json:"price_list_id"`
-	StartsAt        pgtype.Timestamptz `json:"starts_at"`
-	EndsAt          pgtype.Timestamptz `json:"ends_at"`
-	VariantID       uuid.UUID          `json:"variant_id"`
+	ID           uuid.UUID          `json:"id"`
+	PriceSetID   uuid.UUID          `json:"price_set_id"`
+	Amount       int32              `json:"amount"`
+	CurrencyCode string             `json:"currency_code"`
+	MinQuantity  *int32             `json:"min_quantity"`
+	MaxQuantity  *int32             `json:"max_quantity"`
+	PriceListID  *uuid.UUID         `json:"price_list_id"`
+	StartsAt     pgtype.Timestamptz `json:"starts_at"`
+	EndsAt       pgtype.Timestamptz `json:"ends_at"`
+	VariantID    uuid.UUID          `json:"variant_id"`
 }
 
 func (q *Queries) ListBasePricesByProduct(ctx context.Context, arg ListBasePricesByProductParams) ([]ListBasePricesByProductRow, error) {
@@ -275,7 +262,6 @@ func (q *Queries) ListBasePricesByProduct(ctx context.Context, arg ListBasePrice
 			&i.CurrencyCode,
 			&i.MinQuantity,
 			&i.MaxQuantity,
-			&i.CustomerGroupID,
 			&i.PriceListID,
 			&i.StartsAt,
 			&i.EndsAt,
@@ -293,16 +279,14 @@ func (q *Queries) ListBasePricesByProduct(ctx context.Context, arg ListBasePrice
 
 const listBasePricesByVariants = `-- name: ListBasePricesByVariants :many
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
-       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.min_quantity, p.max_quantity,
        p.price_list_id, p.starts_at, p.ends_at,
        ps.variant_id
 FROM price_sets ps
 JOIN prices p ON p.price_set_id = ps.id
 WHERE ps.variant_id = ANY($1::uuid[])
   AND p.currency_code = $2
-  AND p.price_list_id IS NULL
-  AND p.customer_group_id IS NULL
-  AND p.min_quantity IS NULL
+  AND p.price_list_id IS NULL  AND p.min_quantity IS NULL
 `
 
 type ListBasePricesByVariantsParams struct {
@@ -311,17 +295,16 @@ type ListBasePricesByVariantsParams struct {
 }
 
 type ListBasePricesByVariantsRow struct {
-	ID              uuid.UUID          `json:"id"`
-	PriceSetID      uuid.UUID          `json:"price_set_id"`
-	Amount          int32              `json:"amount"`
-	CurrencyCode    string             `json:"currency_code"`
-	MinQuantity     *int32             `json:"min_quantity"`
-	MaxQuantity     *int32             `json:"max_quantity"`
-	CustomerGroupID *uuid.UUID         `json:"customer_group_id"`
-	PriceListID     *uuid.UUID         `json:"price_list_id"`
-	StartsAt        pgtype.Timestamptz `json:"starts_at"`
-	EndsAt          pgtype.Timestamptz `json:"ends_at"`
-	VariantID       uuid.UUID          `json:"variant_id"`
+	ID           uuid.UUID          `json:"id"`
+	PriceSetID   uuid.UUID          `json:"price_set_id"`
+	Amount       int32              `json:"amount"`
+	CurrencyCode string             `json:"currency_code"`
+	MinQuantity  *int32             `json:"min_quantity"`
+	MaxQuantity  *int32             `json:"max_quantity"`
+	PriceListID  *uuid.UUID         `json:"price_list_id"`
+	StartsAt     pgtype.Timestamptz `json:"starts_at"`
+	EndsAt       pgtype.Timestamptz `json:"ends_at"`
+	VariantID    uuid.UUID          `json:"variant_id"`
 }
 
 func (q *Queries) ListBasePricesByVariants(ctx context.Context, arg ListBasePricesByVariantsParams) ([]ListBasePricesByVariantsRow, error) {
@@ -340,7 +323,6 @@ func (q *Queries) ListBasePricesByVariants(ctx context.Context, arg ListBasePric
 			&i.CurrencyCode,
 			&i.MinQuantity,
 			&i.MaxQuantity,
-			&i.CustomerGroupID,
 			&i.PriceListID,
 			&i.StartsAt,
 			&i.EndsAt,
@@ -358,7 +340,7 @@ func (q *Queries) ListBasePricesByVariants(ctx context.Context, arg ListBasePric
 
 const listPriceListPricesByProduct = `-- name: ListPriceListPricesByProduct :many
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
-       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.min_quantity, p.max_quantity,
        p.price_list_id, p.starts_at, p.ends_at,
        ps.variant_id
 FROM variants v
@@ -366,9 +348,7 @@ JOIN price_sets ps ON ps.variant_id = v.id
 JOIN prices p ON p.price_set_id = ps.id
 WHERE v.product_id = $1
   AND p.currency_code = $2
-  AND p.price_list_id IS NOT NULL
-  AND p.customer_group_id IS NULL
-  AND p.min_quantity IS NULL
+  AND p.price_list_id IS NOT NULL  AND p.min_quantity IS NULL
 `
 
 type ListPriceListPricesByProductParams struct {
@@ -377,17 +357,16 @@ type ListPriceListPricesByProductParams struct {
 }
 
 type ListPriceListPricesByProductRow struct {
-	ID              uuid.UUID          `json:"id"`
-	PriceSetID      uuid.UUID          `json:"price_set_id"`
-	Amount          int32              `json:"amount"`
-	CurrencyCode    string             `json:"currency_code"`
-	MinQuantity     *int32             `json:"min_quantity"`
-	MaxQuantity     *int32             `json:"max_quantity"`
-	CustomerGroupID *uuid.UUID         `json:"customer_group_id"`
-	PriceListID     *uuid.UUID         `json:"price_list_id"`
-	StartsAt        pgtype.Timestamptz `json:"starts_at"`
-	EndsAt          pgtype.Timestamptz `json:"ends_at"`
-	VariantID       uuid.UUID          `json:"variant_id"`
+	ID           uuid.UUID          `json:"id"`
+	PriceSetID   uuid.UUID          `json:"price_set_id"`
+	Amount       int32              `json:"amount"`
+	CurrencyCode string             `json:"currency_code"`
+	MinQuantity  *int32             `json:"min_quantity"`
+	MaxQuantity  *int32             `json:"max_quantity"`
+	PriceListID  *uuid.UUID         `json:"price_list_id"`
+	StartsAt     pgtype.Timestamptz `json:"starts_at"`
+	EndsAt       pgtype.Timestamptz `json:"ends_at"`
+	VariantID    uuid.UUID          `json:"variant_id"`
 }
 
 func (q *Queries) ListPriceListPricesByProduct(ctx context.Context, arg ListPriceListPricesByProductParams) ([]ListPriceListPricesByProductRow, error) {
@@ -406,7 +385,6 @@ func (q *Queries) ListPriceListPricesByProduct(ctx context.Context, arg ListPric
 			&i.CurrencyCode,
 			&i.MinQuantity,
 			&i.MaxQuantity,
-			&i.CustomerGroupID,
 			&i.PriceListID,
 			&i.StartsAt,
 			&i.EndsAt,
@@ -424,16 +402,14 @@ func (q *Queries) ListPriceListPricesByProduct(ctx context.Context, arg ListPric
 
 const listPriceListPricesByVariants = `-- name: ListPriceListPricesByVariants :many
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
-       p.min_quantity, p.max_quantity, p.customer_group_id,
+       p.min_quantity, p.max_quantity,
        p.price_list_id, p.starts_at, p.ends_at,
        ps.variant_id
 FROM price_sets ps
 JOIN prices p ON p.price_set_id = ps.id
 WHERE ps.variant_id = ANY($1::uuid[])
   AND p.currency_code = $2
-  AND p.price_list_id = $3
-  AND p.customer_group_id IS NULL
-  AND p.min_quantity IS NULL
+  AND p.price_list_id = $3  AND p.min_quantity IS NULL
 `
 
 type ListPriceListPricesByVariantsParams struct {
@@ -443,17 +419,16 @@ type ListPriceListPricesByVariantsParams struct {
 }
 
 type ListPriceListPricesByVariantsRow struct {
-	ID              uuid.UUID          `json:"id"`
-	PriceSetID      uuid.UUID          `json:"price_set_id"`
-	Amount          int32              `json:"amount"`
-	CurrencyCode    string             `json:"currency_code"`
-	MinQuantity     *int32             `json:"min_quantity"`
-	MaxQuantity     *int32             `json:"max_quantity"`
-	CustomerGroupID *uuid.UUID         `json:"customer_group_id"`
-	PriceListID     *uuid.UUID         `json:"price_list_id"`
-	StartsAt        pgtype.Timestamptz `json:"starts_at"`
-	EndsAt          pgtype.Timestamptz `json:"ends_at"`
-	VariantID       uuid.UUID          `json:"variant_id"`
+	ID           uuid.UUID          `json:"id"`
+	PriceSetID   uuid.UUID          `json:"price_set_id"`
+	Amount       int32              `json:"amount"`
+	CurrencyCode string             `json:"currency_code"`
+	MinQuantity  *int32             `json:"min_quantity"`
+	MaxQuantity  *int32             `json:"max_quantity"`
+	PriceListID  *uuid.UUID         `json:"price_list_id"`
+	StartsAt     pgtype.Timestamptz `json:"starts_at"`
+	EndsAt       pgtype.Timestamptz `json:"ends_at"`
+	VariantID    uuid.UUID          `json:"variant_id"`
 }
 
 func (q *Queries) ListPriceListPricesByVariants(ctx context.Context, arg ListPriceListPricesByVariantsParams) ([]ListPriceListPricesByVariantsRow, error) {
@@ -472,7 +447,6 @@ func (q *Queries) ListPriceListPricesByVariants(ctx context.Context, arg ListPri
 			&i.CurrencyCode,
 			&i.MinQuantity,
 			&i.MaxQuantity,
-			&i.CustomerGroupID,
 			&i.PriceListID,
 			&i.StartsAt,
 			&i.EndsAt,
@@ -551,7 +525,7 @@ const upsertBasePrice = `-- name: UpsertBasePrice :one
 INSERT INTO prices (id, price_set_id, amount, currency_code)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (id) DO UPDATE SET amount = EXCLUDED.amount
-RETURNING id, price_set_id, amount, currency_code, min_quantity, max_quantity, customer_group_id, price_list_id, starts_at, ends_at
+RETURNING id, price_set_id, amount, currency_code, min_quantity, max_quantity, price_list_id, starts_at, ends_at
 `
 
 type UpsertBasePriceParams struct {
@@ -576,7 +550,6 @@ func (q *Queries) UpsertBasePrice(ctx context.Context, arg UpsertBasePriceParams
 		&i.CurrencyCode,
 		&i.MinQuantity,
 		&i.MaxQuantity,
-		&i.CustomerGroupID,
 		&i.PriceListID,
 		&i.StartsAt,
 		&i.EndsAt,
@@ -588,7 +561,7 @@ const upsertPriceListPrice = `-- name: UpsertPriceListPrice :one
 INSERT INTO prices (id, price_set_id, amount, currency_code, price_list_id)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (id) DO UPDATE SET amount = EXCLUDED.amount
-RETURNING id, price_set_id, amount, currency_code, min_quantity, max_quantity, customer_group_id, price_list_id, starts_at, ends_at
+RETURNING id, price_set_id, amount, currency_code, min_quantity, max_quantity, price_list_id, starts_at, ends_at
 `
 
 type UpsertPriceListPriceParams struct {
@@ -615,7 +588,6 @@ func (q *Queries) UpsertPriceListPrice(ctx context.Context, arg UpsertPriceListP
 		&i.CurrencyCode,
 		&i.MinQuantity,
 		&i.MaxQuantity,
-		&i.CustomerGroupID,
 		&i.PriceListID,
 		&i.StartsAt,
 		&i.EndsAt,

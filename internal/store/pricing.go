@@ -204,7 +204,6 @@ func priceFromRow(r sqlcgen.Price) *domain.Price {
 		CurrencyCode:    r.CurrencyCode,
 		MinQuantity:     int32PtrToIntPtr(r.MinQuantity),
 		MaxQuantity:     int32PtrToIntPtr(r.MaxQuantity),
-		CustomerGroupID: r.CustomerGroupID,
 		PriceListID:     r.PriceListID,
 		StartsAt:        timestampFromPG(r.StartsAt),
 		EndsAt:          timestampFromPG(r.EndsAt),

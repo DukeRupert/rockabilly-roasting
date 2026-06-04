@@ -37,7 +37,6 @@ type Price struct {
 	CurrencyCode    string
 	MinQuantity     *int
 	MaxQuantity     *int
-	CustomerGroupID *uuid.UUID
 	PriceListID     *uuid.UUID
 	StartsAt        *time.Time
 	EndsAt          *time.Time

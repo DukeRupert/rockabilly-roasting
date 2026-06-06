@@ -61,6 +61,51 @@ func TestShippingConfig_EligibleLocalMethods(t *testing.T) {
 	}
 }
 
+func TestShippingConfig_WholesaleFulfillmentMethods(t *testing.T) {
+	deliveryEnabled := ShippingConfig{
+		LocalZipCodes:        []string{"99336"},
+		LocalDeliveryEnabled: true,
+	}
+	deliveryDisabled := ShippingConfig{
+		LocalZipCodes: []string{"99336"},
+	}
+
+	tests := []struct {
+		name string
+		cfg  ShippingConfig
+		zip  string
+		want []ShippingMethod
+	}{
+		{"local zip, delivery on — all three", deliveryEnabled, "99336",
+			[]ShippingMethod{ShippingMethodLocalDelivery, ShippingMethodPickup, ShippingMethodShipped}},
+		{"local zip+4, delivery on", deliveryEnabled, "99336-1234",
+			[]ShippingMethod{ShippingMethodLocalDelivery, ShippingMethodPickup, ShippingMethodShipped}},
+		{"non-local zip — pickup + shipping only", deliveryEnabled, "90210",
+			[]ShippingMethod{ShippingMethodPickup, ShippingMethodShipped}},
+		{"local zip but delivery disabled", deliveryDisabled, "99336",
+			[]ShippingMethod{ShippingMethodPickup, ShippingMethodShipped}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.cfg.WholesaleFulfillmentMethods(tt.zip))
+		})
+	}
+}
+
+func TestShippingConfig_WholesaleMethodAllowed(t *testing.T) {
+	cfg := ShippingConfig{LocalZipCodes: []string{"99336"}, LocalDeliveryEnabled: true}
+
+	// Pickup and shipping are always allowed regardless of zip.
+	assert.True(t, cfg.WholesaleMethodAllowed("90210", ShippingMethodPickup))
+	assert.True(t, cfg.WholesaleMethodAllowed("90210", ShippingMethodShipped))
+	// Local delivery only inside the zone.
+	assert.True(t, cfg.WholesaleMethodAllowed("99336", ShippingMethodLocalDelivery))
+	assert.False(t, cfg.WholesaleMethodAllowed("90210", ShippingMethodLocalDelivery))
+	// Garbage method never allowed.
+	assert.False(t, cfg.WholesaleMethodAllowed("99336", ShippingMethod("courier_pigeon")))
+}
+
 func TestShippingConfig_Calculate(t *testing.T) {
 	threshold := 5000
 	cfg := ShippingConfig{

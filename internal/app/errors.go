@@ -100,6 +100,11 @@ var (
 	// Surfaced to the buyer with a fix-it message rather than an opaque 500.
 	ErrAddressIncomplete = errors.New("address is missing required fields")
 
+	// ErrFulfillmentUnavailable signals the buyer picked a fulfillment method
+	// (e.g. local delivery) that isn't valid for their ship-to ZIP. Surfaced as
+	// a fix-it message so they can switch to pickup or shipping.
+	ErrFulfillmentUnavailable = errors.New("fulfillment method not available for address")
+
 	// Status errors
 	ErrInvalidOrderStatus = errors.New("invalid order status transition")
 

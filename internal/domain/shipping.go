@@ -100,6 +100,33 @@ func (c ShippingConfig) EligibleLocalMethods(shipToZip string) []ShippingMethod 
 	return out
 }
 
+// WholesaleFulfillmentMethods returns the fulfillment options offered to a
+// wholesale account shipping to shipToZip, in display order. Unlike retail,
+// wholesale always offers free pickup at the shop and free carrier shipping;
+// local delivery is added only when the zip is inside the local zone and local
+// delivery is enabled. Wholesale shipping is always free regardless of method —
+// the choice records how the order reaches the buyer, not what it costs.
+func (c ShippingConfig) WholesaleFulfillmentMethods(shipToZip string) []ShippingMethod {
+	out := make([]ShippingMethod, 0, 3)
+	if c.LocalDeliveryEnabled && c.IsLocal(shipToZip) {
+		out = append(out, ShippingMethodLocalDelivery)
+	}
+	out = append(out, ShippingMethodPickup, ShippingMethodShipped)
+	return out
+}
+
+// WholesaleMethodAllowed reports whether method is a valid wholesale fulfillment
+// choice for the given ship-to zip. Callers validate the buyer's submitted
+// selection with this rather than trusting the form value.
+func (c ShippingConfig) WholesaleMethodAllowed(shipToZip string, method ShippingMethod) bool {
+	for _, m := range c.WholesaleFulfillmentMethods(shipToZip) {
+		if m == method {
+			return true
+		}
+	}
+	return false
+}
+
 // normalizeZip trims whitespace and strips a ZIP+4 suffix so "99336-1234 "
 // compares equal to "99336".
 func normalizeZip(zip string) string {

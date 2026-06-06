@@ -504,6 +504,7 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 	cartID := getWholesaleCartID(r)
 	var checkoutItems []storefront.WholesaleCheckoutItem
 	var addresses []domain.Address
+	var shipCfg *domain.ShippingConfig
 	subtotal := 0
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -512,6 +513,13 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 			return txErr
 		}
 		addresses = addrs
+
+		// Shipping config drives the local-delivery toggle and the local ZIP
+		// list the checkout uses to gate the delivery option.
+		shipCfg, txErr = d.CheckoutService.GetShippingConfig(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
 
 		if cartID == nil {
 			return nil
@@ -573,6 +581,12 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 		PriceChangeBanner: banner,
 		Addresses:         addresses,
 		DefaultAddressID:  defaultAddressID,
+	}
+	if shipCfg != nil {
+		props.LocalDeliveryEnabled = shipCfg.LocalDeliveryEnabled
+		props.LocalZipCodes = shipCfg.LocalZipCodes
+		props.LocalDeliveryDays = shipCfg.LocalDeliveryDays
+		props.LocalPickupInstructions = shipCfg.LocalPickupInstructions
 	}
 
 	if status != 0 && !IsHTMX(r) {
@@ -671,6 +685,31 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			})
 		}
 
+		// Resolve the chosen fulfillment method against the ship-to ZIP before
+		// creating anything, so an invalid choice rolls the transaction back
+		// cleanly. Pickup and free shipping are always allowed; local delivery
+		// only inside the local zone. The ZIP comes from the new-address form
+		// or, for a saved address, a read-only lookup.
+		shipZip := strings.TrimSpace(r.FormValue("ship_postal_code"))
+		if !isNewWholesaleAddr(shipSel) {
+			if id, perr := uuid.Parse(shipSel); perr == nil {
+				if a, gerr := d.CustomerService.GetAddress(ctx, tx, id, customer.ID); gerr == nil {
+					shipZip = a.PostalCode
+				}
+			}
+		}
+		shipCfg, txErr := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		method := domain.ShippingMethod(r.FormValue("fulfillment_method"))
+		if method == "" {
+			method = domain.ShippingMethodShipped
+		}
+		if !shipCfg.WholesaleMethodAllowed(shipZip, method) {
+			return app.ErrFulfillmentUnavailable
+		}
+
 		// Resolve the shipping address (creating it if the customer entered a
 		// new one), then billing — defaulting to the shipping address.
 		shipID, txErr := d.resolveWholesaleAddress(ctx, tx, customer, r, shipSel, "ship", actor)
@@ -694,6 +733,7 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			ShippingCents:     0,
 			ShippingAddressID: shipID,
 			BillingAddressID:  billID,
+			ShippingMethod:    &method,
 		}
 		if poNumber != "" {
 			orderParams.CustomerPONumber = &poNumber
@@ -745,6 +785,10 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		case errors.Is(err, app.ErrAddressNotFound):
 			d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "address_incomplete").Inc()
 			d.renderWholesaleCheckout(w, r, customer, false, "That saved address is no longer available. Pick another or enter a new one below.", http.StatusUnprocessableEntity)
+			return
+		case errors.Is(err, app.ErrFulfillmentUnavailable):
+			d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "fulfillment_unavailable").Inc()
+			d.renderWholesaleCheckout(w, r, customer, false, "Local delivery isn't available for that ZIP. Choose pickup or free shipping.", http.StatusUnprocessableEntity)
 			return
 		}
 		reason := classifyCheckoutError(err)

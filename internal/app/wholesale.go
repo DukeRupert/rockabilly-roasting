@@ -423,8 +423,11 @@ type PlaceWholesaleOrderParams struct {
 	CustomerPONumber  *string
 	ShippingCents     int
 	TaxCents          int
-	Notes             *string
-	Metadata          map[string]any
+	// ShippingMethod records how the buyer chose to receive the order
+	// (local delivery, pickup, or free shipping). Nil leaves it unset.
+	ShippingMethod *domain.ShippingMethod
+	Notes          *string
+	Metadata       map[string]any
 }
 
 // PlaceWholesaleOrder creates an order with payment_status = pending_invoice (no Stripe).
@@ -493,6 +496,7 @@ func (s *WholesaleService) PlaceWholesaleOrder(ctx context.Context, tx pgx.Tx, p
 		Total:             total,
 		ShippingAddressID: p.ShippingAddressID,
 		BillingAddressID:  p.BillingAddressID,
+		ShippingMethod:    p.ShippingMethod,
 		Notes:             p.Notes,
 		Metadata:          p.Metadata,
 		PlacedAt:          time.Now(),

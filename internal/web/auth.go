@@ -22,7 +22,7 @@ func (d *Deps) requireStaffSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil || cookie.Value == "" {
-			http.Redirect(w, r, "/auth/staff/login", http.StatusSeeOther)
+			redirectToStaffLogin(w, r)
 			return
 		}
 
@@ -51,7 +51,7 @@ func (d *Deps) requireStaffSession(next http.Handler) http.Handler {
 				MaxAge:   -1,
 				HttpOnly: true,
 			})
-			http.Redirect(w, r, "/auth/staff/login", http.StatusSeeOther)
+			redirectToStaffLogin(w, r)
 			return
 		}
 
@@ -59,6 +59,18 @@ func (d *Deps) requireStaffSession(next http.Handler) http.Handler {
 		ctx := auth.WithStaff(r.Context(), staff)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// redirectToStaffLogin sends the client to the staff login page. For htmx
+// requests (the admin panel is hx-boosted), a plain 303 would be followed by
+// XHR and the login page swapped into #main-content; HX-Redirect forces a full
+// page navigation instead.
+func redirectToStaffLogin(w http.ResponseWriter, r *http.Request) {
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", "/auth/staff/login")
+		return
+	}
+	http.Redirect(w, r, "/auth/staff/login", http.StatusSeeOther)
 }
 
 // staffActor builds an Actor from the authenticated staff in context.

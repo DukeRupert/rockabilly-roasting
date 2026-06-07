@@ -50,7 +50,7 @@ func SubscriptionsContent(props SubscriptionsPageProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Hero: ink surface, candle glow, stamp-pressed headline --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 -mt-8 relative bg-ink overflow-hidden\"><!-- Amber radial glow centered --><div class=\"absolute inset-0 pointer-events-none\" style=\"background: radial-gradient(ellipse at center, rgba(242,160,61,0.16) 0%, rgba(242,160,61,0.04) 45%, transparent 75%);\"></div><!-- Paper halftone dot texture --><div class=\"absolute inset-0 texture-halftone-paper pointer-events-none\" style=\"mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent);\"></div><div class=\"relative mx-auto max-w-5xl px-6 sm:px-10 lg:px-14 py-20 sm:py-28 text-center\"><p class=\"font-oswald font-semibold text-candle text-xs sm:text-sm\" style=\"letter-spacing:0.3em; text-transform:uppercase;\">Fresh on your schedule</p><h1 class=\"font-slab text-paper uppercase leading-[0.9] mt-5\" style=\"font-size: clamp(2.75rem, 8vw, 5.5rem); letter-spacing:-0.005em;\">The Daily <span class=\"font-script text-candle normal-case inline-block align-baseline\" style=\"font-size:1.05em; letter-spacing:0;\">grind.</span></h1><p class=\"font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-xl mx-auto\">Pick the roast. Pick the cadence. We roast it, let it rest, and ship it at its peak — the way good coffee is meant to be enjoyed.</p><!-- Three inline value props, newspaper-column feel --><ul class=\"mt-10 inline-flex flex-col sm:flex-row items-center gap-3 sm:gap-0 font-oswald font-bold text-paper text-xs sm:text-sm\" style=\"letter-spacing:0.2em; text-transform:uppercase;\"><li class=\"inline-flex items-center gap-2\"><span class=\"text-candle\" aria-hidden=\"true\">◆</span> Always fresh</li><li class=\"hidden sm:inline-block text-chrome-deep mx-5\" aria-hidden=\"true\">·</li>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Hero: ink surface, candle glow, stamp-pressed headline --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 -mt-8 relative bg-ink overflow-hidden\"><!-- Amber radial glow centered --><div class=\"absolute inset-0 pointer-events-none\" style=\"background: radial-gradient(ellipse at center, rgba(242,160,61,0.16) 0%, rgba(242,160,61,0.04) 45%, transparent 75%);\"></div><!-- Paper halftone dot texture --><div class=\"absolute inset-0 texture-halftone-paper pointer-events-none\" style=\"mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent);\"></div><div class=\"relative mx-auto max-w-5xl px-6 sm:px-10 lg:px-14 py-20 sm:py-28 text-center\"><!-- Double-candle mark: the Daily Grind brand anchor, lit by the amber glow behind it --><img src=\"/static/double-candle-mark.png\" alt=\"\" aria-hidden=\"true\" class=\"mx-auto mb-8 h-36 sm:h-44 w-auto select-none pointer-events-none\" width=\"583\" height=\"760\" loading=\"eager\" decoding=\"async\"><p class=\"font-oswald font-semibold text-candle text-xs sm:text-sm\" style=\"letter-spacing:0.3em; text-transform:uppercase;\">Fresh on your schedule</p><h1 class=\"font-slab text-paper uppercase leading-[0.9] mt-5\" style=\"font-size: clamp(2.75rem, 8vw, 5.5rem); letter-spacing:-0.005em;\">The Daily <span class=\"font-script text-candle normal-case inline-block align-baseline\" style=\"font-size:1.05em; letter-spacing:0;\">grind.</span></h1><p class=\"font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-xl mx-auto\">Pick the roast. Pick the cadence. We roast it, let it rest, and ship it at its peak — the way good coffee is meant to be enjoyed.</p><!-- Three inline value props, newspaper-column feel --><ul class=\"mt-10 inline-flex flex-col sm:flex-row items-center gap-3 sm:gap-0 font-oswald font-bold text-paper text-xs sm:text-sm\" style=\"letter-spacing:0.2em; text-transform:uppercase;\"><li class=\"inline-flex items-center gap-2\"><span class=\"text-candle\" aria-hidden=\"true\">◆</span> Always fresh</li><li class=\"hidden sm:inline-block text-chrome-deep mx-5\" aria-hidden=\"true\">·</li>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -62,7 +62,7 @@ func SubscriptionsContent(props SubscriptionsPageProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d%%", props.maxDiscount()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 52, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 63, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -143,7 +143,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 		var templ_7745c5c3_Var4 templ.SafeURL
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/catalog/" + card.Product.Slug + "?mode=subscribe"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 143, Col: 77}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 154, Col: 77}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -161,7 +161,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(card.ThumbnailURL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 148, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 159, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -174,7 +174,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(cardAltText(card.Product.Title, card.Coffee))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 149, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 160, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
@@ -192,7 +192,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(card.Product.Title)[0:1]))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 157, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 168, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -215,7 +215,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d%%", card.MaxDiscount))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 166, Col: 50}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 177, Col: 50}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -248,7 +248,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(card.Coffee.Regions[0])
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 184, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 195, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -266,7 +266,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(roastLevelLabel(card.Coffee.RoastLevel))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 188, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 199, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -284,7 +284,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(card.Product.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 193, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 204, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -307,7 +307,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(note)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 200, Col: 13}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 211, Col: 13}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -335,7 +335,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(*card.BasePrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 209, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 220, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -348,7 +348,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(discountedPrice(*card.BasePrice, card.MaxDiscount)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 210, Col: 129}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 221, Col: 129}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -366,7 +366,7 @@ func subscriptionProductCardPaper(card SubscriptionProductCard) templ.Component 
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(*card.BasePrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 214, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/subscriptions.templ`, Line: 225, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {

@@ -27,10 +27,6 @@ type DashboardProps struct {
 	TodayOrderCount int
 	TodayRevenue    int
 
-	// Queue depth
-	ToFulfillCount int
-	ToShipCount    int
-
 	// Subscriptions
 	ActiveSubCount  int
 	PastDueSubCount int
@@ -38,19 +34,20 @@ type DashboardProps struct {
 	// Pending review
 	PendingWholesale int
 
-	// Wholesale orders awaiting fulfillment — surfaced on its own so wholesale
-	// work never hides inside the retail Pack/Ship pipeline.
-	WholesaleToFulfill int
-
 	// Urgent action queues
 	OnHold             []domain.Order
 	OnHoldCount        int
 	FailedPayments     []domain.Order
 	FailedPaymentCount int
 
-	// Pipeline queues — enriched with item summary + customer name for at-a-glance scanning.
-	ToFulfill []PipelineRow
-	ToShip    []PipelineRow
+	// Order pipeline, split by sales channel. Each queue merges the Pack
+	// (unfulfilled) and Ship (fulfilled) stages into one list; the Count is the
+	// channel's full NeedsAction total, the Rows a display subset. Retail and
+	// wholesale stay separate so neither channel's work hides in the other's.
+	RetailCount    int
+	RetailRows     []PipelineRow
+	WholesaleCount int
+	WholesaleRows  []PipelineRow
 
 	// Charts
 	Revenue     RevenueProps
@@ -64,10 +61,12 @@ type DashboardProps struct {
 	StaffRole string
 }
 
-// PipelineRow bundles an order with the summary fields the pack/ship queues
-// need to read at a glance: what the customer ordered, how much, and who from.
+// PipelineRow bundles an order with the summary fields the channel queues need
+// to read at a glance: what the customer ordered, how much, who from, and which
+// fulfillment stage it sits at.
 type PipelineRow struct {
 	Order        domain.Order
+	Stage        string // "Pack" (unfulfilled) or "Ship" (fulfilled, awaiting dispatch)
 	ItemTitle    string // first product's title (e.g., "Espresso Blend")
 	ExtraItems   int    // count of additional distinct line items beyond the first
 	Quantity     int    // total quantity across all line items
@@ -82,16 +81,16 @@ func (p DashboardProps) reviewCount() int {
 	return p.PendingWholesale
 }
 
-func (p DashboardProps) pipelineCount() int {
-	return p.ToFulfillCount + p.ToShipCount
+func (p DashboardProps) retailCount() int {
+	return p.RetailCount
 }
 
 func (p DashboardProps) wholesaleCount() int {
-	return p.WholesaleToFulfill
+	return p.WholesaleCount
 }
 
 func (p DashboardProps) hasAnyAction() bool {
-	return p.urgentCount() > 0 || p.reviewCount() > 0 || p.wholesaleCount() > 0 || p.pipelineCount() > 0
+	return p.urgentCount() > 0 || p.reviewCount() > 0 || p.retailCount() > 0 || p.wholesaleCount() > 0
 }
 
 // ageLabel returns a compact "Nm / Nh / Nd ago" string for a timestamp.
@@ -217,22 +216,21 @@ templ DashboardContent(props DashboardProps) {
 				</div>
 			</div>
 		}
-		<!-- Wholesale orders band — kept distinct from the retail pipeline so B2B work isn't missed -->
-		if props.wholesaleCount() > 0 {
+		<!-- Retail orders band — Pack + Ship merged into one channel queue -->
+		if props.retailCount() > 0 {
 			<div class={ bandSpacing(props.urgentCount() + props.reviewCount()) }>
-				@bandHeader("Wholesale orders", props.wholesaleCount(), "text-rr-amber")
+				@bandHeader("Retail orders", props.retailCount(), "text-rr-heading")
 				<div class="mt-3">
-					@wholesaleOrdersCard(props.wholesaleCount())
+					@channelQueue(props.RetailCount, props.RetailRows, "/admin/fulfillment?view=needs_action", props.MerchantTZ)
 				</div>
 			</div>
 		}
-		<!-- Retail pipeline band -->
-		if props.pipelineCount() > 0 {
-			<div class={ bandSpacing(props.urgentCount() + props.reviewCount() + props.wholesaleCount()) }>
-				@bandHeader("Retail pipeline", props.pipelineCount(), "text-rr-heading")
-				<div class="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
-					@pipelineGroup("Pack", props.ToFulfillCount, props.ToFulfill, "/admin/fulfillment?view=needs_action", "text-rr-red", "bg-rr-red", props.MerchantTZ)
-					@pipelineGroup("Ship", props.ToShipCount, props.ToShip, "/admin/fulfillment?view=ready_to_ship", "text-rr-teal", "bg-rr-teal", props.MerchantTZ)
+		<!-- Wholesale orders band — same treatment, scoped to the B2B channel -->
+		if props.wholesaleCount() > 0 {
+			<div class={ bandSpacing(props.urgentCount() + props.reviewCount() + props.retailCount()) }>
+				@bandHeader("Wholesale orders", props.wholesaleCount(), "text-rr-amber")
+				<div class="mt-3">
+					@channelQueue(props.WholesaleCount, props.WholesaleRows, "/admin/wholesale/fulfillment?view=needs_action", props.MerchantTZ)
 				</div>
 			</div>
 		}
@@ -404,30 +402,6 @@ templ urgentGroupLink(title, detail, href string) {
 	</a>
 }
 
-// wholesaleOrdersCard is the dashboard entry point into the wholesale
-// fulfillment queue. Amber stamp shadow marks it as a highlight (B2B work to
-// pick up), distinct from the red urgent cards and the retail pipeline below.
-templ wholesaleOrdersCard(count int) {
-	<a
-		href="/admin/wholesale/fulfillment"
-		class="block border border-rr-border bg-rr-surface p-4 hover:-translate-x-px hover:-translate-y-px transition-transform"
-		style="box-shadow: 4px 4px 0 0 var(--color-rr-amber);"
-	>
-		<div class="flex items-start justify-between gap-4">
-			<div class="min-w-0">
-				<p class="text-sm font-bold text-rr-heading">
-					{ fmt.Sprintf("%d wholesale order%s to fulfill", count, pluralS(count)) }
-				</p>
-				<p class="mt-1 text-xs text-rr-muted">Handled in the wholesale queue — separate from retail pack &amp; ship.</p>
-			</div>
-			<div class="flex items-center gap-2 shrink-0">
-				<span class="label-font text-rr-amber" style="font-size:0.65rem;">Open wholesale queue</span>
-				@chevronRight()
-			</div>
-		</div>
-	</a>
-}
-
 // orderLinkRow renders a single order row inside a band.
 templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *time.Location) {
 	<a
@@ -453,15 +427,13 @@ templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *t
 	</a>
 }
 
-// pipelineGroup renders a named queue (Pack / Ship) with a count header and row list.
-templ pipelineGroup(label string, count int, rows []PipelineRow, viewAllHref, labelClass, dotClass string, loc *time.Location) {
+// channelQueue renders one channel's combined fulfillment queue: a header bar
+// with a "view all" link into that channel's fulfillment list, then up to
+// pipelineDisplayLimit rows. The owning band header already names the channel
+// and shows the count, so this bar carries only the link.
+templ channelQueue(count int, rows []PipelineRow, viewAllHref string, loc *time.Location) {
 	<div class="border border-rr-border bg-rr-surface">
-		<div class="flex items-baseline justify-between px-4 py-2.5 border-b border-rr-border bg-rr-raised">
-			<div class="flex items-baseline gap-2">
-				<span class={ "inline-block size-2 rounded-full", dotClass }></span>
-				<h3 class="text-sm font-bold uppercase tracking-wide text-rr-heading">{ label } queue</h3>
-				<span class="text-sm font-semibold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", count) }</span>
-			</div>
+		<div class="flex items-baseline justify-end px-4 py-2 border-b border-rr-border bg-rr-raised">
 			if count > len(rows) {
 				<a href={ templ.SafeURL(viewAllHref) } class="text-xs font-semibold text-rr-red hover:text-rr-red-lt">
 					View all { fmt.Sprintf("%d", count) } &rarr;
@@ -484,8 +456,17 @@ templ pipelineGroup(label string, count int, rows []PipelineRow, viewAllHref, la
 	</div>
 }
 
+// stageClass colors a row's stage tag: Ship is teal (packed, ready to move),
+// everything else (Pack) is rust (still needs hands on it).
+func stageClass(stage string) string {
+	if stage == "Ship" {
+		return "text-rr-teal"
+	}
+	return "text-rr-red"
+}
+
 // pipelineRow renders one queue row. Stacks on small screens; on lg+ it lays out
-// item / qty / customer / price / age as a compact 5-column grid.
+// item / qty / customer / price / stage / age as a compact grid.
 templ pipelineRow(row PipelineRow, loc *time.Location) {
 	<a
 		href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) }
@@ -500,6 +481,7 @@ templ pipelineRow(row PipelineRow, loc *time.Location) {
 				</p>
 			</div>
 			<div class="flex items-center gap-2 shrink-0">
+				<span class={ "label-font", stageClass(row.Stage) } style="font-size:0.6rem;">{ row.Stage }</span>
 				<span class="text-sm font-semibold tabular-nums text-rr-heading">{ formatCents(row.Order.Total) }</span>
 				if ageIsStale(row.Order.PlacedAt) {
 					<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>
@@ -509,8 +491,8 @@ templ pipelineRow(row PipelineRow, loc *time.Location) {
 				@chevronRight()
 			</div>
 		</div>
-		<!-- lg+: tabular columns (item / qty / customer / price / age) -->
-		<div class="hidden lg:grid lg:grid-cols-[minmax(0,2fr)_auto_minmax(0,1.4fr)_auto_auto_auto] lg:items-baseline lg:gap-3">
+		<!-- lg+: tabular columns (item / qty / customer / price / stage / age) -->
+		<div class="hidden lg:grid lg:grid-cols-[minmax(0,2fr)_auto_minmax(0,1.4fr)_auto_auto_auto_auto] lg:items-baseline lg:gap-3">
 			<div class="min-w-0">
 				<p class="truncate text-sm font-semibold text-rr-heading">{ pipelineItemLabel(row) }</p>
 				<p class="text-xs text-rr-muted">{ row.Order.Number }</p>
@@ -518,6 +500,7 @@ templ pipelineRow(row PipelineRow, loc *time.Location) {
 			<div class="text-sm tabular-nums text-rr-muted">×{ fmt.Sprintf("%d", row.Quantity) }</div>
 			<div class="min-w-0 truncate text-sm text-rr-muted">{ row.CustomerName }</div>
 			<div class="text-right text-sm font-semibold tabular-nums text-rr-heading">{ formatCents(row.Order.Total) }</div>
+			<span class={ "label-font text-right", stageClass(row.Stage) } style="font-size:0.6rem;">{ row.Stage }</span>
 			if ageIsStale(row.Order.PlacedAt) {
 				<span class="label-font text-rr-red text-right" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>
 			} else {

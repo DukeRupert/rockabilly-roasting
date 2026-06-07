@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -52,56 +53,15 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
-		// Retail channel scoping for the pipeline queues. Wholesale orders run
-		// through their own queue (/admin/wholesale/fulfillment) and are
-		// surfaced separately below — keeping them out of the retail Pack/Ship
-		// pipeline so neither channel's work gets buried in the other's.
-		retailChannel := domain.OrderChannelRetail
-
-		// Orders needing fulfillment (paid but unfulfilled)
-		toFulfillStatus := domain.FulfillmentStatusUnfulfilled
-		toFulfillOrders, txErr := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
-			Channel:           &retailChannel,
-			FulfillmentStatus: &toFulfillStatus,
-			Limit:             10,
-		})
+		// Order pipeline, split by sales channel. Each channel's Pack
+		// (unfulfilled) and Ship (fulfilled) work is merged into one queue —
+		// the dashboard now organizes by retail vs wholesale, not by stage.
+		// The two channels stay separate so neither's work hides in the other's.
+		props.RetailCount, props.RetailRows, txErr = d.buildChannelPipeline(ctx, tx, domain.OrderChannelRetail)
 		if txErr != nil {
 			return txErr
 		}
-		// Filter to only paid orders (payment captured)
-		var paidUnfulfilled []domain.Order
-		for _, o := range toFulfillOrders {
-			if o.PaymentStatus == domain.PaymentStatusCaptured &&
-				o.Status != domain.OrderStatusCancelled &&
-				o.Status != domain.OrderStatusRefunded {
-				paidUnfulfilled = append(paidUnfulfilled, o)
-			}
-		}
-		props.ToFulfillCount = len(paidUnfulfilled)
-		props.ToFulfill, txErr = d.buildPipelineRows(ctx, tx, paidUnfulfilled)
-		if txErr != nil {
-			return txErr
-		}
-
-		// Orders ready to ship (fulfilled but not yet shipped)
-		toShipStatus := domain.FulfillmentStatusFulfilled
-		toShipOrders, txErr := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
-			Channel:           &retailChannel,
-			FulfillmentStatus: &toShipStatus,
-			Limit:             10,
-		})
-		if txErr != nil {
-			return txErr
-		}
-		// Filter out cancelled/refunded
-		var readyToShip []domain.Order
-		for _, o := range toShipOrders {
-			if o.Status != domain.OrderStatusCancelled && o.Status != domain.OrderStatusRefunded {
-				readyToShip = append(readyToShip, o)
-			}
-		}
-		props.ToShipCount = len(readyToShip)
-		props.ToShip, txErr = d.buildPipelineRows(ctx, tx, readyToShip)
+		props.WholesaleCount, props.WholesaleRows, txErr = d.buildChannelPipeline(ctx, tx, domain.OrderChannelWholesale)
 		if txErr != nil {
 			return txErr
 		}
@@ -153,17 +113,6 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
-
-		// Wholesale orders awaiting fulfillment — counted from the wholesale
-		// channel's own NeedsAction bucket (matches the wholesale fulfillment
-		// queue's tab count) so staff see exactly how many wholesale orders
-		// need work without them hiding in the retail pipeline above.
-		wholesaleChannel := domain.OrderChannelWholesale
-		wholesaleViews, txErr := d.OrderService.CountFulfillmentViews(ctx, tx, &wholesaleChannel)
-		if txErr != nil {
-			return txErr
-		}
-		props.WholesaleToFulfill = wholesaleViews.NeedsAction
 
 		// Revenue trend — period from ?days= (7/30/90), defaults to 30
 		props.Revenue, txErr = d.buildRevenueProps(ctx, tx, revenueDays(r), todayStart)
@@ -406,9 +355,86 @@ func (d *Deps) handleAdminTopSellers(w http.ResponseWriter, r *http.Request) {
 	admin.TopSellersCard(buildTopProducts(rows, by), by).Render(ctx, w) //nolint:errcheck
 }
 
-// buildPipelineRows enriches each order with the summary fields the pack/ship
-// queues display: lead item, total quantity, and customer name. Up to ~10
-// orders per queue, so the per-order lookups are bounded — no batching needed.
+// pipelineDisplayLimit caps how many rows each channel queue shows on the
+// dashboard. The header's "View all N" link carries staff to the full
+// fulfillment queue when there's more than this.
+const pipelineDisplayLimit = 8
+
+// buildChannelPipeline assembles one channel's dashboard order queue: the
+// accurate NeedsAction total (matching that channel's fulfillment tab) plus up
+// to pipelineDisplayLimit enriched rows. Pack (unfulfilled, paid) and Ship
+// (fulfilled) stages are merged into a single list — each row carries its
+// Stage — and sorted oldest-first so the most-overdue work surfaces at the top.
+func (d *Deps) buildChannelPipeline(ctx context.Context, tx pgx.Tx, channel domain.OrderChannel) (int, []admin.PipelineRow, error) {
+	views, err := d.OrderService.CountFulfillmentViews(ctx, tx, &channel)
+	if err != nil {
+		return 0, nil, err
+	}
+
+	// Pack stage: unfulfilled orders with payment captured.
+	unfulfilled := domain.FulfillmentStatusUnfulfilled
+	packOrders, err := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+		Channel:           &channel,
+		FulfillmentStatus: &unfulfilled,
+		Limit:             pipelineDisplayLimit,
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	// Ship stage: fulfilled orders awaiting a label or dispatch.
+	fulfilled := domain.FulfillmentStatusFulfilled
+	shipOrders, err := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+		Channel:           &channel,
+		FulfillmentStatus: &fulfilled,
+		Limit:             pipelineDisplayLimit,
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+
+	type staged struct {
+		order domain.Order
+		stage string
+	}
+	var combined []staged
+	for _, o := range packOrders {
+		if o.PaymentStatus == domain.PaymentStatusCaptured &&
+			o.Status != domain.OrderStatusCancelled &&
+			o.Status != domain.OrderStatusRefunded {
+			combined = append(combined, staged{o, "Pack"})
+		}
+	}
+	for _, o := range shipOrders {
+		if o.Status != domain.OrderStatusCancelled && o.Status != domain.OrderStatusRefunded {
+			combined = append(combined, staged{o, "Ship"})
+		}
+	}
+	// Oldest first — the most-overdue order rises to the top of the queue.
+	sort.Slice(combined, func(i, j int) bool {
+		return combined[i].order.PlacedAt.Before(combined[j].order.PlacedAt)
+	})
+	if len(combined) > pipelineDisplayLimit {
+		combined = combined[:pipelineDisplayLimit]
+	}
+
+	orders := make([]domain.Order, len(combined))
+	for i, s := range combined {
+		orders[i] = s.order
+	}
+	rows, err := d.buildPipelineRows(ctx, tx, orders)
+	if err != nil {
+		return 0, nil, err
+	}
+	for i := range rows {
+		rows[i].Stage = combined[i].stage
+	}
+	return views.NeedsAction, rows, nil
+}
+
+// buildPipelineRows enriches each order with the summary fields the channel
+// queues display: lead item, total quantity, and customer name. Bounded by
+// pipelineDisplayLimit, so the per-order lookups need no batching.
 func (d *Deps) buildPipelineRows(ctx context.Context, tx pgx.Tx, orders []domain.Order) ([]admin.PipelineRow, error) {
 	rows := make([]admin.PipelineRow, len(orders))
 	for i, o := range orders {

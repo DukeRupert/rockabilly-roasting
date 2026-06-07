@@ -113,6 +113,28 @@ func (s *SubscriptionService) CountSubscriptionsByStatus(ctx context.Context, tx
 	return count, nil
 }
 
+// ActiveSubscriptionsAsOf returns the number of subscriptions live (created and
+// not yet cancelled or expired) at the instant asOf. Seeds the running total
+// for the active-subscriptions-over-time chart.
+func (s *SubscriptionService) ActiveSubscriptionsAsOf(ctx context.Context, tx pgx.Tx, asOf time.Time) (int, error) {
+	count, err := s.subscriptions.ActiveSubscriptionsAsOf(ctx, tx, asOf)
+	if err != nil {
+		return 0, fmt.Errorf("active subscriptions as of: %w", err)
+	}
+	return count, nil
+}
+
+// ActiveSubscriptionDeltasByDay returns the per-day net change in the active
+// subscription base over [from, to). Days with no change are omitted; callers
+// carry the running total forward from ActiveSubscriptionsAsOf(from).
+func (s *SubscriptionService) ActiveSubscriptionDeltasByDay(ctx context.Context, tx pgx.Tx, from, to time.Time, tz *time.Location) ([]domain.SubscriptionDelta, error) {
+	deltas, err := s.subscriptions.ActiveSubscriptionDeltasByDay(ctx, tx, from, to, tz)
+	if err != nil {
+		return nil, fmt.Errorf("active subscription deltas by day: %w", err)
+	}
+	return deltas, nil
+}
+
 // ListPlans returns all subscription plans.
 func (s *SubscriptionService) ListPlans(ctx context.Context, tx pgx.Tx) ([]domain.SubscriptionPlan, error) {
 	plans, err := s.subscriptions.ListPlans(ctx, tx)

@@ -62,6 +62,16 @@ type Subscription struct {
 	UpdatedAt          time.Time
 }
 
+// SubscriptionDelta is the net change in the active subscription base on one
+// calendar day (merchant timezone): +1 for each subscription created that day,
+// -1 for each that was cancelled or expired. Days with no change are omitted —
+// the caller carries a running total forward to reconstruct the active count
+// over time.
+type SubscriptionDelta struct {
+	Date time.Time
+	Net  int
+}
+
 // SubscriptionOrder links a subscription to an order for a billing period.
 type SubscriptionOrder struct {
 	SubscriptionID uuid.UUID

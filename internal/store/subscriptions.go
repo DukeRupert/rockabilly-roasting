@@ -320,6 +320,85 @@ func (s *SubscriptionStore) CountByStatus(ctx context.Context, tx pgx.Tx, status
 	return count, nil
 }
 
+// subscriptionTermExpr is the SQL expression for the instant a subscription
+// left the active base: cancelled_at when cancelled, ends_at when expired, NULL
+// while it's still live (active / paused / past_due). Both branches fall back
+// to updated_at when the dedicated timestamp is missing on older rows. Shared
+// by ActiveSubscriptionsAsOf and ActiveSubscriptionDeltasByDay so the two agree
+// on exactly when a subscription stops counting.
+const subscriptionTermExpr = `CASE
+		WHEN status = 'cancelled' THEN COALESCE(cancelled_at, updated_at)
+		WHEN status = 'expired'   THEN COALESCE(ends_at, updated_at)
+	END`
+
+// ActiveSubscriptionsAsOf counts subscriptions that were live at the instant
+// asOf — created before it and not yet cancelled or expired by then. "Live"
+// spans active, paused, and past_due: a subscription leaves the base only when
+// cancelled or expired. Pause spans aren't individually timestamped, so a
+// paused subscription counts as live throughout; for a subscriber-base trend
+// that's the intended reading. Used to seed the running total for the
+// active-subscriptions-over-time chart.
+func (s *SubscriptionStore) ActiveSubscriptionsAsOf(ctx context.Context, tx pgx.Tx, asOf time.Time) (_ int, err error) {
+	defer trackQuery(s.metrics, "subscriptions.active_as_of", time.Now(), &err)
+	var count int
+	err = tx.QueryRow(ctx,
+		`SELECT COUNT(*) FROM subscriptions
+		 WHERE created_at < $1
+		   AND (`+subscriptionTermExpr+` IS NULL OR `+subscriptionTermExpr+` >= $1)`,
+		asOf,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count active subscriptions as of: %w", err)
+	}
+	return count, nil
+}
+
+// ActiveSubscriptionDeltasByDay returns the net change in the live subscription
+// base for each day in [from, to) (merchant timezone tz): a created subscription
+// adds +1 on its creation day, a cancelled or expired one subtracts 1 on its
+// termination day. Days with no change are omitted — callers seed with
+// ActiveSubscriptionsAsOf(from) and carry the running total forward.
+func (s *SubscriptionStore) ActiveSubscriptionDeltasByDay(ctx context.Context, tx pgx.Tx, from, to time.Time, tz *time.Location) (_ []domain.SubscriptionDelta, err error) {
+	defer trackQuery(s.metrics, "subscriptions.active_deltas_by_day", time.Now(), &err)
+	tzName := "UTC"
+	if tz != nil {
+		tzName = tz.String()
+	}
+	query := `
+		WITH life AS (
+			SELECT created_at, ` + subscriptionTermExpr + ` AS term_at
+			FROM subscriptions
+		),
+		events AS (
+			SELECT (created_at AT TIME ZONE $3)::date AS day, 1 AS delta
+			FROM life
+			WHERE created_at >= $1 AND created_at < $2
+			UNION ALL
+			SELECT (term_at AT TIME ZONE $3)::date AS day, -1 AS delta
+			FROM life
+			WHERE term_at IS NOT NULL AND term_at >= $1 AND term_at < $2
+		)
+		SELECT day, SUM(delta)::int AS net
+		FROM events
+		GROUP BY day
+		ORDER BY day`
+	rows, err := tx.Query(ctx, query, from, to, tzName)
+	if err != nil {
+		return nil, fmt.Errorf("active subscription deltas by day: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.SubscriptionDelta
+	for rows.Next() {
+		var d pgtype.Date
+		var net int32
+		if err := rows.Scan(&d, &net); err != nil {
+			return nil, fmt.Errorf("scan active subscription delta: %w", err)
+		}
+		out = append(out, domain.SubscriptionDelta{Date: d.Time, Net: int(net)})
+	}
+	return out, rows.Err()
+}
+
 // SubscriptionSort identifies how the list query should order results.
 type SubscriptionSort string
 

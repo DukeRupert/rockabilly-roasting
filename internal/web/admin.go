@@ -120,6 +120,12 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// Active-subscriptions trend — same 7/30/90 window as revenue
+		props.Subscriptions, txErr = d.buildSubscriptionsProps(ctx, tx, revenueDays(r), todayStart)
+		if txErr != nil {
+			return txErr
+		}
+
 		// Top products — last 30 days
 		topStart := todayStart.AddDate(0, 0, -29)
 		topEnd := todayStart.AddDate(0, 0, 1)
@@ -273,6 +279,106 @@ func (d *Deps) handleAdminRevenue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.RevenueCard(rp).Render(ctx, w) //nolint:errcheck
+}
+
+// buildSubscriptionsProps assembles the active-subscriptions trend card: the
+// live base at the window start, the per-day net deltas across the window, and
+// the resulting daily levels. PriorActive is the window-start base; the card
+// renders growth against it. CurrentActive is the final (today's) level.
+func (d *Deps) buildSubscriptionsProps(ctx context.Context, tx pgx.Tx, days int, todayStart time.Time) (admin.SubscriptionsProps, error) {
+	trendStart := todayStart.AddDate(0, 0, -(days - 1))
+	trendEnd := todayStart.AddDate(0, 0, 1) // exclusive upper bound
+
+	baseline, err := d.SubscriptionService.ActiveSubscriptionsAsOf(ctx, tx, trendStart)
+	if err != nil {
+		return admin.SubscriptionsProps{}, err
+	}
+	deltas, err := d.SubscriptionService.ActiveSubscriptionDeltasByDay(ctx, tx, trendStart, trendEnd, d.MerchantTZ)
+	if err != nil {
+		return admin.SubscriptionsProps{}, err
+	}
+
+	trend, currentActive := buildSubscriptionTrend(deltas, baseline, trendStart, d.MerchantTZ, days)
+
+	return admin.SubscriptionsProps{
+		Days:          days,
+		Trend:         trend,
+		CurrentActive: currentActive,
+		PriorActive:   baseline,
+	}, nil
+}
+
+// buildSubscriptionTrend reconstructs the active subscription base for each of
+// `days` contiguous days ending today. Unlike revenue's zero-fill, a day with
+// no delta holds the prior level (carry-forward), because this is a running
+// count, not a per-day total: it's seeded with baseline (the base at
+// trendStart) and walks forward applying each day's net change. Bars normalize
+// against the peak level. Returns the points plus the final (today's) count.
+func buildSubscriptionTrend(deltas []domain.SubscriptionDelta, baseline int, trendStart time.Time, tz *time.Location, days int) ([]charts.ChartPoint, int) {
+	byDay := make(map[string]int, len(deltas))
+	for _, dlt := range deltas {
+		byDay[dlt.Date.Format("2006-01-02")] = dlt.Net
+	}
+
+	levels := make([]int, days)
+	running := baseline
+	for i := 0; i < days; i++ {
+		day := trendStart.AddDate(0, 0, i).In(tz)
+		running += byDay[day.Format("2006-01-02")]
+		levels[i] = running
+	}
+
+	maxLevel := 0
+	for _, v := range levels {
+		if v > maxLevel {
+			maxLevel = v
+		}
+	}
+
+	out := make([]charts.ChartPoint, days)
+	for i := 0; i < days; i++ {
+		mag := 0.0
+		if maxLevel > 0 {
+			mag = float64(levels[i]) / float64(maxLevel)
+		}
+		day := trendStart.AddDate(0, 0, i).In(tz)
+		label := day.Format("Jan 2")
+		if i == days-1 {
+			label = "Today"
+		}
+		out[i] = charts.ChartPoint{
+			Label:     label,
+			Sub:       fmt.Sprintf("%d", levels[i]),
+			Magnitude: mag,
+			Highlight: i == days-1,
+		}
+	}
+	if days == 0 {
+		return out, baseline
+	}
+	return out, levels[days-1]
+}
+
+// handleAdminSubscriptionsTrend renders just the subscriptions card for an htmx
+// swap when the user toggles the 7/30/90-day period selector.
+func (d *Deps) handleAdminSubscriptionsTrend(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	days := revenueDays(r)
+
+	now := time.Now().In(d.MerchantTZ)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, d.MerchantTZ)
+
+	var sp admin.SubscriptionsProps
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		sp, txErr = d.buildSubscriptionsProps(ctx, tx, days, todayStart)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	admin.SubscriptionsCard(sp).Render(ctx, w) //nolint:errcheck
 }
 
 // buildTopProducts converts ProductSales rows to chart data. Bars are

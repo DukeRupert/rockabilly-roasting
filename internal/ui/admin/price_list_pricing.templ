@@ -35,8 +35,13 @@ func priceListDollars(prices map[uuid.UUID]int, listID uuid.UUID) string {
 }
 
 templ PriceListPricingContent(props PriceListPricingProps) {
-	<!-- One page-wide form: a single Save button writes every product's changed cells in one transaction -->
+	<!-- One page-wide form: a single Save button writes every product's changed cells in one transaction.
+	     The id lives on the form (not a wrapper div) so it's present whether this is rendered as the
+	     htmx content partial or inside the full page — otherwise hx-target can't resolve after a boosted
+	     nav and Save throws a target error. The bulk-save handler never swaps into it (HX-Reswap: none on
+	     every branch — success is toast + OOB cell updates); hx-target just needs to resolve. -->
 	<form
+		id="price-list-pricing-content"
 		method="post"
 		action={ templ.SafeURL("/admin/price-lists/prices/bulk") }
 		hx-post="/admin/price-lists/prices/bulk"
@@ -183,9 +188,7 @@ templ PriceListPricing(props PriceListPricingProps) {
 		StaffName:  props.StaffName,
 		StaffRole:  props.StaffRole,
 	}) {
-		<div id="price-list-pricing-content">
-			@PriceListPricingContent(props)
-		</div>
+		@PriceListPricingContent(props)
 	}
 }
 

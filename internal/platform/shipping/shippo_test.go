@@ -165,3 +165,120 @@ func TestShippoProvider_DefaultServiceToken(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "rate_ground", sawTxReq["rate"])
 }
+
+// TestShippoProvider_GetRates verifies GetRates returns every quoted rate,
+// sorted cheapest-first, with the estimated-days and token fields mapped
+// through — and that it does NOT buy anything (no /transactions call).
+func TestShippoProvider_GetRates(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/shipments" {
+			t.Fatalf("GetRates must not call %s — it only fetches rates", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"object_id": "ship_1",
+			"status": "SUCCESS",
+			"rates": [
+				{"object_id": "rate_priority", "amount": "12.50", "currency": "USD", "provider": "USPS", "estimated_days": 2, "servicelevel": {"name": "Priority Mail", "token": "usps_priority"}},
+				{"object_id": "rate_express",  "amount": "28.95", "currency": "USD", "provider": "USPS", "estimated_days": 1, "servicelevel": {"name": "Priority Express", "token": "usps_priority_express"}},
+				{"object_id": "rate_ground",   "amount": "7.58",  "currency": "USD", "provider": "USPS", "estimated_days": 4, "servicelevel": {"name": "Ground Advantage", "token": "usps_ground_advantage"}}
+			]
+		}`)) //nolint:errcheck
+	}))
+	defer srv.Close()
+
+	p := shipping.NewShippoProviderWithBase("test-key", srv.URL, srv.Client())
+
+	rates, err := p.GetRates(context.Background(), shipping.LabelRequest{
+		WeightOz: 12, LengthIn: 10, WidthIn: 8, HeightIn: 4,
+	})
+	require.NoError(t, err)
+	require.Len(t, rates, 3)
+
+	// Cheapest first.
+	assert.Equal(t, "rate_ground", rates[0].RateID)
+	assert.Equal(t, 758, rates[0].AmountCents)
+	assert.Equal(t, "Ground Advantage", rates[0].ServiceName)
+	assert.Equal(t, "usps_ground_advantage", rates[0].ServiceToken)
+	assert.Equal(t, 4, rates[0].EstDeliveryDays)
+	assert.Equal(t, "USD", rates[0].Currency)
+
+	assert.Equal(t, "rate_priority", rates[1].RateID)
+	assert.Equal(t, 1250, rates[1].AmountCents)
+
+	assert.Equal(t, "rate_express", rates[2].RateID)
+	assert.Equal(t, 2895, rates[2].AmountCents)
+}
+
+// TestShippoProvider_GetRates_NoRates surfaces an error (with any Shippo
+// messages) when the shipment comes back with no rates.
+func TestShippoProvider_GetRates_NoRates(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"object_id": "ship_1", "status": "SUCCESS", "rates": [], "messages": [{"text": "Address is undeliverable"}]}`)) //nolint:errcheck
+	}))
+	defer srv.Close()
+
+	p := shipping.NewShippoProviderWithBase("k", srv.URL, srv.Client())
+
+	_, err := p.GetRates(context.Background(), shipping.LabelRequest{WeightOz: 4, LengthIn: 6, WidthIn: 4, HeightIn: 2})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no rates returned")
+	assert.Contains(t, err.Error(), "Address is undeliverable")
+}
+
+// TestShippoProvider_BuyRate buys a single quoted rate by ID and verifies the
+// transaction request and the LabelResult — whose carrier/service/cost come
+// from the rate snapshot, not the transaction response.
+func TestShippoProvider_BuyRate(t *testing.T) {
+	var sawTxReq map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/transactions" {
+			t.Fatalf("BuyRate must only call /transactions, got %s", r.URL.Path)
+		}
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &sawTxReq) //nolint:errcheck
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"object_id": "tx_1", "status": "SUCCESS", "tracking_number": "9400111899223811234567", "label_url": "https://shippo/abc.pdf"}`)) //nolint:errcheck
+	}))
+	defer srv.Close()
+
+	p := shipping.NewShippoProviderWithBase("k", srv.URL, srv.Client())
+
+	result, err := p.BuyRate(context.Background(), shipping.Rate{
+		RateID:       "rate_ground",
+		CarrierName:  "USPS",
+		ServiceName:  "Ground Advantage",
+		ServiceToken: "usps_ground_advantage",
+		AmountCents:  758,
+		Currency:     "USD",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, "rate_ground", sawTxReq["rate"])
+	assert.Equal(t, "PDF", sawTxReq["label_file_type"])
+
+	assert.Equal(t, "9400111899223811234567", result.TrackingNumber)
+	assert.Equal(t, "https://shippo/abc.pdf", result.LabelURL)
+	assert.Equal(t, "USPS", result.CarrierName)
+	assert.Equal(t, "Ground Advantage", result.ServiceName)
+	assert.Equal(t, 758, result.RateCents)
+	assert.Equal(t, "USD", result.Currency)
+}
+
+// TestShippoProvider_BuyRate_TransactionError surfaces a non-SUCCESS
+// transaction status (the common "rate expired" failure mode) as an error so
+// the caller can re-fetch and re-confirm.
+func TestShippoProvider_BuyRate_TransactionError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"object_id": "tx_1", "status": "ERROR", "messages": [{"text": "rate is no longer available"}]}`)) //nolint:errcheck
+	}))
+	defer srv.Close()
+
+	p := shipping.NewShippoProviderWithBase("k", srv.URL, srv.Client())
+
+	_, err := p.BuyRate(context.Background(), shipping.Rate{RateID: "rate_stale", AmountCents: 758, Currency: "USD"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "rate is no longer available")
+}

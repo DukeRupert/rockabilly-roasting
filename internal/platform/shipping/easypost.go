@@ -82,6 +82,18 @@ func (p *EasyPostProvider) CreateLabel(ctx context.Context, req LabelRequest) (*
 	}, nil
 }
 
+// GetRates is not implemented for EasyPost — Shippo is the active provider and
+// the only one wired to the interactive rate-selection UI. EasyPost remains as
+// a one-shot CreateLabel fallback only. See cmd/server/main.go.
+func (p *EasyPostProvider) GetRates(_ context.Context, _ LabelRequest) ([]Rate, error) {
+	return nil, fmt.Errorf("easypost: interactive rate selection not implemented (use Shippo)")
+}
+
+// BuyRate is not implemented for EasyPost — see GetRates.
+func (p *EasyPostProvider) BuyRate(_ context.Context, _ Rate) (*LabelResult, error) {
+	return nil, fmt.Errorf("easypost: interactive rate selection not implemented (use Shippo)")
+}
+
 // SupportedServices returns a static list of common EasyPost service codes.
 // The actual available services depend on the carrier accounts configured
 // in the EasyPost dashboard.

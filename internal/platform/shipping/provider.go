@@ -42,8 +42,34 @@ type LabelResult struct {
 	Currency       string
 }
 
+// Rate is one purchasable shipping option returned by GetRates. RateID and
+// ShipmentID are opaque, provider-specific handles — BuyRate uses them to
+// purchase this exact quoted rate. The remaining fields are display and
+// persistence data carried through to the LabelResult on purchase.
+//
+// Rates are time-limited: a provider may reject a stale RateID at BuyRate
+// time, in which case the caller should re-fetch and let the operator
+// re-confirm against fresh prices.
+type Rate struct {
+	RateID          string
+	ShipmentID      string // unused by Shippo (rate IDs are globally buyable); EasyPost needs it
+	CarrierName     string
+	ServiceName     string
+	ServiceToken    string
+	AmountCents     int
+	Currency        string
+	EstDeliveryDays int // 0 when the carrier returns no estimate
+}
+
 // LabelProvider is the interface for shipping label services.
+//
+// Two purchase paths are supported:
+//   - GetRates + BuyRate: fetch all options, let an operator pick one, buy it.
+//   - CreateLabel: one-shot — create, pick by service code (cheapest default),
+//     and buy. Used by the bulk-label flow where no per-order review happens.
 type LabelProvider interface {
+	GetRates(ctx context.Context, req LabelRequest) ([]Rate, error)
+	BuyRate(ctx context.Context, rate Rate) (*LabelResult, error)
 	CreateLabel(ctx context.Context, req LabelRequest) (*LabelResult, error)
 	SupportedServices(ctx context.Context) ([]string, error)
 }

@@ -119,29 +119,30 @@ func labelFailureDetail(raw string) string {
 	return raw
 }
 
-// ShippoServiceOption is one selectable carrier service in the Buy Label
-// form. Token must match a Shippo servicelevel.token — see
-// internal/platform/shipping/shippo.go.
+// ShippoServiceOption is one selectable carrier service in the bulk-label
+// toolbar. Token must match a Shippo servicelevel.token — see
+// internal/platform/shipping/shippo.go. (Single-order purchases now use the
+// interactive rate chooser — see LabelRatesPanel — not this static menu.)
 type ShippoServiceOption struct {
 	Token string
 	Label string
 }
 
-// ShippoServiceOptions is the menu shown in the Buy Label dropdown. Order is
-// significant: the first entry is the default selection (cheapest USPS
-// ground service for retail orders).
+// ShippoServiceOptions is the menu shown in the bulk-label dropdown
+// (fulfillment_list.templ). Order is significant: the first entry is the
+// default selection (cheapest USPS ground service for retail orders).
 var ShippoServiceOptions = []ShippoServiceOption{
 	{Token: "usps_ground_advantage", Label: "USPS Ground Advantage"},
 	{Token: "usps_priority", Label: "USPS Priority"},
 	{Token: "usps_priority_express", Label: "USPS Priority Express"},
 }
 
-// canBuyLabel reports whether the "Buy Label" button should be shown.
+// canBuyLabel reports whether the "Get shipping rates" button should be shown.
 // Eligible when: order is paid, shipping out via the standard "shipped"
 // channel (not pickup/local delivery), not cancelled/refunded, no shipment
 // row already exists, and no buy attempt is currently in flight. A failed
-// previous attempt does NOT suppress the button — the same form re-enqueues
-// a fresh attempt, so it acts as a Retry.
+// previous attempt (e.g. from a bulk buy) does NOT suppress the button — the
+// operator can fetch rates and buy again, so it doubles as a Retry.
 func canBuyLabel(order *domain.Order, shipments []domain.Shipment, attempt *domain.LabelAttempt) bool {
 	if attempt != nil && attempt.Status == domain.LabelAttemptStatusQueued {
 		return false
@@ -527,31 +528,25 @@ templ OrderShowContent(props OrderShowProps) {
 			</form>
 		}
 		if canBuyLabel(props.Order, props.Shipments, props.LatestLabelAttempt) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/label", props.Order.ID.String())) } class="inline-flex items-stretch gap-2">
-				<label for="buy-label-service" class="sr-only">Shipping service</label>
-				<select
-					id="buy-label-service"
-					name="service_code"
-					class="rounded-sm border border-rr-border bg-rr-surface px-3 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
-				>
-					for _, opt := range ShippoServiceOptions {
-						<option value={ opt.Token }>{ opt.Label }</option>
-					}
-				</select>
+			<div class="w-full">
 				<button
-					type="submit"
+					type="button"
+					hx-get={ fmt.Sprintf("/admin/orders/%s/rates", props.Order.ID.String()) }
+					hx-target="#label-rates-panel"
+					hx-swap="innerHTML"
 					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
 				>
 					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z"></path>
 					</svg>
 					if props.LatestLabelAttempt != nil && props.LatestLabelAttempt.Status == domain.LabelAttemptStatusFailed {
-						Retry Buy Label
+						Get shipping rates (retry)
 					} else {
-						Buy Label
+						Get shipping rates
 					}
 				</button>
-			</form>
+				<div id="label-rates-panel"></div>
+			</div>
 		}
 		for _, sh := range props.Shipments {
 			if sh.LabelURL != nil && *sh.LabelURL != "" {

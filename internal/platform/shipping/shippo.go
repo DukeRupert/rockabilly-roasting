@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -61,6 +62,94 @@ func (p *ShippoProvider) CreateLabel(ctx context.Context, req LabelRequest) (*La
 		serviceToken = ShippoDefaultServiceToken
 	}
 
+	shipResp, err := p.createShipment(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	rate, err := pickRate(shipResp.Rates, serviceToken)
+	if err != nil {
+		return nil, err
+	}
+
+	rateCents, err := dollarsStringToCents(rate.Amount)
+	if err != nil {
+		return nil, fmt.Errorf("shippo: parse rate %q: %w", rate.Amount, err)
+	}
+
+	return p.BuyRate(ctx, Rate{
+		RateID:       rate.ObjectID,
+		CarrierName:  rate.Provider,
+		ServiceName:  rate.ServiceLevel.Name,
+		ServiceToken: rate.ServiceLevel.Token,
+		AmountCents:  rateCents,
+		Currency:     rate.Currency,
+	})
+}
+
+// GetRates creates a Shippo shipment and returns every quoted rate, cheapest
+// first. The returned RateIDs are buyable via BuyRate until Shippo expires
+// them (typically minutes). Fails if Shippo returns no rates for the parcel.
+func (p *ShippoProvider) GetRates(ctx context.Context, req LabelRequest) ([]Rate, error) {
+	shipResp, err := p.createShipment(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if len(shipResp.Rates) == 0 {
+		return nil, fmt.Errorf("shippo: no rates returned: %s", joinMessages(shipResp.Messages))
+	}
+
+	rates := make([]Rate, 0, len(shipResp.Rates))
+	for _, r := range shipResp.Rates {
+		cents, cErr := dollarsStringToCents(r.Amount)
+		if cErr != nil {
+			return nil, fmt.Errorf("shippo: parse rate %q: %w", r.Amount, cErr)
+		}
+		rates = append(rates, Rate{
+			RateID:          r.ObjectID,
+			CarrierName:     r.Provider,
+			ServiceName:     r.ServiceLevel.Name,
+			ServiceToken:    r.ServiceLevel.Token,
+			AmountCents:     cents,
+			Currency:        r.Currency,
+			EstDeliveryDays: r.EstimatedDays,
+		})
+	}
+	sort.Slice(rates, func(i, j int) bool { return rates[i].AmountCents < rates[j].AmountCents })
+	return rates, nil
+}
+
+// BuyRate purchases a specific quoted rate via POST /transactions. The carrier,
+// service, and cost come from the rate snapshot (the transaction response only
+// returns tracking + label URL); tracking and label URL come from Shippo.
+func (p *ShippoProvider) BuyRate(ctx context.Context, rate Rate) (*LabelResult, error) {
+	txReq := shippoTransactionReq{
+		Rate:          rate.RateID,
+		Async:         false,
+		LabelFileType: "PDF",
+	}
+	var txResp shippoTransactionResp
+	if err := p.post(ctx, "/transactions", txReq, &txResp); err != nil {
+		return nil, fmt.Errorf("shippo create transaction: %w", err)
+	}
+
+	if txResp.Status != "SUCCESS" {
+		return nil, fmt.Errorf("shippo transaction status %q: %s", txResp.Status, joinMessages(txResp.Messages))
+	}
+
+	return &LabelResult{
+		TrackingNumber: txResp.TrackingNumber,
+		LabelURL:       txResp.LabelURL,
+		CarrierName:    rate.CarrierName,
+		ServiceName:    rate.ServiceName,
+		RateCents:      rate.AmountCents,
+		Currency:       rate.Currency,
+	}, nil
+}
+
+// createShipment posts a synchronous (async=false) shipment so the response
+// carries the rates inline. Shared by CreateLabel and GetRates.
+func (p *ShippoProvider) createShipment(ctx context.Context, req LabelRequest) (*shippoShipmentResp, error) {
 	shipReq := shippoShipmentReq{
 		AddressFrom: shippoAddress{
 			Name:    req.FromName,
@@ -98,39 +187,7 @@ func (p *ShippoProvider) CreateLabel(ctx context.Context, req LabelRequest) (*La
 	if err := p.post(ctx, "/shipments", shipReq, &shipResp); err != nil {
 		return nil, fmt.Errorf("shippo create shipment: %w", err)
 	}
-
-	rate, err := pickRate(shipResp.Rates, serviceToken)
-	if err != nil {
-		return nil, err
-	}
-
-	txReq := shippoTransactionReq{
-		Rate:          rate.ObjectID,
-		Async:         false,
-		LabelFileType: "PDF",
-	}
-	var txResp shippoTransactionResp
-	if err := p.post(ctx, "/transactions", txReq, &txResp); err != nil {
-		return nil, fmt.Errorf("shippo create transaction: %w", err)
-	}
-
-	if txResp.Status != "SUCCESS" {
-		return nil, fmt.Errorf("shippo transaction status %q: %s", txResp.Status, joinMessages(txResp.Messages))
-	}
-
-	rateCents, err := dollarsStringToCents(rate.Amount)
-	if err != nil {
-		return nil, fmt.Errorf("shippo: parse rate %q: %w", rate.Amount, err)
-	}
-
-	return &LabelResult{
-		TrackingNumber: txResp.TrackingNumber,
-		LabelURL:       txResp.LabelURL,
-		CarrierName:    rate.Provider,
-		ServiceName:    rate.ServiceLevel.Name,
-		RateCents:      rateCents,
-		Currency:       rate.Currency,
-	}, nil
+	return &shipResp, nil
 }
 
 // SupportedServices returns the common USPS service tokens Rockabilly ships
@@ -275,11 +332,12 @@ type shippoServiceLevel struct {
 }
 
 type shippoRate struct {
-	ObjectID     string             `json:"object_id"`
-	Amount       string             `json:"amount"`
-	Currency     string             `json:"currency"`
-	Provider     string             `json:"provider"`
-	ServiceLevel shippoServiceLevel `json:"servicelevel"`
+	ObjectID      string             `json:"object_id"`
+	Amount        string             `json:"amount"`
+	Currency      string             `json:"currency"`
+	Provider      string             `json:"provider"`
+	EstimatedDays int                `json:"estimated_days"`
+	ServiceLevel  shippoServiceLevel `json:"servicelevel"`
 }
 
 type shippoMessage struct {

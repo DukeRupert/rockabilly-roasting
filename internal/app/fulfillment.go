@@ -291,6 +291,31 @@ func (s *FulfillmentService) PurchaseLabel(ctx context.Context, req shipping.Lab
 	return result, nil
 }
 
+// FetchRates returns the purchasable shipping rates for a prepared label
+// request, cheapest first. This is an external API call and MUST NOT be invoked
+// from inside a database transaction — callers run PrepareLabelRequest in a read
+// tx first, then call FetchRates with the tx released (same split as the
+// PrepareLabelRequest → PurchaseLabel flow).
+func (s *FulfillmentService) FetchRates(ctx context.Context, req shipping.LabelRequest) ([]shipping.Rate, error) {
+	rates, err := s.labelProvider.GetRates(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("get rates: %w", err)
+	}
+	return rates, nil
+}
+
+// BuyLabelRate purchases a specific rate the operator selected from FetchRates.
+// Like PurchaseLabel this is an external API call and MUST NOT run inside a
+// transaction. A stale rate may be rejected by the provider — callers should
+// re-fetch and let the operator re-confirm on error.
+func (s *FulfillmentService) BuyLabelRate(ctx context.Context, rate shipping.Rate) (*shipping.LabelResult, error) {
+	result, err := s.labelProvider.BuyRate(ctx, rate)
+	if err != nil {
+		return nil, fmt.Errorf("buy rate: %w", err)
+	}
+	return result, nil
+}
+
 // PersistShipmentLabel writes a shipment record + audit entry for a label
 // that was already purchased via PurchaseLabel. Caller is responsible for
 // enqueueing the StoreLabelToR2 job in the same transaction.

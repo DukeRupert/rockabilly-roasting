@@ -389,7 +389,8 @@ func NewRouter(deps *Deps) http.Handler {
 	// Admin fulfillment & shipping
 	adminMux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)
 	adminMux.HandleFunc("GET /admin/wholesale/fulfillment", deps.handleAdminWholesaleFulfillmentList)
-	adminMux.HandleFunc("POST /admin/orders/{id}/label", deps.handleAdminShipmentLabelCreate)
+	adminMux.HandleFunc("GET /admin/orders/{id}/rates", deps.handleAdminShipmentRates)
+	adminMux.HandleFunc("POST /admin/orders/{id}/label", deps.handleAdminShipmentLabelBuy)
 	adminMux.HandleFunc("POST /admin/orders/labels", deps.handleAdminShipmentBulkLabelCreate)
 	adminMux.HandleFunc("GET /admin/shipments/{id}/label", deps.handleAdminShipmentLabelDownload)
 

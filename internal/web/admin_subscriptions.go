@@ -363,6 +363,30 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+resumed", http.StatusSeeOther)
 }
 
+// handleAdminSubscriptionDunningAck clears a past-due subscription from the
+// dashboard's Urgent band. Invoked from the dashboard row, so it redirects back
+// there; htmx (hx-boost) follows the redirect and re-renders with the row gone
+// and the urgent count decremented.
+func (d *Deps) handleAdminSubscriptionDunningAck(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.SubscriptionService.AcknowledgeDunning(ctx, tx, id, staffActor(r))
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/", http.StatusSeeOther)
+}
+
 func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

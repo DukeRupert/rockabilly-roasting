@@ -52,6 +52,7 @@ type DashboardProps struct {
 	OnHoldCount        int
 	FailedPayments     []domain.Order
 	FailedPaymentCount int
+	PastDueSubs        []PastDueRow
 
 	// Order pipeline, split by sales channel. Each queue merges the Pack
 	// (unfulfilled) and Ship (fulfilled) stages into one list; the Count is the
@@ -73,6 +74,15 @@ type DashboardProps struct {
 
 	StaffName string
 	StaffRole string
+}
+
+// PastDueRow bundles a past-due subscription with the summary fields its Urgent
+// band row displays: who's behind on payment and what they subscribe to.
+type PastDueRow struct {
+	Subscription domain.Subscription
+	CustomerName string // company name, customer "First Last", or "Guest"
+	ProductTitle string // lead variant's product title (e.g., "Espresso Blend")
+	Quantity     int
 }
 
 // PipelineRow bundles an order with the summary fields the channel queues need
@@ -155,12 +165,14 @@ templ DashboardContent(props DashboardProps) {
 				@bandHeader("Urgent", props.urgentCount(), "text-rr-red")
 				<div class="mt-3 space-y-3">
 					if props.PastDueSubCount > 0 {
-						@urgentCard(
-							"/admin/subscriptions?status=past_due",
+						@urgentGroupLink(
 							fmt.Sprintf("%d past-due subscription%s", props.PastDueSubCount, pluralS(props.PastDueSubCount)),
 							"Payments failing — customer may churn if not contacted.",
-							"Review",
+							"/admin/subscriptions?status=past_due",
 						)
+						for _, row := range props.PastDueSubs {
+							@pastDueSubRow(row, props.MerchantTZ)
+						}
 					}
 					if props.OnHoldCount > 0 {
 						@urgentGroupLink(
@@ -519,26 +531,6 @@ templ bandHeader(label string, count int, accent string) {
 	</div>
 }
 
-// urgentCard is a standalone red-stamp card for critical items without a per-item list.
-templ urgentCard(href, title, detail, cta string) {
-	<a
-		href={ templ.SafeURL(href) }
-		class="block border border-rr-border bg-rr-surface p-4 hover:-translate-x-px hover:-translate-y-px transition-transform"
-		style="box-shadow: 4px 4px 0 0 var(--color-rr-red);"
-	>
-		<div class="flex items-start justify-between gap-4">
-			<div class="min-w-0">
-				<p class="text-sm font-bold text-rr-red">{ title }</p>
-				<p class="mt-1 text-xs text-rr-muted">{ detail }</p>
-			</div>
-			<div class="flex items-center gap-2 shrink-0">
-				<span class="label-font text-rr-red" style="font-size:0.65rem;">{ cta }</span>
-				@chevronRight()
-			</div>
-		</div>
-	</a>
-}
-
 // urgentGroupLink renders the header row above an urgent order group.
 templ urgentGroupLink(title, detail, href string) {
 	<a
@@ -582,6 +574,47 @@ templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *t
 			@chevronRight()
 		</div>
 	</a>
+}
+
+// pastDueSubRow renders one past-due subscription in the Urgent band. Unlike the
+// order rows it is not a single full-row link: the left side links to the
+// subscription, the right side carries an Acknowledge action, so the two stay
+// separate interactive targets (no nested anchor/button). Acknowledging posts to
+// the dunning-ack endpoint and drops the row off the dashboard until the next
+// failed charge re-surfaces it.
+templ pastDueSubRow(row PastDueRow, loc *time.Location) {
+	<div class="flex items-center justify-between gap-4 border border-rr-border bg-rr-surface px-4 py-2.5">
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", row.Subscription.ID)) }
+			class="flex min-w-0 items-center gap-3 hover:opacity-80 transition-opacity"
+		>
+			<div class="min-w-0">
+				<p class="truncate text-sm font-semibold text-rr-heading">{ row.CustomerName }</p>
+				<p class="mt-0.5 truncate text-xs text-rr-muted">{ pastDueItemLabel(row) }</p>
+			</div>
+		</a>
+		<div class="flex items-center gap-3 shrink-0">
+			<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(row.Subscription.NextOrderAt, loc) }</span>
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/dunning-ack", row.Subscription.ID)) }>
+				<button
+					type="submit"
+					title="Hide until the next failed charge"
+					class="border border-rr-border bg-rr-surface px-2.5 py-1 label-font text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
+					style="font-size:0.6rem;"
+				>Acknowledge</button>
+			</form>
+		</div>
+	</div>
+}
+
+// pastDueItemLabel renders the subscription's product and quantity, falling back
+// to "—" when the variant or product has been deleted from the catalog.
+func pastDueItemLabel(row PastDueRow) string {
+	title := row.ProductTitle
+	if title == "" {
+		title = "—"
+	}
+	return fmt.Sprintf("%s · ×%d", title, row.Quantity)
 }
 
 // channelQueue renders one channel's combined fulfillment queue: a header bar

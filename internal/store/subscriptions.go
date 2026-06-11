@@ -222,7 +222,54 @@ func (s *SubscriptionStore) UpdateStatus(ctx context.Context, tx pgx.Tx, id uuid
 	if err != nil {
 		return nil, fmt.Errorf("update subscription status: %w", err)
 	}
+	// Entering past_due is a (re)failure event. Drop any prior dashboard
+	// acknowledgement so the alert re-surfaces on the next failed charge —
+	// this is the single chokepoint every dunning path flows through, so no
+	// failure branch can leave a stale ack behind. No-op when the key is absent.
+	if status == domain.SubscriptionStatusPastDue {
+		if _, err = tx.Exec(ctx,
+			`UPDATE subscriptions SET metadata = metadata - 'dunning_acknowledged_at' WHERE id = $1`,
+			id,
+		); err != nil {
+			return nil, fmt.Errorf("clear dunning ack: %w", err)
+		}
+	}
 	return subscriptionFromRow(row), nil
+}
+
+// SetDunningAcknowledged stamps a past-due subscription as acknowledged so it
+// drops off the dashboard's Urgent band. Scoped to status = 'past_due' so a
+// race against a resolving renewal can't mark a now-active subscription. The
+// stamp is cleared automatically by UpdateStatus on the next failed charge.
+func (s *SubscriptionStore) SetDunningAcknowledged(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.set_dunning_ack", time.Now(), &err)
+	_, err = tx.Exec(ctx,
+		`UPDATE subscriptions
+		 SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{dunning_acknowledged_at}', to_jsonb(now())),
+		     updated_at = now()
+		 WHERE id = $1 AND status = 'past_due'`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("set dunning ack: %w", err)
+	}
+	return nil
+}
+
+// CountPastDueUnacknowledged counts past-due subscriptions that have not been
+// acknowledged on the dashboard — the figure that drives the Urgent band's
+// past-due alert.
+func (s *SubscriptionStore) CountPastDueUnacknowledged(ctx context.Context, tx pgx.Tx) (_ int, err error) {
+	defer trackQuery(s.metrics, "subscriptions.count_pastdue_unack", time.Now(), &err)
+	var count int
+	err = tx.QueryRow(ctx,
+		`SELECT COUNT(*) FROM subscriptions
+		 WHERE status = 'past_due' AND (metadata->>'dunning_acknowledged_at') IS NULL`,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count past-due unacknowledged: %w", err)
+	}
+	return count, nil
 }
 
 // UpdatePeriod updates a subscription's billing period.
@@ -411,11 +458,12 @@ const (
 
 // SubscriptionFilter holds optional filters for listing subscriptions.
 type SubscriptionFilter struct {
-	Status        *domain.SubscriptionStatus
-	CustomerQuery string // free-text match on customer name / email / company
-	Sort          SubscriptionSort
-	Limit         int
-	Offset        int
+	Status                     *domain.SubscriptionStatus
+	CustomerQuery              string // free-text match on customer name / email / company
+	ExcludeDunningAcknowledged bool   // drop past-due rows already acknowledged on the dashboard
+	Sort                       SubscriptionSort
+	Limit                      int
+	Offset                     int
 }
 
 // List returns subscriptions matching the given filter (hand-written for dynamic WHERE).
@@ -444,6 +492,10 @@ func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionF
 		query += fmt.Sprintf(" AND (c.email ILIKE $%d OR c.first_name ILIKE $%d OR c.last_name ILIKE $%d OR (c.first_name || ' ' || c.last_name) ILIKE $%d OR c.company_name ILIKE $%d)", argN, argN, argN, argN, argN)
 		args = append(args, "%"+f.CustomerQuery+"%")
 		argN++
+	}
+
+	if f.ExcludeDunningAcknowledged {
+		query += " AND (s.metadata->>'dunning_acknowledged_at') IS NULL"
 	}
 
 	switch f.Sort {

@@ -557,6 +557,12 @@ templ OrderShowContent(props OrderShowProps) {
 			if sh.LabelURL != nil && *sh.LabelURL != "" {
 				{{ track := domain.TrackingURL(sh.CarrierName, sh.TrackingNumber) }}
 				<div class="flex flex-col items-start gap-1.5">
+					<div class="flex items-center gap-2">
+						@ShipmentStatusBadge(sh.Status)
+						if sh.Status == domain.ShipmentStatusDelivered && sh.DeliveredAt != nil {
+							<span class="text-xs text-rr-muted">Delivered { sh.DeliveredAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM") }</span>
+						}
+					</div>
 					<a
 						href={ templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/label", sh.ID.String())) }
 						target="_blank"

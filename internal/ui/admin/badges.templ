@@ -329,6 +329,64 @@ templ FulfillmentItemStatusBadge(status domain.FulfillmentItemStatus) {
 	</span>
 }
 
+// ShipmentStatusLabel returns the human-friendly label for a shipment status.
+// Shipment status tracks the physical parcel (driven by Shippo tracking
+// webhooks), distinct from the order's fulfillment status.
+func ShipmentStatusLabel(s domain.ShipmentStatus) string {
+	switch s {
+	case domain.ShipmentStatusPending:
+		return "Pending"
+	case domain.ShipmentStatusLabelCreated:
+		return "Label created"
+	case domain.ShipmentStatusInTransit:
+		return "In transit"
+	case domain.ShipmentStatusDelivered:
+		return "Delivered"
+	case domain.ShipmentStatusException:
+		return "Exception"
+	}
+	return string(s)
+}
+
+// ShipmentStatusTooltip returns a one-line description of a shipment status,
+// used as the title attr on ShipmentStatusBadge.
+func ShipmentStatusTooltip(s domain.ShipmentStatus) string {
+	switch s {
+	case domain.ShipmentStatusPending:
+		return "Awaiting a shipping label."
+	case domain.ShipmentStatusLabelCreated:
+		return "Label purchased; not yet scanned by the carrier."
+	case domain.ShipmentStatusInTransit:
+		return "Moving through the carrier network."
+	case domain.ShipmentStatusDelivered:
+		return "Carrier confirmed delivery."
+	case domain.ShipmentStatusException:
+		return "Carrier reported a problem (returned or failed) — needs attention."
+	}
+	return ""
+}
+
+func shipmentStatusBadgeClasses(status domain.ShipmentStatus) string {
+	switch status {
+	case domain.ShipmentStatusDelivered:
+		return "badge badge-dot badge-teal"
+	case domain.ShipmentStatusInTransit:
+		return "badge badge-dot badge-green-solid"
+	case domain.ShipmentStatusException:
+		return "badge badge-dot badge-red"
+	case domain.ShipmentStatusLabelCreated:
+		return "badge badge-dot badge-slate"
+	default:
+		return "badge badge-dot badge-grey"
+	}
+}
+
+templ ShipmentStatusBadge(status domain.ShipmentStatus) {
+	<span class={ shipmentStatusBadgeClasses(status) } title={ ShipmentStatusTooltip(status) }>
+		{ ShipmentStatusLabel(status) }
+	</span>
+}
+
 func discountActiveBadgeClasses(active bool) string {
 	if active {
 		return "badge badge-dot badge-green"

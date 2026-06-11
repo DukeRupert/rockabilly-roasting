@@ -131,35 +131,12 @@ func ageIsStale(t time.Time) bool {
 }
 
 templ DashboardContent(props DashboardProps) {
-	<!-- Page title + Today strip -->
+	<!-- Page title -->
 	<div class="flex items-baseline gap-3">
 		<h1 class="admin-page-title">Dashboard</h1>
 	</div>
-	<div class="mt-6 border border-rr-border bg-rr-surface px-6 py-5">
-		<p class="label-font text-rr-muted">Today</p>
-		<div class="mt-2 grid grid-cols-3 gap-x-6 gap-y-4">
-			<div>
-				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ formatCents(props.TodayRevenue) }</p>
-				<p class="label-font text-rr-muted mt-1">revenue</p>
-			</div>
-			<div>
-				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.TodayOrderCount) }</p>
-				<p class="label-font text-rr-muted mt-1">orders</p>
-			</div>
-			<div>
-				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.ActiveSubCount) }</p>
-				<p class="label-font text-rr-muted mt-1">active subs</p>
-			</div>
-		</div>
-	</div>
-	<!-- Charts: revenue spans the row, top sellers + subscriptions split below -->
-	<div class="mt-8">
-		@RevenueCard(props.Revenue)
-	</div>
-	<div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-		@TopSellersCard(props.TopProducts, props.TopBy)
-		@SubscriptionsCard(props.Subscriptions)
-	</div>
+	@commandBar(props)
+	<!-- Actions first: triage queues lead the page; analytics follow below. -->
 	if !props.hasAnyAction() {
 		<!-- All caught up -->
 		<div class="mt-8">
@@ -174,7 +151,7 @@ templ DashboardContent(props DashboardProps) {
 	} else {
 		<!-- Urgent band -->
 		if props.urgentCount() > 0 {
-			<div class="mt-8">
+			<div id="band-urgent" class="mt-8 scroll-mt-6">
 				@bandHeader("Urgent", props.urgentCount(), "text-rr-red")
 				<div class="mt-3 space-y-3">
 					if props.PastDueSubCount > 0 {
@@ -210,7 +187,7 @@ templ DashboardContent(props DashboardProps) {
 		}
 		<!-- Pending review band -->
 		if props.reviewCount() > 0 {
-			<div class={ bandSpacing(props.urgentCount()) }>
+			<div id="band-review" class={ bandSpacing(props.urgentCount()), "scroll-mt-6" }>
 				@bandHeader("Pending review", props.reviewCount(), "text-rr-amber")
 				<div class="mt-3 border border-rr-border bg-rr-surface divide-y divide-rr-border">
 					if props.PendingWholesale > 0 {
@@ -235,7 +212,7 @@ templ DashboardContent(props DashboardProps) {
 		}
 		<!-- Retail orders band — Pack + Ship merged into one channel queue -->
 		if props.retailCount() > 0 {
-			<div class={ bandSpacing(props.urgentCount() + props.reviewCount()) }>
+			<div id="band-retail" class={ bandSpacing(props.urgentCount() + props.reviewCount()), "scroll-mt-6" }>
 				@bandHeader("Retail orders", props.retailCount(), "text-rr-heading")
 				<div class="mt-3">
 					@channelQueue(props.RetailCount, props.RetailRows, "/admin/fulfillment?view=needs_action", props.MerchantTZ)
@@ -244,12 +221,81 @@ templ DashboardContent(props DashboardProps) {
 		}
 		<!-- Wholesale orders band — same treatment, scoped to the B2B channel -->
 		if props.wholesaleCount() > 0 {
-			<div class={ bandSpacing(props.urgentCount() + props.reviewCount() + props.retailCount()) }>
+			<div id="band-wholesale" class={ bandSpacing(props.urgentCount() + props.reviewCount() + props.retailCount()), "scroll-mt-6" }>
 				@bandHeader("Wholesale orders", props.wholesaleCount(), "text-rr-amber")
 				<div class="mt-3">
 					@channelQueue(props.WholesaleCount, props.WholesaleRows, "/admin/wholesale/fulfillment?view=needs_action", props.MerchantTZ)
 				</div>
 			</div>
+		}
+	}
+	<!-- Analytics zone: trend reporting, demoted below the day's work. -->
+	<div class="mt-12">
+		<p class="label-font text-rr-muted">Analytics</p>
+		<div class="mt-4">
+			@RevenueCard(props.Revenue)
+		</div>
+		<div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+			@TopSellersCard(props.TopProducts, props.TopBy)
+			@SubscriptionsCard(props.Subscriptions)
+		</div>
+	</div>
+}
+
+// commandBar is the dashboard's at-a-glance triage header: the day's pulse
+// (today's revenue + order count) on the left, and clickable action-count chips
+// on the right that jump straight to the relevant band below. It fuses "how are
+// we doing right now" with "what needs my hands" so staff triage in one glance,
+// without scrolling. Chips render only for non-zero counts; urgent is rendered
+// loud (filled rust) so a payment failure can never hide.
+templ commandBar(props DashboardProps) {
+	<div class="mt-6 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 border border-rr-border bg-rr-surface px-6 py-4">
+		<!-- Day pulse -->
+		<div class="flex items-center gap-6">
+			<div>
+				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ formatCents(props.TodayRevenue) }</p>
+				<p class="label-font text-rr-muted mt-0.5">today</p>
+			</div>
+			<div class="h-9 w-px bg-rr-border"></div>
+			<div>
+				<p class="text-2xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.TodayOrderCount) }</p>
+				<p class="label-font text-rr-muted mt-0.5">{ fmt.Sprintf("order%s", pluralS(props.TodayOrderCount)) }</p>
+			</div>
+		</div>
+		<!-- Action chips: present only when there's work; urgent rendered loud -->
+		if props.hasAnyAction() {
+			<div class="flex flex-wrap items-center gap-2">
+				@actionChip("Urgent", props.urgentCount(), "#band-urgent", true)
+				@actionChip("Review", props.reviewCount(), "#band-review", false)
+				@actionChip("Retail", props.retailCount(), "#band-retail", false)
+				@actionChip("Wholesale", props.wholesaleCount(), "#band-wholesale", false)
+			</div>
+		}
+	</div>
+}
+
+// actionChip renders one count chip in the command bar. Hidden at zero — an
+// empty chip is noise. `loud` flips the chip to a filled-rust stamp for urgent
+// items so they read as a CTA, not a stat; the rest are quiet outlined chips.
+templ actionChip(label string, count int, anchor string, loud bool) {
+	if count > 0 {
+		if loud {
+			<a
+				href={ templ.SafeURL(anchor) }
+				class="inline-flex items-baseline gap-1.5 border border-rr-red bg-rr-red px-2.5 py-1 text-rr-bg hover:-translate-x-px hover:-translate-y-px transition-transform"
+				style="box-shadow: 2px 2px 0 0 var(--color-rr-red);"
+			>
+				<span class="text-sm font-bold tabular-nums">{ fmt.Sprintf("%d", count) }</span>
+				<span class="label-font" style="font-size:0.6rem;">{ label }</span>
+			</a>
+		} else {
+			<a
+				href={ templ.SafeURL(anchor) }
+				class="inline-flex items-baseline gap-1.5 border border-rr-border bg-rr-surface px-2.5 py-1 text-rr-heading hover:bg-rr-raised transition-colors"
+			>
+				<span class="text-sm font-bold tabular-nums">{ fmt.Sprintf("%d", count) }</span>
+				<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ label }</span>
+			</a>
 		}
 	}
 }
@@ -258,7 +304,7 @@ templ DashboardContent(props DashboardProps) {
 // and a delta vs the equivalent prior window. htmx swaps the whole card on
 // toggle; the stable id makes #revenue-card the swap target.
 templ RevenueCard(props RevenueProps) {
-	<div id="revenue-card" class="border border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
+	<div id="revenue-card" class="border border-rr-border bg-rr-surface px-6 py-5">
 		<div class="flex items-baseline justify-between gap-3">
 			<div class="min-w-0">
 				<p class="label-font text-rr-muted">{ fmt.Sprintf("Revenue · last %d days", props.Days) }</p>
@@ -336,7 +382,7 @@ templ revenueMix(props RevenueProps) {
 // growth curve. Mirrors RevenueCard — a 7/30/90-day selector swaps the whole
 // card via htmx, and #subscriptions-card is the stable swap target.
 templ SubscriptionsCard(props SubscriptionsProps) {
-	<div id="subscriptions-card" class="border border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
+	<div id="subscriptions-card" class="border border-rr-border bg-rr-surface px-6 py-5">
 		<div class="flex items-baseline justify-between gap-3">
 			<div class="min-w-0">
 				<p class="label-font text-rr-muted">{ fmt.Sprintf("Active subscriptions · last %d days", props.Days) }</p>
@@ -434,7 +480,7 @@ templ TopSellersCard(data []charts.LabeledValue, by string) {
 			by = "units"
 		}
 	}}
-	<div id="top-sellers-card" class="border border-rr-border bg-rr-surface px-6 py-5" style="box-shadow: 4px 4px 0 0 var(--color-rr-border);">
+	<div id="top-sellers-card" class="border border-rr-border bg-rr-surface px-6 py-5">
 		<div class="flex items-baseline justify-between gap-3">
 			<p class="label-font text-rr-muted">Top sellers · last 30 days</p>
 			<div class="flex items-center gap-1 text-xs">

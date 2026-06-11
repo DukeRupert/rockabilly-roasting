@@ -1,4 +1,4 @@
-package app
+package domain
 
 import (
 	"strings"
@@ -25,7 +25,7 @@ func TestTrackingURL(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := trackingURL(tt.carrier, tt.trackingNumber)
+			got := TrackingURL(tt.carrier, tt.trackingNumber)
 			if tt.wantHostFrag == "" {
 				assert.Equal(t, "", got)
 				return

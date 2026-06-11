@@ -105,6 +105,50 @@ func TestShippoProvider_CreateLabel_HappyPath(t *testing.T) {
 	assert.Equal(t, "USD", result.Currency)
 }
 
+// TestShippoProvider_CreateLabel_LongDecimalWeight verifies a parcel weight
+// with a long decimal tail (as produced by the grams→ounces conversion) is
+// rounded to 2 decimals before it reaches Shippo. Shippo rejects any parcel
+// field with more than 10 digits total, so the raw 13.365314714921473 would
+// otherwise 400.
+func TestShippoProvider_CreateLabel_LongDecimalWeight(t *testing.T) {
+	var sawShipmentBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		switch r.URL.Path {
+		case "/shipments":
+			sawShipmentBody = string(body)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{
+				"object_id": "ship_1",
+				"status": "SUCCESS",
+				"rates": [
+					{"object_id": "rate_ground", "amount": "7.58", "currency": "USD", "provider": "USPS", "servicelevel": {"name": "Ground Advantage", "token": "usps_ground_advantage"}}
+				]
+			}`)) //nolint:errcheck
+		case "/transactions":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"object_id": "tx_1", "status": "SUCCESS", "tracking_number": "94001", "label_url": "https://example.com/l.pdf"}`)) //nolint:errcheck
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	p := shipping.NewShippoProviderWithBase("test-key", srv.URL, srv.Client())
+
+	_, err := p.CreateLabel(context.Background(), shipping.LabelRequest{
+		ServiceCode: "usps_ground_advantage",
+		WeightOz:    13.365314714921473,
+		LengthIn:    10, WidthIn: 8, HeightIn: 4,
+	})
+	require.NoError(t, err)
+
+	var shipReq map[string]any
+	require.NoError(t, json.Unmarshal([]byte(sawShipmentBody), &shipReq))
+	parcel := shipReq["parcels"].([]any)[0].(map[string]any)
+	assert.Equal(t, "13.37", parcel["weight"], "weight should be rounded to 2 decimals")
+}
+
 // TestShippoProvider_CreateLabel_NoMatchingService verifies the provider
 // surfaces an error (rather than silently picking another carrier) when the
 // requested service token isn't in the returned rates.

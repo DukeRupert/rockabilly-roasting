@@ -251,6 +251,18 @@ html {
 	to { transform: translateY(-50%) rotate(360deg); }
 }
 
+/* Async action buttons (fetch shipping rates, buy label): swap the icon for a
+   spinner while the htmx request is in flight. htmx adds .htmx-request to the
+   requesting element — the button itself for hx-get, or the wrapping <form> for
+   hx-post — so the descendant selector covers both. */
+.async-btn-spinner { display: none; }
+.htmx-request .async-btn-icon { display: none !important; }
+.htmx-request .async-btn-spinner { display: inline-block !important; animation: btn-spin 0.7s linear infinite; }
+@keyframes btn-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
 /* Roast level filter dots */
 @keyframes roast-glow {
 	0%, 100% { box-shadow: 0 0 0 0 rgba(232, 146, 26, 0.4); }

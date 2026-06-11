@@ -276,7 +276,7 @@ func (s *OrderService) SendOrderShippedEmail(ctx context.Context, pool *pgxpool.
 		CarrierName:    shipment.CarrierName,
 		ServiceName:    shipment.ServiceName,
 		TrackingNumber: shipment.TrackingNumber,
-		TrackingURL:    trackingURL(shipment.CarrierName, shipment.TrackingNumber),
+		TrackingURL:    domain.TrackingURL(shipment.CarrierName, shipment.TrackingNumber),
 		ShippedOn:      shipment.ShippedAt,
 		ShippingAddr:   shippingAddr,
 		StoreName:      s.email.StoreName,

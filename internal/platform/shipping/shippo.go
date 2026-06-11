@@ -278,8 +278,15 @@ func joinMessages(msgs []shippoMessage) string {
 	return out
 }
 
+// formatFloat renders a parcel dimension/weight for Shippo. It rounds to 2
+// decimal places first: the raw value can be a long repeating decimal (e.g. a
+// grams→ounces conversion yields 13.365314714921473), and Shippo rejects any
+// parcel field with more than 10 digits total. Two decimals is ample precision
+// for shipping — carriers round up to the ounce anyway. Precision -1 then trims
+// trailing zeros so 12.5 stays "12.5" rather than "12.50".
 func formatFloat(f float64) string {
-	return strconv.FormatFloat(f, 'f', -1, 64)
+	rounded := math.Round(f*100) / 100
+	return strconv.FormatFloat(rounded, 'f', -1, 64)
 }
 
 // dollarsStringToCents converts "7.58" → 758. Shippo returns rate amounts as

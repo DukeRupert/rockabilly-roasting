@@ -1,15 +1,16 @@
-package app
+package domain
 
 import (
 	"net/url"
 	"strings"
 )
 
-// trackingURL returns the carrier's public tracking page for a tracking
+// TrackingURL returns the carrier's public tracking page for a tracking
 // number, or an empty string if we can't recognize the carrier. Carrier
 // names are normalized loosely (USPS, "USPS Ground Advantage", "U.S.P.S."
-// all match the USPS branch).
-func trackingURL(carrier, trackingNumber string) string {
+// all match the USPS branch). Shared by the shipment confirmation email and
+// the admin order page so customers and staff land on the same carrier page.
+func TrackingURL(carrier, trackingNumber string) string {
 	t := strings.TrimSpace(trackingNumber)
 	if t == "" {
 		return ""

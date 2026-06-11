@@ -297,17 +297,6 @@ func run() error {
 
 	// Periodic jobs.
 	periodicJobs := []*river.PeriodicJob{
-		river.NewPeriodicJob(
-			river.PeriodicInterval(1*time.Minute),
-			func() (river.JobArgs, *river.InsertOpts) {
-				return jobs.RenewalSchedulerArgs{}, &river.InsertOpts{
-					UniqueOpts: river.UniqueOpts{
-						ByPeriod: 1 * time.Minute,
-					},
-				}
-			},
-			&river.PeriodicJobOpts{RunOnStart: true},
-		),
 		// Cancel orders that were pre-created at PI time but never had
 		// payment confirmed (customer closed browser, etc.). Stripe auto-
 		// cancels most async PIs at 48h via the canceled webhook; this
@@ -324,6 +313,25 @@ func run() error {
 			},
 			&river.PeriodicJobOpts{RunOnStart: false},
 		),
+	}
+	// Subscription renewal scheduler — scans for due subscriptions every minute
+	// and enqueues renewal charges (which call Stripe). Defaults on so staging
+	// and prod always renew; set DISABLE_RENEWAL_SCHEDULER in local dev to stop
+	// it firing on boot against whatever Stripe key is configured.
+	if os.Getenv("DISABLE_RENEWAL_SCHEDULER") == "" {
+		periodicJobs = append(periodicJobs, river.NewPeriodicJob(
+			river.PeriodicInterval(1*time.Minute),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.RenewalSchedulerArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 1 * time.Minute,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: true},
+		))
+	} else {
+		logger.Warn("subscription renewal scheduler disabled via DISABLE_RENEWAL_SCHEDULER")
 	}
 	if qbClient != nil {
 		// Reconcile open wholesale QB invoices daily. This is the safety net for

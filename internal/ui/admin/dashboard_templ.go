@@ -198,7 +198,7 @@ func DashboardContent(props DashboardProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p><p class=\"label-font text-rr-muted mt-1\">active subs</p></div></div></div><!-- Charts --><div class=\"mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</p><p class=\"label-font text-rr-muted mt-1\">active subs</p></div></div></div><!-- Charts: revenue spans the row, top sellers + subscriptions split below --><div class=\"mt-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -206,11 +206,11 @@ func DashboardContent(props DashboardProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = TopSellersCard(props.TopProducts, props.TopBy).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"mt-6\">")
+		templ_7745c5c3_Err = TopSellersCard(props.TopProducts, props.TopBy).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1242,7 +1242,7 @@ func TopSellersCard(data []charts.LabeledValue, by string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = charts.BarHorizontal(data).Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = charts.Bars("top-sellers-trend", data).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

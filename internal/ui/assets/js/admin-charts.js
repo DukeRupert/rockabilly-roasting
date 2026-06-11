@@ -169,6 +169,110 @@
 		});
 	}
 
+	// barValuePlugin draws each bar's primary value just past its end, so the
+	// figure stays visible without a hidden x-axis or a tooltip. The x-scale is
+	// padded past the leader (max 1.25) to leave room for these labels.
+	var barValuePlugin = {
+		id: "barValues",
+		afterDatasetsDraw: function (chart) {
+			var ds = chart.data.datasets[0];
+			var values = ds.values || [];
+			var meta = chart.getDatasetMeta(0);
+			var c = chart.ctx;
+			c.save();
+			c.font = "600 12px " + FONT;
+			c.fillStyle = MUTED;
+			c.textAlign = "left";
+			c.textBaseline = "middle";
+			meta.data.forEach(function (bar, i) {
+				var label = values[i];
+				if (!label) return;
+				c.fillText(label, bar.x + 6, bar.y);
+			});
+			c.restore();
+		},
+	};
+
+	// barTooltipCfg reuses the shared ink tooltip but joins the primary value and
+	// the secondary sub (e.g. "248 units · $1,240") into one body line.
+	function barTooltipCfg() {
+		var cfg = tooltipCfg();
+		cfg.callbacks = {
+			label: function (item) {
+				var v = item.dataset.values || [];
+				var s = item.dataset.subs || [];
+				var parts = [];
+				if (v[item.dataIndex]) parts.push(v[item.dataIndex]);
+				if (s[item.dataIndex]) parts.push(s[item.dataIndex]);
+				return parts.join(" · ");
+			},
+		};
+		return cfg;
+	}
+
+	// renderBars draws a horizontal bar chart: row labels on the y-axis, bar
+	// length = magnitude (relative to the leader), ink bars that flush rust on
+	// hover. The primary value rides at each bar's end (barValuePlugin); the
+	// secondary value lands in the tooltip.
+	function renderBars(el, d) {
+		new Chart(el, {
+			type: "bar",
+			data: {
+				labels: d.labels,
+				datasets: [
+					{
+						data: d.mags,
+						values: d.values, // carried for the value plugin
+						subs: d.subs, // carried for the tooltip callback
+						backgroundColor: INK,
+						hoverBackgroundColor: RUST,
+						borderWidth: 0,
+						barThickness: 16,
+						maxBarThickness: 22,
+					},
+				],
+			},
+			options: {
+				indexAxis: "y",
+				responsive: true,
+				maintainAspectRatio: false,
+				animation: false,
+				interaction: { mode: "index", intersect: false },
+				layout: { padding: { right: 8 } },
+				scales: {
+					x: { min: 0, max: 1.25, display: false, grid: { display: false } },
+					y: {
+						grid: { display: false },
+						border: { display: false },
+						ticks: {
+							color: INK,
+							crossAlign: "far",
+							font: { family: FONT, size: 12, weight: "600" },
+							callback: function (v) {
+								var lbl = this.getLabelForValue(v);
+								return lbl.length > 24 ? lbl.slice(0, 23) + "…" : lbl;
+							},
+						},
+					},
+				},
+				plugins: { legend: { display: false }, tooltip: barTooltipCfg() },
+			},
+			plugins: [barValuePlugin],
+		});
+	}
+
+	// renderBarsCanvas parses a data-bars canvas and draws it.
+	function renderBarsCanvas(el) {
+		if (!el || !el.dataset.bars) return;
+		var d;
+		try {
+			d = JSON.parse(el.dataset.bars);
+		} catch (e) {
+			return;
+		}
+		renderBars(el, d);
+	}
+
 	// renderOne dispatches on the canvas data-kind: "delta" → bar, else line.
 	function renderOne(el) {
 		if (!el || !el.dataset.trend) return;
@@ -191,10 +295,11 @@
 	// instance) so it renders, while untouched sibling charts are left alone.
 	window.rrRenderTrends = function () {
 		if (!window.Chart) return;
-		var nodes = document.querySelectorAll("canvas[data-trend]");
+		var nodes = document.querySelectorAll("canvas[data-trend], canvas[data-bars]");
 		for (var i = 0; i < nodes.length; i++) {
 			if (Chart.getChart(nodes[i])) continue; // already drawn
-			renderOne(nodes[i]);
+			if (nodes[i].dataset.bars) renderBarsCanvas(nodes[i]);
+			else renderOne(nodes[i]);
 		}
 	};
 

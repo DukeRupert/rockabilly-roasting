@@ -152,12 +152,12 @@ templ DashboardContent(props DashboardProps) {
 			</div>
 		</div>
 	</div>
-	<!-- Charts -->
-	<div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+	<!-- Charts: revenue spans the row, top sellers + subscriptions split below -->
+	<div class="mt-8">
 		@RevenueCard(props.Revenue)
-		@TopSellersCard(props.TopProducts, props.TopBy)
 	</div>
-	<div class="mt-6">
+	<div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+		@TopSellersCard(props.TopProducts, props.TopBy)
 		@SubscriptionsCard(props.Subscriptions)
 	</div>
 	if !props.hasAnyAction() {
@@ -443,7 +443,7 @@ templ TopSellersCard(data []charts.LabeledValue, by string) {
 			</div>
 		</div>
 		<div class="mt-4">
-			@charts.BarHorizontal(data)
+			@charts.Bars("top-sellers-trend", data)
 		</div>
 	</div>
 }

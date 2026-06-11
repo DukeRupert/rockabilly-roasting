@@ -1244,6 +1244,35 @@ func (d *Deps) handleAdminOrderNew(w http.ResponseWriter, r *http.Request) {
 	admin.OrderNew(props).Render(ctx, w) //nolint:errcheck
 }
 
+// handleAdminVariantSearch backs the manual-order line-item typeahead: it takes
+// a `q` query param, searches the catalog by SKU or product title, and renders
+// the results partial (a dropdown list of pickable variants). It returns an
+// empty list — never an error page — on a blank query so the dropdown stays
+// quiet until the staffer types something.
+func (d *Deps) handleAdminVariantSearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+
+	if query == "" {
+		admin.VariantSearchResults(nil, query).Render(ctx, w) //nolint:errcheck
+		return
+	}
+
+	var results []domain.VariantSearchResult
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var sErr error
+		results, sErr = d.CatalogService.SearchVariants(ctx, tx, query, 20)
+		return sErr
+	})
+	if err != nil {
+		logging.FromContext(ctx).Error("variant search", "err", err)
+		http.Error(w, "search failed", http.StatusInternalServerError)
+		return
+	}
+
+	admin.VariantSearchResults(results, query).Render(ctx, w) //nolint:errcheck
+}
+
 // handleAdminOrderCreate parses the manual order form, looks up or creates the
 // customer, creates a fresh shipping address, validates each line item against
 // the catalog, and invokes CheckoutService.CreateManualOrder.

@@ -45,6 +45,56 @@ func TestCatalogService_CreateProduct(t *testing.T) {
 	assert.Equal(t, audit.AuditProductCreated, entry.Action)
 }
 
+func TestCatalogService_SearchVariants(t *testing.T) {
+	pool := testPool
+	tx := testutil.NewTestTx(t, pool)
+	svc := newCatalogService()
+	ctx := context.Background()
+
+	ethiopia := testutil.CreateProduct(t, tx, testutil.WithProductTitle("Ethiopia Yirgacheffe"))
+	v1 := testutil.CreateVariant(t, tx, ethiopia.ID, testutil.WithSKU("ETH-YIRG-12OZ"))
+	testutil.SetBasePriceForVariant(t, tx, v1.ID, 1800, "USD")
+
+	colombia := testutil.CreateProduct(t, tx, testutil.WithProductTitle("Colombia Huila"))
+	v2 := testutil.CreateVariant(t, tx, colombia.ID, testutil.WithSKU("COL-HUIL-12OZ"))
+	// No base price set on v2 — the picker should surface it with a nil price.
+
+	t.Run("matches by product title", func(t *testing.T) {
+		results, err := svc.SearchVariants(ctx, tx, "yirga", 20)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, v1.ID, results[0].VariantID)
+		assert.Equal(t, "Ethiopia Yirgacheffe", results[0].ProductTitle)
+		assert.Equal(t, "ETH-YIRG-12OZ", results[0].SKU)
+		require.NotNil(t, results[0].BasePriceCents)
+		assert.Equal(t, 1800, *results[0].BasePriceCents)
+	})
+
+	t.Run("matches by SKU", func(t *testing.T) {
+		results, err := svc.SearchVariants(ctx, tx, "col-huil", 20)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		assert.Equal(t, v2.ID, results[0].VariantID)
+		assert.Nil(t, results[0].BasePriceCents)
+	})
+
+	t.Run("blank query returns a first page", func(t *testing.T) {
+		results, err := svc.SearchVariants(ctx, tx, "", 20)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(results), 2)
+	})
+
+	t.Run("excludes archived variants", func(t *testing.T) {
+		actor := testutil.TestActor()
+		_, err := svc.ArchiveVariant(ctx, tx, v1.ID, actor)
+		require.NoError(t, err)
+
+		results, err := svc.SearchVariants(ctx, tx, "yirga", 20)
+		require.NoError(t, err)
+		assert.Empty(t, results)
+	})
+}
+
 func TestCatalogService_GetProduct(t *testing.T) {
 	pool := testPool
 	tx := testutil.NewTestTx(t, pool)

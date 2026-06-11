@@ -555,6 +555,53 @@ func (s *CatalogStore) GetVariantBySKU(ctx context.Context, tx pgx.Tx, sku strin
 	return variantFromRow(row), nil
 }
 
+// SearchVariants returns non-archived variants whose SKU or product title match
+// the query (case-insensitive substring), flattened with the product title and
+// the base USD price for the admin manual-order picker. A blank query returns
+// the first `limit` variants ordered by product title.
+func (s *CatalogStore) SearchVariants(ctx context.Context, tx pgx.Tx, query string, limit int) ([]domain.VariantSearchResult, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	const q = `
+		SELECT v.id, p.title, v.sku,
+		       (SELECT pr.amount
+		          FROM price_sets ps
+		          JOIN prices pr ON pr.price_set_id = ps.id
+		         WHERE ps.variant_id = v.id
+		           AND pr.currency_code = 'USD'
+		           AND pr.price_list_id IS NULL
+		           AND pr.min_quantity IS NULL
+		         LIMIT 1) AS base_amount
+		  FROM variants v
+		  JOIN products p ON p.id = v.product_id
+		 WHERE v.archived_at IS NULL
+		   AND ($1 = '' OR v.sku ILIKE '%' || $1 || '%' OR p.title ILIKE '%' || $1 || '%')
+		 ORDER BY p.title, v.position
+		 LIMIT $2`
+
+	rows, err := tx.Query(ctx, q, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search variants: %w", err)
+	}
+	defer rows.Close()
+
+	var results []domain.VariantSearchResult
+	for rows.Next() {
+		var r domain.VariantSearchResult
+		var amount *int32
+		if err := rows.Scan(&r.VariantID, &r.ProductTitle, &r.SKU, &amount); err != nil {
+			return nil, fmt.Errorf("scan variant search result: %w", err)
+		}
+		if amount != nil {
+			cents := int(*amount)
+			r.BasePriceCents = &cents
+		}
+		results = append(results, r)
+	}
+	return results, rows.Err()
+}
+
 // ListVariantsByProduct returns all variants for a product, including archived ones.
 // Use ListActiveVariantsByProduct for storefront/customer-facing surfaces.
 func (s *CatalogStore) ListVariantsByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]domain.Variant, error) {

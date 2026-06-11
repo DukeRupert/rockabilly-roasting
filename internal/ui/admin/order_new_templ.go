@@ -9,6 +9,9 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
+	"strconv"
+
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
@@ -95,7 +98,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Banner)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 73, Col: 17}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 76, Col: 17}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -122,7 +125,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.CustomerEmail)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 85, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 88, Col: 109}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -153,7 +156,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 87, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 90, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -180,7 +183,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.CustomerFirstName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 93, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 96, Col: 113}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -215,7 +218,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.CustomerLastName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 97, Col: 110}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 100, Col: 110}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -250,7 +253,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.ShippingFirstName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 108, Col: 122}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 111, Col: 122}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {
@@ -281,7 +284,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 110, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 113, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -308,7 +311,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.ShippingLastName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 115, Col: 119}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 118, Col: 119}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 		if templ_7745c5c3_Err != nil {
@@ -339,7 +342,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 117, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 120, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -366,7 +369,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.ShippingLine1)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 122, Col: 108}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 125, Col: 108}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 		if templ_7745c5c3_Err != nil {
@@ -397,7 +400,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 124, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 127, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -424,7 +427,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.ShippingLine2)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 129, Col: 99}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 132, Col: 99}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
 		if templ_7745c5c3_Err != nil {
@@ -459,7 +462,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.ShippingCity)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 133, Col: 105}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 136, Col: 105}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
 		if templ_7745c5c3_Err != nil {
@@ -490,7 +493,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 135, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 138, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
@@ -517,7 +520,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var33 string
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.ShippingState)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 140, Col: 139}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 143, Col: 139}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 		if templ_7745c5c3_Err != nil {
@@ -548,7 +551,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var35 string
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 142, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 145, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 			if templ_7745c5c3_Err != nil {
@@ -575,7 +578,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.ShippingPostalCode)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 147, Col: 125}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 150, Col: 125}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 		if templ_7745c5c3_Err != nil {
@@ -606,7 +609,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var39 string
 			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 149, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 152, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 			if templ_7745c5c3_Err != nil {
@@ -633,7 +636,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var41 string
 		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.Country())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 154, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 157, Col: 113}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 		if templ_7745c5c3_Err != nil {
@@ -659,13 +662,13 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var43 string
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.ResolveAttributeValue(orderNewItemsState(props.Form))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 159, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 162, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\"><div class=\"flex items-center justify-between\"><div><h2 class=\"text-base/7 font-semibold text-rr-heading\">Line items</h2><p class=\"mt-1 text-sm/6 text-rr-muted\">Enter the SKU, quantity, and unit price (cents) for each line.</p></div><button type=\"button\" @click=\"add()\" class=\"inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised\">+ Add line</button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\"><div class=\"flex items-center justify-between\"><div><h2 class=\"text-base/7 font-semibold text-rr-heading\">Line items</h2><p class=\"mt-1 text-sm/6 text-rr-muted\">Search the catalog to add a product, or type a SKU by hand. Unit price is in cents.</p></div><button type=\"button\" @click=\"add()\" class=\"inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised\">+ Add line</button></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -677,7 +680,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 168, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 171, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 			if templ_7745c5c3_Err != nil {
@@ -688,7 +691,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "<div class=\"mt-4 space-y-3\"><template x-for=\"(row, i) in rows\" :key=\"i\"><div class=\"grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-12 items-end border-b border-rr-border/50 pb-3\"><div class=\"sm:col-span-5\"><label class=\"block text-xs/5 font-medium text-rr-muted\" :for=\"'sku-' + i\">SKU</label> <input :id=\"'sku-' + i\" name=\"item_sku\" type=\"text\" x-model=\"row.sku\" placeholder=\"e.g. CFE-001-12OZ\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div><div class=\"sm:col-span-2\"><label class=\"block text-xs/5 font-medium text-rr-muted\" :for=\"'qty-' + i\">Qty</label> <input :id=\"'qty-' + i\" name=\"item_quantity\" type=\"number\" min=\"1\" x-model=\"row.quantity\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div><div class=\"sm:col-span-3\"><label class=\"block text-xs/5 font-medium text-rr-muted\" :for=\"'price-' + i\">Unit price (cents)</label> <input :id=\"'price-' + i\" name=\"item_unit_price_cents\" type=\"number\" min=\"0\" x-model=\"row.price\" placeholder=\"1800\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div><div class=\"sm:col-span-2 flex justify-end\"><button type=\"button\" @click=\"remove(i)\" class=\"text-sm text-red-700 hover:underline\">Remove</button></div></div></template></div></div><!-- Totals --><div class=\"border-b border-rr-border pb-8\"><h2 class=\"text-base/7 font-semibold text-rr-heading\">Totals (cents)</h2><p class=\"mt-1 text-sm/6 text-rr-muted\">Whole cents — e.g. <code>1800</code> means $18.00. Empty fields default to 0.</p><div class=\"mt-6 grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-5\"><div><label class=\"block text-sm/6 font-medium text-rr-heading\" for=\"subtotal_cents\">Subtotal</label> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "<!-- Product search: typeahead that fills a line on pick --><div class=\"mt-4 relative\" @click.outside=\"$refs.results.innerHTML = ''\"><input type=\"search\" name=\"q\" x-model=\"query\" placeholder=\"Search products by name or SKU…\" autocomplete=\"off\" hx-boost=\"false\" hx-get=\"/admin/orders/variant-search\" hx-trigger=\"input changed delay:250ms\" hx-target=\"#variant-search-results\" hx-swap=\"innerHTML\" hx-sync=\"this:replace\" hx-push-url=\"false\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"><div id=\"variant-search-results\" x-ref=\"results\" @click=\"onPick($event)\" class=\"absolute z-10 mt-1 w-full overflow-hidden rounded-sm border border-rr-border bg-rr-surface shadow-sm empty:hidden\"></div></div><div class=\"mt-4 space-y-3\"><template x-for=\"(row, i) in rows\" :key=\"i\"><div class=\"grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-12 items-end border-b border-rr-border/50 pb-3\"><div class=\"sm:col-span-5\"><label class=\"block text-xs/5 font-medium text-rr-muted\" :for=\"'sku-' + i\">SKU <span x-show=\"row.label\" class=\"ml-1 font-normal text-rr-body\" x-text=\"row.label\"></span></label> <input :id=\"'sku-' + i\" name=\"item_sku\" type=\"text\" x-model=\"row.sku\" placeholder=\"e.g. CFE-001-12OZ\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div><div class=\"sm:col-span-2\"><label class=\"block text-xs/5 font-medium text-rr-muted\" :for=\"'qty-' + i\">Qty</label> <input :id=\"'qty-' + i\" name=\"item_quantity\" type=\"number\" min=\"1\" x-model=\"row.quantity\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div><div class=\"sm:col-span-3\"><label class=\"block text-xs/5 font-medium text-rr-muted\" :for=\"'price-' + i\">Unit price (cents)</label> <input :id=\"'price-' + i\" name=\"item_unit_price_cents\" type=\"number\" min=\"0\" x-model=\"row.price\" placeholder=\"1800\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red\"></div><div class=\"sm:col-span-2 flex justify-end\"><button type=\"button\" @click=\"remove(i)\" class=\"text-sm text-red-700 hover:underline\">Remove</button></div></div></template></div></div><!-- Totals --><div class=\"border-b border-rr-border pb-8\"><h2 class=\"text-base/7 font-semibold text-rr-heading\">Totals (cents)</h2><p class=\"mt-1 text-sm/6 text-rr-muted\">Whole cents — e.g. <code>1800</code> means $18.00. Empty fields default to 0.</p><div class=\"mt-6 grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-5\"><div><label class=\"block text-sm/6 font-medium text-rr-heading\" for=\"subtotal_cents\">Subtotal</label> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -704,7 +707,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var46 string
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.SubtotalCents)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 199, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 229, Col: 109}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
 		if templ_7745c5c3_Err != nil {
@@ -735,7 +738,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var48 string
 			templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 201, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 231, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 			if templ_7745c5c3_Err != nil {
@@ -762,7 +765,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var50 string
 		templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.DiscountCents)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 206, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 236, Col: 109}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
 		if templ_7745c5c3_Err != nil {
@@ -797,7 +800,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var53 string
 		templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.ShippingCents)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 210, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 240, Col: 109}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
 		if templ_7745c5c3_Err != nil {
@@ -832,7 +835,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var56 string
 		templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.TaxCents)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 214, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 244, Col: 94}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var56)
 		if templ_7745c5c3_Err != nil {
@@ -867,7 +870,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var59 string
 		templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.TotalCents)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 218, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 248, Col: 109}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var59)
 		if templ_7745c5c3_Err != nil {
@@ -898,7 +901,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var61 string
 			templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 220, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 250, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 			if templ_7745c5c3_Err != nil {
@@ -925,7 +928,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var63 string
 		templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Form.StripePaymentIntentID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 231, Col: 148}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 261, Col: 148}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63)
 		if templ_7745c5c3_Err != nil {
@@ -1002,7 +1005,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var67 string
 			templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 245, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 275, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var67))
 			if templ_7745c5c3_Err != nil {
@@ -1071,7 +1074,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 			var templ_7745c5c3_Var70 string
 			templ_7745c5c3_Var70, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 258, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 288, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var70))
 			if templ_7745c5c3_Err != nil {
@@ -1111,7 +1114,7 @@ func OrderNewContent(props OrderNewProps) templ.Component {
 		var templ_7745c5c3_Var73 string
 		templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(props.Form.Notes)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 266, Col: 168}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 296, Col: 168}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 		if templ_7745c5c3_Err != nil {
@@ -1154,7 +1157,7 @@ func paymentStatusOption(value, label, current string) templ.Component {
 			var templ_7745c5c3_Var75 string
 			templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.ResolveAttributeValue(value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 278, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 308, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var75)
 			if templ_7745c5c3_Err != nil {
@@ -1167,7 +1170,7 @@ func paymentStatusOption(value, label, current string) templ.Component {
 			var templ_7745c5c3_Var76 string
 			templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 278, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 308, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 			if templ_7745c5c3_Err != nil {
@@ -1185,7 +1188,7 @@ func paymentStatusOption(value, label, current string) templ.Component {
 			var templ_7745c5c3_Var77 string
 			templ_7745c5c3_Var77, templ_7745c5c3_Err = templ.ResolveAttributeValue(value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 280, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 310, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var77)
 			if templ_7745c5c3_Err != nil {
@@ -1198,7 +1201,7 @@ func paymentStatusOption(value, label, current string) templ.Component {
 			var templ_7745c5c3_Var78 string
 			templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 280, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 310, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 			if templ_7745c5c3_Err != nil {
@@ -1242,7 +1245,7 @@ func orderStatusOption(value, label, current string) templ.Component {
 			var templ_7745c5c3_Var80 string
 			templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.ResolveAttributeValue(value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 286, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 316, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var80)
 			if templ_7745c5c3_Err != nil {
@@ -1255,7 +1258,7 @@ func orderStatusOption(value, label, current string) templ.Component {
 			var templ_7745c5c3_Var81 string
 			templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 286, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 316, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 			if templ_7745c5c3_Err != nil {
@@ -1273,7 +1276,7 @@ func orderStatusOption(value, label, current string) templ.Component {
 			var templ_7745c5c3_Var82 string
 			templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.ResolveAttributeValue(value)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 288, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 318, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var82)
 			if templ_7745c5c3_Err != nil {
@@ -1286,7 +1289,7 @@ func orderStatusOption(value, label, current string) templ.Component {
 			var templ_7745c5c3_Var83 string
 			templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 288, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 318, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 			if templ_7745c5c3_Err != nil {
@@ -1303,28 +1306,44 @@ func orderStatusOption(value, label, current string) templ.Component {
 
 // orderNewItemsState builds the initial Alpine state from the (re-rendered)
 // form. On a fresh form it seeds three empty rows; on validation re-render it
-// keeps whatever the admin already filled in so they don't retype.
+// keeps whatever the admin already filled in so they don't retype. Each row also
+// carries a `label` (product title) populated when the line was added via the
+// search picker, so staff see what they picked next to the bare SKU.
+//
+// addItem fills the first empty row (or appends one) from a picked search
+// result; onPick is the click-delegation handler for the results dropdown —
+// results are htmx-swapped in, so we read the data-* attributes off the clicked
+// button rather than relying on Alpine to have initialised the swapped DOM.
 func orderNewItemsState(f OrderNewForm) string {
+	var rows string
 	if len(f.Items) == 0 {
-		return `{
-			rows: [
-				{ sku: '', quantity: '', price: '' },
-				{ sku: '', quantity: '', price: '' },
-				{ sku: '', quantity: '', price: '' }
-			],
-			add() { this.rows.push({ sku: '', quantity: '', price: '' }) },
-			remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1) }
-		}`
-	}
-	out := `{ rows: [`
-	for i, row := range f.Items {
-		if i > 0 {
-			out += ","
+		rows = `{ sku: '', quantity: '', price: '', label: '' },{ sku: '', quantity: '', price: '', label: '' },{ sku: '', quantity: '', price: '', label: '' }`
+	} else {
+		for i, row := range f.Items {
+			if i > 0 {
+				rows += ","
+			}
+			rows += "{ sku: " + jsString(row.SKU) + ", quantity: " + jsString(row.Quantity) + ", price: " + jsString(row.UnitPriceCents) + ", label: '' }"
 		}
-		out += "{ sku: " + jsString(row.SKU) + ", quantity: " + jsString(row.Quantity) + ", price: " + jsString(row.UnitPriceCents) + " }"
 	}
-	out += `], add() { this.rows.push({ sku: '', quantity: '', price: '' }) }, remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1) } }`
-	return out
+	return `{
+		query: '',
+		rows: [` + rows + `],
+		add() { this.rows.push({ sku: '', quantity: '', price: '', label: '' }) },
+		remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1) },
+		addItem(sku, price, label) {
+			const empty = this.rows.find(r => !r.sku && !r.quantity && !r.price);
+			if (empty) { empty.sku = sku; empty.price = price; empty.quantity = '1'; empty.label = label; }
+			else { this.rows.push({ sku: sku, quantity: '1', price: price, label: label }); }
+		},
+		onPick(e) {
+			const btn = e.target.closest('[data-sku]');
+			if (!btn) return;
+			this.addItem(btn.dataset.sku, btn.dataset.price, btn.dataset.label);
+			this.query = '';
+			if (this.$refs.results) this.$refs.results.innerHTML = '';
+		}
+	}`
 }
 
 // jsString returns a JS-string literal for embedding admin-supplied text into
@@ -1397,6 +1416,164 @@ func OrderNew(props OrderNewProps) templ.Component {
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var85), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// priceData renders the cents value for a result button's data-price attribute,
+// or "" when the variant has no base price so the staffer prices it by hand.
+func priceData(cents *int) string {
+	if cents == nil {
+		return ""
+	}
+	return strconv.Itoa(*cents)
+}
+
+// VariantSearchResults renders the manual-order typeahead dropdown. Each result
+// is a button carrying data-sku/data-price/data-label, picked up by the line-item
+// component's onPick click-delegation handler.
+func VariantSearchResults(results []domain.VariantSearchResult, query string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var86 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var86 == nil {
+			templ_7745c5c3_Var86 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		if len(results) == 0 {
+			if query != "" {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "<div class=\"px-3 py-2 text-sm text-rr-muted\">No products match “")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var87 string
+				templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(query)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 413, Col: 76}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 115, "”.</div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 116, "<ul class=\"max-h-72 divide-y divide-rr-border overflow-auto\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			for _, r := range results {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 117, "<li><button type=\"button\" data-sku=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var88 string
+				templ_7745c5c3_Var88, templ_7745c5c3_Err = templ.ResolveAttributeValue(r.SKU)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 421, Col: 22}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var88)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "\" data-price=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var89 string
+				templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.ResolveAttributeValue(priceData(r.BasePriceCents))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 422, Col: 46}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var89)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 119, "\" data-label=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var90 string
+				templ_7745c5c3_Var90, templ_7745c5c3_Err = templ.ResolveAttributeValue(r.ProductTitle)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 423, Col: 33}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var90)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "\" class=\"flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-rr-raised\"><span class=\"min-w-0\"><span class=\"block truncate font-medium text-rr-heading\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var91 string
+				templ_7745c5c3_Var91, templ_7745c5c3_Err = templ.JoinStringErrs(r.ProductTitle)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 427, Col: 80}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var91))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 121, "</span> <span class=\"block truncate text-xs text-rr-muted\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var92 string
+				templ_7745c5c3_Var92, templ_7745c5c3_Err = templ.JoinStringErrs(r.SKU)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 428, Col: 65}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var92))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 122, "</span></span> <span class=\"shrink-0 tabular-nums text-rr-body\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if r.BasePriceCents != nil {
+					var templ_7745c5c3_Var93 string
+					templ_7745c5c3_Var93, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(*r.BasePriceCents))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/order_new.templ`, Line: 432, Col: 40}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var93))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				} else {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, "—")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "</span></button></li>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 125, "</ul>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
 		return nil
 	})

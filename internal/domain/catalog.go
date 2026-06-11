@@ -127,6 +127,17 @@ func (v Variant) Available(c SalesChannel) bool {
 	}
 }
 
+// VariantSearchResult is a flattened read model for the admin variant picker:
+// a variant joined with its product title and base (USD) price, used by the
+// manual-order line-item typeahead. BasePriceCents is nil when the variant has
+// no base price set, in which case staff enter the unit price by hand.
+type VariantSearchResult struct {
+	VariantID      uuid.UUID
+	ProductTitle   string
+	SKU            string
+	BasePriceCents *int
+}
+
 // FilterVariantsForChannel returns only the variants orderable on the given channel,
 // preserving order. Used by customer-facing storefront/wholesale surfaces so a variant
 // hidden from a channel never renders or gets priced there.

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -628,6 +629,20 @@ func (s *CatalogService) GetVariantBySKU(ctx context.Context, tx pgx.Tx, sku str
 		return nil, fmt.Errorf("get variant by sku: %w", err)
 	}
 	return v, nil
+}
+
+// SearchVariants returns variants matching the query (SKU or product title) for
+// the admin manual-order picker, capped at a sane limit. A blank query returns a
+// first page of variants so the dropdown can prime before the staffer types.
+func (s *CatalogService) SearchVariants(ctx context.Context, tx pgx.Tx, query string, limit int) ([]domain.VariantSearchResult, error) {
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	results, err := s.catalog.SearchVariants(ctx, tx, strings.TrimSpace(query), limit)
+	if err != nil {
+		return nil, fmt.Errorf("search variants: %w", err)
+	}
+	return results, nil
 }
 
 // ListVariants returns all variants for a product, including archived ones.

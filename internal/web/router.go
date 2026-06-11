@@ -325,6 +325,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("GET /admin/orders", deps.handleAdminOrderList)
 	adminMux.HandleFunc("GET /admin/orders/wholesale", deps.handleAdminWholesaleOrderList)
 	adminMux.HandleFunc("GET /admin/orders/new", deps.handleAdminOrderNew)
+	adminMux.HandleFunc("GET /admin/orders/variant-search", deps.handleAdminVariantSearch)
 	adminMux.HandleFunc("POST /admin/orders/new", deps.handleAdminOrderCreate)
 	adminMux.HandleFunc("GET /admin/orders/batch/invoices", deps.handleAdminOrderInvoiceBatch)
 	adminMux.HandleFunc("GET /admin/orders/batch/packing-slips", deps.handleAdminOrderPackingSlipBatch)

@@ -1,6 +1,9 @@
 package admin
 
 import (
+	"strconv"
+
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
@@ -160,18 +163,45 @@ templ OrderNewContent(props OrderNewProps) {
 				<div class="flex items-center justify-between">
 					<div>
 						<h2 class="text-base/7 font-semibold text-rr-heading">Line items</h2>
-						<p class="mt-1 text-sm/6 text-rr-muted">Enter the SKU, quantity, and unit price (cents) for each line.</p>
+						<p class="mt-1 text-sm/6 text-rr-muted">Search the catalog to add a product, or type a SKU by hand. Unit price is in cents.</p>
 					</div>
 					<button type="button" @click="add()" class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised">+ Add line</button>
 				</div>
 				if msg := getError(props.FieldErrors, "items"); msg != "" {
 					<p class="mt-2 text-sm text-red-600">{ msg }</p>
 				}
+				<!-- Product search: typeahead that fills a line on pick -->
+				<div class="mt-4 relative" @click.outside="$refs.results.innerHTML = ''">
+					<input
+						type="search"
+						name="q"
+						x-model="query"
+						placeholder="Search products by name or SKU…"
+						autocomplete="off"
+						hx-boost="false"
+						hx-get="/admin/orders/variant-search"
+						hx-trigger="input changed delay:250ms"
+						hx-target="#variant-search-results"
+						hx-swap="innerHTML"
+						hx-sync="this:replace"
+						hx-push-url="false"
+						class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+					/>
+					<div
+						id="variant-search-results"
+						x-ref="results"
+						@click="onPick($event)"
+						class="absolute z-10 mt-1 w-full overflow-hidden rounded-sm border border-rr-border bg-rr-surface shadow-sm empty:hidden"
+					></div>
+				</div>
 				<div class="mt-4 space-y-3">
 					<template x-for="(row, i) in rows" :key="i">
 						<div class="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-12 items-end border-b border-rr-border/50 pb-3">
 							<div class="sm:col-span-5">
-								<label class="block text-xs/5 font-medium text-rr-muted" :for="'sku-' + i">SKU</label>
+								<label class="block text-xs/5 font-medium text-rr-muted" :for="'sku-' + i">
+									SKU
+									<span x-show="row.label" class="ml-1 font-normal text-rr-body" x-text="row.label"></span>
+								</label>
 								<input :id="'sku-' + i" name="item_sku" type="text" x-model="row.sku" placeholder="e.g. CFE-001-12OZ" class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
 							</div>
 							<div class="sm:col-span-2">
@@ -291,28 +321,44 @@ templ orderStatusOption(value, label, current string) {
 
 // orderNewItemsState builds the initial Alpine state from the (re-rendered)
 // form. On a fresh form it seeds three empty rows; on validation re-render it
-// keeps whatever the admin already filled in so they don't retype.
+// keeps whatever the admin already filled in so they don't retype. Each row also
+// carries a `label` (product title) populated when the line was added via the
+// search picker, so staff see what they picked next to the bare SKU.
+//
+// addItem fills the first empty row (or appends one) from a picked search
+// result; onPick is the click-delegation handler for the results dropdown —
+// results are htmx-swapped in, so we read the data-* attributes off the clicked
+// button rather than relying on Alpine to have initialised the swapped DOM.
 func orderNewItemsState(f OrderNewForm) string {
+	var rows string
 	if len(f.Items) == 0 {
-		return `{
-			rows: [
-				{ sku: '', quantity: '', price: '' },
-				{ sku: '', quantity: '', price: '' },
-				{ sku: '', quantity: '', price: '' }
-			],
-			add() { this.rows.push({ sku: '', quantity: '', price: '' }) },
-			remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1) }
-		}`
-	}
-	out := `{ rows: [`
-	for i, row := range f.Items {
-		if i > 0 {
-			out += ","
+		rows = `{ sku: '', quantity: '', price: '', label: '' },{ sku: '', quantity: '', price: '', label: '' },{ sku: '', quantity: '', price: '', label: '' }`
+	} else {
+		for i, row := range f.Items {
+			if i > 0 {
+				rows += ","
+			}
+			rows += "{ sku: " + jsString(row.SKU) + ", quantity: " + jsString(row.Quantity) + ", price: " + jsString(row.UnitPriceCents) + ", label: '' }"
 		}
-		out += "{ sku: " + jsString(row.SKU) + ", quantity: " + jsString(row.Quantity) + ", price: " + jsString(row.UnitPriceCents) + " }"
 	}
-	out += `], add() { this.rows.push({ sku: '', quantity: '', price: '' }) }, remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1) } }`
-	return out
+	return `{
+		query: '',
+		rows: [` + rows + `],
+		add() { this.rows.push({ sku: '', quantity: '', price: '', label: '' }) },
+		remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1) },
+		addItem(sku, price, label) {
+			const empty = this.rows.find(r => !r.sku && !r.quantity && !r.price);
+			if (empty) { empty.sku = sku; empty.price = price; empty.quantity = '1'; empty.label = label; }
+			else { this.rows.push({ sku: sku, quantity: '1', price: price, label: label }); }
+		},
+		onPick(e) {
+			const btn = e.target.closest('[data-sku]');
+			if (!btn) return;
+			this.addItem(btn.dataset.sku, btn.dataset.price, btn.dataset.label);
+			this.query = '';
+			if (this.$refs.results) this.$refs.results.innerHTML = '';
+		}
+	}`
 }
 
 // jsString returns a JS-string literal for embedding admin-supplied text into
@@ -346,5 +392,51 @@ templ OrderNew(props OrderNewProps) {
 		StaffRole:  props.StaffRole,
 	}) {
 		@OrderNewContent(props)
+	}
+}
+
+// priceData renders the cents value for a result button's data-price attribute,
+// or "" when the variant has no base price so the staffer prices it by hand.
+func priceData(cents *int) string {
+	if cents == nil {
+		return ""
+	}
+	return strconv.Itoa(*cents)
+}
+
+// VariantSearchResults renders the manual-order typeahead dropdown. Each result
+// is a button carrying data-sku/data-price/data-label, picked up by the line-item
+// component's onPick click-delegation handler.
+templ VariantSearchResults(results []domain.VariantSearchResult, query string) {
+	if len(results) == 0 {
+		if query != "" {
+			<div class="px-3 py-2 text-sm text-rr-muted">No products match “{ query }”.</div>
+		}
+	} else {
+		<ul class="max-h-72 divide-y divide-rr-border overflow-auto">
+			for _, r := range results {
+				<li>
+					<button
+						type="button"
+						data-sku={ r.SKU }
+						data-price={ priceData(r.BasePriceCents) }
+						data-label={ r.ProductTitle }
+						class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-rr-raised"
+					>
+						<span class="min-w-0">
+							<span class="block truncate font-medium text-rr-heading">{ r.ProductTitle }</span>
+							<span class="block truncate text-xs text-rr-muted">{ r.SKU }</span>
+						</span>
+						<span class="shrink-0 tabular-nums text-rr-body">
+							if r.BasePriceCents != nil {
+								{ formatCents(*r.BasePriceCents) }
+							} else {
+								—
+							}
+						</span>
+					</button>
+				</li>
+			}
+		</ul>
 	}
 }

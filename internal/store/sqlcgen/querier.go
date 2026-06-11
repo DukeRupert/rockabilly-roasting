@@ -137,6 +137,7 @@ type Querier interface {
 	GetResetTokenByTokenHash(ctx context.Context, tokenHash string) (ResetToken, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (Session, error)
 	GetShipmentByID(ctx context.Context, id uuid.UUID) (Shipment, error)
+	GetShipmentByTrackingNumber(ctx context.Context, trackingNumber string) (Shipment, error)
 	GetShipmentLabelKey(ctx context.Context, id uuid.UUID) (*string, error)
 	GetShippingConfig(ctx context.Context) (ShippingConfig, error)
 	GetStaffByEmail(ctx context.Context, email string) (Staff, error)

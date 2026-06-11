@@ -3,6 +3,7 @@ package web
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	sentrygo "github.com/getsentry/sentry-go"
@@ -65,10 +66,18 @@ func loggingMiddleware(next http.Handler, logger *slog.Logger, _ *metrics.Regist
 		duration := time.Since(start)
 		ctxLogger := logging.FromContext(r.Context())
 
+		// The Shippo webhook carries its auth secret in the URL path (Shippo
+		// can't send headers or sign payloads), so redact path + query here to
+		// keep the secret out of logs and any log aggregation.
+		loggedPath, loggedQuery := r.URL.Path, truncate(r.URL.RawQuery, 500)
+		if strings.HasPrefix(r.URL.Path, "/webhooks/shippo/") {
+			loggedPath, loggedQuery = "/webhooks/shippo/[redacted]", ""
+		}
+
 		attrs := []any{
 			slog.String(logging.FieldMethod, r.Method),
-			slog.String(logging.FieldPath, r.URL.Path),
-			slog.String(logging.FieldQuery, truncate(r.URL.RawQuery, 500)),
+			slog.String(logging.FieldPath, loggedPath),
+			slog.String(logging.FieldQuery, loggedQuery),
 			slog.Int(logging.FieldStatus, rw.statusCode),
 			slog.Float64(logging.FieldDurationMS, float64(duration.Milliseconds())),
 			slog.String(logging.FieldRemoteIP, ratelimit.ClientIP(r)),

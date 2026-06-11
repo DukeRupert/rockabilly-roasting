@@ -142,6 +142,17 @@ func (s *ShippingStore) GetShipmentByIDAsStaff(ctx context.Context, tx pgx.Tx, i
 	return shipmentFromRow(row), nil
 }
 
+// GetShipmentByTrackingNumber returns the most recent shipment with the given
+// tracking number. Used to match an inbound Shippo tracking webhook to a
+// shipment. Returns pgx.ErrNoRows if no shipment carries that number.
+func (s *ShippingStore) GetShipmentByTrackingNumber(ctx context.Context, tx pgx.Tx, trackingNumber string) (*domain.Shipment, error) {
+	row, err := sqlcgen.New(tx).GetShipmentByTrackingNumber(ctx, trackingNumber)
+	if err != nil {
+		return nil, fmt.Errorf("get shipment by tracking number: %w", err)
+	}
+	return shipmentFromRow(row), nil
+}
+
 // ListShipmentsByOrder returns all shipments for an order.
 func (s *ShippingStore) ListShipmentsByOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) ([]domain.Shipment, error) {
 	rows, err := sqlcgen.New(tx).ListShipmentsByOrder(ctx, orderID)

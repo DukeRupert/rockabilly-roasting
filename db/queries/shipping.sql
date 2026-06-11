@@ -32,6 +32,12 @@ RETURNING *;
 -- name: GetShipmentByID :one
 SELECT * FROM shipments WHERE id = $1;
 
+-- name: GetShipmentByTrackingNumber :one
+SELECT * FROM shipments
+WHERE tracking_number = $1
+ORDER BY created_at DESC
+LIMIT 1;
+
 -- name: ListShipmentsByOrder :many
 SELECT * FROM shipments
 WHERE order_id = $1

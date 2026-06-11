@@ -18,6 +18,39 @@ const (
 	ShipmentStatusException    ShipmentStatus = "exception"
 )
 
+// shipmentStatusRank orders shipment statuses along the normal delivery
+// progression so tracking updates can be applied forward-only. Carrier
+// tracking webhooks (Shippo's especially) arrive duplicated and out of order;
+// ranking lets a stale "in transit" event be ignored once a shipment is
+// delivered. "exception" (returned/failed) ranks just below delivered: a
+// shipment can move from in-transit into exception, and an exception can still
+// resolve to delivered, but a delivered shipment is treated as terminal — a
+// post-delivery return is rare and handled manually rather than auto-regressed.
+func shipmentStatusRank(s ShipmentStatus) int {
+	switch s {
+	case ShipmentStatusPending:
+		return 0
+	case ShipmentStatusLabelCreated:
+		return 1
+	case ShipmentStatusInTransit:
+		return 2
+	case ShipmentStatusException:
+		return 3
+	case ShipmentStatusDelivered:
+		return 4
+	default:
+		return 0
+	}
+}
+
+// CanAdvanceTo reports whether moving from the receiver to next is a forward
+// transition (a strictly higher rank). Equal or lower targets return false,
+// which makes applying a tracking update idempotent: replaying the same event,
+// or a late one, is a no-op.
+func (s ShipmentStatus) CanAdvanceTo(next ShipmentStatus) bool {
+	return shipmentStatusRank(next) > shipmentStatusRank(s)
+}
+
 // ShippingConfig holds the merchant's shipping rules.
 type ShippingConfig struct {
 	FlatRateCents         int

@@ -62,6 +62,7 @@ type Deps struct {
 	QBClient               quickbooks.Client
 	QBOAuthManager         *quickbooks.OAuthManager // nil when QuickBooks is not configured
 	QBWebhookVerifierToken string
+	ShippoWebhookSecret    string // URL-path secret for inbound Shippo tracking webhooks; empty disables the endpoint
 	QBHTTPClient           *http.Client
 	HelpRegistry           *help.Registry
 	RateLimiter            *ratelimit.Limiter
@@ -466,6 +467,9 @@ func NewRouter(deps *Deps) http.Handler {
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)
 	mux.HandleFunc("POST /webhooks/quickbooks", deps.handleQBWebhook)
+	// Shippo can't send custom headers or sign payloads, so the auth secret
+	// rides in the URL path; loggingMiddleware redacts it.
+	mux.HandleFunc("POST /webhooks/shippo/{token}", deps.handleShippoWebhook)
 
 	// Catch-all 404 for unmatched GET routes (branded error page)
 	mux.HandleFunc("GET /", deps.handleNotFoundPage)

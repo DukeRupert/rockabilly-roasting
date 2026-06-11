@@ -129,11 +129,15 @@ func run() error {
 	var labelProvider shipping.LabelProvider
 	if key := os.Getenv("SHIPPO_API_KEY"); key != "" {
 		labelProvider = shipping.NewShippoProvider(key)
+		if os.Getenv("SHIPPO_WEBHOOK_SECRET") == "" {
+			logger.Warn("SHIPPO_WEBHOOK_SECRET is not set; the inbound tracking webhook endpoint is disabled")
+		}
 	} else {
 		// Fall back to EasyPost for envs that haven't migrated yet. Once
 		// every environment has SHIPPO_API_KEY set this branch can go.
 		labelProvider = shipping.NewEasyPostProvider(os.Getenv("EASYPOST_API_KEY"))
 	}
+	shippoWebhookSecret := os.Getenv("SHIPPO_WEBHOOK_SECRET")
 	mailer := email.NewPostmarkSender(os.Getenv("POSTMARK_SERVER_TOKEN"))
 	emailRenderer, err := emailtemplates.New()
 	if err != nil {
@@ -290,6 +294,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewInvoicePastDueEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
+	river.AddWorker(workers, jobs.NewShippoTrackingUpdateWorker(fulfillmentSvc, pool))
 	river.AddWorker(workers, jobs.NewAbandonedOrderCleanupWorker(orderSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)
@@ -447,6 +452,7 @@ func run() error {
 		QBClient:               qbClient,
 		QBOAuthManager:         qbOAuthManager,
 		QBWebhookVerifierToken: qbWebhookVerifier,
+		ShippoWebhookSecret:    shippoWebhookSecret,
 		QBHTTPClient:           qbHTTPClient,
 		HelpRegistry:           helpRegistry,
 		RateLimiter:            rateLimiter,

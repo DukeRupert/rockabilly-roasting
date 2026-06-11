@@ -6,6 +6,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestShipmentStatus_CanAdvanceTo(t *testing.T) {
+	t.Run("forward transitions are allowed", func(t *testing.T) {
+		assert.True(t, ShipmentStatusLabelCreated.CanAdvanceTo(ShipmentStatusInTransit))
+		assert.True(t, ShipmentStatusInTransit.CanAdvanceTo(ShipmentStatusDelivered))
+		assert.True(t, ShipmentStatusInTransit.CanAdvanceTo(ShipmentStatusException))
+		// An exception (returned/failed) can still resolve to delivered.
+		assert.True(t, ShipmentStatusException.CanAdvanceTo(ShipmentStatusDelivered))
+	})
+
+	t.Run("same status is not an advance (idempotent replay)", func(t *testing.T) {
+		assert.False(t, ShipmentStatusDelivered.CanAdvanceTo(ShipmentStatusDelivered))
+		assert.False(t, ShipmentStatusInTransit.CanAdvanceTo(ShipmentStatusInTransit))
+	})
+
+	t.Run("backward transitions are blocked (late/out-of-order events)", func(t *testing.T) {
+		assert.False(t, ShipmentStatusDelivered.CanAdvanceTo(ShipmentStatusInTransit))
+		assert.False(t, ShipmentStatusDelivered.CanAdvanceTo(ShipmentStatusException))
+		assert.False(t, ShipmentStatusInTransit.CanAdvanceTo(ShipmentStatusLabelCreated))
+	})
+}
+
 func TestShippingConfig_IsLocal(t *testing.T) {
 	cfg := ShippingConfig{
 		LocalZipCodes: []string{"99336", "99337", "99352"},

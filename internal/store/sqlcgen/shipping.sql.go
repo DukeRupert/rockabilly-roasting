@@ -118,6 +118,42 @@ func (q *Queries) GetShipmentByID(ctx context.Context, id uuid.UUID) (Shipment, 
 	return i, err
 }
 
+const getShipmentByTrackingNumber = `-- name: GetShipmentByTrackingNumber :one
+SELECT id, order_id, status, provider, tracking_number, label_url, carrier_name, service_name, label_cost_cents, label_currency, weight_oz, length_in, width_in, height_in, created_by, created_at, label_created_at, shipped_at, delivered_at, label_r2_key, label_format FROM shipments
+WHERE tracking_number = $1
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+func (q *Queries) GetShipmentByTrackingNumber(ctx context.Context, trackingNumber string) (Shipment, error) {
+	row := q.db.QueryRow(ctx, getShipmentByTrackingNumber, trackingNumber)
+	var i Shipment
+	err := row.Scan(
+		&i.ID,
+		&i.OrderID,
+		&i.Status,
+		&i.Provider,
+		&i.TrackingNumber,
+		&i.LabelUrl,
+		&i.CarrierName,
+		&i.ServiceName,
+		&i.LabelCostCents,
+		&i.LabelCurrency,
+		&i.WeightOz,
+		&i.LengthIn,
+		&i.WidthIn,
+		&i.HeightIn,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.LabelCreatedAt,
+		&i.ShippedAt,
+		&i.DeliveredAt,
+		&i.LabelR2Key,
+		&i.LabelFormat,
+	)
+	return i, err
+}
+
 const getShipmentLabelKey = `-- name: GetShipmentLabelKey :one
 SELECT label_r2_key FROM shipments WHERE id = $1
 `

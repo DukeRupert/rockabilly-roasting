@@ -29,6 +29,7 @@ type RevenueProps struct {
 // hides the comparison.
 type SubscriptionsProps struct {
 	Days          int
+	Mode          string // "delta" (per-day net change, default) or "total" (running base)
 	Trend         []charts.ChartPoint
 	CurrentActive int
 	PriorActive   int
@@ -274,7 +275,7 @@ templ RevenueCard(props RevenueProps) {
 			</div>
 		</div>
 		<div class="mt-4">
-			@charts.BarVertical(props.Trend)
+			@charts.Trend("revenue-trend", "line", props.Trend)
 		</div>
 	</div>
 }
@@ -343,32 +344,63 @@ templ SubscriptionsCard(props SubscriptionsProps) {
 					<p class="text-xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.CurrentActive) }</p>
 					@subscriptionsDelta(props)
 				</div>
-				<p class="mt-1 text-xs text-rr-muted">Live base — active, paused &amp; past-due, until cancelled.</p>
+				if props.Mode == "delta" {
+					<p class="mt-1 text-xs text-rr-muted">Net change per day — new &amp; reactivated minus cancelled.</p>
+				} else {
+					<p class="mt-1 text-xs text-rr-muted">Live base — active, paused &amp; past-due, until cancelled.</p>
+				}
 			</div>
-			<div class="flex items-center gap-1 text-xs shrink-0">
-				@subscriptionsPeriodToggle(7, props.Days)
-				@subscriptionsPeriodToggle(30, props.Days)
-				@subscriptionsPeriodToggle(90, props.Days)
+			<div class="flex flex-col items-end gap-1.5 shrink-0">
+				<div class="flex items-center gap-1 text-xs">
+					@subscriptionsModeToggle("delta", "Net", props.Mode, props.Days)
+					@subscriptionsModeToggle("total", "Total", props.Mode, props.Days)
+				</div>
+				<div class="flex items-center gap-1 text-xs">
+					@subscriptionsPeriodToggle(7, props.Days, props.Mode)
+					@subscriptionsPeriodToggle(30, props.Days, props.Mode)
+					@subscriptionsPeriodToggle(90, props.Days, props.Mode)
+				</div>
 			</div>
 		</div>
 		<div class="mt-4">
-			@charts.BarVertical(props.Trend)
+			if props.Mode == "delta" {
+				@charts.Trend("subscriptions-trend", "delta", props.Trend)
+			} else {
+				@charts.Trend("subscriptions-trend", "line", props.Trend)
+			}
 		</div>
 	</div>
 }
 
-templ subscriptionsPeriodToggle(value, current int) {
+templ subscriptionsPeriodToggle(value, current int, mode string) {
 	if value == current {
 		<span class="px-2 py-1 text-xs font-semibold uppercase tracking-wide bg-rr-heading text-rr-bg rounded-sm">{ fmt.Sprintf("%dd", value) }</span>
 	} else {
 		<a
-			href={ templ.SafeURL(fmt.Sprintf("/admin/dashboard/subscriptions?days=%d", value)) }
-			hx-get={ fmt.Sprintf("/admin/dashboard/subscriptions?days=%d", value) }
+			href={ templ.SafeURL(fmt.Sprintf("/admin/dashboard/subscriptions?days=%d&mode=%s", value, mode)) }
+			hx-get={ fmt.Sprintf("/admin/dashboard/subscriptions?days=%d&mode=%s", value, mode) }
 			hx-target="#subscriptions-card"
 			hx-swap="outerHTML"
 			class="px-2 py-1 border border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading font-semibold uppercase tracking-wide"
 			style="font-size:0.65rem;"
 		>{ fmt.Sprintf("%dd", value) }</a>
+	}
+}
+
+// subscriptionsModeToggle switches the chart between per-day net change ("delta")
+// and the running active base ("total"), preserving the selected day window.
+templ subscriptionsModeToggle(value, label, current string, days int) {
+	if value == current {
+		<span class="px-2 py-1 text-xs font-semibold uppercase tracking-wide bg-rr-heading text-rr-bg rounded-sm">{ label }</span>
+	} else {
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/admin/dashboard/subscriptions?days=%d&mode=%s", days, value)) }
+			hx-get={ fmt.Sprintf("/admin/dashboard/subscriptions?days=%d&mode=%s", days, value) }
+			hx-target="#subscriptions-card"
+			hx-swap="outerHTML"
+			class="px-2 py-1 border border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading font-semibold uppercase tracking-wide"
+			style="font-size:0.65rem;"
+		>{ label }</a>
 	}
 }
 

@@ -120,8 +120,9 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
-		// Active-subscriptions trend — same 7/30/90 window as revenue
-		props.Subscriptions, txErr = d.buildSubscriptionsProps(ctx, tx, revenueDays(r), todayStart)
+		// Active-subscriptions trend — same 7/30/90 window as revenue, plus a
+		// net-change / total mode from ?mode=
+		props.Subscriptions, txErr = d.buildSubscriptionsProps(ctx, tx, revenueDays(r), subscriptionsMode(r), todayStart)
 		if txErr != nil {
 			return txErr
 		}
@@ -207,6 +208,16 @@ func revenueDays(r *http.Request) int {
 	}
 }
 
+// subscriptionsMode reads the subscriptions chart mode from ?mode=. It defaults
+// to "delta" (per-day net change) since day-to-day movement is usually the
+// signal; "total" shows the running active base as a level.
+func subscriptionsMode(r *http.Request) string {
+	if r.URL.Query().Get("mode") == "total" {
+		return "total"
+	}
+	return "delta"
+}
+
 // buildRevenueProps fetches the daily trend plus the prior-window total so the
 // card can render the period-over-period delta. The prior window is the same
 // length as the current one, ending the day before trendStart.
@@ -285,7 +296,7 @@ func (d *Deps) handleAdminRevenue(w http.ResponseWriter, r *http.Request) {
 // live base at the window start, the per-day net deltas across the window, and
 // the resulting daily levels. PriorActive is the window-start base; the card
 // renders growth against it. CurrentActive is the final (today's) level.
-func (d *Deps) buildSubscriptionsProps(ctx context.Context, tx pgx.Tx, days int, todayStart time.Time) (admin.SubscriptionsProps, error) {
+func (d *Deps) buildSubscriptionsProps(ctx context.Context, tx pgx.Tx, days int, mode string, todayStart time.Time) (admin.SubscriptionsProps, error) {
 	trendStart := todayStart.AddDate(0, 0, -(days - 1))
 	trendEnd := todayStart.AddDate(0, 0, 1) // exclusive upper bound
 
@@ -298,10 +309,17 @@ func (d *Deps) buildSubscriptionsProps(ctx context.Context, tx pgx.Tx, days int,
 		return admin.SubscriptionsProps{}, err
 	}
 
+	// buildSubscriptionTrend gives us the running levels and today's count; in
+	// delta mode we keep the count for the headline but swap the chart series for
+	// the per-day net change.
 	trend, currentActive := buildSubscriptionTrend(deltas, baseline, trendStart, d.MerchantTZ, days)
+	if mode == "delta" {
+		trend = buildSubscriptionDeltaTrend(deltas, trendStart, d.MerchantTZ, days)
+	}
 
 	return admin.SubscriptionsProps{
 		Days:          days,
+		Mode:          mode,
 		Trend:         trend,
 		CurrentActive: currentActive,
 		PriorActive:   baseline,
@@ -359,11 +377,63 @@ func buildSubscriptionTrend(deltas []domain.SubscriptionDelta, baseline int, tre
 	return out, levels[days-1]
 }
 
+// buildSubscriptionDeltaTrend renders the per-day net change in the active base
+// over `days` ending today: positive on net sign-ups, negative on net churn. A
+// day with no movement is zero. Magnitudes are normalized symmetrically against
+// the largest absolute swing in the window, so the zero line sits mid-chart and
+// gains/losses read at a glance; Sub carries the signed count for the tooltip.
+func buildSubscriptionDeltaTrend(deltas []domain.SubscriptionDelta, trendStart time.Time, tz *time.Location, days int) []charts.ChartPoint {
+	byDay := make(map[string]int, len(deltas))
+	for _, dlt := range deltas {
+		byDay[dlt.Date.Format("2006-01-02")] = dlt.Net
+	}
+
+	nets := make([]int, days)
+	maxAbs := 0
+	for i := 0; i < days; i++ {
+		day := trendStart.AddDate(0, 0, i).In(tz)
+		n := byDay[day.Format("2006-01-02")]
+		nets[i] = n
+		a := n
+		if a < 0 {
+			a = -a
+		}
+		if a > maxAbs {
+			maxAbs = a
+		}
+	}
+
+	out := make([]charts.ChartPoint, days)
+	for i := 0; i < days; i++ {
+		mag := 0.0
+		if maxAbs > 0 {
+			mag = float64(nets[i]) / float64(maxAbs)
+		}
+		day := trendStart.AddDate(0, 0, i).In(tz)
+		label := day.Format("Jan 2")
+		if i == days-1 {
+			label = "Today"
+		}
+		sub := "0"
+		if nets[i] != 0 {
+			sub = fmt.Sprintf("%+d", nets[i])
+		}
+		out[i] = charts.ChartPoint{
+			Label:     label,
+			Sub:       sub,
+			Magnitude: mag,
+			Highlight: i == days-1,
+		}
+	}
+	return out
+}
+
 // handleAdminSubscriptionsTrend renders just the subscriptions card for an htmx
 // swap when the user toggles the 7/30/90-day period selector.
 func (d *Deps) handleAdminSubscriptionsTrend(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	days := revenueDays(r)
+	mode := subscriptionsMode(r)
 
 	now := time.Now().In(d.MerchantTZ)
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, d.MerchantTZ)
@@ -371,7 +441,7 @@ func (d *Deps) handleAdminSubscriptionsTrend(w http.ResponseWriter, r *http.Requ
 	var sp admin.SubscriptionsProps
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		sp, txErr = d.buildSubscriptionsProps(ctx, tx, days, todayStart)
+		sp, txErr = d.buildSubscriptionsProps(ctx, tx, days, mode, todayStart)
 		return txErr
 	})
 	if err != nil {

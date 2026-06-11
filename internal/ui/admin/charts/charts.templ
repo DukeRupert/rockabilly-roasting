@@ -6,7 +6,10 @@
 // to business types.
 package charts
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // ChartPoint is a single time-series datum for vertical bar charts.
 //   - Label: x-axis label (e.g. "Apr 22")
@@ -32,114 +35,49 @@ type LabeledValue struct {
 	Magnitude float64
 }
 
-// BarVertical renders a vertical bar chart of time-series points.
-// Bars are evenly spaced across the SVG width; each bar's height is
-// Magnitude * (chart height - top label area). Hovering a bar shows a
-// floating HTML tooltip with the bar's Label and Sub value, positioned
-// by viewBox percentage so it tracks the bar across container widths.
-templ BarVertical(data []ChartPoint) {
+// trendJSON serializes a time-series into the compact shape admin-charts.js
+// reads from the canvas data-trend attribute: parallel arrays of x labels,
+// magnitudes (the [0,1] bar heights, reused as line y-values), and the
+// pre-formatted tooltip values. encoding/json HTML-escapes <,>,& and templ
+// escapes the attribute quotes, so embedding the result in an attribute is safe.
+func trendJSON(data []ChartPoint) string {
+	type payload struct {
+		Labels []string  `json:"labels"`
+		Mags   []float64 `json:"mags"`
+		Subs   []string  `json:"subs"`
+	}
+	p := payload{
+		Labels: make([]string, len(data)),
+		Mags:   make([]float64, len(data)),
+		Subs:   make([]string, len(data)),
+	}
+	for i, d := range data {
+		p.Labels[i] = d.Label
+		p.Mags[i] = d.Magnitude
+		p.Subs[i] = d.Sub
+	}
+	b, err := json.Marshal(p)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
+}
+
+// Trend renders a Chart.js time-series from []ChartPoint. kind selects the
+// rendering: "line" draws a filled line of non-negative magnitudes (e.g. revenue
+// or a running total); "delta" draws a zero-centered bar chart of signed
+// magnitudes in [-1,1], gains up and losses down (e.g. net subscription change).
+// The trend is baked into the canvas data-trend attribute and drawn by
+// rrRenderTrends (admin-charts.js) on initial load and after every htmx card
+// swap via a global htmx:load hook. id must be unique per page.
+templ Trend(id, kind string, data []ChartPoint) {
 	if len(data) == 0 {
 		<p class="text-sm text-rr-muted">No data.</p>
 	} else {
-		<div class="relative" x-data="{ tip: null }">
-			<svg
-				viewBox="0 0 700 220"
-				preserveAspectRatio="none"
-				class="block w-full"
-				style="height: 14rem;"
-				role="img"
-				aria-label="Bar chart"
-				@mouseleave="tip = null"
-			>
-				@verticalBars(data)
-			</svg>
-			<div
-				x-show="tip"
-				x-cloak
-				:style="tip ? `left: ${tip.left}; transform: translateX(-50%);` : ''"
-				class="absolute top-0 pointer-events-none border border-rr-border bg-rr-heading text-rr-bg px-2 py-1 text-xs whitespace-nowrap rounded-sm tabular-nums"
-			>
-				<span x-text="tip && tip.date" class="opacity-80 mr-2"></span>
-				<span x-text="tip && tip.value" class="font-bold"></span>
-			</div>
+		<div class="relative" style="height: 14rem;">
+			<canvas id={ id } data-trend={ trendJSON(data) } data-kind={ kind } role="img" aria-label="Trend chart"></canvas>
 		</div>
 	}
-}
-
-templ verticalBars(data []ChartPoint) {
-	{{
-		// Reserved areas: 28px top for value label, 26px bottom for x label.
-		// Bars share the middle band (~166px tall).
-		const W, H = 700.0, 220.0
-		const topPad, botPad = 28.0, 26.0
-		const barInsetFrac = 0.18 // gap between bars as fraction of slot width
-		bandH := H - topPad - botPad
-		n := float64(len(data))
-		slotW := W / n
-		barW := slotW * (1.0 - 2.0*barInsetFrac)
-		// Show ~14 x-axis labels regardless of density. With 7-day view every
-		// bar is labeled; at 90 days only every 7th to avoid overlap.
-		stride := (len(data)-1)/14 + 1
-	}}
-	for i, p := range data {
-		{{
-			x := float64(i)*slotW + slotW*barInsetFrac
-			barH := p.Magnitude * bandH
-			if barH < 2 && p.Magnitude > 0 {
-				barH = 2 // ensure non-zero days are visible
-			}
-			y := topPad + (bandH - barH)
-			cx := float64(i)*slotW + slotW/2
-			slotX := float64(i) * slotW
-			leftPct := cx / W * 100
-			fillClass := "fill-rr-heading"
-			if p.Highlight {
-				fillClass = "fill-rr-red"
-			}
-			tipExpr := fmt.Sprintf("tip = { left: '%.2f%%', date: %q, value: %q }", leftPct, p.Label, p.Sub)
-			showLabel := i%stride == 0 || i == len(data)-1
-		}}
-		<rect
-			x={ fmt.Sprintf("%.2f", x) }
-			y={ fmt.Sprintf("%.2f", y) }
-			width={ fmt.Sprintf("%.2f", barW) }
-			height={ fmt.Sprintf("%.2f", barH) }
-			class={ fillClass }
-		></rect>
-		<rect
-			x={ fmt.Sprintf("%.2f", slotX) }
-			y="0"
-			width={ fmt.Sprintf("%.2f", slotW) }
-			height={ fmt.Sprintf("%.2f", H) }
-			fill="transparent"
-			@mouseenter={ tipExpr }
-		></rect>
-		if p.Sub != "" && p.Magnitude > 0 && p.Highlight {
-			<text
-				x={ fmt.Sprintf("%.2f", cx) }
-				y={ fmt.Sprintf("%.2f", y-6) }
-				text-anchor="middle"
-				class="fill-rr-muted"
-				style="font-family: 'Special Elite', monospace; font-size: 10px;"
-			>{ p.Sub }</text>
-		}
-		if showLabel {
-			<text
-				x={ fmt.Sprintf("%.2f", cx) }
-				y={ fmt.Sprintf("%.2f", H-8) }
-				text-anchor="middle"
-				class="fill-rr-muted"
-				style="font-family: 'Special Elite', monospace; font-size: 10px;"
-			>{ p.Label }</text>
-		}
-	}
-	<line
-		x1="0" x2={ fmt.Sprintf("%.2f", W) }
-		y1={ fmt.Sprintf("%.2f", H-botPad+1) }
-		y2={ fmt.Sprintf("%.2f", H-botPad+1) }
-		class="stroke-rr-border"
-		stroke-width="1"
-	></line>
 }
 
 // BarHorizontal renders a horizontal bar chart of labeled values.

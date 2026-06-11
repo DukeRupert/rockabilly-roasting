@@ -1301,23 +1301,23 @@ func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
 		PaymentStatus:         strings.TrimSpace(r.FormValue("payment_status")),
 		OrderStatus:           strings.TrimSpace(r.FormValue("order_status")),
 		Notes:                 strings.TrimSpace(r.FormValue("notes")),
-		SubtotalCents:         r.FormValue("subtotal_cents"),
-		DiscountCents:         r.FormValue("discount_cents"),
-		ShippingCents:         r.FormValue("shipping_cents"),
-		TaxCents:              r.FormValue("tax_cents"),
-		TotalCents:            r.FormValue("total_cents"),
+		Subtotal:              r.FormValue("subtotal"),
+		Discount:              r.FormValue("discount"),
+		Shipping:              r.FormValue("shipping"),
+		Tax:                   r.FormValue("tax"),
+		Total:                 r.FormValue("total"),
 	}
 
 	skus := r.Form["item_sku"]
 	qtys := r.Form["item_quantity"]
-	prices := r.Form["item_unit_price_cents"]
+	prices := r.Form["item_unit_price"]
 	for i := range skus {
 		row := admin.OrderNewItemRow{SKU: strings.TrimSpace(skus[i])}
 		if i < len(qtys) {
 			row.Quantity = strings.TrimSpace(qtys[i])
 		}
 		if i < len(prices) {
-			row.UnitPriceCents = strings.TrimSpace(prices[i])
+			row.UnitPrice = strings.TrimSpace(prices[i])
 		}
 		form.Items = append(form.Items, row)
 	}
@@ -1348,25 +1348,25 @@ func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
 		errs["shipping_postal_code"] = "Postal code is required"
 	}
 
-	subtotal, ok := parseCents(form.SubtotalCents)
+	subtotal, ok := parseDollars(form.Subtotal)
 	if !ok {
-		errs["subtotal_cents"] = "Must be a whole number of cents"
+		errs["subtotal"] = "Enter a dollar amount, e.g. 18.00"
 	}
-	discount, ok := parseCents(form.DiscountCents)
+	discount, ok := parseDollars(form.Discount)
 	if !ok {
-		errs["discount_cents"] = "Must be a whole number of cents"
+		errs["discount"] = "Enter a dollar amount, e.g. 18.00"
 	}
-	shippingCents, ok := parseCents(form.ShippingCents)
+	shippingCents, ok := parseDollars(form.Shipping)
 	if !ok {
-		errs["shipping_cents"] = "Must be a whole number of cents"
+		errs["shipping"] = "Enter a dollar amount, e.g. 18.00"
 	}
-	taxCents, ok := parseCents(form.TaxCents)
+	taxCents, ok := parseDollars(form.Tax)
 	if !ok {
-		errs["tax_cents"] = "Must be a whole number of cents"
+		errs["tax"] = "Enter a dollar amount, e.g. 18.00"
 	}
-	total, ok := parseCents(form.TotalCents)
+	total, ok := parseDollars(form.Total)
 	if !ok {
-		errs["total_cents"] = "Must be a whole number of cents"
+		errs["total"] = "Enter a dollar amount, e.g. 18.00"
 	}
 
 	switch domain.PaymentStatus(form.PaymentStatus) {
@@ -1392,7 +1392,7 @@ func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
 	// blanks). Variant SKU lookup happens inside the tx.
 	validRows := 0
 	for i, row := range form.Items {
-		if row.SKU == "" && row.Quantity == "" && row.UnitPriceCents == "" {
+		if row.SKU == "" && row.Quantity == "" && row.UnitPrice == "" {
 			continue
 		}
 		if row.SKU == "" {
@@ -1403,8 +1403,8 @@ func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
 			errs[fmt.Sprintf("item_%d_quantity", i)] = "Quantity must be > 0"
 			continue
 		}
-		if unit, uOk := parseCents(row.UnitPriceCents); !uOk || unit < 0 {
-			errs[fmt.Sprintf("item_%d_unit_price_cents", i)] = "Unit price must be ≥ 0"
+		if unit, uOk := parseDollars(row.UnitPrice); !uOk || unit < 0 {
+			errs[fmt.Sprintf("item_%d_unit_price", i)] = "Unit price must be ≥ 0"
 			continue
 		}
 		validRows++
@@ -1434,7 +1434,7 @@ func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
 		// Resolve variant IDs from SKUs (one query per row — fine for admin).
 		manualItems := make([]app.ManualOrderItem, 0, validRows)
 		for i, row := range form.Items {
-			if row.SKU == "" && row.Quantity == "" && row.UnitPriceCents == "" {
+			if row.SKU == "" && row.Quantity == "" && row.UnitPrice == "" {
 				continue
 			}
 			variant, vErr := d.CatalogService.GetVariantBySKU(ctx, tx, row.SKU)
@@ -1446,7 +1446,7 @@ func (d *Deps) handleAdminOrderCreate(w http.ResponseWriter, r *http.Request) {
 				return fmt.Errorf("lookup variant %s: %w", row.SKU, vErr)
 			}
 			qty, _ := parseCents(row.Quantity)
-			unit, _ := parseCents(row.UnitPriceCents)
+			unit, _ := parseDollars(row.UnitPrice)
 			manualItems = append(manualItems, app.ManualOrderItem{
 				VariantID: variant.ID,
 				Quantity:  qty,
@@ -1558,4 +1558,60 @@ func parseCents(s string) (int, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+// parseDollars accepts a dollar amount as typed by staff ("18", "18.5",
+// "18.00", "$18.00", "1,800") and returns the value in integer cents. Empty
+// string parses as 0 so optional money fields default cleanly. At most two
+// fractional digits are allowed; anything else (letters, extra decimals, a bare
+// "-") fails. Negative amounts are rejected — these are order totals, not
+// adjustments.
+func parseDollars(s string) (int, bool) {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(s, "$")
+	s = strings.ReplaceAll(s, ",", "")
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, true
+	}
+
+	whole, frac, hasDot := strings.Cut(s, ".")
+	// A leading "." (".50") means no whole part; treat as zero dollars. A bare
+	// "." with no fractional digits is not a number.
+	if whole == "" && hasDot {
+		if frac == "" {
+			return 0, false
+		}
+		whole = "0"
+	}
+	if whole == "" {
+		return 0, false
+	}
+	dollars, err := strconv.Atoi(whole)
+	if err != nil || dollars < 0 {
+		return 0, false
+	}
+
+	cents := 0
+	if hasDot {
+		switch len(frac) {
+		case 0:
+			// "18." — tolerate a trailing dot.
+		case 1:
+			d, err := strconv.Atoi(frac)
+			if err != nil || d < 0 {
+				return 0, false
+			}
+			cents = d * 10
+		case 2:
+			d, err := strconv.Atoi(frac)
+			if err != nil || d < 0 {
+				return 0, false
+			}
+			cents = d
+		default:
+			return 0, false
+		}
+	}
+	return dollars*100 + cents, true
 }

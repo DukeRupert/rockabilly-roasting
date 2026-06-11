@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -8,9 +9,9 @@ import (
 )
 
 type OrderNewItemRow struct {
-	SKU            string
-	Quantity       string
-	UnitPriceCents string
+	SKU       string
+	Quantity  string
+	UnitPrice string // dollar string as entered, e.g. "18.00"
 }
 
 type OrderNewForm struct {
@@ -26,11 +27,11 @@ type OrderNewForm struct {
 	ShippingPostalCode    string
 	ShippingCountry       string
 	Items                 []OrderNewItemRow
-	SubtotalCents         string
-	DiscountCents         string
-	ShippingCents         string
-	TaxCents              string
-	TotalCents            string
+	Subtotal              string // dollar strings as entered, e.g. "18.00"
+	Discount              string
+	Shipping              string
+	Tax                   string
+	Total                 string
 	StripePaymentIntentID string
 	PaymentStatus         string
 	OrderStatus           string
@@ -77,7 +78,7 @@ templ OrderNewContent(props OrderNewProps) {
 		</div>
 	}
 	<form method="post" action="/admin/orders/new" class="mt-6">
-		<div class="space-y-8">
+		<div class="space-y-8" x-data={ orderNewItemsState(props.Form, props.FieldErrors) } x-init="recompute()">
 			<!-- Customer -->
 			<div class="border-b border-rr-border pb-8">
 				<h2 class="text-base/7 font-semibold text-rr-heading">Customer</h2>
@@ -159,11 +160,11 @@ templ OrderNewContent(props OrderNewProps) {
 				</div>
 			</div>
 			<!-- Line items -->
-			<div class="border-b border-rr-border pb-8" x-data={ orderNewItemsState(props.Form) }>
+			<div class="border-b border-rr-border pb-8">
 				<div class="flex items-center justify-between">
 					<div>
 						<h2 class="text-base/7 font-semibold text-rr-heading">Line items</h2>
-						<p class="mt-1 text-sm/6 text-rr-muted">Search the catalog to add a product, or type a SKU by hand. Unit price is in cents.</p>
+						<p class="mt-1 text-sm/6 text-rr-muted">Search the catalog to add a product, or type a SKU by hand. Prices are in dollars.</p>
 					</div>
 					<button type="button" @click="add()" class="inline-flex items-center rounded-sm px-3 py-1.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised">+ Add line</button>
 				</div>
@@ -196,57 +197,75 @@ templ OrderNewContent(props OrderNewProps) {
 				</div>
 				<div class="mt-4 space-y-3">
 					<template x-for="(row, i) in rows" :key="i">
-						<div class="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-12 items-end border-b border-rr-border/50 pb-3">
+						<div class="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-12 items-start border-b border-rr-border/50 pb-3">
 							<div class="sm:col-span-5">
 								<label class="block text-xs/5 font-medium text-rr-muted" :for="'sku-' + i">
 									SKU
 									<span x-show="row.label" class="ml-1 font-normal text-rr-body" x-text="row.label"></span>
 								</label>
-								<input :id="'sku-' + i" name="item_sku" type="text" x-model="row.sku" placeholder="e.g. CFE-001-12OZ" class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+								<input :id="'sku-' + i" name="item_sku" type="text" x-model="row.sku" placeholder="e.g. CFE-001-12OZ" class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 focus:outline-2 focus:-outline-offset-2" :class="row.skuErr ? 'outline-red-300 focus:outline-red-500' : 'outline-rr-border focus:outline-rr-red'"/>
+								<p x-show="row.skuErr" x-text="row.skuErr" class="mt-1 text-xs text-red-600"></p>
 							</div>
 							<div class="sm:col-span-2">
 								<label class="block text-xs/5 font-medium text-rr-muted" :for="'qty-' + i">Qty</label>
-								<input :id="'qty-' + i" name="item_quantity" type="number" min="1" x-model="row.quantity" class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+								<input :id="'qty-' + i" name="item_quantity" type="number" min="1" x-model="row.quantity" @input="recompute()" class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 focus:outline-2 focus:-outline-offset-2" :class="row.qtyErr ? 'outline-red-300 focus:outline-red-500' : 'outline-rr-border focus:outline-rr-red'"/>
+								<p x-show="row.qtyErr" x-text="row.qtyErr" class="mt-1 text-xs text-red-600"></p>
 							</div>
 							<div class="sm:col-span-3">
-								<label class="block text-xs/5 font-medium text-rr-muted" :for="'price-' + i">Unit price (cents)</label>
-								<input :id="'price-' + i" name="item_unit_price_cents" type="number" min="0" x-model="row.price" placeholder="1800" class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+								<label class="block text-xs/5 font-medium text-rr-muted" :for="'price-' + i">Unit price</label>
+								<div class="relative">
+									<span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-rr-muted">$</span>
+									<input :id="'price-' + i" name="item_unit_price" type="text" inputmode="decimal" x-model="row.price" @input="recompute()" placeholder="18.00" class="block w-full rounded-sm bg-rr-surface pl-7 pr-3 py-1.5 text-sm tabular-nums text-rr-heading outline-1 -outline-offset-1 focus:outline-2 focus:-outline-offset-2" :class="row.priceErr ? 'outline-red-300 focus:outline-red-500' : 'outline-rr-border focus:outline-rr-red'"/>
+								</div>
+								<p x-show="row.priceErr" x-text="row.priceErr" class="mt-1 text-xs text-red-600"></p>
 							</div>
-							<div class="sm:col-span-2 flex justify-end">
+							<div class="sm:col-span-2 flex justify-end pt-6">
 								<button type="button" @click="remove(i)" class="text-sm text-red-700 hover:underline">Remove</button>
 							</div>
 						</div>
 					</template>
 				</div>
+				<p class="mt-3 text-sm text-rr-muted">
+					Line items total
+					<span class="font-medium tabular-nums text-rr-body">$<span x-text="money(lineSubtotal())"></span></span>
+				</p>
 			</div>
 			<!-- Totals -->
 			<div class="border-b border-rr-border pb-8">
-				<h2 class="text-base/7 font-semibold text-rr-heading">Totals (cents)</h2>
-				<p class="mt-1 text-sm/6 text-rr-muted">Whole cents — e.g. <code>1800</code> means $18.00. Empty fields default to 0.</p>
+				<h2 class="text-base/7 font-semibold text-rr-heading">Totals</h2>
+				<p class="mt-1 text-sm/6 text-rr-muted">Subtotal and total fill in from the line items — edit any field to override. Dollars, e.g. <code>18.00</code>.</p>
 				<div class="mt-6 grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-5">
 					<div>
-						<label class="block text-sm/6 font-medium text-rr-heading" for="subtotal_cents">Subtotal</label>
-						<input id="subtotal_cents" name="subtotal_cents" type="number" min="0" value={ props.Form.SubtotalCents } class={ inputClasses(hasError(props.FieldErrors, "subtotal_cents")) }/>
-						if msg := getError(props.FieldErrors, "subtotal_cents"); msg != "" {
+						<label class="block text-sm/6 font-medium text-rr-heading" for="subtotal">Subtotal</label>
+						@dollarInput("subtotal", "subtotal", "subtotalDirty = true; recompute()", false, hasError(props.FieldErrors, "subtotal"))
+						<p x-show="subtotalMismatch()" x-cloak class="mt-2 text-xs text-rr-body">
+							Lines total $<span x-text="money(lineSubtotal())" class="tabular-nums"></span>.
+							<button type="button" @click="applySubtotal()" class="font-semibold text-rr-red underline">Use that</button>
+						</p>
+						if msg := getError(props.FieldErrors, "subtotal"); msg != "" {
 							<p class="mt-2 text-sm text-red-600">{ msg }</p>
 						}
 					</div>
 					<div>
-						<label class="block text-sm/6 font-medium text-rr-heading" for="discount_cents">Discount</label>
-						<input id="discount_cents" name="discount_cents" type="number" min="0" value={ props.Form.DiscountCents } class={ inputClasses(hasError(props.FieldErrors, "discount_cents")) }/>
+						<label class="block text-sm/6 font-medium text-rr-heading" for="discount">Discount</label>
+						@dollarInput("discount", "discount", "recompute()", false, hasError(props.FieldErrors, "discount"))
 					</div>
 					<div>
-						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping_cents">Shipping</label>
-						<input id="shipping_cents" name="shipping_cents" type="number" min="0" value={ props.Form.ShippingCents } class={ inputClasses(hasError(props.FieldErrors, "shipping_cents")) }/>
+						<label class="block text-sm/6 font-medium text-rr-heading" for="shipping">Shipping</label>
+						@dollarInput("shipping", "shipping", "recompute()", false, hasError(props.FieldErrors, "shipping"))
 					</div>
 					<div>
-						<label class="block text-sm/6 font-medium text-rr-heading" for="tax_cents">Tax</label>
-						<input id="tax_cents" name="tax_cents" type="number" min="0" value={ props.Form.TaxCents } class={ inputClasses(hasError(props.FieldErrors, "tax_cents")) }/>
+						<label class="block text-sm/6 font-medium text-rr-heading" for="tax">Tax</label>
+						@dollarInput("tax", "tax", "recompute()", false, hasError(props.FieldErrors, "tax"))
 					</div>
 					<div>
-						<label class="block text-sm/6 font-medium text-rr-heading" for="total_cents">Total</label>
-						<input id="total_cents" name="total_cents" type="number" min="0" required value={ props.Form.TotalCents } class={ inputClasses(hasError(props.FieldErrors, "total_cents")) }/>
-						if msg := getError(props.FieldErrors, "total_cents"); msg != "" {
+						<label class="block text-sm/6 font-medium text-rr-heading" for="total">Total</label>
+						@dollarInput("total", "total", "totalDirty = true", true, hasError(props.FieldErrors, "total"))
+						<p x-show="totalMismatch()" x-cloak class="mt-2 text-xs text-rr-body">
+							Subtotal − discount + shipping + tax = $<span x-text="money(expectedTotal())" class="tabular-nums"></span>.
+							<button type="button" @click="applyTotal()" class="font-semibold text-rr-red underline">Use that</button>
+						</p>
+						if msg := getError(props.FieldErrors, "total"); msg != "" {
 							<p class="mt-2 text-sm text-red-600">{ msg }</p>
 						}
 					</div>
@@ -319,37 +338,63 @@ templ orderStatusOption(value, label, current string) {
 	}
 }
 
-// orderNewItemsState builds the initial Alpine state from the (re-rendered)
-// form. On a fresh form it seeds three empty rows; on validation re-render it
-// keeps whatever the admin already filled in so they don't retype. Each row also
+// orderNewItemsState builds the initial Alpine state for the line items *and*
+// the totals block (they share one scope so the totals can fill in from the
+// lines). On a fresh form it seeds three empty rows; on validation re-render it
+// keeps whatever the admin already filled in so they don't retype. Each row
 // carries a `label` (product title) populated when the line was added via the
-// search picker, so staff see what they picked next to the bare SKU.
+// search picker, plus per-field error strings (skuErr/qtyErr/priceErr) so the
+// server-side line validation surfaces inline on the right row.
 //
-// addItem fills the first empty row (or appends one) from a picked search
-// result; onPick is the click-delegation handler for the results dropdown —
-// results are htmx-swapped in, so we read the data-* attributes off the clicked
-// button rather than relying on Alpine to have initialised the swapped DOM.
-func orderNewItemsState(f OrderNewForm) string {
+// Money is dollars in the UI (cents on the wire). Subtotal and total auto-fill
+// from the lines via recompute() until the staffer overrides a field — the
+// *Dirty flags track that. On re-render a non-empty seeded value is treated as
+// dirty so we never clobber what was submitted. addItem converts the picker's
+// cents price to a dollar string; onPick is the click-delegation handler for the
+// htmx-swapped results dropdown.
+func orderNewItemsState(f OrderNewForm, errs map[string]string) string {
+	blankRow := "{ sku: '', quantity: '', price: '', label: '', skuErr: '', qtyErr: '', priceErr: '' }"
 	var rows string
 	if len(f.Items) == 0 {
-		rows = `{ sku: '', quantity: '', price: '', label: '' },{ sku: '', quantity: '', price: '', label: '' },{ sku: '', quantity: '', price: '', label: '' }`
+		rows = blankRow + "," + blankRow + "," + blankRow
 	} else {
 		for i, row := range f.Items {
 			if i > 0 {
 				rows += ","
 			}
-			rows += "{ sku: " + jsString(row.SKU) + ", quantity: " + jsString(row.Quantity) + ", price: " + jsString(row.UnitPriceCents) + ", label: '' }"
+			rows += "{ sku: " + jsString(row.SKU) +
+				", quantity: " + jsString(row.Quantity) +
+				", price: " + jsString(row.UnitPrice) +
+				", label: '', skuErr: " + jsString(getError(errs, fmt.Sprintf("item_%d_sku", i))) +
+				", qtyErr: " + jsString(getError(errs, fmt.Sprintf("item_%d_quantity", i))) +
+				", priceErr: " + jsString(getError(errs, fmt.Sprintf("item_%d_unit_price", i))) + " }"
 		}
 	}
 	return `{
 		query: '',
 		rows: [` + rows + `],
-		add() { this.rows.push({ sku: '', quantity: '', price: '', label: '' }) },
-		remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1) },
-		addItem(sku, price, label) {
+		subtotal: ` + jsString(f.Subtotal) + `, discount: ` + jsString(f.Discount) + `, shipping: ` + jsString(f.Shipping) + `, tax: ` + jsString(f.Tax) + `, total: ` + jsString(f.Total) + `,
+		subtotalDirty: ` + jsBool(f.Subtotal != "") + `, totalDirty: ` + jsBool(f.Total != "") + `,
+		num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; },
+		money(n) { return n.toFixed(2); },
+		lineSubtotal() { return this.rows.reduce((s, r) => s + this.num(r.quantity) * this.num(r.price), 0); },
+		expectedTotal() { return this.num(this.subtotal) - this.num(this.discount) + this.num(this.shipping) + this.num(this.tax); },
+		subtotalMismatch() { return this.rows.some(r => r.sku || r.price) && Math.abs(this.lineSubtotal() - this.num(this.subtotal)) >= 0.005; },
+		totalMismatch() { return Math.abs(this.expectedTotal() - this.num(this.total)) >= 0.005; },
+		recompute() {
+			if (!this.subtotalDirty) this.subtotal = this.money(this.lineSubtotal());
+			if (!this.totalDirty) this.total = this.money(this.expectedTotal());
+		},
+		applySubtotal() { this.subtotal = this.money(this.lineSubtotal()); this.subtotalDirty = false; this.recompute(); },
+		applyTotal() { this.total = this.money(this.expectedTotal()); this.totalDirty = false; },
+		add() { this.rows.push(` + blankRow + `) },
+		remove(i) { if (this.rows.length > 1) this.rows.splice(i, 1); this.recompute(); },
+		addItem(sku, priceCents, label) {
+			const price = priceCents ? (parseInt(priceCents, 10) / 100).toFixed(2) : '';
 			const empty = this.rows.find(r => !r.sku && !r.quantity && !r.price);
 			if (empty) { empty.sku = sku; empty.price = price; empty.quantity = '1'; empty.label = label; }
-			else { this.rows.push({ sku: sku, quantity: '1', price: price, label: label }); }
+			else { this.rows.push({ sku: sku, quantity: '1', price: price, label: label, skuErr: '', qtyErr: '', priceErr: '' }); }
+			this.recompute();
 		},
 		onPick(e) {
 			const btn = e.target.closest('[data-sku]');
@@ -359,6 +404,38 @@ func orderNewItemsState(f OrderNewForm) string {
 			if (this.$refs.results) this.$refs.results.innerHTML = '';
 		}
 	}`
+}
+
+// jsBool renders a Go bool as a JS boolean literal for the x-data block.
+func jsBool(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+// dollarInputClasses mirrors inputClasses but leaves room for a leading "$"
+// adornment (pl-7) and right-aligns digits (tabular-nums).
+func dollarInputClasses(hasErr bool) string {
+	base := "block w-full rounded-sm bg-rr-surface pl-7 pr-3 py-1.5 text-base tabular-nums text-rr-heading outline-1 -outline-offset-1 placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 sm:text-sm/6 "
+	if hasErr {
+		return base + "outline-red-300 focus:outline-red-500"
+	}
+	return base + "outline-rr-border focus:outline-rr-red"
+}
+
+// dollarInput is a "$"-prefixed money field bound to Alpine via x-model. The
+// value is a dollar string; the server parses it to cents. oninput is the Alpine
+// expression run on input (dirty tracking / recompute).
+templ dollarInput(id, model, oninput string, required, hasErr bool) {
+	<div class="relative">
+		<span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-sm text-rr-muted">$</span>
+		if required {
+			<input id={ id } name={ id } type="text" inputmode="decimal" required x-model={ model } x-on:input={ oninput } placeholder="0.00" class={ dollarInputClasses(hasErr) }/>
+		} else {
+			<input id={ id } name={ id } type="text" inputmode="decimal" x-model={ model } x-on:input={ oninput } placeholder="0.00" class={ dollarInputClasses(hasErr) }/>
+		}
+	</div>
 }
 
 // jsString returns a JS-string literal for embedding admin-supplied text into

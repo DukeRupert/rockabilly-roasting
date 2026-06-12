@@ -38,6 +38,23 @@ type checkoutCartResponse struct {
 	Items    []checkoutCartItem `json:"items"`
 	Subtotal int                `json:"subtotal"`
 	Currency string             `json:"currency"`
+	// Prefill carries the signed-in customer's contact info and default
+	// address so the Information step doesn't make returning customers
+	// retype what we already know. Omitted for guests.
+	Prefill *checkoutPrefill `json:"prefill,omitempty"`
+}
+
+type checkoutPrefill struct {
+	Email      string `json:"email"`
+	Phone      string `json:"phone,omitempty"`
+	FirstName  string `json:"first_name,omitempty"`
+	LastName   string `json:"last_name,omitempty"`
+	Line1      string `json:"line1,omitempty"`
+	Line2      string `json:"line2,omitempty"`
+	City       string `json:"city,omitempty"`
+	State      string `json:"state,omitempty"`
+	PostalCode string `json:"postal_code,omitempty"`
+	Country    string `json:"country,omitempty"`
 }
 
 type checkoutAddressRequest struct {
@@ -263,6 +280,16 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 				LineTotal:    lineTotal,
 			})
 		}
+
+		if customer, ok := auth.CustomerFromContext(ctx); ok {
+			prefill, pErr := d.checkoutPrefillForCustomer(ctx, tx, customer)
+			if pErr != nil {
+				// Prefill is a convenience — never fail the cart load over it.
+				logger.Warn("checkout cart: load prefill", "error", pErr)
+			} else {
+				resp.Prefill = prefill
+			}
+		}
 		return nil
 	})
 	if err != nil {
@@ -276,6 +303,49 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	JSON(w, http.StatusOK, resp)
+}
+
+// checkoutPrefillForCustomer builds the Information-step prefill for a
+// signed-in customer: contact details plus their default address (the
+// address list is ordered default-first). Non-US addresses are skipped —
+// the checkout form only ships domestically — but contact info still
+// prefills. The name on the address wins over the account name because
+// it's what the customer last shipped under.
+func (d *Deps) checkoutPrefillForCustomer(ctx context.Context, tx pgx.Tx, customer *domain.Customer) (*checkoutPrefill, error) {
+	prefill := &checkoutPrefill{
+		Email:     customer.Email,
+		FirstName: customer.FirstName,
+		LastName:  customer.LastName,
+	}
+	if customer.Phone != nil {
+		prefill.Phone = *customer.Phone
+	}
+
+	addresses, err := d.CustomerService.ListAddresses(ctx, tx, customer.ID)
+	if err != nil {
+		return nil, fmt.Errorf("list addresses: %w", err)
+	}
+	for _, addr := range addresses {
+		if addr.CountryCode != "" && addr.CountryCode != "US" {
+			continue
+		}
+		if addr.FirstName != "" {
+			prefill.FirstName = addr.FirstName
+		}
+		if addr.LastName != "" {
+			prefill.LastName = addr.LastName
+		}
+		prefill.Line1 = addr.Line1
+		if addr.Line2 != nil {
+			prefill.Line2 = *addr.Line2
+		}
+		prefill.City = addr.City
+		prefill.State = addr.State
+		prefill.PostalCode = addr.PostalCode
+		prefill.Country = "US"
+		break
+	}
+	return prefill, nil
 }
 
 // handleCheckoutAddress validates and saves a shipping address, creating a guest customer if needed.

@@ -8,16 +8,23 @@
 
   let { cart, onComplete }: Props = $props();
 
-  let email = $state('');
-  let phone = $state('');
-  let firstName = $state('');
-  let lastName = $state('');
-  let line1 = $state('');
-  let line2 = $state('');
-  let city = $state('');
-  let state = $state('');
-  let postalCode = $state('');
-  let country = $state('US');
+  // Seed from the server's prefill (signed-in customers get their contact
+  // info + default address back on the cart payload). Everything stays
+  // editable — this just saves the retyping. Deliberately captures the
+  // initial value only: the form must not reset mid-edit if cart reloads.
+  // svelte-ignore state_referenced_locally
+  const prefill = cart.prefill;
+
+  let email = $state(prefill?.email ?? '');
+  let phone = $state(prefill?.phone ?? '');
+  let firstName = $state(prefill?.first_name ?? '');
+  let lastName = $state(prefill?.last_name ?? '');
+  let line1 = $state(prefill?.line1 ?? '');
+  let line2 = $state(prefill?.line2 ?? '');
+  let city = $state(prefill?.city ?? '');
+  let state = $state(prefill?.state ?? '');
+  let postalCode = $state(prefill?.postal_code ?? '');
+  let country = $state(prefill?.country || 'US');
 
   let submitting = $state(false);
   let errors = $state<Record<string, string>>({});
@@ -94,10 +101,12 @@
         <label for="email" class={labelClasses} style={labelStyle}>Email</label>
         <input
           id="email"
+          name="email"
           type="email"
           bind:value={email}
           placeholder="you@example.com"
           required
+          autocomplete="email"
           class={inputClasses}
           style={inputStyle}
         />
@@ -107,6 +116,7 @@
         <label for="phone" class={labelClasses} style={labelStyle}>Phone (optional)</label>
         <input
           id="phone"
+          name="phone"
           type="tel"
           bind:value={phone}
           placeholder="(509) 555-0123"
@@ -123,9 +133,11 @@
         <label for="firstName" class={labelClasses} style={labelStyle}>First name</label>
         <input
           id="firstName"
+          name="first-name"
           type="text"
           bind:value={firstName}
           required
+          autocomplete="given-name"
           class={inputClasses}
           style={inputStyle}
         />
@@ -135,9 +147,11 @@
         <label for="lastName" class={labelClasses} style={labelStyle}>Last name</label>
         <input
           id="lastName"
+          name="last-name"
           type="text"
           bind:value={lastName}
           required
+          autocomplete="family-name"
           class={inputClasses}
           style={inputStyle}
         />
@@ -150,9 +164,11 @@
       <label for="line1" class={labelClasses} style={labelStyle}>Address</label>
       <input
         id="line1"
+        name="address-line1"
         type="text"
         bind:value={line1}
         required
+        autocomplete="shipping address-line1"
         class={inputClasses}
         style={inputStyle}
       />
@@ -165,8 +181,10 @@
       >
       <input
         id="line2"
+        name="address-line2"
         type="text"
         bind:value={line2}
+        autocomplete="shipping address-line2"
         class={inputClasses}
         style={inputStyle}
       />
@@ -177,9 +195,11 @@
         <label for="city" class={labelClasses} style={labelStyle}>City</label>
         <input
           id="city"
+          name="city"
           type="text"
           bind:value={city}
           required
+          autocomplete="shipping address-level2"
           class={inputClasses}
           style={inputStyle}
         />
@@ -189,10 +209,12 @@
         <label for="state" class={labelClasses} style={labelStyle}>State</label>
         <input
           id="state"
+          name="state"
           type="text"
           bind:value={state}
           placeholder="WA"
           required
+          autocomplete="shipping address-level1"
           class={inputClasses}
           style={inputStyle}
         />
@@ -202,10 +224,12 @@
         <label for="postalCode" class={labelClasses} style={labelStyle}>ZIP code</label>
         <input
           id="postalCode"
+          name="postal-code"
           type="text"
           bind:value={postalCode}
           placeholder="99336"
           required
+          autocomplete="shipping postal-code"
           class={inputClasses}
           style={inputStyle}
         />
@@ -217,7 +241,9 @@
       <label for="country" class={labelClasses} style={labelStyle}>Country</label>
       <select
         id="country"
+        name="country"
         bind:value={country}
+        autocomplete="shipping country"
         class={inputClasses}
         style={inputStyle}
       >

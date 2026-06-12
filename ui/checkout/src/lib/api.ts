@@ -7,11 +7,28 @@ export interface CartItem {
   line_total: number;
 }
 
+// CheckoutPrefill mirrors the server's prefill payload: contact info and
+// default address for a signed-in customer. All fields may be empty strings.
+export interface CheckoutPrefill {
+  email: string;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+}
+
 export interface CartResponse {
   cart_id: string;
   items: CartItem[];
   subtotal: number;
   currency: string;
+  // Present only when the visitor has a customer session.
+  prefill?: CheckoutPrefill;
 }
 
 export interface AddressRequest {

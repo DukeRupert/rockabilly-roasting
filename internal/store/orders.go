@@ -647,6 +647,52 @@ func (s *OrderStore) ListAbandonedOrderIDs(ctx context.Context, tx pgx.Tx, older
 	return ids, rows.Err()
 }
 
+// ListShippedOrderIDsDeliveredBefore returns the IDs of orders still sitting in
+// fulfillment_status='shipped' whose ship time is older than olderThan — the
+// auto-deliver sweep's working set. Carrier delivery for these is never
+// reported (legacy orders predating the current shipping integration have no
+// shipments rows at all; live orders may simply have missed the tracking
+// webhook), so after a grace window we assume the package arrived.
+//
+// The ship-time signal is COALESCE(MAX(shipments.shipped_at), updated_at):
+// orders with shipment rows use the precise carrier ship time (so a package
+// still inside its delivery window is never swept), while legacy orders with no
+// shipments fall back to updated_at, which for an imported, long-completed order
+// is comfortably in the past. cancelled/refunded orders are excluded — their
+// fulfillment_status is left as-is for the record.
+func (s *OrderStore) ListShippedOrderIDsDeliveredBefore(ctx context.Context, tx pgx.Tx, olderThan time.Time, limit int) (_ []uuid.UUID, err error) {
+	defer trackQuery(s.metrics, "orders.list_shipped_delivered_before", time.Now(), &err)
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT o.id
+		   FROM orders o
+		  WHERE o.fulfillment_status = 'shipped'
+		    AND o.status NOT IN ('cancelled', 'refunded')
+		    AND COALESCE(
+		          (SELECT MAX(s.shipped_at) FROM shipments s WHERE s.order_id = o.id),
+		          o.updated_at
+		        ) < $1
+		  ORDER BY o.updated_at ASC
+		  LIMIT $2`,
+		olderThan, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list shipped orders to auto-deliver: %w", err)
+	}
+	defer rows.Close()
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan auto-deliver order id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // SumOrderRevenue returns the total revenue (in cents) for orders matching the filter.
 func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilter) (_ int, err error) {
 	defer trackQuery(s.metrics, "orders.sum_revenue", time.Now(), &err)

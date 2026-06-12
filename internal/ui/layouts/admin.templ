@@ -167,6 +167,20 @@ templ Admin(props AdminProps) {
 					letter-spacing: 0.06em !important;
 					font-size: 0.6875rem !important;
 				}
+				/* Collapsed desktop rail — once the labels have faded out, center the
+				   icon column so the 64px rail reads as a tidy stack instead of a
+				   left-ragged one. Collapse is desktop-only, so scope to lg+. The
+				   [data-dropdown-trigger] match is the user-menu avatar; it lives
+				   only in the (always-expanded) mobile drawer otherwise, so the
+				   #desktop-sidebar scope keeps the drawer untouched. */
+				@media (min-width: 1024px) {
+					#desktop-sidebar.is-collapsed nav[data-admin-sidebar-nav] a,
+					#desktop-sidebar.is-collapsed [data-sidebar-toggle],
+					#desktop-sidebar.is-collapsed [data-dropdown-trigger] {
+						justify-content: center;
+						gap: 0;
+					}
+				}
 				/* Page title utility — Alfa Slab display, matches storefront headlines */
 				.admin-page-title {
 					font-family: 'Alfa Slab One', 'Rockwell', Georgia, serif;
@@ -384,6 +398,7 @@ templ Admin(props AdminProps) {
 						// Collapse
 						sb.classList.remove('lg:w-72');
 						sb.classList.add('lg:w-16');
+						sb.classList.add('is-collapsed');
 						inner.classList.remove('px-6');
 						inner.classList.add('px-2');
 						wrapper.classList.remove('lg:pl-72');
@@ -399,6 +414,7 @@ templ Admin(props AdminProps) {
 						// Expand
 						sb.classList.remove('lg:w-16');
 						sb.classList.add('lg:w-72');
+						sb.classList.remove('is-collapsed');
 						inner.classList.remove('px-2');
 						inner.classList.add('px-6');
 						wrapper.classList.remove('lg:pl-16');
@@ -550,7 +566,7 @@ templ adminLogo() {
 }
 
 templ adminSidebarToggle() {
-	<button type="button" onclick="toggleSidebar()" class="group flex w-full items-center gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors">
+	<button type="button" onclick="toggleSidebar()" data-sidebar-toggle title="Toggle sidebar" class="group flex w-full items-center gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors">
 		<!-- Menu icon: shown when collapsed -->
 		<svg id="sidebar-menu-icon" class="hidden size-6 shrink-0 text-rr-muted group-hover:text-rr-red" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>

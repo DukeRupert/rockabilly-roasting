@@ -112,11 +112,13 @@ func (q *Queries) DeleteDiscount(ctx context.Context, id uuid.UUID) error {
 }
 
 const getCouponCodeByCode = `-- name: GetCouponCodeByCode :one
-SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at, redeemed_by_order_id FROM coupon_codes WHERE code = $1
+SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at, redeemed_by_order_id FROM coupon_codes WHERE UPPER(code) = UPPER($1)
 `
 
-func (q *Queries) GetCouponCodeByCode(ctx context.Context, code string) (CouponCode, error) {
-	row := q.db.QueryRow(ctx, getCouponCodeByCode, code)
+// Case-insensitive: codes are stored uppercase by the admin form, but legacy
+// or hand-inserted rows may differ and customers type in any case.
+func (q *Queries) GetCouponCodeByCode(ctx context.Context, upper interface{}) (CouponCode, error) {
+	row := q.db.QueryRow(ctx, getCouponCodeByCode, upper)
 	var i CouponCode
 	err := row.Scan(
 		&i.ID,

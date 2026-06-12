@@ -22,7 +22,9 @@ VALUES ($1, $2, $3, $4)
 RETURNING *;
 
 -- name: GetCouponCodeByCode :one
-SELECT * FROM coupon_codes WHERE code = $1;
+-- Case-insensitive: codes are stored uppercase by the admin form, but legacy
+-- or hand-inserted rows may differ and customers type in any case.
+SELECT * FROM coupon_codes WHERE UPPER(code) = UPPER($1);
 
 -- name: GetCouponCodeByID :one
 SELECT * FROM coupon_codes WHERE id = $1;

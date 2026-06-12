@@ -65,6 +65,8 @@ var (
 	ErrCouponAlreadyUsed     = errors.New("coupon code already used")
 	ErrCouponAlreadyRedeemed = errors.New("coupon code was just redeemed by someone else")
 	ErrCouponNotFound        = errors.New("coupon code not found")
+	ErrCouponCodeExists      = errors.New("coupon code already exists")
+	ErrDiscountInvalid       = errors.New("discount fields are invalid")
 	ErrMinimumOrderNotMet    = errors.New("minimum order amount not met")
 
 	// Auth errors

@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
 type DiscountListProps struct {
 	Discounts    []domain.Discount
+	Codes        map[uuid.UUID][]domain.CouponCode
 	ActiveFilter string
 	Page         int
 	PerPage      int
@@ -53,6 +56,92 @@ templ DiscountListContent(props DiscountListProps) {
 			<p class="mt-1 text-sm text-rr-muted">Manage discounts and promotions</p>
 		</div>
 	</div>
+	<!-- Create form -->
+	<div class="mt-6 border border-rr-border bg-rr-surface p-6">
+		<h2 class="text-sm font-semibold text-rr-heading">New Discount</h2>
+		<p class="mt-1 text-sm text-rr-muted">Each discount carries one single-use coupon code. Codes are stored uppercase.</p>
+		<form method="post" action="/admin/discounts" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6">
+			<div class="sm:col-span-2">
+				<label for="discount-name" class="block text-sm font-medium text-rr-body">Name</label>
+				<input
+					id="discount-name"
+					name="name"
+					type="text"
+					required
+					placeholder="e.g. Spring promo"
+					class="mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+				/>
+			</div>
+			<div class="sm:col-span-1">
+				<label for="discount-code" class="block text-sm font-medium text-rr-body">Coupon code</label>
+				<input
+					id="discount-code"
+					name="code"
+					type="text"
+					required
+					placeholder="SPRING10"
+					class="mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading uppercase placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+				/>
+			</div>
+			<div class="sm:col-span-1">
+				<label for="discount-type" class="block text-sm font-medium text-rr-body">Type</label>
+				<div class="mt-1 grid grid-cols-1">
+					<select
+						id="discount-type"
+						name="type"
+						required
+						class="col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+					>
+						<option value="percentage" selected>Percentage</option>
+						<option value="fixed_amount">Fixed amount</option>
+					</select>
+					<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+						<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</div>
+			<div class="sm:col-span-1">
+				<label for="discount-value" class="block text-sm font-medium text-rr-body">Value</label>
+				<input
+					id="discount-value"
+					name="value"
+					type="text"
+					required
+					placeholder="10 or 5.00"
+					class="mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+				/>
+				<p class="mt-1 text-xs text-rr-muted">Percent (10) or dollars (5.00)</p>
+			</div>
+			<div class="sm:col-span-1">
+				<label for="discount-minimum" class="block text-sm font-medium text-rr-body">Min order $</label>
+				<input
+					id="discount-minimum"
+					name="minimum_order"
+					type="text"
+					placeholder="Optional"
+					class="mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+				/>
+			</div>
+			<div class="sm:col-span-1">
+				<label for="discount-expires" class="block text-sm font-medium text-rr-body">Expires</label>
+				<input
+					id="discount-expires"
+					name="expires_at"
+					type="date"
+					class="mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+				/>
+				<p class="mt-1 text-xs text-rr-muted">Valid through end of day</p>
+			</div>
+			<div class="flex items-end">
+				<button
+					type="submit"
+					class="inline-flex items-center rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
+				>
+					Create Discount
+				</button>
+			</div>
+		</form>
+	</div>
 	<!-- Filters -->
 	<form method="get" action="/admin/discounts" class="mt-6 flex items-center gap-3">
 		<div class="grid grid-cols-1">
@@ -79,7 +168,7 @@ templ DiscountListContent(props DiscountListProps) {
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6Z"></path>
 				</svg>
 				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No discounts</h3>
-				<p class="mt-1 text-sm text-rr-muted">Discounts and promotions you create will appear here.</p>
+				<p class="mt-1 text-sm text-rr-muted">Create your first discount above — customers redeem the code at checkout.</p>
 			</div>
 		} else {
 			<div class="overflow-hidden border border-rr-border bg-rr-surface">
@@ -87,11 +176,15 @@ templ DiscountListContent(props DiscountListProps) {
 					<thead class="bg-rr-raised">
 						<tr>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Name</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Code</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Type</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Value</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Dates</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Created</th>
+							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+								<span class="sr-only">Actions</span>
+							</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
@@ -99,6 +192,21 @@ templ DiscountListContent(props DiscountListProps) {
 							<tr>
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-rr-heading sm:pl-6">
 									{ d.Name }
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									for i, code := range props.Codes[d.ID] {
+										if i > 0 {
+											<span class="text-rr-border"> · </span>
+										}
+										if code.RedeemedAt != nil {
+											<span class="font-mono text-rr-muted line-through" title={ "Redeemed " + code.RedeemedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }>{ code.Code }</span>
+										} else {
+											<span class="font-mono text-rr-heading">{ code.Code }</span>
+										}
+									}
+									if len(props.Codes[d.ID]) == 0 {
+										<span class="text-rr-border">&mdash;</span>
+									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
 									{ discountTypeLabel(d.Type) }
@@ -128,6 +236,17 @@ templ DiscountListContent(props DiscountListProps) {
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
 									{ d.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
+								</td>
+								<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+									if d.Active {
+										<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/deactivate", d.ID.String())) } class="inline">
+											<button type="submit" class="text-rr-muted hover:text-rr-heading">Deactivate</button>
+										</form>
+									} else {
+										<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/activate", d.ID.String())) } class="inline">
+											<button type="submit" class="text-rr-red hover:text-rr-red-lt">Activate</button>
+										</form>
+									}
 								</td>
 							</tr>
 						}

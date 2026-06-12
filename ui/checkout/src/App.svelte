@@ -1,8 +1,11 @@
 <script lang="ts">
   import {
+    applyCoupon,
     confirmOrder,
     getCart,
+    removeCoupon,
     type AddressResponse,
+    type AppliedCoupon,
     type CartResponse,
     type LocalFulfillmentMethod,
     type PaymentIntentResponse,
@@ -37,6 +40,15 @@
   let preferredLocalFulfillment = $state<LocalFulfillmentMethod | ''>('');
   let chosenShippingMethod = $state<LocalFulfillmentMethod | ''>('');
   let totals = $state<PaymentIntentResponse | null>(null);
+
+  // Coupon state. pricingVersion bumps whenever the cart's pricing inputs
+  // change (coupon applied/removed) so the Payment step knows to recreate
+  // the payment intent — same lifecycle as switching shipping method.
+  let appliedCoupon = $state<AppliedCoupon | null>(null);
+  let couponInput = $state('');
+  let couponError = $state('');
+  let couponBusy = $state(false);
+  let pricingVersion = $state(0);
 
   const steps: { key: Step; label: string }[] = [
     { key: 'information', label: 'Information' },
@@ -98,6 +110,7 @@
       loading = true;
       error = '';
       cart = await getCart();
+      appliedCoupon = cart.coupon ?? null;
       if (!cart.items.length) {
         error = 'Your cart is empty.';
       }
@@ -105,6 +118,45 @@
       error = e.message || 'Failed to load cart';
     } finally {
       loading = false;
+    }
+  }
+
+  async function handleApplyCoupon(e: Event) {
+    e.preventDefault();
+    if (!cart || !couponInput.trim() || couponBusy) return;
+    couponBusy = true;
+    couponError = '';
+    try {
+      const result = await applyCoupon(cart.cart_id, couponInput.trim());
+      if (!result.valid) {
+        couponError = result.error_message || "That code didn't work.";
+        return;
+      }
+      appliedCoupon = { code: couponInput.trim().toUpperCase(), name: result.discount_name || 'Discount' };
+      couponInput = '';
+      // Invalidate totals so the Payment step re-prices the order.
+      totals = null;
+      pricingVersion += 1;
+    } catch (err: any) {
+      couponError = err.message || 'Failed to apply code. Please try again.';
+    } finally {
+      couponBusy = false;
+    }
+  }
+
+  async function handleRemoveCoupon() {
+    if (!cart || couponBusy) return;
+    couponBusy = true;
+    couponError = '';
+    try {
+      await removeCoupon(cart.cart_id);
+      appliedCoupon = null;
+      totals = null;
+      pricingVersion += 1;
+    } catch (err: any) {
+      couponError = err.message || 'Failed to remove code. Please try again.';
+    } finally {
+      couponBusy = false;
     }
   }
 
@@ -292,6 +344,7 @@
               {localPickupInstructions}
               {localDeliveryDays}
               shippingMethod={chosenShippingMethod}
+              {pricingVersion}
               onShippingMethodChange={handleShippingMethodChange}
               totalsLoaded={handleTotalsLoaded}
               onBack={() => (step = 'information')}
@@ -328,6 +381,52 @@
                 </li>
               {/each}
             </ul>
+            <!-- Coupon code -->
+            <div class="mt-4 pt-4 border-t-2 border-ink">
+              {#if appliedCoupon}
+                <div class="flex items-center justify-between gap-3">
+                  <p class="font-oswald text-ink text-sm min-w-0" style="letter-spacing:0.04em;">
+                    <span class="font-special text-rust">{appliedCoupon.code}</span>
+                    <span class="text-ink-soft"> · {appliedCoupon.name}</span>
+                  </p>
+                  <button
+                    type="button"
+                    onclick={handleRemoveCoupon}
+                    disabled={couponBusy}
+                    class="font-oswald font-bold text-[10px] text-chrome-deep hover:text-rust transition-colors disabled:opacity-50"
+                    style="letter-spacing:0.18em; text-transform:uppercase;"
+                  >
+                    Remove
+                  </button>
+                </div>
+              {:else}
+                <form onsubmit={handleApplyCoupon} class="flex gap-2">
+                  <label for="coupon-code" class="sr-only">Coupon code</label>
+                  <input
+                    id="coupon-code"
+                    type="text"
+                    bind:value={couponInput}
+                    placeholder="Coupon code"
+                    autocomplete="off"
+                    autocapitalize="characters"
+                    spellcheck="false"
+                    class="paper-input min-w-0 flex-1 border-2 border-ink bg-paper px-3 py-2 font-special text-sm text-ink uppercase placeholder:normal-case placeholder:font-oswald placeholder:text-chrome-deep focus:outline-none"
+                    style="letter-spacing:0.08em;"
+                  />
+                  <button
+                    type="submit"
+                    disabled={couponBusy || !couponInput.trim()}
+                    class="font-oswald font-bold text-[11px] text-ink border-2 border-ink bg-paper-warm px-4 py-2 hover:bg-ink hover:text-paper transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style="letter-spacing:0.16em; text-transform:uppercase;"
+                  >
+                    {couponBusy ? 'Checking…' : 'Apply'}
+                  </button>
+                </form>
+              {/if}
+              {#if couponError}
+                <p class="mt-2 font-oswald font-bold text-rust text-xs" role="alert">{couponError}</p>
+              {/if}
+            </div>
             <dl class="mt-4 pt-4 border-t-2 border-ink space-y-2">
               <div class="flex items-baseline justify-between">
                 <dt class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">

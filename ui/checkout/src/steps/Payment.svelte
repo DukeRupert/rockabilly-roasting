@@ -20,6 +20,9 @@
     localPickupInstructions: string;
     localDeliveryDays: string;
     shippingMethod: LocalFulfillmentMethod | '';
+    // Bumped by the parent when cart pricing changes (coupon applied or
+    // removed) — triggers a payment-intent recreate, like a method switch.
+    pricingVersion: number;
     onShippingMethodChange: (m: LocalFulfillmentMethod) => void;
     totalsLoaded?: (pi: PaymentIntentResponse) => void;
     onBack: () => void;
@@ -34,6 +37,7 @@
     localPickupInstructions,
     localDeliveryDays,
     shippingMethod,
+    pricingVersion,
     onShippingMethodChange,
     totalsLoaded,
     onBack,
@@ -55,12 +59,14 @@
   let initFailed = $state(false);
   let initNeedsAddress = $state(false);
 
-  // Track the method the current PI was created for. When the user toggles
-  // the radio, we tear down the Stripe element and re-create the PI so the
-  // pre-created order gets stamped with the new method. The previous order
-  // stays in payment_status=awaiting and Stripe auto-cancels its PI within a
-  // day — same lifecycle as a customer abandoning checkout.
+  // Track the method + pricing version the current PI was created for. When
+  // either changes (method radio toggled, coupon applied/removed), we tear
+  // down the Stripe element and re-create the PI so the pre-created order
+  // gets stamped with the new method and totals. The previous order stays in
+  // payment_status=awaiting and Stripe auto-cancels its PI within a day —
+  // same lifecycle as a customer abandoning checkout.
   let initializedMethod = $state<LocalFulfillmentMethod | '' | null>(null);
+  let initializedPricingVersion = $state(0);
 
   onMount(async () => {
     stripe = await getStripe(stripeKey);
@@ -73,12 +79,13 @@
   });
 
   $effect(() => {
-    // Re-init when the user picks a different local fulfillment method, but
-    // only after the first init completes — onMount handles the initial call.
+    // Re-init when the user picks a different local fulfillment method or
+    // changes the coupon, but only after the first init completes — onMount
+    // handles the initial call.
     if (
       stripe &&
       initializedMethod !== null &&
-      shippingMethod !== initializedMethod &&
+      (shippingMethod !== initializedMethod || pricingVersion !== initializedPricingVersion) &&
       !processing
     ) {
       initializePayment();
@@ -102,6 +109,7 @@
       clientSecret = piResponse.client_secret;
       resolvedTotal = piResponse.amount;
       initializedMethod = shippingMethod;
+      initializedPricingVersion = pricingVersion;
       totalsLoaded?.(piResponse);
 
       loading = false;

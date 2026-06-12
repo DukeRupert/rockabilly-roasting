@@ -385,9 +385,11 @@ func (s *CheckoutService) GetCouponCodeByCode(ctx context.Context, tx pgx.Tx, co
 	return coupon, nil
 }
 
-// ApplyCoupon validates a coupon code and returns its associated discount for preview.
-func (s *CheckoutService) ApplyCoupon(ctx context.Context, tx pgx.Tx, code string) (*domain.Discount, error) {
-	coupon, err := s.discounts.GetCouponCodeByCode(ctx, tx, code)
+// ApplyCoupon validates a coupon code against the cart subtotal and returns
+// its associated discount for preview. The code lookup is case-insensitive
+// (handled in SQL), so customers can type codes however they like.
+func (s *CheckoutService) ApplyCoupon(ctx context.Context, tx pgx.Tx, code string, subtotalCents int) (*domain.Discount, error) {
+	coupon, err := s.discounts.GetCouponCodeByCode(ctx, tx, strings.TrimSpace(code))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrCouponNotFound
@@ -414,6 +416,10 @@ func (s *CheckoutService) ApplyCoupon(ctx context.Context, tx pgx.Tx, code strin
 	now := time.Now()
 	if discount.ExpiresAt != nil && now.After(*discount.ExpiresAt) {
 		return nil, ErrDiscountExpired
+	}
+
+	if discount.MinimumOrderCents != nil && subtotalCents < *discount.MinimumOrderCents {
+		return nil, ErrMinimumOrderNotMet
 	}
 
 	return discount, nil

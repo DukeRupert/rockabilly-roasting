@@ -22,6 +22,13 @@ export interface CheckoutPrefill {
   country?: string;
 }
 
+// AppliedCoupon describes a coupon already attached to the cart and still
+// valid — used to restore the applied state after a reload.
+export interface AppliedCoupon {
+  code: string;
+  name: string;
+}
+
 export interface CartResponse {
   cart_id: string;
   items: CartItem[];
@@ -29,6 +36,7 @@ export interface CartResponse {
   currency: string;
   // Present only when the visitor has a customer session.
   prefill?: CheckoutPrefill;
+  coupon?: AppliedCoupon;
 }
 
 export interface AddressRequest {
@@ -146,6 +154,28 @@ export function submitAddress(addr: AddressRequest): Promise<AddressResponse> {
   return request<AddressResponse>('/api/checkout/address', {
     method: 'POST',
     body: JSON.stringify(addr),
+  });
+}
+
+export interface ApplyCouponResponse {
+  valid: boolean;
+  discount_name?: string;
+  discount_type?: string;
+  discount_value?: number;
+  error_message?: string;
+}
+
+export function applyCoupon(cartId: string, code: string): Promise<ApplyCouponResponse> {
+  return request<ApplyCouponResponse>('/api/checkout/coupon', {
+    method: 'POST',
+    body: JSON.stringify({ cart_id: cartId, code }),
+  });
+}
+
+export function removeCoupon(cartId: string): Promise<void> {
+  return request<void>('/api/checkout/coupon', {
+    method: 'DELETE',
+    body: JSON.stringify({ cart_id: cartId }),
   });
 }
 

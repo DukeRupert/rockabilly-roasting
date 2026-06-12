@@ -102,7 +102,9 @@ type Querier interface {
 	GetCartByCustomerID(ctx context.Context, customerID *uuid.UUID) (Cart, error)
 	GetCartByID(ctx context.Context, id uuid.UUID) (Cart, error)
 	GetCartItemCount(ctx context.Context, cartID uuid.UUID) (int32, error)
-	GetCouponCodeByCode(ctx context.Context, code string) (CouponCode, error)
+	// Case-insensitive: codes are stored uppercase by the admin form, but legacy
+	// or hand-inserted rows may differ and customers type in any case.
+	GetCouponCodeByCode(ctx context.Context, upper interface{}) (CouponCode, error)
 	GetCouponCodeByID(ctx context.Context, id uuid.UUID) (CouponCode, error)
 	GetCustomerByEmail(ctx context.Context, email string) (Customer, error)
 	GetCustomerByID(ctx context.Context, id uuid.UUID) (Customer, error)

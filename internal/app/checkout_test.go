@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -322,9 +323,28 @@ func TestCheckoutService_ApplyCoupon(t *testing.T) {
 		discount := testutil.CreateDiscount(t, tx)
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
 
-		got, err := svc.ApplyCoupon(ctx, tx, coupon.Code)
+		got, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000)
 		require.NoError(t, err)
 		assert.Equal(t, discount.ID, got.ID)
+	})
+
+	t.Run("lowercase code matches", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		discount := testutil.CreateDiscount(t, tx)
+		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
+
+		got, err := svc.ApplyCoupon(ctx, tx, strings.ToLower(coupon.Code), 1000)
+		require.NoError(t, err)
+		assert.Equal(t, discount.ID, got.ID)
+	})
+
+	t.Run("subtotal below minimum order errors", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		discount := testutil.CreateDiscount(t, tx, testutil.WithMinimumOrder(50000))
+		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
+
+		_, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000)
+		assert.ErrorIs(t, err, app.ErrMinimumOrderNotMet)
 	})
 
 	t.Run("expired discount errors", func(t *testing.T) {
@@ -333,7 +353,7 @@ func TestCheckoutService_ApplyCoupon(t *testing.T) {
 		discount := testutil.CreateDiscount(t, tx, testutil.WithDiscountExpiry(past))
 		coupon := testutil.CreateCouponCode(t, tx, discount.ID)
 
-		_, err := svc.ApplyCoupon(ctx, tx, coupon.Code)
+		_, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000)
 		assert.ErrorIs(t, err, app.ErrDiscountExpired)
 	})
 
@@ -345,7 +365,7 @@ func TestCheckoutService_ApplyCoupon(t *testing.T) {
 
 		store.NewDiscountStore().MarkCouponCodeRedeemed(ctx, tx, coupon.ID, &customer.ID)
 
-		_, err := svc.ApplyCoupon(ctx, tx, coupon.Code)
+		_, err := svc.ApplyCoupon(ctx, tx, coupon.Code, 1000)
 		assert.ErrorIs(t, err, app.ErrCouponAlreadyUsed)
 	})
 }

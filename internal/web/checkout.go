@@ -42,6 +42,14 @@ type checkoutCartResponse struct {
 	// address so the Information step doesn't make returning customers
 	// retype what we already know. Omitted for guests.
 	Prefill *checkoutPrefill `json:"prefill,omitempty"`
+	// Coupon reports a coupon already applied to this cart (and still
+	// valid) so the checkout UI can show the applied state after a reload.
+	Coupon *checkoutCartCoupon `json:"coupon,omitempty"`
+}
+
+type checkoutCartCoupon struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
 }
 
 type checkoutPrefill struct {
@@ -281,6 +289,20 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
+		// Surface the applied coupon (if still valid) so the UI can restore
+		// the applied state on reload. Mirrors the payment-intent validity
+		// rules: unredeemed, active, minimum met.
+		if cart.AppliedCouponCodeID != nil {
+			cc, ccErr := d.CheckoutService.GetCouponCodeByID(ctx, tx, *cart.AppliedCouponCodeID)
+			if ccErr == nil && cc.RedeemedAt == nil {
+				discount, dErr := d.DiscountService.GetDiscount(ctx, tx, cc.DiscountID)
+				if dErr == nil && discount.Active &&
+					(discount.MinimumOrderCents == nil || resp.Subtotal >= *discount.MinimumOrderCents) {
+					resp.Coupon = &checkoutCartCoupon{Code: cc.Code, Name: discount.Name}
+				}
+			}
+		}
+
 		if customer, ok := auth.CustomerFromContext(ctx); ok {
 			prefill, pErr := d.checkoutPrefillForCustomer(ctx, tx, customer)
 			if pErr != nil {
@@ -496,7 +518,9 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	code := strings.TrimSpace(req.Code)
+	// Normalize once — codes are stored uppercase, and both the validation
+	// and the follow-up lookup below must agree on the exact string.
+	code := strings.ToUpper(strings.TrimSpace(req.Code))
 	if code == "" {
 		JSON(w, http.StatusOK, checkoutApplyCouponResponse{
 			Valid:        false,
@@ -514,7 +538,16 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 	var resp checkoutApplyCouponResponse
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		discount, txErr := d.CheckoutService.ApplyCoupon(ctx, tx, code)
+		items, txErr := d.CartService.ListItems(ctx, tx, cartID)
+		if txErr != nil {
+			return fmt.Errorf("list cart items: %w", txErr)
+		}
+		var subtotal int
+		for _, ci := range items {
+			subtotal += ci.UnitPrice * ci.Quantity
+		}
+
+		discount, txErr := d.CheckoutService.ApplyCoupon(ctx, tx, code, subtotal)
 		if txErr != nil {
 			switch {
 			case errors.Is(txErr, app.ErrCouponNotFound):
@@ -529,6 +562,9 @@ func (d *Deps) handleCheckoutApplyCoupon(w http.ResponseWriter, r *http.Request)
 			case errors.Is(txErr, app.ErrDiscountExpired):
 				d.Metrics.CouponRejected.WithLabelValues("expired").Inc()
 				resp = checkoutApplyCouponResponse{ErrorMessage: "That code has expired."}
+			case errors.Is(txErr, app.ErrMinimumOrderNotMet):
+				d.Metrics.CouponRejected.WithLabelValues("minimum_not_met").Inc()
+				resp = checkoutApplyCouponResponse{ErrorMessage: "Your order doesn't meet the minimum for that code."}
 			default:
 				return txErr
 			}
@@ -691,7 +727,8 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 			cc, ccErr := d.CheckoutService.GetCouponCodeByID(ctx, tx, *cart.AppliedCouponCodeID)
 			if ccErr == nil && cc.RedeemedAt == nil {
 				discount, dErr := d.DiscountService.GetDiscount(ctx, tx, cc.DiscountID)
-				if dErr == nil && discount.Active {
+				if dErr == nil && discount.Active &&
+					(discount.MinimumOrderCents == nil || subtotal >= *discount.MinimumOrderCents) {
 					discountTotal = calculateDiscountAmount(discount, subtotal)
 					discountName = discount.Name
 					couponCode = cc.Code

@@ -66,19 +66,24 @@ templ adminSectionTabs(tabs []sectionTab, activeHref string) {
 	</nav>
 }
 
-// Neutral segmented control — active segment lifts on a raised track with a
-// soft shadow. No rust fill: a channel scope switch is chrome, not a CTA.
+// Segmented control — the active channel is STAMPED IN INK (paper text on ink
+// fill) so a view-wide context switch reads as obviously selected, not as the
+// near-white-on-grey pill it used to be. Still no rust fill: a channel scope
+// switch is chrome, not a CTA — rust stays reserved for actions. Inactive
+// segments use body ink (not muted) so the unselected option is clearly the
+// other half of a real switch.
 func channelSegClass(active bool) string {
 	if active {
-		return "rounded-sm bg-rr-surface px-4 py-1.5 text-sm font-semibold text-rr-heading shadow-sm"
+		return "rounded-sm bg-rr-heading px-4 py-1.5 text-sm font-semibold text-rr-bg shadow-sm"
 	}
-	return "rounded-sm px-4 py-1.5 text-sm font-medium text-rr-muted hover:text-rr-heading"
+	return "rounded-sm px-4 py-1.5 text-sm font-medium text-rr-body hover:bg-rr-surface hover:text-rr-heading"
 }
 
 // adminChannelToggle renders a two-up segmented control for retail/wholesale.
-// activeHref is the current list's BasePath.
+// activeHref is the current list's BasePath. The track carries a hairline ring
+// so the control reads as a deliberate object on the paper, not a stray strip.
 templ adminChannelToggle(retailHref, wholesaleHref, activeHref string) {
-	<div class="mb-6 inline-flex items-center gap-1 rounded-sm bg-rr-raised p-1" role="tablist" aria-label="Sales channel">
+	<div class="mb-6 inline-flex items-center gap-1 rounded-sm bg-rr-raised p-1 ring-1 ring-rr-border" role="tablist" aria-label="Sales channel">
 		<a href={ templ.SafeURL(retailHref) } role="tab" aria-selected={ boolAttr(retailHref == activeHref) } class={ channelSegClass(retailHref == activeHref) }>Retail</a>
 		<a href={ templ.SafeURL(wholesaleHref) } role="tab" aria-selected={ boolAttr(wholesaleHref == activeHref) } class={ channelSegClass(wholesaleHref == activeHref) }>Wholesale</a>
 	</div>

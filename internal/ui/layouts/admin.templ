@@ -167,18 +167,65 @@ templ Admin(props AdminProps) {
 					letter-spacing: 0.06em !important;
 					font-size: 0.6875rem !important;
 				}
-				/* Collapsed desktop rail — once the labels have faded out, center the
-				   icon column so the 64px rail reads as a tidy stack instead of a
-				   left-ragged one. Collapse is desktop-only, so scope to lg+. The
-				   [data-dropdown-trigger] match is the user-menu avatar; it lives
-				   only in the (always-expanded) mobile drawer otherwise, so the
-				   #desktop-sidebar scope keeps the drawer untouched. */
+				/* ── Desktop sidebar collapse ──
+				   One attribute (`.is-collapsed`) drives the whole transition on a
+				   single 200ms timeline so width, padding, labels and icon centering
+				   never desync. Each label collapses its OWN max-width in lock-step
+				   (and never wraps), so the icon column is never shoved by reflowing
+				   text — the layout-shift that made the old fade look janky. Scoped to
+				   lg+ since collapse is desktop-only; the [data-dropdown-trigger] match
+				   is the user-menu avatar, kept inside #desktop-sidebar so the
+				   always-expanded mobile drawer is untouched. */
 				@media (min-width: 1024px) {
+					#desktop-sidebar { transition: width 200ms ease; }
+					#desktop-sidebar-inner { transition: padding 200ms ease; }
+					#main-content-wrapper { transition: padding 200ms ease; }
+
+					#desktop-sidebar [data-sidebar-label] {
+						white-space: nowrap;
+						overflow: hidden;
+						max-width: 12rem;
+						opacity: 1;
+						transition: max-width 200ms ease, opacity 200ms ease;
+					}
+					#desktop-sidebar.is-collapsed [data-sidebar-label] {
+						max-width: 0;
+						opacity: 0;
+					}
+
+					/* Collapsed rail: center the icon column, the header chevron and the
+					   user avatar so the 64px rail reads as a tidy stack, not a
+					   left-ragged one. */
 					#desktop-sidebar.is-collapsed nav[data-admin-sidebar-nav] a,
+					#desktop-sidebar.is-collapsed [data-sidebar-header],
 					#desktop-sidebar.is-collapsed [data-sidebar-toggle],
 					#desktop-sidebar.is-collapsed [data-dropdown-trigger] {
 						justify-content: center;
 						gap: 0;
+					}
+
+					/* The chevron points "<" to collapse; flip it to ">" once collapsed
+					   so it always reads as "this opens/closes the rail." */
+					#desktop-sidebar.is-collapsed [data-sidebar-chevron] {
+						transform: rotate(180deg);
+					}
+				}
+
+				/* Suppress the transition while restoring a collapsed rail on hard
+				   load — otherwise the sidebar visibly slams shut on every refresh. */
+				.sidebar-no-anim #desktop-sidebar,
+				.sidebar-no-anim #desktop-sidebar *,
+				.sidebar-no-anim #main-content-wrapper {
+					transition: none !important;
+				}
+
+				@media (prefers-reduced-motion: reduce) {
+					#desktop-sidebar,
+					#desktop-sidebar-inner,
+					#main-content-wrapper,
+					#desktop-sidebar [data-sidebar-label],
+					#desktop-sidebar [data-sidebar-chevron] {
+						transition: none;
 					}
 				}
 				/* Page title utility — Alfa Slab display, matches storefront headlines */
@@ -344,9 +391,10 @@ templ Admin(props AdminProps) {
 				</div>
 			</div>
 			<!-- Desktop sidebar (expanded by default for desktop-first use) -->
-			<div id="desktop-sidebar" class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300">
-				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 bg-rr-surface border-r border-rr-border px-6 pb-4 transition-all duration-300">
-					<div class="flex h-16 shrink-0 items-center">
+			<div id="desktop-sidebar" class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
+				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 bg-rr-surface border-r border-rr-border px-6 pb-4">
+					<div data-sidebar-header class="flex h-16 shrink-0 items-center justify-between gap-x-2">
+						@adminSidebarBrand()
 						@adminSidebarToggle()
 					</div>
 					<!-- Nav (flex-1) fills the column and pins the user menu to the
@@ -361,7 +409,7 @@ templ Admin(props AdminProps) {
 				</div>
 			</div>
 			<!-- Main content area -->
-			<div id="main-content-wrapper" class="lg:pl-72 transition-all duration-300 overflow-x-hidden">
+			<div id="main-content-wrapper" class="lg:pl-72 overflow-x-hidden">
 				<!-- Mobile top bar — drawer trigger + brand. Hidden on desktop, where
 				     the sidebar is always visible and carries the user menu itself,
 				     so the whole bar disappears and the content reclaims the height. -->
@@ -384,59 +432,43 @@ templ Admin(props AdminProps) {
 				<div id="toast-container" aria-live="assertive"></div>
 			</div>
 			<script>
-				// Desktop sidebar toggle
+				// Desktop sidebar toggle. The CSS (keyed on .is-collapsed) owns the
+				// labels, icon centering and chevron flip on a single timeline; JS
+				// just flips the state class, the width/padding utilities it animates,
+				// the a11y attributes, and the persisted preference.
 				function toggleSidebar() {
 					var sb = document.getElementById('desktop-sidebar');
 					var inner = document.getElementById('desktop-sidebar-inner');
 					var wrapper = document.getElementById('main-content-wrapper');
-					var labels = document.querySelectorAll('#desktop-sidebar [data-sidebar-label]');
-					var menuIcon = document.getElementById('sidebar-menu-icon');
-					var logoIcon = document.getElementById('sidebar-logo-icon');
-					var expanded = sb.classList.contains('lg:w-72');
+					var toggle = sb.querySelector('[data-sidebar-toggle]');
+					var collapsed = sb.classList.toggle('is-collapsed');
 
-					if (expanded) {
-						// Collapse
-						sb.classList.remove('lg:w-72');
-						sb.classList.add('lg:w-16');
-						sb.classList.add('is-collapsed');
-						inner.classList.remove('px-6');
-						inner.classList.add('px-2');
-						wrapper.classList.remove('lg:pl-72');
-						wrapper.classList.add('lg:pl-16');
-						menuIcon.classList.remove('hidden');
-						logoIcon.classList.add('hidden');
-						labels.forEach(function(el) {
-							el.classList.add('opacity-0');
-							setTimeout(function() { el.classList.add('hidden'); }, 200);
-						});
-						localStorage.setItem('sidebar-collapsed', 'true');
-					} else {
-						// Expand
-						sb.classList.remove('lg:w-16');
-						sb.classList.add('lg:w-72');
-						sb.classList.remove('is-collapsed');
-						inner.classList.remove('px-2');
-						inner.classList.add('px-6');
-						wrapper.classList.remove('lg:pl-16');
-						wrapper.classList.add('lg:pl-72');
-						menuIcon.classList.add('hidden');
-						logoIcon.classList.remove('hidden');
-						labels.forEach(function(el) {
-							el.classList.remove('hidden');
-							requestAnimationFrame(function() {
-								el.classList.remove('opacity-0');
-								el.classList.add('opacity-100');
-							});
-						});
-						localStorage.setItem('sidebar-collapsed', 'false');
+					sb.classList.toggle('lg:w-72', !collapsed);
+					sb.classList.toggle('lg:w-16', collapsed);
+					inner.classList.toggle('px-6', !collapsed);
+					inner.classList.toggle('px-2', collapsed);
+					wrapper.classList.toggle('lg:pl-72', !collapsed);
+					wrapper.classList.toggle('lg:pl-16', collapsed);
+
+					if (toggle) {
+						toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+						toggle.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
 					}
+					localStorage.setItem('sidebar-collapsed', collapsed ? 'true' : 'false');
 				}
 
 				(function() {
-					// Restore sidebar state from localStorage (default: expanded)
-					var collapsed = localStorage.getItem('sidebar-collapsed');
-					if (collapsed === 'true') {
-						toggleSidebar(); // collapse from default expanded
+					// Restore sidebar state from localStorage (default: expanded).
+					// Suppress the transition for the restore so a collapsed rail
+					// doesn't visibly slam shut on every hard page load.
+					if (localStorage.getItem('sidebar-collapsed') === 'true') {
+						document.body.classList.add('sidebar-no-anim');
+						toggleSidebar();
+						requestAnimationFrame(function() {
+							requestAnimationFrame(function() {
+								document.body.classList.remove('sidebar-no-anim');
+							});
+						});
 					}
 
 					// Mobile sidebar
@@ -565,15 +597,26 @@ templ adminLogo() {
 	</a>
 }
 
+// adminSidebarBrand is the wordmark/home link. It collapses to nothing on the
+// rail (data-sidebar-label) so the dedicated chevron toggle is the sole header
+// control when collapsed.
+templ adminSidebarBrand() {
+	<a href="/admin" data-sidebar-label class="flex items-center gap-2 overflow-hidden">
+		<img src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="h-7 w-auto shrink-0"/>
+		<span class="text-lg tracking-wide text-rr-heading uppercase" style="font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;">Rockabilly</span>
+	</a>
+}
+
+// adminSidebarToggle is the persistent collapse affordance — a chevron that is
+// visible in BOTH states and flips direction (CSS, on .is-collapsed) so the
+// control always reads as "open/close the rail." Replaces the old logo-that-
+// secretly-toggled, which had no discoverable affordance.
 templ adminSidebarToggle() {
-	<button type="button" onclick="toggleSidebar()" data-sidebar-toggle title="Toggle sidebar" class="group flex w-full items-center gap-x-3 rounded-sm p-2 text-sm/6 font-semibold text-rr-body hover:bg-rr-raised hover:text-rr-red transition-colors">
-		<!-- Menu icon: shown when collapsed -->
-		<svg id="sidebar-menu-icon" class="hidden size-6 shrink-0 text-rr-muted group-hover:text-rr-red" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-			<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
+	<button type="button" onclick="toggleSidebar()" data-sidebar-toggle aria-expanded="true" aria-controls="desktop-sidebar" title="Collapse sidebar" class="group flex shrink-0 items-center justify-center rounded-sm p-2 text-rr-muted hover:bg-rr-raised hover:text-rr-red transition-colors">
+		<span class="sr-only">Toggle sidebar</span>
+		<svg data-sidebar-chevron class="size-5 shrink-0 transition-transform duration-200" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"></path>
 		</svg>
-		<!-- Logo mark: shown when expanded (default) -->
-		<img id="sidebar-logo-icon" src="/static/rockabilly-logo.svg" alt="Rockabilly Roasting Co." class="size-6 shrink-0"/>
-		<span data-sidebar-label class="text-lg tracking-wide text-rr-heading uppercase transition-opacity duration-200" style="font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;">Rockabilly</span>
 	</button>
 }
 

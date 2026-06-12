@@ -162,17 +162,22 @@ func adminSectionTabs(tabs []sectionTab, activeHref string) templ.Component {
 	})
 }
 
-// Neutral segmented control — active segment lifts on a raised track with a
-// soft shadow. No rust fill: a channel scope switch is chrome, not a CTA.
+// Segmented control — the active channel is STAMPED IN INK (paper text on ink
+// fill) so a view-wide context switch reads as obviously selected, not as the
+// near-white-on-grey pill it used to be. Still no rust fill: a channel scope
+// switch is chrome, not a CTA — rust stays reserved for actions. Inactive
+// segments use body ink (not muted) so the unselected option is clearly the
+// other half of a real switch.
 func channelSegClass(active bool) string {
 	if active {
-		return "rounded-sm bg-rr-surface px-4 py-1.5 text-sm font-semibold text-rr-heading shadow-sm"
+		return "rounded-sm bg-rr-heading px-4 py-1.5 text-sm font-semibold text-rr-bg shadow-sm"
 	}
-	return "rounded-sm px-4 py-1.5 text-sm font-medium text-rr-muted hover:text-rr-heading"
+	return "rounded-sm px-4 py-1.5 text-sm font-medium text-rr-body hover:bg-rr-surface hover:text-rr-heading"
 }
 
 // adminChannelToggle renders a two-up segmented control for retail/wholesale.
-// activeHref is the current list's BasePath.
+// activeHref is the current list's BasePath. The track carries a hairline ring
+// so the control reads as a deliberate object on the paper, not a stray strip.
 func adminChannelToggle(retailHref, wholesaleHref, activeHref string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -194,7 +199,7 @@ func adminChannelToggle(retailHref, wholesaleHref, activeHref string) templ.Comp
 			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"mb-6 inline-flex items-center gap-1 rounded-sm bg-rr-raised p-1\" role=\"tablist\" aria-label=\"Sales channel\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"mb-6 inline-flex items-center gap-1 rounded-sm bg-rr-raised p-1 ring-1 ring-rr-border\" role=\"tablist\" aria-label=\"Sales channel\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -210,7 +215,7 @@ func adminChannelToggle(retailHref, wholesaleHref, activeHref string) templ.Comp
 		var templ_7745c5c3_Var9 templ.SafeURL
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(retailHref))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/section_nav.templ`, Line: 82, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/section_nav.templ`, Line: 87, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -223,7 +228,7 @@ func adminChannelToggle(retailHref, wholesaleHref, activeHref string) templ.Comp
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(boolAttr(retailHref == activeHref))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/section_nav.templ`, Line: 82, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/section_nav.templ`, Line: 87, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -258,7 +263,7 @@ func adminChannelToggle(retailHref, wholesaleHref, activeHref string) templ.Comp
 		var templ_7745c5c3_Var13 templ.SafeURL
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(wholesaleHref))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/section_nav.templ`, Line: 83, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/section_nav.templ`, Line: 88, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -271,7 +276,7 @@ func adminChannelToggle(retailHref, wholesaleHref, activeHref string) templ.Comp
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(boolAttr(wholesaleHref == activeHref))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/section_nav.templ`, Line: 83, Col: 107}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/section_nav.templ`, Line: 88, Col: 107}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 		if templ_7745c5c3_Err != nil {

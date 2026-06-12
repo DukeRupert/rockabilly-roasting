@@ -224,6 +224,7 @@ func orderTabCountClass(active bool) string {
 }
 
 templ OrderListContent(props OrderListProps) {
+	@adminChannelToggle("/admin/orders", "/admin/orders/wholesale", props.BasePath)
 	<!-- Page header -->
 	<div class="sm:flex sm:items-end sm:justify-between">
 		<div>

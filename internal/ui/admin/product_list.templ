@@ -75,6 +75,7 @@ func productPageHref(page int, status, taxon, search string) string {
 }
 
 templ ProductListContent(props ProductListProps) {
+		@adminSectionTabs(catalogTabs(), "/admin/catalog")
 		<!-- Page header -->
 		<div class="sm:flex sm:items-center">
 			<div class="sm:flex-auto">

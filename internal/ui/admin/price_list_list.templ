@@ -15,6 +15,7 @@ type PriceListListProps struct {
 }
 
 templ PriceListListContent(props PriceListListProps) {
+	@adminSectionTabs(customersTabs(), "/admin/price-lists")
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">

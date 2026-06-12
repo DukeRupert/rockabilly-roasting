@@ -60,6 +60,10 @@ func PlanListContent(props PlanListProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = adminSectionTabs(subscriptionsTabs(), "/admin/plans").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Subscription Plans</h1><p class=\"mt-1 text-sm text-rr-muted\">Define recurring delivery cadences. Plans are available on all subscribable products.</p></div></div><!-- Create form --><div class=\"mt-6 border border-rr-border bg-rr-surface p-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">New Plan</h2><form method=\"post\" action=\"/admin/plans\" class=\"mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6\"><div class=\"sm:col-span-2\"><label for=\"plan-name\" class=\"block text-sm font-medium text-rr-body\">Name</label> <input id=\"plan-name\" name=\"name\" type=\"text\" required placeholder=\"e.g. Every 30 Days\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"></div><div class=\"sm:col-span-1\"><label for=\"plan-interval\" class=\"block text-sm font-medium text-rr-body\">Interval</label><div class=\"mt-1 grid grid-cols-1\"><select id=\"plan-interval\" name=\"interval\" required class=\"col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"><option value=\"every_7_days\">Every 7 Days</option> <option value=\"every_14_days\">Every 14 Days</option> <option value=\"every_21_days\">Every 21 Days</option> <option value=\"every_30_days\" selected>Every 30 Days</option> <option value=\"every_60_days\">Every 60 Days</option> <option value=\"every_90_days\">Every 90 Days</option></select> <svg class=\"pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4\" viewBox=\"0 0 16 16\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z\" clip-rule=\"evenodd\"></path></svg></div></div><div class=\"sm:col-span-1\"><label for=\"plan-discount\" class=\"block text-sm font-medium text-rr-body\">Discount %</label> <input id=\"plan-discount\" name=\"discount_pct\" type=\"number\" min=\"0\" max=\"100\" value=\"0\" class=\"mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none\"></div><div class=\"flex items-end\"><button type=\"submit\" class=\"inline-flex items-center rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Create Plan</button></div></form></div><!-- Plan table --><div class=\"mt-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -82,7 +86,7 @@ func PlanListContent(props PlanListProps) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 128, Col: 17}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 129, Col: 17}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -95,7 +99,7 @@ func PlanListContent(props PlanListProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(planIntervalLabel(p.Interval, p.IntervalCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 131, Col: 57}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 132, Col: 57}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -108,7 +112,7 @@ func PlanListContent(props PlanListProps) templ.Component {
 				var templ_7745c5c3_Var4 templ.SafeURL
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/plans/%s/discount", p.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 136, Col: 88}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 137, Col: 88}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -121,7 +125,7 @@ func PlanListContent(props PlanListProps) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", p.DiscountPct))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 144, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 145, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 				if templ_7745c5c3_Err != nil {
@@ -147,7 +151,7 @@ func PlanListContent(props PlanListProps) templ.Component {
 					var templ_7745c5c3_Var6 templ.SafeURL
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/plans/%s/deactivate", p.ID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 158, Col: 110}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 159, Col: 110}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -165,7 +169,7 @@ func PlanListContent(props PlanListProps) templ.Component {
 					var templ_7745c5c3_Var7 templ.SafeURL
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/plans/%s/activate", p.ID.String())))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 162, Col: 108}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/plan_list.templ`, Line: 163, Col: 108}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {

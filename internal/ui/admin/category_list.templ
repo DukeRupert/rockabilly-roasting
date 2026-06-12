@@ -16,6 +16,7 @@ type CategoryListProps struct {
 }
 
 templ CategoryListContent(props CategoryListProps) {
+		@adminSectionTabs(catalogTabs(), "/admin/categories")
 		<!-- Page header -->
 		<div class="sm:flex sm:items-center">
 			<div class="sm:flex-auto">

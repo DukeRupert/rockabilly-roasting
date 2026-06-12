@@ -18,66 +18,55 @@ type navItem struct {
 	IconFn func(...icon.Props) templ.Component
 }
 
-type navGroup struct {
-	Label string // empty for ungrouped items (e.g. Dashboard)
-	Items []navItem
+// adminNavItems is the flat primary sidebar — seven daily-use destinations.
+// Second-level pages (categories, attributes, groups, price lists, plans,
+// wholesale orders/fulfillment) no longer get their own row; they live behind
+// the in-page section tabs / channel toggles of these parents. Settings, the
+// audit log, and help moved to the user menu — they're occasional, not daily.
+func adminNavItems() []navItem {
+	return []navItem{
+		{Label: "Dashboard", Href: "/admin", IconFn: icon.LayoutDashboard},
+		{Label: "Orders", Href: "/admin/orders", IconFn: icon.ShoppingCart},
+		{Label: "Fulfillment", Href: "/admin/fulfillment", IconFn: icon.Truck},
+		{Label: "Catalog", Href: "/admin/catalog", IconFn: icon.Package},
+		{Label: "Customers", Href: "/admin/customers", IconFn: icon.Users},
+		{Label: "Subscriptions", Href: "/admin/subscriptions", IconFn: icon.Repeat},
+		{Label: "Discounts", Href: "/admin/discounts", IconFn: icon.Tag},
+	}
 }
 
-func adminNavGroups() []navGroup {
-	return []navGroup{
-		{
-			Label: "",
-			Items: []navItem{
-				{Label: "Dashboard", Href: "/admin", IconFn: icon.LayoutDashboard},
-			},
-		},
-		{
-			Label: "RETAIL",
-			Items: []navItem{
-				{Label: "Orders", Href: "/admin/orders", IconFn: icon.ShoppingCart},
-				{Label: "Fulfillment", Href: "/admin/fulfillment", IconFn: icon.Truck},
-			},
-		},
-		{
-			Label: "WHOLESALE",
-			Items: []navItem{
-				{Label: "Accounts", Href: "/admin/wholesale", IconFn: icon.Building},
-				{Label: "Orders", Href: "/admin/orders/wholesale", IconFn: icon.ReceiptText},
-				{Label: "Fulfillment", Href: "/admin/wholesale/fulfillment", IconFn: icon.Truck},
-			},
-		},
-		{
-			Label: "CATALOG",
-			Items: []navItem{
-				{Label: "Products", Href: "/admin/catalog", IconFn: icon.Package},
-				{Label: "Categories", Href: "/admin/categories", IconFn: icon.FolderTree},
-				{Label: "Attributes", Href: "/admin/attributes", IconFn: icon.SlidersHorizontal},
-			},
-		},
-		{
-			Label: "CUSTOMERS",
-			Items: []navItem{
-				{Label: "Customers", Href: "/admin/customers", IconFn: icon.Users},
-				{Label: "Groups", Href: "/admin/groups", IconFn: icon.Group},
-				{Label: "Price Lists", Href: "/admin/price-lists", IconFn: icon.BadgeDollarSign},
-			},
-		},
-		{
-			Label: "SUBSCRIPTIONS",
-			Items: []navItem{
-				{Label: "Plans", Href: "/admin/plans", IconFn: icon.ClipboardList},
-				{Label: "Subscriptions", Href: "/admin/subscriptions", IconFn: icon.Repeat},
-			},
-		},
-		{
-			Label: "SYSTEM",
-			Items: []navItem{
-				{Label: "Discounts", Href: "/admin/discounts", IconFn: icon.Tag},
-				{Label: "Audit Log", Href: "/admin/audit", IconFn: icon.ScrollText},
-				{Label: "Help", Href: "/admin/help", IconFn: icon.BookOpen},
-			},
-		},
+// resolveActiveNav maps any admin path to the sidebar row that should be lit.
+// Sub-pages reached through section tabs (e.g. /admin/categories) or the
+// wholesale channel (/admin/orders/wholesale, /admin/wholesale/fulfillment)
+// resolve to their parent. Keep this in sync with the JS twin in the page
+// script — both must agree so server render and post-htmx highlight match.
+// Order matters: the wholesale-fulfillment case is checked before the generic
+// /admin/wholesale → Customers case so it doesn't get mis-bucketed.
+func resolveActiveNav(path string) string {
+	switch {
+	case path == "/admin":
+		return "/admin"
+	case strings.HasPrefix(path, "/admin/orders"):
+		return "/admin/orders"
+	case path == "/admin/fulfillment" || strings.HasPrefix(path, "/admin/fulfillment/") ||
+		strings.HasPrefix(path, "/admin/wholesale/fulfillment"):
+		return "/admin/fulfillment"
+	case strings.HasPrefix(path, "/admin/catalog") ||
+		strings.HasPrefix(path, "/admin/categories") ||
+		strings.HasPrefix(path, "/admin/attributes"):
+		return "/admin/catalog"
+	case strings.HasPrefix(path, "/admin/customers") ||
+		strings.HasPrefix(path, "/admin/groups") ||
+		strings.HasPrefix(path, "/admin/price-lists") ||
+		strings.HasPrefix(path, "/admin/wholesale"):
+		return "/admin/customers"
+	case strings.HasPrefix(path, "/admin/subscriptions") ||
+		strings.HasPrefix(path, "/admin/plans"):
+		return "/admin/subscriptions"
+	case strings.HasPrefix(path, "/admin/discounts"):
+		return "/admin/discounts"
 	}
+	return path
 }
 
 func staffInitials(name string) string {
@@ -103,6 +92,25 @@ func navIconColor(active bool) string {
 		return "size-5 shrink-0 text-rr-heading"
 	}
 	return "size-5 shrink-0 text-rr-muted group-hover:text-rr-heading"
+}
+
+// adminNav is the single source of truth for the sidebar link list, shared by
+// the mobile drawer and the desktop rail so they can't drift. The
+// data-sidebar-label spans let the desktop collapse toggle fade the text to an
+// icon-only rail; the mobile drawer never collapses, so they simply stay shown.
+templ adminNav(activePath string) {
+	<nav data-admin-sidebar-nav class="flex flex-1 flex-col">
+		<ul role="list" class="-mx-2 flex flex-1 flex-col gap-y-1">
+			for _, item := range adminNavItems() {
+				<li>
+					<a href={ templ.SafeURL(item.Href) } title={ item.Label } class={ navItemClasses(resolveActiveNav(activePath) == item.Href) }>
+						@item.IconFn(icon.Props{Class: navIconColor(resolveActiveNav(activePath) == item.Href)})
+						<span data-sidebar-label class="transition-opacity duration-200">{ item.Label }</span>
+					</a>
+				</li>
+			}
+		</ul>
+	</nav>
 }
 
 templ Admin(props AdminProps) {
@@ -311,123 +319,49 @@ templ Admin(props AdminProps) {
 							<div class="flex h-16 shrink-0 items-center">
 								@adminLogo()
 							</div>
-							<nav data-admin-sidebar-nav class="flex flex-1 flex-col">
-								<ul role="list" class="flex flex-1 flex-col gap-y-0.5">
-									for _, group := range adminNavGroups() {
-										<li>
-											if group.Label != "" {
-												<p class="label-font text-rr-muted mt-3 mb-0.5 px-2">{ group.Label }</p>
-											}
-											<ul role="list" class="-mx-2 space-y-0.5">
-												for _, item := range group.Items {
-													<li>
-														<a href={ templ.SafeURL(item.Href) } class={ navItemClasses(props.ActivePath == item.Href) }>
-															@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
-															{ item.Label }
-														</a>
-													</li>
-												}
-											</ul>
-										</li>
-									}
-									<li>
-										<p class="label-font text-rr-muted mt-3 mb-0.5 px-2">SETTINGS</p>
-										<ul role="list" class="-mx-2 space-y-0.5">
-											<li>
-												<a href="/admin/settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
-													@icon.Settings(icon.Props{Class: navIconColor(props.ActivePath == "/admin/settings")})
-													Settings
-												</a>
-											</li>
-										</ul>
-									</li>
-									<li class="mt-auto">
-										@adminUserFooter(props)
-									</li>
-								</ul>
-							</nav>
+							<div class="flex flex-1 flex-col">
+								@adminNav(props.ActivePath)
+								<div class="mt-auto">
+									@adminUserFooter(props)
+								</div>
+							</div>
 						</div>
 					</div>
 				</div>
 			</div>
 			<!-- Desktop sidebar (expanded by default for desktop-first use) -->
 			<div id="desktop-sidebar" class="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col transition-all duration-300">
-				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface border-r border-rr-border px-6 pb-4 transition-all duration-300">
+				<div id="desktop-sidebar-inner" class="flex grow flex-col gap-y-5 bg-rr-surface border-r border-rr-border px-6 pb-4 transition-all duration-300">
 					<div class="flex h-16 shrink-0 items-center">
 						@adminSidebarToggle()
 					</div>
-					<nav data-admin-sidebar-nav class="flex flex-1 flex-col">
-						<ul role="list" class="flex flex-1 flex-col gap-y-1">
-							for _, group := range adminNavGroups() {
-								<li>
-									if group.Label != "" {
-										<p data-sidebar-label class="label-font text-rr-muted mt-3 mb-0.5 px-2 transition-opacity duration-200">{ group.Label }</p>
-									}
-									<ul role="list" class="-mx-2 space-y-0.5">
-										for _, item := range group.Items {
-											<li>
-												<a href={ templ.SafeURL(item.Href) } title={ item.Label } class={ navItemClasses(props.ActivePath == item.Href) }>
-													@item.IconFn(icon.Props{Class: navIconColor(props.ActivePath == item.Href)})
-													<span data-sidebar-label class="transition-opacity duration-200">{ item.Label }</span>
-												</a>
-											</li>
-										}
-									</ul>
-								</li>
-							}
-							<li>
-								<p data-sidebar-label class="label-font text-rr-muted mt-3 mb-0.5 px-2 transition-opacity duration-200">SETTINGS</p>
-								<ul role="list" class="-mx-2 space-y-0.5">
-									<li>
-										<a href="/admin/settings" title="Settings" class={ navItemClasses(props.ActivePath == "/admin/settings") }>
-											@icon.Settings(icon.Props{Class: navIconColor(props.ActivePath == "/admin/settings")})
-											<span data-sidebar-label class="transition-opacity duration-200">Settings</span>
-										</a>
-									</li>
-								</ul>
-							</li>
-						</ul>
-					</nav>
+					<!-- Nav (flex-1) fills the column and pins the user menu to the
+					     bottom. No overflow container here: the seven-item nav never
+					     needs to scroll, and an overflow context would both clip the
+					     menu's upward dropdown and turn the nav's -mx-2 gutter bleed
+					     into a stray horizontal scrollbar. -->
+					@adminNav(props.ActivePath)
+					<div class="shrink-0 border-t border-rr-border pt-2">
+						@adminUserFooter(props)
+					</div>
 				</div>
 			</div>
 			<!-- Main content area -->
 			<div id="main-content-wrapper" class="lg:pl-72 transition-all duration-300 overflow-x-hidden">
-				<!-- Top bar -->
-				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 sm:gap-x-6 sm:px-6 lg:px-8">
-					<button type="button" id="mobile-menu-btn" class="-m-2.5 p-2.5 text-rr-body lg:hidden">
+				<!-- Mobile top bar — drawer trigger + brand. Hidden on desktop, where
+				     the sidebar is always visible and carries the user menu itself,
+				     so the whole bar disappears and the content reclaims the height. -->
+				<div class="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 lg:hidden">
+					<button type="button" id="mobile-menu-btn" class="-m-2.5 p-2.5 text-rr-body">
 						<span class="sr-only">Open sidebar</span>
 						<svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path>
 						</svg>
 					</button>
-					<!-- Separator -->
-					<div class="h-6 w-px bg-rr-border lg:hidden" aria-hidden="true"></div>
-					<div class="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-						<div class="flex-1"></div>
-						<div class="flex items-center gap-x-4 lg:gap-x-6">
-							<!-- Desktop user dropdown -->
-							<div class="relative hidden lg:block" data-dropdown>
-								<button type="button" class="-m-1.5 flex items-center p-1.5" data-dropdown-trigger>
-									<span class="sr-only">Open user menu</span>
-									<span class="inline-flex size-8 items-center justify-center rounded-full bg-rr-red">
-										<span class="text-sm font-medium text-white">{ staffInitials(props.StaffName) }</span>
-									</span>
-									<span class="hidden lg:flex lg:items-center">
-										<span class="ml-4 text-sm/6 font-semibold text-rr-heading">{ props.StaffName }</span>
-										<svg class="ml-2 size-5 text-rr-muted" viewBox="0 0 20 20" fill="currentColor">
-											<path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
-										</svg>
-									</span>
-								</button>
-								<div data-dropdown-menu class="hidden absolute right-0 z-10 mt-2.5 w-48 origin-top-right rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border">
-									<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Settings</a>
-									<form method="post" action="/auth/staff/logout"><button type="submit" class="block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Sign out</button></form>
-								</div>
-							</div>
-						</div>
-					</div>
+					<div class="h-6 w-px bg-rr-border" aria-hidden="true"></div>
+					@adminLogo()
 				</div>
-			<main class="py-10">
+			<main class="py-10 lg:py-8">
 					<div id="main-content" class="px-4 sm:px-6 lg:px-8">
 						{ children... }
 					</div>
@@ -441,7 +375,7 @@ templ Admin(props AdminProps) {
 					var sb = document.getElementById('desktop-sidebar');
 					var inner = document.getElementById('desktop-sidebar-inner');
 					var wrapper = document.getElementById('main-content-wrapper');
-					var labels = document.querySelectorAll('[data-sidebar-label]');
+					var labels = document.querySelectorAll('#desktop-sidebar [data-sidebar-label]');
 					var menuIcon = document.getElementById('sidebar-menu-icon');
 					var logoIcon = document.getElementById('sidebar-logo-icon');
 					var expanded = sb.classList.contains('lg:w-72');
@@ -541,6 +475,23 @@ templ Admin(props AdminProps) {
 				var activeIcon = 'size-5 shrink-0 text-rr-heading';
 				var inactiveIcon = 'size-5 shrink-0 text-rr-muted group-hover:text-rr-heading';
 
+				// Twin of resolveActiveNav in admin.templ — maps any admin path to the
+				// flat sidebar row that owns it (section-tab and wholesale sub-pages
+				// resolve to their parent). Keep the two in sync.
+				function resolveActiveNav(path) {
+					if (path === '/admin') return '/admin';
+					if (path.indexOf('/admin/orders') === 0) return '/admin/orders';
+					if (path === '/admin/fulfillment' || path.indexOf('/admin/fulfillment/') === 0 ||
+						path.indexOf('/admin/wholesale/fulfillment') === 0) return '/admin/fulfillment';
+					if (path.indexOf('/admin/catalog') === 0 || path.indexOf('/admin/categories') === 0 ||
+						path.indexOf('/admin/attributes') === 0) return '/admin/catalog';
+					if (path.indexOf('/admin/customers') === 0 || path.indexOf('/admin/groups') === 0 ||
+						path.indexOf('/admin/price-lists') === 0 || path.indexOf('/admin/wholesale') === 0) return '/admin/customers';
+					if (path.indexOf('/admin/subscriptions') === 0 || path.indexOf('/admin/plans') === 0) return '/admin/subscriptions';
+					if (path.indexOf('/admin/discounts') === 0) return '/admin/discounts';
+					return path;
+				}
+
 				function updateActiveNav() {
 					// Prefer an explicit marker the swapped content may carry. The order
 					// detail page lives at the same /admin/orders/{id} URL for both
@@ -548,26 +499,12 @@ templ Admin(props AdminProps) {
 					// marker disambiguates (e.g. "/admin/orders/wholesale").
 					var marker = document.querySelector('#main-content [data-active-path]');
 					var path = marker ? marker.getAttribute('data-active-path') : window.location.pathname;
+					var resolved = resolveActiveNav(path);
 					// Scoped to the sidebar so we don't trample page-level tab navs
 					// (e.g. orders/fulfillment view tabs) that also link to /admin/*.
 					var links = document.querySelectorAll('nav[data-admin-sidebar-nav] a[href^="/admin"]');
-					// Pick the single longest href the path matches. Prefix matches must
-					// land on a path boundary so /admin/orders never claims
-					// /admin/orders/wholesale, and so /admin/orders/{id} resolves to the
-					// most specific group rather than every ancestor.
-					var best = null, bestLen = -1;
 					links.forEach(function(a) {
-						var href = a.getAttribute('href');
-						var matches = (href === '/admin')
-							? (path === '/admin')
-							: (path === href || path.indexOf(href + '/') === 0);
-						if (matches && href.length > bestLen) {
-							best = a;
-							bestLen = href.length;
-						}
-					});
-					links.forEach(function(a) {
-						var isActive = a === best;
+						var isActive = a.getAttribute('href') === resolved;
 						a.className = isActive ? activeLink : inactiveLink;
 						var icon = a.querySelector('svg');
 						if (icon) icon.className = isActive ? activeIcon : inactiveIcon;
@@ -640,6 +577,9 @@ templ adminUserFooter(props AdminProps) {
 		</button>
 		<div data-dropdown-menu class="hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border">
 			<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Settings</a>
+			<a href="/admin/audit" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Audit log</a>
+			<a href="/admin/help" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Help</a>
+			<div class="my-1 border-t border-rr-border"></div>
 			<form method="post" action="/auth/staff/logout"><button type="submit" class="block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Sign out</button></form>
 		</div>
 	</div>

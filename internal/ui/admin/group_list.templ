@@ -13,6 +13,7 @@ type GroupListProps struct {
 }
 
 templ GroupListContent(props GroupListProps) {
+	@adminSectionTabs(customersTabs(), "/admin/groups")
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">

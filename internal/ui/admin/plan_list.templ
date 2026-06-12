@@ -32,6 +32,7 @@ func planIntervalLabel(interval domain.SubscriptionInterval, count int) string {
 }
 
 templ PlanListContent(props PlanListProps) {
+	@adminSectionTabs(subscriptionsTabs(), "/admin/plans")
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">

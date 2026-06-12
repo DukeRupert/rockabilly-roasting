@@ -41,6 +41,10 @@ func GroupListContent(props GroupListProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = adminSectionTabs(customersTabs(), "/admin/groups").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!-- Page header --><div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Customer Groups</h1><p class=\"mt-1 text-sm text-rr-muted\">Groups grant access to restricted products. Assign customers to a group, then set a product's visibility to that group. Wholesale pricing is set under Price lists.</p></div></div><!-- Create form --><div class=\"mt-6\"><form method=\"post\" action=\"/admin/groups\" class=\"flex items-end gap-3\"><div class=\"flex-1 max-w-sm\"><label for=\"name\" class=\"block text-sm/6 font-medium text-rr-heading\">New group</label><div class=\"mt-2\"><input type=\"text\" name=\"name\" id=\"name\" required placeholder=\"e.g. Wholesale Tier 1\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6\"></div></div><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\">Create group</button></form></div><!-- Groups table --><div class=\"mt-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -63,7 +67,7 @@ func GroupListContent(props GroupListProps) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(g.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/group_list.templ`, Line: 73, Col: 17}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/group_list.templ`, Line: 74, Col: 17}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -76,7 +80,7 @@ func GroupListContent(props GroupListProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(g.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/group_list.templ`, Line: 76, Col: 24}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/group_list.templ`, Line: 77, Col: 24}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -89,7 +93,7 @@ func GroupListContent(props GroupListProps) templ.Component {
 				var templ_7745c5c3_Var4 templ.SafeURL
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/groups/%s/delete", g.ID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/group_list.templ`, Line: 79, Col: 97}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/group_list.templ`, Line: 80, Col: 97}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {

@@ -258,6 +258,7 @@ func fulfillmentEmptyBucketCopy(view string) string {
 }
 
 templ FulfillmentListContent(props FulfillmentListProps) {
+	@adminChannelToggle("/admin/fulfillment", "/admin/wholesale/fulfillment", props.BasePath)
 	if props.BatchResult != nil {
 		@batchActionResultBanner(*props.BatchResult)
 	}

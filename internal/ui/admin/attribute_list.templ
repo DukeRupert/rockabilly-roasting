@@ -14,6 +14,7 @@ type AttributeSetListProps struct {
 }
 
 templ AttributeSetListContent(props AttributeSetListProps) {
+	@adminSectionTabs(catalogTabs(), "/admin/attributes")
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">

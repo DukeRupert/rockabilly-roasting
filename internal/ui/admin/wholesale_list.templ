@@ -64,6 +64,7 @@ func wholesaleFilterClasses(current, filter string) string {
 }
 
 templ WholesaleListContent(props WholesaleListProps) {
+	@adminSectionTabs(customersTabs(), "/admin/wholesale")
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">

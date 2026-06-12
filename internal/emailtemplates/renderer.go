@@ -303,3 +303,23 @@ func FormatAddress(line1, city, state, postalCode string) string {
 	}
 	return strings.Join(parts, ", ") + " " + postalCode
 }
+
+// FormatRecipientAddress builds a one-line shipping address including the
+// recipient's name and second address line — the full destination as it
+// appears on the label, so the customer can spot a wrong apartment or an
+// old address before the order ships.
+func FormatRecipientAddress(firstName, lastName, line1 string, line2 *string, city, state, postalCode string) string {
+	parts := []string{}
+	if name := strings.TrimSpace(firstName + " " + lastName); name != "" {
+		parts = append(parts, name)
+	}
+	parts = append(parts, line1)
+	if line2 != nil && strings.TrimSpace(*line2) != "" {
+		parts = append(parts, strings.TrimSpace(*line2))
+	}
+	parts = append(parts, city)
+	if state != "" {
+		parts = append(parts, state)
+	}
+	return strings.Join(parts, ", ") + " " + postalCode
+}

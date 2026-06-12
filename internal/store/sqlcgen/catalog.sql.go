@@ -777,6 +777,37 @@ func (q *Queries) ListTaxonsByParent(ctx context.Context, parentID *uuid.UUID) (
 	return items, nil
 }
 
+const listVariantOptionLabels = `-- name: ListVariantOptionLabels :many
+SELECT pov.value
+FROM variant_option_values vov
+JOIN product_option_values pov ON pov.id = vov.product_option_value_id
+JOIN product_options po ON po.id = pov.product_option_id
+WHERE vov.variant_id = $1
+ORDER BY po.position, pov.position
+`
+
+// Option values for a variant in display order ("Whole Bean", "12oz").
+// Empty for single-variant products with no options.
+func (q *Queries) ListVariantOptionLabels(ctx context.Context, variantID uuid.UUID) ([]string, error) {
+	rows, err := q.db.Query(ctx, listVariantOptionLabels, variantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var value string
+		if err := rows.Scan(&value); err != nil {
+			return nil, err
+		}
+		items = append(items, value)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listVariantOptionValuesByVariant = `-- name: ListVariantOptionValuesByVariant :many
 SELECT variant_id, product_option_value_id FROM variant_option_values
 WHERE variant_id = $1

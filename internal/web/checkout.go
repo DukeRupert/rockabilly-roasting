@@ -17,6 +17,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/logging"
+	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
@@ -27,6 +28,10 @@ import (
 type checkoutCartItem struct {
 	VariantID    string `json:"variant_id"`
 	ProductTitle string `json:"product_title"`
+	// VariantLabel is the human-readable option summary ("Whole Bean · 12oz");
+	// empty for single-variant products. The UI prefers it over the SKU.
+	VariantLabel string `json:"variant_label,omitempty"`
+	ThumbnailURL string `json:"thumbnail_url,omitempty"`
 	SKU          string `json:"sku"`
 	Quantity     int    `json:"quantity"`
 	UnitPrice    int    `json:"unit_price"`
@@ -275,6 +280,16 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 			if pErr != nil {
 				return pErr
 			}
+			label, lErr := d.CatalogService.VariantLabel(ctx, tx, ci.VariantID)
+			if lErr != nil {
+				return lErr
+			}
+			thumbnailURL := ""
+			if media, mErr := d.CatalogService.ListProductMedia(ctx, tx, product.ID); mErr != nil {
+				return mErr
+			} else if len(media) > 0 {
+				thumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantThumbnail)
+			}
 
 			lineTotal := ci.UnitPrice * ci.Quantity
 			resp.Subtotal += lineTotal
@@ -282,6 +297,8 @@ func (d *Deps) handleCheckoutCart(w http.ResponseWriter, r *http.Request) {
 			resp.Items = append(resp.Items, checkoutCartItem{
 				VariantID:    ci.VariantID.String(),
 				ProductTitle: product.Title,
+				VariantLabel: label,
+				ThumbnailURL: thumbnailURL,
 				SKU:          variant.SKU,
 				Quantity:     ci.Quantity,
 				UnitPrice:    ci.UnitPrice,

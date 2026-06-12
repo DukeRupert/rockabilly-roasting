@@ -835,6 +835,17 @@ func (s *CatalogStore) ListVariantOptionValues(ctx context.Context, tx pgx.Tx, v
 	return values, nil
 }
 
+// ListVariantOptionLabels returns the variant's option value strings in
+// display order (option position, then value position) — e.g. ["Whole Bean",
+// "12oz"]. Empty for single-variant products with no options.
+func (s *CatalogStore) ListVariantOptionLabels(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) ([]string, error) {
+	labels, err := sqlcgen.New(tx).ListVariantOptionLabels(ctx, variantID)
+	if err != nil {
+		return nil, fmt.Errorf("list variant option labels: %w", err)
+	}
+	return labels, nil
+}
+
 // DeleteVariantOptionValues removes all option values for a variant.
 func (s *CatalogStore) DeleteVariantOptionValues(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) error {
 	if err := sqlcgen.New(tx).DeleteVariantOptionValuesByVariant(ctx, variantID); err != nil {

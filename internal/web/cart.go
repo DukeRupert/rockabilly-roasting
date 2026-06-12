@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/domain"
+	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
@@ -154,6 +155,20 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 				return pErr
 			}
 
+			// Human-readable variant ("Whole Bean · 12oz") — the detail a
+			// coffee buyer actually needs to verify, unlike the SKU.
+			label, lErr := d.CatalogService.VariantLabel(ctx, tx, ci.VariantID)
+			if lErr != nil {
+				return lErr
+			}
+
+			thumbnailURL := ""
+			if media, mErr := d.CatalogService.ListProductMedia(ctx, tx, product.ID); mErr != nil {
+				return mErr
+			} else if len(media) > 0 {
+				thumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantThumbnail)
+			}
+
 			lineTotal := ci.UnitPrice * ci.Quantity
 			subtotal += lineTotal
 
@@ -161,6 +176,9 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 				ItemID:       ci.ID,
 				VariantID:    ci.VariantID,
 				ProductTitle: product.Title,
+				ProductSlug:  product.Slug,
+				VariantLabel: label,
+				ThumbnailURL: thumbnailURL,
 				SKU:          variant.SKU,
 				Quantity:     ci.Quantity,
 				UnitPrice:    ci.UnitPrice,

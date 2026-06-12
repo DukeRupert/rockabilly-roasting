@@ -984,6 +984,18 @@ func (s *CatalogService) ListVariantOptionValues(ctx context.Context, tx pgx.Tx,
 	return vals, nil
 }
 
+// VariantLabel returns the variant's option values joined for customer-facing
+// display — "Whole Bean · 12oz". Empty string when the variant has no options
+// (single-variant product), so callers can fall back to nothing rather than
+// showing an internal SKU.
+func (s *CatalogService) VariantLabel(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) (string, error) {
+	labels, err := s.catalog.ListVariantOptionLabels(ctx, tx, variantID)
+	if err != nil {
+		return "", fmt.Errorf("list variant option labels: %w", err)
+	}
+	return strings.Join(labels, " · "), nil
+}
+
 // CheckDuplicateVariantOptions returns ErrDuplicateVariantOptions if any existing
 // variant for the product already has the exact same set of option values.
 func (s *CatalogService) CheckDuplicateVariantOptions(ctx context.Context, tx pgx.Tx, productID uuid.UUID, optionValueIDs []uuid.UUID) error {

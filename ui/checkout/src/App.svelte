@@ -363,7 +363,28 @@
             </p>
             <ul class="divide-y-2 divide-ink/30">
               {#each cart.items as item}
-                <li class="py-3 flex justify-between gap-3">
+                <li class="py-3 flex items-start gap-3">
+                  <span
+                    class="flex-shrink-0 w-12 h-12 bg-paper-warm border-2 border-ink overflow-hidden"
+                    aria-hidden="true"
+                  >
+                    {#if item.thumbnail_url}
+                      <img
+                        src={item.thumbnail_url}
+                        alt=""
+                        width="96"
+                        height="96"
+                        class="h-full w-full object-cover object-center"
+                        loading="lazy"
+                      />
+                    {:else}
+                      <span
+                        class="flex h-full w-full items-center justify-center font-slab text-ink text-base leading-none uppercase"
+                      >
+                        {item.product_title.slice(0, 1)}
+                      </span>
+                    {/if}
+                  </span>
                   <div class="min-w-0 flex-1">
                     <p
                       class="font-slab text-ink uppercase leading-[1.0] text-sm"
@@ -372,7 +393,7 @@
                       {item.product_title}
                     </p>
                     <p class="font-special text-chrome-deep text-xs mt-1">
-                      {item.sku} · qty {item.quantity}
+                      {#if item.variant_label}{item.variant_label} · {/if}qty {item.quantity}
                     </p>
                   </div>
                   <p class="font-special text-ink text-sm shrink-0">

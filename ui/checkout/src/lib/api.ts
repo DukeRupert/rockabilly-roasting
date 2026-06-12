@@ -1,6 +1,10 @@
 export interface CartItem {
   variant_id: string;
   product_title: string;
+  // Human-readable option summary ("Whole Bean · 12oz"); absent for
+  // single-variant products. Preferred over the SKU for display.
+  variant_label?: string;
+  thumbnail_url?: string;
   sku: string;
   quantity: number;
   unit_price: number;

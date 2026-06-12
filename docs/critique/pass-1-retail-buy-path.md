@@ -83,7 +83,12 @@ sidebar (the response shape `discount_total`/`discount_name` is already rendered
 give admin a create form. If not: remove the endpoints and the dead rendering branch.
 **Command:** product decision first; then /distill (remove) or implement (add).
 
-### P3 — After "Add to cart," the product disappears
+### P3 — After "Add to cart," the product disappears — ✅ FIXED 2026-06-12
+*(New `VariantLabel` service method resolves option values to "Whole Bean · 12oz". Cart
+page and checkout sidebar now show product thumbnails + variant labels instead of raw
+SKUs; order emails carry the label in the line item and the shipping address now includes
+recipient name + line 2. Remaining: order-history pages and wholesale surfaces still show
+SKUs — noted for passes 3/6.)*
 **What:** Cart line items, the checkout order summary, and the confirmation email all show
 no product image and no human-readable variant. Cart and checkout show raw SKUs ("SKU
 RR-DRIP-12") as the only variant signal. The email shows only the product title — built in

@@ -199,6 +199,9 @@ type Querier interface {
 	ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscription, error)
 	ListTaxonsByParent(ctx context.Context, parentID *uuid.UUID) ([]Taxon, error)
 	ListUnprocessedWebhookEvents(ctx context.Context) ([]WebhookEvent, error)
+	// Option values for a variant in display order ("Whole Bean", "12oz").
+	// Empty for single-variant products with no options.
+	ListVariantOptionLabels(ctx context.Context, variantID uuid.UUID) ([]string, error)
 	ListVariantOptionValuesByVariant(ctx context.Context, variantID uuid.UUID) ([]VariantOptionValue, error)
 	ListVariantsByProduct(ctx context.Context, productID uuid.UUID) ([]Variant, error)
 	ListWholesaleByStatus(ctx context.Context, arg ListWholesaleByStatusParams) ([]Customer, error)

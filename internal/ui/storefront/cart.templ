@@ -11,6 +11,9 @@ type CartItemDisplay struct {
 	ItemID       uuid.UUID
 	VariantID    uuid.UUID
 	ProductTitle string
+	ProductSlug  string
+	VariantLabel string // human-readable options, e.g. "Whole Bean · 12oz"; "" when the product has no options
+	ThumbnailURL string
 	SKU          string
 	Quantity     int
 	UnitPrice    int
@@ -108,12 +111,38 @@ templ CartContent(props CartPageProps) {
 						<ul class="divide-y-2 divide-ink">
 							for _, item := range props.Items {
 								<li class="py-5 flex flex-col sm:flex-row sm:items-start gap-4">
-									<!-- Title + SKU -->
+									<!-- Thumbnail -->
+									<a
+										href={ templ.SafeURL("/catalog/" + item.ProductSlug) }
+										class="flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 bg-paper-warm border-2 border-ink overflow-hidden"
+										aria-hidden="true"
+										tabindex="-1"
+									>
+										if item.ThumbnailURL != "" {
+											<img
+												src={ item.ThumbnailURL }
+												alt=""
+												width="160"
+												height="160"
+												class="h-full w-full object-cover object-center"
+												loading="lazy"
+											/>
+										} else {
+											<span class="flex h-full w-full items-center justify-center font-slab text-ink text-xl leading-none uppercase">
+												{ string([]rune(item.ProductTitle)[0:1]) }
+											</span>
+										}
+									</a>
+									<!-- Title + variant -->
 									<div class="flex-1 min-w-0">
 										<h3 class="font-slab text-ink uppercase leading-[0.95] text-lg sm:text-xl" style="letter-spacing:-0.005em;">
-											{ item.ProductTitle }
+											<a href={ templ.SafeURL("/catalog/" + item.ProductSlug) } class="hover:text-rust transition-colors">
+												{ item.ProductTitle }
+											</a>
 										</h3>
-										<p class="font-special text-chrome-deep text-xs mt-1">SKU { item.SKU }</p>
+										if item.VariantLabel != "" {
+											<p class="font-special text-ink-soft text-sm mt-1">{ item.VariantLabel }</p>
+										}
 										<p class="font-special text-ink-soft text-sm mt-1 sm:hidden">
 											{ formatCents(item.UnitPrice) } &middot; ea
 										</p>

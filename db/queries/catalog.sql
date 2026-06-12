@@ -198,3 +198,13 @@ WHERE product_id = $1 AND customer_id = $2;
 -- name: ListProductCustomerVisibility :many
 SELECT customer_id FROM product_customer_visibility
 WHERE product_id = $1;
+
+-- name: ListVariantOptionLabels :many
+-- Option values for a variant in display order ("Whole Bean", "12oz").
+-- Empty for single-variant products with no options.
+SELECT pov.value
+FROM variant_option_values vov
+JOIN product_option_values pov ON pov.id = vov.product_option_value_id
+JOIN product_options po ON po.id = pov.product_option_id
+WHERE vov.variant_id = $1
+ORDER BY po.position, pov.position;

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +16,32 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/store"
 )
+
+// emailLineItems builds the line-item rows for order emails. The product
+// name carries the variant's option summary ("Bonneville Blend — Whole Bean
+// · 12oz") because grind and size are what a coffee buyer needs to verify;
+// lookups are best-effort so a deleted variant never blocks the email.
+func (s *OrderService) emailLineItems(ctx context.Context, tx pgx.Tx, lineItems []domain.LineItem) []emailtemplates.OrderLineItemData {
+	items := make([]emailtemplates.OrderLineItemData, len(lineItems))
+	for i, li := range lineItems {
+		productName := "Product"
+		if variant, err := s.catalog.GetVariantByID(ctx, tx, li.VariantID); err == nil {
+			if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
+				productName = product.Title
+			}
+			if labels, err := s.catalog.ListVariantOptionLabels(ctx, tx, li.VariantID); err == nil && len(labels) > 0 {
+				productName += " — " + strings.Join(labels, " · ")
+			}
+		}
+		items[i] = emailtemplates.OrderLineItemData{
+			ProductName: productName,
+			Quantity:    li.Quantity,
+			UnitPrice:   li.UnitPrice,
+			Total:       li.Total,
+		}
+	}
+	return items
+}
 
 // SendConfirmationEmail sends an order confirmation email. Data is loaded
 // in a read tx, the external email send happens outside any tx, and audit
@@ -45,24 +72,10 @@ func (s *OrderService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.
 			return fmt.Errorf("list line items: %w", err)
 		}
 
-		items = make([]emailtemplates.OrderLineItemData, len(lineItems))
-		for i, li := range lineItems {
-			productName := "Product"
-			if variant, err := s.catalog.GetVariantByID(ctx, tx, li.VariantID); err == nil {
-				if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
-					productName = product.Title
-				}
-			}
-			items[i] = emailtemplates.OrderLineItemData{
-				ProductName: productName,
-				Quantity:    li.Quantity,
-				UnitPrice:   li.UnitPrice,
-				Total:       li.Total,
-			}
-		}
+		items = s.emailLineItems(ctx, tx, lineItems)
 
 		if addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID); err == nil {
-			shippingAddr = emailtemplates.FormatAddress(addr.Line1, addr.City, addr.State, addr.PostalCode)
+			shippingAddr = emailtemplates.FormatRecipientAddress(addr.FirstName, addr.LastName, addr.Line1, addr.Line2, addr.City, addr.State, addr.PostalCode)
 		}
 		return nil
 	}); err != nil {
@@ -147,24 +160,10 @@ func (s *OrderService) SendRenewalReceiptEmail(ctx context.Context, pool *pgxpoo
 			return fmt.Errorf("list line items: %w", err)
 		}
 
-		items = make([]emailtemplates.OrderLineItemData, len(lineItems))
-		for i, li := range lineItems {
-			productName := "Product"
-			if variant, err := s.catalog.GetVariantByID(ctx, tx, li.VariantID); err == nil {
-				if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
-					productName = product.Title
-				}
-			}
-			items[i] = emailtemplates.OrderLineItemData{
-				ProductName: productName,
-				Quantity:    li.Quantity,
-				UnitPrice:   li.UnitPrice,
-				Total:       li.Total,
-			}
-		}
+		items = s.emailLineItems(ctx, tx, lineItems)
 
 		if addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID); err == nil {
-			shippingAddr = emailtemplates.FormatAddress(addr.Line1, addr.City, addr.State, addr.PostalCode)
+			shippingAddr = emailtemplates.FormatRecipientAddress(addr.FirstName, addr.LastName, addr.Line1, addr.Line2, addr.City, addr.State, addr.PostalCode)
 		}
 
 		// Single-subscription renewal — pull the next billing date directly.
@@ -263,7 +262,7 @@ func (s *OrderService) SendOrderShippedEmail(ctx context.Context, pool *pgxpool.
 		shipment = sh
 
 		if addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID); err == nil {
-			shippingAddr = emailtemplates.FormatAddress(addr.Line1, addr.City, addr.State, addr.PostalCode)
+			shippingAddr = emailtemplates.FormatRecipientAddress(addr.FirstName, addr.LastName, addr.Line1, addr.Line2, addr.City, addr.State, addr.PostalCode)
 		}
 		return nil
 	}); err != nil {
@@ -499,7 +498,7 @@ func (s *OrderService) SendOrderOutForDeliveryEmail(ctx context.Context, pool *p
 			}
 		}
 		if addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID); err == nil {
-			shippingAddr = emailtemplates.FormatAddress(addr.Line1, addr.City, addr.State, addr.PostalCode)
+			shippingAddr = emailtemplates.FormatRecipientAddress(addr.FirstName, addr.LastName, addr.Line1, addr.Line2, addr.City, addr.State, addr.PostalCode)
 		}
 		return nil
 	}); err != nil {

@@ -25,9 +25,9 @@ import (
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/email"
+	"github.com/dukerupert/hiri/internal/platform/help"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/media"
-	"github.com/dukerupert/hiri/internal/platform/help"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
@@ -200,10 +200,10 @@ func run() error {
 		MediaBaseURL: os.Getenv("MEDIA_BASE_URL"),
 	}
 	r2Client, err := media.NewR2Client(ctx, media.R2Config{
-		AccountID:      os.Getenv("R2_ACCOUNT_ID"),
-		AccessKeyID:    os.Getenv("R2_ACCESS_KEY_ID"),
+		AccountID:       os.Getenv("R2_ACCOUNT_ID"),
+		AccessKeyID:     os.Getenv("R2_ACCESS_KEY_ID"),
 		SecretAccessKey: os.Getenv("R2_SECRET_ACCESS_KEY"),
-		Bucket:         os.Getenv("R2_BUCKET"),
+		Bucket:          os.Getenv("R2_BUCKET"),
 	})
 	if err != nil {
 		return fmt.Errorf("create r2 client: %w", err)
@@ -294,8 +294,9 @@ func run() error {
 	river.AddWorker(workers, jobs.NewInvoicePastDueEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
-	river.AddWorker(workers, jobs.NewShippoTrackingUpdateWorker(fulfillmentSvc, pool))
+	river.AddWorker(workers, jobs.NewShippoTrackingUpdateWorker(fulfillmentSvc, orderSvc, pool))
 	river.AddWorker(workers, jobs.NewAbandonedOrderCleanupWorker(orderSvc, pool))
+	river.AddWorker(workers, jobs.NewShippedOrderAutoDeliverWorker(orderSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)
 	// See below after riverClient creation.
@@ -317,6 +318,22 @@ func run() error {
 				}
 			},
 			&river.PeriodicJobOpts{RunOnStart: false},
+		),
+		// Mark long-shipped orders delivered. Carrier delivery is never reported
+		// for legacy orders (no shipments rows) and can be missed for live ones
+		// (dropped Shippo webhook), so without this they sit in the fulfillment
+		// dashboard's "shipped" bucket forever. RunOnStart clears the standing
+		// backlog as soon as this ships; daily thereafter is plenty.
+		river.NewPeriodicJob(
+			river.PeriodicInterval(24*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.ShippedOrderAutoDeliverArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 24 * time.Hour,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: true},
 		),
 	}
 	// Subscription renewal scheduler — scans for due subscriptions every minute
@@ -423,32 +440,32 @@ func run() error {
 
 	// Router
 	deps := &web.Deps{
-		Pool:                 pool,
-		Logger:               logger,
-		Metrics:              metricsReg,
-		Sessions:             sessionMgr,
-		OrderService:         orderSvc,
-		CustomerService:      customerSvc,
-		CatalogService:       catalogSvc,
-		CheckoutService:      checkoutSvc,
-		FulfillmentService:    fulfillmentSvc,
-		SubscriptionService:  subscriptionSvc,
-		DiscountService:      discountSvc,
-		AuthService:          authSvc,
-		PricingService:       pricingSvc,
-		CartService:          cartSvc,
-		WholesaleService:     wholesaleSvc,
-		AttributeService:     attributeSvc,
-		InvoiceService:       invoiceSvc,
-		CustomerGroupService: customerGroupSvc,
-		PriceListService:     priceListSvc,
-		AuditQueryService:    auditQuerySvc,
-		WebhookService:       webhookSvc,
-		AuditWriter:          auditWriter,
-		PaymentProvider:      paymentProvider,
-		RiverClient:          riverClient,
-		R2Client:             r2Client,
-		MediaConfig:          mediaConfig,
+		Pool:                   pool,
+		Logger:                 logger,
+		Metrics:                metricsReg,
+		Sessions:               sessionMgr,
+		OrderService:           orderSvc,
+		CustomerService:        customerSvc,
+		CatalogService:         catalogSvc,
+		CheckoutService:        checkoutSvc,
+		FulfillmentService:     fulfillmentSvc,
+		SubscriptionService:    subscriptionSvc,
+		DiscountService:        discountSvc,
+		AuthService:            authSvc,
+		PricingService:         pricingSvc,
+		CartService:            cartSvc,
+		WholesaleService:       wholesaleSvc,
+		AttributeService:       attributeSvc,
+		InvoiceService:         invoiceSvc,
+		CustomerGroupService:   customerGroupSvc,
+		PriceListService:       priceListSvc,
+		AuditQueryService:      auditQuerySvc,
+		WebhookService:         webhookSvc,
+		AuditWriter:            auditWriter,
+		PaymentProvider:        paymentProvider,
+		RiverClient:            riverClient,
+		R2Client:               r2Client,
+		MediaConfig:            mediaConfig,
 		QBClient:               qbClient,
 		QBOAuthManager:         qbOAuthManager,
 		QBWebhookVerifierToken: qbWebhookVerifier,

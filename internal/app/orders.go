@@ -255,6 +255,19 @@ func (s *OrderService) ListAbandonedOrderIDs(ctx context.Context, tx pgx.Tx, old
 	return ids, nil
 }
 
+// ListOrderIDsToAutoDeliver returns the IDs of orders still in
+// fulfillment_status='shipped' whose ship time is older than olderThan. The
+// auto-deliver sweep uses this to find orders the carrier never reported
+// delivered for (legacy orders predating the shipping integration, or live
+// orders that missed a tracking webhook) so they can be marked delivered.
+func (s *OrderService) ListOrderIDsToAutoDeliver(ctx context.Context, tx pgx.Tx, olderThan time.Time, limit int) ([]uuid.UUID, error) {
+	ids, err := s.orders.ListShippedOrderIDsDeliveredBefore(ctx, tx, olderThan, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list orders to auto-deliver: %w", err)
+	}
+	return ids, nil
+}
+
 // UpdateOrderStatus updates the order's status and records an audit entry.
 func (s *OrderService) UpdateOrderStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.OrderStatus, actor Actor) (*domain.Order, error) {
 	o, err := s.orders.UpdateOrderStatus(ctx, tx, id, status)
@@ -734,6 +747,136 @@ func (s *OrderService) MarkPickedUp(ctx context.Context, tx pgx.Tx, id uuid.UUID
 		After:        order,
 	}); err != nil {
 		return nil, fmt.Errorf("audit picked-up: %w", err)
+	}
+
+	return order, nil
+}
+
+// MarkOrderDelivered advances a shipped order to delivered. It is the blunt,
+// signal-free transition used by the auto-deliver sweep: carrier delivery is
+// never reported for these orders, so after a grace window the package is
+// assumed arrived. ReconcileDelivery is the precise, tracking-driven
+// counterpart for live shipments.
+//
+// Guarded to shipped/partially_shipped so a concurrent transition (e.g. a
+// tracking webhook that reconciled the order between the sweep's list and its
+// per-order update) is a no-op: callers treat ErrInvalidOrderStatus as "already
+// handled, skip". Order status is left untouched — a shipped order is already
+// complete, and delivery is a fulfillment-level fact.
+func (s *OrderService) MarkOrderDelivered(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for auto-deliver: %w", err)
+	}
+
+	switch order.FulfillmentStatus {
+	case domain.FulfillmentStatusShipped, domain.FulfillmentStatusPartiallyShipped:
+		// allowed
+	default:
+		return nil, fmt.Errorf("order is not shipped: %w", ErrInvalidOrderStatus)
+	}
+
+	from := order.FulfillmentStatus
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusDelivered)
+	if err != nil {
+		return nil, fmt.Errorf("set delivered: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderDelivered,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+		Metadata: map[string]any{
+			"from_status": string(from),
+			"to_status":   string(domain.FulfillmentStatusDelivered),
+			"source":      "auto_deliver_sweep",
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit auto-deliver: %w", err)
+	}
+
+	return order, nil
+}
+
+// ReconcileDelivery recomputes an order's fulfillment status from its shipment
+// rows after one of them reaches delivered. Called by the Shippo tracking path
+// in the same transaction that marks a shipment delivered: when every shipment
+// is delivered the order becomes delivered, when only some are it becomes
+// partially_delivered.
+//
+// Only orders currently in shipped/partially_shipped are advanced — any other
+// state (returned, already delivered, pre-ship) is left alone, making the call
+// a safe no-op on replayed or out-of-order webhooks. Returns the order
+// unchanged when there is nothing to do.
+func (s *OrderService) ReconcileDelivery(ctx context.Context, tx pgx.Tx, orderID uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for delivery reconcile: %w", err)
+	}
+
+	switch order.FulfillmentStatus {
+	case domain.FulfillmentStatusShipped, domain.FulfillmentStatusPartiallyShipped:
+		// advanceable
+	default:
+		return order, nil
+	}
+
+	shipments, err := s.shipments.ListShipmentsByOrder(ctx, tx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("list shipments for delivery reconcile: %w", err)
+	}
+	if len(shipments) == 0 {
+		return order, nil
+	}
+
+	allDelivered := true
+	for _, sh := range shipments {
+		if sh.Status != domain.ShipmentStatusDelivered {
+			allDelivered = false
+			break
+		}
+	}
+
+	target := domain.FulfillmentStatusPartiallyDelivered
+	if allDelivered {
+		target = domain.FulfillmentStatusDelivered
+	}
+	if order.FulfillmentStatus == target {
+		return order, nil
+	}
+
+	from := order.FulfillmentStatus
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, orderID, target)
+	if err != nil {
+		return nil, fmt.Errorf("set delivered from reconcile: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderDelivered,
+		ResourceType: "order",
+		ResourceID:   orderID,
+		After:        order,
+		Metadata: map[string]any{
+			"from_status":    string(from),
+			"to_status":      string(target),
+			"shipment_count": len(shipments),
+			"source":         "shippo_tracking",
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit delivery reconcile: %w", err)
 	}
 
 	return order, nil

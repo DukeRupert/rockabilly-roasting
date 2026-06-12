@@ -9,6 +9,7 @@ const (
 	AuditOrderCancelled              = "order.cancelled"
 	AuditOrderFulfilled              = "order.fulfilled"
 	AuditOrderShipped                = "order.shipped"
+	AuditOrderDelivered              = "order.delivered"
 	AuditOrderFulfillmentReverted    = "order.fulfillment_reverted"
 	AuditOrderShipmentReverted       = "order.shipment_reverted"
 	AuditOrderReadyForPickup         = "order.ready_for_pickup"

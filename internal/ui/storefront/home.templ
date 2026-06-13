@@ -139,15 +139,17 @@ templ HomeContent(props HomePageProps) {
 									class="absolute inset-0 w-full h-full object-cover object-center"
 								/>
 							}
-							<!-- "FRESH WEEKLY" stamp, tilted, top-left corner -->
-							<div class="absolute top-4 left-4 pointer-events-none">
-								<span
-									class="inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust"
-									style="letter-spacing:0.18em; text-transform:uppercase; transform:rotate(-6deg); outline:2px solid var(--color-rust); outline-offset:2px;"
-								>
-									Fresh Weekly
-								</span>
-							</div>
+							if props.FeaturedProduct.Coffee != nil {
+								<!-- "FRESH WEEKLY" stamp, tilted, top-left corner — coffee only -->
+								<div class="absolute top-4 left-4 pointer-events-none">
+									<span
+										class="inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust"
+										style="letter-spacing:0.18em; text-transform:uppercase; transform:rotate(-6deg); outline:2px solid var(--color-rust); outline-offset:2px;"
+									>
+										Fresh Weekly
+									</span>
+								</div>
+							}
 						</div>
 						<!-- Content — 2/5 columns on desktop -->
 						<div class="flex flex-col justify-center p-8 sm:p-10 md:col-span-2">

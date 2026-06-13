@@ -104,7 +104,15 @@ instead of (or beside) SKU; add thumbnails to cart and checkout summary; include
 name + line2 in the email address block.
 **Command:** /clarify for the labels; small backend change for the email data.
 
-### P4 — Fabricated specifics undermine the brand's own trust rule
+### P4 — Fabricated specifics undermine the brand's own trust rule — ✅ FIXED 2026-06-12
+*(Receipt strip now shows the real cart short ID [first 8 of the cart UUID — stable and
+support-usable]. Stock line softened to always-true claims: "Roasted to order · ships
+within 48 hours" for coffee, "Ships within 48 hours" for merch. JSON-LD keeps `InStock`
+deliberately — with no inventory tracking, every published product is genuinely orderable,
+which is what the schema enum means. "Fresh Weekly" stamp gated on coffee, on both the
+product page and the home featured card. Cart cancel promise replaced with "Ships within
+48 hours." Self-service cancel-before-fulfillment remains a candidate feature — the order
+state machine supports it — but it's a feature decision, not a copy fix.)*
 **What:** Four instances of invented or unconditional specificity:
 - Cart renders a fake receipt number — `receipt #{ len(items)*17+3 }` — that changes as you
   edit your cart (`cart.templ:106`).

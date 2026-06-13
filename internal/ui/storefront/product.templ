@@ -119,15 +119,17 @@ templ ProductContent(props ProductDetailProps) {
 								alt={ props.Media[0].AltText }
 								class="absolute inset-0 h-full w-full object-cover object-center"
 							/>
-							<!-- "Fresh Weekly" stamp sticker -->
-							<div class="absolute top-4 left-4 pointer-events-none">
-								<span
-									class="inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust"
-									style="letter-spacing:0.18em; text-transform:uppercase; transform:rotate(-4deg); outline:2px solid var(--color-rust); outline-offset:2px;"
-								>
-									Fresh Weekly
-								</span>
-							</div>
+							if props.Coffee != nil {
+								<!-- "Fresh Weekly" stamp sticker — coffee only; a mug isn't roasted weekly -->
+								<div class="absolute top-4 left-4 pointer-events-none">
+									<span
+										class="inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust"
+										style="letter-spacing:0.18em; text-transform:uppercase; transform:rotate(-4deg); outline:2px solid var(--color-rust); outline-offset:2px;"
+									>
+										Fresh Weekly
+									</span>
+								</div>
+							}
 						</div>
 						<!-- Thumbnails -->
 						if len(props.Media) > 1 {
@@ -443,12 +445,16 @@ templ ProductContent(props ProductDetailProps) {
 							}
 						</div>
 					}
-					<!-- In stock indicator -->
+					<!-- Fulfillment promise — only claims that are always true (no live inventory signal exists) -->
 					<div class="mt-6 flex items-center gap-2">
 						<svg class="size-4 text-rust" aria-hidden="true" viewBox="0 0 20 20" fill="currentColor">
 							<path d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd" fill-rule="evenodd"></path>
 						</svg>
-						<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">In stock &middot; roasted fresh &middot; ships within 48 hours</p>
+						if props.Coffee != nil {
+							<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Roasted to order &middot; ships within 48 hours</p>
+						} else {
+							<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">Ships within 48 hours</p>
+						}
 					</div>
 				</div>
 			</div>

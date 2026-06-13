@@ -106,7 +106,7 @@ func HomeContent(props HomePageProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" width=\"1200\" height=\"900\" class=\"absolute inset-0 w-full h-full object-cover object-center\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" width=\"1200\" height=\"900\" class=\"absolute inset-0 w-full h-full object-cover object-center\"> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -137,110 +137,116 @@ func HomeContent(props HomePageProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" width=\"1200\" height=\"900\" class=\"absolute inset-0 w-full h-full object-cover object-center\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" width=\"1200\" height=\"900\" class=\"absolute inset-0 w-full h-full object-cover object-center\"> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<!-- \"FRESH WEEKLY\" stamp, tilted, top-left corner --><div class=\"absolute top-4 left-4 pointer-events-none\"><span class=\"inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust\" style=\"letter-spacing:0.18em; text-transform:uppercase; transform:rotate(-6deg); outline:2px solid var(--color-rust); outline-offset:2px;\">Fresh Weekly</span></div></div><!-- Content — 2/5 columns on desktop --><div class=\"flex flex-col justify-center p-8 sm:p-10 md:col-span-2\">")
+			if props.FeaturedProduct.Coffee != nil {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<!-- \"FRESH WEEKLY\" stamp, tilted, top-left corner — coffee only --> <div class=\"absolute top-4 left-4 pointer-events-none\"><span class=\"inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust\" style=\"letter-spacing:0.18em; text-transform:uppercase; transform:rotate(-6deg); outline:2px solid var(--color-rust); outline-offset:2px;\">Fresh Weekly</span></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div><!-- Content — 2/5 columns on desktop --><div class=\"flex flex-col justify-center p-8 sm:p-10 md:col-span-2\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if props.FeaturedProduct.Coffee != nil && len(props.FeaturedProduct.Coffee.Regions) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<p class=\"font-oswald text-chrome-deep text-[11px] mb-3\" style=\"letter-spacing:0.2em; text-transform:uppercase; font-weight:600;\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<p class=\"font-oswald text-chrome-deep text-[11px] mb-3\" style=\"letter-spacing:0.2em; text-transform:uppercase; font-weight:600;\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(props.FeaturedProduct.Coffee.Regions, " · "))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 156, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 158, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<h3 class=\"font-slab text-ink uppercase leading-[0.92]\" style=\"font-size: clamp(2.25rem, 4.5vw, 3.5rem); letter-spacing:-0.005em;\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<h3 class=\"font-slab text-ink uppercase leading-[0.92]\" style=\"font-size: clamp(2.25rem, 4.5vw, 3.5rem); letter-spacing:-0.005em;\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.Product.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 160, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 162, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</h3>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</h3>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if props.FeaturedProduct.Product.Description != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<p class=\"font-oswald text-ink-soft text-base leading-relaxed mt-5\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<p class=\"font-oswald text-ink-soft text-base leading-relaxed mt-5\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(props.FeaturedProduct.Product.Description)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 164, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 166, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if props.FeaturedProduct.Coffee != nil && len(props.FeaturedProduct.Coffee.TastingNotes) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<ul class=\"flex flex-wrap gap-2 mt-6\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<ul class=\"flex flex-wrap gap-2 mt-6\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				for _, note := range props.FeaturedProduct.Coffee.TastingNotes {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<li class=\"font-oswald font-bold text-[10px] text-ink bg-paper border-2 border-ink px-2.5 py-1 rounded-full\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<li class=\"font-oswald font-bold text-[10px] text-ink bg-paper border-2 border-ink px-2.5 py-1 rounded-full\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var11 string
 					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(note)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 171, Col: 17}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/home.templ`, Line: 173, Col: 17}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</li>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</li>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</ul>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</ul>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<!-- Inline CTA indicator --><span class=\"inline-flex items-center gap-2 mt-8 font-oswald font-bold text-sm text-rust group-hover:text-rust-deep transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shop this roast <svg class=\"size-4 transition-transform group-hover:translate-x-0.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></span></div></div></a></div><!-- Flame-stripe divider bridges back to the dark sections below --><div class=\"flame-stripe\"></div></section>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<!-- Inline CTA indicator --><span class=\"inline-flex items-center gap-2 mt-8 font-oswald font-bold text-sm text-rust group-hover:text-rust-deep transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shop this roast <svg class=\"size-4 transition-transform group-hover:translate-x-0.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></span></div></div></a></div><!-- Flame-stripe divider bridges back to the dark sections below --><div class=\"flame-stripe\"></div></section>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<!-- The Daily Grind — subscription pitch (ink-dominant, stamp-pressed) --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-ink overflow-hidden\"><!-- Amber radial glow centered --><div class=\"absolute inset-0 pointer-events-none\" style=\"background: radial-gradient(ellipse at center, rgba(242,160,61,0.14) 0%, rgba(242,160,61,0.04) 40%, transparent 70%);\"></div><!-- Paper halftone dot texture --><div class=\"absolute inset-0 texture-halftone-paper pointer-events-none\" style=\"mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent);\"></div><div class=\"relative mx-auto max-w-5xl px-6 sm:px-10 lg:px-14 py-20 sm:py-28 text-center\"><!-- Double-candle mark: the Daily Grind brand anchor, lit by the amber glow behind it --><img src=\"/static/double-candle-mark.png\" alt=\"\" aria-hidden=\"true\" class=\"mx-auto mb-8 h-28 sm:h-36 w-auto select-none pointer-events-none\" width=\"583\" height=\"760\" loading=\"lazy\" decoding=\"async\"><p class=\"font-oswald text-candle text-xs sm:text-sm font-semibold\" style=\"letter-spacing:0.3em; text-transform:uppercase;\">Fresh on your schedule</p><h2 class=\"font-slab text-paper uppercase leading-[0.9] mt-5\" style=\"font-size: clamp(2.75rem, 7vw, 5rem); letter-spacing:-0.005em;\">The Daily <span class=\"font-script text-candle candle-flicker normal-case inline-block align-baseline\" style=\"font-size:1.05em; letter-spacing:0;\">grind.</span></h2><p class=\"font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-xl mx-auto\">Pick the roast. Pick the cadence. We roast it, let it rest, and ship it at its peak — the way good coffee is meant to be enjoyed.</p><!-- Three numbered value props, stamped like a menu --><ul class=\"grid sm:grid-cols-3 gap-10 sm:gap-8 mt-14 text-left\"><li class=\"flex items-start gap-4\"><span class=\"font-slab text-candle leading-none flex-shrink-0\" style=\"font-size: 2.5rem;\">01</span><div><p class=\"font-oswald font-bold text-paper text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Roasted the day we ship</p><p class=\"font-oswald text-paper-warm text-sm mt-1 leading-snug\">Never pulled from a shelf. Never more than a week old.</p></div></li><li class=\"flex items-start gap-4\"><span class=\"font-slab text-candle leading-none flex-shrink-0\" style=\"font-size: 2.5rem;\">02</span><div><p class=\"font-oswald font-bold text-paper text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">10% off every bag</p><p class=\"font-oswald text-paper-warm text-sm mt-1 leading-snug\">Subscribers never pay full price. Simple as that.</p></div></li><li class=\"flex items-start gap-4\"><span class=\"font-slab text-candle leading-none flex-shrink-0\" style=\"font-size: 2.5rem;\">03</span><div><p class=\"font-oswald font-bold text-paper text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Skip, swap, or quit</p><p class=\"font-oswald text-paper-warm text-sm mt-1 leading-snug\">Change anything, anytime. No call, no hassle, no hold music.</p></div></li></ul><!-- CTA + reassurance microcopy --><div class=\"mt-14 flex flex-col items-center gap-4\"><a href=\"/subscriptions\" class=\"btn-stamp-paper group inline-flex items-center gap-2 bg-rust text-paper border-2 border-paper px-8 py-4 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Join the daily grind <svg class=\"size-4 transition-transform group-hover:translate-x-0.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a><p class=\"font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">No membership fee · Cancel in two clicks</p></div></div></section><!-- Popular Roasts — paper-and-ink product grid -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<!-- The Daily Grind — subscription pitch (ink-dominant, stamp-pressed) --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-ink overflow-hidden\"><!-- Amber radial glow centered --><div class=\"absolute inset-0 pointer-events-none\" style=\"background: radial-gradient(ellipse at center, rgba(242,160,61,0.14) 0%, rgba(242,160,61,0.04) 40%, transparent 70%);\"></div><!-- Paper halftone dot texture --><div class=\"absolute inset-0 texture-halftone-paper pointer-events-none\" style=\"mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent);\"></div><div class=\"relative mx-auto max-w-5xl px-6 sm:px-10 lg:px-14 py-20 sm:py-28 text-center\"><!-- Double-candle mark: the Daily Grind brand anchor, lit by the amber glow behind it --><img src=\"/static/double-candle-mark.png\" alt=\"\" aria-hidden=\"true\" class=\"mx-auto mb-8 h-28 sm:h-36 w-auto select-none pointer-events-none\" width=\"583\" height=\"760\" loading=\"lazy\" decoding=\"async\"><p class=\"font-oswald text-candle text-xs sm:text-sm font-semibold\" style=\"letter-spacing:0.3em; text-transform:uppercase;\">Fresh on your schedule</p><h2 class=\"font-slab text-paper uppercase leading-[0.9] mt-5\" style=\"font-size: clamp(2.75rem, 7vw, 5rem); letter-spacing:-0.005em;\">The Daily <span class=\"font-script text-candle candle-flicker normal-case inline-block align-baseline\" style=\"font-size:1.05em; letter-spacing:0;\">grind.</span></h2><p class=\"font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-xl mx-auto\">Pick the roast. Pick the cadence. We roast it, let it rest, and ship it at its peak — the way good coffee is meant to be enjoyed.</p><!-- Three numbered value props, stamped like a menu --><ul class=\"grid sm:grid-cols-3 gap-10 sm:gap-8 mt-14 text-left\"><li class=\"flex items-start gap-4\"><span class=\"font-slab text-candle leading-none flex-shrink-0\" style=\"font-size: 2.5rem;\">01</span><div><p class=\"font-oswald font-bold text-paper text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Roasted the day we ship</p><p class=\"font-oswald text-paper-warm text-sm mt-1 leading-snug\">Never pulled from a shelf. Never more than a week old.</p></div></li><li class=\"flex items-start gap-4\"><span class=\"font-slab text-candle leading-none flex-shrink-0\" style=\"font-size: 2.5rem;\">02</span><div><p class=\"font-oswald font-bold text-paper text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">10% off every bag</p><p class=\"font-oswald text-paper-warm text-sm mt-1 leading-snug\">Subscribers never pay full price. Simple as that.</p></div></li><li class=\"flex items-start gap-4\"><span class=\"font-slab text-candle leading-none flex-shrink-0\" style=\"font-size: 2.5rem;\">03</span><div><p class=\"font-oswald font-bold text-paper text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Skip, swap, or quit</p><p class=\"font-oswald text-paper-warm text-sm mt-1 leading-snug\">Change anything, anytime. No call, no hassle, no hold music.</p></div></li></ul><!-- CTA + reassurance microcopy --><div class=\"mt-14 flex flex-col items-center gap-4\"><a href=\"/subscriptions\" class=\"btn-stamp-paper group inline-flex items-center gap-2 bg-rust text-paper border-2 border-paper px-8 py-4 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Join the daily grind <svg class=\"size-4 transition-transform group-hover:translate-x-0.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a><p class=\"font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.18em; text-transform:uppercase;\">No membership fee · Cancel in two clicks</p></div></div></section><!-- Popular Roasts — paper-and-ink product grid -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(props.FeaturedProducts) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper-warm\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24\"><!-- Section header --><div class=\"flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10 sm:mb-14\"><div><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Roasted this week</p><h2 class=\"font-slab text-ink uppercase leading-[0.95] mt-3\" style=\"font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing:-0.005em;\">The <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">whole</span> lineup</h2></div><p class=\"font-oswald text-ink-soft text-sm leading-relaxed max-w-xs\">Every bag roasted to order. Pick your grind, pick your size, pick your day.</p></div><!-- Product grid --><div class=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper-warm\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24\"><!-- Section header --><div class=\"flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-10 sm:mb-14\"><div><p class=\"font-oswald text-chrome-deep text-xs font-semibold\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Roasted this week</p><h2 class=\"font-slab text-ink uppercase leading-[0.95] mt-3\" style=\"font-size: clamp(2rem, 5vw, 3.5rem); letter-spacing:-0.005em;\">The <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">whole</span> lineup</h2></div><p class=\"font-oswald text-ink-soft text-sm leading-relaxed max-w-xs\">Every bag roasted to order. Pick your grind, pick your size, pick your day.</p></div><!-- Product grid --><div class=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -250,12 +256,12 @@ func HomeContent(props HomePageProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div><!-- CTA --><div class=\"mt-14 text-center\"><a href=\"/catalog\" class=\"btn-stamp group inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-8 py-4 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Browse all coffee <svg class=\"size-4 transition-transform group-hover:translate-x-0.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a></div></div></section>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</div><!-- CTA --><div class=\"mt-14 text-center\"><a href=\"/catalog\" class=\"btn-stamp group inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-8 py-4 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Browse all coffee <svg class=\"size-4 transition-transform group-hover:translate-x-0.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a></div></div></section>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<!-- About / Visit — paper editorial close --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24\"><div class=\"grid md:grid-cols-2 gap-10 lg:gap-16 items-center\"><!-- Photo panel — ink-bordered with stamp shadow and tilted stamp sticker --><div class=\"relative border-2 border-ink bg-paper-warm shadow-stamp overflow-hidden aspect-[4/5] md:aspect-[3/4]\"><img src=\"/static/rockabilly_cafe.webp\" alt=\"Inside Rockabilly Roasting Co. in Kennewick, WA\" width=\"900\" height=\"1125\" loading=\"lazy\" class=\"absolute inset-0 w-full h-full object-cover object-center\"><!-- Tilted rust \"EST. 2014\" stamp, bottom-right --><div class=\"absolute bottom-5 right-5 pointer-events-none\"><span class=\"inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust\" style=\"letter-spacing:0.2em; text-transform:uppercase; transform:rotate(-4deg); outline:2px solid var(--color-rust); outline-offset:2px;\">Est. 2014</span></div></div><!-- Content --><div><p class=\"font-oswald text-chrome-deep text-xs sm:text-sm font-semibold mb-5\" style=\"letter-spacing:0.3em; text-transform:uppercase;\">Kennewick, WA</p><h2 class=\"font-slab text-ink uppercase leading-[0.92]\" style=\"font-size: clamp(2.25rem, 5.5vw, 4rem); letter-spacing:-0.005em;\">Coffee with <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">character.</span></h2><p class=\"font-oswald text-ink-soft text-base sm:text-lg leading-relaxed mt-6 max-w-md\">Small-batch roaster on West Kennewick Ave. Specialty-grade beans from around the world, roasted on the drum in-house, shipped fresh — no shelves, no shortcuts, no middleman. Come by for a pour, or have us send one your way.</p><!-- Address + hours stripe: ink double-rule --><div class=\"mt-8 border-t-2 border-b-2 border-ink py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2\"><div class=\"font-oswald text-sm text-ink\" style=\"letter-spacing:0.08em; text-transform:uppercase;\">101 W. Kennewick Ave</div><div class=\"font-special text-ink-soft text-sm\">6am – 2pm · Mon – Thu</div></div><!-- CTAs --><div class=\"mt-8 flex flex-wrap gap-4 items-center\"><a href=\"/about\" class=\"btn-stamp group inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Visit the cafe <svg class=\"size-4 transition-transform group-hover:translate-x-0.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a> <a href=\"/catalog\" class=\"btn inline-flex items-center gap-2 bg-transparent text-ink border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm hover:bg-ink hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shop coffee</a></div></div></div></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<!-- About / Visit — paper editorial close --><section class=\"-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper\"><!-- Paper grain overlay --><div class=\"absolute inset-0 opacity-[0.05] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24\"><div class=\"grid md:grid-cols-2 gap-10 lg:gap-16 items-center\"><!-- Photo panel — ink-bordered with stamp shadow and tilted stamp sticker --><div class=\"relative border-2 border-ink bg-paper-warm shadow-stamp overflow-hidden aspect-[4/5] md:aspect-[3/4]\"><img src=\"/static/rockabilly_cafe.webp\" alt=\"Inside Rockabilly Roasting Co. in Kennewick, WA\" width=\"900\" height=\"1125\" loading=\"lazy\" class=\"absolute inset-0 w-full h-full object-cover object-center\"><!-- Tilted rust \"EST. 2014\" stamp, bottom-right --><div class=\"absolute bottom-5 right-5 pointer-events-none\"><span class=\"inline-block font-oswald font-bold text-[11px] text-rust bg-paper px-3 py-1.5 border-2 border-rust\" style=\"letter-spacing:0.2em; text-transform:uppercase; transform:rotate(-4deg); outline:2px solid var(--color-rust); outline-offset:2px;\">Est. 2014</span></div></div><!-- Content --><div><p class=\"font-oswald text-chrome-deep text-xs sm:text-sm font-semibold mb-5\" style=\"letter-spacing:0.3em; text-transform:uppercase;\">Kennewick, WA</p><h2 class=\"font-slab text-ink uppercase leading-[0.92]\" style=\"font-size: clamp(2.25rem, 5.5vw, 4rem); letter-spacing:-0.005em;\">Coffee with <span class=\"font-script text-rust normal-case inline-block align-baseline\" style=\"font-size:1.1em; letter-spacing:0;\">character.</span></h2><p class=\"font-oswald text-ink-soft text-base sm:text-lg leading-relaxed mt-6 max-w-md\">Small-batch roaster on West Kennewick Ave. Specialty-grade beans from around the world, roasted on the drum in-house, shipped fresh — no shelves, no shortcuts, no middleman. Come by for a pour, or have us send one your way.</p><!-- Address + hours stripe: ink double-rule --><div class=\"mt-8 border-t-2 border-b-2 border-ink py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2\"><div class=\"font-oswald text-sm text-ink\" style=\"letter-spacing:0.08em; text-transform:uppercase;\">101 W. Kennewick Ave</div><div class=\"font-special text-ink-soft text-sm\">6am – 2pm · Mon – Thu</div></div><!-- CTAs --><div class=\"mt-8 flex flex-wrap gap-4 items-center\"><a href=\"/about\" class=\"btn-stamp group inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Visit the cafe <svg class=\"size-4 transition-transform group-hover:translate-x-0.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></a> <a href=\"/catalog\" class=\"btn inline-flex items-center gap-2 bg-transparent text-ink border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm hover:bg-ink hover:text-paper transition-colors\" style=\"letter-spacing:0.14em; text-transform:uppercase;\">Shop coffee</a></div></div></div></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

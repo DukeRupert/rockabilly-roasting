@@ -3,6 +3,7 @@ package storefront
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -21,10 +22,18 @@ type CartItemDisplay struct {
 }
 
 type CartPageProps struct {
+	CartID             uuid.UUID // real cart ID, shown as a short reference on the receipt strip
 	Items              []CartItemDisplay
 	Subtotal           int
 	CartCount          int
 	FreeShippingHint   string // e.g. "Spend $12.00 more for free shipping"; "" if unused
+}
+
+// cartRef renders the cart's short reference — the first 8 hex chars of the
+// real cart UUID. Stable across edits and usable in a support conversation,
+// unlike a decorative made-up number.
+func cartRef(id uuid.UUID) string {
+	return strings.ToUpper(id.String()[:8])
 }
 
 // cartAnalyticsScript renders the cart contents for view_cart / remove_from_cart,
@@ -106,7 +115,7 @@ templ CartContent(props CartPageProps) {
 							<span class="font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.2em; text-transform:uppercase;">
 								{ fmt.Sprintf("%d %s", itemCount(props.Items), itemCountLabel(props.Items)) }
 							</span>
-							<span class="font-special text-chrome-deep text-xs">receipt #{ fmt.Sprintf("%04d", len(props.Items)*17+3) }</span>
+							<span class="font-special text-chrome-deep text-xs">cart #{ cartRef(props.CartID) }</span>
 						</div>
 						<ul class="divide-y-2 divide-ink">
 							for _, item := range props.Items {
@@ -250,7 +259,7 @@ templ CartContent(props CartPageProps) {
 								</svg>
 							</a>
 							<p class="mt-3 font-oswald text-chrome-deep text-xs text-center" style="letter-spacing:0.04em;">
-								Secure checkout · Cancel anytime before shipping.
+								Secure checkout · Ships within 48 hours.
 							</p>
 							<a href="/catalog" class="mt-4 block text-center font-oswald font-bold text-xs text-ink hover:text-rust transition-colors" style="letter-spacing:0.18em; text-transform:uppercase;">
 								← Keep shopping

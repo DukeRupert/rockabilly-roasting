@@ -204,6 +204,7 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.CartPageProps{
+		CartID:           *cartID,
 		Items:            items,
 		Subtotal:         subtotal,
 		CartCount:        cartCount,

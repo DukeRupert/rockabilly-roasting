@@ -10,7 +10,7 @@ Quantity:    {{.Quantity}}
 {{if .IntervalDays}}Ships:       Every {{.IntervalDays}} days
 {{end}}Next charge: {{date .NextChargeOn}}
 
-Manage your subscription, update shipping, or change your payment method:
+Update your shipping address or payment method, or pause or cancel, any time:
 {{.AccountURL}}
 
 {{.StoreName}}

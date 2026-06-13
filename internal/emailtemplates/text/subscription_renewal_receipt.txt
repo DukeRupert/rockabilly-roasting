@@ -20,7 +20,7 @@ Ships to: {{.ShippingAddr}}
 {{end}}{{if .NextChargeOn}}
 Next charge: {{date .NextChargeOn}}
 {{end}}
-Pause, skip, or cancel anytime from your account: {{.AccountURL}}
+Pause or cancel anytime from your account: {{.AccountURL}}
 
 {{.StoreName}}
 {{.StoreURL}}

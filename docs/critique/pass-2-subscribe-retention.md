@@ -245,7 +245,26 @@ instead of recreate-per-blur (or at least reuse the Stripe customer); dedupe add
 (customer, line1, zip) or offer the saved-address picker.
 **Command:** /harden (forms + endpoints), then /verify.
 
-### P6 — Retention copy promises powers the account page doesn't have
+### P6 — Retention copy promises powers the account page doesn't have — ⚠️ PARTIAL: copy-truth fixed 2026-06-12, features still open
+*(Copy-truth pass done — every customer-facing surface now promises only what the account page
+can actually do (pause / resume / cancel):
+- Subscribe page intro "skip, swap, or cancel" → "pause or cancel" (done in P4).
+- Home page promo "Skip, swap, or quit" / "Change anything, anytime" → "Pause or cancel anytime" /
+  "Pause when you've got enough, cancel when you're done" (kept the "no call, no hassle, no hold
+  music" line).
+- subscription_confirm email "update shipping, payment, or your delivery cadence" → "update your
+  shipping address or payment method, or pause or cancel" (html + txt).
+- subscription_renewal_receipt email "Pause, skip, or cancel anytime" → "Pause or cancel anytime"
+  (html + txt).
+- Account paused card: dropped the "Resumes {date}" line — nothing auto-resumes, so it was a
+  false promise; now "Paused — no upcoming orders. Hit resume below whenever you want it back."
+Left deliberately: the /subscriptions hero "Pick your cadence" / "Pick the roast. Pick the
+cadence." is about CHOOSING a plan at signup (true), not changing it later — not touched. The
+admin "Paused until {date}" is staff tooling for a field staff set themselves — out of the
+customer-facing copy scope.
+STILL OPEN (features, separate pass): skip-a-delivery, pause-until + an auto-resume job,
+resume-and-ship-now, restart on cancelled/expired rows, and exposing the existing
+ChangeVariant/ChangePlan to customers. Until those ship, the copy no longer over-promises.)*
 **What:** The subscribe page says "skip, swap, or cancel anytime from your account"; the
 renewal receipt says "Pause, skip, or cancel anytime"; the confirm email says you can update
 "shipping, payment, or your delivery cadence." The account page offers pause, resume, cancel.

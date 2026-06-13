@@ -5,6 +5,7 @@
   import {
     createSubscribePaymentIntent,
     confirmSubscription,
+    type SubscribePaymentIntentResponse,
   } from './lib/subscribe-api';
   import { formatCents } from './lib/format';
 
@@ -47,6 +48,9 @@
   let elements = $state<StripeElements | null>(null);
   let clientSecret = $state('');
   let stripeReady = $state(false);
+  // Server-computed charge breakdown (item subtotal + shipping + tax), known
+  // once the PI is created. Until then the page shows the static item price.
+  let totals = $state<SubscribePaymentIntentResponse | null>(null);
 
   // UI state
   let processing = $state(false);
@@ -165,6 +169,7 @@
       });
       previousPaymentIntentId = '';
 
+      totals = piResponse;
       clientSecret = piResponse.client_secret;
       stripeReady = true;
       await tick();
@@ -248,6 +253,7 @@
       stripeReady = false;
       stripeInitialized = false;
       clientSecret = '';
+      totals = null;
       elements = null;
       stripeInitialized = true;
       initStripe();
@@ -434,6 +440,38 @@
             </p>
           </div>
         {:else}
+          {#if totals}
+            <!-- Charge breakdown — what the card is actually charged today. -->
+            <div class="border-2 border-ink bg-cream-hi p-4 sm:p-5 space-y-2">
+              <div class="flex items-center justify-between font-oswald text-sm text-ink" style="letter-spacing:0.04em;">
+                <span>Your roast</span>
+                <span class="font-special">{formatCents(totals.subtotal)}</span>
+              </div>
+              <div class="flex items-center justify-between font-oswald text-sm text-ink" style="letter-spacing:0.04em;">
+                <span>Shipping</span>
+                <span class="font-special">
+                  {#if totals.shipping_total === 0}
+                    {totals.shipping_label || 'Free'}
+                  {:else}
+                    {formatCents(totals.shipping_total)}
+                  {/if}
+                </span>
+              </div>
+              {#if totals.tax_total > 0}
+                <div class="flex items-center justify-between font-oswald text-sm text-ink" style="letter-spacing:0.04em;">
+                  <span>{totals.tax_label || 'Tax'}</span>
+                  <span class="font-special">{formatCents(totals.tax_total)}</span>
+                </div>
+              {/if}
+              <div class="flex items-center justify-between border-t-2 border-ink pt-2 font-oswald font-bold text-ink" style="letter-spacing:0.04em;">
+                <span class="uppercase" style="letter-spacing:0.08em;">Charged today</span>
+                <span class="font-special text-base">{formatCents(totals.amount)}</span>
+              </div>
+              <p class="font-oswald text-chrome-deep text-xs pt-1" style="letter-spacing:0.04em;">
+                Auto-renews each delivery until you cancel. Manage it anytime from your account.
+              </p>
+            </div>
+          {/if}
           <div
             id="stripe-subscribe-payment"
             class="border-2 border-ink bg-cream-hi p-4 sm:p-5"
@@ -465,7 +503,7 @@
           </svg>
           Processing…
         {:else}
-          Subscribe · {formatCents(price)}
+          Subscribe · {formatCents(totals ? totals.amount : price)}
           <svg
             class="size-4"
             fill="none"

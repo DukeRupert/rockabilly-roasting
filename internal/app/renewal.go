@@ -13,6 +13,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/payments"
+	"github.com/dukerupert/hiri/internal/platform/tax"
 	"github.com/dukerupert/hiri/internal/store"
 )
 
@@ -26,7 +27,9 @@ type RenewalService struct {
 	payments      payments.Provider
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
-	enqueuer      JobEnqueuer // populated via WithJobEnqueuer; nil-safe (renewal still proceeds without it)
+	enqueuer      JobEnqueuer          // populated via WithJobEnqueuer; nil-safe (renewal still proceeds without it)
+	settings      *store.SettingsStore // populated via WithTaxCalc; nil-safe (tax skipped without it)
+	catalog       *store.CatalogStore  // populated via WithTaxCalc; needed to read per-product tax exemption
 }
 
 // NewRenewalService creates a new RenewalService.
@@ -60,6 +63,66 @@ func (s *RenewalService) WithJobEnqueuer(e JobEnqueuer) *RenewalService {
 	return s
 }
 
+// WithTaxCalc attaches the stores needed to charge shipping and tax on renewal
+// orders, matching retail checkout. Wiring-time only. When not set, renewals
+// fall back to charging the bare line subtotal (the pre-P2 behaviour).
+func (s *RenewalService) WithTaxCalc(settings *store.SettingsStore, catalog *store.CatalogStore) *RenewalService {
+	s.settings = settings
+	s.catalog = catalog
+	return s
+}
+
+// renewalCharges computes the shipping and tax due on a renewal order, matching
+// retail checkout: shipping is the merchant flat rate (free over threshold, free
+// for local zips) on the order subtotal, tax runs the store's configured
+// calculator over per-line taxable amounts honouring product + customer
+// exemption. cfg is returned so the caller can resolve the local fulfilment
+// method without re-reading config. Best-effort: a missing config or catalog
+// lookup yields zero for that component rather than blocking the renewal.
+func (s *RenewalService) renewalCharges(ctx context.Context, tx pgx.Tx, lines []domain.TaxLineItem, subtotalCents int, customer *domain.Customer, addr *domain.Address) (shipping, taxTotal int, cfg *domain.ShippingConfig) {
+	if s.shipping != nil {
+		if c, err := s.shipping.GetConfig(ctx, tx); err == nil {
+			cfg = c
+			shipping = cfg.Calculate(subtotalCents, addr.PostalCode)
+		}
+	}
+
+	if s.settings != nil {
+		taxCfg, err := s.settings.GetTaxConfig(ctx, tx)
+		if err == nil {
+			isWholesale := customer.AccountType == domain.AccountTypeWholesale
+			calculator := taxCalculatorForConfig(taxCfg, isWholesale)
+			if res, cErr := calculator.Calculate(ctx, tax.TaxOrder{
+				CustomerExempt: customer.TaxExempt,
+				ShippingState:  addr.State,
+				LineItems:      lines,
+			}); cErr == nil {
+				taxTotal = res.TaxTotal
+			}
+		}
+	}
+
+	return shipping, taxTotal, cfg
+}
+
+// taxExemptForVariant reports whether the variant's product is tax-exempt.
+// Defaults to false (taxable) when catalog is unwired or the lookup fails —
+// the safe direction for tax collection.
+func (s *RenewalService) taxExemptForVariant(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) bool {
+	if s.catalog == nil {
+		return false
+	}
+	variant, err := s.catalog.GetVariantByID(ctx, tx, variantID)
+	if err != nil {
+		return false
+	}
+	product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID)
+	if err != nil {
+		return false
+	}
+	return product.TaxExempt
+}
+
 // RenewSubscription processes a single subscription renewal:
 // 1. Load subscription + plan + customer + address + price
 // 2. Create off-session PaymentIntent via Stripe (external, outside tx)
@@ -74,6 +137,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	var customer *domain.Customer
 	var addr *domain.Address
 	var priceCents int
+	var subtotalCents int
+	var shippingCents int
+	var taxCents int
 	var shipMethod *domain.ShippingMethod
 
 	err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
@@ -110,16 +176,21 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		if plan.DiscountPct > 0 {
 			priceCents = priceCents - (priceCents * plan.DiscountPct / 100)
 		}
+		subtotalCents = priceCents * sub.Quantity
 
-		// Stamp the chosen local fulfillment method when the saved address
-		// sits inside a local zip and the merchant's config plus the
-		// customer's preference yield a single sensible choice. Otherwise
-		// the renewal order ships normally.
-		if s.shipping != nil {
-			cfg, txErr := s.shipping.GetConfig(ctx, tx)
-			if txErr == nil {
-				shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
-			}
+		// Shipping + tax, matching retail checkout. The cfg returned by
+		// renewalCharges also resolves the local fulfillment method (saved
+		// address in a local zip + the customer's preference); otherwise the
+		// renewal order ships normally.
+		taxLine := []domain.TaxLineItem{{
+			LineIndex: 0,
+			Subtotal:  subtotalCents,
+			TaxExempt: s.taxExemptForVariant(ctx, tx, sub.VariantID),
+		}}
+		var cfg *domain.ShippingConfig
+		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLine, subtotalCents, customer, addr)
+		if cfg != nil {
+			shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
 		}
 
 		return nil
@@ -128,7 +199,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		return nil, fmt.Errorf("renewal read phase: %w", err)
 	}
 
-	totalCents := priceCents * sub.Quantity
+	totalCents := subtotalCents + shippingCents + taxCents
 
 	if customer.StripeCustomerID == nil {
 		return nil, fmt.Errorf("customer %s has no Stripe customer ID", customer.ID)
@@ -210,7 +281,9 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			PaymentStatus:     domain.PaymentStatusCaptured,
 			FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
 			CurrencyCode:      "USD",
-			Subtotal:          totalCents,
+			Subtotal:          subtotalCents,
+			ShippingTotal:     shippingCents,
+			TaxTotal:          taxCents,
 			Total:             totalCents,
 			ShippingAddressID: sub.ShippingAddressID,
 			BillingAddressID:  sub.ShippingAddressID,
@@ -232,8 +305,8 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			VariantID: sub.VariantID,
 			Quantity:  sub.Quantity,
 			UnitPrice: priceCents,
-			Subtotal:  totalCents,
-			Total:     totalCents,
+			Subtotal:  subtotalCents,
+			Total:     subtotalCents,
 		})
 		if txErr != nil {
 			return fmt.Errorf("create renewal line item: %w", txErr)
@@ -322,6 +395,9 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	var items []subscriptionLineItem
 	var customer *domain.Customer
 	var addr *domain.Address
+	var subtotalCents int
+	var shippingCents int
+	var taxCents int
 	var orderTotal int
 	var shipMethod *domain.ShippingMethod
 
@@ -374,7 +450,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				UnitPrice:  unitPrice,
 				TotalPrice: totalPrice,
 			})
-			orderTotal += totalPrice
+			subtotalCents += totalPrice
 		}
 
 		var txErr error
@@ -388,11 +464,20 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			return fmt.Errorf("get address: %w", txErr)
 		}
 
-		if s.shipping != nil {
-			cfg, txErr := s.shipping.GetConfig(ctx, tx)
-			if txErr == nil {
-				shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
+		// Shipping (one charge on the combined subtotal — single box) + tax
+		// (per line, honouring each product's exemption), matching retail.
+		taxLines := make([]domain.TaxLineItem, len(items))
+		for i, item := range items {
+			taxLines[i] = domain.TaxLineItem{
+				LineIndex: i,
+				Subtotal:  item.TotalPrice,
+				TaxExempt: s.taxExemptForVariant(ctx, tx, item.Sub.VariantID),
 			}
+		}
+		var cfg *domain.ShippingConfig
+		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLines, subtotalCents, customer, addr)
+		if cfg != nil {
+			shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
 		}
 
 		return nil
@@ -400,6 +485,8 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if err != nil {
 		return nil, fmt.Errorf("batch renewal read phase: %w", err)
 	}
+
+	orderTotal = subtotalCents + shippingCents + taxCents
 
 	if customer.StripeCustomerID == nil {
 		return nil, fmt.Errorf("customer %s has no Stripe customer ID", customer.ID)
@@ -482,7 +569,9 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			PaymentStatus:     domain.PaymentStatusCaptured,
 			FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
 			CurrencyCode:      "USD",
-			Subtotal:          orderTotal,
+			Subtotal:          subtotalCents,
+			ShippingTotal:     shippingCents,
+			TaxTotal:          taxCents,
 			Total:             orderTotal,
 			ShippingAddressID: addr.ID,
 			BillingAddressID:  addr.ID,

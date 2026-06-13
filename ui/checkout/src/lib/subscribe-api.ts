@@ -21,8 +21,14 @@ export interface SubscribePaymentIntentRequest {
 
 export interface SubscribePaymentIntentResponse {
   client_secret: string;
+  /** Total being charged: item subtotal + shipping + tax. */
   amount: number;
   currency: string;
+  subtotal: number;
+  shipping_total: number;
+  shipping_label?: string;
+  tax_total: number;
+  tax_label?: string;
 }
 
 export interface SubscribeConfirmRequest {

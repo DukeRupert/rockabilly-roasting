@@ -95,7 +95,25 @@ to do this. Add redirect-back handling to `SubscribeApp` while in there. Until t
 async payment method offered by the Payment Element is a trap.
 **Command:** implement (backend + Svelte), then /verify with a forced confirm failure.
 
-### P2 — Subscriptions never charge shipping or tax; nobody decided that out loud
+### P2 — Subscriptions never charge shipping or tax; nobody decided that out loud — ✅ FIXED 2026-06-12 (decision: same as retail)
+*(Product decision: subscriptions are priced identically to a one-off order — shipping + tax,
+no perk. Threaded the existing checkout calc through both ends. Signup
+(`handleSubscribePaymentIntent`) now builds the tax line from the variant's product
+exemption, runs `CheckoutService.CalculateTax` + `CalculateShipping`, resolves the local
+fulfillment method via `resolveLocalMethod`, and feeds shipping/tax/method into the PI amount
+and `PlaceOrder`. Renewals gained `RenewalService.WithTaxCalc(settings, catalog)` + a
+`renewalCharges` helper that runs the same `taxCalculatorForConfig` + `ShippingConfig.Calculate`
+primitives; `RenewSubscription` and `RenewBatch` now set `Subtotal`/`ShippingTotal`/`TaxTotal`/
+`Total` on the order and charge the full amount (batch: one shipping charge on the combined
+subtotal, per-line tax). The renewal-receipt email's "Shipping $0.00 / Tax $0.00" cosmetic
+resolves itself since the fields are now real. To keep the flow honest (you can't charge more
+than you show), the subscribe form now renders a "Charged today" breakdown — roast / shipping /
+tax / total — once the address is entered and the PI is created, and the Subscribe button shows
+the real total instead of the bare item price. The math primitives (`CalculateFlatRateTax`,
+`ShippingConfig.Calculate`) and `PlaceOrder`'s total composition already have unit coverage;
+the renewal services are pool-based and, by existing project convention, have no integration
+tests. Note: the static "Your plan" summary card still shows the item price with the misleading
+"N × total" prefix — that's P4, untouched here.)*
 **What:** Retail checkout computes shipping and Stripe Tax and adds them to the PI. The
 subscribe flow charges exactly `discounted price × quantity` (`subscribe.go:197`), and renewal
 orders hardcode `Subtotal = Total` with no shipping or tax lines (`renewal.go:213`). The

@@ -200,12 +200,16 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		req.Country = "US"
 	}
 
-	// Phase 1: load plan + price, find-or-create customer, save address (tx).
+	// Phase 1: load plan + price, find-or-create customer, save address, and
+	// price shipping + tax exactly like retail checkout (tx).
 	var (
-		plan     *domain.SubscriptionPlan
-		customer *domain.Customer
-		addr     *domain.Address
-		unit     int
+		plan          *domain.SubscriptionPlan
+		customer      *domain.Customer
+		addr          *domain.Address
+		unit          int
+		shippingCents int
+		taxCents      int
+		shipMethod    *domain.ShippingMethod
 	)
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -260,6 +264,39 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		if txErr != nil {
 			return fmt.Errorf("create address: %w", txErr)
 		}
+
+		// Tax + shipping, matching retail checkout. The subscription plan
+		// discount is already baked into `unit`, so the taxable subtotal is
+		// the discounted line total.
+		subtotal := unit * quantity
+		variant, txErr := d.CatalogService.GetVariant(ctx, tx, variantID)
+		if txErr != nil {
+			return fmt.Errorf("get variant for tax: %w", txErr)
+		}
+		product, txErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+		if txErr != nil {
+			return fmt.Errorf("get product for tax: %w", txErr)
+		}
+		taxLines := []domain.TaxLineItem{{LineIndex: 0, Subtotal: subtotal, TaxExempt: product.TaxExempt}}
+		isWholesale := customer.AccountType == domain.AccountTypeWholesale
+		taxResult, txErr := d.CheckoutService.CalculateTax(ctx, tx, taxLines, customer.TaxExempt, isWholesale, addr.State)
+		if txErr != nil {
+			return fmt.Errorf("calculate tax: %w", txErr)
+		}
+		taxCents = taxResult.TaxTotal
+
+		shipCents, shipCfg, txErr := d.CheckoutService.CalculateShipping(ctx, tx, subtotal, addr.PostalCode)
+		if txErr != nil {
+			return fmt.Errorf("calculate shipping: %w", txErr)
+		}
+		shippingCents = shipCents
+
+		// No fulfillment UI on the subscribe form, so resolve the method from
+		// the customer's saved preference (nil for new customers → first
+		// eligible for local zips, nil otherwise = standard shipped).
+		eligible := shipCfg.EligibleLocalMethods(addr.PostalCode)
+		shipMethod = resolveLocalMethod(eligible, "", customer.PreferredLocalFulfillment)
+
 		return nil
 	})
 	if err != nil {
@@ -282,7 +319,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	totalCents := unit * quantity
+	totalCents := unit*quantity + shippingCents + taxCents
 
 	// Phase 2: ensure Stripe customer + create PaymentIntent (external — no tx).
 	// The Stripe customer is required so the payment method is saved for
@@ -356,6 +393,9 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			ShippingAddressID: addr.ID,
 			BillingAddressID:  addr.ID,
 			CurrencyCode:      "USD",
+			ShippingCents:     shippingCents,
+			TaxCents:          taxCents,
+			ShippingMethod:    shipMethod,
 			Metadata:          app.SubscriptionSignupOrderMetadata(planID, pi.ID),
 		}, app.Actor{
 			Type: domain.AuditActorTypeCustomer,
@@ -393,10 +433,20 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	// Return the full breakdown so the subscribe form can show what's actually
+	// being charged (item + shipping + tax), not just the item price.
+	shippingLabel := ""
+	if shippingCents == 0 {
+		shippingLabel = "Free"
+	}
 	JSON(w, http.StatusOK, checkoutPaymentIntentResponse{
-		ClientSecret: pi.ClientSecret,
-		Amount:       totalCents,
-		Currency:     "usd",
+		ClientSecret:  pi.ClientSecret,
+		Amount:        totalCents,
+		Currency:      "usd",
+		Subtotal:      unit * quantity,
+		TaxTotal:      taxCents,
+		ShippingTotal: shippingCents,
+		ShippingLabel: shippingLabel,
 	})
 }
 

@@ -120,7 +120,9 @@ products are WA-food-exempt). To avoid a silent mid-subscription price bump, mig
 `shipping_grandfathered` on every subscription existing at deploy time, and the renewal waives
 shipping when that flag is set (a batch order is grandfathered only when *all* its subs are). New
 subscriptions created through the post-P2 flow carry no flag and pay shipping. Verified locally:
-0 of 74 active subs now see an increase.)*
+0 of 74 active subs now see an increase. Staff can also flip the exception per subscription from
+the admin detail page ("Renewal shipping" toggle → `POST .../grandfather-shipping`, audited), so
+the exception can be granted or revoked case by case without a migration.)*
 **What:** Retail checkout computes shipping and Stripe Tax and adds them to the PI. The
 subscribe flow charges exactly `discounted price × quantity` (`subscribe.go:197`), and renewal
 orders hardcode `Subtotal = Total` with no shipping or tax lines (`renewal.go:213`). The

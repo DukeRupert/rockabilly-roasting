@@ -62,6 +62,23 @@ type Subscription struct {
 	UpdatedAt          time.Time
 }
 
+// SubscriptionMetaShippingGrandfathered is the metadata key marking a
+// subscription whose renewals keep free shipping (it predates, or was manually
+// exempted from, the shipping-on-renewal policy). Migration 054 seeds it on
+// pre-existing subscriptions; staff toggle it per subscription thereafter.
+const SubscriptionMetaShippingGrandfathered = "shipping_grandfathered"
+
+// ShippingGrandfathered reports whether this subscription's renewals should
+// waive the shipping charge. jsonb true round-trips through Metadata as a Go
+// bool; any other shape reads as false (charge shipping normally).
+func (s *Subscription) ShippingGrandfathered() bool {
+	if s.Metadata == nil {
+		return false
+	}
+	v, _ := s.Metadata[SubscriptionMetaShippingGrandfathered].(bool)
+	return v
+}
+
 // SubscriptionDelta is the net change in the active subscription base on one
 // calendar day (merchant timezone): +1 for each subscription created that day,
 // -1 for each that was cancelled or expired. Days with no change are omitted —

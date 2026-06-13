@@ -429,6 +429,37 @@ func (d *Deps) handleAdminSubscriptionRetry(w http.ResponseWriter, r *http.Reque
 	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash="+flash, http.StatusSeeOther)
 }
 
+// handleAdminSubscriptionGrandfatherShipping toggles a subscription's
+// free-renewal-shipping exception. The form's "enabled" field carries the
+// desired state ("true"/"false") so the action is idempotent regardless of
+// double-submits — it sets an absolute value rather than flipping.
+func (d *Deps) handleAdminSubscriptionGrandfatherShipping(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	enabled := r.FormValue("enabled") == "true"
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.SubscriptionService.SetShippingGrandfathered(ctx, tx, id, enabled, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	flash := "Free-shipping+exception+removed"
+	if enabled {
+		flash = "Free-shipping+exception+applied"
+	}
+	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+}
+
 func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

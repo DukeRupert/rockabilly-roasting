@@ -150,6 +150,37 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			}
 		</div>
 	}
+	<!-- Renewal shipping exception (grandfather toggle) -->
+	if canCancel(props.Subscription.Status) {
+		{{ grandfathered := props.Subscription.ShippingGrandfathered() }}
+		<div class="mt-6 border border-rr-border bg-rr-surface p-4">
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<p class="text-sm font-semibold text-rr-heading">Renewal shipping</p>
+					if grandfathered {
+						<p class="mt-0.5 text-sm text-rr-muted">Exempt — renewals ship free for this subscription.</p>
+					} else {
+						<p class="mt-0.5 text-sm text-rr-muted">Charged on renewal like a retail order (free over the threshold or for local zips).</p>
+					}
+				</div>
+				<div class="flex items-center gap-3">
+					if grandfathered {
+						<span class="badge-green">Free shipping</span>
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/grandfather-shipping", props.Subscription.ID.String())) }>
+							<input type="hidden" name="enabled" value="false"/>
+							<button type="submit" class="btn-secondary">Remove exception</button>
+						</form>
+					} else {
+						<span class="badge-slate">Standard</span>
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/grandfather-shipping", props.Subscription.ID.String())) }>
+							<input type="hidden" name="enabled" value="true"/>
+							<button type="submit" class="btn-secondary">Grant free shipping</button>
+						</form>
+					}
+				</div>
+			</div>
+		</div>
+	}
 	<!-- Product line -->
 	if props.Product != nil && props.Variant != nil {
 		<div class="mt-6 border border-rr-border bg-rr-surface p-4">

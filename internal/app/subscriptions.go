@@ -833,6 +833,48 @@ func (s *SubscriptionService) AcknowledgeDunning(ctx context.Context, tx pgx.Tx,
 	return nil
 }
 
+// SetShippingGrandfathered flips a subscription's free-renewal-shipping
+// exception on or off and records who changed it. When on, renewals waive the
+// shipping charge (the customer keeps the terms they signed up under); when
+// off, renewals price shipping like a retail order. No-op-safe: re-setting the
+// same value just rewrites the flag and writes an audit row.
+func (s *SubscriptionService) SetShippingGrandfathered(ctx context.Context, tx pgx.Tx, id uuid.UUID, enabled bool, actor Actor) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for grandfather toggle: %w", err)
+	}
+
+	if err := s.subscriptions.SetShippingGrandfathered(ctx, tx, id, enabled); err != nil {
+		return nil, err
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditSubscriptionShippingGrandfathered,
+		ResourceType: "subscription",
+		ResourceID:   id,
+		Metadata:     map[string]any{"shipping_grandfathered": enabled},
+	}); err != nil {
+		return nil, fmt.Errorf("audit shipping grandfather change: %w", err)
+	}
+
+	// Reflect the new value on the returned struct without a re-read.
+	if sub.Metadata == nil {
+		sub.Metadata = map[string]any{}
+	}
+	if enabled {
+		sub.Metadata[domain.SubscriptionMetaShippingGrandfathered] = true
+	} else {
+		delete(sub.Metadata, domain.SubscriptionMetaShippingGrandfathered)
+	}
+	return sub, nil
+}
+
 // AdvancePeriod advances the subscription's billing period after a successful renewal.
 func (s *SubscriptionService) AdvancePeriod(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Subscription, error) {
 	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)

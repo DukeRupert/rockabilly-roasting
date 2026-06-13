@@ -317,6 +317,33 @@ func (s *SubscriptionStore) ClearDunning(ctx context.Context, tx pgx.Tx, id uuid
 	return nil
 }
 
+// SetShippingGrandfathered sets or clears the shipping_grandfathered metadata
+// flag, which the renewal engine reads to waive (or charge) renewal shipping.
+// Staff toggle this per subscription from the admin detail page.
+func (s *SubscriptionStore) SetShippingGrandfathered(ctx context.Context, tx pgx.Tx, id uuid.UUID, enabled bool) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.set_shipping_grandfathered", time.Now(), &err)
+	if enabled {
+		_, err = tx.Exec(ctx,
+			`UPDATE subscriptions
+			 SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), $2, 'true'::jsonb),
+			     updated_at = now()
+			 WHERE id = $1`,
+			id, []string{domain.SubscriptionMetaShippingGrandfathered},
+		)
+	} else {
+		_, err = tx.Exec(ctx,
+			`UPDATE subscriptions
+			 SET metadata = metadata - $2, updated_at = now()
+			 WHERE id = $1`,
+			id, domain.SubscriptionMetaShippingGrandfathered,
+		)
+	}
+	if err != nil {
+		return fmt.Errorf("set shipping grandfathered: %w", err)
+	}
+	return nil
+}
+
 // CountPastDueUnacknowledged counts past-due subscriptions that have not been
 // acknowledged on the dashboard — the figure that drives the Urgent band's
 // past-due alert.

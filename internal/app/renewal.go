@@ -146,22 +146,6 @@ var dunningRetryDelays = [maxDunningAttempts - 1]time.Duration{
 	96 * time.Hour,
 }
 
-// subMetaShippingGrandfathered marks a subscription that predates the P2
-// shipping-on-renewal change. Renewals for these keep shipping free, honoring
-// the terms the customer signed up under. Set by migration 054 on every
-// subscription that existed at deploy time.
-const subMetaShippingGrandfathered = "shipping_grandfathered"
-
-// isShippingGrandfathered reports whether a subscription's renewals should
-// skip the shipping charge (see subMetaShippingGrandfathered).
-func isShippingGrandfathered(metadata map[string]any) bool {
-	if metadata == nil {
-		return false
-	}
-	v, _ := metadata[subMetaShippingGrandfathered].(bool)
-	return v
-}
-
 // dunningAttempt reads the running failed-charge count off a subscription's
 // metadata. Absent (a never-failed subscription) reads as 0. JSON decoding
 // yields float64 for numbers, so both float64 and int are tolerated.
@@ -300,7 +284,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			TaxExempt: s.taxExemptForVariant(ctx, tx, sub.VariantID),
 		}}
 		var cfg *domain.ShippingConfig
-		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLine, subtotalCents, customer, addr, isShippingGrandfathered(sub.Metadata))
+		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLine, subtotalCents, customer, addr, sub.ShippingGrandfathered())
 		if cfg != nil {
 			shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
 		}
@@ -580,7 +564,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				Subtotal:  item.TotalPrice,
 				TaxExempt: s.taxExemptForVariant(ctx, tx, item.Sub.VariantID),
 			}
-			if !isShippingGrandfathered(item.Sub.Metadata) {
+			if !item.Sub.ShippingGrandfathered() {
 				allGrandfathered = false
 			}
 		}

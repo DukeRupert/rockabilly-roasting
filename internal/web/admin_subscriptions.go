@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
@@ -385,6 +386,47 @@ func (d *Deps) handleAdminSubscriptionDunningAck(w http.ResponseWriter, r *http.
 	}
 
 	http.Redirect(w, r, "/admin/", http.StatusSeeOther)
+}
+
+// handleAdminSubscriptionRetry triggers an immediate renewal charge on a
+// past-due subscription — the staff counterpart to the customer's retry, for
+// when a customer calls in after sorting their card. Enqueues the renewal job;
+// the worker runs the same path the scheduler uses.
+func (d *Deps) handleAdminSubscriptionRetry(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var flash string
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		sub, txErr := d.SubscriptionService.GetSubscriptionAsStaff(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		if sub.Status != domain.SubscriptionStatusPastDue {
+			flash = "Subscription+is+not+past+due"
+			return nil
+		}
+		// ByArgs unique on the subscription ID prevents stacking duplicate
+		// charge attempts (double-click, or a race with the scheduler).
+		if _, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionRenewalArgs{
+			SubscriptionID: sub.ID,
+		}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); txErr != nil {
+			return txErr
+		}
+		flash = "Renewal+charge+queued"
+		return nil
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash="+flash, http.StatusSeeOther)
 }
 
 func (d *Deps) handleAdminSubscriptionCancel(w http.ResponseWriter, r *http.Request) {

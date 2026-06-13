@@ -205,7 +205,8 @@ func (s *SubscriptionService) GetSubscriptionByCustomer(ctx context.Context, tx 
 	return sub, nil
 }
 
-// ListDueForRenewal returns active subscriptions due for renewal.
+// ListDueForRenewal returns subscriptions due to be charged now — fresh active
+// renewals plus past_due subscriptions whose next dunning retry has come due.
 func (s *SubscriptionService) ListDueForRenewal(ctx context.Context, tx pgx.Tx) ([]domain.Subscription, error) {
 	subs, err := s.subscriptions.ListDueForRenewal(ctx, tx)
 	if err != nil {

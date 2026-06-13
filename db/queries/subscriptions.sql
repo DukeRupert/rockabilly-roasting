@@ -75,8 +75,12 @@ SET status = 'cancelled', cancelled_at = now(), updated_at = now()
 WHERE id = $1;
 
 -- name: ListSubscriptionsDueForRenewal :many
+-- Picks up both fresh active renewals and past_due dunning retries: for a
+-- past_due subscription next_order_at is the next dunning retry time, pushed
+-- forward on each failed charge so this never spins. Exhausted subscriptions
+-- flip to 'expired' (ends_at set) and drop out here.
 SELECT * FROM subscriptions
-WHERE status = 'active' AND next_order_at <= now()
+WHERE status IN ('active', 'past_due') AND next_order_at <= now()
   AND (ends_at IS NULL OR ends_at > now())
 ORDER BY next_order_at ASC;
 

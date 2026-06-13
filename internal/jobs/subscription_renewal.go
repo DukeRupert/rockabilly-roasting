@@ -48,6 +48,13 @@ func (w *SubscriptionRenewalWorker) Work(ctx context.Context, job *river.Job[Sub
 		if errors.Is(err, app.ErrSubscriptionNotActive) || errors.Is(err, app.ErrSubscriptionNotFound) {
 			return river.JobCancel(fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err))
 		}
+		// A declined charge is terminal for this job: RenewSubscription has
+		// already advanced the dunning state (next retry scheduled, or expired
+		// at the cap). The renewal scheduler owns the next attempt, so River
+		// must not retry — that would double-charge the schedule.
+		if errors.Is(err, app.ErrRenewalPaymentDeclined) {
+			return river.JobCancel(fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err))
+		}
 		return fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err)
 	}
 	metrics.TrackJob(w.metrics, "subscription_renewal", start, nil)

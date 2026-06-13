@@ -299,6 +299,16 @@ type SubscriptionCancelledArgs struct {
 // Kind returns the job kind identifier.
 func (SubscriptionCancelledArgs) Kind() string { return "email:subscription_cancelled" }
 
+// SubscriptionDunningEndedArgs sends the "subscription ended" notice after
+// dunning retries are exhausted and the subscription is expired.
+type SubscriptionDunningEndedArgs struct {
+	SubscriptionID uuid.UUID `json:"subscription_id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (SubscriptionDunningEndedArgs) Kind() string { return "email:subscription_ended" }
+
 // OrderShippedEmailArgs sends an "order shipped" notification with tracking.
 // Enqueued in the same transaction as the shipment insert that triggered it.
 type OrderShippedEmailArgs struct {

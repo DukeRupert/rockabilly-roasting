@@ -137,6 +137,30 @@ func (s *SubscriptionService) SendCancellationEmail(ctx context.Context, pool *p
 	})
 }
 
+// SendDunningEndedEmail tells the customer their subscription has ended because
+// the renewal charge never recovered (dunning exhausted). Distinct from a
+// customer-initiated cancellation — the copy acknowledges the failed card and
+// points them at restarting. Read → send → audit.
+func (s *SubscriptionService) SendDunningEndedEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID) error {
+	return s.sendSubscriptionLifecycleEmail(ctx, pool, subscriptionID, customerID, lifecycleEmailSpec{
+		templateName: "subscription_dunning_ended",
+		subject:      "Your subscription has ended",
+		tag:          "subscription-ended",
+		auditAction:  audit.AuditEmailSubscriptionEnded,
+		actorName:    "subscription_ended_worker",
+		buildData: func(customerName, productName, planName string) any {
+			return emailtemplates.SubscriptionDunningEndedData{
+				CustomerName: customerName,
+				ProductName:  productName,
+				PlanName:     planName,
+				StoreName:    s.email.StoreName,
+				StoreURL:     s.email.BaseURL,
+				AccountURL:   s.email.BaseURL + "/account/subscriptions",
+			}
+		},
+	})
+}
+
 // lifecycleEmailSpec captures the per-template specifics for past-due and
 // cancellation emails — they share the same read-shape (sub + customer + plan +
 // product) and the same three-phase send pattern, so the loader is hoisted

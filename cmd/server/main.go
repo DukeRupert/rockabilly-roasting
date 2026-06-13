@@ -287,6 +287,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalReceiptWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionPastDueWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionCancelledWorker(subscriptionSvc, pool))
+	river.AddWorker(workers, jobs.NewSubscriptionDunningEndedWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewRefundConfirmationWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderShippedEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderReadyForPickupEmailWorker(orderSvc, pool))

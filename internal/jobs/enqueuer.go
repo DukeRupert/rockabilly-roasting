@@ -38,6 +38,16 @@ func (e *Enqueuer) EnqueuePastDueNotice(ctx context.Context, tx pgx.Tx, subscrip
 	return err
 }
 
+// EnqueueSubscriptionEnded enqueues the "subscription ended" notice sent when
+// dunning retries are exhausted, in tx so it rides on the expiry's commit.
+func (e *Enqueuer) EnqueueSubscriptionEnded(ctx context.Context, tx pgx.Tx, subscriptionID, customerID uuid.UUID) error {
+	_, err := e.client.InsertTx(ctx, tx, SubscriptionDunningEndedArgs{
+		SubscriptionID: subscriptionID,
+		CustomerID:     customerID,
+	}, nil)
+	return err
+}
+
 // EnqueueOrderConfirm enqueues an order-confirmation email job in tx.
 func (e *Enqueuer) EnqueueOrderConfirm(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error {
 	_, err := e.client.InsertTx(ctx, tx, OrderConfirmEmailArgs{

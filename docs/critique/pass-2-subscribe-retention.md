@@ -130,7 +130,26 @@ If bug: thread the checkout's shipping/tax calculation into subscribe PI creatio
 `RenewSubscription`/`RenewBatch`.
 **Command:** product decision first; then /clarify (copy) or implement (calculation).
 
-### P3 — Dunning is a dead end wearing a reassuring email
+### P3 — Dunning is a dead end wearing a reassuring email — ✅ FIXED 2026-06-12
+*(Built a real dunning state machine, replacing reliance on River's blind job backoff.
+(a) The scheduler query now selects `status IN ('active','past_due') AND next_order_at <= now()`,
+so for a past_due sub `next_order_at` doubles as the next dunning-retry time and the scheduler
+re-attempts on a deliberate cadence. (b) On a declined charge, `recordRenewalFailure` increments
+a `dunning_attempt` counter (in metadata) and either schedules the next retry — past_due,
+`next_order_at` pushed +3d/+3d/+4d via `SetDunningRetry` — or, at the 4-attempt cap, expires the
+subscription (`status=expired`, `ends_at` set) and sends a new "subscription ended" email with a
+restart link. A successful charge clears the counter (`ClearDunning`). The renewal workers map a
+new `ErrRenewalPaymentDeclined` sentinel to `river.JobCancel` so River no longer retries declines
+— the scheduler owns retries; genuine infra errors still propagate for River retry. (c) Past-due
+account cards now carry "Update payment method" (billing portal) + "Retry payment now"
+(`POST /account/subscriptions/{id}/retry` → enqueues an immediate renewal, `ByArgs`-unique against
+double-click) + an inline cancel, and the copy is honest about both the manual and automatic
+retry. (d) Staff get the same "Retry payment now" on the admin subscription detail for past_due
+subs (`POST /admin/subscriptions/{id}/retry`). The dunning escalation also fixes the renewal
+receipt's reassurance being a lie. Tests: store-level dunning lifecycle (retry scheduling,
+scheduler pickup of due past_due, future-retry exclusion, terminal expiry) + ClearDunning. Note:
+expired subs aren't yet customer-restartable in-place — restart is via /subscriptions; in-place
+restart is P6 territory.)*
 **What:** When a renewal charge fails the subscription goes past_due and the customer gets one
 email saying "Once we have a working card, the renewal will go out automatically." Nothing
 makes that true. The scheduler's query is `WHERE status = 'active'`

@@ -52,7 +52,12 @@ var (
 	ErrSubscriptionNotCancellable = errors.New("subscription cannot be cancelled")
 	ErrSubscriptionNotEditable    = errors.New("subscription cannot be edited in its current state")
 	ErrSubscriptionNotPastDue     = errors.New("subscription is not past due")
-	ErrSubscriptionPlanNotFound   = errors.New("subscription plan not found")
+	// ErrRenewalPaymentDeclined signals that a renewal charge was declined and
+	// the dunning state has already been advanced (past_due retry scheduled, or
+	// expired at the cap). The job worker treats it as terminal — the renewal
+	// scheduler owns the next attempt, so River must not retry the job.
+	ErrRenewalPaymentDeclined   = errors.New("renewal payment declined")
+	ErrSubscriptionPlanNotFound = errors.New("subscription plan not found")
 	ErrSubscriptionPlanInactive   = errors.New("subscription plan is not active")
 
 	// Fulfillment errors

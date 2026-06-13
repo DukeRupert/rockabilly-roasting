@@ -1,0 +1,15 @@
+{{define "subscription_dunning_ended.txt"}}Your subscription has ended
+
+Hi {{.CustomerName}},
+
+We tried your card on file a few times over the past couple of weeks to renew your {{.ProductName}} subscription ({{.PlanName}}), but it didn't go through. We've stopped trying and ended the subscription — no further charges, no more shipments.
+
+No hard feelings, and no hoops to jump through if you want back in. Start a fresh subscription whenever you're ready — it takes a minute and you can use a new card.
+
+Start a new subscription: {{.StoreURL}}/subscriptions
+
+Think this was a mistake? Reply to this email and we'll sort it out.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

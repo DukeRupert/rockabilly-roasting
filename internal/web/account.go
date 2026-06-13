@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
@@ -415,6 +416,48 @@ func (d *Deps) handleAccountSubscriptionResume(w http.ResponseWriter, r *http.Re
 		}
 		_ = sub
 		_, txErr = d.SubscriptionService.ResumeSubscription(ctx, tx, id, customerActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, "/account/subscriptions", http.StatusSeeOther)
+}
+
+// handleAccountSubscriptionRetry lets a customer trigger an immediate renewal
+// charge on a past-due subscription — the natural next step after updating
+// their card in the billing portal. Enqueues the renewal job rather than
+// charging inline so the request returns fast; the worker runs the same path
+// the scheduler uses (success clears dunning, failure advances it). No-op
+// guidance for non-past-due subs is handled by the button only rendering on
+// past-due cards; the status check here is the authoritative guard.
+func (d *Deps) handleAccountSubscriptionRetry(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	customer, _ := auth.CustomerFromContext(ctx)
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		sub, txErr := d.SubscriptionService.GetSubscriptionByCustomer(ctx, tx, id, customer.ID)
+		if txErr != nil {
+			return txErr
+		}
+		if sub.Status != domain.SubscriptionStatusPastDue {
+			// Nothing to retry — fall through to a clean redirect.
+			return nil
+		}
+		// ByArgs unique keys on the subscription ID so a double-click (or a
+		// manual retry racing the scheduler) can't queue two charge attempts
+		// for the same subscription while one is still in flight.
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionRenewalArgs{
+			SubscriptionID: sub.ID,
+		}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}})
 		return txErr
 	})
 	if err != nil {

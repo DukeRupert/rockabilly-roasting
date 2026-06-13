@@ -230,6 +230,17 @@ type SubscriptionCancelledData struct {
 	AccountURL   string
 }
 
+// SubscriptionDunningEndedData holds data for the "we couldn't renew, your
+// subscription has ended" notice sent when dunning retries are exhausted.
+type SubscriptionDunningEndedData struct {
+	CustomerName string
+	ProductName  string
+	PlanName     string
+	StoreName    string
+	StoreURL     string
+	AccountURL   string
+}
+
 // RefundConfirmationData holds data for the refund-issued confirmation.
 type RefundConfirmationData struct {
 	CustomerName string

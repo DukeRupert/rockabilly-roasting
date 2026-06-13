@@ -132,6 +132,11 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 					<button type="submit" class="btn-confirm">Resume</button>
 				</form>
 			}
+			if props.Subscription.Status == domain.SubscriptionStatusPastDue {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/retry", props.Subscription.ID.String())) }>
+					<button type="submit" class="btn-confirm">Retry payment now</button>
+				</form>
+			}
 			if canCancel(props.Subscription.Status) {
 				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/cancel", props.Subscription.ID.String())) }>
 					<button

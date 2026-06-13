@@ -340,11 +340,15 @@ func (q *Queries) ListSubscriptionsByCustomer(ctx context.Context, customerID uu
 
 const listSubscriptionsDueForRenewal = `-- name: ListSubscriptionsDueForRenewal :many
 SELECT id, customer_id, plan_id, status, shipping_address_id, current_period_start, current_period_end, next_order_at, cancelled_at, pause_until, metadata, created_at, updated_at, variant_id, quantity, ends_at, stripe_payment_method_id FROM subscriptions
-WHERE status = 'active' AND next_order_at <= now()
+WHERE status IN ('active', 'past_due') AND next_order_at <= now()
   AND (ends_at IS NULL OR ends_at > now())
 ORDER BY next_order_at ASC
 `
 
+// Picks up both fresh active renewals and past_due dunning retries: for a
+// past_due subscription next_order_at is the next dunning retry time, pushed
+// forward on each failed charge so this never spins. Exhausted subscriptions
+// flip to 'expired' (ends_at set) and drop out here.
 func (q *Queries) ListSubscriptionsDueForRenewal(ctx context.Context) ([]Subscription, error) {
 	rows, err := q.db.Query(ctx, listSubscriptionsDueForRenewal)
 	if err != nil {

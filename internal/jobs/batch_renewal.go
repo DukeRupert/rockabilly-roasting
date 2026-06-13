@@ -46,6 +46,11 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 		if errors.Is(err, app.ErrSubscriptionNotActive) || errors.Is(err, app.ErrSubscriptionNotFound) {
 			return river.JobCancel(fmt.Errorf("batch renewal: %w", err))
 		}
+		// Declined charge: dunning state already advanced for every sub in the
+		// batch. The scheduler owns retries, so don't let River retry the job.
+		if errors.Is(err, app.ErrRenewalPaymentDeclined) {
+			return river.JobCancel(fmt.Errorf("batch renewal: %w", err))
+		}
 		w.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return fmt.Errorf("batch renewal: %w", err)
 	}

@@ -123,6 +123,97 @@ func (s *RenewalService) taxExemptForVariant(ctx context.Context, tx pgx.Tx, var
 	return product.TaxExempt
 }
 
+// --- Dunning ---
+
+// maxDunningAttempts is the number of charge attempts (including the first)
+// before a past-due subscription is given up on and expired. With the retry
+// delays below, the dunning window is roughly ten days.
+const maxDunningAttempts = 4
+
+// dunningRetryDelays are the gaps before each retry, indexed by the attempt
+// number that just failed (1-based). After attempt 1 fails we wait 3 days,
+// after attempt 2 another 3, after attempt 3 another 4 — then attempt 4's
+// failure exhausts the schedule and the subscription expires. Length must be
+// maxDunningAttempts-1.
+var dunningRetryDelays = [maxDunningAttempts - 1]time.Duration{
+	72 * time.Hour,
+	72 * time.Hour,
+	96 * time.Hour,
+}
+
+// dunningAttempt reads the running failed-charge count off a subscription's
+// metadata. Absent (a never-failed subscription) reads as 0. JSON decoding
+// yields float64 for numbers, so both float64 and int are tolerated.
+func dunningAttempt(metadata map[string]any) int {
+	if metadata == nil {
+		return 0
+	}
+	switch v := metadata["dunning_attempt"].(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	default:
+		return 0
+	}
+}
+
+// recordRenewalFailure advances dunning state after a declined charge, inside
+// the caller's transaction. It increments the attempt count and either
+// schedules the next retry (past_due, next_order_at pushed forward) or, at the
+// cap, expires the subscription. The past-due notice email goes out on the
+// first failure; the "subscription ended" email on expiry. Idempotent enough
+// for River's at-least-once delivery: re-running bumps the attempt by one,
+// which at worst shortens the dunning window slightly.
+func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID) error {
+	attempt := dunningAttempt(sub.Metadata) + 1
+
+	if attempt >= maxDunningAttempts {
+		if err := s.subscriptions.ExpireForDunning(ctx, tx, sub.ID); err != nil {
+			return err
+		}
+		if s.enqueuer != nil {
+			if err := s.enqueuer.EnqueueSubscriptionEnded(ctx, tx, sub.ID, customerID); err != nil {
+				return fmt.Errorf("enqueue subscription-ended email: %w", err)
+			}
+		}
+		if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "subscription_renewal",
+			Action:       audit.AuditSubscriptionExpired,
+			ResourceType: "subscription",
+			ResourceID:   sub.ID,
+			Metadata:     map[string]any{"dunning_attempt": attempt, "reason": "dunning_exhausted"},
+		}); err != nil {
+			return fmt.Errorf("audit subscription expired: %w", err)
+		}
+		return nil
+	}
+
+	nextRetry := time.Now().Add(dunningRetryDelays[attempt-1])
+	if err := s.subscriptions.SetDunningRetry(ctx, tx, sub.ID, nextRetry, attempt); err != nil {
+		return err
+	}
+	// First failure only — re-notifying on every retry would be spam. The
+	// final outcome (recovery or expiry) is what the customer hears next.
+	if attempt == 1 && s.enqueuer != nil {
+		if err := s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customerID); err != nil {
+			return fmt.Errorf("enqueue past-due email: %w", err)
+		}
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    domain.AuditActorTypeSystem,
+		ActorName:    "subscription_renewal",
+		Action:       audit.AuditSubscriptionFailed,
+		ResourceType: "subscription",
+		ResourceID:   sub.ID,
+		Metadata:     map[string]any{"dunning_attempt": attempt, "next_retry_at": nextRetry.Format(time.RFC3339)},
+	}); err != nil {
+		return fmt.Errorf("audit renewal failed: %w", err)
+	}
+	return nil
+}
+
 // RenewSubscription processes a single subscription renewal:
 // 1. Load subscription + plan + customer + address + price
 // 2. Create off-session PaymentIntent via Stripe (external, outside tx)
@@ -205,11 +296,6 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		return nil, fmt.Errorf("customer %s has no Stripe customer ID", customer.ID)
 	}
 
-	// Capture pre-renewal status so we only notify the customer on the
-	// active → past_due transition (not on subsequent failed retries while
-	// already past_due).
-	wasActive := sub.Status == domain.SubscriptionStatusActive
-
 	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
 
 	// Prefer the customer's default payment method (set when they update their
@@ -222,14 +308,10 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	}
 	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
-			if wasActive && s.enqueuer != nil {
-				_ = s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customer.ID)
-			}
-			return nil
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID)
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("customer %s has no saved payment methods", customer.ID)
+		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
 	}
 
 	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
@@ -253,16 +335,12 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		},
 	})
 	if err != nil {
-		// Payment failed — mark subscription past_due
+		// Payment declined — advance dunning state (retry or expire).
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
-			if wasActive && s.enqueuer != nil {
-				_ = s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customer.ID)
-			}
-			return nil
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID)
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("create renewal payment intent: %w", err)
+		return nil, fmt.Errorf("create renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
 	}
 
 	// --- Phase 3: create order + link + advance period (single tx) ---
@@ -333,11 +411,15 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			return fmt.Errorf("advance period: %w", txErr)
 		}
 
-		// If subscription was past_due, restore to active
+		// If subscription was past_due, restore to active and clear the
+		// dunning counter so a future failure starts a fresh schedule.
 		if sub.Status == domain.SubscriptionStatusPastDue {
 			_, txErr = s.subscriptions.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusActive)
 			if txErr != nil {
 				return fmt.Errorf("restore active: %w", txErr)
+			}
+			if txErr = s.subscriptions.ClearDunning(ctx, tx, sub.ID); txErr != nil {
+				return fmt.Errorf("clear dunning: %w", txErr)
 			}
 		}
 
@@ -501,16 +583,14 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
-				wasActive := item.Sub.Status == domain.SubscriptionStatusActive
-				s.subscriptions.UpdateStatus(ctx, tx, item.Sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
-				if wasActive && s.enqueuer != nil {
-					_ = s.enqueuer.EnqueuePastDueNotice(ctx, tx, item.Sub.ID, customer.ID)
+				if err := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID); err != nil {
+					return err
 				}
 			}
 			return nil
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("customer %s has no saved payment methods", customer.ID)
+		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
 	}
 
 	// Build subscription ID list for metadata
@@ -542,16 +622,14 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if err != nil {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
-				wasActive := item.Sub.Status == domain.SubscriptionStatusActive
-				s.subscriptions.UpdateStatus(ctx, tx, item.Sub.ID, domain.SubscriptionStatusPastDue) //nolint:errcheck
-				if wasActive && s.enqueuer != nil {
-					_ = s.enqueuer.EnqueuePastDueNotice(ctx, tx, item.Sub.ID, customer.ID)
+				if rfErr := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID); rfErr != nil {
+					return rfErr
 				}
 			}
 			return nil
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("create batch renewal payment intent: %w", err)
+		return nil, fmt.Errorf("create batch renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
 	}
 
 	// --- Phase 3: create order + link + advance periods (single tx) ---
@@ -616,11 +694,14 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				return fmt.Errorf("advance period for %s: %w", item.Sub.ID, txErr)
 			}
 
-			// Restore past_due subscriptions to active
+			// Restore past_due subscriptions to active and clear dunning state.
 			if item.Sub.Status == domain.SubscriptionStatusPastDue {
 				_, txErr = s.subscriptions.UpdateStatus(ctx, tx, item.Sub.ID, domain.SubscriptionStatusActive)
 				if txErr != nil {
 					return fmt.Errorf("restore active for %s: %w", item.Sub.ID, txErr)
+				}
+				if txErr = s.subscriptions.ClearDunning(ctx, tx, item.Sub.ID); txErr != nil {
+					return fmt.Errorf("clear dunning for %s: %w", item.Sub.ID, txErr)
 				}
 			}
 		}

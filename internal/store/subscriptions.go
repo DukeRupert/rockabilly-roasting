@@ -256,6 +256,67 @@ func (s *SubscriptionStore) SetDunningAcknowledged(ctx context.Context, tx pgx.T
 	return nil
 }
 
+// SetDunningRetry records a failed renewal charge: it moves the subscription
+// to past_due, schedules the next dunning retry by setting next_order_at (the
+// renewal scheduler picks up past_due rows whose next_order_at is due), stamps
+// the running attempt count in metadata, and clears any stale dashboard
+// acknowledgement so the alert re-surfaces. The attempt count drives the cap
+// in the app layer (ExpireForDunning) and the escalating retry cadence.
+func (s *SubscriptionStore) SetDunningRetry(ctx context.Context, tx pgx.Tx, id uuid.UUID, nextRetryAt time.Time, attempt int) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.set_dunning_retry", time.Now(), &err)
+	_, err = tx.Exec(ctx,
+		`UPDATE subscriptions
+		 SET status = 'past_due',
+		     next_order_at = $2,
+		     metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{dunning_attempt}', to_jsonb($3::int))
+		                 - 'dunning_acknowledged_at',
+		     updated_at = now()
+		 WHERE id = $1`,
+		id, nextRetryAt, attempt,
+	)
+	if err != nil {
+		return fmt.Errorf("set dunning retry: %w", err)
+	}
+	return nil
+}
+
+// ExpireForDunning ends a subscription whose dunning retries are exhausted:
+// status → expired, ends_at = now. This is involuntary churn (the card never
+// recovered), distinct from a customer-initiated cancel. The attempt count is
+// left in metadata as a record of why it ended.
+func (s *SubscriptionStore) ExpireForDunning(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.expire_for_dunning", time.Now(), &err)
+	_, err = tx.Exec(ctx,
+		`UPDATE subscriptions
+		 SET status = 'expired', ends_at = now(), updated_at = now()
+		 WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("expire for dunning: %w", err)
+	}
+	return nil
+}
+
+// ClearDunning removes dunning bookkeeping after a successful charge — the
+// attempt counter and any dashboard acknowledgement. Called on the renewal
+// success path so a subscription that recovers starts clean if it ever fails
+// again.
+func (s *SubscriptionStore) ClearDunning(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.clear_dunning", time.Now(), &err)
+	_, err = tx.Exec(ctx,
+		`UPDATE subscriptions
+		 SET metadata = metadata - 'dunning_attempt' - 'dunning_acknowledged_at',
+		     updated_at = now()
+		 WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("clear dunning: %w", err)
+	}
+	return nil
+}
+
 // CountPastDueUnacknowledged counts past-due subscriptions that have not been
 // acknowledged on the dashboard — the figure that drives the Urgent band's
 // past-due alert.
@@ -340,6 +401,9 @@ func (s *SubscriptionStore) Cancel(ctx context.Context, tx pgx.Tx, id uuid.UUID)
 }
 
 // ListDueForRenewal returns active subscriptions that are due for renewal.
+// ListDueForRenewal returns subscriptions due to be charged now — both fresh
+// active renewals and past_due subscriptions whose next dunning retry has come
+// due (see ListSubscriptionsDueForRenewal).
 func (s *SubscriptionStore) ListDueForRenewal(ctx context.Context, tx pgx.Tx) (_ []domain.Subscription, err error) {
 	defer trackQuery(s.metrics, "subscriptions.list_due_for_renewal", time.Now(), &err)
 	rows, err := sqlcgen.New(tx).ListSubscriptionsDueForRenewal(ctx)

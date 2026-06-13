@@ -463,10 +463,23 @@ func (s *CheckoutService) ConfirmCheckoutPayment(ctx context.Context, tx pgx.Tx,
 		return nil, false, fmt.Errorf("get order for confirm: %w", err)
 	}
 
+	// Never resurrect a cancelled order. The PI can outlive the order row
+	// (abandoned-order cleanup, manual admin cancel), and a late payment
+	// success against a cancelled order must surface as "not handled" so
+	// callers log it loudly instead of silently recording a capture.
+	if order.Status == domain.OrderStatusCancelled {
+		return order, false, nil
+	}
+
 	// Idempotent guard: if payment has already moved past awaiting we have
 	// nothing to do. The first caller (whichever raced and won) handled
 	// state + side effects; the second now sees the post-transition state.
-	if order.PaymentStatus != domain.PaymentStatusAwaiting {
+	//
+	// 'failed' is treated like awaiting: a failed attempt on a still-live
+	// PaymentIntent (card declined, customer fixed the number and retried
+	// the same PI) is a normal Stripe lifecycle, and the success that
+	// follows must still drive the order forward.
+	if order.PaymentStatus != domain.PaymentStatusAwaiting && order.PaymentStatus != domain.PaymentStatusFailed {
 		return order, false, nil
 	}
 

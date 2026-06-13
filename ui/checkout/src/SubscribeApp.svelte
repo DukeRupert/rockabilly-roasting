@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { tick } from 'svelte';
   import type { Stripe, StripeElements } from '@stripe/stripe-js';
   import { getStripe, createElements } from './lib/stripe';
   import {
@@ -24,6 +24,12 @@
 
   let step = $state<Step>('form');
   let subscriptionId = $state('');
+  // 'active' — subscription exists; 'processing' — payment is settling and
+  // the payment_intent.succeeded webhook will activate it server-side.
+  let confirmationStatus = $state<'active' | 'processing'>('active');
+  // True while we're handling a Stripe redirect-back (async payment methods).
+  // Suppresses the form and shows a finalizing state instead.
+  let finalizing = $state(false);
 
   // Form fields
   let email = $state('');
@@ -69,11 +75,70 @@
   // Initialize Stripe when form becomes valid
   let stripeInitialized = false;
   $effect(() => {
-    if (formValid && !stripeInitialized) {
+    if (formValid && !stripeInitialized && !finalizing && step === 'form') {
       stripeInitialized = true;
       initStripe();
     }
   });
+
+  let redirectHandled = false;
+  $effect(() => {
+    if (!redirectHandled) {
+      redirectHandled = true;
+      handleRedirectBack();
+    }
+  });
+
+  // baseURL is this page's canonical address without Stripe's redirect-back
+  // query params, used to reset the URL after handling (or failing) one.
+  function baseURL(): string {
+    return `${window.location.pathname}?plan_id=${planId}&variant_id=${variantId}&quantity=${quantity}`;
+  }
+
+  // handleRedirectBack runs once on mount. If the URL carries Stripe's
+  // redirect-back query params (payment_intent + redirect_status) the
+  // customer is returning from an async payment method. The order was
+  // pre-created server-side at PaymentIntent time, so finalizing is a single
+  // confirm call — and even if it fails here, the payment_intent.succeeded
+  // webhook activates the subscription without us.
+  async function handleRedirectBack() {
+    const params = new URLSearchParams(window.location.search);
+    const redirectPI = params.get('payment_intent');
+    const redirectStatus = params.get('redirect_status');
+
+    if (!redirectPI) return;
+
+    if (redirectStatus === 'failed') {
+      // The redirect-based method declined. Drop the query params so a
+      // refresh doesn't re-enter this branch and let the customer retry.
+      window.history.replaceState({}, '', baseURL());
+      error = 'Payment was not completed. You can try another method below.';
+      return;
+    }
+
+    // succeeded or processing — finalize against the pre-created order.
+    finalizing = true;
+    try {
+      const result = await confirmSubscription({ payment_intent_id: redirectPI });
+      subscriptionId = result.subscription_id || '';
+      confirmationStatus = result.status === 'processing' ? 'processing' : 'active';
+      step = 'confirmation';
+      window.history.replaceState({}, '', baseURL());
+    } catch {
+      // Payment is in Stripe's hands and the webhook will finish activation
+      // server-side — show the truthful processing state, not a dead end.
+      confirmationStatus = 'processing';
+      step = 'confirmation';
+      window.history.replaceState({}, '', baseURL());
+    } finally {
+      finalizing = false;
+    }
+  }
+
+  // The PI being abandoned when the address changes and a new PI is created.
+  // Sent to the server so the orphaned PI (and its pre-created order) get
+  // cancelled instead of lingering.
+  let previousPaymentIntentId = '';
 
   async function initStripe() {
     try {
@@ -96,7 +161,9 @@
         state: addressState,
         postal_code: postalCode,
         country,
+        previous_payment_intent_id: previousPaymentIntentId || undefined,
       });
+      previousPaymentIntentId = '';
 
       clientSecret = piResponse.client_secret;
       stripeReady = true;
@@ -139,29 +206,22 @@
         return;
       }
 
-      if (!paymentIntent || paymentIntent.status !== 'succeeded') {
+      if (!paymentIntent || (paymentIntent.status !== 'succeeded' && paymentIntent.status !== 'processing')) {
         error = 'Payment was not completed. Please try again.';
         processing = false;
         return;
       }
 
-      const result = await confirmSubscription({
-        plan_id: planId,
-        variant_id: variantId,
-        quantity,
-        email,
-        first_name: firstName,
-        last_name: lastName,
-        line1,
-        line2: line2 || undefined,
-        city,
-        state: addressState,
-        postal_code: postalCode,
-        country,
-        payment_intent_id: paymentIntent.id,
-      });
-
-      subscriptionId = result.subscription_id;
+      try {
+        const result = await confirmSubscription({ payment_intent_id: paymentIntent.id });
+        subscriptionId = result.subscription_id || '';
+        confirmationStatus = result.status === 'processing' ? 'processing' : 'active';
+      } catch {
+        // The charge went through; the payment_intent.succeeded webhook will
+        // activate the subscription server-side. Show the truthful
+        // processing state instead of an error the customer can't act on.
+        confirmationStatus = 'processing';
+      }
       step = 'confirmation';
     } catch (e: any) {
       error = e.message || 'Failed to complete subscription';
@@ -180,7 +240,11 @@
     if (!formValid || !stripeInitialized) return;
     if (addressKey !== lastAddressKey) {
       lastAddressKey = addressKey;
-      // Reset Stripe to get a new PI with updated address
+      // Reset Stripe to get a new PI with updated address. Remember the old
+      // PI so the server can cancel it and its pre-created order.
+      if (clientSecret) {
+        previousPaymentIntentId = clientSecret.split('_secret')[0];
+      }
       stripeReady = false;
       stripeInitialized = false;
       clientSecret = '';
@@ -191,7 +255,20 @@
   }
 </script>
 
-{#if step === 'form'}
+{#if finalizing}
+  <div class="mt-8 border-2 border-ink bg-cream-hi p-8 text-center shadow-stamp">
+    <svg class="mx-auto size-6 animate-spin text-ink mb-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+    </svg>
+    <p class="font-oswald font-bold text-ink text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
+      Finalizing your subscription…
+    </p>
+    <p class="font-oswald text-ink-soft text-sm mt-2" style="letter-spacing:0.04em;">
+      Hold tight — confirming your payment with the bank.
+    </p>
+  </div>
+{:else if step === 'form'}
   <div class="mt-8">
     {#if error}
       <div class="mb-5 border-2 border-rust bg-cream-hi p-3 text-center">
@@ -406,6 +483,74 @@
         {/if}
       </button>
     </form>
+  </div>
+{:else if confirmationStatus === 'processing'}
+  <!-- Payment processing — the webhook activates the subscription server-side. -->
+  <div class="mt-10 text-center">
+    <div class="inline-flex items-center justify-center mb-6">
+      <span
+        class="relative inline-flex size-20 items-center justify-center bg-paper-warm border-2 border-ink"
+        style="box-shadow: var(--shadow-stamp); transform: rotate(-4deg);"
+      >
+        <svg
+          class="size-10 text-ink"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke-width="2.5"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+        </svg>
+        <span
+          class="absolute -bottom-2 -right-3 inline-block font-oswald font-bold text-[10px] text-ink bg-candle px-2 py-0.5 border-2 border-ink"
+          style="letter-spacing:0.16em; text-transform:uppercase; transform:rotate(-10deg);"
+        >
+          Pending
+        </span>
+      </span>
+    </div>
+
+    <p
+      class="font-oswald text-chrome-deep text-xs font-semibold"
+      style="letter-spacing:0.24em; text-transform:uppercase;"
+    >
+      Payment processing
+    </p>
+    <h2
+      class="font-slab text-ink uppercase leading-[0.92] mt-3"
+      style="font-size: clamp(2rem, 4vw, 2.5rem); letter-spacing:-0.005em;"
+    >
+      Order received.
+    </h2>
+    <p class="mt-5 font-oswald text-ink-soft text-base leading-relaxed max-w-md mx-auto">
+      Your payment is still clearing. As soon as it does — usually within a few
+      minutes — we'll activate your
+      <strong class="font-oswald font-bold text-ink">{planName}</strong>
+      subscription and email your confirmation. No need to order again.
+    </p>
+
+    <a
+      href="/catalog"
+      class="btn-stamp inline-flex items-center gap-2 mt-8 bg-rust text-paper border-2 border-ink px-7 py-3.5 font-oswald font-bold text-sm"
+      style="letter-spacing:0.14em; text-transform:uppercase;"
+    >
+      Keep shopping
+      <svg
+        class="size-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke-width="2.5"
+        stroke="currentColor"
+        aria-hidden="true"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
+        />
+      </svg>
+    </a>
   </div>
 {:else}
   <!-- Confirmation -->

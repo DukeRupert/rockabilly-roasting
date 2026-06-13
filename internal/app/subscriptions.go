@@ -346,6 +346,14 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, tx pgx.Tx,
 		}
 	}
 
+	return s.createSubscriptionRecord(ctx, tx, p, plan, actor)
+}
+
+// createSubscriptionRecord inserts the subscription row and audit entry.
+// Callers are responsible for signup-time validation (plan active, variant
+// not archived, quantity bounds) — CreateSubscription enforces all of it,
+// ActivateFromSignupOrder deliberately skips the plan/variant guards.
+func (s *SubscriptionService) createSubscriptionRecord(ctx context.Context, tx pgx.Tx, p CreateSubscriptionParams, plan *domain.SubscriptionPlan, actor Actor) (*domain.Subscription, error) {
 	now := time.Now()
 	periodEnd := nextPeriodEnd(now, plan.Interval, plan.IntervalCount)
 
@@ -375,6 +383,102 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, tx pgx.Tx,
 		After:        sub,
 	}); err != nil {
 		return nil, fmt.Errorf("audit subscription created: %w", err)
+	}
+
+	return sub, nil
+}
+
+// Metadata keys stamped on orders pre-created by the subscribe flow at
+// PaymentIntent time. ConfirmCheckoutPayment's callers use them to recognize
+// a paid signup order and activate its subscription.
+const (
+	orderMetaSubscriptionSignup = "subscription_signup"
+	orderMetaSubscriptionPlanID = "subscription_plan_id"
+)
+
+// SubscriptionSignupOrderMetadata builds the order metadata that marks a
+// pre-created order as a subscription signup for the given plan.
+func SubscriptionSignupOrderMetadata(planID uuid.UUID, paymentIntentID string) map[string]any {
+	return map[string]any{
+		orderMetaSubscriptionSignup: true,
+		orderMetaSubscriptionPlanID: planID.String(),
+		"payment_intent_id":         paymentIntentID,
+	}
+}
+
+// SubscriptionSignupPlanID extracts the plan ID from a subscription-signup
+// order's metadata. ok is false when the order is not a signup order.
+func SubscriptionSignupPlanID(metadata map[string]any) (uuid.UUID, bool) {
+	if metadata == nil {
+		return uuid.Nil, false
+	}
+	if flag, _ := metadata[orderMetaSubscriptionSignup].(bool); !flag {
+		return uuid.Nil, false
+	}
+	raw, _ := metadata[orderMetaSubscriptionPlanID].(string)
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return id, true
+}
+
+// ActivateFromSignupOrder creates and links the subscription promised by a
+// paid signup order — an order pre-created at PaymentIntent time by the
+// subscribe flow with SubscriptionSignupOrderMetadata. Called from the
+// subscribe-confirm endpoint and the payment_intent.succeeded webhook, gated
+// on ConfirmCheckoutPayment's transitioned return so exactly one caller runs
+// it per order.
+//
+// Signup-time guards (plan active, variant not archived) are deliberately not
+// re-checked: they were enforced when the PaymentIntent was created, the
+// customer has already paid, and existing subscriptions are allowed to keep
+// running on archived variants and deactivated plans.
+func (s *SubscriptionService) ActivateFromSignupOrder(ctx context.Context, tx pgx.Tx, order *domain.Order, actor Actor) (*domain.Subscription, error) {
+	planID, ok := SubscriptionSignupPlanID(order.Metadata)
+	if !ok {
+		return nil, fmt.Errorf("activate signup subscription: order %s has no signup metadata", order.ID)
+	}
+	if order.CustomerID == nil {
+		return nil, fmt.Errorf("activate signup subscription: order %s has no customer", order.ID)
+	}
+
+	plan, err := s.subscriptions.GetPlanByID(ctx, tx, planID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionPlanNotFound
+		}
+		return nil, fmt.Errorf("get plan for signup activation: %w", err)
+	}
+
+	items, err := s.orders.ListLineItems(ctx, tx, order.ID)
+	if err != nil {
+		return nil, fmt.Errorf("list signup order line items: %w", err)
+	}
+	if len(items) != 1 {
+		return nil, fmt.Errorf("activate signup subscription: order %s has %d line items, want 1", order.ID, len(items))
+	}
+	item := items[0]
+	if item.Quantity < 1 || item.Quantity > 10 {
+		return nil, ErrInvalidQuantity
+	}
+
+	sub, err := s.createSubscriptionRecord(ctx, tx, CreateSubscriptionParams{
+		CustomerID:        *order.CustomerID,
+		PlanID:            planID,
+		VariantID:         item.VariantID,
+		Quantity:          item.Quantity,
+		ShippingAddressID: order.ShippingAddressID,
+	}, plan, actor)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.LinkOrder(ctx, tx, sub.ID, order.ID, sub.CurrentPeriodStart, sub.CurrentPeriodEnd); err != nil {
+		return nil, err
+	}
+	if err := s.orders.UpdateOrderSubscriptionID(ctx, tx, order.ID, sub.ID); err != nil {
+		return nil, fmt.Errorf("stamp subscription on signup order: %w", err)
 	}
 
 	return sub, nil

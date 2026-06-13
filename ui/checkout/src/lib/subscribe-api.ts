@@ -11,6 +11,12 @@ export interface SubscribePaymentIntentRequest {
   state: string;
   postal_code: string;
   country: string;
+  /**
+   * The PI the client is abandoning (address edited after the payment
+   * element mounted). The server cancels it so its pre-created order is
+   * cleaned up via the payment_intent.canceled webhook.
+   */
+  previous_payment_intent_id?: string;
 }
 
 export interface SubscribePaymentIntentResponse {
@@ -20,24 +26,17 @@ export interface SubscribePaymentIntentResponse {
 }
 
 export interface SubscribeConfirmRequest {
-  plan_id: string;
-  variant_id: string;
-  quantity: number;
-  email: string;
-  first_name: string;
-  last_name: string;
-  line1: string;
-  line2?: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  country: string;
   payment_intent_id: string;
 }
 
 export interface SubscribeConfirmResponse {
-  subscription_id: string;
+  subscription_id?: string;
   order_id: string;
+  /**
+   * "active" when the subscription exists; "processing" when payment is
+   * settling asynchronously and the webhook will activate it server-side.
+   */
+  status: 'active' | 'processing';
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {

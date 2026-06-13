@@ -200,6 +200,24 @@ func (s *OrderStore) UpdateOrderStripePaymentIntentID(ctx context.Context, tx pg
 	return orderFromRow(row), nil
 }
 
+// UpdateOrderSubscriptionID links an order to a subscription after the fact.
+// Used by the subscribe flow, where the order is pre-created at PaymentIntent
+// time and the subscription only comes into existence once payment succeeds.
+func (s *OrderStore) UpdateOrderSubscriptionID(ctx context.Context, tx pgx.Tx, id, subscriptionID uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "orders.update_subscription_id", time.Now(), &err)
+	tag, err := tx.Exec(ctx,
+		`UPDATE orders SET subscription_id = $2, updated_at = now() WHERE id = $1`,
+		id, subscriptionID,
+	)
+	if err != nil {
+		return fmt.Errorf("update order subscription id: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
+}
+
 // GetOrderByStripePaymentIntentIDAsStaff returns an order by its Stripe PaymentIntent ID.
 func (s *OrderStore) GetOrderByStripePaymentIntentIDAsStaff(ctx context.Context, tx pgx.Tx, intentID string) (_ *domain.Order, err error) {
 	defer trackQuery(s.metrics, "orders.get_by_stripe_payment_intent_id", time.Now(), &err)
@@ -623,10 +641,14 @@ func (s *OrderStore) ListAbandonedOrderIDs(ctx context.Context, tx pgx.Tx, older
 	if limit <= 0 {
 		limit = 100
 	}
+	// payment_status 'failed' is included alongside 'awaiting': a failed
+	// attempt on a still-live PaymentIntent leaves the order in
+	// pending+failed (the customer may retry the same PI), and if they never
+	// do, this sweep is what cancels the order and releases its coupon.
 	rows, err := tx.Query(ctx,
 		`SELECT id FROM orders
 		 WHERE status = 'pending'
-		   AND payment_status = 'awaiting'
+		   AND payment_status IN ('awaiting', 'failed')
 		   AND placed_at < $1
 		 ORDER BY placed_at ASC
 		 LIMIT $2`,

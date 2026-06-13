@@ -120,6 +120,11 @@ func (d *Deps) processWebhookEvent(r *http.Request, _ *domain.WebhookEvent, even
 // Stripe reports the PI as succeeded. Idempotent — if the order has already
 // been transitioned (e.g. by the redirect-back path) this no-ops cleanly via
 // ConfirmCheckoutPayment's row-level lock.
+//
+// For subscription-signup orders (pre-created by the subscribe flow), payment
+// success is also what brings the subscription itself into existence — this
+// webhook is the safety net that activates it even when the customer's
+// browser never came back to call /api/subscribe/confirm.
 func (d *Deps) handlePaymentIntentSucceeded(ctx context.Context, event *payments.WebhookEvent) error {
 	piID, err := extractPaymentIntentID(event.Data)
 	if err != nil {
@@ -129,13 +134,37 @@ func (d *Deps) handlePaymentIntentSucceeded(ctx context.Context, event *payments
 	logger := logging.FromContext(ctx)
 
 	return store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, _, err := d.CheckoutService.ConfirmCheckoutPayment(ctx, tx, piID, systemActor())
+		order, transitioned, err := d.CheckoutService.ConfirmCheckoutPayment(ctx, tx, piID, systemActor())
 		if err != nil {
 			if errors.Is(err, app.ErrOrderNotFound) {
 				logger.Warn("webhook: no order for PI", "payment_intent_id", piID)
 				return nil // PI might not be associated with an order yet
 			}
 			return fmt.Errorf("confirm checkout payment: %w", err)
+		}
+
+		if !transitioned {
+			// Money was captured but the order can't move forward — almost
+			// always a benign idempotent re-entry, but a cancelled order
+			// here means a real capture with nothing to fulfil. Shout.
+			if order.Status == domain.OrderStatusCancelled {
+				logger.Error("webhook: payment succeeded for cancelled order — needs manual refund or restore",
+					"order_id", order.ID, "order_number", order.Number, "payment_intent_id", piID)
+			}
+			return nil
+		}
+
+		if _, ok := app.SubscriptionSignupPlanID(order.Metadata); ok {
+			sub, aErr := d.SubscriptionService.ActivateFromSignupOrder(ctx, tx, order, systemActor())
+			if aErr != nil {
+				return fmt.Errorf("activate signup subscription: %w", aErr)
+			}
+			if _, jErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionConfirmEmailArgs{
+				SubscriptionID: sub.ID,
+				CustomerID:     sub.CustomerID,
+			}, nil); jErr != nil {
+				return fmt.Errorf("enqueue subscription confirm email: %w", jErr)
+			}
 		}
 		return nil
 	})
@@ -171,17 +200,12 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 			return fmt.Errorf("update payment status failed: %w", err)
 		}
 
-		// If this is a one-shot retail order (no subscription) that was sitting
-		// in pending+awaiting because we pre-created it at PI time, cancel it
-		// now so the coupon is released and the order doesn't linger as a
-		// zombie waiting for cleanup. Subscription orders are handled below
-		// via MarkPastDue and stay around until renewed/dunned.
-		if order.SubscriptionID == nil && order.Status == domain.OrderStatusPending {
-			if _, cancelErr := d.OrderService.CancelOrder(ctx, tx, order.ID, systemActor()); cancelErr != nil {
-				return fmt.Errorf("cancel order on payment failed: %w", cancelErr)
-			}
-			return nil
-		}
+		// Pre-created orders (retail checkout and subscribe signups) stay in
+		// pending+failed rather than being cancelled here: the PaymentIntent
+		// is still live and the customer may fix their card and retry it —
+		// ConfirmCheckoutPayment accepts the failed → captured transition.
+		// If they never do, the abandoned-order sweep cancels the order (and
+		// releases any coupon) after its grace window.
 
 		// If this order belongs to a subscription, mark it past_due and notify
 		// the customer — but only on the active → past_due transition.

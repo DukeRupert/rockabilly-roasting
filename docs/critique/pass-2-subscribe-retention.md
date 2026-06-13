@@ -113,7 +113,14 @@ the real total instead of the bare item price. The math primitives (`CalculateFl
 `ShippingConfig.Calculate`) and `PlaceOrder`'s total composition already have unit coverage;
 the renewal services are pool-based and, by existing project convention, have no integration
 tests. Note: the static "Your plan" summary card still shows the item price with the misleading
-"N × total" prefix — that's P4, untouched here.)*
+"N × total" prefix — that's P4, untouched here.
+GRANDFATHER ADDENDUM 2026-06-13: a DB check found the change would raise the next renewal for only
+4 of 74 active subs (all out-of-region, < $50, non-local; tax is $0 for everyone since all
+products are WA-food-exempt). To avoid a silent mid-subscription price bump, migration 054 stamps
+`shipping_grandfathered` on every subscription existing at deploy time, and the renewal waives
+shipping when that flag is set (a batch order is grandfathered only when *all* its subs are). New
+subscriptions created through the post-P2 flow carry no flag and pay shipping. Verified locally:
+0 of 74 active subs now see an increase.)*
 **What:** Retail checkout computes shipping and Stripe Tax and adds them to the PI. The
 subscribe flow charges exactly `discounted price × quantity` (`subscribe.go:197`), and renewal
 orders hardcode `Subtotal = Total` with no shipping or tax lines (`renewal.go:213`). The

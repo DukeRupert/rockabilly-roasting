@@ -79,11 +79,16 @@ func (s *RenewalService) WithTaxCalc(settings *store.SettingsStore, catalog *sto
 // exemption. cfg is returned so the caller can resolve the local fulfilment
 // method without re-reading config. Best-effort: a missing config or catalog
 // lookup yields zero for that component rather than blocking the renewal.
-func (s *RenewalService) renewalCharges(ctx context.Context, tx pgx.Tx, lines []domain.TaxLineItem, subtotalCents int, customer *domain.Customer, addr *domain.Address) (shipping, taxTotal int, cfg *domain.ShippingConfig) {
+func (s *RenewalService) renewalCharges(ctx context.Context, tx pgx.Tx, lines []domain.TaxLineItem, subtotalCents int, customer *domain.Customer, addr *domain.Address, grandfatheredShipping bool) (shipping, taxTotal int, cfg *domain.ShippingConfig) {
 	if s.shipping != nil {
 		if c, err := s.shipping.GetConfig(ctx, tx); err == nil {
 			cfg = c
-			shipping = cfg.Calculate(subtotalCents, addr.PostalCode)
+			// Grandfathered subscriptions keep free renewal shipping (migration
+			// 054). cfg is still returned so the caller can resolve the local
+			// fulfillment method — only the shipping cost is waived.
+			if !grandfatheredShipping {
+				shipping = cfg.Calculate(subtotalCents, addr.PostalCode)
+			}
 		}
 	}
 
@@ -139,6 +144,22 @@ var dunningRetryDelays = [maxDunningAttempts - 1]time.Duration{
 	72 * time.Hour,
 	72 * time.Hour,
 	96 * time.Hour,
+}
+
+// subMetaShippingGrandfathered marks a subscription that predates the P2
+// shipping-on-renewal change. Renewals for these keep shipping free, honoring
+// the terms the customer signed up under. Set by migration 054 on every
+// subscription that existed at deploy time.
+const subMetaShippingGrandfathered = "shipping_grandfathered"
+
+// isShippingGrandfathered reports whether a subscription's renewals should
+// skip the shipping charge (see subMetaShippingGrandfathered).
+func isShippingGrandfathered(metadata map[string]any) bool {
+	if metadata == nil {
+		return false
+	}
+	v, _ := metadata[subMetaShippingGrandfathered].(bool)
+	return v
 }
 
 // dunningAttempt reads the running failed-charge count off a subscription's
@@ -279,7 +300,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			TaxExempt: s.taxExemptForVariant(ctx, tx, sub.VariantID),
 		}}
 		var cfg *domain.ShippingConfig
-		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLine, subtotalCents, customer, addr)
+		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLine, subtotalCents, customer, addr, isShippingGrandfathered(sub.Metadata))
 		if cfg != nil {
 			shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
 		}
@@ -549,15 +570,22 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		// Shipping (one charge on the combined subtotal — single box) + tax
 		// (per line, honouring each product's exemption), matching retail.
 		taxLines := make([]domain.TaxLineItem, len(items))
+		// Grandfather the order's shipping only if every subscription in the
+		// batch is grandfathered — a single post-P2 sub in the same box means
+		// the order pays shipping (it's one charge per order, not per line).
+		allGrandfathered := true
 		for i, item := range items {
 			taxLines[i] = domain.TaxLineItem{
 				LineIndex: i,
 				Subtotal:  item.TotalPrice,
 				TaxExempt: s.taxExemptForVariant(ctx, tx, item.Sub.VariantID),
 			}
+			if !isShippingGrandfathered(item.Sub.Metadata) {
+				allGrandfathered = false
+			}
 		}
 		var cfg *domain.ShippingConfig
-		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLines, subtotalCents, customer, addr)
+		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLines, subtotalCents, customer, addr, allGrandfathered)
 		if cfg != nil {
 			shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
 		}

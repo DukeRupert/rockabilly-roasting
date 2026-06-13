@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -16,6 +17,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/logging"
+	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
@@ -87,7 +89,8 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var plan *domain.SubscriptionPlan
-	var price int
+	var basePrice, unitPrice int
+	var productTitle, productSlug, variantLabel, thumbnailURL string
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -102,9 +105,29 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
-		price = p.Amount
+		basePrice = p.Amount
+		unitPrice = basePrice
 		if plan.DiscountPct > 0 {
-			price = price - (price * plan.DiscountPct / 100)
+			unitPrice = basePrice - (basePrice * plan.DiscountPct / 100)
+		}
+
+		// Product context so the page leads with the coffee, not the plan.
+		variant, txErr := d.CatalogService.GetVariant(ctx, tx, variantID)
+		if txErr != nil {
+			return fmt.Errorf("get variant: %w", txErr)
+		}
+		product, txErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+		if txErr != nil {
+			return fmt.Errorf("get product: %w", txErr)
+		}
+		productTitle = product.Title
+		productSlug = product.Slug
+
+		if label, lErr := d.CatalogService.VariantLabel(ctx, tx, variantID); lErr == nil {
+			variantLabel = label
+		}
+		if media, mErr := d.CatalogService.ListProductMedia(ctx, tx, variant.ProductID); mErr == nil && len(media) > 0 {
+			thumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantThumbnail)
 		}
 		return nil
 	})
@@ -126,12 +149,19 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := storefront.SubscribePageProps{
-		Plan:      plan,
-		VariantID: variantID,
-		Quantity:  quantity,
-		Price:     price * quantity,
-		StripeKey: os.Getenv("STRIPE_PUBLISHABLE_KEY"),
-		CartCount: d.cartItemCountFromCookie(r),
+		Plan:         plan,
+		VariantID:    variantID,
+		Quantity:     quantity,
+		UnitPrice:    unitPrice,
+		Subtotal:     unitPrice * quantity,
+		BasePrice:    basePrice,
+		ProductTitle: productTitle,
+		ProductSlug:  productSlug,
+		VariantLabel: variantLabel,
+		ThumbnailURL: thumbnailURL,
+		NextChargeAt: d.SubscriptionService.NextRenewalDate(time.Now(), plan),
+		StripeKey:    os.Getenv("STRIPE_PUBLISHABLE_KEY"),
+		CartCount:    d.cartItemCountFromCookie(r),
 	}
 
 	if IsHTMX(r) {

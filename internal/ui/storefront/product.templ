@@ -1104,14 +1104,15 @@ templ purchaseModeScript() {
 				var label = checked.closest('.subscribe-frequency-option');
 				var discount = parseInt(label.dataset.discount, 10) || 0;
 				var unitCents = Math.round(baseCents * (100 - discount) / 100);
-				var totalCents = unitCents * qty;
 				var display = document.getElementById('price-display');
-				var qtyPrefix = qty > 1 ? qty + ' × ' : '';
+				// Show the per-unit price with an explicit "× N" multiplier rather
+				// than the qty-multiplied total — "2 × $18.00", never "2 × $36.00".
+				var qtySuffix = qty > 1 ? ' <span class="font-oswald text-ink-soft text-base">× ' + qty + '</span>' : '';
 				if (discount > 0) {
 					display.innerHTML = '<span class="font-special text-chrome-deep text-lg line-through">' + formatCents(baseCents) + '</span>' +
-						' <span class="font-special text-rust text-2xl sm:text-3xl leading-none">' + qtyPrefix + formatCents(totalCents) + '</span>';
+						' <span class="font-special text-rust text-2xl sm:text-3xl leading-none">' + formatCents(unitCents) + '</span>' + qtySuffix;
 				} else {
-					display.innerHTML = '<span class="font-special text-ink text-2xl sm:text-3xl leading-none">' + qtyPrefix + formatCents(totalCents) + '</span>';
+					display.innerHTML = '<span class="font-special text-ink text-2xl sm:text-3xl leading-none">' + formatCents(unitCents) + '</span>' + qtySuffix;
 				}
 			}
 

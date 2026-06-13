@@ -2,6 +2,8 @@ package storefront
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
@@ -11,9 +13,23 @@ type SubscribePageProps struct {
 	Plan      *domain.SubscriptionPlan
 	VariantID uuid.UUID
 	Quantity  int
-	Price     int
-	StripeKey string
-	CartCount int
+	// UnitPrice is the per-delivery price of one unit after the plan discount.
+	// Subtotal is UnitPrice × Quantity — the recurring item charge before
+	// shipping and tax (those are added and shown at the payment step).
+	UnitPrice int
+	Subtotal  int
+	// BasePrice is the pre-discount per-unit price, shown struck through when
+	// the plan carries a discount. Zero when there's no discount.
+	BasePrice int
+	// Product context so the page leads with the coffee, not the plan record.
+	ProductTitle string
+	ProductSlug  string
+	VariantLabel string
+	ThumbnailURL string
+	// NextChargeAt previews when the first renewal would land.
+	NextChargeAt time.Time
+	StripeKey    string
+	CartCount    int
 }
 
 templ SubscribeContent(props SubscribePageProps) {
@@ -32,28 +48,76 @@ templ SubscribeContent(props SubscribePageProps) {
 					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">routine.</span>
 				</h1>
 				<p class="font-oswald text-ink-soft text-base mt-4 max-w-md leading-relaxed">
-					Recurring delivery for this plan — skip, swap, or cancel anytime from your account.
+					Recurring delivery, roasted fresh each time — pause or cancel anytime from your account.
 				</p>
 			</div>
-			<!-- Plan summary card -->
+			<!-- Subscription summary card — leads with the coffee, not the plan -->
 			<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
-				<p class="font-oswald font-bold text-candle text-[11px] mb-3 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Your plan</p>
-				<div class="flex items-center justify-between gap-4">
-					<div class="min-w-0">
-						<p class="font-slab text-ink uppercase text-lg leading-[1.0]" style="letter-spacing:-0.005em;">
-							{ props.Plan.Name }
-						</p>
-						<p class="font-oswald text-ink-soft text-sm mt-1.5" style="letter-spacing:0.04em;">
-							Delivery { subscriptionIntervalLabel(props.Plan.Interval, props.Plan.IntervalCount) }
+				<p class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Your subscription</p>
+				<div class="flex items-start gap-4">
+					<!-- Thumbnail -->
+					<div class="shrink-0 w-20 h-20 border-2 border-ink bg-paper-warm overflow-hidden">
+						if props.ThumbnailURL != "" {
+							<img src={ props.ThumbnailURL } alt={ props.ProductTitle } class="h-full w-full object-cover object-center" loading="lazy"/>
+						} else {
+							<div class="flex h-full w-full items-center justify-center">
+								<span class="font-slab text-ink text-2xl leading-none">
+									if props.ProductTitle != "" {
+										{ string([]rune(props.ProductTitle)[0:1]) }
+									} else {
+										★
+									}
+								</span>
+							</div>
+						}
+					</div>
+					<!-- Title + variant + cadence -->
+					<div class="flex-1 min-w-0">
+						if props.ProductSlug != "" {
+							<a href={ templ.SafeURL("/catalog/" + props.ProductSlug) } class="group inline-block">
+								<p class="font-slab text-ink uppercase text-lg sm:text-xl leading-[1.0] group-hover:text-rust transition-colors" style="letter-spacing:-0.005em;">
+									{ props.ProductTitle }
+								</p>
+							</a>
+						} else {
+							<p class="font-slab text-ink uppercase text-lg sm:text-xl leading-[1.0]" style="letter-spacing:-0.005em;">
+								{ props.ProductTitle }
+							</p>
+						}
+						if props.VariantLabel != "" {
+							<p class="font-oswald text-ink text-sm mt-1.5" style="letter-spacing:0.04em;">{ props.VariantLabel }</p>
+						}
+						<p class="font-oswald font-bold text-chrome-deep text-[11px] mt-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">
+							{ subscriptionIntervalLabel(props.Plan.Interval, props.Plan.IntervalCount) }
 						</p>
 					</div>
-					<p class="font-special text-ink text-xl sm:text-2xl shrink-0">
-						if props.Quantity > 1 {
-							{ fmt.Sprintf("%d × ", props.Quantity) }
-						}
-						{ formatCents(props.Price) }
-					</p>
 				</div>
+				<!-- Price -->
+				<div class="mt-4 pt-4 border-t-2 border-ink flex items-end justify-between gap-3">
+					<div class="min-w-0">
+						<span class="inline-flex items-baseline gap-2 flex-wrap">
+							if props.BasePrice > props.UnitPrice {
+								<span class="font-special text-chrome-deep text-sm line-through">{ formatCents(props.BasePrice) }</span>
+							}
+							<span class="font-special text-ink text-lg">{ formatCents(props.UnitPrice) }</span>
+							if props.Quantity > 1 {
+								<span class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">each &times; { fmt.Sprintf("%d", props.Quantity) }</span>
+							}
+						</span>
+					</div>
+					<div class="text-right shrink-0">
+						<p class="font-special text-ink text-xl sm:text-2xl leading-none">{ formatCents(props.Subtotal) }</p>
+						<p class="font-oswald text-chrome-deep text-[11px] mt-1" style="letter-spacing:0.14em; text-transform:uppercase;">Per delivery</p>
+					</div>
+				</div>
+				<!-- Billing rhythm — say plainly when it ships and renews -->
+				<p class="mt-4 font-oswald text-ink-soft text-sm leading-relaxed" style="letter-spacing:0.04em;">
+					First bag ships now, then renews { subscriptionIntervalLabel(props.Plan.Interval, props.Plan.IntervalCount) }.
+					if !props.NextChargeAt.IsZero() {
+						<span>Next charge around <span class="font-bold text-ink">{ formatDate(props.NextChargeAt) }</span>.</span>
+					}
+					<span>Shipping and tax shown at payment.</span>
+				</p>
 			</div>
 			<!-- Subscribe form (Svelte mounts here) -->
 			<div
@@ -61,14 +125,24 @@ templ SubscribeContent(props SubscribePageProps) {
 				data-plan-id={ props.Plan.ID.String() }
 				data-variant-id={ props.VariantID.String() }
 				data-quantity={ fmt.Sprintf("%d", props.Quantity) }
-				data-plan-name={ props.Plan.Name }
-				data-price={ fmt.Sprintf("%d", props.Price) }
+				data-plan-name={ subscriptionConfirmName(props) }
+				data-price={ fmt.Sprintf("%d", props.Subtotal) }
 				data-interval={ string(props.Plan.Interval) }
 				data-stripe-key={ props.StripeKey }
 			></div>
 			<script type="module" src="/static/checkout/subscribe.js"></script>
 		</div>
 	</section>
+}
+
+// subscriptionConfirmName is the name the Svelte confirmation screen shows in
+// "Your {name} subscription is live." The product title reads far better there
+// than a cadence-style plan name ("Every 30 Days"), so prefer it.
+func subscriptionConfirmName(props SubscribePageProps) string {
+	if props.ProductTitle != "" {
+		return props.ProductTitle
+	}
+	return props.Plan.Name
 }
 
 templ SubscribePage(props SubscribePageProps) {

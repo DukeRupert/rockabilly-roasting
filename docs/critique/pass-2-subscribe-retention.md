@@ -172,7 +172,19 @@ the billing portal (the redirect already lands on /account/subscriptions), offer
 payment now" on past-due cards. (d) Add a staff retry action on the admin subscription page.
 **Command:** implement (jobs + handler), /clarify for the email sequence copy.
 
-### P4 — The subscribe page never says what you're subscribing to
+### P4 — The subscribe page never says what you're subscribing to — ✅ FIXED 2026-06-12
+*(`handleSubscribePage` now loads the product (title, slug), the variant label via the pass-1
+`VariantLabel` method, and the first product image. The summary card was rebuilt to lead with
+the coffee: thumbnail + linked product title + "Whole Bean · 12oz" + cadence, with the plan
+name demoted out of the headline entirely. The price is now unambiguous — per-unit price (base
+struck through when the plan discounts) with an explicit "× N" multiplier on the left and the
+"$Subtotal Per delivery" on the right — no more "2 × $36.00" hybrid. The same product-page bug
+(`updatePrice` rendering "N × total") was fixed to show "N × unit". Added a plain billing-rhythm
+line: "First bag ships now, then renews Every 2 Weeks. Next charge around Jul 26. Shipping and
+tax shown at payment." (next-charge date via the new `SubscriptionService.NextRenewalDate`). The
+Svelte confirmation now reads "Your <product> subscription is live" instead of the cadence-y plan
+name. Also corrected the page's "skip, swap, or cancel" intro to "pause or cancel" (truthful
+today; P6 still owns the full skip/swap copy sweep across the other surfaces).)*
 **What:** `/subscribe` shows plan name, cadence, and price — and nothing else. No product
 title, no image, no variant. Plan names are admin free-text with placeholder "e.g. Every 30
 Days" (`plan_list.templ:54`), so the summary card typically reads "Your plan: EVERY 30 DAYS ·

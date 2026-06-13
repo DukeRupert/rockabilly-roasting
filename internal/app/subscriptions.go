@@ -906,6 +906,15 @@ func intervalDays(interval domain.SubscriptionInterval, count int) int {
 	}
 }
 
+// NextRenewalDate previews when the first renewal charge would land for a
+// subscription started now on the given plan. Used by the subscribe page to
+// state the billing rhythm before the subscription exists; the real date is
+// stamped at payment-confirm time (CreateSubscription), which is approximately
+// now, so this is accurate to the cadence's granularity.
+func (s *SubscriptionService) NextRenewalDate(from time.Time, plan *domain.SubscriptionPlan) time.Time {
+	return nextPeriodEnd(from, plan.Interval, plan.IntervalCount)
+}
+
 func nextPeriodEnd(start time.Time, interval domain.SubscriptionInterval, count int) time.Time {
 	switch interval {
 	case domain.SubscriptionIntervalEvery2Minutes:

@@ -57,6 +57,30 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return data as T;
 }
 
+export interface SubscribePrefill {
+  email: string;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+  line1?: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
+}
+
+export interface SubscribeContextResponse {
+  prefill: SubscribePrefill | null;
+}
+
+// getSubscribeContext returns the signed-in customer's contact + default
+// address to prefill the form. Resolves to null prefill for guests; callers
+// treat any failure as "no prefill" and never block the form on it.
+export function getSubscribeContext(): Promise<SubscribeContextResponse> {
+  return request<SubscribeContextResponse>('/api/subscribe/context');
+}
+
 export function createSubscribePaymentIntent(
   req: SubscribePaymentIntentRequest,
 ): Promise<SubscribePaymentIntentResponse> {

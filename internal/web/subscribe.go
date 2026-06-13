@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/jobs"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/payments"
@@ -171,6 +173,37 @@ func (d *Deps) handleSubscribePage(w http.ResponseWriter, r *http.Request) {
 	storefront.SubscribePage(props).Render(ctx, w) //nolint:errcheck
 }
 
+// subscribeContextResponse carries the signed-in customer's prefill for the
+// subscribe form. Prefill is null for guests.
+type subscribeContextResponse struct {
+	Prefill *checkoutPrefill `json:"prefill"`
+}
+
+// handleSubscribeContext returns the session customer's contact + default
+// address so the subscribe form can prefill, mirroring the checkout cart's
+// prefill. Guests get an empty payload. Best-effort — never errors the page.
+func (d *Deps) handleSubscribeContext(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	customer, ok := auth.CustomerFromContext(ctx)
+	if !ok {
+		JSON(w, http.StatusOK, subscribeContextResponse{})
+		return
+	}
+
+	var resp subscribeContextResponse
+	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		prefill, err := d.checkoutPrefillForCustomer(ctx, tx, customer)
+		if err != nil {
+			logging.FromContext(ctx).Warn("subscribe context: load prefill", "error", err)
+			return nil // convenience only
+		}
+		resp.Prefill = prefill
+		return nil
+	})
+	JSON(w, http.StatusOK, resp)
+}
+
 // handleSubscribePaymentIntent prepares a subscription signup for payment.
 // Mirrors the retail checkout's pre-creation pattern so an interrupted flow
 // is always recoverable from the PaymentIntent alone:
@@ -280,7 +313,7 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			ID:   &customer.ID,
 			Name: customer.Email,
 		}
-		addr, txErr = d.CustomerService.CreateAddress(ctx, tx, store.CreateAddressParams{
+		params := store.CreateAddressParams{
 			CustomerID:  &customer.ID,
 			FirstName:   req.FirstName,
 			LastName:    req.LastName,
@@ -290,7 +323,11 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 			State:       req.State,
 			PostalCode:  req.PostalCode,
 			CountryCode: req.Country,
-		}, actor)
+		}
+		// Reuse an existing matching address rather than minting a new row on
+		// every PI (re)creation — this endpoint fires on each address-field
+		// blur, so without dedup a single signup litters the address book.
+		addr, txErr = d.findOrCreateAddress(ctx, tx, customer.ID, params, actor)
 		if txErr != nil {
 			return fmt.Errorf("create address: %w", txErr)
 		}
@@ -478,6 +515,36 @@ func (d *Deps) handleSubscribePaymentIntent(w http.ResponseWriter, r *http.Reque
 		ShippingTotal: shippingCents,
 		ShippingLabel: shippingLabel,
 	})
+}
+
+// findOrCreateAddress reuses a customer's existing address that matches the
+// submitted shipping fields (line1/line2/city/state/zip/country, case- and
+// space-insensitive) instead of creating a duplicate. The subscribe
+// payment-intent endpoint runs on every address-field blur, so creating a new
+// row each time would fill a returning subscriber's address book with copies.
+func (d *Deps) findOrCreateAddress(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, p store.CreateAddressParams, actor app.Actor) (*domain.Address, error) {
+	existing, err := d.CustomerService.ListAddresses(ctx, tx, customerID)
+	if err == nil {
+		for i := range existing {
+			a := existing[i]
+			if addressMatches(a, p) {
+				return &a, nil
+			}
+		}
+	}
+	return d.CustomerService.CreateAddress(ctx, tx, p, actor)
+}
+
+// addressMatches reports whether a saved address is the same shipping
+// destination as the submitted params, ignoring case and surrounding space.
+func addressMatches(a domain.Address, p store.CreateAddressParams) bool {
+	norm := func(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
+	return norm(a.Line1) == norm(p.Line1) &&
+		norm(ptrToString(a.Line2)) == norm(ptrToString(p.Line2)) &&
+		norm(a.City) == norm(p.City) &&
+		norm(a.State) == norm(p.State) &&
+		norm(a.PostalCode) == norm(p.PostalCode) &&
+		norm(a.CountryCode) == norm(p.CountryCode)
 }
 
 // handleSubscribeConfirm finalizes a subscription signup after payment. The

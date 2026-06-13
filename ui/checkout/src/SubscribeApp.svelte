@@ -5,6 +5,7 @@
   import {
     createSubscribePaymentIntent,
     confirmSubscription,
+    getSubscribeContext,
     type SubscribePaymentIntentResponse,
   } from './lib/subscribe-api';
   import { formatCents } from './lib/format';
@@ -110,7 +111,11 @@
     const redirectPI = params.get('payment_intent');
     const redirectStatus = params.get('redirect_status');
 
-    if (!redirectPI) return;
+    if (!redirectPI) {
+      // Normal mount — prefill from the signed-in customer if we have one.
+      loadPrefill();
+      return;
+    }
 
     if (redirectStatus === 'failed') {
       // The redirect-based method declined. Drop the query params so a
@@ -136,6 +141,27 @@
       window.history.replaceState({}, '', baseURL());
     } finally {
       finalizing = false;
+    }
+  }
+
+  // loadPrefill seeds the form from the signed-in customer's contact + default
+  // address. Guests (or any failure) leave the fields blank. Only fills empties
+  // so it never clobbers something the customer already started typing.
+  async function loadPrefill() {
+    try {
+      const { prefill } = await getSubscribeContext();
+      if (!prefill) return;
+      if (!email) email = prefill.email ?? '';
+      if (!firstName) firstName = prefill.first_name ?? '';
+      if (!lastName) lastName = prefill.last_name ?? '';
+      if (!line1) line1 = prefill.line1 ?? '';
+      if (!line2) line2 = prefill.line2 ?? '';
+      if (!city) city = prefill.city ?? '';
+      if (!addressState) addressState = prefill.state ?? '';
+      if (!postalCode) postalCode = prefill.postal_code ?? '';
+      if (prefill.country) country = prefill.country;
+    } catch {
+      // Prefill is a convenience — never block the form on it.
     }
   }
 
@@ -298,11 +324,13 @@
           <label for="sub-email" class={labelClasses} style={labelStyle}>Email</label>
           <input
             id="sub-email"
+            name="email"
             type="email"
             bind:value={email}
             onblur={handleAddressBlur}
             placeholder="you@example.com"
             required
+            autocomplete="email"
             class={inputClasses}
             style={inputStyle}
           />
@@ -313,10 +341,12 @@
             <label for="sub-firstName" class={labelClasses} style={labelStyle}>First name</label>
             <input
               id="sub-firstName"
+              name="first-name"
               type="text"
               bind:value={firstName}
               onblur={handleAddressBlur}
               required
+              autocomplete="given-name"
               class={inputClasses}
               style={inputStyle}
             />
@@ -325,10 +355,12 @@
             <label for="sub-lastName" class={labelClasses} style={labelStyle}>Last name</label>
             <input
               id="sub-lastName"
+              name="last-name"
               type="text"
               bind:value={lastName}
               onblur={handleAddressBlur}
               required
+              autocomplete="family-name"
               class={inputClasses}
               style={inputStyle}
             />
@@ -339,10 +371,12 @@
           <label for="sub-line1" class={labelClasses} style={labelStyle}>Address</label>
           <input
             id="sub-line1"
+            name="address-line1"
             type="text"
             bind:value={line1}
             onblur={handleAddressBlur}
             required
+            autocomplete="shipping address-line1"
             class={inputClasses}
             style={inputStyle}
           />
@@ -354,9 +388,11 @@
           >
           <input
             id="sub-line2"
+            name="address-line2"
             type="text"
             bind:value={line2}
             onblur={handleAddressBlur}
+            autocomplete="shipping address-line2"
             class={inputClasses}
             style={inputStyle}
           />
@@ -367,10 +403,12 @@
             <label for="sub-city" class={labelClasses} style={labelStyle}>City</label>
             <input
               id="sub-city"
+              name="city"
               type="text"
               bind:value={city}
               onblur={handleAddressBlur}
               required
+              autocomplete="shipping address-level2"
               class={inputClasses}
               style={inputStyle}
             />
@@ -379,11 +417,13 @@
             <label for="sub-state" class={labelClasses} style={labelStyle}>State</label>
             <input
               id="sub-state"
+              name="state"
               type="text"
               bind:value={addressState}
               onblur={handleAddressBlur}
               placeholder="WA"
               required
+              autocomplete="shipping address-level1"
               class={inputClasses}
               style={inputStyle}
             />
@@ -392,11 +432,13 @@
             <label for="sub-postalCode" class={labelClasses} style={labelStyle}>ZIP code</label>
             <input
               id="sub-postalCode"
+              name="postal-code"
               type="text"
               bind:value={postalCode}
               onblur={handleAddressBlur}
               placeholder="99336"
               required
+              autocomplete="shipping postal-code"
               class={inputClasses}
               style={inputStyle}
             />
@@ -407,8 +449,10 @@
           <label for="sub-country" class={labelClasses} style={labelStyle}>Country</label>
           <select
             id="sub-country"
+            name="country"
             bind:value={country}
             onchange={handleAddressBlur}
+            autocomplete="shipping country"
             class={inputClasses}
             style={inputStyle}
           >

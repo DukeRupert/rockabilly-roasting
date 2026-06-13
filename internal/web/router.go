@@ -144,9 +144,18 @@ func NewRouter(deps *Deps) http.Handler {
 	// Subscriptions landing page
 	mux.HandleFunc("GET /subscriptions", deps.handleSubscriptionsPage)
 
-	// Subscribe routes
+	// Subscribe routes. payment-intent is rate-limited per IP: it creates
+	// Stripe customers + PaymentIntents without auth, a card-testing target.
+	// confirm is left under the global limiter — it only finalizes an already-
+	// succeeded PI (whose ID is an unguessable server secret) and creates no
+	// Stripe resources, so it's not an abuse vector and must not lock out a
+	// legitimate finalize after many address edits.
+	subscribeIPLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.SubscribeIPLimit, ratelimit.SubscribeWindow, func(r *http.Request) string {
+		return ratelimit.SubscribeIPKey(ratelimit.ClientIP(r))
+	})
 	mux.HandleFunc("GET /subscribe", deps.handleSubscribePage)
-	mux.HandleFunc("POST /api/subscribe/payment-intent", deps.handleSubscribePaymentIntent)
+	mux.HandleFunc("GET /api/subscribe/context", deps.handleSubscribeContext)
+	mux.Handle("POST /api/subscribe/payment-intent", subscribeIPLimit(http.HandlerFunc(deps.handleSubscribePaymentIntent)))
 	mux.HandleFunc("POST /api/subscribe/confirm", deps.handleSubscribeConfirm)
 
 	// Checkout routes

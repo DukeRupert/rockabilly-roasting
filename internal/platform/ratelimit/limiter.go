@@ -35,6 +35,13 @@ var (
 	CheckoutSessionLimit = 5
 	CheckoutWindow       = 10 * time.Minute
 
+	// Subscribe payment-intent attempts. This endpoint creates Stripe
+	// customers and PaymentIntents unauthenticated, so it's a card-testing
+	// target — but a legitimate signup recreates the PI on each address edit,
+	// so the cap needs headroom above a single careful run.
+	SubscribeIPLimit = 30
+	SubscribeWindow  = 10 * time.Minute
+
 	// Contact form.
 	ContactIPLimit = 3
 	ContactWindow  = time.Hour
@@ -159,6 +166,7 @@ func AuthIdentifierKey(hash string) string       { return "auth:id:" + hash }
 func MagicLinkIPKey(ip string) string            { return "magic:ip:" + ip }
 func CouponSessionKey(sessionID string) string   { return "coupon:sess:" + sessionID }
 func CouponIPKey(ip string) string               { return "coupon:ip:" + ip }
+func SubscribeIPKey(ip string) string            { return "subscribe:ip:" + ip }
 func CheckoutSessionKey(sessionID string) string { return "checkout:sess:" + sessionID }
 func ContactIPKey(ip string) string               { return "contact:ip:" + ip }
 func WholesaleApplyIPKey(ip string) string        { return "wholesale-apply:ip:" + ip }

@@ -205,7 +205,25 @@ there: state the billing rhythm plainly — "First bag ships now. Next charge $3
 The customer currently learns when they'll be charged again only from the email.
 **Command:** /clarify + implement (handler data), then /polish the summary card.
 
-### P5 — The subscribe form regressed everything pass 1 fixed in checkout
+### P5 — The subscribe form regressed everything pass 1 fixed in checkout — ✅ FIXED 2026-06-12
+*(Ported the checkout fixes to `SubscribeApp.svelte` and hardened the endpoints.
+(a) Autocomplete: all ten tokens added (`email`, `given-name`, `family-name`, `shipping
+address-line1/line2/address-level2/address-level1/postal-code`, `shipping country`) plus the
+matching `name` attributes. (b) Prefill: new `GET /api/subscribe/context` returns the session
+customer's contact + default address via the same `checkoutPrefillForCustomer` helper; the form
+fetches it on mount and fills empty fields (never clobbers typed input, no-op for guests).
+(c) Rate limit: `POST /api/subscribe/payment-intent` is now IP-limited (30 / 10 min — headroom
+above one careful signup since the PI recreates per address edit) to blunt the unauthenticated
+Stripe-customer/PI card-testing vector; confirm is intentionally left under the global limiter
+(it only finalizes an already-succeeded PI and creates no Stripe resources). (d) Address dedup:
+`findOrCreateAddress` reuses a customer's existing address matching line1/line2/city/state/zip
+(case/space-insensitive) instead of minting a row on every blur. Tests: pure `addressMatches`
+unit coverage. Note: the stale-Stripe-customer-per-blur and orphaned-PI concerns were already
+resolved in P1 (Stripe customer reused across blurs; the abandoned PI is cancelled on recreate).
+Verified-and-dropped: the report's "responsive grids" claim doesn't hold against the code — the
+fixed checkout `Information.svelte` uses the same non-responsive `grid-cols-2`/`grid-cols-3` for
+the name and city/state/zip rows that subscribe already uses, so there was nothing to port;
+making those rows responsive is a shared, app-wide tweak for both forms, out of P5's scope.)*
 **What:** `SubscribeApp.svelte` is a parallel form that shares no code with the fixed
 `Information.svelte` — and none of the fixes. Zero `autocomplete` attributes (checkout has ten,
 including the `shipping` prefixes); no prefill for signed-in customers (checkout prefills

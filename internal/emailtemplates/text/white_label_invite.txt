@@ -1,0 +1,13 @@
+{{define "white_label_invite.txt"}}Put your name on the roast
+
+{{.CompanyName}}, you're approved to set up your own custom-label coffee.
+
+Pick one of our coffees, give it your name, and upload your label. We'll review it and get it on your wholesale catalog.
+
+{{.InviteURL}}
+
+This link expires in 72 hours and works once. If it has expired, contact us for a new one.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

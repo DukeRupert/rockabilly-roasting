@@ -263,6 +263,8 @@ func run() error {
 		WithTaxCalc(settingsStore, catalogStore)
 	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
+	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, customerStore, auditWriter, metricsReg).
+		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
 	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore)
@@ -282,6 +284,8 @@ func run() error {
 	river.AddWorker(workers, jobs.NewWholesaleApplicationNotifyWorker(wholesaleSvc, pool))
 	river.AddWorker(workers, jobs.NewWholesaleApprovedWorker(wholesaleSvc, pool))
 	river.AddWorker(workers, jobs.NewWholesaleSuspendedWorker(wholesaleSvc, pool))
+	river.AddWorker(workers, jobs.NewWhiteLabelInviteWorker(whiteLabelSvc, pool))
+	river.AddWorker(workers, jobs.NewWhiteLabelSubmittedWorker(whiteLabelSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderConfirmEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionConfirmEmailWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalReceiptWorker(orderSvc, pool))
@@ -457,6 +461,7 @@ func run() error {
 		PricingService:         pricingSvc,
 		CartService:            cartSvc,
 		WholesaleService:       wholesaleSvc,
+		WhiteLabelService:      whiteLabelSvc,
 		AttributeService:       attributeSvc,
 		InvoiceService:         invoiceSvc,
 		CustomerGroupService:   customerGroupSvc,

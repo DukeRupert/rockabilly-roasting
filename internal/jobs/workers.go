@@ -121,6 +121,24 @@ type WholesaleSuspendedArgs struct {
 // Kind returns the job kind identifier.
 func (WholesaleSuspendedArgs) Kind() string { return "wholesale_suspended" }
 
+// WhiteLabelInviteArgs emails a white-label onboarding invite to an approved
+// wholesale customer.
+type WhiteLabelInviteArgs struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+}
+
+// Kind returns the job kind identifier.
+func (WhiteLabelInviteArgs) Kind() string { return "white_label_invite" }
+
+// WhiteLabelSubmittedArgs notifies staff that a client submitted a white-label
+// product for review.
+type WhiteLabelSubmittedArgs struct {
+	ProductID uuid.UUID `json:"product_id"`
+}
+
+// Kind returns the job kind identifier.
+func (WhiteLabelSubmittedArgs) Kind() string { return "white_label_submitted" }
+
 // InvoiceSendArgs sends an invoice to the customer via email.
 type InvoiceSendArgs struct {
 	InvoiceID uuid.UUID `json:"invoice_id"`

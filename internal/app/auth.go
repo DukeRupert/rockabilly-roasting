@@ -250,7 +250,7 @@ func (s *AuthService) CreateMagicLinkToken(ctx context.Context, tx pgx.Tx, custo
 	tokenHash := hex.EncodeToString(hash[:])
 
 	expiresAt := time.Now().Add(MagicLinkDuration)
-	_, err = s.magicLinks.Create(ctx, tx, customerID, tokenHash, expiresAt)
+	_, err = s.magicLinks.Create(ctx, tx, customerID, tokenHash, store.MagicLinkPurposeDefault, expiresAt)
 	if err != nil {
 		return "", fmt.Errorf("store magic link token: %w", err)
 	}
@@ -265,7 +265,7 @@ func (s *AuthService) RedeemMagicLink(ctx context.Context, tx pgx.Tx, rawToken s
 	hash := sha256.Sum256([]byte(rawToken))
 	tokenHash := hex.EncodeToString(hash[:])
 
-	token, err := s.magicLinks.Redeem(ctx, tx, tokenHash)
+	token, err := s.magicLinks.Redeem(ctx, tx, tokenHash, store.MagicLinkPurposeDefault)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, "", ErrMagicLinkExpired
@@ -314,12 +314,70 @@ func (s *AuthService) CreateSetupToken(ctx context.Context, tx pgx.Tx, customerI
 	tokenHash := hex.EncodeToString(hash[:])
 
 	expiresAt := time.Now().Add(SetupTokenDuration)
-	_, err = s.magicLinks.Create(ctx, tx, customerID, tokenHash, expiresAt)
+	_, err = s.magicLinks.Create(ctx, tx, customerID, tokenHash, store.MagicLinkPurposeDefault, expiresAt)
 	if err != nil {
 		return "", fmt.Errorf("store setup token: %w", err)
 	}
 
 	return rawToken, nil
+}
+
+// CreateWhiteLabelInviteToken generates a single-use white-label onboarding
+// invite token for a customer. Returns the raw token (for the email link). The
+// token has its own purpose so it can only be redeemed by the white-label flow,
+// never by the password-setup route.
+func (s *AuthService) CreateWhiteLabelInviteToken(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (rawToken string, err error) {
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("generate white-label invite token: %w", err)
+	}
+	rawToken = hex.EncodeToString(tokenBytes)
+
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	expiresAt := time.Now().Add(SetupTokenDuration)
+	_, err = s.magicLinks.Create(ctx, tx, customerID, tokenHash, store.MagicLinkPurposeWhiteLabelInvite, expiresAt)
+	if err != nil {
+		return "", fmt.Errorf("store white-label invite token: %w", err)
+	}
+
+	return rawToken, nil
+}
+
+// LookupWhiteLabelInvite validates an invite token without consuming it and
+// returns the invited customer's ID. Use this to render the onboarding form.
+// Returns ErrWhiteLabelInviteInvalid if the token is missing, expired, used, or
+// of the wrong purpose.
+func (s *AuthService) LookupWhiteLabelInvite(ctx context.Context, tx pgx.Tx, rawToken string) (uuid.UUID, error) {
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	token, err := s.magicLinks.Lookup(ctx, tx, tokenHash, store.MagicLinkPurposeWhiteLabelInvite)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, ErrWhiteLabelInviteInvalid
+		}
+		return uuid.Nil, fmt.Errorf("lookup white-label invite: %w", err)
+	}
+	return token.CustomerID, nil
+}
+
+// RedeemWhiteLabelInvite consumes a white-label invite token (single-use) and
+// returns the invited customer's ID. Returns ErrWhiteLabelInviteInvalid if the
+// token is missing, expired, already used, or of the wrong purpose.
+func (s *AuthService) RedeemWhiteLabelInvite(ctx context.Context, tx pgx.Tx, rawToken string) (uuid.UUID, error) {
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	token, err := s.magicLinks.Redeem(ctx, tx, tokenHash, store.MagicLinkPurposeWhiteLabelInvite)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, ErrWhiteLabelInviteInvalid
+		}
+		return uuid.Nil, fmt.Errorf("redeem white-label invite: %w", err)
+	}
+	return token.CustomerID, nil
 }
 
 // SetPasswordWithToken validates a setup token and sets the customer's password.
@@ -333,7 +391,7 @@ func (s *AuthService) SetPasswordWithToken(ctx context.Context, tx pgx.Tx, rawTo
 	hash := sha256.Sum256([]byte(rawToken))
 	tokenHash := hex.EncodeToString(hash[:])
 
-	token, err := s.magicLinks.Redeem(ctx, tx, tokenHash)
+	token, err := s.magicLinks.Redeem(ctx, tx, tokenHash, store.MagicLinkPurposeDefault)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSetupTokenExpired

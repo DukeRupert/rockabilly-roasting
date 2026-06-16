@@ -1,0 +1,13 @@
+{{define "white_label_submitted.txt"}}New white-label submission
+
+{{.CompanyName}}{{if .CustomerEmail}} ({{.CustomerEmail}}){{end}} submitted a custom-label product for review.
+
+Label name: {{.ProductName}}
+Based on: {{if .BaseCoffee}}{{.BaseCoffee}}{{else}}-{{end}}
+
+It's saved as a draft. Review the name, label image, and pricing, then publish it to make it visible to the client.
+
+Review it: {{.ReviewURL}}
+
+{{.StoreName}}
+{{end}}

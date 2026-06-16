@@ -191,6 +191,26 @@ type WholesaleApplicationData struct {
 	StoreName     string
 }
 
+// WhiteLabelInviteData holds data for the white-label onboarding invite email
+// sent to an approved wholesale customer.
+type WhiteLabelInviteData struct {
+	CompanyName string
+	InviteURL   string
+	StoreName   string
+	StoreURL    string
+}
+
+// WhiteLabelSubmittedData holds data for the staff notification sent when a
+// client submits a white-label product for review.
+type WhiteLabelSubmittedData struct {
+	CompanyName   string
+	CustomerEmail string
+	ProductName   string
+	BaseCoffee    string
+	ReviewURL     string
+	StoreName     string
+}
+
 // SubscriptionRenewalReceiptData holds data for a subscription renewal receipt
 // — sent after a successful off-session charge creates a renewal order.
 type SubscriptionRenewalReceiptData struct {

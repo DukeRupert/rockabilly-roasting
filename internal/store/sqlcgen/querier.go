@@ -152,6 +152,7 @@ type Querier interface {
 	GetSubscriptionPlanByID(ctx context.Context, id uuid.UUID) (SubscriptionPlan, error)
 	GetTaxonByID(ctx context.Context, id uuid.UUID) (Taxon, error)
 	GetTaxonBySlug(ctx context.Context, slug string) (Taxon, error)
+	GetValidMagicLinkToken(ctx context.Context, arg GetValidMagicLinkTokenParams) (MagicLinkToken, error)
 	GetVariantByID(ctx context.Context, id uuid.UUID) (Variant, error)
 	GetVariantBySKU(ctx context.Context, sku string) (Variant, error)
 	GetWebhookEventByProviderAndEventID(ctx context.Context, arg GetWebhookEventByProviderAndEventIDParams) (WebhookEvent, error)
@@ -219,7 +220,7 @@ type Querier interface {
 	// Atomically redeem a coupon — only succeeds if redeemed_at IS NULL.
 	// Returns the row if successful; pgx.ErrNoRows if already redeemed.
 	RedeemCouponCode(ctx context.Context, arg RedeemCouponCodeParams) (CouponCode, error)
-	RedeemMagicLinkToken(ctx context.Context, tokenHash string) (MagicLinkToken, error)
+	RedeemMagicLinkToken(ctx context.Context, arg RedeemMagicLinkTokenParams) (MagicLinkToken, error)
 	// Reverses a coupon redemption tied to a specific order. Used when an order
 	// is cancelled (admin or abandoned-checkout cleanup) so the code can be used
 	// again. No-op if the coupon was never redeemed for that order.

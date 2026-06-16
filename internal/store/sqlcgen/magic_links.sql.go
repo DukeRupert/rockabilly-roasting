@@ -13,9 +13,9 @@ import (
 )
 
 const createMagicLinkToken = `-- name: CreateMagicLinkToken :one
-INSERT INTO magic_link_tokens (id, customer_id, token_hash, expires_at)
-VALUES ($1, $2, $3, $4)
-RETURNING id, customer_id, token_hash, expires_at, used_at, created_at
+INSERT INTO magic_link_tokens (id, customer_id, token_hash, expires_at, purpose)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, customer_id, token_hash, expires_at, used_at, created_at, purpose
 `
 
 type CreateMagicLinkTokenParams struct {
@@ -23,6 +23,7 @@ type CreateMagicLinkTokenParams struct {
 	CustomerID uuid.UUID `json:"customer_id"`
 	TokenHash  string    `json:"token_hash"`
 	ExpiresAt  time.Time `json:"expires_at"`
+	Purpose    string    `json:"purpose"`
 }
 
 func (q *Queries) CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkTokenParams) (MagicLinkToken, error) {
@@ -31,6 +32,7 @@ func (q *Queries) CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkT
 		arg.CustomerID,
 		arg.TokenHash,
 		arg.ExpiresAt,
+		arg.Purpose,
 	)
 	var i MagicLinkToken
 	err := row.Scan(
@@ -40,6 +42,7 @@ func (q *Queries) CreateMagicLinkToken(ctx context.Context, arg CreateMagicLinkT
 		&i.ExpiresAt,
 		&i.UsedAt,
 		&i.CreatedAt,
+		&i.Purpose,
 	)
 	return i, err
 }
@@ -54,15 +57,18 @@ func (q *Queries) DeleteExpiredMagicLinkTokens(ctx context.Context) error {
 	return err
 }
 
-const redeemMagicLinkToken = `-- name: RedeemMagicLinkToken :one
-UPDATE magic_link_tokens
-SET used_at = now()
-WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now()
-RETURNING id, customer_id, token_hash, expires_at, used_at, created_at
+const getValidMagicLinkToken = `-- name: GetValidMagicLinkToken :one
+SELECT id, customer_id, token_hash, expires_at, used_at, created_at, purpose FROM magic_link_tokens
+WHERE token_hash = $1 AND purpose = $2 AND used_at IS NULL AND expires_at > now()
 `
 
-func (q *Queries) RedeemMagicLinkToken(ctx context.Context, tokenHash string) (MagicLinkToken, error) {
-	row := q.db.QueryRow(ctx, redeemMagicLinkToken, tokenHash)
+type GetValidMagicLinkTokenParams struct {
+	TokenHash string `json:"token_hash"`
+	Purpose   string `json:"purpose"`
+}
+
+func (q *Queries) GetValidMagicLinkToken(ctx context.Context, arg GetValidMagicLinkTokenParams) (MagicLinkToken, error) {
+	row := q.db.QueryRow(ctx, getValidMagicLinkToken, arg.TokenHash, arg.Purpose)
 	var i MagicLinkToken
 	err := row.Scan(
 		&i.ID,
@@ -71,6 +77,34 @@ func (q *Queries) RedeemMagicLinkToken(ctx context.Context, tokenHash string) (M
 		&i.ExpiresAt,
 		&i.UsedAt,
 		&i.CreatedAt,
+		&i.Purpose,
+	)
+	return i, err
+}
+
+const redeemMagicLinkToken = `-- name: RedeemMagicLinkToken :one
+UPDATE magic_link_tokens
+SET used_at = now()
+WHERE token_hash = $1 AND purpose = $2 AND used_at IS NULL AND expires_at > now()
+RETURNING id, customer_id, token_hash, expires_at, used_at, created_at, purpose
+`
+
+type RedeemMagicLinkTokenParams struct {
+	TokenHash string `json:"token_hash"`
+	Purpose   string `json:"purpose"`
+}
+
+func (q *Queries) RedeemMagicLinkToken(ctx context.Context, arg RedeemMagicLinkTokenParams) (MagicLinkToken, error) {
+	row := q.db.QueryRow(ctx, redeemMagicLinkToken, arg.TokenHash, arg.Purpose)
+	var i MagicLinkToken
+	err := row.Scan(
+		&i.ID,
+		&i.CustomerID,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CreatedAt,
+		&i.Purpose,
 	)
 	return i, err
 }

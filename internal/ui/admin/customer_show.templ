@@ -79,9 +79,14 @@ templ CustomerShowContent(props CustomerShowProps) {
 						</div>
 					}
 					if *props.Customer.WholesaleStatus == domain.WholesaleStatusApproved {
-						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", props.Customer.ID)) }>
-							<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
-						</form>
+						<div class="flex gap-2">
+							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-white-label-invite", props.Customer.ID)) }>
+								<button type="submit" class="btn-confirm" onclick="return confirm('Email this customer a white-label onboarding invite link?')">Send white-label invite</button>
+							</form>
+							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", props.Customer.ID)) }>
+								<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
+							</form>
+						</div>
 					}
 				</div>
 			</div>

@@ -1,0 +1,141 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+// WhiteLabelChoice is one base coffee a client may build a label on.
+type WhiteLabelChoice struct {
+	ID    string
+	Title string
+}
+
+type WhiteLabelProps struct {
+	Token          string
+	CompanyName    string
+	Choices        []WhiteLabelChoice
+	Name           string // sticky on validation error
+	SelectedBaseID string // sticky on validation error
+	Error          string
+	InvalidToken   bool // token missing/expired/used — show a dead-end message
+	Success        bool
+}
+
+templ WhiteLabelContent(props WhiteLabelProps) {
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)] flex items-center">
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-md lg:max-w-xl w-full px-6 sm:px-10 lg:px-14 py-14 sm:py-20">
+			if props.InvalidToken {
+				<div class="text-center">
+					<h1 class="font-slab text-ink uppercase leading-[0.92]" style="font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;">
+						Link's
+						<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">expired.</span>
+					</h1>
+					<p class="mt-5 font-oswald text-ink-soft text-base leading-relaxed max-w-xs mx-auto">
+						This white-label invite has expired or already been used. Reach out and we'll send you a fresh one.
+					</p>
+				</div>
+			} else if props.Success {
+				<div class="text-center">
+					<div class="inline-flex items-center justify-center mb-6">
+						<span class="relative inline-flex size-20 items-center justify-center bg-paper-warm border-2 border-ink" style="box-shadow: var(--shadow-stamp); transform: rotate(-4deg);">
+							<svg class="size-10 text-ink" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75 10.5 18.75 19.5 5.25"></path>
+							</svg>
+						</span>
+					</div>
+					<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">Submitted</p>
+					<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;">
+						We're on
+						<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">it.</span>
+					</h1>
+					<p class="mt-5 font-oswald text-ink-soft text-base leading-relaxed max-w-sm mx-auto">
+						Thanks — your custom label is in. The crew will review it and get it on your wholesale catalog. We'll be in touch.
+					</p>
+				</div>
+			} else {
+				<div class="text-center mb-8">
+					<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+						if props.CompanyName != "" {
+							{ props.CompanyName }
+						} else {
+							Wholesale
+						}
+					</p>
+					<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;">
+						Your name on the
+						<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">roast.</span>
+					</h1>
+					<p class="font-oswald text-ink-soft text-sm mt-3 max-w-sm mx-auto leading-relaxed">
+						Pick one of our coffees, give it your name, and upload your label. We'll review it and add it to your catalog.
+					</p>
+				</div>
+				<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8">
+					if props.Error != "" {
+						<div class="mb-5 border-2 border-rust bg-paper p-3 text-center">
+							<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">{ props.Error }</p>
+						</div>
+					}
+					<form method="post" action="/wholesale/white-label" enctype="multipart/form-data" class="space-y-5">
+						<input type="hidden" name="token" value={ props.Token }/>
+						<div>
+							<label for="base_product_id" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Base coffee</label>
+							<select
+								name="base_product_id"
+								id="base_product_id"
+								required
+								class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none"
+								style="letter-spacing:0.04em;"
+							>
+								<option value="" disabled selected={ props.SelectedBaseID == "" }>Choose a coffee…</option>
+								for _, c := range props.Choices {
+									<option value={ c.ID } selected={ c.ID == props.SelectedBaseID }>{ c.Title }</option>
+								}
+							</select>
+						</div>
+						<div>
+							<label for="name" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Your product name</label>
+							<input
+								type="text"
+								name="name"
+								id="name"
+								required
+								maxlength="120"
+								value={ props.Name }
+								placeholder="e.g. Midnight Diner Blend"
+								class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none"
+								style="letter-spacing:0.04em;"
+							/>
+						</div>
+						<div>
+							<label for="label_image" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Label image</label>
+							<input
+								type="file"
+								name="label_image"
+								id="label_image"
+								required
+								accept="image/png,image/jpeg,image/webp"
+								class="w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none file:mr-3 file:border-0 file:bg-ink file:text-paper file:px-3 file:py-1 file:font-oswald file:text-xs"
+							/>
+							<p class="font-oswald text-ink-soft text-xs mt-2" style="letter-spacing:0.02em;">PNG, JPG, or WebP. High resolution is best.</p>
+						</div>
+						<button
+							type="submit"
+							class="btn-stamp w-full inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm"
+							style="letter-spacing:0.16em; text-transform:uppercase;"
+						>
+							Submit for review
+						</button>
+					</form>
+				</div>
+			}
+		</div>
+	</section>
+}
+
+templ WhiteLabelPage(props WhiteLabelProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Custom Label Setup",
+		Description: "Set up your custom-label coffee with Rockabilly Roasting Co.",
+	}) {
+		@WhiteLabelContent(props)
+	}
+}

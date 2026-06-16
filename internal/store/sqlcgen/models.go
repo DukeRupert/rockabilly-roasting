@@ -322,6 +322,7 @@ type MagicLinkToken struct {
 	ExpiresAt  time.Time          `json:"expires_at"`
 	UsedAt     pgtype.Timestamptz `json:"used_at"`
 	CreatedAt  time.Time          `json:"created_at"`
+	Purpose    string             `json:"purpose"`
 }
 
 type Order struct {

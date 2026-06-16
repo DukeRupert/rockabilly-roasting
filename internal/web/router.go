@@ -48,6 +48,7 @@ type Deps struct {
 	PricingService         *app.PricingService
 	CartService            *app.CartService
 	WholesaleService       *app.WholesaleService
+	WhiteLabelService      *app.WhiteLabelService
 	AttributeService       *app.AttributeService
 	InvoiceService         *app.InvoiceService
 	CustomerGroupService   *app.CustomerGroupService
@@ -179,6 +180,13 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("POST /wholesale/apply", wholesaleApplyIPLimit(http.HandlerFunc(deps.handleWholesaleApply)))
 	mux.HandleFunc("GET /wholesale/setup", deps.handleWholesaleSetupPage)
 	mux.HandleFunc("POST /wholesale/setup", deps.handleWholesaleSetup)
+
+	// Wholesale white-label onboarding (public, invite-token gated)
+	mux.HandleFunc("GET /wholesale/white-label", deps.handleWhiteLabelPage)
+	whiteLabelIPLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.WholesaleApplyIPLimit, ratelimit.WholesaleApplyWindow, func(r *http.Request) string {
+		return ratelimit.WholesaleApplyIPKey(ratelimit.ClientIP(r))
+	})
+	mux.Handle("POST /wholesale/white-label", whiteLabelIPLimit(http.HandlerFunc(deps.handleWhiteLabelSubmit)))
 
 	// Generic password setup/reset (admin-triggered, retail or wholesale customer)
 	mux.HandleFunc("GET /account/password-setup", deps.handleAccountPasswordSetupPage)
@@ -368,6 +376,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/customers/{id}/billing-method", deps.handleAdminCustomerBillingMethod)
 	adminMux.HandleFunc("POST /admin/customers/{id}/local-fulfillment", deps.handleAdminCustomerLocalFulfillment)
 	adminMux.HandleFunc("POST /admin/customers/{id}/send-password-setup", deps.handleAdminCustomerSendPasswordSetup)
+	adminMux.HandleFunc("POST /admin/customers/{id}/send-white-label-invite", deps.handleAdminCustomerSendWhiteLabelInvite)
 
 	// Admin customer groups (access control for restricted products; not pricing)
 	adminMux.HandleFunc("GET /admin/groups", deps.handleAdminGroupList)

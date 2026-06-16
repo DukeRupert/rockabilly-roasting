@@ -85,6 +85,12 @@ var (
 	ErrSetupTokenExpired = errors.New("setup link expired or already used")
 	ErrPasswordTooShort  = errors.New("password must be at least 10 characters")
 
+	// White-label onboarding errors
+	ErrWhiteLabelInviteInvalid = errors.New("white-label invite link is invalid, expired, or already used")
+	ErrWhiteLabelBaseInvalid   = errors.New("selected base coffee is not available for white-label")
+	ErrWhiteLabelNameRequired  = errors.New("white-label product name is required")
+	ErrWhiteLabelLabelRequired = errors.New("white-label label image is required")
+
 	// Payment errors
 	ErrPaymentFailed         = errors.New("payment failed")
 	ErrPaymentAmountMismatch = errors.New("payment amount does not match order total")

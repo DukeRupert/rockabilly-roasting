@@ -114,6 +114,10 @@ const (
 	AuditWholesaleAccountSuspended    = "wholesale.account_suspended"
 	AuditWholesaleAccountReactivated  = "wholesale.account_reactivated"
 
+	// White-label onboarding actions
+	AuditWhiteLabelInviteSent = "white_label.invite_sent"
+	AuditWhiteLabelSubmitted  = "white_label.submitted"
+
 	// Product visibility actions
 	AuditProductVisibilityUpdated     = "product.visibility_updated"
 	AuditProductGroupAccessUpdated    = "product.group_access_updated"
@@ -164,6 +168,8 @@ const (
 	AuditEmailWholesaleApplicationReceived = "email.wholesale_application_received"
 	AuditEmailWholesaleApproved            = "email.wholesale_approved"
 	AuditEmailWholesaleSuspended           = "email.wholesale_suspended"
+	AuditEmailWhiteLabelInvite             = "email.white_label_invite"
+	AuditEmailWhiteLabelSubmitted          = "email.white_label_submitted"
 
 	// Attribute actions
 	AuditAttributeSetCreated      = "attribute_set.created"

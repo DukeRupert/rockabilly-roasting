@@ -2,11 +2,11 @@
 
 {{.CompanyName}}, you're approved to set up your own custom-label coffee.
 
-Pick one of our coffees, give it your name, and upload your label. We'll review it and get it on your wholesale catalog.
+Pick one of our coffees, give it your name, and upload your label. We'll review it and get it on your wholesale catalog. Got more than one? Use this same link to add as many as you like.
 
 {{.InviteURL}}
 
-This link expires in 72 hours and works once. If it has expired, contact us for a new one.
+This link is good for 30 days and can be used for multiple labels. If it has expired, contact us for a new one.
 
 {{.StoreName}}
 {{.StoreURL}}

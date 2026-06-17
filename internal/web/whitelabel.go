@@ -102,7 +102,9 @@ func (d *Deps) handleWhiteLabelSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		customerID, txErr := d.AuthService.RedeemWhiteLabelInvite(ctx, tx, token)
+		// Validate, don't consume — the invite is reusable until it expires, so a
+		// client can submit several custom-label products from the same link.
+		customerID, txErr := d.AuthService.LookupWhiteLabelInvite(ctx, tx, token)
 		if txErr != nil {
 			return txErr
 		}
@@ -134,7 +136,8 @@ func (d *Deps) handleWhiteLabelSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d.renderWhiteLabel(w, r, storefront.WhiteLabelProps{Success: true})
+	// Reusable link: carry the token so the success page can offer "Add another".
+	d.renderWhiteLabel(w, r, storefront.WhiteLabelProps{Success: true, Token: token})
 }
 
 // uploadLabelImage reads the posted label file and stores it in R2. It returns

@@ -26,6 +26,12 @@ const MagicLinkDuration = 15 * time.Minute
 // SetupTokenDuration is how long a wholesale password setup link is valid.
 const SetupTokenDuration = 72 * time.Hour
 
+// WhiteLabelInviteDuration is how long a white-label onboarding invite link is
+// valid. Unlike setup tokens, an invite is reusable until it expires — a client
+// can submit multiple custom-label products from the same link — so it gets a
+// longer window.
+const WhiteLabelInviteDuration = 30 * 24 * time.Hour
+
 // MagicLinkSessionDuration is the session lifetime for magic link logins.
 const MagicLinkSessionDuration = 30 * 24 * time.Hour
 
@@ -322,10 +328,12 @@ func (s *AuthService) CreateSetupToken(ctx context.Context, tx pgx.Tx, customerI
 	return rawToken, nil
 }
 
-// CreateWhiteLabelInviteToken generates a single-use white-label onboarding
-// invite token for a customer. Returns the raw token (for the email link). The
-// token has its own purpose so it can only be redeemed by the white-label flow,
-// never by the password-setup route.
+// CreateWhiteLabelInviteToken generates a reusable white-label onboarding invite
+// token for a customer. Returns the raw token (for the email link). The token is
+// valid until it expires and may be used to submit multiple products (the flow
+// validates it via LookupWhiteLabelInvite rather than consuming it). It has its
+// own purpose so it can only be used by the white-label flow, never by the
+// password-setup route.
 func (s *AuthService) CreateWhiteLabelInviteToken(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (rawToken string, err error) {
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
@@ -336,7 +344,7 @@ func (s *AuthService) CreateWhiteLabelInviteToken(ctx context.Context, tx pgx.Tx
 	hash := sha256.Sum256([]byte(rawToken))
 	tokenHash := hex.EncodeToString(hash[:])
 
-	expiresAt := time.Now().Add(SetupTokenDuration)
+	expiresAt := time.Now().Add(WhiteLabelInviteDuration)
 	_, err = s.magicLinks.Create(ctx, tx, customerID, tokenHash, store.MagicLinkPurposeWhiteLabelInvite, expiresAt)
 	if err != nil {
 		return "", fmt.Errorf("store white-label invite token: %w", err)

@@ -114,20 +114,20 @@ templ WholesaleListContent(props WholesaleListProps) {
 				}
 			</div>
 		} else {
-			<div class="overflow-visible border border-rr-border bg-rr-surface">
+			<div class="overflow-x-auto border border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
 							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Company</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Contact</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Email</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Terms</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading xl:table-cell">Terms</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading 2xl:table-cell">Applied</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Price list</th>
 							if props.StatusFilter == "all" {
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
 							}
-							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+							<th scope="col" class="sticky right-0 z-20 border-l border-rr-border bg-rr-raised py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
 							</th>
 						</tr>
@@ -148,7 +148,7 @@ templ WholesaleListContent(props WholesaleListProps) {
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted md:table-cell">
 									{ c.Email }
 								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted xl:table-cell">
 									if c.PaymentTermsDays != nil {
 										{ fmt.Sprintf("Net %d", *c.PaymentTermsDays) }
 									} else {
@@ -168,7 +168,7 @@ templ WholesaleListContent(props WholesaleListProps) {
 										}
 									</td>
 								}
-								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+								<td class="sticky right-0 z-10 border-l border-rr-border bg-rr-surface whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
 									@wholesaleRowActions(c)
 								</td>
 							</tr>
@@ -272,10 +272,11 @@ templ wholesaleRowActions(c domain.Customer) {
 		</a>
 	</div>
 	<!-- Kebab dropdown: visible below xl. Same actions, packed into a popover. -->
-	<div class="xl:hidden flex justify-end relative" x-data="{ open: false }">
+	<div class="xl:hidden flex justify-end" x-data="{ open: false, mx: 0, my: 0, place() { const r = $refs.kebab.getBoundingClientRect(); this.mx = r.right; this.my = r.bottom + 4 } }">
 		<button
+			x-ref="kebab"
 			type="button"
-			x-on:click="open = !open"
+			x-on:click="open = !open; open && place()"
 			x-bind:aria-expanded="open"
 			aria-haspopup="true"
 			aria-label="Actions"
@@ -291,8 +292,10 @@ templ wholesaleRowActions(c domain.Customer) {
 			x-transition.opacity
 			x-on:click.outside="open = false"
 			x-on:keydown.escape.window="open = false"
-			class="absolute right-0 top-full z-30 mt-1 w-48 border border-rr-border bg-rr-surface py-1 text-left"
-			style="box-shadow: 4px 4px 0 0 var(--color-rr-border);"
+			x-on:scroll.window.capture="open = false"
+			x-on:resize.window="open = false"
+			x-bind:style="`top:${my}px; left:${mx}px; transform:translateX(-100%)`"
+			class="fixed z-40 w-48 rounded-sm border border-rr-border bg-rr-surface py-1 text-left shadow-lg"
 			role="menu"
 		>
 			if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {

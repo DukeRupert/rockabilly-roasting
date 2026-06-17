@@ -249,7 +249,7 @@ func WholesaleListContent(props WholesaleListProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"overflow-visible border border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Company</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell\">Contact</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell\">Email</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell\">Terms</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading 2xl:table-cell\">Applied</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Price list</th>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"overflow-x-auto border border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Company</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell\">Contact</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell\">Email</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading xl:table-cell\">Terms</th><th scope=\"col\" class=\"hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading 2xl:table-cell\">Applied</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Price list</th>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -259,7 +259,7 @@ func WholesaleListContent(props WholesaleListProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<th scope=\"col\" class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<th scope=\"col\" class=\"sticky right-0 z-20 border-l border-rr-border bg-rr-raised py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -323,7 +323,7 @@ func WholesaleListContent(props WholesaleListProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</td><td class=\"hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</td><td class=\"hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted xl:table-cell\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -384,7 +384,7 @@ func WholesaleListContent(props WholesaleListProps) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<td class=\"whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<td class=\"sticky right-0 z-10 border-l border-rr-border bg-rr-surface whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -753,7 +753,7 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "\" class=\"text-rr-red hover:text-rr-red-lt\">View</a></div><!-- Kebab dropdown: visible below xl. Same actions, packed into a popover. --><div class=\"xl:hidden flex justify-end relative\" x-data=\"{ open: false }\"><button type=\"button\" x-on:click=\"open = !open\" x-bind:aria-expanded=\"open\" aria-haspopup=\"true\" aria-label=\"Actions\" class=\"inline-flex items-center justify-center rounded-sm border border-rr-border bg-rr-surface p-1.5 text-rr-heading hover:bg-rr-raised\"><svg class=\"size-5\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z\"></path></svg></button><div x-show=\"open\" x-cloak x-transition.opacity x-on:click.outside=\"open = false\" x-on:keydown.escape.window=\"open = false\" class=\"absolute right-0 top-full z-30 mt-1 w-48 border border-rr-border bg-rr-surface py-1 text-left\" style=\"box-shadow: 4px 4px 0 0 var(--color-rr-border);\" role=\"menu\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "\" class=\"text-rr-red hover:text-rr-red-lt\">View</a></div><!-- Kebab dropdown: visible below xl. Same actions, packed into a popover. --><div class=\"xl:hidden flex justify-end\" x-data=\"{ open: false, mx: 0, my: 0, place() { const r = $refs.kebab.getBoundingClientRect(); this.mx = r.right; this.my = r.bottom + 4 } }\"><button x-ref=\"kebab\" type=\"button\" x-on:click=\"open = !open; open && place()\" x-bind:aria-expanded=\"open\" aria-haspopup=\"true\" aria-label=\"Actions\" class=\"inline-flex items-center justify-center rounded-sm border border-rr-border bg-rr-surface p-1.5 text-rr-heading hover:bg-rr-raised\"><svg class=\"size-5\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z\"></path></svg></button><div x-show=\"open\" x-cloak x-transition.opacity x-on:click.outside=\"open = false\" x-on:keydown.escape.window=\"open = false\" x-on:scroll.window.capture=\"open = false\" x-on:resize.window=\"open = false\" x-bind:style=\"`top:${my}px; left:${mx}px; transform:translateX(-100%)`\" class=\"fixed z-40 w-48 rounded-sm border border-rr-border bg-rr-surface py-1 text-left shadow-lg\" role=\"menu\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -765,7 +765,7 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			var templ_7745c5c3_Var33 templ.SafeURL
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 299, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 302, Col: 96}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -778,7 +778,7 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			var templ_7745c5c3_Var34 templ.SafeURL
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 302, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 305, Col: 96}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 			if templ_7745c5c3_Err != nil {
@@ -797,7 +797,7 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			var templ_7745c5c3_Var35 templ.SafeURL
 			templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 307, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 310, Col: 96}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 			if templ_7745c5c3_Err != nil {
@@ -816,7 +816,7 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			var templ_7745c5c3_Var36 templ.SafeURL
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 312, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 315, Col: 99}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -834,7 +834,7 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 		var templ_7745c5c3_Var37 templ.SafeURL
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 316, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_list.templ`, Line: 319, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {

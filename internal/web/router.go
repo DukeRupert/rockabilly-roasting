@@ -58,6 +58,7 @@ type Deps struct {
 	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
 	PaymentProvider        payments.Provider
 	RiverClient            *river.Client[pgx.Tx]
+	Enqueuer               app.JobEnqueuer // shared job enqueuer; applies notification quiet hours (see jobs.Enqueuer)
 	R2Client               *media.R2Client
 	MediaConfig            *media.Config
 	QBClient               quickbooks.Client

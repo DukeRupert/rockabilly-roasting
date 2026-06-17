@@ -220,10 +220,10 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 				}
 				return fmt.Errorf("mark subscription past_due: %w", err)
 			}
-			if _, err := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionPastDueArgs{
-				SubscriptionID: *order.SubscriptionID,
-				CustomerID:     *order.CustomerID,
-			}, nil); err != nil {
+			// Route through the enqueuer (not a raw InsertTx) so this past-due
+			// notice respects notification quiet hours like the renewal-batch
+			// path does — a 2am card-decline webhook shouldn't ping the customer.
+			if err := d.Enqueuer.EnqueuePastDueNotice(ctx, tx, *order.SubscriptionID, *order.CustomerID); err != nil {
 				return fmt.Errorf("enqueue past-due email: %w", err)
 			}
 		}

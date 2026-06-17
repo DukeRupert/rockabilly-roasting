@@ -501,6 +501,7 @@ func run() error {
 		AuditWriter:            auditWriter,
 		PaymentProvider:        paymentProvider,
 		RiverClient:            riverClient,
+		Enqueuer:               enqueuer,
 		R2Client:               r2Client,
 		MediaConfig:            mediaConfig,
 		QBClient:               qbClient,

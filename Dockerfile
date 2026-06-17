@@ -51,8 +51,15 @@ COPY --from=frontend /src/internal/ui/assets/checkout/ ./internal/ui/assets/chec
 # Generate templ
 RUN templ generate
 
+# Build version metadata, stamped into the server binary via -ldflags. Passed
+# from CI (deploy workflows) as the release tag and git SHA; default to dev.
+ARG VERSION=dev
+ARG COMMIT=unknown
+
 # Build binaries
-RUN CGO_ENABLED=0 GOOS=linux go build -o /app/server ./cmd/server && \
+RUN CGO_ENABLED=0 GOOS=linux go build \
+        -ldflags "-X github.com/dukerupert/hiri/internal/platform/build.Version=${VERSION} -X github.com/dukerupert/hiri/internal/platform/build.Commit=${COMMIT}" \
+        -o /app/server ./cmd/server && \
     CGO_ENABLED=0 GOOS=linux go build -o /app/seed ./cmd/seed && \
     CGO_ENABLED=0 GOOS=linux go build -o /app/migrate ./cmd/migrate && \
     CGO_ENABLED=0 GOOS=linux go build -o /app/os-migrate ./cmd/os-migrate && \

@@ -25,6 +25,7 @@ import (
 	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/build"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/help"
 	"github.com/dukerupert/hiri/internal/platform/logging"
@@ -72,6 +73,7 @@ func run() error {
 	// Logger — JSON to stdout, plus Sentry fanout when enabled.
 	logger := buildLogger(sentryEnabled)
 	slog.SetDefault(logger)
+	logger.Info("starting hiri", "version", build.Version, "commit", build.Commit)
 	if sentryEnabled {
 		logger.Info("sentry enabled", "environment", os.Getenv("SENTRY_ENVIRONMENT"))
 	}

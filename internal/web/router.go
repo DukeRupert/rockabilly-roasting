@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/build"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/help"
 	"github.com/dukerupert/hiri/internal/platform/media"
@@ -98,6 +100,13 @@ func NewRouter(deps *Deps) http.Handler {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok")) //nolint:errcheck
+	})
+
+	// Reports the build stamped in via -ldflags (see platform/build), so a deploy
+	// can be confirmed live with a curl. Falls back to "dev" for local builds.
+	mux.HandleFunc("GET /version", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(build.Current()) //nolint:errcheck
 	})
 
 	// Prometheus metrics served on a separate internal listener (see MetricsMux).

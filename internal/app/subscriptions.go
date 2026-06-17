@@ -25,6 +25,8 @@ type SubscriptionService struct {
 	catalog       *store.CatalogStore  // populated via WithEmail/WithCatalog; required for SendConfirmationEmail and ChangeVariant
 	pricing       *store.PricingStore  // populated via WithCatalog; required for ChangeVariant same-price guard
 	email         EmailEnv             // populated via WithEmail; required for SendConfirmationEmail
+	renewalLoc    *time.Location       // populated via WithRenewalAnchor; nil disables renewal-time anchoring
+	renewalHour   int                  // hour-of-day (0–23) in renewalLoc that renewals fire at
 }
 
 // NewSubscriptionService creates a new SubscriptionService.
@@ -57,6 +59,23 @@ func (s *SubscriptionService) WithCatalog(catalog *store.CatalogStore, pricing *
 	s.catalog = catalog
 	s.pricing = pricing
 	return s
+}
+
+// WithRenewalAnchor configures renewals to fire at hour:00 in loc rather than at
+// each subscription's signup time-of-day, so the day's renewals batch into one
+// pre-dawn window and orders are ready for staff to fulfill in the morning
+// instead of trickling in. Wiring-time only; when unset, next_order_at keeps the
+// raw period-end instant (the pre-anchor behaviour, used in tests).
+func (s *SubscriptionService) WithRenewalAnchor(loc *time.Location, hour int) *SubscriptionService {
+	s.renewalLoc = loc
+	s.renewalHour = hour
+	return s
+}
+
+// anchorRenewal snaps a next_order_at to the configured renewal window. A no-op
+// when no anchor is wired.
+func (s *SubscriptionService) anchorRenewal(t time.Time) time.Time {
+	return anchorRenewalTime(t, s.renewalLoc, s.renewalHour)
 }
 
 // --- State machine helpers ---
@@ -367,7 +386,7 @@ func (s *SubscriptionService) createSubscriptionRecord(ctx context.Context, tx p
 		ShippingAddressID:  p.ShippingAddressID,
 		CurrentPeriodStart: now,
 		CurrentPeriodEnd:   periodEnd,
-		NextOrderAt:        periodEnd,
+		NextOrderAt:        s.anchorRenewal(periodEnd),
 		Metadata:           p.Metadata,
 	})
 	if err != nil {
@@ -552,12 +571,13 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 		return nil, fmt.Errorf("resume subscription status: %w", err)
 	}
 
-	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, now, periodEnd, periodEnd); err != nil {
+	nextOrder := s.anchorRenewal(periodEnd)
+	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, now, periodEnd, nextOrder); err != nil {
 		return nil, fmt.Errorf("reset billing period: %w", err)
 	}
 	sub.CurrentPeriodStart = now
 	sub.CurrentPeriodEnd = periodEnd
-	sub.NextOrderAt = periodEnd
+	sub.NextOrderAt = nextOrder
 
 	if err := s.subscriptions.UpdatePauseUntil(ctx, tx, id, nil); err != nil {
 		return nil, fmt.Errorf("clear pause_until: %w", err)
@@ -892,8 +912,9 @@ func (s *SubscriptionService) AdvancePeriod(ctx context.Context, tx pgx.Tx, id u
 
 	newStart := sub.CurrentPeriodEnd
 	newEnd := nextPeriodEnd(newStart, plan.Interval, plan.IntervalCount)
+	nextOrder := s.anchorRenewal(newEnd)
 
-	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, newStart, newEnd, newEnd); err != nil {
+	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, newStart, newEnd, nextOrder); err != nil {
 		return nil, fmt.Errorf("advance period: %w", err)
 	}
 
@@ -907,7 +928,7 @@ func (s *SubscriptionService) AdvancePeriod(ctx context.Context, tx pgx.Tx, id u
 
 	sub.CurrentPeriodStart = newStart
 	sub.CurrentPeriodEnd = newEnd
-	sub.NextOrderAt = newEnd
+	sub.NextOrderAt = nextOrder
 
 	return sub, nil
 }
@@ -955,6 +976,26 @@ func intervalDays(interval domain.SubscriptionInterval, count int) int {
 // now, so this is accurate to the cadence's granularity.
 func (s *SubscriptionService) NextRenewalDate(from time.Time, plan *domain.SubscriptionPlan) time.Time {
 	return nextPeriodEnd(from, plan.Interval, plan.IntervalCount)
+}
+
+// anchorRenewalTime snaps a renewal timestamp forward to the next occurrence of
+// hour:00 in loc, so every subscription renews in the same pre-dawn window and
+// the whole day's orders land before staff arrive — rather than each sub firing
+// at its own signup time-of-day throughout the day. Forward-only: the result is
+// always at or after t, so a subscription is never charged before its period
+// truly elapses (at most ~1 day later, once). A nil loc disables anchoring and
+// returns t unchanged — callers that haven't opted in via WithRenewalAnchor
+// (and all tests) keep the raw timestamp.
+func anchorRenewalTime(t time.Time, loc *time.Location, hour int) time.Time {
+	if loc == nil {
+		return t
+	}
+	lt := t.In(loc)
+	anchor := time.Date(lt.Year(), lt.Month(), lt.Day(), hour, 0, 0, 0, loc)
+	if anchor.Before(t) {
+		anchor = anchor.AddDate(0, 0, 1)
+	}
+	return anchor
 }
 
 func nextPeriodEnd(start time.Time, interval domain.SubscriptionInterval, count int) time.Time {

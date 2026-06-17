@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -158,6 +159,33 @@ func run() error {
 	}
 	logger.Info("merchant timezone configured", "tz", merchantTZName)
 
+	// Subscriptions renew at this hour (merchant-local) instead of each sub's
+	// signup time-of-day, so the day's renewals batch into one pre-dawn window
+	// and orders are ready for staff to fulfill in the morning. Default 2am.
+	renewalAnchorHour := 2
+	if raw := os.Getenv("RENEWAL_ANCHOR_HOUR"); raw != "" {
+		h, convErr := strconv.Atoi(raw)
+		if convErr != nil || h < 0 || h > 23 {
+			return fmt.Errorf("RENEWAL_ANCHOR_HOUR must be an integer 0–23, got %q", raw)
+		}
+		renewalAnchorHour = h
+	}
+	logger.Info("subscription renewal anchor configured", "hour", renewalAnchorHour, "tz", merchantTZName)
+
+	// Renewal notification emails (receipt, past-due, subscription-ended) that
+	// would otherwise fire from the pre-dawn batch are held until this hour
+	// (merchant-local) so customers aren't emailed at 2am. Default 8am. Daytime
+	// renewals (e.g. manual admin "renew now") still email immediately.
+	renewalEmailSendHour := 8
+	if raw := os.Getenv("RENEWAL_EMAIL_SEND_HOUR"); raw != "" {
+		h, convErr := strconv.Atoi(raw)
+		if convErr != nil || h < 0 || h > 23 {
+			return fmt.Errorf("RENEWAL_EMAIL_SEND_HOUR must be an integer 0–23, got %q", raw)
+		}
+		renewalEmailSendHour = h
+	}
+	logger.Info("renewal notification send hour configured", "hour", renewalEmailSendHour, "tz", merchantTZName)
+
 	// QuickBooks Online integration
 	qbCredStore := store.NewQBCredentialStore()
 	var qbClient quickbooks.Client
@@ -250,7 +278,8 @@ func run() error {
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore).
-		WithCatalog(catalogStore, pricingStore)
+		WithCatalog(catalogStore, pricingStore).
+		WithRenewalAnchor(merchantTZ, renewalAnchorHour)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg)
@@ -260,7 +289,8 @@ func run() error {
 	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg).
 		WithEmail(emailEnv)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, shippingStore, paymentProvider, auditWriter, metricsReg).
-		WithTaxCalc(settingsStore, catalogStore)
+		WithTaxCalc(settingsStore, catalogStore).
+		WithRenewalAnchor(merchantTZ, renewalAnchorHour)
 	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, customerStore, auditWriter, metricsReg).
@@ -393,7 +423,7 @@ func run() error {
 	// Now that the river client exists, attach the enqueuer to services that
 	// fan out jobs from inside their own transactions (e.g. renewal-receipt
 	// and past-due email enqueues atomic with the renewal write).
-	enqueuer := jobs.NewEnqueuer(riverClient)
+	enqueuer := jobs.NewEnqueuer(riverClient).WithQuietHours(merchantTZ, renewalEmailSendHour)
 	renewalSvc.WithJobEnqueuer(enqueuer)
 	checkoutSvc.WithCheckoutConfirmDeps(cartStore, enqueuer)
 	orderSvc.WithEnqueuer(enqueuer)

@@ -30,6 +30,8 @@ type RenewalService struct {
 	enqueuer      JobEnqueuer          // populated via WithJobEnqueuer; nil-safe (renewal still proceeds without it)
 	settings      *store.SettingsStore // populated via WithTaxCalc; nil-safe (tax skipped without it)
 	catalog       *store.CatalogStore  // populated via WithTaxCalc; needed to read per-product tax exemption
+	renewalLoc    *time.Location       // populated via WithRenewalAnchor; nil disables renewal-time anchoring
+	renewalHour   int                  // hour-of-day (0–23) in renewalLoc that renewals fire at
 }
 
 // NewRenewalService creates a new RenewalService.
@@ -70,6 +72,22 @@ func (s *RenewalService) WithTaxCalc(settings *store.SettingsStore, catalog *sto
 	s.settings = settings
 	s.catalog = catalog
 	return s
+}
+
+// WithRenewalAnchor configures renewals (and dunning retries) to fire at hour:00
+// in loc, so the day's charges and the orders they produce batch into one
+// pre-dawn window for morning fulfillment. Wiring-time only; when unset,
+// next_order_at keeps the raw period-end / retry instant. See anchorRenewalTime.
+func (s *RenewalService) WithRenewalAnchor(loc *time.Location, hour int) *RenewalService {
+	s.renewalLoc = loc
+	s.renewalHour = hour
+	return s
+}
+
+// anchorRenewal snaps a next_order_at to the configured renewal window. A no-op
+// when no anchor is wired.
+func (s *RenewalService) anchorRenewal(t time.Time) time.Time {
+	return anchorRenewalTime(t, s.renewalLoc, s.renewalHour)
 }
 
 // renewalCharges computes the shipping and tax due on a renewal order, matching
@@ -195,7 +213,10 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 		return nil
 	}
 
-	nextRetry := time.Now().Add(dunningRetryDelays[attempt-1])
+	// Anchor the retry to the renewal window too: a recovered charge produces a
+	// fulfillment order, and we want that in the morning batch like any renewal.
+	// Anchoring is forward-only, so the retry is never sooner than the dunning gap.
+	nextRetry := s.anchorRenewal(time.Now().Add(dunningRetryDelays[attempt-1]))
 	if err := s.subscriptions.SetDunningRetry(ctx, tx, sub.ID, nextRetry, attempt); err != nil {
 		return err
 	}
@@ -410,8 +431,10 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			return fmt.Errorf("link subscription order: %w", txErr)
 		}
 
-		// Advance billing period
-		txErr = s.subscriptions.UpdatePeriod(ctx, tx, sub.ID, newStart, newEnd, newEnd)
+		// Advance billing period. The period boundary stays exact; only the
+		// charge trigger is anchored to the renewal window so the next order
+		// lands pre-dawn for morning fulfillment.
+		txErr = s.subscriptions.UpdatePeriod(ctx, tx, sub.ID, newStart, newEnd, s.anchorRenewal(newEnd))
 		if txErr != nil {
 			return fmt.Errorf("advance period: %w", txErr)
 		}
@@ -700,8 +723,10 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				return fmt.Errorf("link subscription order %s: %w", item.Sub.ID, txErr)
 			}
 
-			// Advance billing period
-			txErr = s.subscriptions.UpdatePeriod(ctx, tx, item.Sub.ID, newStart, newEnd, newEnd)
+			// Advance billing period. Period boundary stays exact; only the
+			// charge trigger is anchored to the renewal window so the next order
+			// lands pre-dawn for morning fulfillment.
+			txErr = s.subscriptions.UpdatePeriod(ctx, tx, item.Sub.ID, newStart, newEnd, s.anchorRenewal(newEnd))
 			if txErr != nil {
 				return fmt.Errorf("advance period for %s: %w", item.Sub.ID, txErr)
 			}

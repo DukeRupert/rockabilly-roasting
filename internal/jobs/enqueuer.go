@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -12,7 +13,9 @@ import (
 // service transactions. Wraps a river client so the enqueue rides on the
 // caller's tx.
 type Enqueuer struct {
-	client *river.Client[pgx.Tx]
+	client       *river.Client[pgx.Tx]
+	quietHoursTZ *time.Location // populated via WithQuietHours; nil sends notifications immediately
+	sendHour     int            // hour-of-day (merchant-local) before which renewal notices are held
 }
 
 // NewEnqueuer returns an Enqueuer that uses client for transactional inserts.
@@ -20,12 +23,50 @@ func NewEnqueuer(client *river.Client[pgx.Tx]) *Enqueuer {
 	return &Enqueuer{client: client}
 }
 
+// WithQuietHours holds subscription notification emails (renewal receipt,
+// past-due, subscription-ended) that would otherwise fire from the pre-dawn
+// renewal batch until sendHour:00 merchant-local, so customers aren't pinged at
+// 2am. Renewals processed at or after sendHour (e.g. manual admin renewals
+// during the day) still send immediately. Wiring-time only; nil tz disables it.
+func (e *Enqueuer) WithQuietHours(tz *time.Location, sendHour int) *Enqueuer {
+	e.quietHoursTZ = tz
+	e.sendHour = sendHour
+	return e
+}
+
+// notifyOpts returns InsertOpts that defer a customer notification past quiet
+// hours: when the current merchant-local time is before sendHour, the job is
+// scheduled for sendHour:00 today; otherwise it returns nil (send immediately).
+// Only the pre-dawn renewal batch hits the deferral path — daytime renewals
+// send right away.
+func (e *Enqueuer) notifyOpts() *river.InsertOpts {
+	if e.quietHoursTZ == nil {
+		return nil
+	}
+	if send, deferred := deferToSendHour(time.Now(), e.quietHoursTZ, e.sendHour); deferred {
+		return &river.InsertOpts{ScheduledAt: send}
+	}
+	return nil
+}
+
+// deferToSendHour reports whether a notification enqueued at now should be held
+// until the morning send window. When now (in loc) is before sendHour it
+// returns that day's sendHour:00 and true; otherwise the zero time and false
+// (send immediately). Pure, so the policy is unit-tested without a clock.
+func deferToSendHour(now time.Time, loc *time.Location, sendHour int) (time.Time, bool) {
+	lt := now.In(loc)
+	if lt.Hour() >= sendHour {
+		return time.Time{}, false
+	}
+	return time.Date(lt.Year(), lt.Month(), lt.Day(), sendHour, 0, 0, 0, loc), true
+}
+
 // EnqueueRenewalReceipt enqueues a renewal-receipt email job in tx.
 func (e *Enqueuer) EnqueueRenewalReceipt(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error {
 	_, err := e.client.InsertTx(ctx, tx, SubscriptionRenewalReceiptArgs{
 		OrderID:    orderID,
 		CustomerID: customerID,
-	}, nil)
+	}, e.notifyOpts())
 	return err
 }
 
@@ -34,7 +75,7 @@ func (e *Enqueuer) EnqueuePastDueNotice(ctx context.Context, tx pgx.Tx, subscrip
 	_, err := e.client.InsertTx(ctx, tx, SubscriptionPastDueArgs{
 		SubscriptionID: subscriptionID,
 		CustomerID:     customerID,
-	}, nil)
+	}, e.notifyOpts())
 	return err
 }
 
@@ -44,7 +85,7 @@ func (e *Enqueuer) EnqueueSubscriptionEnded(ctx context.Context, tx pgx.Tx, subs
 	_, err := e.client.InsertTx(ctx, tx, SubscriptionDunningEndedArgs{
 		SubscriptionID: subscriptionID,
 		CustomerID:     customerID,
-	}, nil)
+	}, e.notifyOpts())
 	return err
 }
 

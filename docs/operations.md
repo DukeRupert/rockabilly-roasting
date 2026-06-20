@@ -77,17 +77,26 @@ SENTRY_DSN=... go run ./cmd/sentrycheck
 | Runbook | Covers |
 |---------|--------|
 | [`backup-restore-runbook.md`](backup-restore-runbook.md) | Daily `pg_dump` to Cloudflare R2 (live since 2026-04-24), full restore procedure, verification steps |
+| [`orderspace-migration-runbook.md`](orderspace-migration-runbook.md) | Batched wholesale migration: `cmd/os-report` census, `cmd/os-migrate` importer, `cmd/os-welcome` invites, per-batch procedure, rehearsing on a prod copy, SKU map, verification queries |
 | [`stripe-setup.md`](stripe-setup.md) | Stripe API keys, webhook endpoints, Stripe Tax configuration |
 
 The backup is driven by `ops/rr-backup.timer` + `ops/rr-backup.service` on the Hetzner VPS. Configuration is in `ops/backup.env.example`.
 
 ---
 
+## Wholesale migration tools (active)
+
+The OrderSpace → Hiri wholesale migration is ongoing, batched. Full procedure in
+[`orderspace-migration-runbook.md`](orderspace-migration-runbook.md).
+
+- `cmd/os-report` — read-only census of the OrderSpace tenant.
+- `cmd/os-migrate` — importer (`--only`, `--dry-run`, `--customers-only`). Assigns Wholesale 2026 + NET 7.
+- `cmd/os-welcome` — sends migration welcome emails (`--emails`, `--send`). Dry-runs by default.
+
 ## Archived migration tools
 
-These commands ran during the WooCommerce → Hiri retail cutover (2026-04-24) and the OrderSpace wholesale migration. They remain in the repo for reference but are not part of regular operations.
+Ran during the WooCommerce → Hiri retail cutover (2026-04-24). Kept for reference, not part of regular operations.
 
 - `cmd/migrate` — WooCommerce subscription importer. Mage target `mage wcMigrate` supports `--dry-run` and `--mapping=path/to/mapping.json`.
-- `cmd/os-migrate` — OrderSpace wholesale importer. No mage target; run with `go run ./cmd/os-migrate`.
 
 Run notes and decisions for those migrations live in [`archive/migrations/`](archive/migrations/).

@@ -31,21 +31,21 @@ type osToken struct {
 }
 
 type osCustomer struct {
-	ID             string          `json:"id"`
-	CompanyName    string          `json:"company_name"`
-	CreatedAt      string          `json:"created_at"`
-	Status         string          `json:"status"` // new, active, closed
-	Reference      string          `json:"reference"`
-	InternalNote   string          `json:"internal_note"`
-	Buyers         []osBuyer       `json:"buyers"`
-	Phone          string          `json:"phone"`
-	EmailAddresses osEmails        `json:"email_addresses"`
-	TaxNumber      string          `json:"tax_number"`
-	Addresses      []osAddress     `json:"addresses"`
-	MinimumSpend   *float64        `json:"minimum_spend"`
-	CustomerGroupID string         `json:"customer_group_id"`
-	PriceListID    string          `json:"price_list_id"`
-	PaymentTermsID string          `json:"payment_terms_id"`
+	ID              string      `json:"id"`
+	CompanyName     string      `json:"company_name"`
+	CreatedAt       string      `json:"created_at"`
+	Status          string      `json:"status"` // new, active, closed
+	Reference       string      `json:"reference"`
+	InternalNote    string      `json:"internal_note"`
+	Buyers          []osBuyer   `json:"buyers"`
+	Phone           string      `json:"phone"`
+	EmailAddresses  osEmails    `json:"email_addresses"`
+	TaxNumber       string      `json:"tax_number"`
+	Addresses       []osAddress `json:"addresses"`
+	MinimumSpend    *float64    `json:"minimum_spend"`
+	CustomerGroupID string      `json:"customer_group_id"`
+	PriceListID     string      `json:"price_list_id"`
+	PaymentTermsID  string      `json:"payment_terms_id"`
 }
 
 type osBuyer struct {
@@ -71,26 +71,26 @@ type osAddress struct {
 }
 
 type osOrder struct {
-	ID              string        `json:"id"`
-	Number          int           `json:"number"`
-	Created         string        `json:"created"`
-	Status          string        `json:"status"`
-	CustomerID      string        `json:"customer_id"`
-	CompanyName     string        `json:"company_name"`
-	Phone           string        `json:"phone"`
-	EmailAddresses  osEmails      `json:"email_addresses"`
-	DeliveryDate    string        `json:"delivery_date"`
-	Reference       string        `json:"reference"`
-	InternalNote    string        `json:"internal_note"`
-	CustomerPONumber string       `json:"customer_po_number"`
-	CustomerNote    string        `json:"customer_note"`
-	ShippingType    string        `json:"shipping_type"`
-	ShippingAddress *osAddress    `json:"shipping_address"`
-	BillingAddress  *osAddress    `json:"billing_address"`
-	Currency        string        `json:"currency"`
-	NetTotal        float64       `json:"net_total"`
-	GrossTotal      float64       `json:"gross_total"`
-	OrderLines      []osOrderLine `json:"order_lines"`
+	ID               string        `json:"id"`
+	Number           int           `json:"number"`
+	Created          string        `json:"created"`
+	Status           string        `json:"status"`
+	CustomerID       string        `json:"customer_id"`
+	CompanyName      string        `json:"company_name"`
+	Phone            string        `json:"phone"`
+	EmailAddresses   osEmails      `json:"email_addresses"`
+	DeliveryDate     string        `json:"delivery_date"`
+	Reference        string        `json:"reference"`
+	InternalNote     string        `json:"internal_note"`
+	CustomerPONumber string        `json:"customer_po_number"`
+	CustomerNote     string        `json:"customer_note"`
+	ShippingType     string        `json:"shipping_type"`
+	ShippingAddress  *osAddress    `json:"shipping_address"`
+	BillingAddress   *osAddress    `json:"billing_address"`
+	Currency         string        `json:"currency"`
+	NetTotal         float64       `json:"net_total"`
+	GrossTotal       float64       `json:"gross_total"`
+	OrderLines       []osOrderLine `json:"order_lines"`
 }
 
 type osOrderLine struct {
@@ -309,6 +309,7 @@ func main() {
 func run() error {
 	dryRun := flag.Bool("dry-run", false, "Validate and report without importing")
 	customersOnly := flag.Bool("customers-only", false, "Import only customers, skip orders")
+	only := flag.String("only", "", "comma-separated OrderSpace customer IDs to import (default: all)")
 	flag.Parse()
 
 	_ = godotenv.Load()
@@ -348,6 +349,49 @@ func run() error {
 		logger.Info("fetched orders", "count", len(orders))
 	}
 
+	// Restrict to a specific batch of customers if --only was given.
+	if *only != "" {
+		want := make(map[string]bool)
+		for _, id := range strings.Split(*only, ",") {
+			if id = strings.TrimSpace(id); id != "" {
+				want[id] = true
+			}
+		}
+		var keptC []osCustomer
+		for _, c := range customers {
+			if want[c.ID] {
+				keptC = append(keptC, c)
+			}
+		}
+		customers = keptC
+		logger.Info("restricted to --only batch", "count", len(customers))
+	}
+
+	// Only migrate successful order history (skip cancelled/incomplete) and only
+	// orders belonging to the selected customers.
+	if len(orders) > 0 {
+		selected := make(map[string]bool, len(customers))
+		for _, c := range customers {
+			selected[c.ID] = true
+		}
+		var keptO []osOrder
+		var droppedStatus, droppedCustomer int
+		for _, o := range orders {
+			if !selected[o.CustomerID] {
+				droppedCustomer++
+				continue
+			}
+			if !isSuccessfulOrder(o.Status) {
+				droppedStatus++
+				continue
+			}
+			keptO = append(keptO, o)
+		}
+		orders = keptO
+		logger.Info("filtered orders", "kept", len(orders),
+			"dropped_unsuccessful", droppedStatus, "dropped_other_customer", droppedCustomer)
+	}
+
 	// Connect to database
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
@@ -361,7 +405,15 @@ func run() error {
 		logger.Info("=== DRY RUN MODE ===")
 		dryRunValidation(customers, orders, report, logger)
 	} else {
-		importData(ctx, pool, customers, orders, *customersOnly, report, logger)
+		// Every migrated customer is assigned the Wholesale 2026 price list and
+		// NET 7 terms. Resolve the price list ID up front; bail if it is missing.
+		var priceListID uuid.UUID
+		err := pool.QueryRow(ctx,
+			`SELECT id FROM price_lists WHERE name = 'Wholesale 2026'`).Scan(&priceListID)
+		if err != nil {
+			return fmt.Errorf("look up 'Wholesale 2026' price list (must exist before import): %w", err)
+		}
+		importData(ctx, pool, customers, orders, *customersOnly, priceListID, report, logger)
 	}
 
 	printReport(report, logger)
@@ -436,6 +488,7 @@ func importData(
 	customers []osCustomer,
 	orders []osOrder,
 	customersOnly bool,
+	priceListID uuid.UUID,
 	report *migrationReport,
 	logger *slog.Logger,
 ) {
@@ -457,9 +510,14 @@ func importData(
 			// Check if customer already exists by email
 			existing, err := customerStore.GetByEmail(ctx, tx, email)
 			if err == nil {
+				// Upgrade the existing account to wholesale rather than leaving it
+				// retail (otherwise its OS orders attach but it can't be priced).
+				if err := setWholesaleFields(ctx, tx, existing.ID, mapOSStatus(osCust.Status), osCust.CompanyName, priceListID); err != nil {
+					return fmt.Errorf("upgrade existing customer %s: %w", email, err)
+				}
 				osToHiri[osCust.ID] = existing.ID
 				report.CustomersFound++
-				logger.Info("customer exists", "email", email, "os_id", osCust.ID)
+				logger.Info("customer exists — upgraded to wholesale", "email", email, "os_id", osCust.ID)
 				return nil
 			}
 			if !errors.Is(err, pgx.ErrNoRows) {
@@ -479,17 +537,9 @@ func importData(
 				return fmt.Errorf("create customer %s: %w", email, err)
 			}
 
-			// Set wholesale fields via direct SQL (no typed store methods for these)
-			wholesaleStatus := mapOSStatus(osCust.Status)
-			_, err = tx.Exec(ctx,
-				`UPDATE customers SET account_type = $1, wholesale_status = $2, company_name = $3 WHERE id = $4`,
-				string(domain.AccountTypeWholesale), string(wholesaleStatus), strPtr(osCust.CompanyName), customer.ID,
-			)
-			if err != nil {
+			// Assign wholesale account type + status, Wholesale 2026 price list, NET 7.
+			if err := setWholesaleFields(ctx, tx, customer.ID, mapOSStatus(osCust.Status), osCust.CompanyName, priceListID); err != nil {
 				return fmt.Errorf("set wholesale fields: %w", err)
-			}
-			if wholesaleStatus == domain.WholesaleStatusApproved {
-				_, _ = tx.Exec(ctx, `UPDATE customers SET approved_at = NOW() WHERE id = $1`, customer.ID)
 			}
 
 			if osCust.TaxNumber != "" {
@@ -498,25 +548,34 @@ func importData(
 				}
 			}
 
-			// Create addresses
-			for i, addr := range osCust.Addresses {
+			// Create addresses, deduplicating any repeats (OrderSpace data has many).
+			seen := make(map[string]bool)
+			for _, addr := range osCust.Addresses {
+				if addr.Line1 == "" {
+					continue
+				}
+				key := addrKey(addr.Line1, addr.PostalCode)
+				if seen[key] {
+					continue
+				}
 				contactFirst, contactLast := splitName(addr.ContactName)
 				_, err := customerStore.CreateAddress(ctx, tx, store.CreateAddressParams{
-					CustomerID: &customer.ID,
-					FirstName:  contactFirst,
-					LastName:   contactLast,
-					Company:    strPtr(addr.CompanyName),
-					Line1:      addr.Line1,
-					Line2:      strPtr(addr.Line2),
-					City:       addr.City,
-					State:      addr.State,
-					PostalCode: addr.PostalCode,
+					CustomerID:  &customer.ID,
+					FirstName:   contactFirst,
+					LastName:    contactLast,
+					Company:     strPtr(addr.CompanyName),
+					Line1:       addr.Line1,
+					Line2:       strPtr(addr.Line2),
+					City:        addr.City,
+					State:       addr.State,
+					PostalCode:  addr.PostalCode,
 					CountryCode: mapCountryCode(addr.Country),
-					IsDefault:  i == 0,
+					IsDefault:   len(seen) == 0,
 				})
 				if err != nil {
 					return fmt.Errorf("create address: %w", err)
 				}
+				seen[key] = true
 				report.AddressesCreated++
 			}
 
@@ -526,7 +585,7 @@ func importData(
 				"email", email,
 				"company", osCust.CompanyName,
 				"os_id", osCust.ID,
-				"status", wholesaleStatus,
+				"status", mapOSStatus(osCust.Status),
 			)
 			return nil
 		})
@@ -556,28 +615,43 @@ func importData(
 			}
 			defaultAddr := addresses[0]
 
-			// Create shipping address from order if present, otherwise use default
+			// Resolve the order's shipping address. Reuse an existing matching
+			// address for this customer instead of creating a duplicate per order
+			// (OrderSpace repeats the same address on every order — don't migrate
+			// that bloat). Only create when it's genuinely new.
 			shippingAddrID := defaultAddr.ID
 			if osOrd.ShippingAddress != nil && osOrd.ShippingAddress.Line1 != "" {
-				contactFirst, contactLast := splitName(osOrd.ShippingAddress.ContactName)
-				addr, err := customerStore.CreateAddress(ctx, tx, store.CreateAddressParams{
-					CustomerID:  &hiriCustomerID,
-					FirstName:   contactFirst,
-					LastName:    contactLast,
-					Company:     strPtr(osOrd.ShippingAddress.CompanyName),
-					Line1:       osOrd.ShippingAddress.Line1,
-					Line2:       strPtr(osOrd.ShippingAddress.Line2),
-					City:        osOrd.ShippingAddress.City,
-					State:       osOrd.ShippingAddress.State,
-					PostalCode:  osOrd.ShippingAddress.PostalCode,
-					CountryCode: mapCountryCode(osOrd.ShippingAddress.Country),
-					IsDefault:   false,
-				})
-				if err != nil {
-					return fmt.Errorf("create shipping address: %w", err)
+				key := addrKey(osOrd.ShippingAddress.Line1, osOrd.ShippingAddress.PostalCode)
+				matched := uuid.Nil
+				for _, a := range addresses {
+					if addrKey(a.Line1, a.PostalCode) == key {
+						matched = a.ID
+						break
+					}
 				}
-				shippingAddrID = addr.ID
-				report.AddressesCreated++
+				if matched != uuid.Nil {
+					shippingAddrID = matched
+				} else {
+					contactFirst, contactLast := splitName(osOrd.ShippingAddress.ContactName)
+					addr, err := customerStore.CreateAddress(ctx, tx, store.CreateAddressParams{
+						CustomerID:  &hiriCustomerID,
+						FirstName:   contactFirst,
+						LastName:    contactLast,
+						Company:     strPtr(osOrd.ShippingAddress.CompanyName),
+						Line1:       osOrd.ShippingAddress.Line1,
+						Line2:       strPtr(osOrd.ShippingAddress.Line2),
+						City:        osOrd.ShippingAddress.City,
+						State:       osOrd.ShippingAddress.State,
+						PostalCode:  osOrd.ShippingAddress.PostalCode,
+						CountryCode: mapCountryCode(osOrd.ShippingAddress.Country),
+						IsDefault:   false,
+					})
+					if err != nil {
+						return fmt.Errorf("create shipping address: %w", err)
+					}
+					shippingAddrID = addr.ID
+					report.AddressesCreated++
+				}
 			}
 
 			// Calculate totals in cents
@@ -655,14 +729,18 @@ func importData(
 				_, _ = tx.Exec(ctx, `UPDATE orders SET customer_po_number = $1 WHERE id = $2`, *poNumber, order.ID)
 			}
 
-			// Create line items — try to match by SKU
+			// Create line items — translate the OrderSpace SKU to its Hiri
+			// equivalent, then match by SKU. Unmappable lines are skipped; the
+			// original OrderSpace SKU/name stay in the line metadata below.
 			for _, li := range productLines {
 				variantID := uuid.Nil
-				if li.SKU != "" {
-					err := tx.QueryRow(ctx, `SELECT id FROM variants WHERE sku = $1`, li.SKU).Scan(&variantID)
+				if hiriSKU, ok := translateSKU(li.SKU); ok {
+					err := tx.QueryRow(ctx, `SELECT id FROM variants WHERE sku = $1`, hiriSKU).Scan(&variantID)
 					if err != nil {
-						report.addWarning("order %s line %s: SKU %q not found in catalog", osOrd.ID, li.ID, li.SKU)
+						report.addWarning("order %s line %s: %q -> %q not in catalog", osOrd.ID, li.ID, li.SKU, hiriSKU)
 					}
+				} else if li.SKU != "" {
+					report.addWarning("order %s line %s: no SKU mapping for %q (%s)", osOrd.ID, li.ID, li.SKU, li.Name)
 				}
 
 				if variantID == uuid.Nil {
@@ -674,13 +752,13 @@ func importData(
 				lineTaxCents := dollarsTocents(li.TaxAmount)
 
 				_, err := orderStore.CreateLineItem(ctx, tx, store.CreateLineItemParams{
-					OrderID:       order.ID,
-					VariantID:     variantID,
-					Quantity:      li.Quantity,
-					UnitPrice:     dollarsTocents(li.UnitPrice),
-					Subtotal:      dollarsTocents(li.SubTotal),
-					TaxTotal:      lineTaxCents,
-					Total:         dollarsTocents(li.SubTotal) + lineTaxCents,
+					OrderID:   order.ID,
+					VariantID: variantID,
+					Quantity:  li.Quantity,
+					UnitPrice: dollarsTocents(li.UnitPrice),
+					Subtotal:  dollarsTocents(li.SubTotal),
+					TaxTotal:  lineTaxCents,
+					Total:     dollarsTocents(li.SubTotal) + lineTaxCents,
 					Metadata: map[string]any{
 						"orderspace_line_id": li.ID,
 						"orderspace_sku":     li.SKU,
@@ -756,6 +834,25 @@ func mapOSStatus(status string) domain.WholesaleStatus {
 	default:
 		return domain.WholesaleStatusPending
 	}
+}
+
+// setWholesaleFields marks a customer as wholesale and assigns the migration's
+// standard pricing: the given price list (Wholesale 2026) and NET 7 terms.
+// Existing company_name is preserved; for a freshly created customer (null
+// company_name) the OrderSpace company name is used.
+func setWholesaleFields(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.WholesaleStatus, company string, priceListID uuid.UUID) error {
+	_, err := tx.Exec(ctx, `
+		UPDATE customers SET
+			account_type = $2,
+			wholesale_status = $3,
+			company_name = COALESCE(company_name, NULLIF($4, '')),
+			price_list_id = $5,
+			payment_terms_days = 7,
+			approved_at = CASE WHEN $3 = 'approved' THEN COALESCE(approved_at, NOW()) ELSE approved_at END
+		WHERE id = $1`,
+		id, string(domain.AccountTypeWholesale), string(status), company, priceListID,
+	)
+	return err
 }
 
 func mapOSOrderStatus(status string) domain.OrderStatus {

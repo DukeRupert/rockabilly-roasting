@@ -1,0 +1,15 @@
+{{define "wholesale_migrated.txt"}}Your wholesale account has moved
+
+{{.CompanyName}}, we've moved {{.StoreName}} wholesale ordering to our own online store. Your account, contacts, and order history have come along with it -- nothing to re-enter.
+
+Set a password below and you're back in business.
+
+{{.SetupURL}}
+
+One change to note: wholesale invoices are now on NET 7 terms -- due 7 days after your order.
+
+This link expires in 72 hours. If it has expired, contact us for a new one.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

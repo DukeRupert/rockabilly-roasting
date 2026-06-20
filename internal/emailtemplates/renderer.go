@@ -176,6 +176,16 @@ type WholesaleApprovedData struct {
 	StoreURL    string
 }
 
+// WholesaleMigratedData holds data for the welcome email sent to wholesale
+// customers moved over from Orderspace. Unlike the approved email, the copy
+// explains the move and the new NET 7 terms.
+type WholesaleMigratedData struct {
+	CompanyName string
+	SetupURL    string
+	StoreName   string
+	StoreURL    string
+}
+
 // WholesaleSuspendedData holds data for the wholesale suspended notification email.
 type WholesaleSuspendedData struct {
 	CompanyName string

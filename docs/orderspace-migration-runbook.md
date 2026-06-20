@@ -270,7 +270,57 @@ current list prices.
 
 ---
 
-## 10. Final cutover (after all batches are migrated)
+## 10. Proposed batch schedule
+
+Three batches, **two weeks from the initial batch to the final batch**. Dates are targets; the
+**gates** govern whether to proceed — don't advance on the calendar alone. Account membership is
+indicative — **confirm against the latest `os-report` census** before each batch, since the roster
+and data-hygiene list can shift.
+
+| Batch | Target | Size | Who | Why this grouping |
+|---|---|---|---|---|
+| **1 — Pilot** | Mon **Jun 23** | 8 | Validated pilot accounts | Prove the pipeline on clean, low-to-mid-value, recent-order accounts where a mistake is cheap. |
+| **2 — Main** | Mon **Jun 30** | ~29 | All remaining clean accounts with order history, incl. the high-value ones | The bulk. Run once the pilot has soaked for a week with no pricing/login complaints. |
+| **3 — Final** | Mon **Jul 7** | ~tail | Cleanup-needed (post-fix), zero-history, Tailwind, Bunker, internal | The special cases — each needs something done first. |
+
+### Batch 1 — Pilot (8)
+Wandering Bean, Richland Baptist Church, Healthy Vibes, Novel Coffee, The Coffee Pot Seattle,
+Yellow Cafe, Steam and cream, Caterpillar Cafe.
+**Gate to start:** `Wholesale 2026` price list verified correct (§3); rehearsed on a prod copy (§6).
+
+### Batch 2 — Main bulk (~29)
+The rest of the clean, history-bearing accounts. Includes the whales held out of the pilot —
+Charis Coffee, Sip&Co., Cafe Magnolia, Cafenated, Angel Brook Farm, Calvary Chapel of Tri-Cities,
+Kaffrin's, The Village Bistro, Faith Tri-Cities, Mama's Java — plus the mid/low tier: Caffeine Bar,
+New Vintage Church, Rise & Shine Bake Shop, Walla Walla Tattoo Co, SUB Coffee Shop (WSU), Amendment
+XXI Bar, Tri-Cities Food CoOp, Ice Harbor Brewing, Tri-Tech Skills Center, Fresh Picks, Sip&Dip,
+CKJT Architects, Kennewick School District, Port of Benton, Jae's Coffee Co., PKA Holdings (Last
+Resort), Richland High School (Bomb Shelter), JayDay Cafe & Boba, Foodies, Tina's Tasty Treats.
+Consider running it in two sittings within the week (high-value first) if you'd rather watch a
+smaller blast radius at a time.
+**Gate to start:** pilot accounts have logged in and ordered without pricing/support issues.
+
+### Batch 3 — Final / special cases (~tail)
+Each sub-group needs a precondition met first:
+- **Cleanup-needed (after Marisa fixes them in OS):** ExpressUp Coffee, Port of Benton Admin,
+  Hanford High School, Panadería y Antojitos, Just Juice, Kool Beanz Koffee, Byte Brew, and MOCHA
+  EXPRESS (move off the legacy 2024 list). See the census "Cleanup needed" list for the live set.
+- **Zero order history (clean, low risk):** Stacks Mobile Bistro, The B Spot — accounts only.
+- **Tailwind Concessions:** import on Wholesale 2026, then **manually switch to Tailwinds pricing**
+  in admin (§1, §5 step 9).
+- **Bunker (Bunker Uniforms + white-label):** only if white-label onboarding is ready; otherwise
+  **explicitly defer beyond this plan**.
+- **Exclude:** BASELING Sports Cards (census suggests deleting in OS) and internal/test accounts
+  (Firefly Software, and confirm whether Kagen's `talia@rockabillyroasting.com` is internal).
+**Gate to start:** Marisa has completed the OS cleanup pass; white-label decision made for Bunker.
+
+> **Why two weeks:** a week to let the pilot prove pricing/login/ordering end-to-end, a week to move
+> the bulk while watching for issues, then a final sweep for the accounts that needed prep. If the
+> pilot surfaces a problem, fix it and re-rehearse — slip the schedule rather than push a bad batch.
+
+---
+
+## 11. Final cutover (after all batches are migrated)
 
 From [`orderspace-migration-progress.md`](./orderspace-migration-progress.md), in order:
 freeze OS ordering → final delta import for anything placed during the freeze → flip
@@ -281,8 +331,10 @@ weeks, keeping read-only OS access for 30 days for rollback.
 
 ## Batch log
 
-Append a row per batch.
+Update each row as a batch completes (target dates from §10).
 
-| Date | Batch (count) | OS IDs / notes | Imported | Welcomed | By |
+| Target | Batch (count) | Notes | Imported | Welcomed | By |
 |---|---|---|---|---|---|
-| _pending_ | Pilot (8) | Wandering Bean, Richland Baptist, Healthy Vibes, Novel Coffee, Coffee Pot Seattle, Yellow Cafe, Steam and cream, Caterpillar Cafe | validated on prod copy only | — | — |
+| Jun 23 | 1 — Pilot (8) | Wandering Bean, Richland Baptist, Healthy Vibes, Novel Coffee, Coffee Pot Seattle, Yellow Cafe, Steam and cream, Caterpillar Cafe | validated on prod copy only | — | — |
+| Jun 30 | 2 — Main (~29) | remaining clean accounts w/ history (see §10) | — | — | — |
+| Jul 7 | 3 — Final (~tail) | cleanup-needed + zero-history + Tailwind + Bunker (see §10) | — | — | — |

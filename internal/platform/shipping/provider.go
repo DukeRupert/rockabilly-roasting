@@ -30,6 +30,11 @@ type LabelRequest struct {
 	HeightIn    float64
 	ServiceCode string
 	Reference   string
+	// LabelFileType is the Shippo label_file_type to request (e.g. "PDF_4x6",
+	// "PNG"). Empty means the provider default ("PDF", an 8.5x11 page). Only the
+	// one-shot CreateLabel path honors this; the GetRates+BuyRate path carries
+	// the choice on the Rate instead.
+	LabelFileType string
 }
 
 // LabelResult contains the result of creating a shipping label.
@@ -58,7 +63,27 @@ type Rate struct {
 	ServiceToken    string
 	AmountCents     int
 	Currency        string
-	EstDeliveryDays int // 0 when the carrier returns no estimate
+	EstDeliveryDays int    // 0 when the carrier returns no estimate
+	LabelFileType   string // Shippo label_file_type for purchase; empty = "PDF"
+}
+
+// AllowedLabelFileTypes are the Shippo label_file_type values supported by the
+// label flow and smoke test. Empty/default resolves to "PDF". PDF_4x6 is the
+// 4x6 thermal-label size; PDF is a full 8.5x11 page; PNG is an image.
+var AllowedLabelFileTypes = []string{"PDF", "PDF_4x6", "PNG"}
+
+// ValidLabelFileType reports whether v is empty (provider default) or one of
+// AllowedLabelFileTypes.
+func ValidLabelFileType(v string) bool {
+	if v == "" {
+		return true
+	}
+	for _, a := range AllowedLabelFileTypes {
+		if a == v {
+			return true
+		}
+	}
+	return false
 }
 
 // LabelProvider is the interface for shipping label services.

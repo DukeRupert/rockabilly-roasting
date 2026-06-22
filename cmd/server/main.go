@@ -131,7 +131,19 @@ func run() error {
 	// stays compiled (internal/platform/shipping/easypost.go) as a fallback.
 	var labelProvider shipping.LabelProvider
 	if key := os.Getenv("SHIPPO_API_KEY"); key != "" {
-		labelProvider = shipping.NewShippoProvider(key)
+		// SHIPPO_LABEL_FORMAT controls the label_file_type Shippo returns
+		// (PNG/PDF/PDF_4x6). Defaults to PNG — the format the merchant's label
+		// printer prints cleanest. Invalid values fall back to the default.
+		labelFormat := os.Getenv("SHIPPO_LABEL_FORMAT")
+		if labelFormat == "" {
+			labelFormat = "PNG"
+		}
+		if !shipping.ValidLabelFileType(labelFormat) {
+			logger.Warn("SHIPPO_LABEL_FORMAT is invalid; falling back to PNG", "value", labelFormat, "allowed", shipping.AllowedLabelFileTypes)
+			labelFormat = "PNG"
+		}
+		labelProvider = shipping.NewShippoProvider(key).WithDefaultLabelFileType(labelFormat)
+		logger.Info("shippo label provider configured", "label_format", labelFormat)
 		if os.Getenv("SHIPPO_WEBHOOK_SECRET") == "" {
 			logger.Warn("SHIPPO_WEBHOOK_SECRET is not set; the inbound tracking webhook endpoint is disabled")
 		}

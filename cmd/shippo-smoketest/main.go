@@ -8,18 +8,23 @@
 //	--to-zip     override ship-to zip (default San Francisco CA)
 //	--weight-oz  parcel weight in ounces (default 12)
 //	--service    Shippo servicelevel.token (default usps_ground_advantage)
+//	--format     label_file_type to request: PDF (8.5x11, default), PDF_4x6
+//	             (4x6 thermal label), or PNG. Only applies with --buy.
 //	--buy        actually purchase the label (default false — quote only)
 //
 // Without --buy the script only creates the shipment and prints the returned
-// rates. With --buy it picks the requested service token and buys the label.
-// Test API keys produce a watermarked label and don't move money.
+// rates. With --buy it picks the requested service token and buys the label in
+// the requested format, then prints the label URL — download it to eyeball how
+// the format prints. Test API keys produce a watermarked label and don't move
+// money, so you can buy as many as you need to dial in print settings.
 //
 // Usage:
 //
 //	export SHIPPO_API_KEY=shippo_test_xxxxxxxxxx
-//	go run ./cmd/shippo-smoketest                       # quote only
-//	go run ./cmd/shippo-smoketest --buy                 # quote + purchase
-//	go run ./cmd/shippo-smoketest --weight-oz=80 --buy  # heavier parcel
+//	go run ./cmd/shippo-smoketest                              # quote only
+//	go run ./cmd/shippo-smoketest --buy                        # quote + purchase (PDF)
+//	go run ./cmd/shippo-smoketest --buy --format=PDF_4x6       # 4x6 thermal label
+//	go run ./cmd/shippo-smoketest --weight-oz=80 --buy         # heavier parcel
 package main
 
 import (
@@ -42,8 +47,13 @@ func main() {
 	toZip := flag.String("to-zip", "94103", "ship-to zip")
 	weightOz := flag.Float64("weight-oz", 12, "parcel weight in ounces")
 	service := flag.String("service", shipping.ShippoDefaultServiceToken, "Shippo servicelevel.token to buy")
+	format := flag.String("format", "PDF", "label_file_type to buy: PDF, PDF_4x6, or PNG")
 	buy := flag.Bool("buy", false, "actually purchase the label (default: quote only)")
 	flag.Parse()
+
+	if !shipping.ValidLabelFileType(*format) {
+		log.Fatalf("invalid --format %q; allowed: %v", *format, shipping.AllowedLabelFileTypes)
+	}
 
 	apiKey := os.Getenv("SHIPPO_API_KEY")
 	if apiKey == "" {
@@ -53,33 +63,35 @@ func main() {
 	provider := shipping.NewShippoProvider(apiKey)
 
 	req := shipping.LabelRequest{
-		FromName:    "Rockabilly Roasting Co.",
-		FromStreet1: "101 W Kennewick Ave",
-		FromCity:    "Kennewick",
-		FromState:   "WA",
-		FromZip:     *fromZip,
-		FromCountry: "US",
-		FromEmail:   "info@rockabillyroasting.com",
-		FromPhone:   "5095852320",
-		ToName:      "Mr Hippo",
-		ToStreet1:   "965 Mission St #572",
-		ToCity:      "San Francisco",
-		ToState:     "CA",
-		ToZip:       *toZip,
-		ToCountry:   "US",
-		ToEmail:     "mrhippo@example.com",
-		ToPhone:     "4151234567",
-		WeightOz:    *weightOz,
-		LengthIn:    10,
-		WidthIn:     8,
-		HeightIn:    4,
-		ServiceCode: *service,
-		Reference:   "smoketest-" + time.Now().Format("20060102-150405"),
+		FromName:      "Rockabilly Roasting Co.",
+		FromStreet1:   "101 W Kennewick Ave",
+		FromCity:      "Kennewick",
+		FromState:     "WA",
+		FromZip:       *fromZip,
+		FromCountry:   "US",
+		FromEmail:     "info@rockabillyroasting.com",
+		FromPhone:     "5095852320",
+		ToName:        "Mr Hippo",
+		ToStreet1:     "965 Mission St #572",
+		ToCity:        "San Francisco",
+		ToState:       "CA",
+		ToZip:         *toZip,
+		ToCountry:     "US",
+		ToEmail:       "mrhippo@example.com",
+		ToPhone:       "4151234567",
+		WeightOz:      *weightOz,
+		LengthIn:      10,
+		WidthIn:       8,
+		HeightIn:      4,
+		ServiceCode:   *service,
+		LabelFileType: *format,
+		Reference:     "smoketest-" + time.Now().Format("20060102-150405"),
 	}
 
 	fmt.Printf("Shippo smoke test — %s → %s, %.1f oz\n",
 		req.FromZip, req.ToZip, req.WeightOz)
 	fmt.Printf("Requested service: %s\n", *service)
+	fmt.Printf("Label format:      %s\n", *format)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

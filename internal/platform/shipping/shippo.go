@@ -27,9 +27,13 @@ const ShippoAPIBase = "https://api.goshippo.com"
 // Uses raw net/http — Shippo's surface area for label buying is two endpoints
 // (POST /shipments, POST /transactions), not worth a third-party SDK.
 type ShippoProvider struct {
-	apiKey  string
-	baseURL string
-	client  *http.Client
+	apiKey string
+	// defaultLabelFileType is the label_file_type used when a purchase doesn't
+	// specify one on the Rate. Empty resolves to "PDF" at buy time. Set via
+	// WithDefaultLabelFileType from the SHIPPO_LABEL_FORMAT env var.
+	defaultLabelFileType string
+	baseURL              string
+	client               *http.Client
 }
 
 // NewShippoProvider creates a LabelProvider backed by Shippo's REST API.
@@ -39,6 +43,17 @@ func NewShippoProvider(apiKey string) *ShippoProvider {
 		baseURL: ShippoAPIBase,
 		client:  &http.Client{Timeout: 30 * time.Second},
 	}
+}
+
+// WithDefaultLabelFileType sets the label_file_type used for purchases that
+// don't specify one per-Rate (the admin GetRates+BuyRate flow and the bulk
+// label job). Returns the provider for chaining. An empty or unrecognized
+// value leaves the default unchanged.
+func (p *ShippoProvider) WithDefaultLabelFileType(ft string) *ShippoProvider {
+	if ValidLabelFileType(ft) && ft != "" {
+		p.defaultLabelFileType = ft
+	}
+	return p
 }
 
 // NewShippoProviderWithBase is for tests; allows pointing at a mock server.
@@ -78,12 +93,13 @@ func (p *ShippoProvider) CreateLabel(ctx context.Context, req LabelRequest) (*La
 	}
 
 	return p.BuyRate(ctx, Rate{
-		RateID:       rate.ObjectID,
-		CarrierName:  rate.Provider,
-		ServiceName:  rate.ServiceLevel.Name,
-		ServiceToken: rate.ServiceLevel.Token,
-		AmountCents:  rateCents,
-		Currency:     rate.Currency,
+		RateID:        rate.ObjectID,
+		CarrierName:   rate.Provider,
+		ServiceName:   rate.ServiceLevel.Name,
+		ServiceToken:  rate.ServiceLevel.Token,
+		AmountCents:   rateCents,
+		Currency:      rate.Currency,
+		LabelFileType: req.LabelFileType,
 	})
 }
 
@@ -123,10 +139,19 @@ func (p *ShippoProvider) GetRates(ctx context.Context, req LabelRequest) ([]Rate
 // service, and cost come from the rate snapshot (the transaction response only
 // returns tracking + label URL); tracking and label URL come from Shippo.
 func (p *ShippoProvider) BuyRate(ctx context.Context, rate Rate) (*LabelResult, error) {
+	// Precedence: per-purchase Rate override, then the provider default
+	// (SHIPPO_LABEL_FORMAT), then a hard "PDF" fallback.
+	fileType := rate.LabelFileType
+	if fileType == "" {
+		fileType = p.defaultLabelFileType
+	}
+	if fileType == "" {
+		fileType = "PDF"
+	}
 	txReq := shippoTransactionReq{
 		Rate:          rate.RateID,
 		Async:         false,
-		LabelFileType: "PDF",
+		LabelFileType: fileType,
 	}
 	var txResp shippoTransactionResp
 	if err := p.post(ctx, "/transactions", txReq, &txResp); err != nil {

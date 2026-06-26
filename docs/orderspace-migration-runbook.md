@@ -107,8 +107,38 @@ Mix value tiers but keep the **highest-value accounts out of the first batch** (
 validated pilot batch (8 accounts) was Wandering Bean, Richland Baptist Church, Healthy Vibes,
 Novel Coffee, The Coffee Pot Seattle, Yellow Cafe, Steam and cream, Caterpillar Cafe.
 
-Resolve company names to OS customer IDs (the census prints IDs; or query the OS `/customers`
-endpoint). You'll feed the IDs to `os-migrate --only` and the emails to `os-welcome --emails`.
+### Resolving company names → OS IDs + emails
+
+You feed OS customer IDs to `os-migrate --only` and emails to `os-welcome --emails`, so you need
+both for each account in the batch. **`os-report` does not give you these for clean customers** — it
+only prints `id | company | email` for the **Cleanup-needed** list. For everyone else you must hit
+the OS `/customers` endpoint directly. Get an OAuth token (client-credentials, same creds the tools
+use) and page through `/v1/customers`:
+
+```bash
+CID=$(grep '^ORDERSPACE_CLIENT_ID=' .env | cut -d= -f2- | tr -d '"')
+CSEC=$(grep '^ORDERSPACE_CLIENT_SECRET=' .env | cut -d= -f2- | tr -d '"')
+TOKEN=$(curl -s -X POST https://identity.orderspace.com/oauth/token \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  --data-urlencode "client_id=$CID" --data-urlencode "client_secret=$CSEC" \
+  --data-urlencode 'grant_type=client_credentials' \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+# RR has ~54 customers, so one page of 100 covers it; paginate with starting_after=<last id> if not.
+curl -s 'https://api.orderspace.com/v1/customers?limit=100' -H "Authorization: Bearer $TOKEN" \
+  | python3 -c '
+import sys,json
+for c in json.load(sys.stdin)["customers"]:
+    bs=c.get("buyers") or []
+    em=next((b["email_address"] for b in bs if b.get("email_address")), (c.get("email_addresses") or {}).get("orders",""))
+    print(c["id"], "|", c["company_name"], "|", em)'
+```
+
+Two field gotchas, both confirmed in rehearsal:
+- The buyer email key is **`email_address`** (not `email`); the account-level fallback is
+  `email_addresses.orders`.
+- The importer **stores emails lowercased**. `os-welcome` lowercases its `--emails` input too, so
+  mixed-case OS emails still resolve — but a hand-written **case-sensitive** SQL `WHERE email IN (...)`
+  verify query will false-miss. Use `lower(c.email) IN (...)` when spot-checking (§8).
 
 ---
 
@@ -116,7 +146,8 @@ endpoint). You'll feed the IDs to `os-migrate --only` and the emails to `os-welc
 
 Run top to bottom. **Always rehearse against a prod copy first (§6).**
 
-1. **Census + pick** the batch (§4). Record the OS IDs and emails.
+1. **Census + pick** the batch (§4). Record the OS IDs and emails — `os-report` only prints these
+   for Cleanup-needed accounts, so resolve clean accounts via the `/customers` recipe in §4.
 
 2. **Dry-run the import:**
    ```bash
@@ -232,7 +263,7 @@ SELECT c.company_name, c.wholesale_status, pl.name AS price_list, c.payment_term
 FROM customers c
 LEFT JOIN price_lists pl ON pl.id = c.price_list_id
 WHERE c.account_type = 'wholesale'
-  AND c.email IN ('a@x.com','b@y.com')   -- the batch
+  AND lower(c.email) IN ('a@x.com','b@y.com')   -- the batch; lower() — emails are stored lowercased
 ORDER BY orders DESC;
 -- Expect: every row price_list='Wholesale 2026', net=7, addrs small (no bloat).
 

@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -421,6 +422,113 @@ func (d *Deps) loadProductOptions(ctx context.Context, tx pgx.Tx, productID uuid
 
 // loadVariantsWithPrices loads variants with their base prices, plus the customer
 // group list (used by the product's restricted-visibility controls).
+// productOptionOrdering captures, for one product, the metadata needed to order
+// its variants by size then grind: each option value's display name, position
+// within its option, and owning option, plus an option-priority list that puts
+// the "Size" option first and the remaining options (grind, etc.) in their
+// configured position order. Products without a size option fall back to plain
+// option-position order. Build it once per product with loadProductOptionOrdering
+// and reuse across the catalog, pricing, and subscription pages.
+type productOptionOrdering struct {
+	labels      map[uuid.UUID]string    // option value ID -> display value
+	valuePos    map[uuid.UUID]int       // option value ID -> position within its option
+	valueOption map[uuid.UUID]uuid.UUID // option value ID -> owning option ID
+	optionOrder []uuid.UUID             // option IDs: size first, then position order
+}
+
+func (d *Deps) loadProductOptionOrdering(ctx context.Context, tx pgx.Tx, productID uuid.UUID) (productOptionOrdering, error) {
+	o := productOptionOrdering{
+		labels:      map[uuid.UUID]string{},
+		valuePos:    map[uuid.UUID]int{},
+		valueOption: map[uuid.UUID]uuid.UUID{},
+	}
+	opts, err := d.CatalogService.ListProductOptions(ctx, tx, productID)
+	if err != nil {
+		return o, err
+	}
+	var sizeOptionID uuid.UUID
+	for _, opt := range opts {
+		if sizeOptionID == uuid.Nil && strings.Contains(strings.ToLower(opt.Name), "size") {
+			sizeOptionID = opt.ID
+		}
+		vals, vErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
+		if vErr != nil {
+			return o, vErr
+		}
+		for _, val := range vals {
+			o.labels[val.ID] = val.Value
+			o.valuePos[val.ID] = val.Position
+			o.valueOption[val.ID] = opt.ID
+		}
+	}
+	if sizeOptionID != uuid.Nil {
+		o.optionOrder = append(o.optionOrder, sizeOptionID)
+	}
+	for _, opt := range opts {
+		if opt.ID != sizeOptionID {
+			o.optionOrder = append(o.optionOrder, opt.ID)
+		}
+	}
+	return o, nil
+}
+
+// variantOptionMissing ranks a variant that lacks one of the product's options
+// after those that have it.
+const variantOptionMissing = 1 << 30
+
+// valueByOption maps a variant's option-value links to {option ID -> value ID}.
+func (o productOptionOrdering) valueByOption(vovs []domain.VariantOptionValue) map[uuid.UUID]uuid.UUID {
+	m := make(map[uuid.UUID]uuid.UUID, len(vovs))
+	for _, vov := range vovs {
+		if oid, ok := o.valueOption[vov.ProductOptionValueID]; ok {
+			m[oid] = vov.ProductOptionValueID
+		}
+	}
+	return m
+}
+
+// sortKey builds the size-then-grind sort key for a variant from its option
+// value links. Lower keys sort first.
+func (o productOptionOrdering) sortKey(vovs []domain.VariantOptionValue) []int {
+	vbo := o.valueByOption(vovs)
+	key := make([]int, len(o.optionOrder))
+	for i, oid := range o.optionOrder {
+		if valID, ok := vbo[oid]; ok {
+			key[i] = o.valuePos[valID]
+		} else {
+			key[i] = variantOptionMissing
+		}
+	}
+	return key
+}
+
+// label builds a size-first variant label (e.g. "12oz / Drip") from its option
+// value links, following the same size-then-grind priority as sortKey.
+func (o productOptionOrdering) label(vovs []domain.VariantOptionValue) string {
+	vbo := o.valueByOption(vovs)
+	parts := make([]string, 0, len(o.optionOrder))
+	for _, oid := range o.optionOrder {
+		if valID, ok := vbo[oid]; ok {
+			if s := o.labels[valID]; s != "" {
+				parts = append(parts, s)
+			}
+		}
+	}
+	return strings.Join(parts, " / ")
+}
+
+// lessVariantKey reports whether sort key a sorts strictly before b
+// (lexicographic, then shorter-first). Equal keys return false both ways so
+// callers can apply a stable tiebreak (e.g. SKU).
+func lessVariantKey(a, b []int) bool {
+	for i := 0; i < len(a) && i < len(b); i++ {
+		if a[i] != b[i] {
+			return a[i] < b[i]
+		}
+	}
+	return len(a) < len(b)
+}
+
 func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID uuid.UUID, options []admin.OptionWithValues) ([]admin.VariantWithOptions, []domain.CustomerGroup, error) {
 	rawVariants, err := d.CatalogService.ListVariants(ctx, tx, productID)
 	if err != nil {
@@ -432,12 +540,19 @@ func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID 
 		return nil, nil, err
 	}
 
+	ordering, err := d.loadProductOptionOrdering(ctx, tx, productID)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	var variants []admin.VariantWithOptions
+	keys := make(map[uuid.UUID][]int, len(rawVariants))
 	for _, v := range rawVariants {
 		vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
 		if vErr != nil {
 			return nil, nil, vErr
 		}
+		keys[v.ID] = ordering.sortKey(vov)
 		vwo := admin.VariantWithOptions{
 			Variant:      v,
 			OptionValues: sortedOptionValueNames(vov, options),
@@ -447,6 +562,11 @@ func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID 
 		}
 		variants = append(variants, vwo)
 	}
+	// Order by size then grind so the pricing and variant tabs read 12oz before
+	// 3lb, each grind group in its configured order, instead of catalog order.
+	sortVariantsByKey(variants, keys, func(v admin.VariantWithOptions) (uuid.UUID, string) {
+		return v.Variant.ID, v.Variant.SKU
+	})
 
 	groups, err := d.CustomerGroupService.List(ctx, tx)
 	if err != nil {
@@ -454,6 +574,24 @@ func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID 
 	}
 
 	return variants, groups, nil
+}
+
+// sortVariantsByKey stably orders any slice of variant wrappers by their
+// precomputed size-then-grind keys, falling back to SKU for ties. id extracts
+// the variant ID (to look up its key) and SKU (the tiebreak) from each element.
+func sortVariantsByKey[T any](items []T, keys map[uuid.UUID][]int, id func(T) (uuid.UUID, string)) {
+	sort.SliceStable(items, func(i, j int) bool {
+		idi, skui := id(items[i])
+		idj, skuj := id(items[j])
+		ki, kj := keys[idi], keys[idj]
+		if lessVariantKey(ki, kj) {
+			return true
+		}
+		if lessVariantKey(kj, ki) {
+			return false
+		}
+		return skui < skuj
+	})
 }
 
 func (d *Deps) handleAdminProductUpdate(w http.ResponseWriter, r *http.Request) {

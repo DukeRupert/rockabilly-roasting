@@ -195,23 +195,15 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 			return txErr
 		}
 
-		// Build option label map for the product so we can label sibling variants
-		// the same way the order page does (e.g., "Whole Bean / 12oz").
-		labels := map[uuid.UUID]string{}
-		opts, oErr := d.CatalogService.ListProductOptions(ctx, tx, product.ID)
-		if oErr != nil {
-			return oErr
+		// Option ordering metadata, shared with the catalog/pricing pages, so the
+		// variant dropdown reads by size then grind (12oz before 3lb, each grind
+		// group in its configured order) instead of the catalog's arbitrary order.
+		ordering, ordErr := d.loadProductOptionOrdering(ctx, tx, product.ID)
+		if ordErr != nil {
+			return ordErr
 		}
-		for _, opt := range opts {
-			vals, vlErr := d.CatalogService.ListProductOptionValues(ctx, tx, opt.ID)
-			if vlErr != nil {
-				return vlErr
-			}
-			for _, val := range vals {
-				labels[val.ID] = val.Value
-			}
-		}
-		currentVariantLabel, txErr = buildVariantLabel(ctx, tx, d, variant.ID, labels)
+
+		currentVariantLabel, txErr = buildVariantLabel(ctx, tx, d, variant.ID, ordering.labels)
 		if txErr != nil {
 			return txErr
 		}
@@ -225,6 +217,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 		if avErr != nil {
 			return avErr
 		}
+		keys := make(map[uuid.UUID][]int, len(allVariants))
 		for _, sv := range allVariants {
 			if sv.ArchivedAt != nil && sv.ID != variant.ID {
 				continue
@@ -236,10 +229,12 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 				}
 				return pErr
 			}
-			label, lblErr := buildVariantLabel(ctx, tx, d, sv.ID, labels)
-			if lblErr != nil {
-				return lblErr
+			vovs, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, sv.ID)
+			if vErr != nil {
+				return vErr
 			}
+			keys[sv.ID] = ordering.sortKey(vovs)
+			label := ordering.label(vovs) // size-first, e.g. "12oz / Drip"
 			if label == "" {
 				label = sv.SKU
 			}
@@ -249,6 +244,9 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 				Price: price.Amount,
 			})
 		}
+		sortVariantsByKey(siblingVariants, keys, func(sv admin.SiblingVariant) (uuid.UUID, string) {
+			return sv.ID, sv.Label
+		})
 		if media, mErr := d.CatalogService.ListProductMedia(ctx, tx, variant.ProductID); mErr == nil && len(media) > 0 {
 			thumbnailURL = d.MediaConfig.ProductImageURL(media[0].R2Key, mediapkg.VariantCard)
 		}
@@ -293,24 +291,24 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 
 	name, role := staffNameRole(r)
 	props := admin.SubscriptionShowProps{
-		Subscription:        sub,
-		Plan:                plan,
-		AvailablePlans:      availablePlans,
-		Customer:            customer,
-		Product:             product,
-		Variant:             variant,
-		VariantLabel:        currentVariantLabel,
-		SiblingVariants:     siblingVariants,
-		ThumbnailURL:        thumbnailURL,
-		UnitPrice:           unitPrice,
-		HasUnitPrice:        hasUnitPrice,
-		ShippingAddress:     shippingAddr,
-		Orders:              enrichedOrders,
-		Activity:            activity,
-		Flash:               r.URL.Query().Get("flash"),
-		MerchantTZ:          d.MerchantTZ,
-		StaffName:           name,
-		StaffRole:           role,
+		Subscription:    sub,
+		Plan:            plan,
+		AvailablePlans:  availablePlans,
+		Customer:        customer,
+		Product:         product,
+		Variant:         variant,
+		VariantLabel:    currentVariantLabel,
+		SiblingVariants: siblingVariants,
+		ThumbnailURL:    thumbnailURL,
+		UnitPrice:       unitPrice,
+		HasUnitPrice:    hasUnitPrice,
+		ShippingAddress: shippingAddr,
+		Orders:          enrichedOrders,
+		Activity:        activity,
+		Flash:           r.URL.Query().Get("flash"),
+		MerchantTZ:      d.MerchantTZ,
+		StaffName:       name,
+		StaffRole:       role,
 	}
 
 	if IsHTMX(r) {

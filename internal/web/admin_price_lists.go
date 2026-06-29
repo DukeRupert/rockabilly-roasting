@@ -290,6 +290,24 @@ func (d *Deps) buildPriceListProduct(ctx context.Context, tx pgx.Tx, p domain.Pr
 		return admin.ProductPriceListPricing{}, err
 	}
 
+	// Order rows by size then grind, matching the base-pricing and subscription
+	// pages, instead of the catalog's arbitrary variant order.
+	ordering, err := d.loadProductOptionOrdering(ctx, tx, p.ID)
+	if err != nil {
+		return admin.ProductPriceListPricing{}, err
+	}
+	keys := make(map[uuid.UUID][]int, len(variants))
+	for _, v := range variants {
+		vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
+		if vErr != nil {
+			return admin.ProductPriceListPricing{}, vErr
+		}
+		keys[v.ID] = ordering.sortKey(vov)
+	}
+	sortVariantsByKey(variants, keys, func(v domain.Variant) (uuid.UUID, string) {
+		return v.ID, v.SKU
+	})
+
 	vps := make([]admin.VariantPriceListPricing, len(variants))
 	for i, v := range variants {
 		vp := admin.VariantPriceListPricing{

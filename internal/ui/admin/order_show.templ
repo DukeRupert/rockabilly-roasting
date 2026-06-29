@@ -21,11 +21,14 @@ type EnrichedLineItem struct {
 }
 
 // SiblingVariant is one selectable option in the line-item grind/variant
-// picker. Same-priced siblings only — variants priced differently from the
-// current line item are filtered out by the handler.
+// picker. On the order page these are same-priced siblings only (the handler
+// filters out differently-priced variants). On the subscription page all
+// non-archived siblings are offered and Price (USD cents) is set so each option
+// can show its price; the order page leaves Price at 0 and does not render it.
 type SiblingVariant struct {
 	ID    uuid.UUID
 	Label string
+	Price int
 }
 
 type OrderShowProps struct {

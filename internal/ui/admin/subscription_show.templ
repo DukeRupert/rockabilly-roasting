@@ -214,23 +214,24 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 								action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/variant", props.Subscription.ID.String())) }
 								class="flex flex-wrap items-center gap-2"
 							>
-								<label class="text-xs font-medium uppercase tracking-wide text-rr-muted">Grind</label>
+								<input type="hidden" name="allow_price_change" value="true"/>
+								<label class="text-xs font-medium uppercase tracking-wide text-rr-muted">Size / Grind</label>
 								<select
 									name="variant_id"
 									class="border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
 								>
 									for _, sv := range props.SiblingVariants {
 										if sv.ID == props.Variant.ID {
-											<option value={ sv.ID.String() } selected>{ sv.Label }</option>
+											<option value={ sv.ID.String() } selected>{ sv.Label } — { formatCents(sv.Price) }</option>
 										} else {
-											<option value={ sv.ID.String() }>{ sv.Label }</option>
+											<option value={ sv.ID.String() }>{ sv.Label } — { formatCents(sv.Price) }</option>
 										}
 									}
 								</select>
 								<button
 									type="submit"
 									class="border border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
-									onclick="return confirm('Change grind on this subscription? Future renewals will use the new variant. The current pending order (if any) is not updated by this action.')"
+									onclick="return confirm('Change the size/grind on this subscription? If the new variant is a different price, the per-period charge will change — future renewals use the new variant and its current price. The current pending order (if any) is not updated by this action.')"
 								>Save</button>
 								<span class="text-xs text-rr-muted">Applies to future renewals only.</span>
 							</form>

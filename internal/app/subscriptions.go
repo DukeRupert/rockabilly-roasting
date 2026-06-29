@@ -640,12 +640,18 @@ func (s *SubscriptionService) CancelSubscription(ctx context.Context, tx pgx.Tx,
 }
 
 // ChangeVariant swaps a subscription to a sibling variant on the same product
-// (e.g. Whole Bean → Drip Ground). Future renewals will use the new variant;
-// orders already generated for the current period are not modified — staff
-// must adjust those separately on the order page. The target variant must
-// belong to the same product and share the same base price (USD) as the
-// current variant, mirroring the order-side guard.
-func (s *SubscriptionService) ChangeVariant(ctx context.Context, tx pgx.Tx, id, newVariantID uuid.UUID, actor Actor) (*domain.Subscription, error) {
+// (e.g. Whole Bean → Drip Ground, or 3lb → 12oz). Future renewals will use the
+// new variant and its current price; orders already generated for the current
+// period are not modified — staff must adjust those separately on the order
+// page. The target variant must belong to the same product and not be archived.
+//
+// By default the target must also share the same base price (USD) as the
+// current variant — this protects same-price "grind" swaps from silently
+// changing what the customer pays. Pass allowPriceChange to permit a swap that
+// moves the subscription to a different price tier (e.g. a size change); future
+// renewals then charge the new variant's current price. No out-of-cycle order
+// is ever created by this method.
+func (s *SubscriptionService) ChangeVariant(ctx context.Context, tx pgx.Tx, id, newVariantID uuid.UUID, allowPriceChange bool, actor Actor) (*domain.Subscription, error) {
 	if s.catalog == nil || s.pricing == nil {
 		return nil, fmt.Errorf("change subscription variant: service not wired with catalog/pricing")
 	}
@@ -696,7 +702,7 @@ func (s *SubscriptionService) ChangeVariant(ctx context.Context, tx pgx.Tx, id, 
 		}
 		return nil, fmt.Errorf("get new variant price: %w", err)
 	}
-	if newPrice.Amount != oldPrice.Amount {
+	if newPrice.Amount != oldPrice.Amount && !allowPriceChange {
 		return nil, ErrVariantPriceMismatch
 	}
 
@@ -718,6 +724,8 @@ func (s *SubscriptionService) ChangeVariant(ctx context.Context, tx pgx.Tx, id, 
 			"new_variant_id":  newVariant.ID,
 			"old_variant_sku": oldVariant.SKU,
 			"new_variant_sku": newVariant.SKU,
+			"old_price":       oldPrice.Amount,
+			"new_price":       newPrice.Amount,
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("audit subscription variant changed: %w", err)

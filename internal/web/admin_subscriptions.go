@@ -216,28 +216,25 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 			return txErr
 		}
 
-		// Sibling variants on the same product with the same USD base price.
-		// Always include the current variant so the select shows the active selection.
-		currentPrice, cpErr := d.PricingService.GetBasePrice(ctx, tx, variant.ID, "USD")
-		if cpErr != nil && !errors.Is(cpErr, app.ErrPriceNotFound) {
-			return cpErr
-		}
+		// Sibling variants on the same product, including different price tiers
+		// (e.g. 3lb → 12oz). Each option shows its current USD price so staff see
+		// what the customer's future renewals will be charged. Archived variants
+		// are skipped. Always include the current variant so the select shows the
+		// active selection.
 		allVariants, avErr := d.CatalogService.ListVariants(ctx, tx, product.ID)
 		if avErr != nil {
 			return avErr
 		}
 		for _, sv := range allVariants {
-			if sv.ID != variant.ID {
-				price, pErr := d.PricingService.GetBasePrice(ctx, tx, sv.ID, "USD")
-				if pErr != nil {
-					if errors.Is(pErr, app.ErrPriceNotFound) {
-						continue
-					}
-					return pErr
-				}
-				if currentPrice == nil || price.Amount != currentPrice.Amount {
+			if sv.ArchivedAt != nil && sv.ID != variant.ID {
+				continue
+			}
+			price, pErr := d.PricingService.GetBasePrice(ctx, tx, sv.ID, "USD")
+			if pErr != nil {
+				if errors.Is(pErr, app.ErrPriceNotFound) {
 					continue
 				}
+				return pErr
 			}
 			label, lblErr := buildVariantLabel(ctx, tx, d, sv.ID, labels)
 			if lblErr != nil {
@@ -249,6 +246,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 			siblingVariants = append(siblingVariants, admin.SiblingVariant{
 				ID:    sv.ID,
 				Label: label,
+				Price: price.Amount,
 			})
 		}
 		if media, mErr := d.CatalogService.ListProductMedia(ctx, tx, variant.ProductID); mErr == nil && len(media) > 0 {
@@ -539,9 +537,10 @@ func (d *Deps) handleAdminSubscriptionVariantUpdate(w http.ResponseWriter, r *ht
 		Error(w, r, app.ErrVariantNotFound)
 		return
 	}
+	allowPriceChange := r.FormValue("allow_price_change") == "true"
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.SubscriptionService.ChangeVariant(ctx, tx, id, newVariantID, staffActor(r))
+		_, txErr := d.SubscriptionService.ChangeVariant(ctx, tx, id, newVariantID, allowPriceChange, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -549,5 +548,5 @@ func (d *Deps) handleAdminSubscriptionVariantUpdate(w http.ResponseWriter, r *ht
 		return
 	}
 
-	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Grind+updated", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Variant+updated", http.StatusSeeOther)
 }

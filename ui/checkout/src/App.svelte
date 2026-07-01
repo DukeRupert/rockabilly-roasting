@@ -7,6 +7,7 @@
     type AddressResponse,
     type AppliedCoupon,
     type CartResponse,
+    type CheckoutFulfillmentMethod,
     type LocalFulfillmentMethod,
     type PaymentIntentResponse,
   } from './lib/api';
@@ -37,8 +38,8 @@
   let eligibleLocalMethods = $state<LocalFulfillmentMethod[]>([]);
   let localPickupInstructions = $state('');
   let localDeliveryDays = $state('');
-  let preferredLocalFulfillment = $state<LocalFulfillmentMethod | ''>('');
-  let chosenShippingMethod = $state<LocalFulfillmentMethod | ''>('');
+  let preferredLocalFulfillment = $state<CheckoutFulfillmentMethod | ''>('');
+  let chosenShippingMethod = $state<CheckoutFulfillmentMethod | ''>('');
   let totals = $state<PaymentIntentResponse | null>(null);
 
   // Coupon state. pricingVersion bumps whenever the cart's pricing inputs
@@ -167,12 +168,15 @@
     localPickupInstructions = e.local_pickup_instructions ?? '';
     localDeliveryDays = e.local_delivery_days ?? '';
     preferredLocalFulfillment = e.preferred_local_fulfillment ?? '';
-    // Default the radio: saved preference if it's still eligible, otherwise
-    // the first option. Empty string when there are zero or one option (one
-    // option still gets stamped server-side; UI just doesn't ask).
-    if (eligibleLocalMethods.length > 1) {
+    // A local-eligible customer always has a real choice: the eligible local
+    // method(s) plus "ship it to me". Default to the saved preference when it's
+    // one of those options, otherwise the first free local method — never
+    // default someone into paid shipping. Non-local addresses (no eligible
+    // local methods) get '' and just ship; the UI doesn't ask.
+    if (eligibleLocalMethods.length >= 1) {
+      const options: CheckoutFulfillmentMethod[] = [...eligibleLocalMethods, 'shipped'];
       chosenShippingMethod =
-        preferredLocalFulfillment && eligibleLocalMethods.includes(preferredLocalFulfillment)
+        preferredLocalFulfillment && options.includes(preferredLocalFulfillment)
           ? preferredLocalFulfillment
           : eligibleLocalMethods[0];
     } else {
@@ -182,7 +186,7 @@
     step = 'payment';
   }
 
-  function handleShippingMethodChange(method: LocalFulfillmentMethod) {
+  function handleShippingMethodChange(method: CheckoutFulfillmentMethod) {
     chosenShippingMethod = method;
     // Force Payment to recreate the PI with the new method.
     totals = null;

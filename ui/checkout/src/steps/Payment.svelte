@@ -6,6 +6,7 @@
     createPaymentIntent,
     confirmOrder,
     type CartResponse,
+    type CheckoutFulfillmentMethod,
     type LocalFulfillmentMethod,
     type PaymentIntentResponse,
   } from '../lib/api';
@@ -19,11 +20,11 @@
     eligibleLocalMethods: LocalFulfillmentMethod[];
     localPickupInstructions: string;
     localDeliveryDays: string;
-    shippingMethod: LocalFulfillmentMethod | '';
+    shippingMethod: CheckoutFulfillmentMethod | '';
     // Bumped by the parent when cart pricing changes (coupon applied or
     // removed) — triggers a payment-intent recreate, like a method switch.
     pricingVersion: number;
-    onShippingMethodChange: (m: LocalFulfillmentMethod) => void;
+    onShippingMethodChange: (m: CheckoutFulfillmentMethod) => void;
     totalsLoaded?: (pi: PaymentIntentResponse) => void;
     onBack: () => void;
   }
@@ -45,7 +46,10 @@
 
   let resolvedTotal = $state<number | null>(null);
   let totalAmount = $derived(resolvedTotal ?? cart.subtotal);
-  let showMethodRadio = $derived(eligibleLocalMethods.length > 1);
+  // A local-eligible customer (≥1 local method) always gets the chooser, because
+  // "ship it to me" is offered alongside the free local method(s) — so even a
+  // single local method yields a real choice.
+  let showMethodRadio = $derived(eligibleLocalMethods.length >= 1);
 
   let stripe = $state<Stripe | null>(null);
   let elements = $state<StripeElements | null>(null);
@@ -201,7 +205,7 @@
         class="px-2 font-oswald font-bold text-ink text-[11px]"
         style="letter-spacing:0.2em; text-transform:uppercase;"
       >
-        Local fulfillment
+        How you'll get it
       </legend>
       <div class="space-y-3">
         {#each eligibleLocalMethods as method}
@@ -234,18 +238,33 @@
             </span>
           </label>
         {/each}
+        <!-- Always offered alongside the free local option(s): opt out of local
+             fulfillment and have it mailed. The shipping charge appears in the
+             order summary once selected (the PI recreates with the new method). -->
+        <label class="flex items-start gap-3 cursor-pointer">
+          <input
+            type="radio"
+            name="shipping_method"
+            value="shipped"
+            checked={shippingMethod === 'shipped'}
+            onchange={() => onShippingMethodChange('shipped')}
+            disabled={processing}
+            class="mt-1 size-4 accent-rust"
+          />
+          <span class="flex-1">
+            <span
+              class="block font-oswald font-bold text-ink text-sm"
+              style="letter-spacing:0.04em;"
+            >
+              Ship it to me
+            </span>
+            <span class="block font-oswald text-ink-soft text-xs mt-0.5">
+              We'll mail it out instead — standard shipping added in your total.
+            </span>
+          </span>
+        </label>
       </div>
     </fieldset>
-  {:else if eligibleLocalMethods.length === 1 && shippingMethod === 'pickup' && localPickupInstructions}
-    <div class="mb-6 border-2 border-ink bg-cream-hi p-4 sm:p-5">
-      <p
-        class="font-oswald font-bold text-ink text-[11px] mb-1"
-        style="letter-spacing:0.2em; text-transform:uppercase;"
-      >
-        Free pickup at the shop
-      </p>
-      <p class="font-oswald text-ink-soft text-sm">{localPickupInstructions}</p>
-    </div>
   {/if}
 
   {#if loading}

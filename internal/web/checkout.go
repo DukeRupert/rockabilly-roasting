@@ -791,20 +791,23 @@ func (d *Deps) handleCheckoutPaymentIntent(w http.ResponseWriter, r *http.Reques
 		taxTotal = taxResult.TaxTotal
 		taxLabel = taxResult.Label
 
-		shipCents, shipCfg, txErr := d.CheckoutService.CalculateShipping(ctx, tx, discountedSubtotal, shippingAddr.PostalCode)
+		shipCfg, txErr := d.CheckoutService.GetShippingConfig(ctx, tx)
 		if txErr != nil {
-			return fmt.Errorf("calculate shipping: %w", txErr)
+			return fmt.Errorf("get shipping config: %w", txErr)
 		}
-		shippingTotal = shipCents
 
-		// Resolve the chosen local fulfillment method. The Svelte client sends
-		// a value when the zip is local; validate against the merchant config
-		// instead of trusting the input. If the customer has a saved preference
-		// and didn't send a method, fall back to it before defaulting to the
-		// first eligible option.
+		// Resolve the chosen fulfillment method first, then price shipping off
+		// it. The Svelte client sends a value when the zip is local; validate
+		// against the merchant config instead of trusting the input. If the
+		// customer has a saved preference and didn't send a method, fall back to
+		// it before defaulting to the first eligible option. A local customer may
+		// opt out of free local fulfillment and have it mailed — that "shipped"
+		// choice is priced like any other shipment (flat rate, waived over the
+		// free-ship threshold) even though the zip is local.
 		eligible := shipCfg.EligibleLocalMethods(shippingAddr.PostalCode)
 		chosenMethod = resolveLocalMethod(eligible, req.ShippingMethod, customer.PreferredLocalFulfillment)
-		shippingLabel = shippingDisplayLabel(shipCfg, shipCents, shippingAddr.PostalCode, chosenMethod)
+		shippingTotal = shipCfg.CalculateForMethod(discountedSubtotal, shippingAddr.PostalCode, chosenMethod)
+		shippingLabel = shippingDisplayLabel(shipCfg, shippingTotal, shippingAddr.PostalCode, chosenMethod)
 
 		return nil
 	})
@@ -953,6 +956,10 @@ func shippingDisplayLabel(cfg *domain.ShippingConfig, shippingCents int, shipToZ
 			return "Free pickup at the shop"
 		case domain.ShippingMethodLocalDelivery:
 			return "Free local delivery"
+		case domain.ShippingMethodShipped:
+			// Reached only when shippingCents == 0, i.e. the order cleared the
+			// free-shipping threshold, so it really is free shipping.
+			return "Free shipping"
 		}
 	}
 	if cfg.IsLocal(shipToZip) {
@@ -965,10 +972,16 @@ func shippingDisplayLabel(cfg *domain.ShippingConfig, shippingCents int, shipToZ
 }
 
 // resolveLocalMethod picks the shipping method to stamp on a retail order.
-// Priority: explicit client choice (must be in the eligible set), then the
-// customer's saved preference (likewise validated), then the first eligible
-// option. Returns nil for non-local addresses (eligible empty), which leaves
-// the order's shipping_method NULL — i.e. standard "shipped" downstream.
+// Priority: explicit client choice, then the customer's saved preference, then
+// the first eligible local option. Returns nil for non-local addresses
+// (eligible empty), which leaves the order's shipping_method NULL — i.e.
+// standard "shipped" downstream.
+//
+// A local customer (eligible set non-empty) may still choose to have the order
+// mailed: "shipped" is always an honored choice even though it never appears in
+// the eligible local set, so it's checked explicitly. Local method requests and
+// preferences are validated against the eligible set; an ineligible one falls
+// through to the default.
 func resolveLocalMethod(eligible []domain.ShippingMethod, requested string, preference *domain.ShippingMethod) *domain.ShippingMethod {
 	if len(eligible) == 0 {
 		return nil
@@ -981,15 +994,24 @@ func resolveLocalMethod(eligible []domain.ShippingMethod, requested string, pref
 		}
 		return false
 	}
+	shipped := domain.ShippingMethodShipped
+	if requested == string(domain.ShippingMethodShipped) {
+		return &shipped
+	}
 	if requested != "" {
 		m := domain.ShippingMethod(requested)
 		if contains(m) {
 			return &m
 		}
 	}
-	if preference != nil && contains(*preference) {
-		m := *preference
-		return &m
+	if preference != nil {
+		if *preference == domain.ShippingMethodShipped {
+			return &shipped
+		}
+		if contains(*preference) {
+			m := *preference
+			return &m
+		}
 	}
 	first := eligible[0]
 	return &first

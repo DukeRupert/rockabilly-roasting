@@ -11,6 +11,7 @@ import (
 func TestResolveLocalMethod(t *testing.T) {
 	pickup := domain.ShippingMethodPickup
 	delivery := domain.ShippingMethodLocalDelivery
+	shipped := domain.ShippingMethodShipped
 	bothEligible := []domain.ShippingMethod{delivery, pickup}
 	pickupOnly := []domain.ShippingMethod{pickup}
 
@@ -26,8 +27,23 @@ func TestResolveLocalMethod(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid request falls through to preference", func(t *testing.T) {
+	t.Run("explicit shipped request is honored for a local zip", func(t *testing.T) {
+		// A local customer opting to have it mailed instead of delivered.
 		got := resolveLocalMethod(bothEligible, "shipped", &delivery)
+		if assert.NotNil(t, got) {
+			assert.Equal(t, domain.ShippingMethodShipped, *got)
+		}
+	})
+
+	t.Run("shipped preference is honored when no request", func(t *testing.T) {
+		got := resolveLocalMethod(bothEligible, "", &shipped)
+		if assert.NotNil(t, got) {
+			assert.Equal(t, domain.ShippingMethodShipped, *got)
+		}
+	})
+
+	t.Run("unknown request falls through to preference", func(t *testing.T) {
+		got := resolveLocalMethod(bothEligible, "carrier_pigeon", &delivery)
 		if assert.NotNil(t, got) {
 			assert.Equal(t, domain.ShippingMethodLocalDelivery, *got)
 		}
@@ -75,5 +91,13 @@ func TestShippingDisplayLabel(t *testing.T) {
 	})
 	t.Run("local zip with no method falls back to delivery label", func(t *testing.T) {
 		assert.Equal(t, "Free local delivery", shippingDisplayLabel(cfg, 0, "99336", nil))
+	})
+	t.Run("paid shipped from a local zip uses default label", func(t *testing.T) {
+		shipped := domain.ShippingMethodShipped
+		assert.Equal(t, "", shippingDisplayLabel(cfg, 600, "99336", &shipped))
+	})
+	t.Run("free shipped (over threshold) from a local zip says free shipping", func(t *testing.T) {
+		shipped := domain.ShippingMethodShipped
+		assert.Equal(t, "Free shipping", shippingDisplayLabel(cfg, 0, "99336", &shipped))
 	})
 }

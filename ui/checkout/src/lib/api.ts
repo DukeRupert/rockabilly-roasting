@@ -58,20 +58,26 @@ export interface AddressRequest {
 
 export type LocalFulfillmentMethod = 'local_delivery' | 'pickup';
 
+// The fulfillment options a customer can choose at checkout: the eligible local
+// method(s) plus 'shipped' — opting out of free local fulfillment to have the
+// order mailed (charged at the standard rate). The server only ever reports
+// local methods in eligible_local_methods; 'shipped' is always offered on top.
+export type CheckoutFulfillmentMethod = LocalFulfillmentMethod | 'shipped';
+
 export interface AddressResponse {
   address_id: string;
   customer_id: string;
   eligible_local_methods: LocalFulfillmentMethod[];
   local_pickup_instructions?: string;
   local_delivery_days?: string;
-  preferred_local_fulfillment?: LocalFulfillmentMethod;
+  preferred_local_fulfillment?: CheckoutFulfillmentMethod;
 }
 
 export interface PaymentIntentRequest {
   cart_id: string;
   address_id: string;
   customer_id: string;
-  shipping_method?: LocalFulfillmentMethod | '';
+  shipping_method?: CheckoutFulfillmentMethod | '';
 }
 
 export interface PaymentIntentResponse {

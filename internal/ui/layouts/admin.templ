@@ -330,6 +330,14 @@ templ Admin(props AdminProps) {
 				/* ── Clickable table rows ── */
 				.row-link {
 					position: relative;
+					/* Safari/WebKit ignores `position: relative` on <tr>, so the
+					   .row-link-target::after overlay below is NOT clipped to its row
+					   there — it escapes to the viewport and stacks across the whole
+					   page, swallowing clicks on the tabs/filters above the table and
+					   routing them to a random order's detail page. A transform DOES
+					   establish a containing block on <tr> in WebKit, which clips the
+					   overlay back to its row. See WebKit bug 240961. */
+					transform: translate(0);
 					cursor: pointer;
 					transition: background-color 150ms linear, box-shadow 150ms linear;
 				}
@@ -636,6 +644,9 @@ templ adminUserFooter(props AdminProps) {
 		</button>
 		<div data-dropdown-menu class="hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border">
 			<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Settings</a>
+			if props.StaffRole == "admin" {
+				<a href="/admin/staff" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Team</a>
+			}
 			<a href="/admin/audit" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Audit log</a>
 			<a href="/admin/help" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Help</a>
 			<div class="my-1 border-t border-rr-border"></div>

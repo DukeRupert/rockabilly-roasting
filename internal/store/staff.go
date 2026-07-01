@@ -46,6 +46,54 @@ func (s *StaffStore) Create(ctx context.Context, tx pgx.Tx, params sqlcgen.Creat
 	return staffFromRow(row), nil
 }
 
+// List returns staff members ordered by name, paginated.
+func (s *StaffStore) List(ctx context.Context, tx pgx.Tx, limit, offset int32) ([]domain.Staff, error) {
+	rows, err := sqlcgen.New(tx).ListStaff(ctx, sqlcgen.ListStaffParams{
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list staff: %w", err)
+	}
+	staff := make([]domain.Staff, 0, len(rows))
+	for _, r := range rows {
+		staff = append(staff, *staffFromRow(r))
+	}
+	return staff, nil
+}
+
+// CountActiveByRole returns the number of active staff with the given role.
+// Used to guard against removing the last active admin.
+func (s *StaffStore) CountActiveByRole(ctx context.Context, tx pgx.Tx, role string) (int64, error) {
+	n, err := sqlcgen.New(tx).CountActiveStaffByRole(ctx, role)
+	if err != nil {
+		return 0, fmt.Errorf("count active staff by role: %w", err)
+	}
+	return n, nil
+}
+
+// UpdateRole updates a staff member's role.
+func (s *StaffStore) UpdateRole(ctx context.Context, tx pgx.Tx, id uuid.UUID, role string) error {
+	if err := sqlcgen.New(tx).UpdateStaffRole(ctx, sqlcgen.UpdateStaffRoleParams{
+		ID:   id,
+		Role: role,
+	}); err != nil {
+		return fmt.Errorf("update staff role: %w", err)
+	}
+	return nil
+}
+
+// UpdateActive toggles a staff member's active flag.
+func (s *StaffStore) UpdateActive(ctx context.Context, tx pgx.Tx, id uuid.UUID, active bool) error {
+	if err := sqlcgen.New(tx).UpdateStaffActive(ctx, sqlcgen.UpdateStaffActiveParams{
+		ID:       id,
+		IsActive: active,
+	}); err != nil {
+		return fmt.Errorf("update staff active: %w", err)
+	}
+	return nil
+}
+
 // UpdatePassword updates a staff member's password hash.
 func (s *StaffStore) UpdatePassword(ctx context.Context, tx pgx.Tx, id uuid.UUID, hash string) error {
 	if err := sqlcgen.New(tx).UpdateStaffPassword(ctx, sqlcgen.UpdateStaffPasswordParams{

@@ -130,6 +130,15 @@ type WhiteLabelInviteArgs struct {
 // Kind returns the job kind identifier.
 func (WhiteLabelInviteArgs) Kind() string { return "white_label_invite" }
 
+// StaffInviteArgs emails a staff member their invite / password-setup link.
+// Enqueued when an admin adds a new team member or resends the invite.
+type StaffInviteArgs struct {
+	StaffID uuid.UUID `json:"staff_id"`
+}
+
+// Kind returns the job kind identifier.
+func (StaffInviteArgs) Kind() string { return "staff_invite" }
+
 // WhiteLabelSubmittedArgs notifies staff that a client submitted a white-label
 // product for review.
 type WhiteLabelSubmittedArgs struct {

@@ -37,13 +37,14 @@ const MagicLinkSessionDuration = 30 * 24 * time.Hour
 
 // AuthService contains business logic for authentication and session management.
 type AuthService struct {
-	staff      *store.StaffStore
-	customers  *store.CustomerStore
-	magicLinks *store.MagicLinkStore
-	sessions   *sessions.Manager
-	audit      *audit.AuditWriter
-	metrics    *metrics.Registry
-	email      EmailEnv // populated via WithEmail; required for SendMagicLink
+	staff        *store.StaffStore
+	customers    *store.CustomerStore
+	magicLinks   *store.MagicLinkStore
+	staffInvites *store.StaffInviteTokenStore
+	sessions     *sessions.Manager
+	audit        *audit.AuditWriter
+	metrics      *metrics.Registry
+	email        EmailEnv // populated via WithEmail; required for SendMagicLink
 }
 
 // NewAuthService creates a new AuthService.
@@ -51,17 +52,19 @@ func NewAuthService(
 	staff *store.StaffStore,
 	customers *store.CustomerStore,
 	magicLinks *store.MagicLinkStore,
+	staffInvites *store.StaffInviteTokenStore,
 	sessions *sessions.Manager,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
 ) *AuthService {
 	return &AuthService{
-		staff:      staff,
-		customers:  customers,
-		magicLinks: magicLinks,
-		sessions:   sessions,
-		audit:      audit,
-		metrics:    metrics,
+		staff:        staff,
+		customers:    customers,
+		magicLinks:   magicLinks,
+		staffInvites: staffInvites,
+		sessions:     sessions,
+		audit:        audit,
+		metrics:      metrics,
 	}
 }
 
@@ -386,6 +389,75 @@ func (s *AuthService) RedeemWhiteLabelInvite(ctx context.Context, tx pgx.Tx, raw
 		return uuid.Nil, fmt.Errorf("redeem white-label invite: %w", err)
 	}
 	return token.CustomerID, nil
+}
+
+// CreateStaffInviteToken mints a single-use staff invite / password-setup token
+// and returns the raw token for the email link. Staff tokens live in their own
+// table (staff_invite_tokens) because magic_link_tokens is FK-locked to
+// customers. Mirrors CreateSetupToken but binds to a staff row.
+func (s *AuthService) CreateStaffInviteToken(ctx context.Context, tx pgx.Tx, staffID uuid.UUID) (rawToken string, err error) {
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("generate staff invite token: %w", err)
+	}
+	rawToken = hex.EncodeToString(tokenBytes)
+
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	expiresAt := time.Now().Add(StaffInviteDuration)
+	if _, err := s.staffInvites.Create(ctx, tx, staffID, tokenHash, expiresAt); err != nil {
+		return "", fmt.Errorf("store staff invite token: %w", err)
+	}
+
+	return rawToken, nil
+}
+
+// SetStaffPasswordWithToken validates a staff invite token and sets the staff
+// member's password. The token is single-use. Used by the public /staff/setup
+// page for both first-time setup and admin-triggered password resets. Returns
+// ErrStaffInviteInvalid if the token is missing, expired, or already used, and
+// ErrPasswordTooShort if the password is under 10 characters.
+func (s *AuthService) SetStaffPasswordWithToken(ctx context.Context, tx pgx.Tx, rawToken, password string) (*domain.Staff, error) {
+	if len(password) < 10 {
+		return nil, ErrPasswordTooShort
+	}
+
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	token, err := s.staffInvites.Redeem(ctx, tx, tokenHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrStaffInviteInvalid
+		}
+		return nil, fmt.Errorf("redeem staff invite token: %w", err)
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	if err := s.staff.UpdatePassword(ctx, tx, token.StaffID, string(passwordHash)); err != nil {
+		return nil, fmt.Errorf("update staff password: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    domain.AuditActorTypeSystem,
+		ActorName:    "staff_invite_redeem",
+		Action:       audit.AuditStaffPasswordSet,
+		ResourceType: "staff",
+		ResourceID:   token.StaffID,
+	}); err != nil {
+		return nil, fmt.Errorf("audit staff password set: %w", err)
+	}
+
+	staff, err := s.staff.GetByID(ctx, tx, token.StaffID)
+	if err != nil {
+		return nil, fmt.Errorf("get staff after password set: %w", err)
+	}
+	return staff, nil
 }
 
 // SetPasswordWithToken validates a setup token and sets the customer's password.

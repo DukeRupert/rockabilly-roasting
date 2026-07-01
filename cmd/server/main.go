@@ -271,6 +271,7 @@ func run() error {
 	priceListStore := store.NewPriceListStore()
 	invoiceStore := store.NewInvoiceStore()
 	magicLinkStore := store.NewMagicLinkStore()
+	staffInviteTokenStore := store.NewStaffInviteTokenStore()
 
 	// Email environment shared by every service that sends transactional email.
 	emailEnv := app.EmailEnv{
@@ -300,8 +301,10 @@ func run() error {
 	pricingSvc := app.NewPricingService(pricingStore, customerStore).
 		WithSettings(settingsStore)
 	cartSvc := app.NewCartService(cartStore, catalogStore, pricingSvc, catalogSvc)
-	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, sessionMgr, auditWriter, metricsReg).
+	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, staffInviteTokenStore, sessionMgr, auditWriter, metricsReg).
 		WithEmail(emailEnv)
+	staffSvc := app.NewStaffService(staffStore, auditWriter, metricsReg).
+		WithEmail(emailEnv, authSvc)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, shippingStore, paymentProvider, auditWriter, metricsReg).
 		WithTaxCalc(settingsStore, catalogStore).
 		WithRenewalAnchor(merchantTZ, renewalAnchorHour)
@@ -329,6 +332,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewWholesaleApprovedWorker(wholesaleSvc, pool))
 	river.AddWorker(workers, jobs.NewWholesaleSuspendedWorker(wholesaleSvc, pool))
 	river.AddWorker(workers, jobs.NewWhiteLabelInviteWorker(whiteLabelSvc, pool))
+	river.AddWorker(workers, jobs.NewStaffInviteWorker(staffSvc, pool))
 	river.AddWorker(workers, jobs.NewWhiteLabelSubmittedWorker(whiteLabelSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderConfirmEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionConfirmEmailWorker(subscriptionSvc, pool))
@@ -502,6 +506,7 @@ func run() error {
 		SubscriptionService:    subscriptionSvc,
 		DiscountService:        discountSvc,
 		AuthService:            authSvc,
+		StaffService:           staffSvc,
 		PricingService:         pricingSvc,
 		CartService:            cartSvc,
 		WholesaleService:       wholesaleSvc,

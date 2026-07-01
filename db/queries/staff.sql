@@ -7,6 +7,9 @@ SELECT * FROM staff WHERE email = $1;
 -- name: ListStaff :many
 SELECT * FROM staff ORDER BY name ASC LIMIT $1 OFFSET $2;
 
+-- name: CountActiveStaffByRole :one
+SELECT count(*) FROM staff WHERE role = $1 AND is_active = true;
+
 -- name: CreateStaff :one
 INSERT INTO staff (id, email, name, password_hash, role)
 VALUES ($1, $2, $3, $4, $5)

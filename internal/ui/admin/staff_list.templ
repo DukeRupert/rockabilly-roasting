@@ -1,0 +1,214 @@
+package admin
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type StaffListProps struct {
+	Staff          []domain.Staff
+	CurrentStaffID uuid.UUID
+	MerchantTZ     *time.Location
+	FormError      string
+	StaffName      string
+	StaffRole      string
+}
+
+// staffRoles is the ordered list offered in the invite form and role selector.
+func staffRoles() []domain.StaffRole {
+	return []domain.StaffRole{
+		domain.StaffRoleAdmin,
+		domain.StaffRoleFulfillment,
+		domain.StaffRoleFinance,
+		domain.StaffRoleCatalog,
+		domain.StaffRoleSupport,
+	}
+}
+
+func staffRoleLabel(r domain.StaffRole) string {
+	switch r {
+	case domain.StaffRoleAdmin:
+		return "Admin"
+	case domain.StaffRoleFulfillment:
+		return "Fulfillment"
+	case domain.StaffRoleFinance:
+		return "Finance"
+	case domain.StaffRoleCatalog:
+		return "Catalog"
+	case domain.StaffRoleSupport:
+		return "Support"
+	default:
+		return string(r)
+	}
+}
+
+templ StaffListContent(props StaffListProps) {
+	<!-- Page header -->
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Team</h1>
+			<p class="mt-1 text-sm text-rr-muted">Invite staff, set their role, and manage access. Admins only.</p>
+		</div>
+	</div>
+	if props.FormError != "" {
+		<div class="mt-4 rounded-sm badge-red p-3 text-sm">
+			{ props.FormError }
+		</div>
+	}
+	<!-- Invite form -->
+	<div class="mt-6 border border-rr-border bg-rr-surface p-6">
+		<h2 class="text-sm font-semibold text-rr-heading">Invite a team member</h2>
+		<p class="mt-1 text-sm text-rr-muted">We email them a link to set their own password. The link is good for 72 hours.</p>
+		<form method="post" action="/admin/staff" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-6">
+			<div class="sm:col-span-2">
+				<label for="staff-name" class="block text-sm font-medium text-rr-body">Name</label>
+				<input
+					id="staff-name"
+					name="name"
+					type="text"
+					required
+					placeholder="e.g. Dale Watson"
+					class="mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+				/>
+			</div>
+			<div class="sm:col-span-2">
+				<label for="staff-email" class="block text-sm font-medium text-rr-body">Email</label>
+				<input
+					id="staff-email"
+					name="email"
+					type="email"
+					required
+					placeholder="name@rockabillyroasting.com"
+					class="mt-1 block w-full rounded-sm border border-rr-border px-3 py-2 text-sm text-rr-heading placeholder:text-rr-muted focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+				/>
+			</div>
+			<div class="sm:col-span-1">
+				<label for="staff-role" class="block text-sm font-medium text-rr-body">Role</label>
+				<div class="mt-1 grid grid-cols-1">
+					<select
+						id="staff-role"
+						name="role"
+						required
+						class="col-start-1 row-start-1 w-full appearance-none rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+					>
+						for _, role := range staffRoles() {
+							<option value={ string(role) } selected?={ role == domain.StaffRoleFulfillment }>{ staffRoleLabel(role) }</option>
+						}
+					</select>
+					<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+						<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+					</svg>
+				</div>
+			</div>
+			<div class="flex items-end">
+				<button
+					type="submit"
+					class="inline-flex items-center rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
+				>
+					Send Invite
+				</button>
+			</div>
+		</form>
+	</div>
+	<!-- Staff table -->
+	<div class="mt-6">
+		if len(props.Staff) == 0 {
+			<div class="border border-dashed border-rr-border p-12 text-center">
+				<h3 class="text-sm font-semibold text-rr-heading">No staff yet</h3>
+				<p class="mt-1 text-sm text-rr-muted">Invite your first team member above.</p>
+			</div>
+		} else {
+			<div class="overflow-hidden border border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Name</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Email</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Role</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
+								<span class="sr-only">Actions</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, s := range props.Staff {
+							<tr>
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-rr-heading sm:pl-6">
+									{ s.Name }
+									if s.ID == props.CurrentStaffID {
+										<span class="ml-1 text-xs text-rr-muted">(you)</span>
+									}
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">{ s.Email }</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									if s.ID == props.CurrentStaffID {
+										<span class="badge badge-slate">{ staffRoleLabel(s.Role) }</span>
+									} else {
+										<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/staff/%s/role", s.ID.String())) } class="flex items-center gap-2">
+											<div class="grid grid-cols-1">
+												<select
+													name="role"
+													class="col-start-1 row-start-1 appearance-none rounded-sm border border-rr-border bg-rr-surface py-1 pl-2 pr-7 text-xs text-rr-heading focus:border-rr-red focus:ring-1 focus:ring-rr-red focus:outline-none"
+												>
+													for _, role := range staffRoles() {
+														<option value={ string(role) } selected?={ role == s.Role }>{ staffRoleLabel(role) }</option>
+													}
+												</select>
+												<svg class="pointer-events-none col-start-1 row-start-1 mr-1.5 size-4 self-center justify-self-end text-rr-muted" viewBox="0 0 16 16" fill="currentColor">
+													<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+												</svg>
+											</div>
+											<button type="submit" class="inline-flex items-center rounded-sm border border-rr-border px-2 py-1 text-xs font-semibold text-rr-heading hover:bg-rr-raised">Update</button>
+										</form>
+									}
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									if s.IsActive {
+										<span class="badge badge-green">Active</span>
+									} else {
+										<span class="badge badge-grey">Inactive</span>
+									}
+								</td>
+								<td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+									<div class="flex items-center justify-end gap-3">
+										<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/staff/%s/resend-invite", s.ID.String())) } class="inline">
+											<button type="submit" class="text-rr-muted hover:text-rr-heading">Resend invite</button>
+										</form>
+										if s.ID != props.CurrentStaffID {
+											if s.IsActive {
+												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/staff/%s/deactivate", s.ID.String())) } class="inline">
+													<button type="submit" class="text-rr-red hover:text-rr-red-lt">Deactivate</button>
+												</form>
+											} else {
+												<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/staff/%s/activate", s.ID.String())) } class="inline">
+													<button type="submit" class="text-rr-red hover:text-rr-red-lt">Activate</button>
+												</form>
+											}
+										}
+									</div>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+templ StaffList(props StaffListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Team",
+		ActivePath: "/admin/staff",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@StaffListContent(props)
+	}
+}

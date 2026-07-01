@@ -11,6 +11,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const countActiveStaffByRole = `-- name: CountActiveStaffByRole :one
+SELECT count(*) FROM staff WHERE role = $1 AND is_active = true
+`
+
+func (q *Queries) CountActiveStaffByRole(ctx context.Context, role string) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveStaffByRole, role)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createStaff = `-- name: CreateStaff :one
 INSERT INTO staff (id, email, name, password_hash, role)
 VALUES ($1, $2, $3, $4, $5)

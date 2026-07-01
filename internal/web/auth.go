@@ -61,6 +61,21 @@ func (d *Deps) requireStaffSession(next http.Handler) http.Handler {
 	})
 }
 
+// requirePermission wraps a handler so it only runs for staff whose role grants
+// the given permission. Must be mounted inside requireStaffSession, which puts
+// the authenticated staff on the context. This is the middleware home for
+// authorization checks — handlers and services stay permission-agnostic.
+func (d *Deps) requirePermission(perm string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		staff, ok := auth.StaffFromContext(r.Context())
+		if !ok || !auth.HasPermission(staff.Role, perm) {
+			Error(w, r, app.ErrPermissionDenied)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // redirectToStaffLogin sends the client to the staff login page. For htmx
 // requests (the admin panel is hx-boosted), a plain 303 would be followed by
 // XHR and the login page swapped into #main-content; HX-Redirect forces a full

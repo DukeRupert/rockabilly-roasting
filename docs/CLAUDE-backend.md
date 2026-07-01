@@ -229,7 +229,16 @@ These are hard boundaries. Never cross them.
 
 **Authentication and sessions belong in `platform/sessions/` and `web/middleware.go`.** No service or repository function checks session validity, reads a token, or calls `platform/sessions` directly.
 
-**Authorization belongs in middleware, not handlers or services.** Permission checks (`auth.RequirePermission(...)`) are applied at route registration time in `web/router.go`. A handler that contains `if actor.Role != admin` is wrong.
+**Authorization belongs in middleware, not handlers or services.** Permission checks are applied at route registration time in `web/router.go`. A handler that contains `if actor.Role != admin` is wrong.
+
+Per-route admin permissions use the `deps.requirePermission(perm, next)` middleware, mounted on `adminMux` *inside* `requireStaffSession` (which puts the authenticated staff on the context). Wrap each protected route with a `platform/auth.Perm*` constant:
+
+```go
+adminMux.Handle("GET /admin/staff", deps.requirePermission(auth.PermManageStaff, http.HandlerFunc(deps.handleAdminStaffList)))
+adminMux.Handle("POST /admin/staff", deps.requirePermission(auth.PermManageStaff, http.HandlerFunc(deps.handleAdminStaffInvite)))
+```
+
+The middleware resolves the staff from the context, checks `auth.HasPermission(role, perm)`, and writes `app.ErrPermissionDenied` (→ 403) on failure. Services and handlers stay permission-agnostic — they receive an already-authorized request. Roles map to permissions in one place: `platform/auth.rolePermissions`. (A UI helper like `domain.StaffRole.CanManageStaff()` may mirror a grant to hide a nav affordance, but it is *not* the gate — the middleware is; keep the two in sync.)
 
 **Customer data scoping belongs in `store/`, enforced by function signatures.** A repository function that returns customer orders must require `customerID` as a parameter. This is not optional — it is how ownership is enforced.
 

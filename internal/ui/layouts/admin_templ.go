@@ -9,6 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/components/icon"
 	"strings"
 )
@@ -148,7 +149,7 @@ func adminNav(activePath string) templ.Component {
 			var templ_7745c5c3_Var3 templ.SafeURL
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 106, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 107, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -161,7 +162,7 @@ func adminNav(activePath string) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 106, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 107, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 			if templ_7745c5c3_Err != nil {
@@ -195,7 +196,7 @@ func adminNav(activePath string) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 108, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 109, Col: 83}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -242,7 +243,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(props.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 122, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 123, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -446,7 +447,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 635, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 636, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
@@ -459,7 +460,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 638, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 639, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -472,13 +473,23 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 639, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 640, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span></span> <svg data-sidebar-label class=\"size-5 text-rr-muted transition-opacity duration-200\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z\" clip-rule=\"evenodd\"></path></svg></button><div data-dropdown-menu class=\"hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border\"><a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Settings</a> <a href=\"/admin/audit\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Audit log</a> <a href=\"/admin/help\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Help</a><div class=\"my-1 border-t border-rr-border\"></div><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span></span> <svg data-sidebar-label class=\"size-5 text-rr-muted transition-opacity duration-200\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z\" clip-rule=\"evenodd\"></path></svg></button><div data-dropdown-menu class=\"hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border\"><a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Settings</a> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if domain.StaffRole(props.StaffRole).CanManageStaff() {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<a href=\"/admin/staff\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Team</a> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<a href=\"/admin/audit\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Audit log</a> <a href=\"/admin/help\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Help</a><div class=\"my-1 border-t border-rr-border\"></div><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -28,6 +28,7 @@ func newAuthService() *app.AuthService {
 		store.NewStaffStore(),
 		store.NewCustomerStore(),
 		store.NewMagicLinkStore(),
+		store.NewStaffInviteTokenStore(),
 		sessionMgr,
 		audit.NewAuditWriter(),
 		metrics.NewRegistry(),

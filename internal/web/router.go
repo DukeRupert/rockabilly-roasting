@@ -15,6 +15,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/build"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/help"
@@ -47,6 +48,7 @@ type Deps struct {
 	SubscriptionService    *app.SubscriptionService
 	DiscountService        *app.DiscountService
 	AuthService            *app.AuthService
+	StaffService           *app.StaffService
 	PricingService         *app.PricingService
 	CartService            *app.CartService
 	WholesaleService       *app.WholesaleService
@@ -201,6 +203,10 @@ func NewRouter(deps *Deps) http.Handler {
 	// Generic password setup/reset (admin-triggered, retail or wholesale customer)
 	mux.HandleFunc("GET /account/password-setup", deps.handleAccountPasswordSetupPage)
 	mux.HandleFunc("POST /account/password-setup", deps.handleAccountPasswordSetup)
+
+	// Public staff invite password-setup (reached from the invite email link).
+	mux.HandleFunc("GET /staff/setup", deps.handleStaffSetupPage)
+	mux.HandleFunc("POST /staff/setup", deps.handleStaffSetup)
 
 	// Retail account auth routes (magic link, no session required)
 	magicLinkLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
@@ -433,6 +439,16 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/discounts", deps.handleAdminDiscountCreate)
 	adminMux.HandleFunc("POST /admin/discounts/{id}/deactivate", deps.handleAdminDiscountDeactivate)
 	adminMux.HandleFunc("POST /admin/discounts/{id}/activate", deps.handleAdminDiscountActivate)
+
+	// Admin team / staff management — admin-only (staff:write). Wrapped in
+	// requirePermission; requireStaffSession (mounting the whole adminMux) has
+	// already put the authenticated staff on the context.
+	adminMux.Handle("GET /admin/staff", deps.requirePermission(auth.PermManageStaff, http.HandlerFunc(deps.handleAdminStaffList)))
+	adminMux.Handle("POST /admin/staff", deps.requirePermission(auth.PermManageStaff, http.HandlerFunc(deps.handleAdminStaffInvite)))
+	adminMux.Handle("POST /admin/staff/{id}/role", deps.requirePermission(auth.PermManageStaff, http.HandlerFunc(deps.handleAdminStaffRole)))
+	adminMux.Handle("POST /admin/staff/{id}/activate", deps.requirePermission(auth.PermManageStaff, http.HandlerFunc(deps.handleAdminStaffActivate)))
+	adminMux.Handle("POST /admin/staff/{id}/deactivate", deps.requirePermission(auth.PermManageStaff, http.HandlerFunc(deps.handleAdminStaffDeactivate)))
+	adminMux.Handle("POST /admin/staff/{id}/resend-invite", deps.requirePermission(auth.PermManageStaff, http.HandlerFunc(deps.handleAdminStaffResendInvite)))
 
 	// Admin wholesale
 	adminMux.HandleFunc("GET /admin/wholesale", deps.handleAdminWholesaleList)

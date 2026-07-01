@@ -1,0 +1,166 @@
+package admin
+
+// StaffSetupProps drives the public staff password-setup page reached from an
+// invite email link.
+type StaffSetupProps struct {
+	Token   string
+	Error   string
+	Success bool
+}
+
+templ StaffSetupPage(props StaffSetupProps) {
+	<!DOCTYPE html>
+	<html lang="en" class="h-full">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Set your password — Rockabilly Roasting</title>
+			<link rel="stylesheet" href="/static/css/output.css"/>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+			<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@400;500;600;700&family=Special+Elite&family=Yellowtail&display=swap" rel="stylesheet"/>
+			<style>
+				.login-form-panel {
+					background-color: #F6EFE1;
+					background-image: radial-gradient(circle, rgba(14, 13, 12, 0.06) 1px, transparent 1px);
+					background-size: 4px 4px;
+				}
+				.flame-stripe-login {
+					height: 3px;
+					background: linear-gradient(90deg, #8A240F, #B4351D, #F2A03D, #B4351D, #8A240F);
+				}
+			</style>
+		</head>
+		<body class="h-full" style="background:#F6EFE1; color:#0E0D0C;">
+			<div class="login-form-panel flex min-h-full w-full flex-col justify-center px-6 py-12 sm:px-12 relative">
+				<div class="mx-auto w-full max-w-sm">
+					<!-- Ink badge -->
+					<div class="mb-8 -mx-6 sm:-mx-12 px-6 sm:px-12 py-6 text-center relative" style="background:#0E0D0C;">
+						<div class="flame-stripe-login absolute top-0 left-0 right-0"></div>
+						<img
+							src="/static/logo-white.svg"
+							alt="Rockabilly Roasting Co."
+							class="w-28 h-auto mx-auto mb-2"
+						/>
+						<p
+							class="font-oswald text-candle text-[10px] font-semibold"
+							style="letter-spacing:0.28em; text-transform:uppercase;"
+						>
+							Staff Portal
+						</p>
+						<div class="flame-stripe-login absolute bottom-0 left-0 right-0"></div>
+					</div>
+					if props.Success {
+						<div class="text-center mb-8">
+							<h1
+								class="font-slab text-ink uppercase leading-[0.92]"
+								style="font-size: clamp(1.75rem, 4.5vw, 2.5rem); letter-spacing:-0.005em;"
+							>
+								You're all set.
+							</h1>
+							<p class="font-oswald text-ink-soft text-sm mt-3 max-w-xs mx-auto leading-relaxed">
+								Your password is saved. Sign in to get to work.
+							</p>
+						</div>
+						<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8 text-center">
+							<a
+								href="/auth/staff/login"
+								class="btn-stamp inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm"
+								style="letter-spacing:0.16em; text-transform:uppercase;"
+							>
+								Go to Sign In
+							</a>
+						</div>
+					} else {
+						<div class="text-center mb-8">
+							<p
+								class="font-oswald text-chrome-deep text-xs font-semibold"
+								style="letter-spacing:0.24em; text-transform:uppercase;"
+							>
+								Welcome to the crew
+							</p>
+							<h1
+								class="font-slab text-ink uppercase leading-[0.92] mt-2"
+								style="font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;"
+							>
+								Set your
+								<span
+									class="font-script text-rust normal-case inline-block align-baseline"
+									style="font-size:0.9em; letter-spacing:0;"
+								>
+									password.
+								</span>
+							</h1>
+							<p class="font-oswald text-ink-soft text-sm mt-3 max-w-xs mx-auto leading-relaxed">
+								Pick something at least 10 characters long.
+							</p>
+						</div>
+						<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8">
+							if props.Error != "" {
+								<div class="mb-5 border-2 border-rust bg-paper p-3 text-center">
+									<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">{ props.Error }</p>
+								</div>
+							}
+							<form method="post" action="/staff/setup" class="space-y-5">
+								<input type="hidden" name="token" value={ props.Token }/>
+								<div>
+									<label
+										for="password"
+										class="font-oswald font-bold text-ink text-[11px] mb-2 block"
+										style="letter-spacing:0.2em; text-transform:uppercase;"
+									>
+										New Password
+									</label>
+									<input
+										id="password"
+										name="password"
+										type="password"
+										autocomplete="new-password"
+										required
+										minlength="10"
+										class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-base text-ink placeholder:text-chrome-deep focus:outline-none"
+										style="letter-spacing:0.04em;"
+									/>
+								</div>
+								<div>
+									<label
+										for="password_confirm"
+										class="font-oswald font-bold text-ink text-[11px] mb-2 block"
+										style="letter-spacing:0.2em; text-transform:uppercase;"
+									>
+										Confirm Password
+									</label>
+									<input
+										id="password_confirm"
+										name="password_confirm"
+										type="password"
+										autocomplete="new-password"
+										required
+										minlength="10"
+										class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-base text-ink placeholder:text-chrome-deep focus:outline-none"
+										style="letter-spacing:0.04em;"
+									/>
+								</div>
+								<div class="pt-2">
+									<button
+										type="submit"
+										class="btn-stamp w-full inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm"
+										style="letter-spacing:0.16em; text-transform:uppercase;"
+									>
+										Set Password
+									</button>
+								</div>
+							</form>
+						</div>
+					}
+					<p
+						class="mt-8 text-center font-special text-chrome-deep text-xs"
+						style="letter-spacing:0.04em;"
+					>
+						Rockabilly Roasting Co. &middot; Kennewick, WA
+					</p>
+				</div>
+			</div>
+		</body>
+	</html>
+}

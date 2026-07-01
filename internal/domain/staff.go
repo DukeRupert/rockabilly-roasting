@@ -17,6 +17,26 @@ const (
 	StaffRoleSupport     StaffRole = "support"
 )
 
+// CanManageStaff reports whether the role may access staff (team) management.
+// This mirrors the PermManageStaff grant in platform/auth.rolePermissions — that
+// map is the enforcement source of truth (the requirePermission middleware). This
+// helper exists only so the UI layer (which may import domain but not
+// platform/auth) can hide the Team nav affordance for non-managers; keep the two
+// in sync if the permission is reassigned.
+func (r StaffRole) CanManageStaff() bool {
+	return r == StaffRoleAdmin
+}
+
+// Valid reports whether the role is one of the known staff roles.
+func (r StaffRole) Valid() bool {
+	switch r {
+	case StaffRoleAdmin, StaffRoleFulfillment, StaffRoleFinance, StaffRoleCatalog, StaffRoleSupport:
+		return true
+	default:
+		return false
+	}
+}
+
 // Staff represents an internal staff member.
 type Staff struct {
 	ID           uuid.UUID

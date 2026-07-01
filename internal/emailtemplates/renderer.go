@@ -210,6 +210,15 @@ type WhiteLabelInviteData struct {
 	StoreURL    string
 }
 
+// StaffInviteData holds data for the staff invite / password-setup email sent
+// when an admin adds a new team member (or resends the link as a reset).
+type StaffInviteData struct {
+	StaffName string
+	InviteURL string
+	StoreName string
+	StoreURL  string
+}
+
 // WhiteLabelSubmittedData holds data for the staff notification sent when a
 // client submits a white-label product for review.
 type WhiteLabelSubmittedData struct {

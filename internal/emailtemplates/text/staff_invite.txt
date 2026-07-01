@@ -1,0 +1,15 @@
+{{define "staff_invite.txt"}}{{.StoreName}}
+==========================================
+
+WELCOME TO THE CREW
+
+Hey{{if .StaffName}} {{.StaffName}}{{end}} -- you've been added to the {{.StoreName}} staff panel. Use this link to set your password and sign in. The link is good for 72 hours.
+
+{{.InviteURL}}
+
+Not expecting this? Ignore the email -- the account can't be used until this link is opened and a password is set.
+
+------------------------------------------
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

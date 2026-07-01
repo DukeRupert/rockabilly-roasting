@@ -58,7 +58,7 @@ var (
 	// scheduler owns the next attempt, so River must not retry the job.
 	ErrRenewalPaymentDeclined   = errors.New("renewal payment declined")
 	ErrSubscriptionPlanNotFound = errors.New("subscription plan not found")
-	ErrSubscriptionPlanInactive   = errors.New("subscription plan is not active")
+	ErrSubscriptionPlanInactive = errors.New("subscription plan is not active")
 
 	// Fulfillment errors
 	ErrFulfillmentNotFound = errors.New("fulfillment not found")
@@ -75,15 +75,23 @@ var (
 	ErrMinimumOrderNotMet    = errors.New("minimum order amount not met")
 
 	// Auth errors
-	ErrSessionExpired    = errors.New("session expired")
-	ErrTokenExpired      = errors.New("token expired")
-	ErrTokenAlreadyUsed  = errors.New("token already used")
-	ErrStaffNotFound     = errors.New("staff not found")
-	ErrStaffInactive     = errors.New("staff account is inactive")
-	ErrPermissionDenied  = errors.New("permission denied")
-	ErrMagicLinkExpired  = errors.New("magic link expired or already used")
-	ErrSetupTokenExpired = errors.New("setup link expired or already used")
-	ErrPasswordTooShort  = errors.New("password must be at least 10 characters")
+	ErrSessionExpired   = errors.New("session expired")
+	ErrTokenExpired     = errors.New("token expired")
+	ErrTokenAlreadyUsed = errors.New("token already used")
+	ErrStaffNotFound    = errors.New("staff not found")
+	ErrStaffInactive    = errors.New("staff account is inactive")
+	// Staff management errors
+	ErrStaffEmailExists   = errors.New("a staff member with this email already exists")
+	ErrStaffNameRequired  = errors.New("staff name is required")
+	ErrStaffEmailRequired = errors.New("staff email is required")
+	ErrInvalidStaffRole   = errors.New("invalid staff role")
+	ErrStaffInviteInvalid = errors.New("staff invite link is invalid, expired, or already used")
+	ErrCannotModifySelf   = errors.New("you cannot change your own role or account status")
+	ErrLastActiveAdmin    = errors.New("cannot remove the last active admin")
+	ErrPermissionDenied   = errors.New("permission denied")
+	ErrMagicLinkExpired   = errors.New("magic link expired or already used")
+	ErrSetupTokenExpired  = errors.New("setup link expired or already used")
+	ErrPasswordTooShort   = errors.New("password must be at least 10 characters")
 
 	// White-label onboarding errors
 	ErrWhiteLabelInviteInvalid = errors.New("white-label invite link is invalid, expired, or already used")

@@ -543,6 +543,15 @@ type Staff struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+type StaffInviteToken struct {
+	ID        uuid.UUID          `json:"id"`
+	StaffID   uuid.UUID          `json:"staff_id"`
+	TokenHash string             `json:"token_hash"`
+	ExpiresAt time.Time          `json:"expires_at"`
+	UsedAt    pgtype.Timestamptz `json:"used_at"`
+	CreatedAt time.Time          `json:"created_at"`
+}
+
 type StockLevel struct {
 	ID                uuid.UUID `json:"id"`
 	InventoryItemID   uuid.UUID `json:"inventory_item_id"`

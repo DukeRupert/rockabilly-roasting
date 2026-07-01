@@ -86,6 +86,8 @@ const (
 	AuditStaffCreated     = "staff.created"
 	AuditStaffRoleChanged = "staff.role_changed"
 	AuditStaffDeactivated = "staff.deactivated"
+	AuditStaffActivated   = "staff.activated"
+	AuditStaffPasswordSet = "staff.password_set"
 	AuditStaffLogin       = "staff.login"
 	AuditStaffLogout      = "staff.logout"
 
@@ -171,6 +173,7 @@ const (
 	AuditEmailWholesaleSuspended           = "email.wholesale_suspended"
 	AuditEmailWhiteLabelInvite             = "email.white_label_invite"
 	AuditEmailWhiteLabelSubmitted          = "email.white_label_submitted"
+	AuditEmailStaffInvite                  = "email.staff_invite"
 
 	// Attribute actions
 	AuditAttributeSetCreated      = "attribute_set.created"

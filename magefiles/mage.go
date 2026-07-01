@@ -107,8 +107,9 @@ func Check() {
 // The admin uses the rr-* token layer with a warm-professional override; direct
 // paper-and-ink utilities bypass that and lock you into the wrong palette.
 //
-// staff_login.templ is excluded — it's a standalone branded splash page using
-// its own layout and font import.
+// staff_login.templ and staff_setup.templ are excluded — they're standalone
+// branded splash pages (login, and the public invite password-setup page) using
+// their own layout and font import rather than the admin shell.
 //
 // See docs/admin-ui.md for the full allowed/banned class lists and rationale.
 func CheckAdminUI() error {
@@ -152,6 +153,7 @@ func CheckAdminUI() error {
 
 	excluded := map[string]bool{
 		filepath.FromSlash("internal/ui/admin/staff_login.templ"): true,
+		filepath.FromSlash("internal/ui/admin/staff_setup.templ"): true,
 	}
 
 	// Match a banned class only when it appears as a complete token — bounded

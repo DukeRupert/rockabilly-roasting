@@ -20,6 +20,7 @@ type Querier interface {
 	ClearDefaultAddresses(ctx context.Context, customerID *uuid.UUID) error
 	ClearDefaultVariants(ctx context.Context, productID uuid.UUID) error
 	ClearOtherFeaturedProducts(ctx context.Context, id uuid.UUID) error
+	CountActiveStaffByRole(ctx context.Context, role string) (int64, error)
 	CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error)
 	CountCustomersByPriceList(ctx context.Context, priceListID *uuid.UUID) (int64, error)
 	CountWholesaleByStatus(ctx context.Context, wholesaleStatus *string) (int64, error)
@@ -55,6 +56,7 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateShipment(ctx context.Context, arg CreateShipmentParams) (Shipment, error)
 	CreateStaff(ctx context.Context, arg CreateStaffParams) (Staff, error)
+	CreateStaffInviteToken(ctx context.Context, arg CreateStaffInviteTokenParams) (StaffInviteToken, error)
 	CreateStockLevel(ctx context.Context, arg CreateStockLevelParams) (StockLevel, error)
 	CreateStockLocation(ctx context.Context, arg CreateStockLocationParams) (StockLocation, error)
 	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error)
@@ -79,6 +81,7 @@ type Querier interface {
 	DeleteCustomerGroup(ctx context.Context, id uuid.UUID) error
 	DeleteDiscount(ctx context.Context, id uuid.UUID) error
 	DeleteExpiredMagicLinkTokens(ctx context.Context) error
+	DeleteExpiredStaffInviteTokens(ctx context.Context) error
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
 	DeleteLineItemsByOrder(ctx context.Context, orderID uuid.UUID) error
 	DeleteOrder(ctx context.Context, id uuid.UUID) error
@@ -153,6 +156,7 @@ type Querier interface {
 	GetTaxonByID(ctx context.Context, id uuid.UUID) (Taxon, error)
 	GetTaxonBySlug(ctx context.Context, slug string) (Taxon, error)
 	GetValidMagicLinkToken(ctx context.Context, arg GetValidMagicLinkTokenParams) (MagicLinkToken, error)
+	GetValidStaffInviteToken(ctx context.Context, tokenHash string) (StaffInviteToken, error)
 	GetVariantByID(ctx context.Context, id uuid.UUID) (Variant, error)
 	GetVariantBySKU(ctx context.Context, sku string) (Variant, error)
 	GetWebhookEventByProviderAndEventID(ctx context.Context, arg GetWebhookEventByProviderAndEventIDParams) (WebhookEvent, error)
@@ -221,6 +225,7 @@ type Querier interface {
 	// Returns the row if successful; pgx.ErrNoRows if already redeemed.
 	RedeemCouponCode(ctx context.Context, arg RedeemCouponCodeParams) (CouponCode, error)
 	RedeemMagicLinkToken(ctx context.Context, arg RedeemMagicLinkTokenParams) (MagicLinkToken, error)
+	RedeemStaffInviteToken(ctx context.Context, tokenHash string) (StaffInviteToken, error)
 	// Reverses a coupon redemption tied to a specific order. Used when an order
 	// is cancelled (admin or abandoned-checkout cleanup) so the code can be used
 	// again. No-op if the coupon was never redeemed for that order.

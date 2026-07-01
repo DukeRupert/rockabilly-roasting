@@ -319,6 +319,12 @@ func (s *FulfillmentService) BuyLabelRate(ctx context.Context, rate shipping.Rat
 // PersistShipmentLabel writes a shipment record + audit entry for a label
 // that was already purchased via PurchaseLabel. Caller is responsible for
 // enqueueing the StoreLabelToR2 job in the same transaction.
+//
+// It refuses to persist a second live label for an order (ErrOrderHasActiveLabel):
+// the "one active label per order" rule is enforced here, in the write tx, not
+// just in the UI — a stale page or double-submit would otherwise buy a duplicate
+// label. A refunded (or refund-requested) label no longer blocks, so a corrected
+// label can be bought after requesting a refund on the wrong one.
 func (s *FulfillmentService) PersistShipmentLabel(
 	ctx context.Context,
 	tx pgx.Tx,
@@ -327,26 +333,41 @@ func (s *FulfillmentService) PersistShipmentLabel(
 	result shipping.LabelResult,
 	actor Actor,
 ) (*domain.Shipment, error) {
+	existing, err := s.shipments.ListShipmentsByOrder(ctx, tx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("list shipments: %w", err)
+	}
+	for _, sh := range existing {
+		if sh.BlocksRebuy() {
+			return nil, ErrOrderHasActiveLabel
+		}
+	}
+
 	labelURL := result.LabelURL
 	lengthIn := req.LengthIn
 	widthIn := req.WidthIn
 	heightIn := req.HeightIn
+	var txnID *string
+	if result.ProviderTransactionID != "" {
+		txnID = &result.ProviderTransactionID
+	}
 
 	shipment, err := s.shipments.CreateShipment(ctx, tx, store.CreateShipmentParams{
-		OrderID:        orderID,
-		Status:         domain.ShipmentStatusLabelCreated,
-		Provider:       "shippo",
-		TrackingNumber: result.TrackingNumber,
-		LabelURL:       &labelURL,
-		CarrierName:    result.CarrierName,
-		ServiceName:    result.ServiceName,
-		LabelCostCents: result.RateCents,
-		LabelCurrency:  result.Currency,
-		WeightOz:       req.WeightOz,
-		LengthIn:       &lengthIn,
-		WidthIn:        &widthIn,
-		HeightIn:       &heightIn,
-		CreatedBy:      derefUUID(actor.ID),
+		OrderID:               orderID,
+		Status:                domain.ShipmentStatusLabelCreated,
+		Provider:              "shippo",
+		TrackingNumber:        result.TrackingNumber,
+		LabelURL:              &labelURL,
+		CarrierName:           result.CarrierName,
+		ServiceName:           result.ServiceName,
+		LabelCostCents:        result.RateCents,
+		LabelCurrency:         result.Currency,
+		WeightOz:              req.WeightOz,
+		LengthIn:              &lengthIn,
+		WidthIn:               &widthIn,
+		HeightIn:              &heightIn,
+		CreatedBy:             derefUUID(actor.ID),
+		ProviderTransactionID: txnID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert shipment: %w", err)
@@ -364,6 +385,106 @@ func (s *FulfillmentService) PersistShipmentLabel(
 		return nil, fmt.Errorf("audit shipment label created: %w", err)
 	}
 	return shipment, nil
+}
+
+// --- Label refunds ---
+//
+// Refunding a label follows the same two-phase pattern as buying one: load and
+// validate in a read tx, call the carrier outside any tx, then write the result
+// in a write tx that also enqueues the poll job. The carrier resolves refunds
+// asynchronously (up to 14 days), so a River job polls for the terminal state.
+
+// LoadRefundableShipment loads a shipment and confirms it can be refunded,
+// returning its provider transaction ID. Returns ErrShipmentNotRefundable when
+// the label has no transaction ID, already has a refund in flight/completed, or
+// is delivered. Run in a read tx before calling the carrier.
+func (s *FulfillmentService) LoadRefundableShipment(ctx context.Context, tx pgx.Tx, shipmentID uuid.UUID) (*domain.Shipment, error) {
+	shipment, err := s.shipments.GetShipmentByIDAsStaff(ctx, tx, shipmentID)
+	if err != nil {
+		return nil, fmt.Errorf("get shipment: %w", err)
+	}
+	if !shipment.CanRequestRefund() {
+		return nil, ErrShipmentNotRefundable
+	}
+	return shipment, nil
+}
+
+// RequestRefundExternal asks the carrier to refund the label. This is an
+// external API call and MUST NOT run inside a transaction.
+func (s *FulfillmentService) RequestRefundExternal(ctx context.Context, transactionID string) (*shipping.RefundResult, error) {
+	res, err := s.labelProvider.RequestRefund(ctx, transactionID)
+	if err != nil {
+		return nil, fmt.Errorf("request refund: %w", err)
+	}
+	return res, nil
+}
+
+// PersistRefundRequest records that a refund is in flight, audits it, and
+// returns the updated shipment. Callers enqueue the PollLabelRefund job in the
+// same transaction so the async resolution is tracked.
+func (s *FulfillmentService) PersistRefundRequest(ctx context.Context, tx pgx.Tx, shipmentID uuid.UUID, refund *shipping.RefundResult, actor Actor) (*domain.Shipment, error) {
+	shipment, err := s.shipments.UpdateShipmentRefundRequested(ctx, tx, shipmentID, refund.RefundID, actor.ID)
+	if err != nil {
+		return nil, fmt.Errorf("mark refund requested: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditShipmentLabelRefundRequested,
+		ResourceType: "shipment",
+		ResourceID:   shipment.ID,
+		After:        shipment,
+	}); err != nil {
+		return nil, fmt.Errorf("audit refund requested: %w", err)
+	}
+	return shipment, nil
+}
+
+// GetRefundStatus polls the carrier for the current state of a refund. External
+// call — MUST NOT run inside a transaction. Thin passthrough for the poll job.
+func (s *FulfillmentService) GetRefundStatus(ctx context.Context, refundID string) (*shipping.RefundResult, error) {
+	res, err := s.labelProvider.GetRefund(ctx, refundID)
+	if err != nil {
+		return nil, fmt.Errorf("get refund: %w", err)
+	}
+	return res, nil
+}
+
+// ResolveRefund settles a requested refund to its terminal status. It is
+// idempotent: the underlying update only touches a shipment still in
+// 'requested', so a replayed poll job (or one racing a resolution) makes no
+// change and records no audit entry. status must be RefundStatusRefunded or
+// RefundStatusFailed. metadata is attached to the audit entry (the poll job
+// passes its river_job_id); it may be nil.
+func (s *FulfillmentService) ResolveRefund(ctx context.Context, tx pgx.Tx, shipmentID uuid.UUID, status domain.RefundStatus, actor Actor, metadata map[string]any) error {
+	shipment, ok, err := s.shipments.UpdateShipmentRefundResolved(ctx, tx, shipmentID, status)
+	if err != nil {
+		return fmt.Errorf("resolve refund: %w", err)
+	}
+	if !ok {
+		// Already resolved by a prior run — no-op, no re-audit.
+		return nil
+	}
+
+	action := audit.AuditShipmentLabelRefunded
+	if status == domain.RefundStatusFailed {
+		action = audit.AuditShipmentLabelRefundFailed
+	}
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       action,
+		ResourceType: "shipment",
+		ResourceID:   shipment.ID,
+		After:        shipment,
+		Metadata:     metadata,
+	}); err != nil {
+		return fmt.Errorf("audit refund resolved: %w", err)
+	}
+	return nil
 }
 
 func derefUUID(p *uuid.UUID) uuid.UUID {

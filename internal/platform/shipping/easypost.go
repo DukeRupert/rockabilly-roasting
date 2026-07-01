@@ -94,6 +94,17 @@ func (p *EasyPostProvider) BuyRate(_ context.Context, _ Rate) (*LabelResult, err
 	return nil, fmt.Errorf("easypost: interactive rate selection not implemented (use Shippo)")
 }
 
+// RequestRefund is not implemented for EasyPost — Shippo is the active provider
+// and the only one wired to the refund flow. Present to satisfy LabelProvider.
+func (p *EasyPostProvider) RequestRefund(_ context.Context, _ string) (*RefundResult, error) {
+	return nil, fmt.Errorf("easypost: refunds not supported (use Shippo)")
+}
+
+// GetRefund is not implemented for EasyPost — see RequestRefund.
+func (p *EasyPostProvider) GetRefund(_ context.Context, _ string) (*RefundResult, error) {
+	return nil, fmt.Errorf("easypost: refunds not supported (use Shippo)")
+}
+
 // SupportedServices returns a static list of common EasyPost service codes.
 // The actual available services depend on the carrier accounts configured
 // in the EasyPost dashboard.

@@ -387,6 +387,42 @@ templ ShipmentStatusBadge(status domain.ShipmentStatus) {
 	</span>
 }
 
+// RefundStatusLabel returns operator-facing copy for a label refund state.
+func RefundStatusLabel(s domain.RefundStatus) string {
+	switch s {
+	case domain.RefundStatusRequested:
+		return "Refund requested"
+	case domain.RefundStatusRefunded:
+		return "Refunded"
+	case domain.RefundStatusFailed:
+		return "Refund rejected"
+	}
+	return ""
+}
+
+func refundStatusBadgeClasses(status domain.RefundStatus) string {
+	switch status {
+	case domain.RefundStatusRequested:
+		return "badge badge-dot badge-amber"
+	case domain.RefundStatusRefunded:
+		return "badge badge-dot badge-green"
+	case domain.RefundStatusFailed:
+		return "badge badge-dot badge-red"
+	default:
+		return "badge badge-dot badge-slate"
+	}
+}
+
+// RefundStatusBadge renders a label refund's state. Renders nothing when no
+// refund has been requested (RefundStatusNone).
+templ RefundStatusBadge(status domain.RefundStatus) {
+	if status != domain.RefundStatusNone && status != "" {
+		<span class={ refundStatusBadgeClasses(status) }>
+			{ RefundStatusLabel(status) }
+		</span>
+	}
+}
+
 func discountActiveBadgeClasses(active bool) string {
 	if active {
 		return "badge badge-dot badge-green"

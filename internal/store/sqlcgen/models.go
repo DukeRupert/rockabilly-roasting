@@ -488,27 +488,33 @@ type Session struct {
 }
 
 type Shipment struct {
-	ID             uuid.UUID          `json:"id"`
-	OrderID        uuid.UUID          `json:"order_id"`
-	Status         string             `json:"status"`
-	Provider       string             `json:"provider"`
-	TrackingNumber string             `json:"tracking_number"`
-	LabelUrl       *string            `json:"label_url"`
-	CarrierName    string             `json:"carrier_name"`
-	ServiceName    string             `json:"service_name"`
-	LabelCostCents int32              `json:"label_cost_cents"`
-	LabelCurrency  string             `json:"label_currency"`
-	WeightOz       pgtype.Numeric     `json:"weight_oz"`
-	LengthIn       pgtype.Numeric     `json:"length_in"`
-	WidthIn        pgtype.Numeric     `json:"width_in"`
-	HeightIn       pgtype.Numeric     `json:"height_in"`
-	CreatedBy      uuid.UUID          `json:"created_by"`
-	CreatedAt      time.Time          `json:"created_at"`
-	LabelCreatedAt pgtype.Timestamptz `json:"label_created_at"`
-	ShippedAt      pgtype.Timestamptz `json:"shipped_at"`
-	DeliveredAt    pgtype.Timestamptz `json:"delivered_at"`
-	LabelR2Key     *string            `json:"label_r2_key"`
-	LabelFormat    *string            `json:"label_format"`
+	ID                    uuid.UUID          `json:"id"`
+	OrderID               uuid.UUID          `json:"order_id"`
+	Status                string             `json:"status"`
+	Provider              string             `json:"provider"`
+	TrackingNumber        string             `json:"tracking_number"`
+	LabelUrl              *string            `json:"label_url"`
+	CarrierName           string             `json:"carrier_name"`
+	ServiceName           string             `json:"service_name"`
+	LabelCostCents        int32              `json:"label_cost_cents"`
+	LabelCurrency         string             `json:"label_currency"`
+	WeightOz              pgtype.Numeric     `json:"weight_oz"`
+	LengthIn              pgtype.Numeric     `json:"length_in"`
+	WidthIn               pgtype.Numeric     `json:"width_in"`
+	HeightIn              pgtype.Numeric     `json:"height_in"`
+	CreatedBy             uuid.UUID          `json:"created_by"`
+	CreatedAt             time.Time          `json:"created_at"`
+	LabelCreatedAt        pgtype.Timestamptz `json:"label_created_at"`
+	ShippedAt             pgtype.Timestamptz `json:"shipped_at"`
+	DeliveredAt           pgtype.Timestamptz `json:"delivered_at"`
+	LabelR2Key            *string            `json:"label_r2_key"`
+	LabelFormat           *string            `json:"label_format"`
+	ProviderTransactionID *string            `json:"provider_transaction_id"`
+	RefundStatus          string             `json:"refund_status"`
+	RefundID              *string            `json:"refund_id"`
+	RefundRequestedAt     pgtype.Timestamptz `json:"refund_requested_at"`
+	RefundRequestedBy     *uuid.UUID         `json:"refund_requested_by"`
+	RefundedAt            pgtype.Timestamptz `json:"refunded_at"`
 }
 
 type ShippingConfig struct {

@@ -308,6 +308,75 @@ func TestShippoProvider_BuyRate(t *testing.T) {
 	assert.Equal(t, "Ground Advantage", result.ServiceName)
 	assert.Equal(t, 758, result.RateCents)
 	assert.Equal(t, "USD", result.Currency)
+	// The transaction object_id is surfaced so the label can later be refunded.
+	assert.Equal(t, "tx_1", result.ProviderTransactionID)
+}
+
+// TestShippoProvider_RequestRefund posts a transaction ID to /refunds and maps
+// the returned QUEUED status to a pending state with the refund handle.
+func TestShippoProvider_RequestRefund(t *testing.T) {
+	var sawBody map[string]any
+	var sawAuth, sawMethod string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/refunds" {
+			t.Fatalf("RequestRefund must call /refunds, got %s", r.URL.Path)
+		}
+		sawAuth = r.Header.Get("Authorization")
+		sawMethod = r.Method
+		body, _ := io.ReadAll(r.Body)
+		json.Unmarshal(body, &sawBody) //nolint:errcheck
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"object_id": "refund_1", "status": "QUEUED", "transaction": "tx_1"}`)) //nolint:errcheck
+	}))
+	defer srv.Close()
+
+	p := shipping.NewShippoProviderWithBase("k", srv.URL, srv.Client())
+
+	res, err := p.RequestRefund(context.Background(), "tx_1")
+	require.NoError(t, err)
+
+	assert.Equal(t, http.MethodPost, sawMethod)
+	assert.Equal(t, "ShippoToken k", sawAuth)
+	assert.Equal(t, "tx_1", sawBody["transaction"])
+	assert.Equal(t, false, sawBody["async"])
+
+	assert.Equal(t, "refund_1", res.RefundID)
+	assert.Equal(t, shipping.RefundPending, res.State)
+}
+
+// TestShippoProvider_GetRefund polls a refund by ID and maps Shippo's terminal
+// statuses onto the provider-neutral RefundState.
+func TestShippoProvider_GetRefund(t *testing.T) {
+	cases := []struct {
+		shippoStatus string
+		want         shipping.RefundState
+	}{
+		{"QUEUED", shipping.RefundPending},
+		{"PENDING", shipping.RefundPending},
+		{"SUCCESS", shipping.RefundSuccess},
+		{"ERROR", shipping.RefundError},
+	}
+	for _, tc := range cases {
+		t.Run(tc.shippoStatus, func(t *testing.T) {
+			var sawPath, sawMethod string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				sawPath = r.URL.Path
+				sawMethod = r.Method
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"object_id": "refund_1", "status": "` + tc.shippoStatus + `", "transaction": "tx_1"}`)) //nolint:errcheck
+			}))
+			defer srv.Close()
+
+			p := shipping.NewShippoProviderWithBase("k", srv.URL, srv.Client())
+
+			res, err := p.GetRefund(context.Background(), "refund_1")
+			require.NoError(t, err)
+			assert.Equal(t, http.MethodGet, sawMethod)
+			assert.Equal(t, "/refunds/refund_1", sawPath)
+			assert.Equal(t, tc.want, res.State)
+			assert.Equal(t, "refund_1", res.RefundID)
+		})
+	}
 }
 
 // TestShippoProvider_BuyRate_TransactionError surfaces a non-SUCCESS

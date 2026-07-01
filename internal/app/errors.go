@@ -110,6 +110,13 @@ var (
 	// Shipping errors
 	ErrShipmentNotFound      = errors.New("shipment not found")
 	ErrShipmentWeightUnknown = errors.New("shipment weight cannot be calculated: variant has no weight set")
+	// ErrShipmentNotRefundable signals a label cannot be refunded: it carries no
+	// provider transaction ID (imported/legacy), a refund is already in flight or
+	// completed, or the shipment is delivered (an obviously-used label).
+	ErrShipmentNotRefundable = errors.New("shipment label cannot be refunded")
+	// ErrOrderHasActiveLabel guards against buying a second label: an order that
+	// already has a live (non-refunded) label must have it refunded first.
+	ErrOrderHasActiveLabel = errors.New("order already has an active shipping label")
 
 	// Taxon errors
 	ErrTaxonNotFound = errors.New("taxon not found")

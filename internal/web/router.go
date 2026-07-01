@@ -433,6 +433,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/orders/{id}/label", deps.handleAdminShipmentLabelBuy)
 	adminMux.HandleFunc("POST /admin/orders/labels", deps.handleAdminShipmentBulkLabelCreate)
 	adminMux.HandleFunc("GET /admin/shipments/{id}/label", deps.handleAdminShipmentLabelDownload)
+	adminMux.HandleFunc("POST /admin/shipments/{id}/refund", deps.handleAdminShipmentRefundRequest)
 
 	// Admin discounts
 	adminMux.HandleFunc("GET /admin/discounts", deps.handleAdminDiscountList)

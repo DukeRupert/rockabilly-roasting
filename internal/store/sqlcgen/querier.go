@@ -289,6 +289,12 @@ type Querier interface {
 	UpdateSessionLastSeen(ctx context.Context, id uuid.UUID) error
 	UpdateShipmentDelivered(ctx context.Context, id uuid.UUID) error
 	UpdateShipmentLabel(ctx context.Context, arg UpdateShipmentLabelParams) error
+	UpdateShipmentRefundRequested(ctx context.Context, arg UpdateShipmentRefundRequestedParams) (Shipment, error)
+	// Idempotent: only a shipment still in 'requested' is resolved, so a poll job
+	// that runs more than once (or after the row was already settled) is a no-op
+	// and returns no row. $2 must be 'refunded' or 'failed'; refunded_at is set
+	// only on success.
+	UpdateShipmentRefundResolved(ctx context.Context, arg UpdateShipmentRefundResolvedParams) (Shipment, error)
 	UpdateShipmentStatus(ctx context.Context, arg UpdateShipmentStatusParams) (Shipment, error)
 	UpdateShipmentTracking(ctx context.Context, arg UpdateShipmentTrackingParams) (Shipment, error)
 	UpdateShippingConfig(ctx context.Context, arg UpdateShippingConfigParams) error

@@ -248,6 +248,25 @@ type LabelAttempt struct {
 	LastError   string // empty for queued attempts; populated for failed
 }
 
+// RefundStatus represents the state of a carrier label refund. Refunds are
+// asynchronous: Shippo returns QUEUED immediately, then settles the request
+// over up to 14 days. A poll job walks a shipment from Requested to the
+// terminal Refunded or Failed.
+type RefundStatus string
+
+const (
+	// RefundStatusNone — no refund has been requested (the default).
+	RefundStatusNone RefundStatus = "none"
+	// RefundStatusRequested — a refund was submitted to the carrier and is
+	// pending resolution.
+	RefundStatusRequested RefundStatus = "requested"
+	// RefundStatusRefunded — the carrier accepted the refund. Terminal.
+	RefundStatusRefunded RefundStatus = "refunded"
+	// RefundStatusFailed — the carrier rejected the refund (label was used or
+	// scanned) or the request timed out. Terminal. The label is live.
+	RefundStatusFailed RefundStatus = "failed"
+)
+
 // Shipment represents a physical shipment with tracking. Several fields are
 // pointer-typed because not every shipment source carries a label artifact
 // or box dimensions — only carrier label purchases populate them.
@@ -273,4 +292,41 @@ type Shipment struct {
 	DeliveredAt    *time.Time
 	LabelR2Key     *string
 	LabelFormat    *string
+
+	// ProviderTransactionID is the carrier's transaction handle (Shippo's
+	// transaction object_id) needed to request a refund. Nil for imported or
+	// legacy shipments — those cannot be refunded through the API.
+	ProviderTransactionID *string
+	RefundStatus          RefundStatus
+	RefundID              *string // carrier refund handle, for polling resolution
+	RefundRequestedAt     *time.Time
+	RefundRequestedBy     *uuid.UUID
+	RefundedAt            *time.Time
+}
+
+// BlocksRebuy reports whether this shipment should prevent buying a new label
+// for its order. A shipment blocks re-buy while its label is live — that is,
+// when no refund has been requested (none) or a requested refund was rejected
+// (failed, meaning the label was found to be used). A requested or completed
+// refund frees the order to have a corrected label purchased.
+//
+// This is the single source of truth for the "one active label per order"
+// rule — the server-side buy guard, the buy-label UI gate, and re-buy all
+// read it. Do not re-express the rule inline anywhere else.
+func (s Shipment) BlocksRebuy() bool {
+	return s.RefundStatus == RefundStatusNone || s.RefundStatus == RefundStatusFailed
+}
+
+// CanRequestRefund reports whether a refund may be requested for this shipment:
+// it must carry a provider transaction ID (so the carrier can be called), must
+// not already have a refund in flight or completed, and must not be delivered
+// (an obviously-used label the carrier will reject).
+func (s Shipment) CanRequestRefund() bool {
+	if s.ProviderTransactionID == nil || *s.ProviderTransactionID == "" {
+		return false
+	}
+	if s.RefundStatus != RefundStatusNone && s.RefundStatus != RefundStatusFailed {
+		return false
+	}
+	return s.Status != ShipmentStatusDelivered
 }

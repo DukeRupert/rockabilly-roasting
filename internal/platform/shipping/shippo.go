@@ -163,13 +163,50 @@ func (p *ShippoProvider) BuyRate(ctx context.Context, rate Rate) (*LabelResult, 
 	}
 
 	return &LabelResult{
-		TrackingNumber: txResp.TrackingNumber,
-		LabelURL:       txResp.LabelURL,
-		CarrierName:    rate.CarrierName,
-		ServiceName:    rate.ServiceName,
-		RateCents:      rate.AmountCents,
-		Currency:       rate.Currency,
+		TrackingNumber:        txResp.TrackingNumber,
+		LabelURL:              txResp.LabelURL,
+		CarrierName:           rate.CarrierName,
+		ServiceName:           rate.ServiceName,
+		RateCents:             rate.AmountCents,
+		Currency:              rate.Currency,
+		ProviderTransactionID: txResp.ObjectID,
 	}, nil
+}
+
+// RequestRefund submits a refund for a purchased label via POST /refunds. Shippo
+// accepts the transaction object_id and returns a refund object whose status is
+// QUEUED initially; the caller polls GetRefund for resolution. Only unused,
+// unscanned labels within 90 days are eligible — Shippo rejects the rest.
+func (p *ShippoProvider) RequestRefund(ctx context.Context, transactionID string) (*RefundResult, error) {
+	var resp shippoRefundResp
+	if err := p.post(ctx, "/refunds", shippoRefundReq{Transaction: transactionID, Async: false}, &resp); err != nil {
+		return nil, fmt.Errorf("shippo create refund: %w", err)
+	}
+	return &RefundResult{RefundID: resp.ObjectID, State: refundStateFromShippo(resp.Status)}, nil
+}
+
+// GetRefund fetches the current state of a refund via GET /refunds/{id}. Shippo
+// walks the status from QUEUED/PENDING to SUCCESS or ERROR over up to 14 days.
+func (p *ShippoProvider) GetRefund(ctx context.Context, refundID string) (*RefundResult, error) {
+	var resp shippoRefundResp
+	if err := p.get(ctx, "/refunds/"+refundID, &resp); err != nil {
+		return nil, fmt.Errorf("shippo get refund: %w", err)
+	}
+	return &RefundResult{RefundID: resp.ObjectID, State: refundStateFromShippo(resp.Status)}, nil
+}
+
+// refundStateFromShippo maps Shippo's refund status onto the provider-neutral
+// RefundState. QUEUED and PENDING are both still-resolving; anything other than
+// SUCCESS/ERROR is treated conservatively as pending so the poller keeps trying.
+func refundStateFromShippo(status string) RefundState {
+	switch status {
+	case "SUCCESS":
+		return RefundSuccess
+	case "ERROR":
+		return RefundError
+	default: // QUEUED, PENDING, or anything unrecognized
+		return RefundPending
+	}
 }
 
 // createShipment posts a synchronous (async=false) shipment so the response
@@ -241,6 +278,36 @@ func (p *ShippoProvider) post(ctx context.Context, path string, body, out any) e
 		return fmt.Errorf("new request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "ShippoToken "+p.apiKey)
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("do: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read body: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("status %d: %s", resp.StatusCode, string(respBytes))
+	}
+
+	if err := json.Unmarshal(respBytes, out); err != nil {
+		return fmt.Errorf("decode: %w", err)
+	}
+	return nil
+}
+
+// get sends a GET to the given Shippo endpoint and decodes the response into
+// out. Same auth and error handling as post; used for polling refund status.
+func (p *ShippoProvider) get(ctx context.Context, path string, out any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.baseURL+path, nil)
+	if err != nil {
+		return fmt.Errorf("new request: %w", err)
+	}
 	req.Header.Set("Authorization", "ShippoToken "+p.apiKey)
 
 	resp, err := p.client.Do(req)
@@ -397,4 +464,15 @@ type shippoTransactionResp struct {
 	TrackingNumber string          `json:"tracking_number"`
 	LabelURL       string          `json:"label_url"`
 	Messages       []shippoMessage `json:"messages"`
+}
+
+type shippoRefundReq struct {
+	Transaction string `json:"transaction"`
+	Async       bool   `json:"async"`
+}
+
+type shippoRefundResp struct {
+	ObjectID    string `json:"object_id"`
+	Status      string `json:"status"` // QUEUED | PENDING | SUCCESS | ERROR
+	Transaction string `json:"transaction"`
 }

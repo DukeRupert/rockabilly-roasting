@@ -161,7 +161,16 @@ func canBuyLabel(order *domain.Order, shipments []domain.Shipment, attempt *doma
 			*order.ShippingMethod == domain.ShippingMethodLocalDelivery) {
 		return false
 	}
-	return len(shipments) == 0
+	// Blocked only by a live label. A refunded (or refund-requested) shipment no
+	// longer counts, so a corrected label can be bought after requesting a
+	// refund on one purchased in error. BlocksRebuy is the shared source of
+	// truth — the server-side buy guard enforces the same rule.
+	for _, sh := range shipments {
+		if sh.BlocksRebuy() {
+			return false
+		}
+	}
+	return true
 }
 
 func canCancelOrder(status domain.OrderStatus) bool {
@@ -575,20 +584,37 @@ templ OrderShowContent(props OrderShowProps) {
 				<div class="flex flex-col items-start gap-1.5">
 					<div class="flex items-center gap-2">
 						@ShipmentStatusBadge(sh.Status)
+						@RefundStatusBadge(sh.RefundStatus)
 						if sh.Status == domain.ShipmentStatusDelivered && sh.DeliveredAt != nil {
 							<span class="text-xs text-rr-muted">Delivered { sh.DeliveredAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM") }</span>
 						}
 					</div>
-					<a
-						href={ templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/label", sh.ID.String())) }
-						target="_blank"
-						class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
-					>
-						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-							<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
-						</svg>
-						Download label
-					</a>
+					<div class="flex flex-wrap items-center gap-2">
+						<a
+							href={ templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/label", sh.ID.String())) }
+							target="_blank"
+							class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
+						>
+							<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
+							</svg>
+							Download label
+						</a>
+						if sh.CanRequestRefund() {
+							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/refund", sh.ID.String())) }>
+								<button
+									type="submit"
+									class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
+									onclick="return confirm('Request a carrier refund for this label? Only unused labels are eligible — a used or scanned label will be rejected.')"
+								>
+									<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+										<path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"></path>
+									</svg>
+									Request refund
+								</button>
+							</form>
+						}
+					</div>
 					if sh.TrackingNumber != "" {
 						<p class="font-mono text-xs text-rr-muted">
 							{ sh.CarrierName }

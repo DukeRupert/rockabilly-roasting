@@ -25,8 +25,9 @@ SET flat_rate_cents = $1,
 -- name: CreateShipment :one
 INSERT INTO shipments (id, order_id, status, provider, tracking_number, label_url,
                        carrier_name, service_name, label_cost_cents, label_currency,
-                       weight_oz, length_in, width_in, height_in, shipped_at, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+                       weight_oz, length_in, width_in, height_in, shipped_at, created_by,
+                       provider_transaction_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 RETURNING *;
 
 -- name: GetShipmentByID :one
@@ -67,3 +68,23 @@ WHERE id = $1;
 
 -- name: GetShipmentLabelKey :one
 SELECT label_r2_key FROM shipments WHERE id = $1;
+
+-- name: UpdateShipmentRefundRequested :one
+UPDATE shipments
+SET refund_status = 'requested',
+    refund_id = $2,
+    refund_requested_at = now(),
+    refund_requested_by = $3
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateShipmentRefundResolved :one
+-- Idempotent: only a shipment still in 'requested' is resolved, so a poll job
+-- that runs more than once (or after the row was already settled) is a no-op
+-- and returns no row. $2 must be 'refunded' or 'failed'; refunded_at is set
+-- only on success.
+UPDATE shipments
+SET refund_status = $2,
+    refunded_at = CASE WHEN $2 = 'refunded' THEN now() ELSE refunded_at END
+WHERE id = $1 AND refund_status = 'requested'
+RETURNING *;

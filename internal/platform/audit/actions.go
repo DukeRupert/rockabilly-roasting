@@ -92,8 +92,11 @@ const (
 	AuditStaffLogout      = "staff.logout"
 
 	// Shipping actions
-	AuditShipmentLabelCreated  = "shipment.label_created"
-	AuditShipmentStatusUpdated = "shipment.status_updated"
+	AuditShipmentLabelCreated         = "shipment.label_created"
+	AuditShipmentLabelRefundRequested = "shipment.label_refund_requested"
+	AuditShipmentLabelRefunded        = "shipment.label_refunded"
+	AuditShipmentLabelRefundFailed    = "shipment.label_refund_failed"
+	AuditShipmentStatusUpdated        = "shipment.status_updated"
 	AuditShipmentImported      = "shipment.imported"
 	AuditShippingConfigUpdated = "shipping_config.updated"
 	AuditBoxPresetCreated      = "box_preset.created"

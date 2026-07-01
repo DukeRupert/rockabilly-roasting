@@ -105,6 +105,9 @@ type CreateShipmentParams struct {
 	HeightIn       *float64
 	ShippedAt      *time.Time
 	CreatedBy      uuid.UUID
+	// ProviderTransactionID is the carrier's transaction handle, kept so the
+	// label can later be refunded. Nil for sources that don't supply one.
+	ProviderTransactionID *string
 }
 
 // CreateShipment inserts a new shipment and returns it.
@@ -126,6 +129,8 @@ func (s *ShippingStore) CreateShipment(ctx context.Context, tx pgx.Tx, p CreateS
 		HeightIn:       float64PtrToNumeric(p.HeightIn),
 		ShippedAt:      timestampToPG(p.ShippedAt),
 		CreatedBy:      p.CreatedBy,
+
+		ProviderTransactionID: p.ProviderTransactionID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert shipment: %w", err)
@@ -219,6 +224,38 @@ func (s *ShippingStore) GetShipmentLabelKey(ctx context.Context, tx pgx.Tx, id u
 		return nil, fmt.Errorf("get shipment label key: %w", err)
 	}
 	return key, nil
+}
+
+// UpdateShipmentRefundRequested marks a shipment as having a refund in flight,
+// recording the carrier's refund handle and who requested it, and returns it.
+func (s *ShippingStore) UpdateShipmentRefundRequested(ctx context.Context, tx pgx.Tx, id uuid.UUID, refundID string, requestedBy *uuid.UUID) (*domain.Shipment, error) {
+	row, err := sqlcgen.New(tx).UpdateShipmentRefundRequested(ctx, sqlcgen.UpdateShipmentRefundRequestedParams{
+		ID:                id,
+		RefundID:          &refundID,
+		RefundRequestedBy: requestedBy,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update shipment refund requested: %w", err)
+	}
+	return shipmentFromRow(row), nil
+}
+
+// UpdateShipmentRefundResolved settles a requested refund to its terminal
+// status ('refunded' or 'failed'). The update only touches a shipment still in
+// 'requested', so a replayed poll job is a safe no-op: in that case no row
+// matches and ok is false (the caller treats it as already-resolved).
+func (s *ShippingStore) UpdateShipmentRefundResolved(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.RefundStatus) (*domain.Shipment, bool, error) {
+	row, err := sqlcgen.New(tx).UpdateShipmentRefundResolved(ctx, sqlcgen.UpdateShipmentRefundResolvedParams{
+		ID:           id,
+		RefundStatus: string(status),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("update shipment refund resolved: %w", err)
+	}
+	return shipmentFromRow(row), true, nil
 }
 
 // --- Label attempts ---
@@ -368,5 +405,12 @@ func shipmentFromRow(r sqlcgen.Shipment) *domain.Shipment {
 		DeliveredAt:    timestampFromPG(r.DeliveredAt),
 		LabelR2Key:     r.LabelR2Key,
 		LabelFormat:    r.LabelFormat,
+
+		ProviderTransactionID: r.ProviderTransactionID,
+		RefundStatus:          domain.RefundStatus(r.RefundStatus),
+		RefundID:              r.RefundID,
+		RefundRequestedAt:     timestampFromPG(r.RefundRequestedAt),
+		RefundRequestedBy:     r.RefundRequestedBy,
+		RefundedAt:            timestampFromPG(r.RefundedAt),
 	}
 }

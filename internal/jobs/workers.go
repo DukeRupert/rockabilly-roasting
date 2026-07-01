@@ -217,6 +217,18 @@ type BuyLabelArgs struct {
 // Kind returns the job kind identifier.
 func (BuyLabelArgs) Kind() string { return "buy_label" }
 
+// PollLabelRefundArgs polls the carrier for the resolution of a label refund
+// that was requested via the admin refund flow. Refunds settle asynchronously
+// (Shippo takes up to 14 days), so this job snoozes and re-polls until the
+// refund reaches a terminal state or the request ages out.
+type PollLabelRefundArgs struct {
+	ShipmentID uuid.UUID `json:"shipment_id"`
+	RefundID   string    `json:"refund_id"`
+}
+
+// Kind returns the job kind identifier.
+func (PollLabelRefundArgs) Kind() string { return "poll_label_refund" }
+
 // --- QuickBooks integration jobs ---
 
 // EnsureQBCustomerArgs creates or updates a QB customer, then chains to CreateQBInvoice.

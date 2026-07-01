@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -318,4 +319,95 @@ func (d *Deps) handleAdminShipmentLabelDownload(w http.ResponseWriter, r *http.R
 	}
 
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+// handleAdminShipmentRefundRequest requests a carrier refund for an unused or
+// erroneously-purchased label. Same three-phase shape as the buy flow: load and
+// validate in a read tx, call the carrier outside any tx, then record the
+// request and enqueue the poll job in a write tx. The refund resolves
+// asynchronously; PollLabelRefund walks it to its terminal state.
+//
+// POST /admin/shipments/{id}/refund
+func (d *Deps) handleAdminShipmentRefundRequest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	shipmentID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	actor := staffActor(r)
+
+	// Phase 1: read tx — load and validate the shipment, grab its order + txn ID.
+	var orderID uuid.UUID
+	var transactionID string
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		sh, txErr := d.FulfillmentService.LoadRefundableShipment(ctx, tx, shipmentID)
+		if txErr != nil {
+			return txErr
+		}
+		orderID = sh.OrderID
+		transactionID = *sh.ProviderTransactionID
+		return nil
+	})
+	if err != nil {
+		d.redirectShipmentRefund(w, r, orderID, shipmentID, refundErrorMessage(err))
+		return
+	}
+
+	// Phase 2: external refund request — no tx held.
+	refund, err := d.FulfillmentService.RequestRefundExternal(ctx, transactionID)
+	if err != nil {
+		slog.Error("admin refund: provider request failed", "error", err, "shipment_id", shipmentID)
+		d.redirectShipmentRefund(w, r, orderID, shipmentID, "Couldn't reach the carrier to request the refund. Try again in a moment.")
+		return
+	}
+
+	// Phase 3: write tx — record the request + enqueue the poll job.
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		if _, txErr := d.FulfillmentService.PersistRefundRequest(ctx, tx, shipmentID, refund, actor); txErr != nil {
+			return txErr
+		}
+		_, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.PollLabelRefundArgs{
+			ShipmentID: shipmentID,
+			RefundID:   refund.RefundID,
+		}, nil)
+		return txErr
+	})
+	if err != nil {
+		slog.Error("admin refund: persist failed", "error", err, "shipment_id", shipmentID)
+		Error(w, r, err)
+		return
+	}
+
+	d.redirectShipmentRefund(w, r, orderID, shipmentID, "Refund requested. It can take up to 14 days for the carrier to confirm.")
+}
+
+// redirectShipmentRefund sends the operator back to the order page (or the
+// shipment's order when known) with a flash message. Falls back to the orders
+// list if the order id couldn't be resolved (a bad shipment id).
+func (d *Deps) redirectShipmentRefund(w http.ResponseWriter, r *http.Request, orderID, shipmentID uuid.UUID, flash string) {
+	dest := "/admin/orders"
+	if orderID != uuid.Nil {
+		dest = "/admin/orders/" + orderID.String()
+	}
+	dest += "?flash=" + url.QueryEscape(flash)
+	if IsHTMX(r) {
+		w.Header().Set("HX-Redirect", dest)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
+
+// refundErrorMessage maps a refund validation error to operator-facing copy.
+func refundErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, app.ErrShipmentNotRefundable):
+		return "This label can't be refunded — it's already been refunded, used, or wasn't bought through the carrier."
+	case errors.Is(err, app.ErrShipmentNotFound):
+		return "That shipment no longer exists."
+	}
+	return "Couldn't request the refund. Try again in a moment."
 }

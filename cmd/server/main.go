@@ -348,6 +348,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewInvoicePastDueEmailWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewR2ImageDeleteWorker(r2Client))
 	river.AddWorker(workers, jobs.NewStoreLabelToR2Worker(fulfillmentSvc, pool, r2Client))
+	river.AddWorker(workers, jobs.NewPollLabelRefundWorker(fulfillmentSvc, pool))
 	river.AddWorker(workers, jobs.NewShippoTrackingUpdateWorker(fulfillmentSvc, orderSvc, pool))
 	river.AddWorker(workers, jobs.NewAbandonedOrderCleanupWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewShippedOrderAutoDeliverWorker(orderSvc, pool))

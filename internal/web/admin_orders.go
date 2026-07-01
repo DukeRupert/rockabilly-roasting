@@ -750,7 +750,15 @@ func (d *Deps) handleAdminOrderShippingMethod(w http.ResponseWriter, r *http.Req
 	target := domain.ShippingMethod(r.FormValue("method"))
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.OrderService.SwapLocalShippingMethod(ctx, tx, id, target, staffActor(r))
+		var txErr error
+		// "shipped" is a one-way conversion off the local channel (comped
+		// shipping, unlocks the label flow); everything else is a
+		// pickup↔local_delivery swap.
+		if target == domain.ShippingMethodShipped {
+			_, txErr = d.OrderService.ConvertLocalOrderToShipped(ctx, tx, id, staffActor(r))
+		} else {
+			_, txErr = d.OrderService.SwapLocalShippingMethod(ctx, tx, id, target, staffActor(r))
+		}
 		return txErr
 	})
 	if err != nil {
@@ -764,6 +772,8 @@ func (d *Deps) handleAdminOrderShippingMethod(w http.ResponseWriter, r *http.Req
 		flash = "Shipping+method+changed+to+local+pickup"
 	case domain.ShippingMethodLocalDelivery:
 		flash = "Shipping+method+changed+to+local+delivery"
+	case domain.ShippingMethodShipped:
+		flash = "Converted+to+mail-out.+Get+shipping+rates+to+print+a+label."
 	default:
 		flash = "Shipping+method+updated"
 	}

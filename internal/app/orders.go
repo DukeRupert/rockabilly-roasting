@@ -1112,6 +1112,66 @@ func (s *OrderService) SwapLocalShippingMethod(ctx context.Context, tx pgx.Tx, i
 	return order, nil
 }
 
+// ConvertLocalOrderToShipped moves a local-fulfillment order (pickup or
+// local_delivery) onto the standard carrier "shipped" channel so staff can buy
+// a label and mail it out — used when a customer who checked out as local turns
+// out to need it posted instead.
+//
+// Unlike SwapLocalShippingMethod this is a deliberate, explicit one-way action:
+// once the order is "shipped" the order page surfaces the rate/label flow.
+// Shipping is comped — local orders carry no shipping line and staff make this
+// change as a courtesy after talking to the customer, so we leave the order
+// total untouched and do not re-charge or recompute tax. No customer email is
+// sent. Valid only while the order is still in the shop (unfulfilled or
+// fulfilled) and not cancelled/refunded.
+func (s *OrderService) ConvertLocalOrderToShipped(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for shipped conversion: %w", err)
+	}
+
+	if order.ShippingMethod == nil ||
+		(*order.ShippingMethod != domain.ShippingMethodPickup && *order.ShippingMethod != domain.ShippingMethodLocalDelivery) {
+		return nil, fmt.Errorf("order is not a local fulfillment order: %w", ErrInvalidOrderStatus)
+	}
+	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
+		return nil, fmt.Errorf("cannot convert cancelled/refunded order to shipped: %w", ErrInvalidOrderStatus)
+	}
+	switch order.FulfillmentStatus {
+	case domain.FulfillmentStatusUnfulfilled, domain.FulfillmentStatusFulfilled:
+		// allowed
+	default:
+		return nil, fmt.Errorf("order has already left the shop: %w", ErrInvalidOrderStatus)
+	}
+
+	previous := *order.ShippingMethod
+	order, err = s.orders.UpdateOrderShippingMethod(ctx, tx, id, domain.ShippingMethodShipped)
+	if err != nil {
+		return nil, fmt.Errorf("set shipping method: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderShippingMethodChanged,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+		Metadata: map[string]any{
+			"from": string(previous),
+			"to":   string(domain.ShippingMethodShipped),
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit shipped conversion: %w", err)
+	}
+
+	return order, nil
+}
+
 // UpdateFulfillmentStatus updates an order's fulfillment status.
 func (s *OrderService) UpdateFulfillmentStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.FulfillmentStatus, actor Actor) (*domain.Order, error) {
 	order, err := s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, status)

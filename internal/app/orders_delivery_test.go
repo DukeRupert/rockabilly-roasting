@@ -141,6 +141,81 @@ func TestOrderService_MarkOrderDelivered(t *testing.T) {
 	})
 }
 
+func TestOrderService_ConvertLocalOrderToShipped(t *testing.T) {
+	ctx := context.Background()
+	svc := newOrderService()
+	actor := testutil.TestActor()
+
+	t.Run("local_delivery order converts to shipped, total untouched", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodLocalDelivery),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		got, err := svc.ConvertLocalOrderToShipped(ctx, tx, order.ID, actor)
+		require.NoError(t, err)
+		require.NotNil(t, got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodShipped, *got.ShippingMethod)
+		// Comped: shipping is not charged, so the order total is unchanged.
+		assert.Equal(t, order.Total, got.Total)
+		assert.Equal(t, order.ShippingTotal, got.ShippingTotal)
+	})
+
+	t.Run("pickup order also converts (still in shop)", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodPickup),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusFulfilled))
+
+		got, err := svc.ConvertLocalOrderToShipped(ctx, tx, order.ID, actor)
+		require.NoError(t, err)
+		require.NotNil(t, got.ShippingMethod)
+		assert.Equal(t, domain.ShippingMethodShipped, *got.ShippingMethod)
+	})
+
+	t.Run("already-shipped-channel order is rejected", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodShipped),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		_, err := svc.ConvertLocalOrderToShipped(ctx, tx, order.ID, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+
+	t.Run("order that already left the shop is rejected", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodLocalDelivery),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusShipped))
+
+		_, err := svc.ConvertLocalOrderToShipped(ctx, tx, order.ID, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+
+	t.Run("cancelled order is rejected", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		custID, shipID, billID := orderFixtures(t, tx)
+		order := testutil.CreateOrder(t, tx, custID, shipID, billID,
+			testutil.WithShippingMethod(domain.ShippingMethodLocalDelivery),
+			testutil.WithOrderStatus(domain.OrderStatusCancelled),
+			testutil.WithFulfillmentStatus(domain.FulfillmentStatusUnfulfilled))
+
+		_, err := svc.ConvertLocalOrderToShipped(ctx, tx, order.ID, actor)
+		assert.ErrorIs(t, err, app.ErrInvalidOrderStatus)
+	})
+
+	t.Run("missing order returns ErrOrderNotFound", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		_, err := svc.ConvertLocalOrderToShipped(ctx, tx, uuid.New(), actor)
+		assert.ErrorIs(t, err, app.ErrOrderNotFound)
+	})
+}
+
 // TestOrderService_ListOrderIDsToAutoDeliver exercises the sweep candidate query
 // across the two cohorts it must handle: legacy orders with no shipment rows
 // (fall back to updated_at) and live orders with a precise shipments.shipped_at.

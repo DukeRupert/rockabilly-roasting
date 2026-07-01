@@ -339,6 +339,19 @@ templ shippingMethodSwap(orderID uuid.UUID, current domain.ShippingMethod) {
 	</form>
 }
 
+// convertToShippedForm flips a local order onto the carrier "shipped" channel
+// so staff can buy a label. One-way and comped — the confirm spells that out.
+templ convertToShippedForm(orderID uuid.UUID) {
+	<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/shipping-method", orderID.String())) } class="inline">
+		<input type="hidden" name="method" value="shipped"/>
+		<button
+			type="submit"
+			class="btn-secondary text-xs"
+			onclick="return confirm('Convert this order to a mail-out? Shipping is comped (no extra charge), and you can then buy a shipping label. The customer is not notified.')"
+		>Convert to mail-out</button>
+	</form>
+}
+
 templ grindCell(orderID uuid.UUID, eli EnrichedLineItem, canEdit bool) {
 	if canEdit && len(eli.SiblingVariants) > 1 {
 		<form
@@ -747,6 +760,7 @@ templ OrderShowContent(props OrderShowProps) {
 						@ShippingMethodBadge(*props.Order.ShippingMethod)
 						if canSwapShippingMethod(props.Order) {
 							@shippingMethodSwap(props.Order.ID, *props.Order.ShippingMethod)
+							@convertToShippedForm(props.Order.ID)
 						}
 					</div>
 				}

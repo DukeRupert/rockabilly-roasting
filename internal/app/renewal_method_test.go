@@ -11,6 +11,7 @@ import (
 func TestPickRenewalLocalMethod(t *testing.T) {
 	pickup := domain.ShippingMethodPickup
 	delivery := domain.ShippingMethodLocalDelivery
+	shipped := domain.ShippingMethodShipped
 
 	bothEnabled := &domain.ShippingConfig{
 		LocalZipCodes:        []string{"99336"},
@@ -66,5 +67,15 @@ func TestPickRenewalLocalMethod(t *testing.T) {
 		if assert.NotNil(t, got) {
 			assert.Equal(t, domain.ShippingMethodLocalDelivery, *got)
 		}
+	})
+
+	t.Run("shipped preference always ships, even from a local zip", func(t *testing.T) {
+		// A local-zone customer who opted to have it mailed gets shipped (nil),
+		// not defaulted back to delivery.
+		assert.Nil(t, pickRenewalLocalMethod(bothEnabled, "99336", &shipped))
+	})
+
+	t.Run("shipped preference ships a non-local zip too", func(t *testing.T) {
+		assert.Nil(t, pickRenewalLocalMethod(bothEnabled, "90210", &shipped))
 	})
 }

@@ -205,8 +205,8 @@ templ AccountSettingsContent(props AccountSettingsProps) {
 				if props.ShowLocalFulfillment {
 					<div class="pt-4 border-t-2 border-ink/30 space-y-3">
 						<div>
-							<p class="font-oswald font-bold text-ink text-[11px] mb-1" style="letter-spacing:0.2em; text-transform:uppercase;">Local fulfillment preference</p>
-							<p class="font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">Used as the default at checkout when your address is in our local delivery zone.</p>
+							<p class="font-oswald font-bold text-ink text-[11px] mb-1" style="letter-spacing:0.2em; text-transform:uppercase;">Fulfillment preference</p>
+							<p class="font-oswald text-chrome-deep text-xs" style="letter-spacing:0.04em;">How we get your orders and subscription renewals to you, since your address is in our local delivery zone.</p>
 						</div>
 						<label class="flex items-start gap-3 cursor-pointer">
 							<input type="radio" name="preferred_local_fulfillment" value="" checked?={ props.Customer.PreferredLocalFulfillment == nil } class="mt-1 size-4 accent-rust"/>
@@ -234,6 +234,13 @@ templ AccountSettingsContent(props AccountSettingsProps) {
 								</span>
 							</label>
 						}
+						<label class="flex items-start gap-3 cursor-pointer">
+							<input type="radio" name="preferred_local_fulfillment" value="shipped" checked?={ props.Customer.PreferredLocalFulfillment != nil && *props.Customer.PreferredLocalFulfillment == domain.ShippingMethodShipped } class="mt-1 size-4 accent-rust"/>
+							<span>
+								<span class="block font-oswald font-bold text-ink text-sm" style="letter-spacing:0.04em;">Ship it to me</span>
+								<span class="block font-oswald text-chrome-deep text-xs">We'll mail it out instead — standard shipping charges apply.</span>
+							</span>
+						</label>
 					</div>
 				}
 				<div class="pt-2">

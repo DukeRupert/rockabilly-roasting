@@ -90,22 +90,23 @@ func (s *RenewalService) anchorRenewal(t time.Time) time.Time {
 	return anchorRenewalTime(t, s.renewalLoc, s.renewalHour)
 }
 
-// renewalCharges computes the shipping and tax due on a renewal order, matching
-// retail checkout: shipping is the merchant flat rate (free over threshold, free
-// for local zips) on the order subtotal, tax runs the store's configured
-// calculator over per-line taxable amounts honouring product + customer
-// exemption. cfg is returned so the caller can resolve the local fulfilment
-// method without re-reading config. Best-effort: a missing config or catalog
-// lookup yields zero for that component rather than blocking the renewal.
-func (s *RenewalService) renewalCharges(ctx context.Context, tx pgx.Tx, lines []domain.TaxLineItem, subtotalCents int, customer *domain.Customer, addr *domain.Address, grandfatheredShipping bool) (shipping, taxTotal int, cfg *domain.ShippingConfig) {
+// renewalCharges computes the shipping and tax due on a renewal order and
+// resolves the local fulfilment method to stamp on it, matching retail
+// checkout. The method is resolved first (saved address in a local zip + the
+// customer's preference), then shipping is priced off that method: local
+// delivery and pickup are free, while an explicit "mail it to me" preference
+// pays the standard carrier rate even from a local zip. Tax runs the store's
+// configured calculator over per-line taxable amounts honouring product +
+// customer exemption. Grandfathered subscriptions keep free renewal shipping
+// (migration 054) but still get a resolved method. Best-effort: a missing
+// config or catalog lookup yields zero/nil for that component rather than
+// blocking the renewal.
+func (s *RenewalService) renewalCharges(ctx context.Context, tx pgx.Tx, lines []domain.TaxLineItem, subtotalCents int, customer *domain.Customer, addr *domain.Address, grandfatheredShipping bool) (shipping, taxTotal int, shipMethod *domain.ShippingMethod) {
 	if s.shipping != nil {
-		if c, err := s.shipping.GetConfig(ctx, tx); err == nil {
-			cfg = c
-			// Grandfathered subscriptions keep free renewal shipping (migration
-			// 054). cfg is still returned so the caller can resolve the local
-			// fulfillment method — only the shipping cost is waived.
+		if cfg, err := s.shipping.GetConfig(ctx, tx); err == nil {
+			shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
 			if !grandfatheredShipping {
-				shipping = cfg.Calculate(subtotalCents, addr.PostalCode)
+				shipping = cfg.CalculateForMethod(subtotalCents, addr.PostalCode, shipMethod)
 			}
 		}
 	}
@@ -125,7 +126,7 @@ func (s *RenewalService) renewalCharges(ctx context.Context, tx pgx.Tx, lines []
 		}
 	}
 
-	return shipping, taxTotal, cfg
+	return shipping, taxTotal, shipMethod
 }
 
 // taxExemptForVariant reports whether the variant's product is tax-exempt.
@@ -295,20 +296,16 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		}
 		subtotalCents = priceCents * sub.Quantity
 
-		// Shipping + tax, matching retail checkout. The cfg returned by
-		// renewalCharges also resolves the local fulfillment method (saved
-		// address in a local zip + the customer's preference); otherwise the
-		// renewal order ships normally.
+		// Shipping + tax + resolved fulfillment method, matching retail
+		// checkout. renewalCharges resolves the method (saved address in a
+		// local zip + the customer's preference) and prices shipping off it;
+		// otherwise the renewal order ships normally.
 		taxLine := []domain.TaxLineItem{{
 			LineIndex: 0,
 			Subtotal:  subtotalCents,
 			TaxExempt: s.taxExemptForVariant(ctx, tx, sub.VariantID),
 		}}
-		var cfg *domain.ShippingConfig
-		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLine, subtotalCents, customer, addr, sub.ShippingGrandfathered())
-		if cfg != nil {
-			shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
-		}
+		shippingCents, taxCents, shipMethod = s.renewalCharges(ctx, tx, taxLine, subtotalCents, customer, addr, sub.ShippingGrandfathered())
 
 		return nil
 	})
@@ -591,11 +588,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				allGrandfathered = false
 			}
 		}
-		var cfg *domain.ShippingConfig
-		shippingCents, taxCents, cfg = s.renewalCharges(ctx, tx, taxLines, subtotalCents, customer, addr, allGrandfathered)
-		if cfg != nil {
-			shipMethod = pickRenewalLocalMethod(cfg, addr.PostalCode, customer.PreferredLocalFulfillment)
-		}
+		shippingCents, taxCents, shipMethod = s.renewalCharges(ctx, tx, taxLines, subtotalCents, customer, addr, allGrandfathered)
 
 		return nil
 	})
@@ -825,6 +818,12 @@ func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCus
 // the address is not local or when the merchant has both channels disabled —
 // the order then falls back to the standard "shipped" flow.
 func pickRenewalLocalMethod(cfg *domain.ShippingConfig, shipToZip string, preference *domain.ShippingMethod) *domain.ShippingMethod {
+	// An explicit "mail it to me" preference always wins — even a local-zone
+	// customer who could get free delivery gets it shipped if that's what they
+	// chose. nil => the standard shipped flow downstream.
+	if preference != nil && *preference == domain.ShippingMethodShipped {
+		return nil
+	}
 	eligible := cfg.EligibleLocalMethods(shipToZip)
 	if len(eligible) == 0 {
 		return nil

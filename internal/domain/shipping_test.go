@@ -150,3 +150,36 @@ func TestShippingConfig_Calculate(t *testing.T) {
 		assert.Equal(t, 600, c.Calculate(100000, "90210"))
 	})
 }
+
+func TestShippingConfig_CalculateForMethod(t *testing.T) {
+	threshold := 5000
+	cfg := ShippingConfig{
+		FlatRateCents:         600,
+		FreeShippingThreshold: &threshold,
+		LocalZipCodes:         []string{"99336"},
+	}
+	delivery := ShippingMethodLocalDelivery
+	pickup := ShippingMethodPickup
+	shipped := ShippingMethodShipped
+
+	t.Run("local delivery is free", func(t *testing.T) {
+		assert.Equal(t, 0, cfg.CalculateForMethod(2000, "99336", &delivery))
+	})
+	t.Run("pickup is free", func(t *testing.T) {
+		assert.Equal(t, 0, cfg.CalculateForMethod(2000, "99336", &pickup))
+	})
+	t.Run("shipped from a local zip still pays flat rate", func(t *testing.T) {
+		// The point of the feature: a local customer who opts to have it mailed
+		// is charged like any other shipment, not given the local-zone freeness.
+		assert.Equal(t, 600, cfg.CalculateForMethod(2000, "99336", &shipped))
+	})
+	t.Run("shipped from a local zip is still waived over the threshold", func(t *testing.T) {
+		assert.Equal(t, 0, cfg.CalculateForMethod(5000, "99336", &shipped))
+	})
+	t.Run("nil method (standard shipped flow) pays flat rate off-zone", func(t *testing.T) {
+		assert.Equal(t, 600, cfg.CalculateForMethod(2000, "90210", nil))
+	})
+	t.Run("non-local shipped under threshold pays flat rate", func(t *testing.T) {
+		assert.Equal(t, 600, cfg.CalculateForMethod(2000, "90210", &shipped))
+	})
+}

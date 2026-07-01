@@ -115,6 +115,24 @@ func (c ShippingConfig) Calculate(subtotalCents int, shipToZip string) int {
 	return c.FlatRateCents
 }
 
+// CalculateForMethod returns the shipping cost in cents once the fulfillment
+// method is known. Local delivery and pickup are always free. A "shipped"
+// method (or nil, the standard shipped flow) pays the normal carrier
+// calculation — flat rate, waived above the free-shipping threshold — even from
+// a local zip: a local customer who opts to have an order mailed is charged like
+// any other shipment rather than getting the local-zone freeness. Use this
+// instead of Calculate wherever the resolved method is available, so an opt-in
+// mail-out from a local address is priced correctly.
+func (c ShippingConfig) CalculateForMethod(subtotalCents int, shipToZip string, method *ShippingMethod) int {
+	if method != nil && (*method == ShippingMethodLocalDelivery || *method == ShippingMethodPickup) {
+		return 0
+	}
+	if c.FreeShippingThreshold != nil && subtotalCents >= *c.FreeShippingThreshold {
+		return 0
+	}
+	return c.FlatRateCents
+}
+
 // EligibleLocalMethods returns the local fulfillment methods available for a
 // given ship-to zip, in stable display order (delivery first, then pickup).
 // Returns an empty slice when the zip is not local or when no local toggles

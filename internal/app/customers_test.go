@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
@@ -198,4 +199,46 @@ func TestCustomerService_GetAddress(t *testing.T) {
 	// Wrong customer returns not found.
 	_, err = svc.GetAddress(ctx, tx, addr.ID, uuid.New())
 	assert.ErrorIs(t, err, app.ErrAddressNotFound)
+}
+
+func TestCustomerService_UpdatePreferredLocalFulfillmentSelf(t *testing.T) {
+	pool := testPool
+	ctx := context.Background()
+	svc := newCustomerService()
+	cstore := store.NewCustomerStore()
+
+	t.Run("shipped is a valid preference and persists", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		customer := testutil.CreateCustomer(t, tx)
+		shipped := domain.ShippingMethodShipped
+
+		require.NoError(t, svc.UpdatePreferredLocalFulfillmentSelf(ctx, tx, customer.ID, &shipped))
+
+		got, err := cstore.GetByID(ctx, tx, customer.ID)
+		require.NoError(t, err)
+		require.NotNil(t, got.PreferredLocalFulfillment)
+		assert.Equal(t, domain.ShippingMethodShipped, *got.PreferredLocalFulfillment)
+	})
+
+	t.Run("nil clears the preference", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		customer := testutil.CreateCustomer(t, tx)
+		delivery := domain.ShippingMethodLocalDelivery
+		require.NoError(t, svc.UpdatePreferredLocalFulfillmentSelf(ctx, tx, customer.ID, &delivery))
+
+		require.NoError(t, svc.UpdatePreferredLocalFulfillmentSelf(ctx, tx, customer.ID, nil))
+
+		got, err := cstore.GetByID(ctx, tx, customer.ID)
+		require.NoError(t, err)
+		assert.Nil(t, got.PreferredLocalFulfillment)
+	})
+
+	t.Run("an unknown method is rejected", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		customer := testutil.CreateCustomer(t, tx)
+		bogus := domain.ShippingMethod("carrier_pigeon")
+
+		err := svc.UpdatePreferredLocalFulfillmentSelf(ctx, tx, customer.ID, &bogus)
+		assert.Error(t, err)
+	})
 }

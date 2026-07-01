@@ -461,9 +461,9 @@ func (s *CustomerStore) UpdatePaymentTerms(ctx context.Context, tx pgx.Tx, id uu
 	return nil
 }
 
-// UpdatePreferredLocalFulfillment sets a customer's saved choice for local
-// fulfillment. Pass nil to clear the preference (back to "ask each time").
-// The DB CHECK constraint enforces the value is pickup or local_delivery.
+// UpdatePreferredLocalFulfillment sets a customer's saved fulfillment choice.
+// Pass nil to clear the preference (back to "ask each time"). The DB CHECK
+// constraint enforces the value is pickup, local_delivery, or shipped.
 func (s *CustomerStore) UpdatePreferredLocalFulfillment(ctx context.Context, tx pgx.Tx, id uuid.UUID, method *domain.ShippingMethod) error {
 	var v *string
 	if method != nil {

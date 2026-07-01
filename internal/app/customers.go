@@ -110,14 +110,31 @@ func (s *CustomerService) UpdatePhone(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return c, nil
 }
 
+// validPreferredFulfillment reports an error if method is not a settable
+// fulfillment preference. nil (clear the preference, back to "ask each time")
+// is always valid; otherwise it must be pickup, local delivery, or shipped —
+// the last being an explicit opt-in to have local-eligible orders mailed rather
+// than delivered/picked up. Eligibility for a given method is enforced at
+// render time and re-checked at renewal, so an ineligible saved value is
+// harmless (renewal falls back), not an error here.
+func validPreferredFulfillment(method *domain.ShippingMethod) error {
+	if method == nil {
+		return nil
+	}
+	switch *method {
+	case domain.ShippingMethodPickup, domain.ShippingMethodLocalDelivery, domain.ShippingMethodShipped:
+		return nil
+	default:
+		return fmt.Errorf("invalid fulfillment preference: %s", *method)
+	}
+}
+
 // UpdatePreferredLocalFulfillmentSelf is the customer-initiated path (no
 // audit). The audited staff path is UpdatePreferredLocalFulfillment, below.
 // Pass nil to clear the preference back to "ask each time".
 func (s *CustomerService) UpdatePreferredLocalFulfillmentSelf(ctx context.Context, tx pgx.Tx, id uuid.UUID, method *domain.ShippingMethod) error {
-	if method != nil {
-		if *method != domain.ShippingMethodPickup && *method != domain.ShippingMethodLocalDelivery {
-			return fmt.Errorf("invalid local fulfillment method: %s", *method)
-		}
+	if err := validPreferredFulfillment(method); err != nil {
+		return err
 	}
 	if err := s.customers.UpdatePreferredLocalFulfillment(ctx, tx, id, method); err != nil {
 		return fmt.Errorf("update preferred local fulfillment: %w", err)
@@ -326,10 +343,8 @@ func (s *CustomerService) UpdateBillingMethod(ctx context.Context, tx pgx.Tx, id
 // the self-service variant but additionally records an audit entry. Pass nil
 // to clear the preference back to "ask each time".
 func (s *CustomerService) UpdatePreferredLocalFulfillment(ctx context.Context, tx pgx.Tx, id uuid.UUID, method *domain.ShippingMethod, actor Actor) error {
-	if method != nil {
-		if *method != domain.ShippingMethodPickup && *method != domain.ShippingMethodLocalDelivery {
-			return fmt.Errorf("invalid local fulfillment method: %s", *method)
-		}
+	if err := validPreferredFulfillment(method); err != nil {
+		return err
 	}
 	if err := s.customers.UpdatePreferredLocalFulfillment(ctx, tx, id, method); err != nil {
 		return fmt.Errorf("update preferred local fulfillment: %w", err)

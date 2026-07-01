@@ -37,20 +37,23 @@ func (d *Deps) handleAccountSettings(w http.ResponseWriter, r *http.Request) {
 	storefront.AccountSettingsPage(props).Render(ctx, w) //nolint:errcheck
 }
 
-// fillLocalFulfillmentPrefs decides whether to render the local fulfillment
-// section on the account settings page. It only renders when (a) at least one
-// of the customer's saved addresses sits inside a local zip and (b) the
-// merchant has more than one local channel enabled — otherwise there's no
-// real preference to set.
+// fillLocalFulfillmentPrefs decides whether to render the fulfillment-preference
+// section on the account settings page. It renders when (a) at least one of the
+// customer's saved addresses sits inside a local zip and (b) the merchant has at
+// least one local channel enabled. In that case the customer has a real choice:
+// the eligible local method(s) — delivery and/or pickup — plus the option to
+// have their orders shipped ("mail it to me") instead. When no local channel is
+// enabled, or no address is local, everything ships anyway and there's nothing
+// to choose, so the section stays hidden.
 func (d *Deps) fillLocalFulfillmentPrefs(ctx context.Context, customerID uuid.UUID, props *storefront.AccountSettingsProps) {
 	_ = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		cfg, err := d.CheckoutService.GetShippingConfig(ctx, tx)
 		if err != nil {
 			return err
 		}
-		// Only ask the customer to choose when the merchant offers both
-		// channels — otherwise the single eligible option is forced anyway.
-		if !cfg.LocalDeliveryEnabled || !cfg.LocalPickupEnabled {
+		// With no local channel enabled, a local zip falls back to shipped
+		// anyway — there's no trade-off to offer.
+		if !cfg.LocalDeliveryEnabled && !cfg.LocalPickupEnabled {
 			return nil
 		}
 		addrs, err := d.CustomerService.ListAddresses(ctx, tx, customerID)

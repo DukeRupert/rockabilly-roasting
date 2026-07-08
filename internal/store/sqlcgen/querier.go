@@ -238,6 +238,7 @@ type Querier interface {
 	ReserveStock(ctx context.Context, arg ReserveStockParams) (StockLevel, error)
 	RevokeAllSessionsForActor(ctx context.Context, arg RevokeAllSessionsForActorParams) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
+	SetCartItemByVariant(ctx context.Context, arg SetCartItemByVariantParams) (CartItem, error)
 	SetCartItemQuantity(ctx context.Context, arg SetCartItemQuantityParams) (CartItem, error)
 	SetDefaultAddress(ctx context.Context, arg SetDefaultAddressParams) error
 	SetProductCustomerVisibility(ctx context.Context, arg SetProductCustomerVisibilityParams) error

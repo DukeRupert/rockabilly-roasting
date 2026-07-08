@@ -109,6 +109,45 @@ func (q *Queries) ListCartItems(ctx context.Context, cartID uuid.UUID) ([]CartIt
 	return items, nil
 }
 
+const setCartItemByVariant = `-- name: SetCartItemByVariant :one
+INSERT INTO cart_items (id, cart_id, variant_id, quantity, unit_price)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (cart_id, variant_id)
+DO UPDATE SET quantity = EXCLUDED.quantity,
+              unit_price = EXCLUDED.unit_price,
+              updated_at = now()
+RETURNING id, cart_id, variant_id, quantity, unit_price, created_at, updated_at
+`
+
+type SetCartItemByVariantParams struct {
+	ID        uuid.UUID `json:"id"`
+	CartID    uuid.UUID `json:"cart_id"`
+	VariantID uuid.UUID `json:"variant_id"`
+	Quantity  int32     `json:"quantity"`
+	UnitPrice int32     `json:"unit_price"`
+}
+
+func (q *Queries) SetCartItemByVariant(ctx context.Context, arg SetCartItemByVariantParams) (CartItem, error) {
+	row := q.db.QueryRow(ctx, setCartItemByVariant,
+		arg.ID,
+		arg.CartID,
+		arg.VariantID,
+		arg.Quantity,
+		arg.UnitPrice,
+	)
+	var i CartItem
+	err := row.Scan(
+		&i.ID,
+		&i.CartID,
+		&i.VariantID,
+		&i.Quantity,
+		&i.UnitPrice,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const setCartItemQuantity = `-- name: SetCartItemQuantity :one
 UPDATE cart_items
 SET quantity = $1, updated_at = now()

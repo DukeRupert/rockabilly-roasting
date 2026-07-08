@@ -2,9 +2,25 @@ package storefront
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
+
+// quickOrderFilterText is the lowercase haystack a product card is matched
+// against by the client-side sheet filter: title, SKUs, and option values.
+func quickOrderFilterText(p QuickOrderProduct) string {
+	parts := []string{strings.ToLower(p.Title)}
+	for _, v := range p.Variants {
+		parts = append(parts, strings.ToLower(v.SKU))
+		for _, ov := range v.OptionValues {
+			parts = append(parts, strings.ToLower(ov))
+		}
+	}
+	return strings.Join(parts, " ")
+}
 
 type QuickOrderVariant struct {
 	ID           uuid.UUID
@@ -13,7 +29,9 @@ type QuickOrderVariant struct {
 	UnitPrice    int
 	MinQty       *int
 	Multiple     *int
-	InStock      bool
+	// CartQty is what's already in the buyer's cart for this variant; the row
+	// pre-fills with it so the sheet reflects the current order.
+	CartQty int
 }
 
 type QuickOrderProduct struct {
@@ -24,10 +42,20 @@ type QuickOrderProduct struct {
 	Variants []QuickOrderVariant
 }
 
+// PortalLastOrder summarizes the buyer's most recent order for the one-click
+// reorder shortcut at the top of the sheet.
+type PortalLastOrder struct {
+	ID       uuid.UUID
+	Number   string
+	PlacedAt time.Time
+	Total    int
+}
+
 type WholesalePortalProps struct {
 	CompanyName string
 	Products    []QuickOrderProduct
 	CartCount   int
+	LastOrder   *PortalLastOrder
 }
 
 templ WholesalePortalContent(props WholesalePortalProps) {
@@ -61,13 +89,39 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 				</svg>
 			</a>
 		</div>
+		<!--
+			One-click restock: shown only while the order is empty — once the
+			buyer starts building a sheet, pinning it to a past order from up
+			here would silently rewrite their work.
+		-->
+		if props.LastOrder != nil && props.CartCount == 0 {
+			<div class="flex flex-wrap items-center justify-between gap-4 border-2 border-ink bg-candle-soft px-5 py-4" style="box-shadow: var(--shadow-stamp);">
+				<div>
+					<p class="font-oswald font-bold text-ink text-sm" style="letter-spacing:0.06em;">Same as last time?</p>
+					<p class="mt-0.5 font-oswald text-ink-soft text-sm">
+						Load your order from { formatDate(props.LastOrder.PlacedAt) } — { props.LastOrder.Number }, { formatCents(props.LastOrder.Total) } — and review it before it goes out.
+					</p>
+				</div>
+				<form method="POST" action={ templ.SafeURL("/wholesale/account/orders/" + props.LastOrder.ID.String() + "/reorder") }>
+					<button type="submit" class="btn-stamp inline-flex items-center gap-2 border-2 border-ink bg-paper text-ink px-4 py-2.5 font-oswald font-bold text-xs hover:bg-ink hover:text-paper transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">
+						<svg class="size-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"></path>
+						</svg>
+						Reorder Last Order
+					</button>
+				</form>
+			</div>
+		}
 		<!-- Quick order form -->
 		<!--
-			Live order summary: each qty input carries its unit price in
+			The sheet IS the order: rows pre-fill with the cart's current
+			quantities and bulk-add uses set semantics, so what's on screen is
+			exactly what's in the order — resubmitting never doubles lines and
+			clearing a row removes it. Each qty input carries its unit price in
 			data-price and pings recompute() on input, so the sticky bar shows a
-			running unit count + subtotal client-side as the buyer stacks the
-			order — no server round-trip. Prices match the catalog the page was
-			rendered with; checkout re-resolves and flags any drift.
+			running unit count + subtotal client-side — no server round-trip.
+			Prices match the catalog the page was rendered with; checkout
+			re-resolves and flags any drift.
 		-->
 		<form
 			method="post"
@@ -76,11 +130,29 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 			x-data="{
 				units: 0,
 				cents: 0,
+				q: '',
+				match(hay) { const n = this.q.toLowerCase().trim(); return !n || hay.includes(n); },
+				get hits() { return Array.from(this.$root.querySelectorAll('[data-filter]')).filter(el => this.match(el.dataset.filter)).length; },
 				recompute() {
 					let units = 0, cents = 0;
 					this.$root.querySelectorAll('input[data-price]').forEach(el => {
 						const q = parseInt(el.value, 10) || 0;
-						if (q > 0) { units += q; cents += q * (parseInt(el.dataset.price, 10) || 0); }
+						// Flag quantities that break the wholesale minimum or case
+						// multiple via native validation, so submit stops at the
+						// offending input with a plain message instead of a server
+						// rejection later.
+						const min = parseInt(el.dataset.min, 10) || 0;
+						const mult = parseInt(el.dataset.mult, 10) || 0;
+						let problem = '';
+						if (q > 0 && min && q < min) problem = 'Minimum for this item is ' + min + '.';
+						else if (q > 0 && mult && q % mult !== 0) problem = 'This item comes in multiples of ' + mult + '.';
+						el.setCustomValidity(problem);
+						const price = parseInt(el.dataset.price, 10) || 0;
+						// Extended price per row, so a buyer working to a budget
+						// never does qty × unit in their head.
+						const lineTotal = el.closest('tr')?.querySelector('[data-line-total]');
+						if (lineTotal) lineTotal.textContent = q > 0 ? this.money(q * price) : '—';
+						if (q > 0) { units += q; cents += q * price; }
 					});
 					this.units = units;
 					this.cents = cents;
@@ -89,6 +161,30 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 			}"
 			x-init="recompute()"
 		>
+			<!--
+				Sheet filter — client-side only, so filtered-out rows keep their
+				values and still submit with the form. Enter is swallowed so a
+				quick search never submits the order.
+			-->
+			if len(props.Products) > 5 {
+				<div class="flex items-center gap-3">
+					<input
+						type="search"
+						placeholder="Filter the sheet — coffee, SKU, grind…"
+						aria-label="Filter products"
+						x-model="q"
+						x-on:keydown.enter.prevent
+						class="paper-input w-full max-w-sm border-2 border-ink bg-cream-hi px-3 py-2 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none focus:bg-paper"
+						style="box-shadow: var(--shadow-stamp-sm);"
+					/>
+					<p class="font-oswald text-chrome-deep text-xs" x-show="q" x-cloak>
+						<span x-text="hits"></span> of { fmt.Sprint(len(props.Products)) } match
+					</p>
+				</div>
+				<p class="border-2 border-ink bg-cream-hi p-6 text-center font-oswald text-chrome-deep text-sm" x-show="q && hits === 0" x-cloak>
+					Nothing on the sheet matches — clear the filter to see the full lineup.
+				</p>
+			}
 			if len(props.Products) == 0 {
 				<div class="border-2 border-ink bg-cream-hi p-12 text-center" style="box-shadow: var(--shadow-stamp);">
 					<p class="font-slab text-ink text-xl uppercase">The shelf's empty</p>
@@ -96,7 +192,7 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 				</div>
 			}
 			for _, product := range props.Products {
-				<div class="border-2 border-ink bg-cream-hi" style="box-shadow: var(--shadow-stamp);">
+				<div class="border-2 border-ink bg-cream-hi" style="box-shadow: var(--shadow-stamp);" data-filter={ quickOrderFilterText(product) } x-show="match($el.dataset.filter)">
 					<!-- Product header -->
 					<div class="flex items-center gap-4 border-b-2 border-ink bg-paper-warm px-4 py-3">
 						if product.ImageURL != "" {
@@ -128,7 +224,7 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 									}
 									<th class="px-4 py-2.5">Unit Price</th>
 									<th class="px-4 py-2.5 text-center">Qty</th>
-									<th class="px-4 py-2.5">Stock</th>
+									<th class="px-4 py-2.5 text-right">Total</th>
 								</tr>
 							</thead>
 							<tbody class="block sm:table-row-group">
@@ -149,9 +245,9 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 											<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Unit Price</span>
 											<span>
 												<span class="font-special text-base text-ink">{ formatCents(variant.UnitPrice) }</span>
-												if variant.MinQty != nil {
+												if hint := moqHint(variant.MinQty, variant.Multiple); hint != "" {
 													<span class="ml-1.5 font-oswald text-[11px] text-chrome-deep" style="letter-spacing:0.04em;">
-														min { fmt.Sprint(*variant.MinQty) }
+														{ hint }
 													</span>
 												}
 											</span>
@@ -162,33 +258,27 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 												type="number"
 												name={ fmt.Sprintf("qty[%s]", variant.ID.String()) }
 												min="0"
-												step={
-													func() string {
-														if variant.Multiple != nil && *variant.Multiple > 1 {
-															return fmt.Sprint(*variant.Multiple)
-														}
-														return "1"
-													}()
-												}
+												step={ multipleAttr(variant.Multiple) }
 												placeholder="0"
+												if variant.CartQty > 0 {
+													value={ fmt.Sprint(variant.CartQty) }
+												}
 												aria-label={ "Quantity for " + variant.SKU }
 												data-price={ fmt.Sprint(variant.UnitPrice) }
+												if variant.MinQty != nil {
+													data-min={ fmt.Sprint(*variant.MinQty) }
+												}
+												if variant.Multiple != nil {
+													data-mult={ fmt.Sprint(*variant.Multiple) }
+												}
 												x-on:input="recompute()"
 												class="w-20 border-2 border-ink bg-cream-hi px-2 py-1.5 text-center font-special text-sm text-ink focus:outline-none focus:bg-paper [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 												style="box-shadow: var(--shadow-stamp-sm);"
 											/>
 										</td>
-										<td class="flex items-center justify-between gap-4 py-1.5 sm:table-cell sm:whitespace-nowrap sm:px-4 sm:py-2.5">
-											<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Stock</span>
-											if variant.InStock {
-												<span class="inline-flex items-center border-2 border-ink bg-candle px-2.5 py-0.5 font-oswald font-bold text-[10px] text-ink rounded-full" style="letter-spacing:0.12em; text-transform:uppercase;">
-													In Stock
-												</span>
-											} else {
-												<span class="inline-flex items-center border-2 border-rust bg-paper px-2.5 py-0.5 font-oswald font-bold text-[10px] text-rust rounded-full" style="letter-spacing:0.12em; text-transform:uppercase;">
-													Out
-												</span>
-											}
+										<td class="flex items-baseline justify-between gap-4 py-1.5 sm:table-cell sm:whitespace-nowrap sm:px-4 sm:py-2.5 sm:text-right">
+											<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Total</span>
+											<span class="font-special text-base text-ink" data-line-total>&mdash;</span>
 										</td>
 									</tr>
 								}
@@ -212,7 +302,11 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 						class="btn-stamp inline-flex shrink-0 items-center border-2 border-ink bg-rust text-paper px-6 py-3 font-oswald font-bold text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rust"
 						style="letter-spacing:0.16em; text-transform:uppercase;"
 					>
-						Add to Order
+						if props.CartCount > 0 {
+							Update Order
+						} else {
+							Add to Order
+						}
 					</button>
 				</div>
 			}

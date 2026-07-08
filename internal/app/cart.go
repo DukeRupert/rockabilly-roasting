@@ -138,6 +138,48 @@ func (s *CartService) AddItemForCustomer(ctx context.Context, tx pgx.Tx, cartID,
 	return item, nil
 }
 
+// SetItemForCustomer makes the cart line for a variant exactly quantity at the
+// customer's current effective price — replacing any existing line rather than
+// incrementing it. Quantity 0 removes the line (a no-op if absent) and returns
+// nil. This is the write behind order-sheet style forms, where the submitted
+// quantities are the whole truth, and behind price refreshes.
+func (s *CartService) SetItemForCustomer(ctx context.Context, tx pgx.Tx, cartID, variantID uuid.UUID, quantity int, customerID uuid.UUID, currencyCode string) (*domain.CartItem, error) {
+	if quantity < 0 {
+		return nil, ErrInvalidQuantity
+	}
+	if quantity == 0 {
+		if err := s.carts.RemoveCartItemByVariant(ctx, tx, cartID, variantID); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	if err := s.assertVariantPurchasable(ctx, tx, variantID); err != nil {
+		return nil, err
+	}
+	viewer, err := s.access.ResolveViewer(ctx, tx, customerID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.assertVariantAccessible(ctx, tx, viewer, variantID); err != nil {
+		return nil, err
+	}
+	if err := s.assertVariantInChannel(ctx, tx, variantID, domain.ChannelFor(viewer)); err != nil {
+		return nil, err
+	}
+
+	price, err := s.pricing.ResolveForCustomer(ctx, tx, variantID, customerID, currencyCode)
+	if err != nil {
+		return nil, err
+	}
+
+	item, err := s.carts.SetCartItemByVariant(ctx, tx, cartID, variantID, quantity, int(price))
+	if err != nil {
+		return nil, fmt.Errorf("set cart item: %w", err)
+	}
+	return item, nil
+}
+
 // assertVariantPurchasable returns ErrVariantArchived if the variant is archived,
 // or ErrVariantNotFound if it doesn't exist.
 func (s *CartService) assertVariantPurchasable(ctx context.Context, tx pgx.Tx, variantID uuid.UUID) error {

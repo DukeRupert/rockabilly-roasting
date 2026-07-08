@@ -11,6 +11,15 @@ DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity,
               updated_at = now()
 RETURNING *;
 
+-- name: SetCartItemByVariant :one
+INSERT INTO cart_items (id, cart_id, variant_id, quantity, unit_price)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (cart_id, variant_id)
+DO UPDATE SET quantity = EXCLUDED.quantity,
+              unit_price = EXCLUDED.unit_price,
+              updated_at = now()
+RETURNING *;
+
 -- name: SetCartItemQuantity :one
 UPDATE cart_items
 SET quantity = $1, updated_at = now()

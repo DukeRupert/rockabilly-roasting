@@ -65,6 +65,23 @@ func (s *CartStore) UpsertCartItem(ctx context.Context, tx pgx.Tx, cartID, varia
 	return cartItemFromRow(row), nil
 }
 
+// SetCartItemByVariant inserts or replaces a cart line for a variant, setting
+// quantity and unit price to exactly the given values (unlike UpsertCartItem,
+// which increments quantity and keeps the original price).
+func (s *CartStore) SetCartItemByVariant(ctx context.Context, tx pgx.Tx, cartID, variantID uuid.UUID, quantity, unitPriceCents int) (*domain.CartItem, error) {
+	row, err := sqlcgen.New(tx).SetCartItemByVariant(ctx, sqlcgen.SetCartItemByVariantParams{
+		ID:        uuid.New(),
+		CartID:    cartID,
+		VariantID: variantID,
+		Quantity:  int32(quantity),
+		UnitPrice: int32(unitPriceCents),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("set cart item by variant: %w", err)
+	}
+	return cartItemFromRow(row), nil
+}
+
 // SetCartItemQuantity updates the quantity of a cart item.
 func (s *CartStore) SetCartItemQuantity(ctx context.Context, tx pgx.Tx, itemID uuid.UUID, quantity int) (*domain.CartItem, error) {
 	row, err := sqlcgen.New(tx).SetCartItemQuantity(ctx, sqlcgen.SetCartItemQuantityParams{

@@ -1,6 +1,10 @@
 package app
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/dukerupert/hiri/internal/domain"
+)
 
 // Sentinel errors for the application layer.
 var (
@@ -183,3 +187,14 @@ var (
 	ErrShipmentNoPhysicalItems = errors.New("order has no physical items to ship")
 	ErrNoBoxPreset             = errors.New("no box presets configured")
 )
+
+// MOQViolationError carries the per-line minimum/multiple violations so
+// handlers can tell the buyer which lines are short instead of a bare
+// rejection. errors.Is(err, ErrMOQViolation) matches it, so existing checks
+// and the HTTP mapping keep working.
+type MOQViolationError struct {
+	Violations []domain.MOQViolation
+}
+
+func (e *MOQViolationError) Error() string        { return ErrMOQViolation.Error() }
+func (e *MOQViolationError) Is(target error) bool { return target == ErrMOQViolation }

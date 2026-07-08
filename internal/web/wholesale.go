@@ -245,6 +245,11 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 	}
 
 	var products []app.QuickOrderProduct
+	// The sheet pre-fills each row with what's already in the cart, so the
+	// portal always shows the buyer's current order (and bulk-add can use set
+	// semantics — resubmitting the sheet never doubles quantities).
+	cartQty := map[uuid.UUID]int{}
+	var lastOrder *domain.Order
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		// Access identity comes from the membership join (the source of truth), not the
 		// deprecated customer.customer_group_id column.
@@ -253,7 +258,41 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 			return txErr
 		}
 		products, txErr = d.WholesaleService.QuickOrderCatalog(ctx, tx, viewer.GroupIDs, customer.ID, d.PricingService, "USD")
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+		if cartID := getWholesaleCartID(r); cartID != nil {
+			cart, txErr := d.CartService.GetCart(ctx, tx, *cartID)
+			if txErr != nil && !errors.Is(txErr, app.ErrCartNotFound) {
+				return txErr
+			}
+			if txErr == nil {
+				items, txErr := d.CartService.ListItems(ctx, tx, cart.ID)
+				if txErr != nil {
+					return txErr
+				}
+				for _, ci := range items {
+					cartQty[ci.VariantID] = ci.Quantity
+				}
+			}
+		}
+
+		// The buyer's most recent order powers the one-click "reorder last
+		// order" shortcut — restocking the same lineup is the core job here.
+		channel := domain.OrderChannelWholesale
+		recent, txErr := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+			CustomerID:         &customer.ID,
+			Channel:            &channel,
+			Limit:              1,
+			ExcludeUnconfirmed: true,
+		})
+		if txErr != nil {
+			return txErr
+		}
+		if len(recent) > 0 {
+			lastOrder = &recent[0]
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -272,7 +311,7 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 				UnitPrice:    v.UnitPrice,
 				MinQty:       v.MinQty,
 				Multiple:     v.Multiple,
-				InStock:      v.InStock,
+				CartQty:      cartQty[v.ID],
 			}
 		}
 		imageURL := ""
@@ -292,6 +331,14 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 		CompanyName: companyName,
 		Products:    templateProducts,
 		CartCount:   d.wholesaleCartItemCount(r),
+	}
+	if lastOrder != nil {
+		props.LastOrder = &storefront.PortalLastOrder{
+			ID:       lastOrder.ID,
+			Number:   lastOrder.Number,
+			PlacedAt: lastOrder.PlacedAt,
+			Total:    lastOrder.Total,
+		}
 	}
 
 	if IsHTMX(r) {
@@ -314,12 +361,17 @@ func (d *Deps) handleWholesaleBulkAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse qty[variant_id] = quantity from form.
+	// Parse qty[variant_id] = quantity from form. The sheet's inputs pre-fill
+	// with the current cart, so the submitted quantities are the whole order:
+	// zero/blank means "this variant should not be in the order". Every field
+	// present is kept — positive quantities are applied with set semantics
+	// (never incremented), and zeroes clear the line if one exists.
 	type bulkItem struct {
 		VariantID uuid.UUID
 		Quantity  int
 	}
 	var items []bulkItem
+	anyPositive := false
 	for key, values := range r.Form {
 		if len(key) <= 4 || key[:4] != "qty[" || key[len(key)-1] != ']' {
 			continue
@@ -329,32 +381,65 @@ func (d *Deps) handleWholesaleBulkAdd(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			continue
 		}
-		if len(values) == 0 || values[0] == "" || values[0] == "0" {
-			continue
+		qty := 0
+		if len(values) > 0 && values[0] != "" {
+			qty, err = strconv.Atoi(values[0])
+			if err != nil || qty < 0 {
+				continue
+			}
 		}
-		qty, err := strconv.Atoi(values[0])
-		if err != nil || qty <= 0 {
-			continue
+		if qty > 0 {
+			anyPositive = true
 		}
 		items = append(items, bulkItem{VariantID: variantID, Quantity: qty})
 	}
 
-	if len(items) == 0 {
+	cartID := getWholesaleCartID(r)
+
+	// Nothing ordered and no cart to clear — stay on the sheet.
+	if !anyPositive && cartID == nil {
 		http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
 		return
 	}
 
-	cartID := getWholesaleCartID(r)
 	var resultCartID uuid.UUID
-
+	var skipped int
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		cart, txErr := d.CartService.GetOrCreateCart(ctx, tx, cartID)
 		if txErr != nil {
 			return txErr
 		}
 		resultCartID = cart.ID
+
+		// Only issue removals for variants actually in the cart — most rows on
+		// a fresh sheet are blank and need no write at all.
+		inCart := map[uuid.UUID]bool{}
+		existing, txErr := d.CartService.ListItems(ctx, tx, cart.ID)
+		if txErr != nil {
+			return txErr
+		}
+		for _, ci := range existing {
+			inCart[ci.VariantID] = true
+		}
+
 		for _, item := range items {
-			if _, txErr := d.CartService.AddItemForCustomer(ctx, tx, cart.ID, item.VariantID, item.Quantity, customer.ID, "USD"); txErr != nil {
+			if item.Quantity == 0 && !inCart[item.VariantID] {
+				continue
+			}
+			_, txErr := d.CartService.SetItemForCustomer(ctx, tx, cart.ID, item.VariantID, item.Quantity, customer.ID, "USD")
+			switch {
+			case txErr == nil:
+			case errors.Is(txErr, app.ErrVariantArchived),
+				errors.Is(txErr, app.ErrVariantNotFound),
+				errors.Is(txErr, app.ErrVariantNotInChannel),
+				errors.Is(txErr, app.ErrProductNotAccessible),
+				errors.Is(txErr, app.ErrPriceNotFound):
+				// A variant retired between the sheet render and the submit —
+				// leave that line off and keep the rest of the order rather
+				// than failing the whole sheet (and losing every quantity the
+				// buyer typed).
+				skipped++
+			default:
 				return txErr
 			}
 		}
@@ -366,7 +451,11 @@ func (d *Deps) handleWholesaleBulkAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	setWholesaleCartCookie(w, resultCartID)
-	http.Redirect(w, r, "/wholesale/checkout", http.StatusSeeOther)
+	dest := "/wholesale/checkout"
+	if skipped > 0 {
+		dest += fmt.Sprintf("?sheet_skipped=%d", skipped)
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
 // handleWholesaleReorder re-adds every line item from a past order to the
@@ -421,7 +510,10 @@ func (d *Deps) handleWholesaleReorder(w http.ResponseWriter, r *http.Request) {
 			if li.Quantity <= 0 {
 				continue
 			}
-			_, addErr := d.CartService.AddItemForCustomer(ctx, tx, cart.ID, li.VariantID, li.Quantity, customer.ID, order.CurrencyCode)
+			// Set semantics keep reorder idempotent: clicking it twice (or on
+			// top of a half-built cart) pins each line to the past order's
+			// quantity instead of stacking on whatever was there.
+			_, addErr := d.CartService.SetItemForCustomer(ctx, tx, cart.ID, li.VariantID, li.Quantity, customer.ID, order.CurrencyCode)
 			switch {
 			case addErr == nil:
 				added++
@@ -454,9 +546,13 @@ func (d *Deps) handleWholesaleReorder(w http.ResponseWriter, r *http.Request) {
 }
 
 // reorderNotice builds the informational banner shown on checkout after a
-// reorder, from the ?reordered / ?skipped counts set by handleWholesaleReorder.
-// Empty when the buyer didn't arrive via reorder.
+// reorder (?reordered / ?skipped, set by handleWholesaleReorder) or after a
+// quick-order submit that had to leave lines off (?sheet_skipped, set by
+// handleWholesaleBulkAdd). Empty when neither applies.
 func reorderNotice(r *http.Request) string {
+	if n, _ := strconv.Atoi(r.URL.Query().Get("sheet_skipped")); n > 0 {
+		return fmt.Sprintf("Left off %s that %s not available anymore — everything else came through.", itemCount(n), isAre(n))
+	}
 	reordered, _ := strconv.Atoi(r.URL.Query().Get("reordered"))
 	skipped, _ := strconv.Atoi(r.URL.Query().Get("skipped"))
 	if reordered <= 0 && skipped <= 0 {
@@ -478,6 +574,13 @@ func itemCount(n int) string {
 		return "1 item"
 	}
 	return fmt.Sprintf("%d items", n)
+}
+
+func isAre(n int) string {
+	if n == 1 {
+		return "is"
+	}
+	return "are"
 }
 
 func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Request) {
@@ -506,6 +609,11 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 	var addresses []domain.Address
 	var shipCfg *domain.ShippingConfig
 	subtotal := 0
+	// Collected alongside the line items so the page can warn about MOQ
+	// violations before the buyer hits Place Order (which hard-rejects them).
+	var cartItemsForMOQ []domain.CartItem
+	var variantsForMOQ []domain.Variant
+	productNameByVariant := map[uuid.UUID]string{}
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		addrs, txErr := d.CustomerService.ListAddresses(ctx, tx, customer.ID)
@@ -554,7 +662,13 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 				Quantity:    ci.Quantity,
 				UnitPrice:   ci.UnitPrice,
 				LineTotal:   lineTotal,
+				MinQty:      variant.WholesaleMinQty,
+				Multiple:    variant.WholesaleMultiple,
 			})
+
+			cartItemsForMOQ = append(cartItemsForMOQ, domain.CartItem{VariantID: ci.VariantID, Quantity: ci.Quantity})
+			variantsForMOQ = append(variantsForMOQ, *variant)
+			productNameByVariant[ci.VariantID] = product.Title
 		}
 		return nil
 	})
@@ -571,6 +685,21 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 		}
 	}
 
+	// Name every line that would fail MOQ validation at Place Order, so the
+	// buyer can fix quantities here instead of being rejected at the last step.
+	var moqProblems []string
+	for _, v := range domain.ValidateWholesaleCart(cartItemsForMOQ, variantsForMOQ) {
+		name := productNameByVariant[v.VariantID]
+		if name == "" {
+			name = v.VariantName
+		}
+		if v.Minimum > 0 {
+			moqProblems = append(moqProblems, fmt.Sprintf("%s (%s) — you have %d, the minimum is %d.", name, v.VariantName, v.Ordered, v.Minimum))
+		} else {
+			moqProblems = append(moqProblems, fmt.Sprintf("%s (%s) — comes in multiples of %d, you have %d.", name, v.VariantName, v.Multiple, v.Ordered))
+		}
+	}
+
 	props := storefront.WholesaleCheckoutProps{
 		CompanyName:       companyName,
 		Items:             checkoutItems,
@@ -579,6 +708,7 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 		Notice:            reorderNotice(r),
 		CartCount:         d.wholesaleCartItemCount(r),
 		PriceChangeBanner: banner,
+		MOQProblems:       moqProblems,
 		Addresses:         addresses,
 		DefaultAddressID:  defaultAddressID,
 	}
@@ -667,7 +797,10 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		for _, ci := range cartItems {
 			if ci.UnitPrice != freshPrices[ci.VariantID] {
 				stale = true
-				if _, txErr := d.CartService.AddItemForCustomer(ctx, tx, cart.ID, ci.VariantID, ci.Quantity, customer.ID, "USD"); txErr != nil {
+				// Set semantics: rewrite the line at the fresh price with the
+				// same quantity. (The old AddItemForCustomer call here doubled
+				// the quantity and never touched the price.)
+				if _, txErr := d.CartService.SetItemForCustomer(ctx, tx, cart.ID, ci.VariantID, ci.Quantity, customer.ID, "USD"); txErr != nil {
 					return txErr
 				}
 			}
@@ -789,6 +922,12 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 		case errors.Is(err, app.ErrFulfillmentUnavailable):
 			d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "fulfillment_unavailable").Inc()
 			d.renderWholesaleCheckout(w, r, customer, false, "Local delivery isn't available for that ZIP. Choose pickup or free shipping.", http.StatusUnprocessableEntity)
+			return
+		case errors.Is(err, app.ErrMOQViolation):
+			// The re-render recomputes the per-line violations from the cart, so
+			// the banner below names exactly which lines are short.
+			d.Metrics.CheckoutFailed.WithLabelValues("wholesale", "moq_violation").Inc()
+			d.renderWholesaleCheckout(w, r, customer, false, "Some lines don't meet wholesale minimums yet — adjust the quantities flagged below and place the order again.", http.StatusUnprocessableEntity)
 			return
 		}
 		reason := classifyCheckoutError(err)

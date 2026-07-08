@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -274,7 +276,6 @@ type QuickOrderVariant struct {
 	UnitPrice    int      // Cents
 	MinQty       *int
 	Multiple     *int
-	InStock      bool
 }
 
 // QuickOrderProduct represents a product with all its variants for the quick order page.
@@ -310,6 +311,12 @@ func (s *WholesaleService) QuickOrderCatalog(
 	if err != nil {
 		return nil, fmt.Errorf("list products: %w", err)
 	}
+
+	// Alphabetical, not created_at: buyers scan the same order sheet week after
+	// week, so its row order must not reshuffle when a new product launches.
+	sort.Slice(products, func(i, j int) bool {
+		return strings.ToLower(products[i].Title) < strings.ToLower(products[j].Title)
+	})
 
 	type productCtx struct {
 		product  domain.Product
@@ -395,7 +402,6 @@ func (s *WholesaleService) QuickOrderCatalog(
 				UnitPrice:    priceMap[v.ID],
 				MinQty:       v.WholesaleMinQty,
 				Multiple:     v.WholesaleMultiple,
-				InStock:      true, // TODO: wire up inventory
 			})
 		}
 
@@ -469,7 +475,7 @@ func (s *WholesaleService) PlaceWholesaleOrder(ctx context.Context, tx pgx.Tx, p
 	}
 	violations := domain.ValidateWholesaleCart(cartItems, variants)
 	if len(violations) > 0 {
-		return nil, ErrMOQViolation
+		return nil, &MOQViolationError{Violations: violations}
 	}
 
 	// Calculate totals.

@@ -17,6 +17,9 @@ type WholesaleCheckoutItem struct {
 	Quantity    int
 	UnitPrice   int
 	LineTotal   int
+	// Wholesale ordering rules, shown as a hint and enforced by Place Order.
+	MinQty   *int
+	Multiple *int
 }
 
 type WholesaleCheckoutProps struct {
@@ -29,6 +32,9 @@ type WholesaleCheckoutProps struct {
 	Notice            string
 	CartCount         int
 	PriceChangeBanner bool
+	// MOQProblems lists cart lines that would fail wholesale minimum/multiple
+	// validation at Place Order, pre-formatted one per line.
+	MOQProblems []string
 	Addresses         []domain.Address
 	// DefaultAddressID preselects a saved address for shipping; empty means
 	// the "new address" form is shown by default (e.g. customer has none).
@@ -42,6 +48,35 @@ type WholesaleCheckoutProps struct {
 	LocalZipCodes           []string
 	LocalDeliveryDays       string
 	LocalPickupInstructions string
+}
+
+// minQtyAttr is the qty input's min: the wholesale minimum when set, else 1
+// (a checkout line always has at least one unit — removal is a separate action).
+func minQtyAttr(minQty *int) string {
+	if minQty != nil && *minQty > 1 {
+		return fmt.Sprint(*minQty)
+	}
+	return "1"
+}
+
+// multipleAttr is the qty input's step: the wholesale case multiple when set.
+func multipleAttr(multiple *int) string {
+	if multiple != nil && *multiple > 1 {
+		return fmt.Sprint(*multiple)
+	}
+	return "1"
+}
+
+// moqHint renders the ordering rules under a qty input, e.g. "min 6 · ×6".
+func moqHint(minQty, multiple *int) string {
+	parts := []string{}
+	if minQty != nil && *minQty > 1 {
+		parts = append(parts, fmt.Sprintf("min %d", *minQty))
+	}
+	if multiple != nil && *multiple > 1 {
+		parts = append(parts, fmt.Sprintf("×%d", *multiple))
+	}
+	return strings.Join(parts, " · ")
 }
 
 // normalizeZipJS mirrors domain.normalizeZip for building the client-side local
@@ -115,6 +150,17 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 				</p>
 			</div>
 		}
+		if len(props.MOQProblems) > 0 {
+			<div class="border-2 border-rust bg-paper-warm p-4" role="alert">
+				<p class="font-oswald font-bold text-sm text-rust uppercase" style="letter-spacing:0.1em;">Below wholesale minimums</p>
+				<ul class="mt-2 space-y-1 font-oswald text-sm text-ink list-disc pl-5">
+					for _, problem := range props.MOQProblems {
+						<li>{ problem }</li>
+					}
+				</ul>
+				<p class="mt-2 font-oswald text-sm text-ink-soft">Adjust the quantities below — the order can't go out until these are squared away.</p>
+			</div>
+		}
 		if len(props.Items) == 0 {
 			<div class="border-2 border-ink bg-cream-hi p-12 text-center" style="box-shadow: var(--shadow-stamp);">
 				<p class="font-slab text-ink text-xl uppercase">Nothing here yet</p>
@@ -155,20 +201,26 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 								</td>
 								<td class="flex items-center justify-between gap-4 py-1 sm:table-cell sm:px-4 sm:py-3 sm:text-center">
 									<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Qty</span>
-									<input
-										type="number"
-										name="quantity"
-										value={ fmt.Sprint(item.Quantity) }
-										min="1"
-										aria-label={ "Quantity for " + item.ProductName }
-										class="paper-input w-16 border-2 border-ink bg-cream-hi px-2 py-1 text-center font-special text-sm text-ink focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-										style="box-shadow: var(--shadow-stamp-sm);"
-										hx-post={ fmt.Sprintf("/wholesale/cart/update?item_id=%s", item.ItemID.String()) }
-										hx-trigger="change"
-										hx-target="#wholesale-checkout"
-										hx-swap="outerHTML"
-										hx-include="this"
-									/>
+									<span class="inline-flex flex-col items-end sm:items-center gap-0.5">
+										<input
+											type="number"
+											name="quantity"
+											value={ fmt.Sprint(item.Quantity) }
+											min={ minQtyAttr(item.MinQty) }
+											step={ multipleAttr(item.Multiple) }
+											aria-label={ "Quantity for " + item.ProductName }
+											class="paper-input w-16 border-2 border-ink bg-cream-hi px-2 py-1 text-center font-special text-sm text-ink focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+											style="box-shadow: var(--shadow-stamp-sm);"
+											hx-post={ fmt.Sprintf("/wholesale/cart/update?item_id=%s", item.ItemID.String()) }
+											hx-trigger="change"
+											hx-target="#wholesale-checkout"
+											hx-swap="outerHTML"
+											hx-include="this"
+										/>
+										if hint := moqHint(item.MinQty, item.Multiple); hint != "" {
+											<span class="font-oswald text-[10px] text-chrome-deep whitespace-nowrap" style="letter-spacing:0.04em;">{ hint }</span>
+										}
+									</span>
 								</td>
 								<td class="flex items-center justify-between gap-4 py-1 sm:table-cell sm:px-4 sm:py-3 sm:text-right">
 									<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Total</span>

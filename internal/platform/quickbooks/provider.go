@@ -15,6 +15,13 @@ type InvoiceParams struct {
 	DueDate    time.Time
 	Lines      []InvoiceLine
 	Shipping   int // shipping amount in cents
+
+	// AllowOnlineACHPayment / AllowOnlineCreditCardPayment put the matching
+	// pay buttons on the emailed invoice. The invoice's BillEmail is
+	// deliberately NOT set here — QB defaults it from the customer record's
+	// email, which is the curated billing contact for linked customers.
+	AllowOnlineACHPayment        bool
+	AllowOnlineCreditCardPayment bool
 }
 
 // InvoiceLine represents a single line item on a QB invoice.
@@ -25,13 +32,18 @@ type InvoiceLine struct {
 	Amount      int // total in cents (quantity * unit_amount)
 }
 
+// EmailStatusSent is QB's EmailStatus once an invoice has been emailed —
+// the idempotency signal for SendInvoice retries.
+const EmailStatusSent = "EmailSent"
+
 // Invoice represents a QuickBooks invoice.
 type Invoice struct {
-	ID        string    // QB internal invoice ID
-	DocNumber string    // human-readable invoice number
-	Balance   float64   // remaining balance in dollars (0 = fully paid)
-	TotalAmt  float64   // invoice total in dollars; 0 on a voided invoice
-	DueDate   time.Time // payment due date (net terms); zero if QB omitted it
+	ID          string    // QB internal invoice ID
+	DocNumber   string    // human-readable invoice number
+	Balance     float64   // remaining balance in dollars (0 = fully paid)
+	TotalAmt    float64   // invoice total in dollars; 0 on a voided invoice
+	DueDate     time.Time // payment due date (net terms); zero if QB omitted it
+	EmailStatus string    // NotSet | NeedToSend | EmailSent
 }
 
 // BalanceCents returns the remaining balance in integer cents, rounded to the
@@ -88,6 +100,15 @@ type Client interface {
 
 	// GetInvoice fetches the current state of an invoice from QBO.
 	GetInvoice(ctx context.Context, qbInvoiceID string) (*Invoice, error)
+
+	// FindInvoiceByDocNumber returns the QBO invoice carrying the given
+	// DocNumber, or nil (not an error) if none exists. DocNumber is the Hiri
+	// order number, so this is the cross-attempt idempotency probe for
+	// CreateInvoice.
+	FindInvoiceByDocNumber(ctx context.Context, docNumber string) (*Invoice, error)
+
+	// SendInvoice has QBO email the invoice to its BillEmail address.
+	SendInvoice(ctx context.Context, qbInvoiceID string) error
 
 	// CreatePayment records a payment against a QB invoice.
 	CreatePayment(ctx context.Context, p PaymentParams) (*Payment, error)

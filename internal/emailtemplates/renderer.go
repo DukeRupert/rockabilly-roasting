@@ -127,6 +127,21 @@ type InvoicePastDueData struct {
 	StoreURL      string
 }
 
+// QBInvoiceAlertData holds data for the staff notification sent when a
+// QuickBooks invoicing job fails permanently. Problem and NextStep are
+// computed per failed step — a send-only failure must NOT tell staff to
+// issue the invoice by hand (it already exists in QB; that would double-bill).
+type QBInvoiceAlertData struct {
+	OrderNumber string
+	CompanyName string // empty hides the "for <company>" clause
+	Problem     string // what went wrong, in staff terms
+	NextStep    string // what staff must do about it
+	FailedKind  string // job kind that failed (qb_ensure_customer / qb_create_invoice / qb_send_invoice)
+	Cause       string // error message
+	OrderURL    string // admin order detail page
+	StoreName   string
+}
+
 // MagicLinkData holds data for the magic link email.
 type MagicLinkData struct {
 	CustomerName string

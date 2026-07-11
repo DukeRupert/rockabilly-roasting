@@ -18,16 +18,18 @@ import (
 	"github.com/dukerupert/hiri/internal/store"
 )
 
-// CreateQBInvoiceWorker creates a QB invoice for a wholesale order.
+// CreateQBInvoiceWorker creates a QB invoice for a wholesale order, then
+// chains to SendQBInvoice so QBO emails it to the customer.
 type CreateQBInvoiceWorker struct {
 	river.WorkerDefaults[CreateQBInvoiceArgs]
-	orders    *store.OrderStore
-	customers *store.CustomerStore
-	catalog   *store.CatalogStore
-	qb        quickbooks.Client
-	audit     *audit.AuditWriter
-	pool      *pgxpool.Pool
-	metrics   *metrics.Registry
+	orders      *store.OrderStore
+	customers   *store.CustomerStore
+	catalog     *store.CatalogStore
+	qb          quickbooks.Client
+	audit       *audit.AuditWriter
+	pool        *pgxpool.Pool
+	riverClient *river.Client[pgx.Tx]
+	metrics     *metrics.Registry
 }
 
 // NewCreateQBInvoiceWorker creates a new CreateQBInvoiceWorker.
@@ -38,16 +40,18 @@ func NewCreateQBInvoiceWorker(
 	qb quickbooks.Client,
 	auditWriter *audit.AuditWriter,
 	pool *pgxpool.Pool,
+	riverClient *river.Client[pgx.Tx],
 	m *metrics.Registry,
 ) *CreateQBInvoiceWorker {
 	return &CreateQBInvoiceWorker{
-		orders:    orders,
-		customers: customers,
-		catalog:   catalog,
-		qb:        qb,
-		audit:     auditWriter,
-		pool:      pool,
-		metrics:   m,
+		orders:      orders,
+		customers:   customers,
+		catalog:     catalog,
+		qb:          qb,
+		audit:       auditWriter,
+		pool:        pool,
+		riverClient: riverClient,
+		metrics:     m,
 	}
 }
 
@@ -66,7 +70,13 @@ func (w *CreateQBInvoiceWorker) Work(ctx context.Context, job *river.Job[CreateQ
 			"error", err.Error(),
 		)
 		if !quickbooks.IsRetryable(err) {
+			enqueueQBInvoiceAlert(ctx, w.pool, w.riverClient, job.Args.OrderID, "qb_create_invoice", err)
 			return river.JobCancel(fmt.Errorf("create qb invoice for order %s: %w", job.Args.OrderID, err))
+		}
+		if job.Attempt >= job.MaxAttempts {
+			// Final retry burned — River discards the job after this return,
+			// so alert now or the failure is silent.
+			enqueueQBInvoiceAlert(ctx, w.pool, w.riverClient, job.Args.OrderID, "qb_create_invoice", err)
 		}
 	}
 	return err
@@ -135,22 +145,53 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		})
 	}
 
-	// Create QB invoice (external call outside transaction). Due date follows
-	// the customer's NET terms; net-7 when none are set.
-	invoice, err := w.qb.CreateInvoice(ctx, quickbooks.InvoiceParams{
-		CustomerID: job.Args.QBCustomerID,
-		DocNumber:  formatOrderRef(order.Number),
-		DueDate:    order.PlacedAt.Add(time.Duration(termsDays) * 24 * time.Hour),
-		Lines:      lines,
-		Shipping:   order.ShippingTotal,
-	})
+	// The order-level idempotency check above can't see an invoice a previous
+	// attempt created in QBO but failed to persist locally. DocNumber is the
+	// order number, so probe for it and adopt rather than create a duplicate —
+	// especially important now that every created invoice chains a send job
+	// that emails the customer.
+	docNumber := formatOrderRef(order.Number)
+	invoice, err := w.qb.FindInvoiceByDocNumber(ctx, docNumber)
 	if err != nil {
-		return fmt.Errorf("qb create invoice: %w", err)
+		return fmt.Errorf("qb find invoice by doc number: %w", err)
+	}
+	adopted := invoice != nil
+
+	if invoice == nil {
+		// Create QB invoice (external call outside transaction). Due date
+		// follows the customer's NET terms; net-7 when none are set. QBO
+		// emails the invoice (chained SendQBInvoice job below) with
+		// online-payment buttons: ACH always, card only when that's the
+		// customer's billing method (card fees are opt-in per account). The
+		// bill-to email comes from the QB customer record.
+		params := quickbooks.InvoiceParams{
+			CustomerID:            job.Args.QBCustomerID,
+			DocNumber:             docNumber,
+			DueDate:               order.PlacedAt.Add(time.Duration(termsDays) * 24 * time.Hour),
+			Lines:                 lines,
+			Shipping:              order.ShippingTotal,
+			AllowOnlineACHPayment: true,
+		}
+		if customer != nil {
+			params.AllowOnlineCreditCardPayment = customer.BillingMethod == domain.BillingMethodCreditCard
+		}
+		invoice, err = w.qb.CreateInvoice(ctx, params)
+		if err != nil {
+			return fmt.Errorf("qb create invoice: %w", err)
+		}
 	}
 
-	// Persist QB invoice ID in a transaction with audit
+	// Persist QB invoice ID and chain the send job in one transaction with
+	// audit — if the send fails later it retries on its own, and can never
+	// re-create the invoice.
 	return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		if txErr := w.orders.SetQBInvoice(ctx, tx, order.ID, invoice.ID, invoice.DocNumber); txErr != nil {
+			return txErr
+		}
+		if _, txErr := w.riverClient.InsertTx(ctx, tx, SendQBInvoiceArgs{
+			OrderID:     order.ID,
+			QBInvoiceID: invoice.ID,
+		}, nil); txErr != nil {
 			return txErr
 		}
 		return w.audit.Record(ctx, tx, audit.AuditEntry{
@@ -163,6 +204,7 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 				"qb_invoice_id":  invoice.ID,
 				"qb_doc_number":  invoice.DocNumber,
 				"net_terms_days": termsDays,
+				"adopted":        adopted,
 				"river_job_id":   job.ID,
 			},
 		})

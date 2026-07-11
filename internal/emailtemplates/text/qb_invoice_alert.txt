@@ -1,0 +1,13 @@
+{{define "qb_invoice_alert.txt"}}QuickBooks Invoicing Failed
+
+Order {{.OrderNumber}}{{if .CompanyName}} for {{.CompanyName}}{{end}}: {{.Problem}}
+
+{{.NextStep}}
+
+Failed step: {{.FailedKind}}
+Error:       {{.Cause}}
+
+View order: {{.OrderURL}}
+
+{{.StoreName}} — Staff notification
+{{end}}

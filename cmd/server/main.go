@@ -463,7 +463,9 @@ func run() error {
 	// Register QB workers (need riverClient for job chaining)
 	if qbClient != nil {
 		river.AddWorker(workers, jobs.NewEnsureQBCustomerWorker(customerStore, qbClient, auditWriter, pool, riverClient, metricsReg))
-		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, customerStore, catalogStore, qbClient, auditWriter, pool, metricsReg))
+		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, customerStore, catalogStore, qbClient, auditWriter, pool, riverClient, metricsReg))
+		river.AddWorker(workers, jobs.NewSendQBInvoiceWorker(qbClient, auditWriter, pool, riverClient, metricsReg))
+		river.AddWorker(workers, jobs.NewQBInvoiceAlertEmailWorker(orderSvc, pool))
 		river.AddWorker(workers, jobs.NewProcessQBInvoiceUpdateWorker(orderSvc, qbClient, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewReconcileQBInvoicesWorker(orderSvc, qbClient, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewSyncQBCustomerWorker(customerStore, qbClient, auditWriter, pool, metricsReg))

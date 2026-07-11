@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -126,6 +127,95 @@ func (s *OrderService) SendInvoicePastDueEmail(ctx context.Context, pool *pgxpoo
 	}
 
 	s.metrics.EmailsSent.WithLabelValues("invoice_past_due", "sent").Inc()
+	return nil
+}
+
+// SendQBInvoiceAlertEmail notifies staff that a QB invoicing job failed
+// permanently — the order will not be billed until someone intervenes.
+// Recipient is EmailEnv.StaffEmail; when unset the alert is logged-only (the
+// job cancellation is still in Sentry/logs), not retried forever.
+func (s *OrderService) SendQBInvoiceAlertEmail(ctx context.Context, pool *pgxpool.Pool, orderID uuid.UUID, failedKind, cause string) error {
+	if s.email.StaffEmail == "" {
+		slog.WarnContext(ctx, "qb invoice alert: STAFF_NOTIFICATION_EMAIL unset, alert not emailed",
+			"order_id", orderID, "failed_kind", failedKind)
+		return nil
+	}
+
+	var (
+		order    *domain.Order
+		customer *domain.Customer
+	)
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		o, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
+		if err != nil {
+			return fmt.Errorf("get order %s: %w", orderID, err)
+		}
+		order = o
+		if order.CustomerID != nil {
+			customer, err = s.customers.GetByID(ctx, tx, *order.CustomerID)
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	companyName := ""
+	if customer != nil && customer.CompanyName != nil {
+		companyName = *customer.CompanyName
+	}
+
+	// Copy is per failed step: a send-only failure means the invoice already
+	// exists in QuickBooks — telling staff to issue one by hand would
+	// double-bill the customer.
+	problem := "The order could not be invoiced in QuickBooks and the job has stopped retrying."
+	nextStep := "Fix the underlying problem, then invoice the order by hand in QuickBooks or retry the job. The order will not be billed until then."
+	if failedKind == "qb_send_invoice" {
+		problem = "The invoice was created in QuickBooks but could not be emailed to the customer."
+		nextStep = "Send the existing invoice manually from QuickBooks — do not create a new one."
+	}
+
+	html, text, err := s.email.Renderer.Render("qb_invoice_alert", emailtemplates.QBInvoiceAlertData{
+		OrderNumber: order.Number,
+		CompanyName: companyName,
+		Problem:     problem,
+		NextStep:    nextStep,
+		FailedKind:  failedKind,
+		Cause:       cause,
+		OrderURL:    s.email.BaseURL + "/admin/orders/" + order.ID.String(),
+		StoreName:   s.email.StoreName,
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("qb_invoice_alert", "failed").Inc()
+		return fmt.Errorf("render qb invoice alert template: %w", err)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      s.email.StaffEmail,
+		Subject: fmt.Sprintf("ACTION NEEDED: QuickBooks invoicing failed for order %s", order.Number),
+		HTML:    html,
+		Text:    text,
+		Tag:     "qb-invoice-alert",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("qb_invoice_alert", "failed").Inc()
+		return fmt.Errorf("send qb invoice alert: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "qb_invoice_alert_worker",
+			Action:       audit.AuditEmailQBInvoiceAlert,
+			ResourceType: "order",
+			ResourceID:   order.ID,
+			Metadata:     map[string]any{"failed_kind": failedKind, "order_number": order.Number},
+		})
+	}); err != nil {
+		return fmt.Errorf("audit qb invoice alert: %w", err)
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("qb_invoice_alert", "sent").Inc()
 	return nil
 }
 

@@ -349,3 +349,48 @@ func TestFormatAddress(t *testing.T) {
 	assert.True(t, strings.Contains(addr, "Austin"))
 	assert.True(t, strings.Contains(addr, "78701"))
 }
+
+func TestRender_QBInvoiceAlert(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	html, text, err := r.Render("qb_invoice_alert", QBInvoiceAlertData{
+		OrderNumber: "RR-1042",
+		CompanyName: "Blue Heron Cafe",
+		Problem:     "The order could not be invoiced in QuickBooks and the job has stopped retrying.",
+		NextStep:    "Fix the underlying problem, then invoice the order by hand in QuickBooks or retry the job.",
+		FailedKind:  "qb_create_invoice",
+		Cause:       "quickbooks: bad request (data problem)",
+		OrderURL:    "https://rockabillyroasting.com/admin/orders/abc",
+		StoreName:   "Rockabilly Roasting",
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, html, "RR-1042")
+	assert.Contains(t, html, "Blue Heron Cafe")
+	assert.Contains(t, html, "qb_create_invoice")
+	assert.Contains(t, html, "could not be invoiced")
+	assert.Contains(t, html, "Fix the underlying problem")
+
+	assert.Contains(t, text, "RR-1042")
+	assert.Contains(t, text, "bad request")
+	assert.Contains(t, text, "/admin/orders/abc")
+}
+
+func TestRender_QBInvoiceAlert_NoCompany(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	html, _, err := r.Render("qb_invoice_alert", QBInvoiceAlertData{
+		OrderNumber: "RR-1042",
+		Problem:     "The invoice was created in QuickBooks but could not be emailed to the customer.",
+		NextStep:    "Send the existing invoice manually from QuickBooks — do not create a new one.",
+		FailedKind:  "qb_send_invoice",
+		Cause:       "boom",
+		OrderURL:    "https://example.com/admin/orders/abc",
+		StoreName:   "Rockabilly Roasting",
+	})
+	require.NoError(t, err)
+	assert.NotContains(t, html, " for <strong>")
+	assert.Contains(t, html, "do not create a new one")
+}

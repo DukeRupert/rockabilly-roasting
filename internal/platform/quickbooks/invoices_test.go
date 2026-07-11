@@ -1,6 +1,7 @@
 package quickbooks
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
 
@@ -72,4 +73,19 @@ func TestCentsToFloat(t *testing.T) {
 				"centsToFloat(%d) = %f, want %f (within 0.005)", tt.cents, got, tt.want)
 		})
 	}
+}
+
+// The payment flags must reach QBO explicitly — an omitempty would drop
+// `false` and let the company default re-enable a pay button the caller
+// meant to turn off.
+func TestInvoiceRequestPaymentFlagsAlwaysSent(t *testing.T) {
+	b, err := json.Marshal(qbInvoiceRequest{
+		CustomerRef:                  qbRef{Value: "42"},
+		DueDate:                      "2026-07-17",
+		AllowOnlineACHPayment:        true,
+		AllowOnlineCreditCardPayment: false,
+	})
+	require.NoError(t, err)
+	assert.Contains(t, string(b), `"AllowOnlineACHPayment":true`)
+	assert.Contains(t, string(b), `"AllowOnlineCreditCardPayment":false`)
 }

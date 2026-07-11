@@ -227,17 +227,27 @@ func (c *QBClient) refreshTokenWithLock(ctx context.Context, creds *domain.QBCre
 	return creds, nil
 }
 
-// doAPI makes an authenticated API request to QBO. On a 401 it forces a single
-// token refresh and retries once, covering the case where Intuit rejects a
-// token that the proactive-refresh check considered still valid (clock skew or
-// out-of-band revocation).
+// doAPI makes an authenticated JSON API request to QBO. On a 401 it forces a
+// single token refresh and retries once, covering the case where Intuit
+// rejects a token that the proactive-refresh check considered still valid
+// (clock skew or out-of-band revocation).
 func (c *QBClient) doAPI(ctx context.Context, method, path string, body any) ([]byte, error) {
+	contentType := ""
+	if body != nil {
+		contentType = "application/json"
+	}
+	return c.doAPIContentType(ctx, method, path, body, contentType)
+}
+
+// doAPIContentType is doAPI with an explicit Content-Type — some QBO endpoints
+// (e.g. invoice send) take an empty body but demand application/octet-stream.
+func (c *QBClient) doAPIContentType(ctx context.Context, method, path string, body any, contentType string) ([]byte, error) {
 	token, realmID, err := c.ValidToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	respBody, status, err := c.sendAPI(ctx, method, path, realmID, token, body)
+	respBody, status, err := c.sendAPI(ctx, method, path, realmID, token, body, contentType)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +258,7 @@ func (c *QBClient) doAPI(ctx context.Context, method, path string, body any) ([]
 		if err != nil {
 			return nil, err
 		}
-		respBody, status, err = c.sendAPI(ctx, method, path, realmID, token, body)
+		respBody, status, err = c.sendAPI(ctx, method, path, realmID, token, body, contentType)
 		if err != nil {
 			return nil, err
 		}
@@ -264,7 +274,7 @@ func (c *QBClient) doAPI(ctx context.Context, method, path string, body any) ([]
 // sendAPI builds and executes a single authenticated QBO request, returning the
 // raw body and HTTP status. It does not classify error statuses — doAPI owns
 // retry/classification so it can act on a 401 before the error is finalized.
-func (c *QBClient) sendAPI(ctx context.Context, method, path, realmID, token string, body any) ([]byte, int, error) {
+func (c *QBClient) sendAPI(ctx context.Context, method, path, realmID, token string, body any, contentType string) ([]byte, int, error) {
 	url := fmt.Sprintf("%s/v3/company/%s%s", c.baseURL, realmID, path)
 
 	var reqBody io.Reader
@@ -283,8 +293,8 @@ func (c *QBClient) sendAPI(ctx context.Context, method, path, realmID, token str
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
 	}
 
 	resp, err := c.httpClient.Do(req)

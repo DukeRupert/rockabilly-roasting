@@ -251,6 +251,28 @@ type CreateQBInvoiceArgs struct {
 // Kind returns the job kind identifier.
 func (CreateQBInvoiceArgs) Kind() string { return "qb_create_invoice" }
 
+// SendQBInvoiceArgs has QBO email an invoice to the customer. Chained by
+// CreateQBInvoice in the transaction that persists the QB invoice ID, so a
+// send failure retries independently of (and never re-creates) the invoice.
+type SendQBInvoiceArgs struct {
+	OrderID     uuid.UUID `json:"order_id"`
+	QBInvoiceID string    `json:"qb_invoice_id"`
+}
+
+// Kind returns the job kind identifier.
+func (SendQBInvoiceArgs) Kind() string { return "qb_send_invoice" }
+
+// EmailQBInvoiceAlertArgs notifies staff that a QB invoicing job failed
+// permanently — the order will not be billed until someone intervenes.
+type EmailQBInvoiceAlertArgs struct {
+	OrderID    uuid.UUID `json:"order_id"`
+	FailedKind string    `json:"failed_kind"` // job kind that failed
+	Cause      string    `json:"cause"`       // error message for the email body
+}
+
+// Kind returns the job kind identifier.
+func (EmailQBInvoiceAlertArgs) Kind() string { return "email:qb_invoice_alert" }
+
 // ProcessQBInvoiceUpdateArgs handles a QB webhook notification about an invoice update.
 type ProcessQBInvoiceUpdateArgs struct {
 	QBInvoiceID string `json:"qb_invoice_id"`

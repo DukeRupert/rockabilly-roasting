@@ -13,6 +13,11 @@ type qbInvoiceRequest struct {
 	DocNumber   string          `json:"DocNumber,omitempty"`
 	DueDate     string          `json:"DueDate"` // YYYY-MM-DD
 	Line        []qbInvoiceLine `json:"Line"`
+	// Payment flags are always sent explicitly — an omitempty here would drop
+	// `false` and let the QBO company default re-enable the pay button the
+	// caller meant to turn off.
+	AllowOnlineACHPayment        bool `json:"AllowOnlineACHPayment"`
+	AllowOnlineCreditCardPayment bool `json:"AllowOnlineCreditCardPayment"`
 }
 
 type qbRef struct {
@@ -35,12 +40,13 @@ type qbSalesItemDetail struct {
 // qbInvoiceResponse is the JSON response from QB invoice endpoints.
 type qbInvoiceResponse struct {
 	Invoice struct {
-		ID        string  `json:"Id"`
-		DocNumber string  `json:"DocNumber"`
-		Balance   float64 `json:"Balance"`
-		TotalAmt  float64 `json:"TotalAmt"`
-		DueDate   string  `json:"DueDate"` // YYYY-MM-DD
-		SyncToken string  `json:"SyncToken"`
+		ID          string  `json:"Id"`
+		DocNumber   string  `json:"DocNumber"`
+		Balance     float64 `json:"Balance"`
+		TotalAmt    float64 `json:"TotalAmt"`
+		DueDate     string  `json:"DueDate"` // YYYY-MM-DD
+		EmailStatus string  `json:"EmailStatus"`
+		SyncToken   string  `json:"SyncToken"`
 	} `json:"Invoice"`
 }
 
@@ -55,11 +61,12 @@ func invoiceFromResponse(resp qbInvoiceResponse) *Invoice {
 		}
 	}
 	return &Invoice{
-		ID:        resp.Invoice.ID,
-		DocNumber: resp.Invoice.DocNumber,
-		Balance:   resp.Invoice.Balance,
-		TotalAmt:  resp.Invoice.TotalAmt,
-		DueDate:   dueDate,
+		ID:          resp.Invoice.ID,
+		DocNumber:   resp.Invoice.DocNumber,
+		Balance:     resp.Invoice.Balance,
+		TotalAmt:    resp.Invoice.TotalAmt,
+		DueDate:     dueDate,
+		EmailStatus: resp.Invoice.EmailStatus,
 	}
 }
 
@@ -112,10 +119,12 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 	lines := buildInvoiceLines(p, c.config.SalesItemID, c.config.ShippingItemID)
 
 	body := qbInvoiceRequest{
-		CustomerRef: qbRef{Value: p.CustomerID},
-		DocNumber:   p.DocNumber,
-		DueDate:     p.DueDate.Format("2006-01-02"),
-		Line:        lines,
+		CustomerRef:                  qbRef{Value: p.CustomerID},
+		DocNumber:                    p.DocNumber,
+		DueDate:                      p.DueDate.Format("2006-01-02"),
+		Line:                         lines,
+		AllowOnlineACHPayment:        p.AllowOnlineACHPayment,
+		AllowOnlineCreditCardPayment: p.AllowOnlineCreditCardPayment,
 	}
 
 	respBody, err := c.doAPI(ctx, "POST", "/invoice", body)
@@ -129,6 +138,68 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 	}
 
 	return invoiceFromResponse(resp), nil
+}
+
+// qbInvoiceQueryResponse is the response shape for invoice queries.
+type qbInvoiceQueryResponse struct {
+	QueryResponse struct {
+		Invoice []struct {
+			ID          string  `json:"Id"`
+			DocNumber   string  `json:"DocNumber"`
+			Balance     float64 `json:"Balance"`
+			TotalAmt    float64 `json:"TotalAmt"`
+			DueDate     string  `json:"DueDate"`
+			EmailStatus string  `json:"EmailStatus"`
+		} `json:"Invoice"`
+	} `json:"QueryResponse"`
+}
+
+// FindInvoiceByDocNumber returns the QBO invoice carrying the given DocNumber,
+// or nil (not an error) if none exists. Used by the create-invoice job to
+// adopt an invoice a previous attempt created but failed to persist, instead
+// of creating (and emailing) a duplicate.
+func (c *QBClient) FindInvoiceByDocNumber(ctx context.Context, docNumber string) (*Invoice, error) {
+	query := fmt.Sprintf("SELECT * FROM Invoice WHERE DocNumber = '%s'", escapeQBQuery(docNumber))
+	respBody, err := c.doAPI(ctx, "GET", "/query?query="+urlEncode(query), nil)
+	if err != nil {
+		return nil, fmt.Errorf("qb invoice query: %w", err)
+	}
+
+	var resp qbInvoiceQueryResponse
+	if err := json.Unmarshal(respBody, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal qb invoice query: %w", err)
+	}
+	if len(resp.QueryResponse.Invoice) == 0 {
+		return nil, nil
+	}
+
+	match := resp.QueryResponse.Invoice[0]
+	var dueDate time.Time
+	if match.DueDate != "" {
+		if d, err := time.Parse("2006-01-02", match.DueDate); err == nil {
+			dueDate = d
+		}
+	}
+	return &Invoice{
+		ID:          match.ID,
+		DocNumber:   match.DocNumber,
+		Balance:     match.Balance,
+		TotalAmt:    match.TotalAmt,
+		DueDate:     dueDate,
+		EmailStatus: match.EmailStatus,
+	}, nil
+}
+
+// SendInvoice has QBO email the invoice to its BillEmail address. The send
+// endpoint takes an empty body but requires Content-Type
+// application/octet-stream.
+func (c *QBClient) SendInvoice(ctx context.Context, qbInvoiceID string) error {
+	_, err := c.doAPIContentType(ctx, "POST",
+		fmt.Sprintf("/invoice/%s/send", qbInvoiceID), nil, "application/octet-stream")
+	if err != nil {
+		return fmt.Errorf("send QB invoice: %w", err)
+	}
+	return nil
 }
 
 // GetInvoice fetches the current state of an invoice from QBO.

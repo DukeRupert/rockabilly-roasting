@@ -71,9 +71,17 @@ func (w *EnsureQBCustomerWorker) Work(ctx context.Context, job *river.Job[Ensure
 			"customer_id", job.Args.CustomerID,
 			"error", err.Error(),
 		)
-		// Bad request errors from QB are permanent — data needs fixing
+		// Bad request errors from QB are permanent — data needs fixing. This
+		// job is the head of the invoicing chain, so its failure also means
+		// the order never gets billed: alert staff.
 		if !quickbooks.IsRetryable(err) {
+			enqueueQBInvoiceAlert(ctx, w.pool, w.riverClient, job.Args.OrderID, "qb_ensure_customer", err)
 			return river.JobCancel(fmt.Errorf("ensure qb customer %s: %w", job.Args.CustomerID, err))
+		}
+		if job.Attempt >= job.MaxAttempts {
+			// Final retry burned — River discards the job after this return,
+			// so alert now or the failure is silent.
+			enqueueQBInvoiceAlert(ctx, w.pool, w.riverClient, job.Args.OrderID, "qb_ensure_customer", err)
 		}
 	}
 	return err

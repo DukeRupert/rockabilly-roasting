@@ -311,6 +311,31 @@ func (c *QBClient) sendAPI(ctx context.Context, method, path, realmID, token str
 	return respBody, resp.StatusCode, nil
 }
 
+// qbFaultResponse is the error body QBO returns on 4xx responses.
+type qbFaultResponse struct {
+	Fault struct {
+		Error []struct {
+			Code string `json:"code"`
+		} `json:"Error"`
+	} `json:"Fault"`
+}
+
+// isQBObjectNotFound reports whether a 400 body carries Intuit fault code 610
+// ("Object Not Found") — QBO answers reads of hard-deleted entities with a 400,
+// not a 404, so this is how a deleted invoice actually presents.
+func isQBObjectNotFound(body []byte) bool {
+	var fault qbFaultResponse
+	if err := json.Unmarshal(body, &fault); err != nil {
+		return false
+	}
+	for _, e := range fault.Fault.Error {
+		if e.Code == "610" {
+			return true
+		}
+	}
+	return false
+}
+
 // classifyError converts an HTTP error response into the appropriate error type.
 func classifyError(statusCode int, body []byte) error {
 	msg := string(body)
@@ -321,6 +346,11 @@ func classifyError(statusCode int, body []byte) error {
 	}
 	switch statusCode {
 	case 400:
+		// Fault 610 is a deleted/missing entity wearing a 400 status — callers
+		// (the reconcile's deleted-invoice revert) need ErrNotFound.
+		if isQBObjectNotFound(body) {
+			return errors.Join(ErrNotFound, apiErr)
+		}
 		// Join (like the 404 case) so errors.Is(err, ErrBadRequest) and
 		// errors.As(*APIError) both keep working — %s-wrapping would strip
 		// the APIError from the chain.

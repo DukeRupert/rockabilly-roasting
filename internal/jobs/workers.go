@@ -273,6 +273,13 @@ type EmailQBInvoiceAlertArgs struct {
 // Kind returns the job kind identifier.
 func (EmailQBInvoiceAlertArgs) Kind() string { return "email:qb_invoice_alert" }
 
+// CheckQBTokenArgs runs the daily QuickBooks refresh-token expiry check —
+// warns staff before the connection lapses and stalls all invoicing.
+type CheckQBTokenArgs struct{}
+
+// Kind returns the job kind identifier.
+func (CheckQBTokenArgs) Kind() string { return "qb_token_check" }
+
 // ProcessQBInvoiceUpdateArgs handles a QB webhook notification about an invoice update.
 type ProcessQBInvoiceUpdateArgs struct {
 	QBInvoiceID string `json:"qb_invoice_id"`

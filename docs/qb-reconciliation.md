@@ -23,7 +23,10 @@ a manually-invoiced order. The two regimes are disjoint by construction.
 QB-driven payment status. Both triggers funnel through it:
 
 - **Webhook (fast path):** `POST /webhooks/quickbooks` → `qb_process_invoice_update`
-  job → reconcile. Fires within seconds of a QB change.
+  job → reconcile. Fires within seconds of a QB change. Handles Invoice
+  Update/Void/Delete operations. Create is deliberately skipped (it races the
+  transaction persisting `qb_invoice_id` for invoices we cut ourselves);
+  Emailed and Merge are ignored — neither changes payment state.
 - **Poll (safety net):** the `qb_reconcile_invoices` periodic job runs **daily**,
   sweeps every open QB-managed order, and reconciles each. This covers missed
   Intuit webhooks (which are not perfectly reliable) and is the detector that

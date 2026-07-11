@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -202,6 +203,9 @@ func (s *OrderService) SendQBInvoiceAlertEmail(ctx context.Context, pool *pgxpoo
 		return fmt.Errorf("send qb invoice alert: %w", err)
 	}
 
+	// Audit is best-effort once the email is out: failing the job here would
+	// make River retry and re-send the alert — a duplicate staff email is
+	// worse than a missing audit row.
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		return s.audit.Record(ctx, tx, audit.AuditEntry{
 			ActorType:    domain.AuditActorTypeSystem,
@@ -212,11 +216,86 @@ func (s *OrderService) SendQBInvoiceAlertEmail(ctx context.Context, pool *pgxpoo
 			Metadata:     map[string]any{"failed_kind": failedKind, "order_number": order.Number},
 		})
 	}); err != nil {
-		return fmt.Errorf("audit qb invoice alert: %w", err)
+		slog.ErrorContext(ctx, "audit qb invoice alert failed (email already sent)", "error", err.Error())
 	}
 
 	s.metrics.EmailsSent.WithLabelValues("qb_invoice_alert", "sent").Inc()
 	return nil
+}
+
+// SendQBTokenAlertEmail warns staff that the QuickBooks refresh token is
+// about to lapse (or already has) — once it does, every QB job stalls until
+// the connection is re-authorized in admin settings. Sent daily by the
+// qb_token_check periodic job while expiry is inside the warning window.
+// Recipient is EmailEnv.StaffEmail; unset means log-only.
+func (s *OrderService) SendQBTokenAlertEmail(ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID, expiresAt time.Time, riverJobID int64) error {
+	if s.email.StaffEmail == "" {
+		slog.WarnContext(ctx, "qb token alert: STAFF_NOTIFICATION_EMAIL unset, alert not emailed",
+			"refresh_expires_at", expiresAt)
+		return nil
+	}
+
+	remaining := time.Until(expiresAt)
+	expired := remaining <= 0
+	// Ceil, not truncate: 20 hours of token life is "expires in 1 day", never
+	// the nonsensical "0 days" at the most urgent pre-expiry moment.
+	daysLeft := int(math.Ceil(remaining.Hours() / 24))
+
+	subject := fmt.Sprintf("QuickBooks connection expires in %d %s — reconnect soon", daysLeft, dayWord(daysLeft))
+	if expired {
+		subject = "ACTION NEEDED: QuickBooks connection has expired — invoicing is stalled"
+	}
+
+	html, text, err := s.email.Renderer.Render("qb_token_alert", emailtemplates.QBTokenAlertData{
+		DaysLeft:    daysLeft,
+		Expired:     expired,
+		ExpiresAt:   expiresAt,
+		SettingsURL: s.email.BaseURL + "/admin/settings",
+		StoreName:   s.email.StoreName,
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("qb_token_alert", "failed").Inc()
+		return fmt.Errorf("render qb token alert template: %w", err)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      s.email.StaffEmail,
+		Subject: subject,
+		HTML:    html,
+		Text:    text,
+		Tag:     "qb-token-alert",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("qb_token_alert", "failed").Inc()
+		return fmt.Errorf("send qb token alert: %w", err)
+	}
+
+	// Audit is best-effort once the email is out: failing the job here would
+	// make River retry and re-send the alert — a duplicate staff email is
+	// worse than a missing audit row.
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "qb_token_check_worker",
+			Action:       audit.AuditEmailQBTokenAlert,
+			ResourceType: "qb_connection",
+			ResourceID:   tenantID,
+			Metadata:     map[string]any{"refresh_expires_at": expiresAt, "expired": expired, "river_job_id": riverJobID},
+		})
+	}); err != nil {
+		slog.ErrorContext(ctx, "audit qb token alert failed (email already sent)", "error", err.Error())
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("qb_token_alert", "sent").Inc()
+	return nil
+}
+
+// dayWord pluralizes "day" for alert copy.
+func dayWord(n int) string {
+	if n == 1 {
+		return "day"
+	}
+	return "days"
 }
 
 // loadOrderAndCustomer reads an order and its customer in a single read tx.

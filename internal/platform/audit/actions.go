@@ -172,6 +172,7 @@ const (
 	AuditEmailInvoicePaid                  = "email.invoice_paid"
 	AuditEmailInvoicePastDue               = "email.invoice_past_due"
 	AuditEmailQBInvoiceAlert               = "email.qb_invoice_alert"
+	AuditEmailQBTokenAlert                 = "email.qb_token_alert"
 	AuditEmailWholesaleApplicationReceived = "email.wholesale_application_received"
 	AuditEmailWholesaleApproved            = "email.wholesale_approved"
 	AuditEmailWholesaleMigrated            = "email.wholesale_migrated"

@@ -394,3 +394,30 @@ func TestRender_QBInvoiceAlert_NoCompany(t *testing.T) {
 	assert.NotContains(t, html, " for <strong>")
 	assert.Contains(t, html, "do not create a new one")
 }
+
+func TestRender_QBTokenAlert(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	expiring, _, err := r.Render("qb_token_alert", QBTokenAlertData{
+		DaysLeft:    5,
+		Expired:     false,
+		ExpiresAt:   time.Date(2026, 7, 16, 0, 0, 0, 0, time.UTC),
+		SettingsURL: "https://example.com/admin/settings",
+		StoreName:   "Rockabilly Roasting",
+	})
+	require.NoError(t, err)
+	assert.Contains(t, expiring, "expires in <strong>5 days</strong>")
+	assert.Contains(t, expiring, "/admin/settings")
+
+	expired, text, err := r.Render("qb_token_alert", QBTokenAlertData{
+		Expired:     true,
+		ExpiresAt:   time.Date(2026, 7, 9, 0, 0, 0, 0, time.UTC),
+		SettingsURL: "https://example.com/admin/settings",
+		StoreName:   "Rockabilly Roasting",
+	})
+	require.NoError(t, err)
+	assert.Contains(t, expired, "Connection Expired")
+	assert.Contains(t, expired, "stalled")
+	assert.Contains(t, text, "stalled")
+}

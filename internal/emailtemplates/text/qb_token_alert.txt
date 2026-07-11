@@ -1,0 +1,13 @@
+{{define "qb_token_alert.txt"}}{{if .Expired}}QuickBooks Connection Expired
+
+The QuickBooks connection expired on {{date .ExpiresAt}}. Wholesale invoicing and payment tracking are stalled until it is reconnected — jobs will pick back up automatically once it is.
+{{else}}QuickBooks Connection Expiring
+
+The QuickBooks connection expires in {{.DaysLeft}} day{{if ne .DaysLeft 1}}s{{end}} (on {{date .ExpiresAt}}). If it lapses, wholesale invoicing and payment tracking stop until someone reconnects.
+{{end}}
+Reconnect from admin Settings -> Integrations -> QuickBooks. This reminder repeats daily until the connection is renewed.
+
+Open settings: {{.SettingsURL}}
+
+{{.StoreName}} — Staff notification
+{{end}}

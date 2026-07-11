@@ -43,3 +43,19 @@ func TestClassifyError400KeepsChain(t *testing.T) {
 	assert.True(t, errors.As(err, &apiErr))
 	assert.Equal(t, 400, apiErr.StatusCode)
 }
+
+// QBO reports reads of hard-deleted entities as HTTP 400 with fault code 610
+// ("Object Not Found"), not as a 404 — the reconcile's deleted-invoice revert
+// depends on that mapping to ErrNotFound.
+func TestClassifyError400Fault610IsNotFound(t *testing.T) {
+	body := []byte(`{"Fault":{"Error":[{"Message":"Object Not Found","Detail":"Object Not Found : Something you're trying to use has been made inactive.","code":"610"}],"type":"ValidationFault"},"time":"2026-07-11T10:00:00.000-07:00"}`)
+	err := classifyError(400, body)
+	assert.True(t, errors.Is(err, ErrNotFound))
+	assert.False(t, errors.Is(err, ErrBadRequest))
+	assert.False(t, IsRetryable(err))
+
+	// A plain 400 (no fault 610) stays a bad request.
+	plain := classifyError(400, []byte(`{"Fault":{"Error":[{"Message":"Invalid Reference Id","code":"2500"}]}}`))
+	assert.True(t, errors.Is(plain, ErrBadRequest))
+	assert.False(t, errors.Is(plain, ErrNotFound))
+}

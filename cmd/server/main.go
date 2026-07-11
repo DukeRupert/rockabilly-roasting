@@ -431,6 +431,22 @@ func run() error {
 			},
 			&river.PeriodicJobOpts{RunOnStart: false},
 		))
+		// Watch the QB refresh token daily. Intuit expires it 100 days after
+		// its last use; if it lapses, every QB job stalls until someone
+		// reconnects — warn staff before that happens, not after. No
+		// RunOnStart: restarts straddling a UTC ByPeriod boundary would
+		// double-send the daily alert.
+		periodicJobs = append(periodicJobs, river.NewPeriodicJob(
+			river.PeriodicInterval(24*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.CheckQBTokenArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 24 * time.Hour,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
+		))
 	}
 
 	// River client — we create it first, then pass it to the scheduler worker
@@ -466,6 +482,7 @@ func run() error {
 		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, customerStore, catalogStore, qbClient, auditWriter, pool, riverClient, metricsReg))
 		river.AddWorker(workers, jobs.NewSendQBInvoiceWorker(qbClient, auditWriter, pool, riverClient, metricsReg))
 		river.AddWorker(workers, jobs.NewQBInvoiceAlertEmailWorker(orderSvc, pool))
+		river.AddWorker(workers, jobs.NewCheckQBTokenWorker(qbCredStore, tenantIDFromEnv(), orderSvc, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewProcessQBInvoiceUpdateWorker(orderSvc, qbClient, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewReconcileQBInvoicesWorker(orderSvc, qbClient, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewSyncQBCustomerWorker(customerStore, qbClient, auditWriter, pool, metricsReg))

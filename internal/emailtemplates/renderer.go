@@ -142,6 +142,16 @@ type QBInvoiceAlertData struct {
 	StoreName   string
 }
 
+// QBTokenAlertData holds data for the staff warning that the QuickBooks
+// connection (refresh token) is about to lapse or already has.
+type QBTokenAlertData struct {
+	DaysLeft    int  // days until the refresh token expires; <= 0 when expired
+	Expired     bool
+	ExpiresAt   time.Time
+	SettingsURL string // admin settings page with the Reconnect button
+	StoreName   string
+}
+
 // MagicLinkData holds data for the magic link email.
 type MagicLinkData struct {
 	CustomerName string

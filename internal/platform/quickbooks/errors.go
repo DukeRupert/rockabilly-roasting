@@ -32,6 +32,9 @@ func IsRetryable(err error) bool {
 	if errors.Is(err, ErrNotFound) {
 		return false // a missing/deleted resource won't reappear on retry
 	}
+	if errors.Is(err, ErrBadRequest) {
+		return false // data or config problem, won't fix itself
+	}
 	var apiErr *APIError
 	if !errors.As(err, &apiErr) {
 		return true // network errors are retryable

@@ -43,6 +43,14 @@ type ClientConfig struct {
 	EncryptionKey []byte // AES-256, 32 bytes
 	Environment   string // "sandbox" or "production"
 	RedirectURI   string
+
+	// SalesItemID is the QB Item every invoice product line references.
+	// QBO rejects a SalesItemLineDetail without an ItemRef, so this must be
+	// the ID of an existing service item in the connected company file.
+	SalesItemID string
+	// ShippingItemID is the QB Item for the shipping line. Optional — falls
+	// back to SalesItemID when empty.
+	ShippingItemID string
 }
 
 // QBClient is the concrete implementation of the Client interface.
@@ -303,7 +311,10 @@ func classifyError(statusCode int, body []byte) error {
 	}
 	switch statusCode {
 	case 400:
-		return fmt.Errorf("%w: %s", ErrBadRequest, apiErr.Error())
+		// Join (like the 404 case) so errors.Is(err, ErrBadRequest) and
+		// errors.As(*APIError) both keep working — %s-wrapping would strip
+		// the APIError from the chain.
+		return errors.Join(ErrBadRequest, apiErr)
 	case 401:
 		return fmt.Errorf("%w: %s", ErrTokenExpired, apiErr.Error())
 	case 404:

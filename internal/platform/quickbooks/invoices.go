@@ -27,6 +27,7 @@ type qbInvoiceLine struct {
 }
 
 type qbSalesItemDetail struct {
+	ItemRef   qbRef   `json:"ItemRef"` // required by QBO on every sales line
 	Qty       float64 `json:"Qty,omitempty"`
 	UnitPrice float64 `json:"UnitPrice,omitempty"`
 }
@@ -62,34 +63,53 @@ func invoiceFromResponse(resp qbInvoiceResponse) *Invoice {
 	}
 }
 
-// CreateInvoice creates an invoice in QBO.
-func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice, error) {
-	lines := make([]qbInvoiceLine, 0, len(p.Lines)+1)
+// buildInvoiceLines maps InvoiceParams lines (plus the shipping line) to QB
+// request lines, stamping each with the item it bills against. shippingItemID
+// falls back to salesItemID when empty.
+func buildInvoiceLines(p InvoiceParams, salesItemID, shippingItemID string) []qbInvoiceLine {
+	if shippingItemID == "" {
+		shippingItemID = salesItemID
+	}
 
+	lines := make([]qbInvoiceLine, 0, len(p.Lines)+1)
 	for _, line := range p.Lines {
 		lines = append(lines, qbInvoiceLine{
 			DetailType:  "SalesItemLineDetail",
 			Amount:      centsToFloat(line.Amount),
 			Description: line.Description,
 			SalesItemLineDetail: &qbSalesItemDetail{
+				ItemRef:   qbRef{Value: salesItemID},
 				Qty:       float64(line.Quantity),
 				UnitPrice: centsToFloat(line.UnitAmount),
 			},
 		})
 	}
 
-	// Add shipping as a line item if present
 	if p.Shipping > 0 {
 		lines = append(lines, qbInvoiceLine{
 			DetailType:  "SalesItemLineDetail",
 			Amount:      centsToFloat(p.Shipping),
 			Description: "Shipping",
 			SalesItemLineDetail: &qbSalesItemDetail{
+				ItemRef:   qbRef{Value: shippingItemID},
 				Qty:       1,
 				UnitPrice: centsToFloat(p.Shipping),
 			},
 		})
 	}
+
+	return lines
+}
+
+// CreateInvoice creates an invoice in QBO.
+func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice, error) {
+	// Wrapped in ErrBadRequest so IsRetryable classifies it permanent — a
+	// missing item mapping never fixes itself on retry.
+	if c.config.SalesItemID == "" {
+		return nil, fmt.Errorf("%w: QB sales item not configured (QB_SALES_ITEM_ID)", ErrBadRequest)
+	}
+
+	lines := buildInvoiceLines(p, c.config.SalesItemID, c.config.ShippingItemID)
 
 	body := qbInvoiceRequest{
 		CustomerRef: qbRef{Value: p.CustomerID},

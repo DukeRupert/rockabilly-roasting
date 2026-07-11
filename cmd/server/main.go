@@ -211,6 +211,10 @@ func run() error {
 		if qbWebhookVerifier == "" {
 			return fmt.Errorf("QB_WEBHOOK_VERIFIER_TOKEN is required when QB_CLIENT_ID is set")
 		}
+		qbSalesItemID := os.Getenv("QB_SALES_ITEM_ID")
+		if qbSalesItemID == "" {
+			return fmt.Errorf("QB_SALES_ITEM_ID is required when QB_CLIENT_ID is set (QBO rejects invoice lines without an ItemRef)")
+		}
 		qbEncKeyB64 := os.Getenv("QB_TOKEN_ENCRYPTION_KEY")
 		qbEncKey, decodeErr := base64DecodeKey(qbEncKeyB64)
 		if decodeErr != nil {
@@ -221,11 +225,13 @@ func run() error {
 		tenantID := tenantIDFromEnv()
 
 		qbConfig := quickbooks.ClientConfig{
-			ClientID:      qbClientID,
-			ClientSecret:  os.Getenv("QB_CLIENT_SECRET"),
-			EncryptionKey: qbEncKey,
-			Environment:   os.Getenv("QB_ENVIRONMENT"),
-			RedirectURI:   os.Getenv("QB_REDIRECT_URI"),
+			ClientID:       qbClientID,
+			ClientSecret:   os.Getenv("QB_CLIENT_SECRET"),
+			EncryptionKey:  qbEncKey,
+			Environment:    os.Getenv("QB_ENVIRONMENT"),
+			RedirectURI:    os.Getenv("QB_REDIRECT_URI"),
+			SalesItemID:    qbSalesItemID,
+			ShippingItemID: os.Getenv("QB_SHIPPING_ITEM_ID"),
 		}
 		qbConcrete := quickbooks.NewQBClient(qbConfig, tenantID, qbCredStore, pool)
 		qbClient = qbConcrete

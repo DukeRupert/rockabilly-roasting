@@ -5,7 +5,49 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestBuildInvoiceLines(t *testing.T) {
+	// buildInvoiceLines reads only Lines and Shipping from the params.
+	params := InvoiceParams{
+		Lines: []InvoiceLine{
+			{Description: "Iron Horse Blend (WH-5LB)", Quantity: 4, UnitAmount: 5500, Amount: 22000},
+			{Description: "Rebel Roast (WH-5LB)", Quantity: 2, UnitAmount: 6000, Amount: 12000},
+		},
+		Shipping: 1500,
+	}
+
+	t.Run("every line carries the sales ItemRef", func(t *testing.T) {
+		lines := buildInvoiceLines(params, "17", "23")
+		require.Len(t, lines, 3) // 2 products + shipping
+
+		for _, l := range lines[:2] {
+			assert.Equal(t, "SalesItemLineDetail", l.DetailType)
+			require.NotNil(t, l.SalesItemLineDetail)
+			assert.Equal(t, "17", l.SalesItemLineDetail.ItemRef.Value)
+		}
+
+		ship := lines[2]
+		assert.Equal(t, "Shipping", ship.Description)
+		require.NotNil(t, ship.SalesItemLineDetail)
+		assert.Equal(t, "23", ship.SalesItemLineDetail.ItemRef.Value)
+		assert.Equal(t, 15.0, ship.Amount)
+	})
+
+	t.Run("shipping falls back to the sales item", func(t *testing.T) {
+		lines := buildInvoiceLines(params, "17", "")
+		require.Len(t, lines, 3)
+		assert.Equal(t, "17", lines[2].SalesItemLineDetail.ItemRef.Value)
+	})
+
+	t.Run("no shipping line when shipping is zero", func(t *testing.T) {
+		p := params
+		p.Shipping = 0
+		lines := buildInvoiceLines(p, "17", "")
+		require.Len(t, lines, 2)
+	})
+}
 
 func TestCentsToFloat(t *testing.T) {
 	tests := []struct {

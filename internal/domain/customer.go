@@ -33,6 +33,10 @@ const (
 	BillingMethodCreditCard BillingMethod = "credit_card"
 )
 
+// DefaultPaymentTermsDays is the NET terms applied to wholesale invoicing when
+// a customer has no explicit PaymentTermsDays set (net-7 is the house default).
+const DefaultPaymentTermsDays = 7
+
 // Customer represents a registered or guest customer.
 type Customer struct {
 	ID              uuid.UUID

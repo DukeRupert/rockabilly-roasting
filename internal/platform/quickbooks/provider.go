@@ -73,8 +73,8 @@ type Payment struct {
 
 // Client is the interface for QuickBooks Online API operations.
 type Client interface {
-	// FindCustomer searches QBO for an existing customer by display name, then
-	// by email. Returns nil (not an error) if no match is found.
+	// FindCustomer searches QBO for an existing customer by email first, then
+	// by display name. Returns nil (not an error) if no match is found.
 	FindCustomer(ctx context.Context, displayName, email string) (*QBCustomer, error)
 
 	// CreateCustomer creates a customer in QBO and returns their QB customer ID.

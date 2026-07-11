@@ -9,10 +9,6 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 )
 
-// qbNetTermsDays is the net payment term for wholesale QB invoices: the due date
-// set on the invoice at creation is order.PlacedAt + qbNetTermsDays.
-const qbNetTermsDays = 7
-
 // fetchQBInvoiceFacts pulls QuickBooks' current view of an invoice and maps it
 // to app.QBInvoiceFacts (the primitive form the reconcile seam consumes). A 404
 // is reported as NotFound rather than an error, so the reconcile treats a

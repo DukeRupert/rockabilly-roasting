@@ -142,14 +142,15 @@ func (e *Enqueuer) EnqueueInvoicePaid(ctx context.Context, tx pgx.Tx, orderID, c
 }
 
 // EnqueueInvoicePastDue enqueues a past-due reminder for an overdue wholesale
-// invoice at the given milestone (days since placed). UniqueOpts keys on the
-// full args so the same (order, stage) reminder can't double-send even if a
-// reconcile is retried.
-func (e *Enqueuer) EnqueueInvoicePastDue(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID, stage int) error {
+// invoice at the given reminder stage, carrying QB's authoritative due date
+// for display. UniqueOpts keys on the full args so the same (order, stage)
+// reminder can't double-send even if a reconcile is retried.
+func (e *Enqueuer) EnqueueInvoicePastDue(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID, stage int, dueDate time.Time) error {
 	_, err := e.client.InsertTx(ctx, tx, EmailInvoicePastDueArgs{
 		OrderID:    orderID,
 		CustomerID: customerID,
 		Stage:      stage,
+		DueDate:    dueDate,
 	}, &river.InsertOpts{
 		UniqueOpts: river.UniqueOpts{ByArgs: true},
 	})

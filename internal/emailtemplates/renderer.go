@@ -110,17 +110,18 @@ type InvoicePaidData struct {
 	AccountURL    string
 }
 
-// InvoicePastDueData holds data for a wholesale past-due reminder. Stage is the
-// milestone (days since the order was placed) that triggered the reminder.
-// NOTE: copy for the 7/14/21/30 milestones is still to be finalized — see
+// InvoicePastDueData holds data for a wholesale past-due reminder. Stage is
+// which reminder this is: 1 fires when the invoice first goes overdue, later
+// stages weekly after that.
+// NOTE: per-stage copy is still to be finalized — see
 // docs/qb-overdue-reminders-TODO.md.
 type InvoicePastDueData struct {
 	CustomerName  string
 	InvoiceNumber string
 	OrderNumber   string
 	AmountDue     int        // cents still owed (invoice total)
-	DueDate       *time.Time // net-terms due date
-	Stage         int        // reminder milestone in days-since-placed (7/14/21/30)
+	DueDate       *time.Time // QB's authoritative due date; nil hides the "Was Due" row
+	Stage         int        // which reminder this is (1 on going overdue, then weekly)
 	PaymentURL    string
 	StoreName     string
 	StoreURL      string

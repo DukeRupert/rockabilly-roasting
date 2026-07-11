@@ -40,12 +40,16 @@ const (
 	ReconcileReverted      ReconcileTransition = "reverted"
 )
 
-// overdueReminderMilestones are the days-since-placed thresholds at which a
-// past-due reminder is sent for an unpaid wholesale invoice. With net-7 terms,
-// day 7 is the due date (first nudge) and the rest are weekly follow-ups. The
-// order.overdue_reminder_stage column records the highest milestone already
-// sent so each fires exactly once.
-var overdueReminderMilestones = []int{7, 14, 21, 30}
+// Past-due reminders fire the first time an invoice is seen overdue (per QB's
+// authoritative due date) and then weekly, capped at maxOverdueReminders in
+// total. Keying the cadence to the due date — not days-since-placed — keeps it
+// correct for any NET terms. The order.overdue_reminder_stage column records
+// how many reminders have been sent (1..max) so the daily poll never re-sends
+// one.
+const (
+	overdueReminderIntervalDays = 7
+	maxOverdueReminders         = 4
+)
 
 // qbReconcileActor is the system actor recorded for QB-driven payment-status
 // transitions (webhook or reconciliation poll).
@@ -143,7 +147,7 @@ func (s *OrderService) ReconcileWholesalePayment(ctx context.Context, tx pgx.Tx,
 
 	// 3. Past due — balance still owed and QB gave us a due date that has passed.
 	case !f.DueDate.IsZero() && now.After(f.DueDate):
-		return s.markInvoiceOverdue(ctx, tx, order, now)
+		return s.markInvoiceOverdue(ctx, tx, order, f.DueDate, now)
 
 	// 4. Partial payment within terms.
 	case f.BalanceCents < f.TotalCents:
@@ -292,10 +296,12 @@ func orderManuallyPayable(o *domain.Order) bool {
 	}
 }
 
-// markInvoiceOverdue flips the order to overdue (on first crossing) and sends at
-// most one past-due reminder per milestone, advancing overdue_reminder_stage so
-// the daily poll never re-sends a milestone it has already notified.
-func (s *OrderService) markInvoiceOverdue(ctx context.Context, tx pgx.Tx, order *domain.Order, now time.Time) (ReconcileTransition, error) {
+// markInvoiceOverdue flips the order to overdue (on first crossing) and sends
+// at most one past-due reminder per stage — first on going overdue, then
+// weekly — advancing overdue_reminder_stage so the daily poll never re-sends
+// one. dueDate is QB's authoritative due date, passed on to the reminder email
+// so it displays the date the invoice was actually issued under.
+func (s *OrderService) markInvoiceOverdue(ctx context.Context, tx pgx.Tx, order *domain.Order, dueDate, now time.Time) (ReconcileTransition, error) {
 	changed := false
 
 	if order.PaymentStatus != domain.PaymentStatusOverdue {
@@ -308,14 +314,14 @@ func (s *OrderService) markInvoiceOverdue(ctx context.Context, tx pgx.Tx, order 
 		changed = true
 	}
 
-	daysOverdue := int(now.Sub(order.PlacedAt).Hours() / 24)
-	if milestone := highestOverdueMilestone(daysOverdue); milestone > order.OverdueReminderStage {
+	daysPastDue := int(now.Sub(dueDate).Hours() / 24)
+	if stage := overdueReminderStageFor(daysPastDue); stage > order.OverdueReminderStage {
 		if s.enqueuer != nil && order.CustomerID != nil {
-			if err := s.enqueuer.EnqueueInvoicePastDue(ctx, tx, order.ID, *order.CustomerID, milestone); err != nil {
+			if err := s.enqueuer.EnqueueInvoicePastDue(ctx, tx, order.ID, *order.CustomerID, stage, dueDate); err != nil {
 				return ReconcileNone, fmt.Errorf("enqueue past-due email: %w", err)
 			}
 		}
-		if err := s.orders.SetOverdueReminderStage(ctx, tx, order.ID, milestone); err != nil {
+		if err := s.orders.SetOverdueReminderStage(ctx, tx, order.ID, stage); err != nil {
 			return ReconcileNone, fmt.Errorf("set overdue reminder stage: %w", err)
 		}
 		changed = true
@@ -371,14 +377,29 @@ func (s *OrderService) recordQBAudit(ctx context.Context, tx pgx.Tx, order *doma
 	return nil
 }
 
-// highestOverdueMilestone returns the largest reminder milestone that daysOverdue
-// has reached, or 0 if none have been reached yet.
-func highestOverdueMilestone(daysOverdue int) int {
-	highest := 0
-	for _, m := range overdueReminderMilestones {
-		if daysOverdue >= m {
-			highest = m
-		}
+// overdueReminderStageFor returns which reminder (1..maxOverdueReminders) an
+// invoice daysPastDue past its due date should have received by now, or 0 if
+// it is not yet overdue. Stage 1 is due on the first overdue day; each later
+// stage a week after the previous.
+func overdueReminderStageFor(daysPastDue int) int {
+	if daysPastDue < 0 {
+		return 0
 	}
-	return highest
+	stage := daysPastDue/overdueReminderIntervalDays + 1
+	if stage > maxOverdueReminders {
+		stage = maxOverdueReminders
+	}
+	return stage
+}
+
+// EffectivePaymentTermsDays returns a customer's NET payment terms in days,
+// falling back to the house default (net-7) when none are set. The QB invoice
+// job uses it to set the invoice due date; from then on QB's due date is
+// authoritative (the reconcile poll reads it back and threads it through to
+// the past-due email).
+func EffectivePaymentTermsDays(c *domain.Customer) int {
+	if c != nil && c.PaymentTermsDays != nil && *c.PaymentTermsDays > 0 {
+		return *c.PaymentTermsDays
+	}
+	return domain.DefaultPaymentTermsDays
 }

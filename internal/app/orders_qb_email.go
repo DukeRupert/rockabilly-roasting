@@ -16,12 +16,6 @@ import (
 	"github.com/dukerupert/hiri/internal/store"
 )
 
-// qbNetTermsDays is the net payment term (in days) for wholesale QB invoices.
-// The invoice's due date is order.PlacedAt + qbNetTermsDays; the reconciliation
-// poll reads the authoritative due date back from QB, but the past-due email
-// recomputes it for display.
-const qbNetTermsDays = 7
-
 // SendInvoicePaidEmail sends the payment-confirmation email for a wholesale QB
 // invoice paid in full. Read → send → audit, matching SendConfirmationEmail.
 func (s *OrderService) SendInvoicePaidEmail(ctx context.Context, pool *pgxpool.Pool, orderID, customerID uuid.UUID) error {
@@ -74,20 +68,28 @@ func (s *OrderService) SendInvoicePaidEmail(ctx context.Context, pool *pgxpool.P
 }
 
 // SendInvoicePastDueEmail sends a past-due reminder for an overdue wholesale QB
-// invoice at the given milestone (days since placed). Read → send → audit.
-func (s *OrderService) SendInvoicePastDueEmail(ctx context.Context, pool *pgxpool.Pool, orderID, customerID uuid.UUID, stage int) error {
+// invoice at the given reminder stage. dueDate is QB's authoritative due date,
+// threaded through the job args by the reconcile — the email must show the
+// date the invoice was actually issued under, not one recomputed from the
+// customer's current terms (which may have changed since). Read → send → audit.
+func (s *OrderService) SendInvoicePastDueEmail(ctx context.Context, pool *pgxpool.Pool, orderID, customerID uuid.UUID, stage int, dueDate time.Time) error {
 	order, customer, err := s.loadOrderAndCustomer(ctx, pool, orderID, customerID)
 	if err != nil {
 		return err
 	}
 
-	dueDate := order.PlacedAt.Add(qbNetTermsDays * 24 * time.Hour)
+	// The template hides the "Was Due" row when the date is absent — better
+	// than rendering a zero time if an old queued job predates the field.
+	var duePtr *time.Time
+	if !dueDate.IsZero() {
+		duePtr = &dueDate
+	}
 	html, text, err := s.email.Renderer.Render("invoice_past_due", emailtemplates.InvoicePastDueData{
 		CustomerName:  customer.FirstName,
 		InvoiceNumber: qbInvoiceLabel(order),
 		OrderNumber:   order.Number,
 		AmountDue:     order.Total,
-		DueDate:       &dueDate,
+		DueDate:       duePtr,
 		Stage:         stage,
 		PaymentURL:    s.email.BaseURL + "/account/orders/" + order.ID.String(),
 		StoreName:     s.email.StoreName,

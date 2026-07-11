@@ -1,6 +1,8 @@
 package jobs
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 
 	"github.com/dukerupert/hiri/internal/app"
@@ -296,13 +298,15 @@ type EmailInvoicePaidArgs struct {
 func (EmailInvoicePaidArgs) Kind() string { return "email:invoice_paid" }
 
 // EmailInvoicePastDueArgs sends a past-due reminder for an overdue wholesale
-// invoice. Stage is the milestone (days since the order was placed: 7/14/21/30)
-// the reminder is for; it is part of the args so the reconcile's ByArgs
-// uniqueness guarantees one email per milestone.
+// invoice. Stage is which reminder this is (1 on going overdue, then weekly);
+// it is part of the args so the reconcile's ByArgs uniqueness guarantees one
+// email per stage. DueDate is QB's authoritative due date, carried through so
+// the email displays the date the invoice was actually issued under.
 type EmailInvoicePastDueArgs struct {
 	OrderID    uuid.UUID `json:"order_id"`
 	CustomerID uuid.UUID `json:"customer_id"`
 	Stage      int       `json:"stage"`
+	DueDate    time.Time `json:"due_date"`
 }
 
 // Kind returns the job kind identifier.

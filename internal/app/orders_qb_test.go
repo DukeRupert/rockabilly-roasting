@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ type fakeEnqueuer struct {
 type pastDueCall struct {
 	orderID uuid.UUID
 	stage   int
+	dueDate time.Time
 }
 
 func (f *fakeEnqueuer) EnqueueRenewalReceipt(context.Context, pgx.Tx, uuid.UUID, uuid.UUID) error {
@@ -55,8 +57,8 @@ func (f *fakeEnqueuer) EnqueueInvoicePaid(_ context.Context, _ pgx.Tx, orderID, 
 	f.paid = append(f.paid, orderID)
 	return nil
 }
-func (f *fakeEnqueuer) EnqueueInvoicePastDue(_ context.Context, _ pgx.Tx, orderID, _ uuid.UUID, stage int) error {
-	f.pastDue = append(f.pastDue, pastDueCall{orderID: orderID, stage: stage})
+func (f *fakeEnqueuer) EnqueueInvoicePastDue(_ context.Context, _ pgx.Tx, orderID, _ uuid.UUID, stage int, dueDate time.Time) error {
+	f.pastDue = append(f.pastDue, pastDueCall{orderID: orderID, stage: stage, dueDate: dueDate})
 	return nil
 }
 
@@ -106,7 +108,7 @@ func TestReconcileWholesalePayment_DecisionTable(t *testing.T) {
 		want        app.ReconcileTransition
 		wantPayment domain.PaymentStatus
 		wantPaid    bool
-		wantPastDue int // milestone expected, 0 = none
+		wantPastDue int // reminder stage expected, 0 = none
 	}{
 		{
 			name:        "paid in full",
@@ -141,7 +143,7 @@ func TestReconcileWholesalePayment_DecisionTable(t *testing.T) {
 			facts:       app.QBInvoiceFacts{BalanceCents: 10000, TotalCents: 10000, DueDate: past},
 			want:        app.ReconcileOverdue,
 			wantPayment: domain.PaymentStatusOverdue,
-			wantPastDue: 7,
+			wantPastDue: 1,
 		},
 		{
 			name:        "late partial flags overdue (precedence over partial)",
@@ -150,7 +152,7 @@ func TestReconcileWholesalePayment_DecisionTable(t *testing.T) {
 			facts:       app.QBInvoiceFacts{BalanceCents: 4000, TotalCents: 10000, DueDate: past},
 			want:        app.ReconcileOverdue,
 			wantPayment: domain.PaymentStatusOverdue,
-			wantPastDue: 7,
+			wantPastDue: 1,
 		},
 		{
 			name:        "voided in QB (total zeroed) reverts",
@@ -220,14 +222,14 @@ func TestReconcileWholesalePayment_Idempotent(t *testing.T) {
 	enq := &fakeEnqueuer{}
 	svc, st := newReconcileService(enq)
 
-	// Already overdue, milestone 7 already sent.
-	order, qbInvoiceID := makeQBOrder(t, tx, st, domain.PaymentStatusOverdue, now.Add(-8*24*time.Hour), 7)
+	// Already overdue, first reminder (stage 1) already sent.
+	order, qbInvoiceID := makeQBOrder(t, tx, st, domain.PaymentStatusOverdue, now.Add(-8*24*time.Hour), 1)
 	facts := app.QBInvoiceFacts{BalanceCents: 10000, TotalCents: 10000, DueDate: now.Add(-24 * time.Hour)}
 
 	got, err := svc.ReconcileWholesalePayment(ctx, tx, order, facts, now)
 	require.NoError(t, err)
 	assert.Equal(t, app.ReconcileNone, got)
-	assert.Empty(t, enq.pastDue, "milestone 7 already sent, no resend")
+	assert.Empty(t, enq.pastDue, "stage 1 already sent, no resend")
 
 	reread, err := st.GetOrderByQBInvoiceIDForUpdate(ctx, tx, qbInvoiceID)
 	require.NoError(t, err)
@@ -321,46 +323,54 @@ func TestMarkWholesaleOrderPaid(t *testing.T) {
 
 func TestReconcileWholesalePayment_ReminderCadence(t *testing.T) {
 	ctx := context.Background()
-	placedAt := time.Now().Add(-60 * 24 * time.Hour) // long ago; we drive "now" explicitly
-	tx := testutil.NewTestTx(t, testPool)
-	enq := &fakeEnqueuer{}
-	svc, st := newReconcileService(enq)
 
-	_, qbInvoiceID := makeQBOrder(t, tx, st, domain.PaymentStatusInvoiced, placedAt, 0)
-	facts := app.QBInvoiceFacts{BalanceCents: 10000, TotalCents: 10000, DueDate: placedAt.Add(7 * 24 * time.Hour)}
+	// The cadence keys off QB's due date, not days-since-placed, so it holds
+	// for any NET terms: the first reminder fires when the invoice is first
+	// seen overdue, then weekly, capped at four total.
+	for _, termsDays := range []int{7, 30} {
+		t.Run(fmt.Sprintf("net-%d", termsDays), func(t *testing.T) {
+			placedAt := time.Now().Add(-120 * 24 * time.Hour) // long ago; we drive "now" explicitly
+			tx := testutil.NewTestTx(t, testPool)
+			enq := &fakeEnqueuer{}
+			svc, st := newReconcileService(enq)
 
-	// Walk forward through each milestone; each crossing fires exactly one
-	// reminder. A check between milestones fires nothing.
-	// Days are chosen strictly past each threshold: the invoice is "due" at
-	// exactly placedAt+7d and becomes past-due the moment after, so a reminder
-	// for milestone N fires once daysSincePlaced has passed N.
-	steps := []struct {
-		daysSincePlaced int
-		wantStage       int // 0 = no new reminder this step
-	}{
-		{8, 7},
-		{10, 0},
-		{15, 14},
-		{22, 21},
-		{31, 30},
-		{45, 0},
+			_, qbInvoiceID := makeQBOrder(t, tx, st, domain.PaymentStatusInvoiced, placedAt, 0)
+			dueDate := placedAt.Add(time.Duration(termsDays) * 24 * time.Hour)
+			facts := app.QBInvoiceFacts{BalanceCents: 10000, TotalCents: 10000, DueDate: dueDate}
+
+			// Walk forward from the due date; each weekly crossing fires
+			// exactly one reminder, a check in between fires nothing, and the
+			// fifth week onward stays silent (cap).
+			steps := []struct {
+				daysPastDue int
+				wantStage   int // 0 = no new reminder this step
+			}{
+				{1, 1},
+				{3, 0},
+				{8, 2},
+				{15, 3},
+				{24, 4},
+				{38, 0},
+			}
+			wantTotal := 0
+			for _, s := range steps {
+				now := dueDate.Add(time.Duration(s.daysPastDue) * 24 * time.Hour)
+				order, err := st.GetOrderByQBInvoiceIDForUpdate(ctx, tx, qbInvoiceID)
+				require.NoError(t, err)
+				_, err = svc.ReconcileWholesalePayment(ctx, tx, order, facts, now)
+				require.NoError(t, err)
+				if s.wantStage > 0 {
+					wantTotal++
+					require.Len(t, enq.pastDue, wantTotal)
+					assert.Equal(t, s.wantStage, enq.pastDue[wantTotal-1].stage, "stage at %d days past due", s.daysPastDue)
+					assert.Equal(t, dueDate, enq.pastDue[wantTotal-1].dueDate, "email carries QB's due date")
+				} else {
+					assert.Len(t, enq.pastDue, wantTotal, "no new reminder at %d days past due", s.daysPastDue)
+				}
+			}
+			assert.Equal(t, 4, wantTotal, "exactly four reminders, then silence")
+		})
 	}
-	wantTotal := 0
-	for _, s := range steps {
-		now := placedAt.Add(time.Duration(s.daysSincePlaced) * 24 * time.Hour)
-		order, err := st.GetOrderByQBInvoiceIDForUpdate(ctx, tx, qbInvoiceID)
-		require.NoError(t, err)
-		_, err = svc.ReconcileWholesalePayment(ctx, tx, order, facts, now)
-		require.NoError(t, err)
-		if s.wantStage > 0 {
-			wantTotal++
-			require.Len(t, enq.pastDue, wantTotal)
-			assert.Equal(t, s.wantStage, enq.pastDue[wantTotal-1].stage, "milestone at day %d", s.daysSincePlaced)
-		} else {
-			assert.Len(t, enq.pastDue, wantTotal, "no new reminder at day %d", s.daysSincePlaced)
-		}
-	}
-	assert.Equal(t, 4, wantTotal, "exactly four reminders across the four milestones")
 }
 
 func TestInvoiceService_FenceQBManagedOrder(t *testing.T) {

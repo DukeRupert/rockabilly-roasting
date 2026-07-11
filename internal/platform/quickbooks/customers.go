@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/dukerupert/hiri/internal/domain"
 )
@@ -48,36 +49,64 @@ type qbQueryResponse struct {
 	} `json:"QueryResponse"`
 }
 
-// FindCustomer searches QBO for an existing customer by display name first,
-// then by email. Returns nil (not an error) if no match is found.
+// FindCustomer searches QBO for an existing customer by email first, then by
+// display name. Returns nil (not an error) if no match is found.
+//
+// Email leads because it is the stabler identifier: company display names
+// drift between systems ("Blue Heron Cafe" vs "Blue Heron Café") while the
+// billing email rarely does. QBO query comparisons are case-insensitive, so
+// Hiri's lowercased emails match however the address was entered in QB.
+// PrimaryEmailAddr is NOT unique in QBO, so an ambiguous email hit is only
+// trusted when a record carries our display name; otherwise the unique
+// DisplayName lookup decides.
 func (c *QBClient) FindCustomer(ctx context.Context, displayName, email string) (*QBCustomer, error) {
-	// Try display name first (unique in QB, most reliable match for wholesale)
-	if displayName != "" {
-		found, err := c.queryCustomer(ctx, "DisplayName", displayName)
+	if email != "" {
+		matches, err := c.queryCustomers(ctx, "PrimaryEmailAddr", email)
 		if err != nil {
 			return nil, err
 		}
-		if found != nil {
-			return found, nil
+		if m := pickEmailMatch(matches, displayName); m != nil {
+			return m, nil
 		}
 	}
 
-	// Fall back to email
-	if email != "" {
-		found, err := c.queryCustomer(ctx, "PrimaryEmailAddr", email)
+	// Fall back to display name (company name for wholesale; unique in QB)
+	if displayName != "" {
+		matches, err := c.queryCustomers(ctx, "DisplayName", displayName)
 		if err != nil {
 			return nil, err
 		}
-		if found != nil {
-			return found, nil
+		if len(matches) > 0 {
+			return &matches[0], nil
 		}
 	}
 
 	return nil, nil
 }
 
-// queryCustomer runs a QB query for a customer by a single field.
-func (c *QBClient) queryCustomer(ctx context.Context, field, value string) (*QBCustomer, error) {
+// pickEmailMatch resolves the results of an email query. A single hit is
+// trusted; multiple hits (one billing email shared across QB customer records,
+// e.g. two locations of the same owner) are only accepted when a record's
+// display name matches ours — otherwise nil is returned so the caller falls
+// through to the unique DisplayName lookup rather than guessing at
+// QueryResponse order.
+func pickEmailMatch(matches []QBCustomer, displayName string) *QBCustomer {
+	if len(matches) == 1 {
+		return &matches[0]
+	}
+	if displayName == "" {
+		return nil
+	}
+	for i := range matches {
+		if strings.EqualFold(matches[i].DisplayName, displayName) {
+			return &matches[i]
+		}
+	}
+	return nil
+}
+
+// queryCustomers runs a QB query for customers matching a single field.
+func (c *QBClient) queryCustomers(ctx context.Context, field, value string) ([]QBCustomer, error) {
 	// Whitelist allowed query fields to prevent injection via the field parameter.
 	switch field {
 	case "DisplayName", "PrimaryEmailAddr":
@@ -100,19 +129,18 @@ func (c *QBClient) queryCustomer(ctx context.Context, field, value string) (*QBC
 		return nil, fmt.Errorf("unmarshal qb customer query: %w", err)
 	}
 
-	if len(resp.QueryResponse.Customer) == 0 {
-		return nil, nil
+	customers := make([]QBCustomer, 0, len(resp.QueryResponse.Customer))
+	for _, match := range resp.QueryResponse.Customer {
+		qbc := QBCustomer{
+			ID:          match.ID,
+			DisplayName: match.DisplayName,
+		}
+		if match.PrimaryEmailAddr != nil {
+			qbc.Email = match.PrimaryEmailAddr.Address
+		}
+		customers = append(customers, qbc)
 	}
-
-	match := resp.QueryResponse.Customer[0]
-	qbc := &QBCustomer{
-		ID:          match.ID,
-		DisplayName: match.DisplayName,
-	}
-	if match.PrimaryEmailAddr != nil {
-		qbc.Email = match.PrimaryEmailAddr.Address
-	}
-	return qbc, nil
+	return customers, nil
 }
 
 // escapeQBQuery escapes single quotes for QB's query language.

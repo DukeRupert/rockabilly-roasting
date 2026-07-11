@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
@@ -20,17 +21,19 @@ import (
 // CreateQBInvoiceWorker creates a QB invoice for a wholesale order.
 type CreateQBInvoiceWorker struct {
 	river.WorkerDefaults[CreateQBInvoiceArgs]
-	orders  *store.OrderStore
-	catalog *store.CatalogStore
-	qb      quickbooks.Client
-	audit   *audit.AuditWriter
-	pool    *pgxpool.Pool
-	metrics *metrics.Registry
+	orders    *store.OrderStore
+	customers *store.CustomerStore
+	catalog   *store.CatalogStore
+	qb        quickbooks.Client
+	audit     *audit.AuditWriter
+	pool      *pgxpool.Pool
+	metrics   *metrics.Registry
 }
 
 // NewCreateQBInvoiceWorker creates a new CreateQBInvoiceWorker.
 func NewCreateQBInvoiceWorker(
 	orders *store.OrderStore,
+	customers *store.CustomerStore,
 	catalog *store.CatalogStore,
 	qb quickbooks.Client,
 	auditWriter *audit.AuditWriter,
@@ -38,12 +41,13 @@ func NewCreateQBInvoiceWorker(
 	m *metrics.Registry,
 ) *CreateQBInvoiceWorker {
 	return &CreateQBInvoiceWorker{
-		orders:  orders,
-		catalog: catalog,
-		qb:      qb,
-		audit:   auditWriter,
-		pool:    pool,
-		metrics: m,
+		orders:    orders,
+		customers: customers,
+		catalog:   catalog,
+		qb:        qb,
+		audit:     auditWriter,
+		pool:      pool,
+		metrics:   m,
 	}
 }
 
@@ -69,26 +73,38 @@ func (w *CreateQBInvoiceWorker) Work(ctx context.Context, job *river.Job[CreateQ
 }
 
 func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQBInvoiceArgs]) error {
-	// Read order and line items
+	// Read order, line items, and the customer's NET terms
 	var order *domain.Order
 	var items []domain.LineItem
+	var customer *domain.Customer
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
 		order, txErr = w.orders.GetOrderByIDAsStaff(ctx, tx, job.Args.OrderID)
 		if txErr != nil {
 			return txErr
 		}
+		// Idempotency: if the invoice already exists (job retry), skip the
+		// remaining reads — the early return below never uses them.
+		if order.QBInvoiceID != nil {
+			return nil
+		}
 		items, txErr = w.orders.ListLineItems(ctx, tx, order.ID)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+		if order.CustomerID != nil {
+			customer, txErr = w.customers.GetByID(ctx, tx, *order.CustomerID)
+			return txErr
+		}
+		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("get order: %w", err)
 	}
-
-	// Idempotency: if invoice already created (job retry), skip
 	if order.QBInvoiceID != nil {
 		return nil
 	}
+	termsDays := app.EffectivePaymentTermsDays(customer)
 
 	// Build QB invoice lines
 	lines := make([]quickbooks.InvoiceLine, 0, len(items))
@@ -119,11 +135,12 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		})
 	}
 
-	// Create QB invoice (external call outside transaction)
+	// Create QB invoice (external call outside transaction). Due date follows
+	// the customer's NET terms; net-7 when none are set.
 	invoice, err := w.qb.CreateInvoice(ctx, quickbooks.InvoiceParams{
 		CustomerID: job.Args.QBCustomerID,
 		DocNumber:  formatOrderRef(order.Number),
-		DueDate:    order.PlacedAt.Add(qbNetTermsDays * 24 * time.Hour),
+		DueDate:    order.PlacedAt.Add(time.Duration(termsDays) * 24 * time.Hour),
 		Lines:      lines,
 		Shipping:   order.ShippingTotal,
 	})
@@ -143,9 +160,10 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 			ResourceType: "order",
 			ResourceID:   order.ID,
 			Metadata: map[string]any{
-				"qb_invoice_id": invoice.ID,
-				"qb_doc_number": invoice.DocNumber,
-				"river_job_id":  job.ID,
+				"qb_invoice_id":  invoice.ID,
+				"qb_doc_number":  invoice.DocNumber,
+				"net_terms_days": termsDays,
+				"river_job_id":   job.ID,
 			},
 		})
 	})

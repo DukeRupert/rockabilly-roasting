@@ -53,15 +53,17 @@ refunded) and already-settled payment statuses.
 
 ## Past-due reminders
 
-While an invoice is overdue, reminders are sent at milestones measured in **days
-since the order was placed**: 7, 14, 21, 30 (net-7 terms put the due date at day
-7). `orders.overdue_reminder_stage` records the highest milestone already sent,
+While an invoice is overdue, up to four reminders are sent, keyed to **QB's
+authoritative due date** so the cadence holds for any NET terms: stage 1 fires
+the first time the invoice is seen overdue, stages 2–4 weekly after that, then
+silence. `orders.overdue_reminder_stage` records how many have been sent (1–4),
 so each fires exactly once even though the poll re-checks daily; the
 `email:invoice_past_due` job is additionally `UniqueOpts{ByArgs}` as a second
-guard. Reminders fire as each milestone is *passed* (the invoice is "due", not
-"past due", at exactly day 7).
+guard. The reminder email displays the due date the invoice was actually issued
+under — QB's, carried through the job args — never one recomputed from the
+customer's current terms (which may have changed since the invoice was cut).
 
-> Milestone **copy** is still placeholder — see
+> Per-stage **copy** is still placeholder — see
 > [qb-overdue-reminders-TODO.md](qb-overdue-reminders-TODO.md).
 
 ## Money representation

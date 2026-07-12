@@ -271,6 +271,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var shipments []domain.Shipment
 	var latestLabelAttempt *domain.LabelAttempt
 	var enrichedItems []admin.EnrichedLineItem
+	var accountPastDue bool
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -293,6 +294,16 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		latestLabelAttempt, txErr = d.FulfillmentService.GetLatestLabelAttempt(ctx, tx, id)
 		if txErr != nil {
 			return txErr
+		}
+
+		// Flag a not-current account (invoices past terms) so the page can warn
+		// staff before they fulfill more of this customer's orders.
+		if order.CustomerID != nil {
+			pastDue, pdErr := d.OrderService.PastDueCustomerFlags(ctx, tx, []uuid.UUID{*order.CustomerID})
+			if pdErr != nil {
+				return pdErr
+			}
+			accountPastDue = pastDue[*order.CustomerID]
 		}
 
 		// Resolve customer.
@@ -437,6 +448,7 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		StaffName:          name,
 		StaffRole:          role,
 		CanEditLineItems:   canEditOrderLineItemsView(order),
+		AccountPastDue:     accountPastDue,
 		PollCount:          pollCount,
 	}
 

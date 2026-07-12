@@ -23,6 +23,9 @@ type OrderRow struct {
 	CustomerEmail string
 	AccountType   domain.AccountType
 	LabelFailed   bool
+	// AccountPastDue flags an order whose customer has invoices past terms —
+	// staff hold new fulfillment for that account until the balance clears.
+	AccountPastDue bool
 }
 
 // showOrderStatusOverFulfillment decides which badge to show in the single

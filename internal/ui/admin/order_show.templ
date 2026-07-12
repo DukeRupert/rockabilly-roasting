@@ -44,6 +44,9 @@ type OrderShowProps struct {
 	StaffName           string
 	StaffRole           string
 	CanEditLineItems    bool
+	// AccountPastDue flags a customer with invoices past terms — staff hold
+	// new fulfillment for the account until the balance clears.
+	AccountPastDue bool
 	// PollCount is the auto-refresh tick number for the label poller — 0 on a
 	// normal load, incremented by each self-refresh while a BuyLabel attempt is
 	// queued. Caps the loop at maxLabelPolls. See shouldPollLabel.
@@ -410,6 +413,18 @@ templ OrderShowContent(props OrderShowProps) {
 	<div data-active-path={ orderShowActivePath(props.Order) } class="hidden"></div>
 	if props.Flash != "" {
 		@flashToast(props.Flash)
+	}
+	if props.AccountPastDue && props.Order.Status != domain.OrderStatusCancelled && props.Order.Status != domain.OrderStatusRefunded {
+		<!-- Not-current account: warn before staff fulfill more of this customer's orders. -->
+		<div class="mb-5 flex items-start justify-between gap-4 border border-rr-border bg-rr-surface px-4 py-3">
+			<div class="min-w-0">
+				<p class="text-sm font-semibold text-rr-red">Account past due</p>
+				<p class="mt-0.5 text-sm text-rr-body">This customer has invoices past terms. Hold new fulfillment until the account is current — check their order history before shipping.</p>
+			</div>
+			if props.Customer != nil {
+				<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID)) } class="shrink-0 text-sm font-semibold text-rr-red hover:text-rr-red-lt">View account &rarr;</a>
+			}
+		</div>
 	}
 	<!-- Header -->
 	<div class="sm:flex sm:items-center sm:justify-between">

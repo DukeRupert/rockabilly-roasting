@@ -48,11 +48,13 @@ type DashboardProps struct {
 	PendingWholesale int
 
 	// Urgent action queues
-	OnHold             []domain.Order
-	OnHoldCount        int
-	FailedPayments     []domain.Order
-	FailedPaymentCount int
-	PastDueSubs        []PastDueRow
+	OnHold              []domain.Order
+	OnHoldCount         int
+	FailedPayments      []domain.Order
+	FailedPaymentCount  int
+	PastDueSubs         []PastDueRow
+	PastDueAccounts     []PastDueAccountRow
+	PastDueAccountCount int
 
 	// Order pipeline, split by sales channel. Each queue merges the Pack
 	// (unfulfilled) and Ship (fulfilled) stages into one list; the Count is the
@@ -85,6 +87,17 @@ type PastDueRow struct {
 	Quantity     int
 }
 
+// PastDueAccountRow summarizes a wholesale account that is not current — one
+// or more invoices past terms. Staff hold new fulfillment for these accounts
+// until the balance clears.
+type PastDueAccountRow struct {
+	CustomerID     string // uuid string for the customer-page href
+	CustomerName   string // company name, customer "First Last", or email
+	OverdueOrders  int
+	OverdueTotal   int // cents, sum of the overdue orders' invoiced totals (not net of partial payments)
+	OldestPlacedAt time.Time
+}
+
 // PipelineRow bundles an order with the summary fields the channel queues need
 // to read at a glance: what the customer ordered, how much, who from, and which
 // fulfillment stage it sits at.
@@ -98,7 +111,7 @@ type PipelineRow struct {
 }
 
 func (p DashboardProps) urgentCount() int {
-	return p.PastDueSubCount + p.OnHoldCount + p.FailedPaymentCount
+	return p.PastDueAccountCount + p.PastDueSubCount + p.OnHoldCount + p.FailedPaymentCount
 }
 
 func (p DashboardProps) reviewCount() int {
@@ -164,6 +177,16 @@ templ DashboardContent(props DashboardProps) {
 			<div id="band-urgent" class="mt-8 scroll-mt-6">
 				@bandHeader("Urgent", props.urgentCount(), "text-rr-red")
 				<div class="mt-3 space-y-3">
+					if props.PastDueAccountCount > 0 {
+						@urgentGroupLink(
+							fmt.Sprintf("%d past-due wholesale account%s", props.PastDueAccountCount, pluralS(props.PastDueAccountCount)),
+							"Invoices past terms — hold new fulfillment for these accounts until they're current.",
+							"/admin/wholesale/fulfillment",
+						)
+						for _, row := range props.PastDueAccounts {
+							@pastDueAccountRow(row, props.MerchantTZ)
+						}
+					}
 					if props.PastDueSubCount > 0 {
 						@urgentGroupLink(
 							fmt.Sprintf("%d past-due subscription%s", props.PastDueSubCount, pluralS(props.PastDueSubCount)),
@@ -605,6 +628,27 @@ templ pastDueSubRow(row PastDueRow, loc *time.Location) {
 			</form>
 		</div>
 	</div>
+}
+
+// pastDueAccountRow renders one not-current wholesale account in the Urgent
+// band: who owes, how many invoices and how much, and how old the oldest debt
+// is. Links to the customer page where staff see every order and its status.
+templ pastDueAccountRow(row PastDueAccountRow, loc *time.Location) {
+	<a
+		href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", row.CustomerID)) }
+		class="flex items-center justify-between gap-4 border border-rr-border bg-rr-surface px-4 py-2.5 hover:bg-rr-raised transition-colors"
+	>
+		<div class="min-w-0">
+			<p class="truncate text-sm font-semibold text-rr-heading">{ row.CustomerName }</p>
+			<p class="mt-0.5 text-xs text-rr-muted">
+				{ fmt.Sprintf("%d overdue invoice%s · %s invoiced", row.OverdueOrders, pluralS(row.OverdueOrders), formatCents(row.OverdueTotal)) }
+			</p>
+		</div>
+		<div class="flex items-center gap-3 shrink-0">
+			<span class="label-font text-rr-red" style="font-size:0.6rem;">{ "oldest " + ageLabel(row.OldestPlacedAt, loc) }</span>
+			@chevronRight()
+		</div>
+	</a>
 }
 
 // pastDueItemLabel renders the subscription's product and quantity, falling back

@@ -91,6 +91,35 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 		props.FailedPaymentCount = len(props.FailedPayments)
 
+		// Past-due wholesale accounts — invoices past terms. Fulfillment for
+		// these accounts holds until the balance clears, so they lead the
+		// Urgent band. Display-capped like the other queues; the fulfillment
+		// list flags every affected order regardless.
+		pastDueAccounts, txErr := d.OrderService.ListPastDueAccounts(ctx, tx, pipelineDisplayLimit)
+		if txErr != nil {
+			return txErr
+		}
+		for _, a := range pastDueAccounts {
+			name := a.Email
+			if a.FirstName != "" || a.LastName != "" {
+				name = strings.TrimSpace(a.FirstName + " " + a.LastName)
+			}
+			if a.CompanyName != nil && *a.CompanyName != "" {
+				name = *a.CompanyName
+			}
+			props.PastDueAccounts = append(props.PastDueAccounts, admin.PastDueAccountRow{
+				CustomerID:     a.CustomerID.String(),
+				CustomerName:   name,
+				OverdueOrders:  a.OverdueOrders,
+				OverdueTotal:   a.OverdueTotal,
+				OldestPlacedAt: a.OldestPlacedAt,
+			})
+		}
+		props.PastDueAccountCount, txErr = d.OrderService.CountPastDueAccounts(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+
 		// Active subscriptions
 		props.ActiveSubCount, txErr = d.SubscriptionService.CountSubscriptionsByStatus(ctx, tx, domain.SubscriptionStatusActive)
 		if txErr != nil {

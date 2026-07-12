@@ -183,6 +183,29 @@ func (d *Deps) renderFulfillmentList(w http.ResponseWriter, r *http.Request, cha
 				rows[i].LabelFailed = true
 			}
 		}
+
+		// Flag orders whose account is not current (invoices past terms) so
+		// staff hold them instead of fulfilling. Only invoiced wholesale
+		// accounts can be past due, so retail queues skip the lookup.
+		if channel == domain.OrderChannelWholesale {
+			customerIDs := make([]uuid.UUID, 0, len(rows))
+			seen := make(map[uuid.UUID]bool, len(rows))
+			for i := range rows {
+				if cid := rows[i].Order.CustomerID; cid != nil && !seen[*cid] {
+					seen[*cid] = true
+					customerIDs = append(customerIDs, *cid)
+				}
+			}
+			pastDue, pdErr := d.OrderService.PastDueCustomerFlags(ctx, tx, customerIDs)
+			if pdErr != nil {
+				return pdErr
+			}
+			for i := range rows {
+				if cid := rows[i].Order.CustomerID; cid != nil && pastDue[*cid] {
+					rows[i].AccountPastDue = true
+				}
+			}
+		}
 		return nil
 	})
 	if err != nil {

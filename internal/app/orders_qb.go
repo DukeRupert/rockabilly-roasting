@@ -71,6 +71,37 @@ func (s *OrderService) ListWholesaleOpenInvoiceOrders(ctx context.Context, pool 
 	return orders, nil
 }
 
+// ListPastDueAccounts returns the customers whose accounts are not current —
+// at least one overdue invoice — oldest debt first, for the admin dashboard.
+func (s *OrderService) ListPastDueAccounts(ctx context.Context, tx pgx.Tx, limit int) ([]store.PastDueAccountRow, error) {
+	accounts, err := s.orders.ListPastDueAccounts(ctx, tx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list past due accounts: %w", err)
+	}
+	return accounts, nil
+}
+
+// CountPastDueAccounts returns the true number of not-current accounts, not
+// bounded by the dashboard's display limit.
+func (s *OrderService) CountPastDueAccounts(ctx context.Context, tx pgx.Tx) (int, error) {
+	count, err := s.orders.CountPastDueAccounts(ctx, tx)
+	if err != nil {
+		return 0, fmt.Errorf("count past due accounts: %w", err)
+	}
+	return count, nil
+}
+
+// PastDueCustomerFlags filters the given customers down to those with at least
+// one overdue invoice, so list views can flag orders whose account is not
+// current before staff fulfill them.
+func (s *OrderService) PastDueCustomerFlags(ctx context.Context, tx pgx.Tx, customerIDs []uuid.UUID) (map[uuid.UUID]bool, error) {
+	flags, err := s.orders.ListPastDueCustomerIDs(ctx, tx, customerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("past due customer flags: %w", err)
+	}
+	return flags, nil
+}
+
 // ReconcileQBInvoiceByID fetches the QB-owned order for the given invoice ID
 // (FOR UPDATE) and reconciles its payment status against facts QuickBooks
 // reported, in one transaction. It returns the transition applied. The caller

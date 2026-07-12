@@ -990,6 +990,105 @@ func (s *OrderStore) ListWholesaleOpenInvoiceOrders(ctx context.Context, tx pgx.
 	return orders, nil
 }
 
+// PastDueAccountRow aggregates a customer's overdue wholesale invoices for the
+// admin dashboard's past-due accounts panel.
+type PastDueAccountRow struct {
+	CustomerID     uuid.UUID
+	CompanyName    *string
+	FirstName      string
+	LastName       string
+	Email          string
+	OverdueOrders  int
+	OverdueTotal   int // sum of the overdue orders' invoiced totals, in cents — not net of partial payments (QB holds authoritative balances)
+	OldestPlacedAt time.Time
+}
+
+// CountPastDueAccounts returns the total number of customers with at least one
+// overdue order, so the dashboard count stays truthful when the display list
+// is capped.
+func (s *OrderStore) CountPastDueAccounts(ctx context.Context, tx pgx.Tx) (_ int, err error) {
+	defer trackQuery(s.metrics, "orders.count_past_due_accounts", time.Now(), &err)
+	var count int
+	err = tx.QueryRow(ctx,
+		`SELECT COUNT(DISTINCT customer_id)
+		 FROM orders
+		 WHERE payment_status = 'overdue'
+		   AND status NOT IN ('cancelled', 'refunded')
+		   AND customer_id IS NOT NULL`).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count past due accounts: %w", err)
+	}
+	return count, nil
+}
+
+// ListPastDueAccounts returns customers with at least one overdue order —
+// "account not current" — oldest debt first, with per-account overdue count
+// and total. Cancelled/refunded orders never count. Bounded by limit.
+func (s *OrderStore) ListPastDueAccounts(ctx context.Context, tx pgx.Tx, limit int) (_ []PastDueAccountRow, err error) {
+	defer trackQuery(s.metrics, "orders.list_past_due_accounts", time.Now(), &err)
+	rows, err := tx.Query(ctx,
+		`SELECT c.id, c.company_name, c.first_name, c.last_name, c.email,
+		        COUNT(o.id)::int, COALESCE(SUM(o.total), 0)::int, MIN(o.placed_at)
+		 FROM orders o
+		 JOIN customers c ON c.id = o.customer_id
+		 WHERE o.payment_status = 'overdue'
+		   AND o.status NOT IN ('cancelled', 'refunded')
+		 GROUP BY c.id, c.company_name, c.first_name, c.last_name, c.email
+		 ORDER BY MIN(o.placed_at)
+		 LIMIT $1`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list past due accounts: %w", err)
+	}
+	defer rows.Close()
+
+	var accounts []PastDueAccountRow
+	for rows.Next() {
+		var a PastDueAccountRow
+		if scanErr := rows.Scan(&a.CustomerID, &a.CompanyName, &a.FirstName, &a.LastName, &a.Email,
+			&a.OverdueOrders, &a.OverdueTotal, &a.OldestPlacedAt); scanErr != nil {
+			return nil, fmt.Errorf("scan past due account: %w", scanErr)
+		}
+		accounts = append(accounts, a)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate past due accounts: %w", err)
+	}
+	return accounts, nil
+}
+
+// ListPastDueCustomerIDs filters the given customers down to those with at
+// least one overdue order — the batch flag the fulfillment queue uses to mark
+// rows whose account is not current.
+func (s *OrderStore) ListPastDueCustomerIDs(ctx context.Context, tx pgx.Tx, customerIDs []uuid.UUID) (_ map[uuid.UUID]bool, err error) {
+	defer trackQuery(s.metrics, "orders.list_past_due_customer_ids", time.Now(), &err)
+	pastDue := make(map[uuid.UUID]bool)
+	if len(customerIDs) == 0 {
+		return pastDue, nil
+	}
+	rows, err := tx.Query(ctx,
+		`SELECT DISTINCT customer_id
+		 FROM orders
+		 WHERE customer_id = ANY($1)
+		   AND payment_status = 'overdue'
+		   AND status NOT IN ('cancelled', 'refunded')`, customerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list past due customer ids: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id uuid.UUID
+		if scanErr := rows.Scan(&id); scanErr != nil {
+			return nil, fmt.Errorf("scan past due customer id: %w", scanErr)
+		}
+		pastDue[id] = true
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate past due customer ids: %w", err)
+	}
+	return pastDue, nil
+}
+
 // SetOverdueReminderStage records the highest past-due reminder milestone (days
 // since placed) already notified for an order, so the poll never re-sends one.
 func (s *OrderStore) SetOverdueReminderStage(ctx context.Context, tx pgx.Tx, id uuid.UUID, stage int) (err error) {

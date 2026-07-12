@@ -550,6 +550,9 @@ templ fulfillmentRow(row OrderRow, props FulfillmentListProps) {
 				if row.LabelFailed {
 					<span class="badge badge-red" title="Most recent label purchase failed — open the order to retry.">Label failed</span>
 				}
+				if row.AccountPastDue {
+					<span class="badge badge-pastdue" title="This account has invoices past terms — hold fulfillment until it's current.">Account past due</span>
+				}
 			</div>
 		</td>
 		<td class={ "hidden whitespace-nowrap px-3 py-4 text-sm tabular-nums md:table-cell", templ.KV("text-rr-red font-semibold", stale), templ.KV("text-rr-muted", !stale) }>
@@ -578,7 +581,12 @@ templ fulfillmentFlatRow(row OrderRow, props FulfillmentListProps) {
 			</a>
 		</td>
 		<td class="whitespace-nowrap px-3 py-4 text-sm">
-			@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+			<div class="flex flex-wrap items-center gap-1.5">
+				@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+				if row.AccountPastDue {
+					<span class="badge badge-pastdue" title="This account has invoices past terms — hold fulfillment until it's current.">Account past due</span>
+				}
+			</div>
 		</td>
 		<td class="hidden whitespace-nowrap px-3 py-4 text-sm lg:table-cell">
 			if row.Order.ShippingMethod != nil {

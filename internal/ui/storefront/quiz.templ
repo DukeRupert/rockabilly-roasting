@@ -1,0 +1,242 @@
+package storefront
+
+import (
+	"fmt"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// QuizProps carries the live subscribable catalog so each archetype's result
+// card recommends a real coffee. Scoring runs client-side in Alpine; all
+// four result cards are pre-rendered and the winner is revealed by x-show.
+type QuizProps struct {
+	Cards        []SubscriptionProductCard
+	CartCount    int
+	CanonicalURL string
+}
+
+templ QuizContent(props QuizProps) {
+	<!-- Hero: ink surface, same treatment as the Daily Grind landing -->
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 -mt-8 relative bg-ink overflow-hidden">
+		<div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse at center, rgba(242,160,61,0.16) 0%, rgba(242,160,61,0.04) 45%, transparent 75%);"></div>
+		<div class="absolute inset-0 texture-halftone-paper pointer-events-none" style="mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent); -webkit-mask-image: linear-gradient(180deg, transparent, black 25%, black 75%, transparent);"></div>
+		<div class="relative mx-auto max-w-5xl px-6 sm:px-10 lg:px-14 py-16 sm:py-24 text-center">
+			<p class="font-oswald font-semibold text-candle text-xs sm:text-sm" style="letter-spacing:0.3em; text-transform:uppercase;">
+				Six questions · No wrong answers
+			</p>
+			<h1 class="font-slab text-paper uppercase leading-[0.9] mt-5" style="font-size: clamp(2.75rem, 8vw, 5.5rem); letter-spacing:-0.005em;">
+				What's your
+				<span class="font-script text-candle normal-case inline-block align-baseline" style="font-size:1.05em; letter-spacing:0;">roast?</span>
+			</h1>
+			<p class="font-oswald text-paper-warm text-base sm:text-lg leading-relaxed mt-6 max-w-xl mx-auto">
+				Every cup has a personality — so do you. Answer six quick ones and we'll tell you which coffee's got your name on it, plus the subscription to keep it coming.
+			</p>
+			<div class="mt-10 flex flex-col items-center gap-3">
+				<a
+					href="#quiz"
+					hx-boost="false"
+					class="btn-stamp-paper inline-flex items-center gap-2 bg-rust text-paper border-2 border-paper px-8 py-4 font-oswald font-bold text-sm"
+					style="letter-spacing:0.14em; text-transform:uppercase;"
+				>
+					Get sorted
+					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3"/>
+					</svg>
+				</a>
+				<p class="font-oswald text-chrome-deep text-xs" style="letter-spacing:0.18em; text-transform:uppercase;">
+					Just for kicks · Nothing saved, nothing sent
+				</p>
+			</div>
+		</div>
+		<div class="flame-stripe"></div>
+	</section>
+	<!-- Quiz: paper surface -->
+	<section id="quiz" class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper scroll-mt-16">
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div
+			class="relative mx-auto max-w-2xl px-6 sm:px-10 py-16 sm:py-20"
+			x-data="coffeeQuiz()"
+			data-total={ fmt.Sprint(len(quizQuestions())) }
+		>
+			<!-- Progress -->
+			<div x-show="!done">
+				<div class="flex items-baseline justify-between mb-3">
+					<p class="font-special text-ink text-sm" aria-live="polite">
+						Question <span x-text="step + 1"></span> of <span x-text="total"></span>
+					</p>
+					<button
+						type="button"
+						x-show="step > 0"
+						x-cloak
+						@click="back()"
+						class="font-oswald font-bold text-xs text-rust hover:text-ink transition-colors"
+						style="letter-spacing:0.16em; text-transform:uppercase;"
+					>
+						&larr; Back one
+					</button>
+				</div>
+				<div class="border-2 border-ink bg-cream-hi h-3 mb-8" role="presentation">
+					<div class="h-full bg-candle border-ink" :style="'width: ' + Math.round(step / total * 100) + '%'" :class="step === 0 ? 'border-r-0' : 'border-r-2'"></div>
+				</div>
+			</div>
+			<!-- Questions -->
+			for i, q := range quizQuestions() {
+				<div x-show={ fmt.Sprintf("!done && step === %d", i) } x-cloak?={ i > 0 } role="group" aria-labelledby={ fmt.Sprintf("quiz-q%d", i) }>
+					<h2
+						id={ fmt.Sprintf("quiz-q%d", i) }
+						tabindex="-1"
+						class="font-slab text-ink uppercase leading-[0.95] text-2xl sm:text-3xl mb-8 focus:outline-none scroll-mt-24"
+						style="letter-spacing:-0.005em;"
+					>
+						{ q.Prompt }
+					</h2>
+					<div class="flex flex-col gap-4">
+						for _, a := range q.Answers {
+							<button
+								type="button"
+								@click={ fmt.Sprintf("pick('%s')", a.Key) }
+								class="btn-stamp block w-full text-left bg-cream-hi border-2 border-ink px-5 py-4 font-oswald text-ink text-base sm:text-lg"
+								style="letter-spacing:0.02em;"
+							>
+								{ a.Label }
+							</button>
+						}
+					</div>
+				</div>
+			}
+			<!-- Results: one pre-rendered card per archetype -->
+			{{ recs := quizRecommendations(props.Cards) }}
+			for _, arch := range quizArchetypes() {
+				<div x-show={ fmt.Sprintf("done && result === '%s'", arch.Key) } x-cloak aria-labelledby={ "quiz-result-" + arch.Key }>
+					<div class="text-center">
+						<span
+							class="inline-block font-special text-paper bg-ink px-4 py-1.5 text-sm shadow-stamp"
+							style="transform: rotate(-2deg); letter-spacing:0.2em; text-transform:uppercase;"
+						>
+							&#9733; The verdict &#9733;
+						</span>
+						<h2
+							id={ "quiz-result-" + arch.Key }
+							tabindex="-1"
+							class="font-slab text-ink uppercase leading-[0.9] mt-6 focus:outline-none scroll-mt-24"
+							style="font-size: clamp(2.25rem, 7vw, 4rem); letter-spacing:-0.005em;"
+						>
+							{ arch.Name }
+							<span class="font-script text-rust normal-case block" style="font-size:0.55em; letter-spacing:0;">{ arch.Accent }</span>
+						</h2>
+						<p class="font-oswald text-ink-soft text-base sm:text-lg leading-relaxed mt-6 max-w-lg mx-auto">
+							{ arch.Blurb }
+						</p>
+						<ul class="mt-6 flex flex-wrap justify-center gap-2">
+							for _, chip := range arch.Profile {
+								<li class="font-oswald font-bold text-[10px] sm:text-xs text-ink bg-cream-hi border-2 border-ink px-3 py-1 rounded-full" style="letter-spacing:0.14em; text-transform:uppercase;">
+									{ chip }
+								</li>
+							}
+						</ul>
+					</div>
+					if recs[arch.Key] != nil {
+						<div class="mt-12">
+							<p class="font-oswald text-chrome-deep text-xs font-semibold text-center mb-5" style="letter-spacing:0.24em; text-transform:uppercase;">
+								Your match from the shelf
+							</p>
+							<div class="max-w-sm mx-auto">
+								@subscriptionProductCardPaper(*recs[arch.Key])
+							</div>
+						</div>
+					} else {
+						<div class="mt-12 text-center">
+							<a href="/subscriptions" class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-8 py-4 font-oswald font-bold text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">
+								Find your coffee
+								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/>
+								</svg>
+							</a>
+						</div>
+					}
+					<div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+						<button
+							type="button"
+							@click="reset()"
+							class="btn-stamp inline-flex items-center gap-2 bg-cream-hi text-ink border-2 border-ink px-6 py-3 font-oswald font-bold text-xs"
+							style="letter-spacing:0.14em; text-transform:uppercase;"
+						>
+							Take it again
+						</button>
+						<a
+							href="/subscriptions"
+							class="font-oswald font-bold text-xs text-rust hover:text-ink transition-colors"
+							style="letter-spacing:0.16em; text-transform:uppercase;"
+						>
+							See every subscription &rarr;
+						</a>
+					</div>
+				</div>
+			}
+		</div>
+	</section>
+	<script>
+		// Quiz state machine. Archetype keys and the tie-break order mirror
+		// quizArchetypeOrder in quiz_data.go — keep them in sync.
+		function coffeeQuiz() {
+			return {
+				step: 0,
+				total: 1,
+				history: [],
+				done: false,
+				result: '',
+				init() {
+					this.total = parseInt(this.$root.dataset.total, 10) || 1;
+				},
+				pick(key) {
+					this.history.push(key);
+					if (this.history.length >= this.total) {
+						this.finish();
+					} else {
+						this.step++;
+						this.focusHeading('quiz-q' + this.step);
+					}
+				},
+				back() {
+					if (this.step === 0) return;
+					this.history.pop();
+					this.step--;
+					this.focusHeading('quiz-q' + this.step);
+				},
+				finish() {
+					const scores = {};
+					this.history.forEach(k => { scores[k] = (scores[k] || 0) + 1; });
+					const order = ['greaser', 'cruiser', 'firecracker', 'nightowl'];
+					let best = order[0];
+					order.forEach(k => { if ((scores[k] || 0) > (scores[best] || 0)) best = k; });
+					this.result = best;
+					this.done = true;
+					this.focusHeading('quiz-result-' + best);
+				},
+				reset() {
+					this.step = 0;
+					this.history = [];
+					this.done = false;
+					this.result = '';
+					this.focusHeading('quiz-q0');
+				},
+				focusHeading(id) {
+					this.$nextTick(() => {
+						const el = document.getElementById(id);
+						if (el) el.focus({ preventScroll: false });
+					});
+				}
+			};
+		}
+	</script>
+}
+
+templ QuizPage(props QuizProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:        "What's Your Roast?",
+		Description:  "Six questions, no wrong answers — find your coffee personality and the Rockabilly Roasting subscription to match",
+		CartCount:    props.CartCount,
+		CanonicalURL: props.CanonicalURL,
+	}) {
+		@QuizContent(props)
+	}
+}

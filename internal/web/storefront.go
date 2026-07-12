@@ -383,10 +383,11 @@ func (d *Deps) handleStorefrontCatalog(w http.ResponseWriter, r *http.Request) {
 	storefront.CatalogPage(props).Render(ctx, w) //nolint:errcheck
 }
 
-// handleSubscriptionsPage renders the subscriptions landing page.
-func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
+// loadSubscribableCards loads active subscribable retail products as
+// subscription cards (thumbnail, default-variant price, coffee attributes)
+// along with the active plans. Shared by the subscriptions landing page and
+// the coffee quiz.
+func (d *Deps) loadSubscribableCards(ctx context.Context) ([]storefront.SubscriptionProductCard, []domain.SubscriptionPlan, error) {
 	subscribable := true
 	activeStatus := domain.ProductStatusActive
 	filter := store.ProductFilter{
@@ -409,8 +410,7 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 		return txErr
 	})
 	if err != nil {
-		Error(w, r, err)
-		return
+		return nil, nil, err
 	}
 
 	// Compute max discount across plans
@@ -463,6 +463,17 @@ func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return cards, plans, nil
+}
+
+// handleSubscriptionsPage renders the subscriptions landing page.
+func (d *Deps) handleSubscriptionsPage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	cards, plans, err := d.loadSubscribableCards(ctx)
 	if err != nil {
 		Error(w, r, err)
 		return
@@ -915,6 +926,7 @@ func (d *Deps) handleSitemapXML(w http.ResponseWriter, r *http.Request) {
 		{Loc: base + "/", ChangeFreq: "weekly", Priority: "1.0"},
 		{Loc: base + "/catalog", ChangeFreq: "daily", Priority: "0.9"},
 		{Loc: base + "/subscriptions", ChangeFreq: "weekly", Priority: "0.8"},
+		{Loc: base + "/quiz", ChangeFreq: "monthly", Priority: "0.5"},
 		{Loc: base + "/wholesale", ChangeFreq: "monthly", Priority: "0.6"},
 		{Loc: base + "/about", ChangeFreq: "monthly", Priority: "0.5"},
 		{Loc: base + "/help", ChangeFreq: "monthly", Priority: "0.4"},

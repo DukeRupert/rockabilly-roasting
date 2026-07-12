@@ -154,8 +154,9 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /cart/update", deps.handleCartUpdateQuantity)
 	mux.HandleFunc("POST /cart/remove", deps.handleCartRemoveItem)
 
-	// Subscriptions landing page
+	// Subscriptions landing page + the coffee personality quiz that feeds it
 	mux.HandleFunc("GET /subscriptions", deps.handleSubscriptionsPage)
+	mux.HandleFunc("GET /quiz", deps.handleQuizPage)
 
 	// Subscribe routes. payment-intent is rate-limited per IP: it creates
 	// Stripe customers + PaymentIntents without auth, a card-testing target.

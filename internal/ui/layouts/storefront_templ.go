@@ -398,7 +398,7 @@ func Storefront(props StorefrontProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"polite\"></div><!-- Footer --><div class=\"flame-stripe\"></div><footer class=\"relative bg-ink\"><!-- Paper grain overlay (dim, on ink) --><div class=\"absolute inset-0 opacity-[0.04] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(246,239,225,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16\"><div class=\"grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4\"><!-- Logo column --><div><div class=\"flex items-center gap-3 mb-4\"><img src=\"/static/badge-white.png\" alt=\"Rockabilly Roasting Co.\" class=\"h-12 w-auto flex-shrink-0\"><div><p class=\"font-slab text-paper text-[13px] uppercase leading-[1.05] whitespace-nowrap\" style=\"letter-spacing:0.02em;\">ROCKABILLY ROASTING <span class=\"text-candle\">CO.</span></p><p class=\"font-oswald text-chrome-deep text-[10px] mt-1\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Est. 2014 &middot; Kennewick WA</p></div></div><p class=\"font-oswald text-paper-warm text-sm leading-relaxed\">101 W. Kennewick Ave.<br>Kennewick, WA &middot; 509-585-2320</p></div><!-- Shop links --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Shop</p><ul class=\"space-y-2\"><li><a href=\"/catalog\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Coffee</a></li><li><a href=\"/subscriptions\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">The Daily Grind</a></li><li><a href=\"/wholesale\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Wholesale</a></li>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"polite\"></div><!-- Footer --><div class=\"flame-stripe\"></div><footer class=\"relative bg-ink\"><!-- Paper grain overlay (dim, on ink) --><div class=\"absolute inset-0 opacity-[0.04] pointer-events-none\" style=\"background-image: radial-gradient(circle, rgba(246,239,225,0.6) 1px, transparent 1px); background-size: 3px 3px;\"></div><div class=\"relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 sm:py-16\"><div class=\"grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4\"><!-- Logo column --><div><div class=\"flex items-center gap-3 mb-4\"><img src=\"/static/badge-white.png\" alt=\"Rockabilly Roasting Co.\" class=\"h-12 w-auto flex-shrink-0\"><div><p class=\"font-slab text-paper text-[13px] uppercase leading-[1.05] whitespace-nowrap\" style=\"letter-spacing:0.02em;\">ROCKABILLY ROASTING <span class=\"text-candle\">CO.</span></p><p class=\"font-oswald text-chrome-deep text-[10px] mt-1\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Est. 2014 &middot; Kennewick WA</p></div></div><p class=\"font-oswald text-paper-warm text-sm leading-relaxed\">101 W. Kennewick Ave.<br>Kennewick, WA &middot; 509-585-2320</p></div><!-- Shop links --><div><p class=\"font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink-soft\" style=\"letter-spacing:0.24em; text-transform:uppercase;\">Shop</p><ul class=\"space-y-2\"><li><a href=\"/catalog\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Coffee</a></li><li><a href=\"/subscriptions\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">The Daily Grind</a></li><li><a href=\"/quiz\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">The Roast Quiz</a></li><li><a href=\"/wholesale\" class=\"font-oswald text-paper text-sm hover:text-candle transition-colors\">Wholesale</a></li>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -452,7 +452,7 @@ func CartBadge(count int) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 538, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 539, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -504,7 +504,7 @@ func CartBadgeOOB(count int) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 549, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/storefront.templ`, Line: 550, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {

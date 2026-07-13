@@ -699,6 +699,7 @@ func importData(
 			order, err := orderStore.CreateOrder(ctx, tx, store.CreateOrderParams{
 				Number:                orderNumber,
 				CustomerID:            &hiriCustomerID,
+				Channel:               domain.OrderChannelWholesale,
 				Status:                mapOSOrderStatus(osOrd.Status),
 				PaymentStatus:         domain.PaymentStatusCaptured,
 				FulfillmentStatus:     mapOSFulfillmentStatus(osOrd.Status),
@@ -872,6 +873,12 @@ func mapOSOrderStatus(status string) domain.OrderStatus {
 	}
 }
 
+// mapOSFulfillmentStatus picks the Hiri fulfillment status for an imported
+// order. Historical completed orders land terminal (delivered) — anything
+// short of shipped/delivered sits in the admin "needs action" queue, and a
+// migrated back-catalog must not show up as work to do. Only orders that were
+// genuinely still open in OrderSpace at cutover (invoiced/released/
+// part_fulfilled) stay actionable, in the wholesale queue.
 func mapOSFulfillmentStatus(status string) domain.FulfillmentStatus {
 	switch status {
 	case "new", "invoiced", "released", "preorder":
@@ -879,9 +886,9 @@ func mapOSFulfillmentStatus(status string) domain.FulfillmentStatus {
 	case "part_fulfilled":
 		return domain.FulfillmentStatusPartiallyFulfilled
 	case "fulfilled":
-		return domain.FulfillmentStatusFulfilled
+		return domain.FulfillmentStatusDelivered
 	default:
-		return domain.FulfillmentStatusFulfilled
+		return domain.FulfillmentStatusDelivered
 	}
 }
 

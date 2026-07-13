@@ -13,6 +13,7 @@ Working punch list for executing the OS → Hiri wholesale migration across mult
 | 2026-05-03 | W5 + W6 + W8 + W7 | Wholesale cart + checkout now use customer-aware pricing + visibility; staleness check returns 409 + banner; G1 + G3 closed; tests green |
 | 2026-05-03 | W9 + W10 | testutil fixtures (price list, price list price, customer group, product visibility) + 21 tests across `pricing_test.go`, `cart_pricing_test.go`, `wholesale_pricing_test.go` covering D2/D3/D4/D5 invariants; all green |
 | 2026-05-03 | W11 | PriceListStore + PriceListService (CRUD, audited); PricingService.SetPriceListPrice + DeletePriceListPrice; admin pages at /admin/price-lists (list + inline edit) and /admin/price-lists/prices (variant×list matrix); customer-show price-list dropdown; sidebar entry; tests green |
+| 2026-07-07 | **Batch 1 (pilot) migrated to PRODUCTION** | Rehearsed on fresh prod copy, then imported for real: 8 customers, 169 orders, 298 line items, 0 warnings; all on Wholesale 2026 + NET 7, verified; 8/8 welcome emails sent via Postmark |
 
 When you finish a session, append a row. One sentence each.
 

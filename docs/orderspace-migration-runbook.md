@@ -20,6 +20,7 @@ This doc is the **how-to**.
 | Price list | **`Wholesale 2026`** for everyone… |
 | …except | **Tailwind Concessions** stays on Tailwinds pricing — **handled manually post-migration**, not by the importer |
 | Order history | **Successful orders only** (fulfilled/invoiced); cancelled + incomplete are dropped |
+| Order channel + fulfillment | Imported orders land as **`channel = wholesale`** with completed history mapped to **`fulfillment_status = delivered`** (terminal — keeps them out of the admin needs-action queue). Orders still open in OS at cutover (invoiced/released/part_fulfilled) stay unfulfilled/partial and correctly show as work in the *wholesale* fulfillment queue. Fixed after Batch 1 (commit `a11c4d2`) — Batch 1 originally imported as retail/fulfilled and flooded the retail queue with 167 phantom "needs action" orders; prod data was corrected by hand 2026-07-13. |
 | Addresses | **Deduplicated** — OS repeats the same address per order; we collapse to one |
 | Status | Imported customers are set `wholesale_status = approved` (OS `active` → approved, `closed` → suspended, `new` → pending) |
 
@@ -272,6 +273,15 @@ SELECT count(*) FROM orders o
 WHERE o.number LIKE 'OS-%'
   AND NOT EXISTS (SELECT 1 FROM line_items li WHERE li.order_id = o.id);
 
+-- Channel + fulfillment sanity (see §1): every imported order must be wholesale,
+-- and only orders genuinely open in OS at cutover may be non-terminal.
+-- First count should be 0; eyeball the second — non-delivered rows should match
+-- the dry-run's invoiced/released/part_fulfilled counts, and will appear in the
+-- admin *wholesale* needs-action queue as real work.
+SELECT count(*) FROM orders WHERE number LIKE 'OS-%' AND channel <> 'wholesale';
+SELECT fulfillment_status, count(*) FROM orders
+WHERE number LIKE 'OS-%' GROUP BY 1 ORDER BY 2 DESC;
+
 -- Spot-check a line item maps to the right variant and preserves the OS price
 SELECT o.number, v.sku, li.quantity, li.unit_price AS paid_cents,
        li.metadata->>'orderspace_sku' AS os_sku
@@ -366,6 +376,6 @@ Update each row as a batch completes (target dates from §10).
 
 | Target | Batch (count) | Notes | Imported | Welcomed | By |
 |---|---|---|---|---|---|
-| Jun 23 | 1 — Pilot (8) | Wandering Bean, Richland Baptist, Healthy Vibes, Novel Coffee, Coffee Pot Seattle, Yellow Cafe, Steam and cream, Caterpillar Cafe | validated on prod copy only | — | — |
+| Jun 23 → done Jul 7 | 1 — Pilot (8) | Wandering Bean, Richland Baptist, Healthy Vibes, Novel Coffee, Coffee Pot Seattle, Yellow Cafe, Steam and cream, Caterpillar Cafe | ✅ 2026-07-07 (169 orders, 298 lines, 0 warnings) | ✅ 2026-07-07 (8/8 sent) | Logan + Claude |
 | Jun 30 | 2 — Main (~29) | remaining clean accounts w/ history (see §10) | — | — | — |
 | Jul 7 | 3 — Final (~tail) | cleanup-needed + zero-history + Tailwind + Bunker (see §10) | — | — | — |

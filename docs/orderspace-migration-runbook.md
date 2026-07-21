@@ -17,8 +17,8 @@ This doc is the **how-to**.
 | Decision | Value |
 |---|---|
 | Payment terms | **NET 7** for every migrated customer (OS terms are *not* carried over) |
-| Price list | **`Wholesale 2026`** for everyone… |
-| …except | **Tailwind Concessions** stays on Tailwinds pricing — **handled manually post-migration**, not by the importer |
+| Price list | Each customer gets the **Hiri list matching their OS list** — they keep their tier: OS *2025* → `Wholesale 2025`, OS *2026* → `Wholesale 2026` (kept, **not** moved down), legacy OS *2024* / no list → `Wholesale 2025`. The importer maps this automatically (§3). Native Hiri signups are on 2026. |
+| …except | **Tailwind Concessions** (and anyone on the OS **Tailwinds** price list) keeps **Tailwinds** pricing via a dedicated Hiri `Tailwinds` price list. The importer assigns it **automatically** — customers on OS list `pl_v1x78pl0` → Hiri `Tailwinds`. Prerequisite: seed the Hiri Tailwinds list first (§3). |
 | Order history | **Successful orders only** (fulfilled/invoiced); cancelled + incomplete are dropped |
 | Order channel + fulfillment | Imported orders land as **`channel = wholesale`** with completed history mapped to **`fulfillment_status = delivered`** (terminal — keeps them out of the admin needs-action queue). Orders still open in OS at cutover (invoiced/released/part_fulfilled) stay unfulfilled/partial and correctly show as work in the *wholesale* fulfillment queue. Fixed after Batch 1 (commit `a11c4d2`) — Batch 1 originally imported as retail/fulfilled and flooded the retail queue with 167 phantom "needs action" orders; prod data was corrected by hand 2026-07-13. |
 | Addresses | **Deduplicated** — OS repeats the same address per order; we collapse to one |
@@ -36,7 +36,7 @@ All live under `cmd/`. All read `DATABASE_URL` and (except where noted) Orderspa
 | Tool | Purpose | Writes? |
 |---|---|---|
 | `cmd/os-report` | Read-only census of the OS tenant: groups, price lists, terms, products, customers, and a data-hygiene list of customers needing fixes. | No |
-| `cmd/os-migrate` | The importer: creates wholesale customers + successful order history, assigns Wholesale 2026 + NET 7, translates SKUs, dedups addresses. | DB only |
+| `cmd/os-migrate` | The importer: creates wholesale customers + successful order history, assigns the Hiri price list matching each customer's OS list (§3) + NET 7, translates SKUs, dedups addresses. | DB only |
 | `cmd/os-welcome` | Sends the migration welcome email (password-setup link). Dry-runs unless `--send`. | DB (tokens) + email when `--send` |
 
 ### Required environment
@@ -67,25 +67,70 @@ cmd/os-welcome
 
 ---
 
-## 3. Prerequisite: the `Wholesale 2026` price list must exist and be correct
+## 3. Prerequisite: price lists must exist and be correct
 
-`os-migrate` looks the price list up by the exact name **`Wholesale 2026`** and **aborts if it's
-missing**. Before any batch, confirm it exists and that its prices match the intended go-forward
-(OS 2026) prices. Regular coffee at the 2026 tier is `$12.50 / $37.50 / $62.50` (12oz / 3lb / 5lb);
-Cascadia Decaf is `$13.50 / $40.50 / $67.50`.
+The importer assigns each migrated customer the **Hiri list that matches the OS list they were
+on** (`hiriPriceListName` in `cmd/os-migrate/main.go`) — customers keep the tier they had:
+
+| OS list | → Hiri list | Notes |
+|---|---|---|
+| `2025` (`pl_q1m82yl5`) | `Wholesale 2025` | the common case — 47 of 54 OS customers |
+| `2026` (`pl_yjg926l9`) | `Wholesale 2026` | **kept, not moved down** — 4 customers, all Batch 3 |
+| `Tailwinds` (`pl_v1x78pl0`) | `Tailwinds` | 1 customer (Tailwind Concessions), Batch 3 |
+| `2024` (`pl_v1xq3yj0`) / none | `Wholesale 2025` | legacy floor — 1 legacy (MOCHA) + 1 none |
+
+It resolves the needed lists **by exact name** and **fails fast before writing anything** if any is
+missing (e.g. the `Tailwinds` list must be seeded before a Tailwinds customer imports). Native Hiri
+signups (never on OS) are on `Wholesale 2026`.
+
+> The 4 OS-2026 customers (ExpressUp, Hanford High, Panadería, Stacks Mobile Bistro) are all
+> Batch 3, so Batch 1 (pilot) and Batch 2 are 100% OS-2025 → Hiri 2025. **Do not grandfather the
+> OS-2026 four down to 2025** — the importer keeps them on 2026 automatically.
+
+### Verify Wholesale 2025 and Wholesale 2026
+
+Both lists already exist in prod; confirm their prices are right before importing. The 2025 tier is
+`$11.50 / $34.50 / $57.50` (12oz / 3lb / 5lb), **flat across grinds, no decaf premium**. The 2026
+tier is `$12.50 / $37.50 / $62.50` and **does** charge a decaf premium.
 
 ```sql
-SELECT v.sku, max(p.amount) FILTER (WHERE p.price_list_id IS NOT NULL) AS wh2026_cents
-FROM variants v
-JOIN price_sets ps ON ps.variant_id = v.id
-JOIN prices p ON p.price_set_id = ps.id
-WHERE v.sku LIKE 'C9-%'
-GROUP BY v.sku ORDER BY v.sku;
+SELECT pl.name, split_part(v.sku,'-',2) AS size, array_agg(DISTINCT p.amount) AS cents
+FROM prices p
+JOIN price_sets ps ON ps.id = p.price_set_id
+JOIN variants v ON v.id = ps.variant_id
+JOIN price_lists pl ON pl.id = p.price_list_id
+WHERE pl.name IN ('Wholesale 2025','Wholesale 2026')
+GROUP BY 1,2 ORDER BY 1,2;
+-- 2025 expect: 12O={1150}, 1LB={1150}, 3LB={3450}, 5LB={5750} (regular sizes; one value per size).
+-- 2026 regular coffee: 5LB={6250}; decaf carries its premium.
 ```
 
-> History: in June 2026 this list was briefly mis-keyed (decaf prices on every coffee, $67.50
-> across the board). If 5lb regular coffee shows $67.50 instead of $62.50, **stop** — the list is
-> wrong and every migrated customer would be overcharged.
+> History: in June 2026 the 2026 list was briefly mis-keyed (decaf prices on every coffee, $67.50
+> across the board). If 2026 regular 5lb shows $6750 instead of $6250 — **stop** and fix the list.
+>
+> The 8 Batch-1 pilots imported onto Wholesale 2026 on Jul 7 (importer bug — it assigned 2026 to
+> everyone), then were manually moved to Wholesale 2025 on Jul 10 to match their OS-2025 tier. The
+> importer now maps by OS list, so Batch 2 onward land correctly with no manual move.
+
+### Tailwinds (seed before any batch that includes a Tailwinds customer)
+
+Tailwind Concessions is a **Batch-3** account, so this is a Batch-3 prerequisite. Seed the Hiri
+Tailwinds list from the idempotent script (safe to re-run — it only fills gaps):
+
+```bash
+psql "$DATABASE_URL" -f cmd/os-migrate/tailwinds_price_list.sql
+```
+
+Tailwinds is a **markup** list (concessions pay more than base), priced flat by size to match the
+OS Tailwinds list: `12oz $12.50 / 1lb $11.00 / 3lb $33.00 / 5lb $55.00`, no decaf premium. Verify:
+
+```sql
+SELECT split_part(v.sku,'-',2) AS size, array_agg(DISTINCT p.amount) AS cents
+FROM prices p JOIN price_sets ps ON ps.id=p.price_set_id JOIN variants v ON v.id=ps.variant_id
+WHERE p.price_list_id = (SELECT id FROM price_lists WHERE name = 'Tailwinds')
+GROUP BY 1 ORDER BY 1;
+-- Expect: 12O={1250}, 1LB={1100}, 3LB={3300}, 5LB={5500}.
+```
 
 ---
 
@@ -180,14 +225,15 @@ Run top to bottom. **Always rehearse against a prod copy first (§6).**
    Each customer gets a 72h `/wholesale/setup` link. Re-running is safe (mints a fresh token);
    don't send twice in a row without reason.
 
-7. **Spot-check** one account: it logs in via the setup link, sees Wholesale 2026 prices, and its
+7. **Spot-check** one account: it logs in via the setup link, sees its wholesale prices, and its
    order history is present.
 
 8. **Log the batch** in the table at the bottom of this doc and in
    [`orderspace-migration-progress.md`](./orderspace-migration-progress.md).
 
-9. **Tailwind Concessions only:** if in this batch, manually set its pricing in admin afterward
-   (it imports on Wholesale 2026 like everyone else).
+9. **Tailwind Concessions only:** no manual pricing step — the importer assigns the Hiri
+   `Tailwinds` list automatically (provided it was seeded first, §3). Just confirm in the §8 check
+   that it landed on `Tailwinds`, not `Wholesale 2025`.
 
 ---
 
@@ -266,7 +312,9 @@ LEFT JOIN price_lists pl ON pl.id = c.price_list_id
 WHERE c.account_type = 'wholesale'
   AND lower(c.email) IN ('a@x.com','b@y.com')   -- the batch; lower() — emails are stored lowercased
 ORDER BY orders DESC;
--- Expect: every row price_list='Wholesale 2026', net=7, addrs small (no bloat).
+-- Expect: price_list matches each customer's OS tier — 'Wholesale 2025' for Batch 1/2,
+-- 'Wholesale 2026' for the OS-2026 four, 'Tailwinds' for Tailwind Concessions; net=7,
+-- addrs small (no bloat).
 
 -- Any imported order left with zero line items? (should be 0)
 SELECT count(*) FROM orders o
@@ -293,7 +341,7 @@ WHERE o.number = 'OS-####';
 
 **Price parity caveat:** OS prices changed over time, so a customer's *historical* line items carry
 the price they paid *then* (preserved as-is). The migration's promise is the *go-forward* price:
-once on Wholesale 2026, new orders price at the 2026 tier. Don't expect old line items to equal
+once on Wholesale 2025, new orders price at the 2025 tier. Don't expect old line items to equal
 current list prices.
 
 ---
@@ -327,7 +375,7 @@ and data-hygiene list can shift.
 ### Batch 1 — Pilot (8)
 Wandering Bean, Richland Baptist Church, Healthy Vibes, Novel Coffee, The Coffee Pot Seattle,
 Yellow Cafe, Steam and cream, Caterpillar Cafe.
-**Gate to start:** `Wholesale 2026` price list verified correct (§3); rehearsed on a prod copy (§6).
+**Gate to start:** default price list verified correct (§3); rehearsed on a prod copy (§6).
 
 ### Batch 2 — Main bulk (~29)
 The rest of the clean, history-bearing accounts. Includes the whales held out of the pilot —
@@ -347,8 +395,8 @@ Each sub-group needs a precondition met first:
   Hanford High School, Panadería y Antojitos, Just Juice, Kool Beanz Koffee, Byte Brew, and MOCHA
   EXPRESS (move off the legacy 2024 list). See the census "Cleanup needed" list for the live set.
 - **Zero order history (clean, low risk):** Stacks Mobile Bistro, The B Spot — accounts only.
-- **Tailwind Concessions:** import on Wholesale 2026, then **manually switch to Tailwinds pricing**
-  in admin (§1, §5 step 9).
+- **Tailwind Concessions:** seed the Hiri `Tailwinds` list first (`cmd/os-migrate/tailwinds_price_list.sql`,
+  §3), then import normally — the importer assigns Tailwinds automatically. No manual pricing step.
 - **Bunker (Bunker Uniforms + white-label):** only if white-label onboarding is ready; otherwise
   **explicitly defer beyond this plan**.
 - **Exclude:** BASELING Sports Cards (census suggests deleting in OS) and internal/test accounts

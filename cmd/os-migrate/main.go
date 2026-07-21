@@ -405,15 +405,31 @@ func run() error {
 		logger.Info("=== DRY RUN MODE ===")
 		dryRunValidation(customers, orders, report, logger)
 	} else {
-		// Every migrated customer is assigned the Wholesale 2026 price list and
-		// NET 7 terms. Resolve the price list ID up front; bail if it is missing.
-		var priceListID uuid.UUID
-		err := pool.QueryRow(ctx,
-			`SELECT id FROM price_lists WHERE name = 'Wholesale 2026'`).Scan(&priceListID)
-		if err != nil {
-			return fmt.Errorf("look up 'Wholesale 2026' price list (must exist before import): %w", err)
+		// Each migrated customer gets the Hiri price list matching the OS list they
+		// were on (see hiriPriceListName): OS 2025 → Wholesale 2025, OS 2026 →
+		// Wholesale 2026 (kept — NOT grandfathered down to 2025), OS Tailwinds →
+		// Tailwinds, legacy OS 2024 / no list → the Wholesale 2025 floor. NET 7 for
+		// everyone. Resolve only the Hiri lists this batch actually needs, by exact
+		// name, and fail fast before writing anything if any is missing (e.g. the
+		// Tailwinds list must be seeded before a Tailwinds customer can import).
+		needed := map[string]bool{}
+		for _, c := range customers {
+			needed[hiriPriceListName(c)] = true
 		}
-		importData(ctx, pool, customers, orders, *customersOnly, priceListID, report, logger)
+		priceListIDs := map[string]uuid.UUID{}
+		for name := range needed {
+			var id uuid.UUID
+			if err := pool.QueryRow(ctx,
+				`SELECT id FROM price_lists WHERE name = $1`, name).Scan(&id); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return fmt.Errorf("price list %q (required by this batch) does not exist in Hiri — create it before importing", name)
+				}
+				return fmt.Errorf("look up %q price list: %w", name, err)
+			}
+			priceListIDs[name] = id
+		}
+
+		importData(ctx, pool, customers, orders, *customersOnly, priceListIDs, report, logger)
 	}
 
 	printReport(report, logger)
@@ -482,13 +498,36 @@ func dryRunValidation(customers []osCustomer, orders []osOrder, report *migratio
 	}
 }
 
+// osToHiriPriceList maps an OrderSpace price list ID to the name of the Hiri
+// price list a migrated customer on it should receive. OS 2025/2026/Tailwinds
+// map to their Hiri equivalents (customers keep the tier they were on — OS 2026
+// customers are NOT grandfathered down to 2025); the legacy OS 2024 list and
+// customers with no OS list fall back to the Wholesale 2025 floor. OS IDs are
+// stable; update this map if OS ever recreates a list.
+var osToHiriPriceList = map[string]string{
+	"pl_q1m82yl5": "Wholesale 2025", // OS "2025"
+	"pl_yjg926l9": "Wholesale 2026", // OS "2026" — kept, not grandfathered down
+	"pl_v1x78pl0": "Tailwinds",      // OS "Tailwinds" (concessions markup)
+	"pl_v1xq3yj0": "Wholesale 2025", // OS "2024 Wholesale Price" (legacy) → 2025 floor
+}
+
+const defaultHiriPriceList = "Wholesale 2025"
+
+// hiriPriceListName returns the Hiri price list name for an OS customer.
+func hiriPriceListName(osCust osCustomer) string {
+	if name, ok := osToHiriPriceList[osCust.PriceListID]; ok {
+		return name
+	}
+	return defaultHiriPriceList
+}
+
 func importData(
 	ctx context.Context,
 	pool *pgxpool.Pool,
 	customers []osCustomer,
 	orders []osOrder,
 	customersOnly bool,
-	priceListID uuid.UUID,
+	priceListIDs map[string]uuid.UUID,
 	report *migrationReport,
 	logger *slog.Logger,
 ) {
@@ -505,6 +544,10 @@ func importData(
 			report.addError("customer %s (%s): no email, skipping", osCust.ID, osCust.CompanyName)
 			continue
 		}
+
+		// All names returned by hiriPriceListName were resolved up front, so this
+		// lookup is always present.
+		priceListID := priceListIDs[hiriPriceListName(osCust)]
 
 		err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			// Check if customer already exists by email
@@ -537,7 +580,7 @@ func importData(
 				return fmt.Errorf("create customer %s: %w", email, err)
 			}
 
-			// Assign wholesale account type + status, Wholesale 2026 price list, NET 7.
+			// Assign wholesale account type + status, resolved price list, NET 7.
 			if err := setWholesaleFields(ctx, tx, customer.ID, mapOSStatus(osCust.Status), osCust.CompanyName, priceListID); err != nil {
 				return fmt.Errorf("set wholesale fields: %w", err)
 			}
@@ -838,7 +881,8 @@ func mapOSStatus(status string) domain.WholesaleStatus {
 }
 
 // setWholesaleFields marks a customer as wholesale and assigns the migration's
-// standard pricing: the given price list (Wholesale 2026) and NET 7 terms.
+// standard pricing: the given price list (matched to the customer's OS list via
+// hiriPriceListName) and NET 7 terms.
 // Existing company_name is preserved; for a freshly created customer (null
 // company_name) the OrderSpace company name is used.
 func setWholesaleFields(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.WholesaleStatus, company string, priceListID uuid.UUID) error {

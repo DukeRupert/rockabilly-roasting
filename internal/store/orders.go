@@ -735,6 +735,11 @@ func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilt
 	if f.PlacedTo != nil {
 		query += fmt.Sprintf(" AND placed_at <= $%d", argN)
 		args = append(args, *f.PlacedTo)
+		argN++
+	}
+	if f.Channel != nil {
+		query += fmt.Sprintf(" AND channel = $%d", argN)
+		args = append(args, string(*f.Channel))
 		argN++ //nolint:ineffassign
 	}
 	if f.ExcludeUnconfirmed {

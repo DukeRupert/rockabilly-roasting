@@ -9,17 +9,27 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
-// RevenueProps holds the data backing the Revenue chart card. CurrentTotal
-// and PriorTotal (cents) are used to render the period-over-period delta;
-// PriorTotal == 0 hides the comparison since there's nothing to compare to.
-// SubscriptionRevenue is a subset of CurrentTotal — orders with a non-null
-// subscription_id — so the card can show recurring vs one-time mix.
+// RevenueProps holds the data backing the Revenue chart card. Trend is the
+// combined (retail + wholesale) daily revenue that draws the sparkline. The
+// current-window totals are split by sales channel so the subscription vs
+// one-time mix is measured only against retail revenue — wholesale orders carry
+// no subscription_id, so folding them in would inflate the "one-time" share.
 type RevenueProps struct {
-	Days                int                 // 7, 30, or 90
-	Trend               []charts.ChartPoint // contiguous days, oldest → today
-	CurrentTotal        int
-	PriorTotal          int
-	SubscriptionRevenue int
+	Days      int                 // 7, 30, or 90
+	Trend     []charts.ChartPoint // combined daily revenue, oldest → today
+	Retail    ChannelRevenue
+	Wholesale ChannelRevenue
+}
+
+// ChannelRevenue is one sales channel's revenue over the selected window, plus
+// the prior window that drives the period-over-period delta. Subscription is the
+// recurring subset of Current and is meaningful only when HasSubs is set (retail
+// only). Prior == 0 hides the delta; Current == 0 hides the mix line.
+type ChannelRevenue struct {
+	Current      int
+	Prior        int
+	Subscription int  // recurring subset of Current; 0 for wholesale
+	HasSubs      bool // render the subscription/one-time mix instead of "No subscriptions"
 }
 
 // SubscriptionsProps backs the active-subscriptions trend card. Trend holds one
@@ -341,23 +351,39 @@ templ actionChip(label string, count int, anchor string, loud bool) {
 templ RevenueCard(props RevenueProps) {
 	<div id="revenue-card" class="border border-rr-border bg-rr-surface px-6 py-5">
 		<div class="flex items-baseline justify-between gap-3">
-			<div class="min-w-0">
-				<p class="label-font text-rr-muted">{ fmt.Sprintf("Revenue · last %d days", props.Days) }</p>
-				<div class="mt-1 flex items-baseline gap-3 flex-wrap">
-					<p class="text-xl font-bold tabular-nums text-rr-heading">{ formatCents(props.CurrentTotal) }</p>
-					@revenueDelta(props)
-				</div>
-				@revenueMix(props)
-			</div>
+			<p class="label-font text-rr-muted">{ fmt.Sprintf("Revenue · last %d days", props.Days) }</p>
 			<div class="flex items-center gap-1 text-xs shrink-0">
 				@revenuePeriodToggle(7, props.Days)
 				@revenuePeriodToggle(30, props.Days)
 				@revenuePeriodToggle(90, props.Days)
 			</div>
 		</div>
+		<div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+			@revenueChannel("Retail", props.Retail, props.Days)
+			@revenueChannel("Wholesale", props.Wholesale, props.Days)
+		</div>
 		<div class="mt-4">
 			@charts.Trend("revenue-trend", "line", props.Trend)
 		</div>
+	</div>
+}
+
+// revenueChannel renders one channel's revenue block: total, period delta, and
+// either the subscription/one-time mix (retail) or a "No subscriptions" note
+// (wholesale). Subscriptions are retail-only, so the mix line never claims a
+// wholesale split.
+templ revenueChannel(label string, cr ChannelRevenue, days int) {
+	<div class="min-w-0">
+		<p class="label-font text-rr-muted">{ label }</p>
+		<div class="mt-1 flex items-baseline gap-3 flex-wrap">
+			<p class="text-xl font-bold tabular-nums text-rr-heading">{ formatCents(cr.Current) }</p>
+			@revenueDelta(cr, days)
+		</div>
+		if cr.HasSubs {
+			@revenueMix(cr)
+		} else {
+			<p class="mt-1 text-xs text-rr-muted">No subscriptions</p>
+		}
 	</div>
 }
 
@@ -376,10 +402,10 @@ templ revenuePeriodToggle(value, current int) {
 	}
 }
 
-templ revenueDelta(props RevenueProps) {
-	if props.PriorTotal > 0 {
+templ revenueDelta(cr ChannelRevenue, days int) {
+	if cr.Prior > 0 {
 		{{
-			deltaPct := float64(props.CurrentTotal-props.PriorTotal) / float64(props.PriorTotal) * 100
+			deltaPct := float64(cr.Current-cr.Prior) / float64(cr.Prior) * 100
 		}}
 		<span class="text-xs">
 			if deltaPct >= 0.1 {
@@ -389,19 +415,20 @@ templ revenueDelta(props RevenueProps) {
 			} else {
 				<span class="text-rr-muted font-bold">flat</span>
 			}
-			<span class="text-rr-muted ml-1">{ fmt.Sprintf("vs prior %dd", props.Days) }</span>
+			<span class="text-rr-muted ml-1">{ fmt.Sprintf("vs prior %dd", days) }</span>
 		</span>
 	}
 }
 
-// revenueMix shows the subscription vs one-time split as a small text line.
-// Rendered only when there's revenue to break down — at $0 the percentages
-// are meaningless. Subscription revenue is the recurring component; everything
-// else (one-time orders, draft sales, manual orders) falls into "one-time".
-templ revenueMix(props RevenueProps) {
-	if props.CurrentTotal > 0 {
+// revenueMix shows the subscription vs one-time split for a channel as a small
+// text line. Rendered only when there's revenue to break down — at $0 the
+// percentages are meaningless. Subscription is the recurring component;
+// everything else (one-time orders, draft sales, manual orders) falls into
+// "one-time". Only called for channels where subscriptions apply (retail).
+templ revenueMix(cr ChannelRevenue) {
+	if cr.Current > 0 {
 		{{
-			subPct := float64(props.SubscriptionRevenue) / float64(props.CurrentTotal) * 100
+			subPct := float64(cr.Subscription) / float64(cr.Current) * 100
 			oneTimePct := 100 - subPct
 		}}
 		<p class="mt-1 text-xs text-rr-muted">

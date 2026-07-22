@@ -252,55 +252,85 @@ func subscriptionsMode(r *http.Request) string {
 	return "delta"
 }
 
-// buildRevenueProps fetches the daily trend plus the prior-window total so the
-// card can render the period-over-period delta. The prior window is the same
-// length as the current one, ending the day before trendStart.
+// buildRevenueProps assembles the revenue card: a combined daily trend for the
+// sparkline plus current/prior-window totals split by sales channel. The prior
+// window is the same length as the current one, ending the day before
+// trendStart. Retail and wholesale are summed separately so the
+// subscription/one-time mix is measured only against retail revenue —
+// subscriptions are retail-only, and folding wholesale (always subscription_id
+// NULL) into the denominator would inflate the "one-time" share.
 func (d *Deps) buildRevenueProps(ctx context.Context, tx pgx.Tx, days int, todayStart time.Time) (admin.RevenueProps, error) {
 	trendStart := todayStart.AddDate(0, 0, -(days - 1))
 	trendEnd := todayStart.AddDate(0, 0, 1) // exclusive upper bound
+
+	// Combined daily trend drives the sparkline — whole-business revenue.
 	daily, err := d.OrderService.RevenueByDay(ctx, tx, trendStart, trendEnd, d.MerchantTZ)
 	if err != nil {
 		return admin.RevenueProps{}, err
 	}
 
-	currentTotal := 0
-	for _, r := range daily {
-		currentTotal += r.Cents
-	}
-
 	priorStart := trendStart.AddDate(0, 0, -days)
 	priorEnd := trendStart // exclusive — equal to trendStart
-	priorTotal, err := d.OrderService.SumOrderRevenue(ctx, tx, store.OrderFilter{
-		PlacedFrom:               &priorStart,
-		PlacedTo:                 &priorEnd,
-		ExcludeUnconfirmed:       true,
-		ExcludeCancelledRefunded: true,
-	})
+
+	// channelRevenue sums the current and prior windows for one channel. When
+	// withSubs is set it also pulls the subscription subset of the current
+	// window (the mix line's numerator); wholesale passes false since it has no
+	// subscriptions. The exclusion set mirrors RevenueByDay so the trend and the
+	// channel totals stay reconcilable.
+	channelRevenue := func(ch domain.OrderChannel, withSubs bool) (admin.ChannelRevenue, error) {
+		current, err := d.OrderService.SumOrderRevenue(ctx, tx, store.OrderFilter{
+			Channel:                  &ch,
+			PlacedFrom:               &trendStart,
+			PlacedTo:                 &trendEnd,
+			ExcludeUnconfirmed:       true,
+			ExcludeCancelledRefunded: true,
+		})
+		if err != nil {
+			return admin.ChannelRevenue{}, err
+		}
+		prior, err := d.OrderService.SumOrderRevenue(ctx, tx, store.OrderFilter{
+			Channel:                  &ch,
+			PlacedFrom:               &priorStart,
+			PlacedTo:                 &priorEnd,
+			ExcludeUnconfirmed:       true,
+			ExcludeCancelledRefunded: true,
+		})
+		if err != nil {
+			return admin.ChannelRevenue{}, err
+		}
+		cr := admin.ChannelRevenue{Current: current, Prior: prior, HasSubs: withSubs}
+		if withSubs {
+			onlySub := true
+			sub, err := d.OrderService.SumOrderRevenue(ctx, tx, store.OrderFilter{
+				Channel:                  &ch,
+				PlacedFrom:               &trendStart,
+				PlacedTo:                 &trendEnd,
+				ExcludeUnconfirmed:       true,
+				ExcludeCancelledRefunded: true,
+				OnlySubscription:         &onlySub,
+			})
+			if err != nil {
+				return admin.ChannelRevenue{}, err
+			}
+			cr.Subscription = sub
+		}
+		return cr, nil
+	}
+
+	retail, err := channelRevenue(domain.OrderChannelRetail, true)
 	if err != nil {
 		return admin.RevenueProps{}, err
 	}
-
-	// Subscription revenue subset of the current window — drives the
-	// "X% subscription · Y% one-time" mix line on the card. Filter set
-	// mirrors RevenueByDay so the percentage adds up against the chart total.
-	onlySub := true
-	subRevenue, err := d.OrderService.SumOrderRevenue(ctx, tx, store.OrderFilter{
-		PlacedFrom:               &trendStart,
-		PlacedTo:                 &trendEnd,
-		ExcludeUnconfirmed:       true,
-		ExcludeCancelledRefunded: true,
-		OnlySubscription:         &onlySub,
-	})
+	wholesale, err := channelRevenue(domain.OrderChannelWholesale, false)
 	if err != nil {
 		return admin.RevenueProps{}, err
 	}
 
 	return admin.RevenueProps{
-		Days:                days,
-		Trend:               buildRevenueTrend(daily, trendStart, d.MerchantTZ, days),
-		CurrentTotal:        currentTotal,
-		PriorTotal:          priorTotal,
-		SubscriptionRevenue: subRevenue,
+		Days:      days,
+		Trend:     buildRevenueTrend(daily, trendStart, d.MerchantTZ, days),
+		Retail:    retail,
+		Wholesale: wholesale,
 	}, nil
 }
 

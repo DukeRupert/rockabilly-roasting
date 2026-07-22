@@ -498,27 +498,40 @@ func dryRunValidation(customers []osCustomer, orders []osOrder, report *migratio
 	}
 }
 
-// osToHiriPriceList maps an OrderSpace price list ID to the name of the Hiri
-// price list a migrated customer on it should receive. OS 2025/2026/Tailwinds
-// map to their Hiri equivalents (customers keep the tier they were on — OS 2026
-// customers are NOT grandfathered down to 2025); the legacy OS 2024 list and
-// customers with no OS list fall back to the Wholesale 2025 floor. OS IDs are
-// stable; update this map if OS ever recreates a list.
-var osToHiriPriceList = map[string]string{
-	"pl_q1m82yl5": "Wholesale 2025", // OS "2025"
-	"pl_yjg926l9": "Wholesale 2026", // OS "2026" — kept, not grandfathered down
-	"pl_v1x78pl0": "Tailwinds",      // OS "Tailwinds" (concessions markup)
-	"pl_v1xq3yj0": "Wholesale 2025", // OS "2024 Wholesale Price" (legacy) → 2025 floor
-}
+// OrderSpace price list IDs (stable; update if OS ever recreates a list).
+const (
+	osPriceList2024      = "pl_v1xq3yj0" // OS "2024 Wholesale Price" (legacy)
+	osPriceList2025      = "pl_q1m82yl5" // OS "2025"
+	osPriceList2026      = "pl_yjg926l9" // OS "2026"
+	osTailwindsPriceList = "pl_v1x78pl0" // OS "Tailwinds" (concessions markup)
+)
 
-const defaultHiriPriceList = "Wholesale 2025"
-
-// hiriPriceListName returns the Hiri price list name for an OS customer.
+// hiriPriceListName returns the Hiri price list a migrated OS customer should
+// receive. Rules, in order:
+//  1. Special OS lists always win: Tailwinds → Tailwinds, legacy 2024 → the
+//     dedicated Wholesale 2024 list (preserves those customers' exact pricing;
+//     e.g. MOCHA stays on 2024, and moving it up to 2026 is a later business call).
+//  2. Data-hygiene fallback: a customer with NO OS group gets current (2026)
+//     pricing regardless of the (often stale) list on their record.
+//  3. Otherwise keep the tier they were on: OS 2026 → 2026, OS 2025 → 2025.
+//  4. Default (has group, no/unknown OS list): the Wholesale 2025 floor.
 func hiriPriceListName(osCust osCustomer) string {
-	if name, ok := osToHiriPriceList[osCust.PriceListID]; ok {
-		return name
+	switch osCust.PriceListID {
+	case osTailwindsPriceList:
+		return "Tailwinds"
+	case osPriceList2024:
+		return "Wholesale 2024"
 	}
-	return defaultHiriPriceList
+	if osCust.CustomerGroupID == "" {
+		return "Wholesale 2026"
+	}
+	switch osCust.PriceListID {
+	case osPriceList2026:
+		return "Wholesale 2026"
+	case osPriceList2025:
+		return "Wholesale 2025"
+	}
+	return "Wholesale 2025"
 }
 
 func importData(

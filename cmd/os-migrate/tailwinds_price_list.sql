@@ -3,9 +3,12 @@
 -- Recreates the OrderSpace "Tailwinds" concessions price list in Hiri so that
 -- Tailwind Concessions keeps its pricing through the migration. Tailwinds is a
 -- MARKUP list (concessions pay more than base), priced flat by size — grind and
--- decaf make no difference, matching the OS Tailwinds list exactly:
+-- decaf make no difference. Hiri prices follow the same size convention as the
+-- Wholesale 2025/2026 lists: the Hiri 12O (12oz) variant takes the OS *1LB*
+-- wholesale price (Hiri retired the 1lb bag and carried its price to 12oz), NOT
+-- the OS retail-12oz price. From the OS Tailwinds list:
 --
---   12O (12oz bag)  $12.50   -- OS Tailwinds 12oz retail-bag price
+--   12O <- OS 1LB   $11.00
 --   1LB (RIU only)  $11.00   -- OS Tailwinds 1lb wholesale price
 --   3LB             $33.00
 --   5LB             $55.00
@@ -25,7 +28,7 @@ WITH tw AS (SELECT id FROM price_lists WHERE name = 'Tailwinds')
 INSERT INTO prices (price_set_id, amount, currency_code, price_list_id)
 SELECT ps.id,
        CASE split_part(v.sku, '-', 2)
-           WHEN '12O' THEN 1250
+           WHEN '12O' THEN 1100
            WHEN '1LB' THEN 1100
            WHEN '3LB' THEN 3300
            WHEN '5LB' THEN 5500

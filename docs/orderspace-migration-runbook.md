@@ -426,4 +426,5 @@ Update each row as a batch completes (target dates from §10).
 |---|---|---|---|---|---|
 | Jun 23 → done Jul 7 | 1 — Pilot (8) | Wandering Bean, Richland Baptist, Healthy Vibes, Novel Coffee, Coffee Pot Seattle, Yellow Cafe, Steam and cream, Caterpillar Cafe | ✅ 2026-07-07 (169 orders, 298 lines, 0 warnings) | ✅ 2026-07-07 (8/8 sent) | Logan + Claude |
 | Jun 30 → done Jul 21 | 2 — Main (31) | 10 whales + 21 mid/low incl. Blackthorne (net-new, folded in); all OS-2025 → Wholesale 2025 + NET 7 | ✅ 2026-07-21 (874 orders, 1600 lines, all WS2025/NET7; 1 white-label line skipped by design) | ✅ 2026-07-21 (31/31 sent, BCC Logan) | Logan + Claude |
-| Jul 7 | 3 — Final (~tail) | cleanup-needed + zero-history + Tailwind + Bunker (see §10) | — | — | — |
+| Jul 7 → done Jul 21 | 3 — Final (12) | MOCHA (→Wholesale 2024), Tailwind (→Tailwinds), no-group accounts (→2026), zero-history, Baseling (2026/pending), Kool Beanz (2026/suspended) | ✅ 2026-07-21 (147 orders, 326 lines, 0 warnings) | ✅ 2026-07-21 (10/10 approved sent, BCC Logan; Kool Beanz/Baseling not emailed) | Logan + Claude |
+| — | **Parked / excluded** | **Bunker Uniforms** parked (white-label support needed first — has no successful OS orders yet). **Kagen's, Firefly** excluded (early test accounts). These 3 are the only OS accounts left un-migrated. | — | — | — |

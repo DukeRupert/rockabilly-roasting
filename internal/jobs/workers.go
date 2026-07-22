@@ -168,6 +168,17 @@ type MagicLinkSendArgs struct {
 // Kind returns the job kind identifier.
 func (MagicLinkSendArgs) Kind() string { return "magic_link_send" }
 
+// PasswordResetSendArgs sends a self-service password reset email to a customer.
+// The token is a setup token (magic_link_tokens, 72h) minted in the request tx;
+// the email links to /account/password-setup.
+type PasswordResetSendArgs struct {
+	CustomerID uuid.UUID `json:"customer_id"`
+	RawToken   string    `json:"raw_token"`
+}
+
+// Kind returns the job kind identifier.
+func (PasswordResetSendArgs) Kind() string { return "password_reset_send" }
+
 // EmailVerifySendArgs sends an email-verification message to a customer.
 // The underlying token is a magic-link token; redeeming it verifies the
 // email and signs the customer in. The email copy is framed around

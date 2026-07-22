@@ -339,5 +339,76 @@ func TestSendPasswordSetupEmail_ExistingPassword_FlagsReset(t *testing.T) {
 	}
 }
 
+// --- SendPasswordResetEmail (self-service) ---
+
+// mintSetupToken creates a committed setup token for customerID so
+// SendPasswordResetEmail (which expects a pre-minted token) can send it.
+func mintSetupToken(t *testing.T, ctx context.Context, svc *app.AuthService, customerID uuid.UUID) string {
+	t.Helper()
+	var rawToken string
+	require.NoError(t, store.Tx(ctx, testPool, func(tx pgx.Tx) error {
+		var err error
+		rawToken, err = svc.CreateSetupToken(ctx, tx, customerID)
+		return err
+	}))
+	return rawToken
+}
+
+func TestSendPasswordResetEmail_NoExistingPassword_SetsWording(t *testing.T) {
+	ctx := context.Background()
+	svc, sender := newAuthServiceWithEmail(t)
+	customerID := createCommittedCustomer(t, ctx, false)
+	rawToken := mintSetupToken(t, ctx, svc, customerID)
+
+	require.NoError(t, svc.SendPasswordResetEmail(ctx, testPool, customerID, rawToken))
+
+	require.Len(t, sender.Sent, 1)
+	msg := sender.Sent[0]
+	assert.Equal(t, "Set your password", msg.Subject)
+	assert.Contains(t, msg.HTML, "https://example.test/account/password-setup?token=")
+
+	var (
+		actorType string
+		metaReset *bool
+		metaSelf  *bool
+	)
+	require.NoError(t, testPool.QueryRow(ctx,
+		`SELECT actor_type, (metadata->>'reset')::bool, (metadata->>'self_service')::bool FROM audit_log
+		 WHERE resource_type = 'customer' AND resource_id = $1 AND action = $2
+		 ORDER BY created_at DESC LIMIT 1`,
+		customerID, audit.AuditEmailPasswordSetupSent,
+	).Scan(&actorType, &metaReset, &metaSelf))
+	assert.Equal(t, string(domain.AuditActorTypeSystem), actorType)
+	if assert.NotNil(t, metaReset) {
+		assert.False(t, *metaReset, "no password set -> reset=false")
+	}
+	if assert.NotNil(t, metaSelf) {
+		assert.True(t, *metaSelf, "self-service reset -> self_service=true")
+	}
+}
+
+func TestSendPasswordResetEmail_ExistingPassword_FlagsReset(t *testing.T) {
+	ctx := context.Background()
+	svc, sender := newAuthServiceWithEmail(t)
+	customerID := createCommittedCustomer(t, ctx, true)
+	rawToken := mintSetupToken(t, ctx, svc, customerID)
+
+	require.NoError(t, svc.SendPasswordResetEmail(ctx, testPool, customerID, rawToken))
+
+	require.Len(t, sender.Sent, 1)
+	assert.Equal(t, "Reset your password", sender.Sent[0].Subject)
+
+	var metaReset *bool
+	require.NoError(t, testPool.QueryRow(ctx,
+		`SELECT (metadata->>'reset')::bool FROM audit_log
+		 WHERE resource_type = 'customer' AND resource_id = $1 AND action = $2
+		 ORDER BY created_at DESC LIMIT 1`,
+		customerID, audit.AuditEmailPasswordSetupSent,
+	).Scan(&metaReset))
+	if assert.NotNil(t, metaReset) {
+		assert.True(t, *metaReset, "existing password -> reset=true")
+	}
+}
+
 // pgx is used implicitly via the auth service.
 var _ = pgx.ErrNoRows

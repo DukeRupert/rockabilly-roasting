@@ -145,6 +145,79 @@ func (s *AuthService) SendVerificationEmail(ctx context.Context, pool *pgxpool.P
 	return nil
 }
 
+// SendPasswordResetEmail renders and sends a self-service password reset email.
+// The token must already have been created via CreateSetupToken; this method
+// only composes + sends the notification (same three-phase pattern as
+// SendMagicLink). It reuses the password_setup template and the
+// /account/password-setup consumption page, so a reset lands on the same page as
+// an admin-triggered setup. The wording adapts based on whether the customer
+// already has a password: "Reset" for existing passwords, "Set" for a first-time
+// password (e.g. a guest-checkout customer recovering access).
+//
+// Unlike SendPasswordSetupEmail (staff-triggered), this records a system actor —
+// the customer initiated it anonymously from the public forgot-password page.
+func (s *AuthService) SendPasswordResetEmail(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID, rawToken string) error {
+	var customer *domain.Customer
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		c, err := s.customers.GetByID(ctx, tx, customerID)
+		if err != nil {
+			return fmt.Errorf("get customer %s: %w", customerID, err)
+		}
+		customer = c
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	isReset := customer.PasswordHash != nil
+	setupURL := s.email.BaseURL + "/account/password-setup?token=" + url.QueryEscape(rawToken)
+
+	html, text, err := s.email.Renderer.Render("password_setup", emailtemplates.PasswordSetupData{
+		CustomerName: customer.FirstName,
+		SetupURL:     setupURL,
+		IsReset:      isReset,
+		StoreName:    s.email.StoreName,
+		StoreURL:     s.email.BaseURL,
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("password_reset", "failed").Inc()
+		return fmt.Errorf("render password reset template: %w", err)
+	}
+
+	subject := "Set your password"
+	if isReset {
+		subject = "Reset your password"
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      customer.Email,
+		Subject: subject,
+		HTML:    html,
+		Text:    text,
+		Tag:     "password-reset",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("password_reset", "failed").Inc()
+		return fmt.Errorf("send password reset email: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "password_reset_request",
+			Action:       audit.AuditEmailPasswordSetupSent,
+			ResourceType: "customer",
+			ResourceID:   customer.ID,
+			Metadata:     map[string]any{"reset": isReset, "self_service": true},
+		})
+	}); err != nil {
+		return fmt.Errorf("audit password reset email sent: %w", err)
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("password_reset", "sent").Inc()
+	return nil
+}
+
 // SendPasswordSetupEmail mints a setup token for the customer and emails them a
 // link to set (or reset) their password. Triggered by staff from the admin
 // customer page when a customer cannot sign in. The email wording adapts based

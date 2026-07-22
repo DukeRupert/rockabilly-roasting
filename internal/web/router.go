@@ -218,6 +218,12 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /account/magic", deps.handleAccountMagicRedeem)
 	mux.Handle("POST /account/logout", deps.requireCustomerSession(http.HandlerFunc(deps.handleAccountLogout)))
 
+	// Public self-service password reset (retail or wholesale customer). Same
+	// rate limit as magic-link login — the threat model (email enumeration /
+	// spamming) is identical.
+	mux.HandleFunc("GET /account/forgot-password", deps.handleAccountForgotPasswordPage)
+	mux.Handle("POST /account/forgot-password", magicLinkLimit(http.HandlerFunc(deps.handleAccountForgotPassword)))
+
 	// Security POST routes: rate-limited + authenticated. Registered at the outer
 	// mux so the rate-limit middleware wraps the auth check (same pattern as wholesale
 	// auth routes). The limiter uses the same IP-based limits as magic-link since the

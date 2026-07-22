@@ -332,6 +332,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool, metricsReg))
 	river.AddWorker(workers, jobs.NewBatchRenewalWorker(renewalSvc, pool, metricsReg))
 	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(authSvc, pool))
+	river.AddWorker(workers, jobs.NewPasswordResetSendWorker(authSvc, pool))
 	river.AddWorker(workers, jobs.NewEmailVerifySendWorker(authSvc, pool))
 	river.AddWorker(workers, jobs.NewInvoiceSendWorker(invoiceSvc, pool))
 	river.AddWorker(workers, jobs.NewWholesaleApplicationNotifyWorker(wholesaleSvc, pool))

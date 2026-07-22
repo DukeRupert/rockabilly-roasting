@@ -323,6 +323,65 @@ func (d *Deps) handleAccountLoginRequest(w http.ResponseWriter, r *http.Request)
 	renderLogin(w, r, storefront.AccountLoginProps{Success: successMsg})
 }
 
+// renderForgotPassword renders the forgot-password page (htmx-aware).
+func renderForgotPassword(w http.ResponseWriter, r *http.Request, props storefront.AccountForgotPasswordProps) {
+	if IsHTMX(r) {
+		storefront.AccountForgotPasswordContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	storefront.AccountForgotPasswordPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleAccountForgotPasswordPage renders the public forgot-password form.
+func (d *Deps) handleAccountForgotPasswordPage(w http.ResponseWriter, r *http.Request) {
+	renderForgotPassword(w, r, storefront.AccountForgotPasswordProps{})
+}
+
+// handleAccountForgotPassword mints a setup token for the matching customer and
+// enqueues a reset email. Works for any customer (retail or wholesale) — the
+// emailed link lands on the generic /account/password-setup page. Always returns
+// a generic success message to prevent email enumeration; a non-matching email
+// silently succeeds. Mirrors the magic-link branch of handleAccountLoginRequest.
+func (d *Deps) handleAccountForgotPassword(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	email := r.FormValue("email")
+
+	if email == "" {
+		renderForgotPassword(w, r, storefront.AccountForgotPasswordProps{Error: "Please enter your email address."})
+		return
+	}
+
+	successMsg := "If you have an account, we've emailed you a link to set your password."
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		customer, txErr := d.CustomerService.GetCustomerByEmail(ctx, tx, email)
+		if txErr != nil {
+			if errors.Is(txErr, app.ErrCustomerNotFound) {
+				return nil // Silently succeed — no enumeration
+			}
+			return txErr
+		}
+
+		rawToken, txErr := d.AuthService.CreateSetupToken(ctx, tx, customer.ID)
+		if txErr != nil {
+			return txErr
+		}
+
+		// Enqueue email send job in the same transaction.
+		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.PasswordResetSendArgs{
+			CustomerID: customer.ID,
+			RawToken:   rawToken,
+		}, nil)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	renderForgotPassword(w, r, storefront.AccountForgotPasswordProps{Success: successMsg})
+}
+
 // handleAccountSecurity renders the security / password management page.
 func (d *Deps) handleAccountSecurity(w http.ResponseWriter, r *http.Request) {
 	customer, ok := auth.CustomerFromContext(r.Context())

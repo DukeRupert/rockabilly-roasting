@@ -110,6 +110,15 @@ func staffNameRole(r *http.Request) (string, string) {
 	return staff.Name, string(staff.Role)
 }
 
+// staffCan reports whether the staff on the request's context holds perm. It is
+// for deciding whether to *render* a control, never for deciding whether to
+// allow the action — that stays in requirePermission. Hiding a button the
+// server would refuse anyway is a courtesy, not a check.
+func staffCan(r *http.Request, perm string) bool {
+	staff, ok := auth.StaffFromContext(r.Context())
+	return ok && auth.HasPermission(staff.Role, perm)
+}
+
 // --- Login / Logout handlers ---
 
 func (d *Deps) handleStaffLoginPage(w http.ResponseWriter, r *http.Request) {

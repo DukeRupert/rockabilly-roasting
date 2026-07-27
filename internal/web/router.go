@@ -401,11 +401,16 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("GET /admin/customers/{id}", deps.handleAdminCustomerShow)
 	adminMux.HandleFunc("POST /admin/customers/{id}/groups/add", deps.handleAdminCustomerGroupAdd)
 	adminMux.HandleFunc("POST /admin/customers/{id}/groups/{groupID}/remove", deps.handleAdminCustomerGroupRemove)
+	// Changing a customer's sign-in address is the front half of an account
+	// takeover, so unlike its neighbours it is gated on customers:write rather
+	// than plain staff-session access.
+	adminMux.Handle("POST /admin/customers/{id}/email", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminCustomerEmail)))
 	adminMux.HandleFunc("POST /admin/customers/{id}/payment-terms", deps.handleAdminCustomerPaymentTerms)
 	adminMux.HandleFunc("POST /admin/customers/{id}/price-list", deps.handleAdminCustomerPriceList)
 	adminMux.HandleFunc("POST /admin/customers/{id}/billing-method", deps.handleAdminCustomerBillingMethod)
 	adminMux.HandleFunc("POST /admin/customers/{id}/local-fulfillment", deps.handleAdminCustomerLocalFulfillment)
 	adminMux.HandleFunc("POST /admin/customers/{id}/send-password-setup", deps.handleAdminCustomerSendPasswordSetup)
+	adminMux.HandleFunc("POST /admin/customers/{id}/send-verification", deps.handleAdminCustomerSendVerification)
 	adminMux.HandleFunc("POST /admin/customers/{id}/send-white-label-invite", deps.handleAdminCustomerSendWhiteLabelInvite)
 
 	// Admin customer groups (access control for restricted products; not pricing)

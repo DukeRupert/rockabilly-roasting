@@ -71,6 +71,95 @@ func TestCustomerService_UpdateEmail(t *testing.T) {
 	})
 }
 
+func TestCustomerService_UpdateEmailAsStaff(t *testing.T) {
+	pool := testPool
+	ctx := context.Background()
+	svc := newCustomerService()
+	actor := testutil.TestActor()
+
+	t.Run("records who made the change and what the address was", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		customer := testutil.CreateCustomer(t, tx, testutil.WithEmail("old@example.com"))
+
+		updated, err := svc.UpdateEmailAsStaff(ctx, tx, customer.ID, "new@example.com", actor)
+		require.NoError(t, err)
+		assert.Equal(t, "new@example.com", updated.Email)
+
+		entry := testutil.LastAuditEntryWithAction(t, tx, "customer", customer.ID, audit.AuditCustomerEmailUpdated)
+		var after map[string]any
+		require.NoError(t, json.Unmarshal(entry.AfterSnapshot, &after))
+		assert.Equal(t, "new@example.com", after["email"])
+
+		// Support staff hold customers:write purely for this action, so the
+		// trail has to name the person and the address they moved away from.
+		assert.Equal(t, string(domain.AuditActorTypeStaff), entry.ActorType)
+		assert.Equal(t, actor.Name, entry.ActorName)
+
+		var metadata map[string]any
+		require.NoError(t, tx.QueryRow(ctx,
+			`SELECT metadata FROM audit_log WHERE id = $1`, entry.ID,
+		).Scan(&metadata))
+		assert.Equal(t, "old@example.com", metadata["previous_email"])
+	})
+
+	t.Run("normalizes before writing", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		customer := testutil.CreateCustomer(t, tx)
+
+		updated, err := svc.UpdateEmailAsStaff(ctx, tx, customer.ID, "  Mixed.Case@Example.COM ", actor)
+		require.NoError(t, err)
+		assert.Equal(t, "mixed.case@example.com", updated.Email)
+	})
+
+	t.Run("clears verification so the new address is not vouched for", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		customer := testutil.CreateCustomer(t, tx, testutil.WithEmail("verified@example.com"))
+		require.NoError(t, svc.VerifyEmail(ctx, tx, customer.ID))
+
+		updated, err := svc.UpdateEmailAsStaff(ctx, tx, customer.ID, "moved@example.com", actor)
+		require.NoError(t, err)
+		assert.False(t, updated.EmailVerified)
+
+		got, err := svc.GetCustomer(ctx, tx, customer.ID)
+		require.NoError(t, err)
+		assert.False(t, got.EmailVerified)
+	})
+
+	t.Run("no-op change leaves verification and the trail alone", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		customer := testutil.CreateCustomer(t, tx, testutil.WithEmail("steady@example.com"))
+		require.NoError(t, svc.VerifyEmail(ctx, tx, customer.ID))
+
+		updated, err := svc.UpdateEmailAsStaff(ctx, tx, customer.ID, "Steady@Example.com", actor)
+		require.NoError(t, err)
+		assert.Equal(t, "steady@example.com", updated.Email)
+		assert.True(t, updated.EmailVerified)
+
+		var count int
+		require.NoError(t, tx.QueryRow(ctx,
+			`SELECT count(*) FROM audit_log WHERE resource_type = 'customer' AND resource_id = $1 AND action = $2`,
+			customer.ID, audit.AuditCustomerEmailUpdated,
+		).Scan(&count))
+		assert.Zero(t, count)
+	})
+
+	t.Run("refuses an address another customer holds", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+		testutil.CreateCustomer(t, tx, testutil.WithEmail("taken@example.com"))
+		other := testutil.CreateCustomer(t, tx)
+
+		_, err := svc.UpdateEmailAsStaff(ctx, tx, other.ID, "TAKEN@example.com", actor)
+		assert.ErrorIs(t, err, app.ErrEmailAlreadyExists)
+	})
+
+	t.Run("unknown customer", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, pool)
+
+		_, err := svc.UpdateEmailAsStaff(ctx, tx, uuid.New(), "nobody@example.com", actor)
+		assert.ErrorIs(t, err, app.ErrCustomerNotFound)
+	})
+}
+
 func TestCustomerService_UpdatePhone(t *testing.T) {
 	pool := testPool
 	ctx := context.Background()

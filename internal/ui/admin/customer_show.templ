@@ -21,6 +21,10 @@ type CustomerShowProps struct {
 	MerchantTZ   *time.Location
 	StaffName    string
 	StaffRole    string
+	// CanEditEmail gates the inline email editor. The route is gated
+	// independently on customers:write; this only keeps the form from showing
+	// to staff whose submit would bounce.
+	CanEditEmail bool
 }
 
 // availableGroups returns groups the customer is NOT already a member of.
@@ -96,11 +100,18 @@ templ CustomerShowContent(props CustomerShowProps) {
 	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
 		<div class="border border-rr-border bg-rr-surface p-4">
 			<dt class="text-sm font-medium text-rr-muted">Email verified</dt>
-			<dd class="mt-1 flex items-center justify-between gap-2">
+			<dd class="mt-1 flex flex-wrap items-center justify-between gap-2">
 				if props.Customer.EmailVerified {
 					<span class="badge badge-green">yes</span>
 				} else {
 					<span class="badge badge-amber">no</span>
+				}
+				if !props.Customer.EmailVerified {
+					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-verification", props.Customer.ID)) }>
+						<button type="submit" class="btn-confirm" style="padding:0.35rem 0.75rem;font-size:0.7rem;" onclick="return confirm('Email this customer a link to confirm this address? Following it signs them in — no password change.')">
+							Send verification link
+						</button>
+					</form>
 				}
 				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-password-setup", props.Customer.ID)) }>
 					if props.Customer.PasswordHash == nil {
@@ -203,6 +214,35 @@ templ CustomerShowContent(props CustomerShowProps) {
 		</div>
 		<div class="border-t border-rr-border">
 			<dl class="divide-y divide-rr-border">
+				<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+					<dt class="text-sm font-medium text-rr-muted">Email</dt>
+					<dd class="mt-1 sm:col-span-2 sm:mt-0">
+						if props.CanEditEmail {
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/email", props.Customer.ID)) }
+								class="flex flex-wrap items-center gap-2"
+								onsubmit="return confirm('Change this customer’s sign-in address? They will use the new address to log in. Send them a verification link afterwards to confirm it works.')"
+							>
+								<input
+									type="email"
+									name="email"
+									value={ props.Customer.Email }
+									required
+									maxlength="255"
+									autocomplete="off"
+									class="w-full max-w-sm rounded-sm bg-rr-surface py-1.5 px-3 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+								/>
+								<button type="submit" class="btn-confirm">Save</button>
+							</form>
+							<p class="mt-1 text-xs text-rr-muted">
+								Orders, subscriptions, and history stay with the customer. The address is marked unverified until they follow a verification link &mdash; send one from the Email verified card above.
+							</p>
+						} else {
+							<span class="text-sm text-rr-heading">{ props.Customer.Email }</span>
+						}
+					</dd>
+				</div>
 				if props.Customer.Phone != nil {
 					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
 						<dt class="text-sm font-medium text-rr-muted">Phone</dt>

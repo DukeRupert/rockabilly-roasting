@@ -87,6 +87,63 @@ func (s *CustomerService) UpdateEmail(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return c, nil
 }
 
+// UpdateEmailAsStaff changes a customer's sign-in address on their behalf and
+// records who did it. Staff use this when a customer loses access to the
+// address on file — the account, its orders, and its subscriptions all stay
+// put; only the address moves.
+//
+// Two things separate it from the self-service UpdateEmail above:
+//
+//   - It audits. A staff-driven address change is the first half of an account
+//     takeover (change the address, then send a reset link to it), so the
+//     before/after pair and the actor need to survive in the trail.
+//   - It clears email_verified. Verification is a claim about a specific
+//     address; carrying a "yes" over to an address nobody has proven would be a
+//     lie, and the unverified badge is the only signal staff get that a typo'd
+//     address is silently swallowing the customer's mail. Staff re-establish it
+//     with SendVerificationEmailAsStaff, which asks the customer to confirm the
+//     address rather than to reset a password they never lost.
+//
+// A no-op change (same address after normalizing) returns the customer
+// untouched rather than writing an audit row that says nothing happened.
+func (s *CustomerService) UpdateEmailAsStaff(ctx context.Context, tx pgx.Tx, id uuid.UUID, email string, actor Actor) (*domain.Customer, error) {
+	before, err := s.GetCustomer(ctx, tx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if domain.NormalizeEmail(email) == before.Email {
+		return before, nil
+	}
+
+	c, err := s.UpdateEmail(ctx, tx, id, email)
+	if err != nil {
+		return nil, err
+	}
+
+	if before.EmailVerified {
+		if err := s.customers.UpdateEmailVerified(ctx, tx, id, false); err != nil {
+			return nil, fmt.Errorf("clear email verification: %w", err)
+		}
+		c.EmailVerified = false
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerEmailUpdated,
+		ResourceType: "customer",
+		ResourceID:   id,
+		After:        map[string]any{"email": c.Email, "email_verified": c.EmailVerified},
+		Metadata:     map[string]any{"previous_email": before.Email},
+	}); err != nil {
+		return nil, fmt.Errorf("record email update audit: %w", err)
+	}
+
+	return c, nil
+}
+
 // UpdatePhone updates a customer's phone number. Pass nil (or empty after
 // trimming) to clear it. Records a customer.phone_updated audit entry on every
 // successful update — including self-service edits, unlike UpdateName /

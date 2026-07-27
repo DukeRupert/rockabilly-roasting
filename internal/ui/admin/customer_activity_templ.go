@@ -45,6 +45,8 @@ func customerEventLabel(action string) string {
 		return "Billing method updated"
 	case audit.AuditCustomerStripeIDLinked:
 		return "Linked to Stripe"
+	case audit.AuditCustomerEmailUpdated:
+		return "Email address changed"
 	case audit.AuditWholesaleApplicationApproved:
 		return "Wholesale application approved"
 	case audit.AuditWholesaleApplicationDeclined:

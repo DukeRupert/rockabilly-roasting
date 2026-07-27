@@ -34,8 +34,14 @@ var rolePermissions = map[domain.StaffRole][]string{
 	domain.StaffRoleCatalog: {
 		PermManageProducts, PermManagePricing, PermManageInventory,
 	},
+	// Support fields the "we lost access to our shop inbox" calls, so they hold
+	// customers:write. Today that gates exactly one route — changing a
+	// customer's sign-in address — and every use of it lands in the audit log
+	// with the staff member's name against customer.email_updated. Before
+	// hanging a second route off customers:write, re-check that support should
+	// have it too; this grant was made for the email case specifically.
 	domain.StaffRoleSupport: {
-		PermViewOrders, PermViewCustomers, PermCreateDraftOrders,
+		PermViewOrders, PermViewCustomers, PermEditCustomers, PermCreateDraftOrders,
 	},
 }
 

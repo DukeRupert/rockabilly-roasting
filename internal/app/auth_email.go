@@ -87,7 +87,7 @@ func (s *AuthService) SendMagicLink(ctx context.Context, pool *pgxpool.Pool, cus
 // so redeeming the link both verifies the email and signs the customer in —
 // but the email itself is framed as a verification, not a sign-in. Same
 // three-phase pattern as SendMagicLink.
-func (s *AuthService) SendVerificationEmail(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID, rawToken, next string) error {
+func (s *AuthService) SendVerificationEmail(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID, rawToken, next string, actor Actor) error {
 	var customer *domain.Customer
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		c, err := s.customers.GetByID(ctx, tx, customerID)
@@ -131,8 +131,9 @@ func (s *AuthService) SendVerificationEmail(ctx context.Context, pool *pgxpool.P
 
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		return s.audit.Record(ctx, tx, audit.AuditEntry{
-			ActorType:    domain.AuditActorTypeSystem,
-			ActorName:    "email_verify_worker",
+			ActorType:    actor.Type,
+			ActorID:      actor.ID,
+			ActorName:    actor.Name,
 			Action:       audit.AuditEmailVerificationSent,
 			ResourceType: "customer",
 			ResourceID:   customer.ID,
@@ -143,6 +144,39 @@ func (s *AuthService) SendVerificationEmail(ctx context.Context, pool *pgxpool.P
 
 	s.metrics.EmailsSent.WithLabelValues("email_verification", "sent").Inc()
 	return nil
+}
+
+// VerifyEmailWorkerActor attributes verification sends that originate from the
+// job queue rather than from a person clicking a button.
+var VerifyEmailWorkerActor = Actor{
+	Type: domain.AuditActorTypeSystem,
+	Name: "email_verify_worker",
+}
+
+// SendVerificationEmailAsStaff mints a fresh verification link and sends it,
+// attributing the send to the staff member who asked for it. Staff reach for
+// this after correcting an address on a customer's behalf: the customer clicks
+// through, which both proves the new address works and signs them in — no
+// password dance for something they never lost.
+//
+// Deliberately not automatic on an address change. Staff type the new address
+// from an email or a phone call, and a typo would mail a working sign-in link
+// to a stranger. Making the send a separate, explicit click gives whoever made
+// the edit a beat to read the address back before anything leaves the building.
+func (s *AuthService) SendVerificationEmailAsStaff(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID, actor Actor) error {
+	var rawToken string
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		token, err := s.CreateMagicLinkToken(ctx, tx, customerID)
+		if err != nil {
+			return fmt.Errorf("create verification token: %w", err)
+		}
+		rawToken = token
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return s.SendVerificationEmail(ctx, pool, customerID, rawToken, "", actor)
 }
 
 // SendPasswordResetEmail renders and sends a self-service password reset email.

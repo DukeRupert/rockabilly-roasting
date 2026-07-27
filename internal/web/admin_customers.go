@@ -3,12 +3,15 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"net/mail"
 	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
@@ -139,6 +142,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		MerchantTZ:   d.MerchantTZ,
 		StaffName:    name,
 		StaffRole:    role,
+		CanEditEmail: staffCan(r, auth.PermEditCustomers),
 	}
 
 	if IsHTMX(r) {
@@ -169,6 +173,42 @@ func (d *Deps) handleAdminCustomerPaymentTerms(w http.ResponseWriter, r *http.Re
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		return d.CustomerService.UpdatePaymentTerms(ctx, tx, id, days, staffActor(r))
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/customers/%s", id), http.StatusSeeOther)
+}
+
+// handleAdminCustomerEmail changes the address a customer signs in and receives
+// mail at. Used when a customer loses access to the address on file — a shared
+// shop inbox moving to a new provider, a staffer leaving a wholesale account.
+// Mounted behind customers:write: this is the front half of an account
+// takeover, so it stays with the roles trusted to edit customer records.
+func (d *Deps) handleAdminCustomerEmail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	email := strings.TrimSpace(r.FormValue("email"))
+	if len(email) > 255 {
+		http.Error(w, "Email address too long", http.StatusBadRequest)
+		return
+	}
+	if _, err := mail.ParseAddress(email); err != nil {
+		http.Error(w, "Invalid email address", http.StatusBadRequest)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.CustomerService.UpdateEmailAsStaff(ctx, tx, id, email, staffActor(r))
+		return txErr
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -247,6 +287,31 @@ func (d *Deps) handleAdminCustomerSendPasswordSetup(w http.ResponseWriter, r *ht
 	}
 
 	if err := d.AuthService.SendPasswordSetupEmail(ctx, d.Pool, id, staffActor(r)); err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/customers/%s", id), http.StatusSeeOther)
+}
+
+// handleAdminCustomerSendVerification emails the customer a link that proves
+// the address on file works. Redeeming it also signs them in, which is the
+// point after a staff-corrected address: the customer confirms the new address
+// and lands in their account without a password reset they didn't ask for.
+//
+// Ungated like send-password-setup beside it — both mail a sign-in link to the
+// address already on record, so neither widens what the recipient can reach.
+// Changing that address is the privileged move, and that route is gated.
+func (d *Deps) handleAdminCustomerSendVerification(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := d.AuthService.SendVerificationEmailAsStaff(ctx, d.Pool, id, staffActor(r)); err != nil {
 		Error(w, r, err)
 		return
 	}

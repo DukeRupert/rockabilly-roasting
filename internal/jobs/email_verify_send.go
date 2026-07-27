@@ -24,5 +24,5 @@ func NewEmailVerifySendWorker(auth *app.AuthService, pool *pgxpool.Pool) *EmailV
 
 // Work processes an email verification send job.
 func (w *EmailVerifySendWorker) Work(ctx context.Context, job *river.Job[EmailVerifySendArgs]) error {
-	return w.auth.SendVerificationEmail(ctx, w.pool, job.Args.CustomerID, job.Args.RawToken, job.Args.Next)
+	return w.auth.SendVerificationEmail(ctx, w.pool, job.Args.CustomerID, job.Args.RawToken, job.Args.Next, app.VerifyEmailWorkerActor)
 }

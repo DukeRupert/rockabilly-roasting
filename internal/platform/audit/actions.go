@@ -61,6 +61,7 @@ const (
 	AuditCustomerLocalFulfillmentUpdated = "customer.local_fulfillment_updated"
 	AuditCustomerStripeIDLinked          = "customer.stripe_customer_id_linked"
 	AuditCustomerPriceListUpdated        = "customer.price_list_updated"
+	AuditCustomerEmailUpdated            = "customer.email_updated"
 
 	// Customer group actions
 	AuditCustomerGroupCreated       = "customer_group.created"

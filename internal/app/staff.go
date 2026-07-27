@@ -92,7 +92,7 @@ func (s *StaffService) Invite(ctx context.Context, tx pgx.Tx, params InviteStaff
 	if name == "" {
 		return nil, ErrStaffNameRequired
 	}
-	emailAddr := strings.ToLower(strings.TrimSpace(params.Email))
+	emailAddr := domain.NormalizeEmail(params.Email)
 	if emailAddr == "" {
 		return nil, ErrStaffEmailRequired
 	}

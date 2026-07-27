@@ -412,3 +412,63 @@ func TestSendPasswordResetEmail_ExistingPassword_FlagsReset(t *testing.T) {
 
 // pgx is used implicitly via the auth service.
 var _ = pgx.ErrNoRows
+
+// --- Email case-insensitivity (regression) ---
+//
+// Customer emails are looked up with an exact `WHERE email = $1`. Before
+// NormalizeEmail was applied at these boundaries, a customer whose keyboard or
+// autofill capitalized the address failed to authenticate against a row that was
+// plainly there -- and, worse, the forgot-password form silently "succeeded"
+// without sending anything, because the anti-enumeration branch cannot tell a
+// typo from an absent account.
+
+func TestCustomerLogin_EmailIsCaseInsensitive(t *testing.T) {
+	pool := testPool
+	tx := testutil.NewTestTx(t, pool)
+	svc := newAuthService()
+	ctx := context.Background()
+
+	customer := testutil.CreateCustomer(t, tx, testutil.WithEmail("info@thevillagebistro.com"))
+	require.NoError(t, svc.SetPassword(ctx, tx, customer.ID, "supersecret99", testutil.TestActor()))
+
+	variants := []string{
+		"info@thevillagebistro.com",
+		"Info@thevillagebistro.com",
+		"INFO@THEVILLAGEBISTRO.COM",
+		"  info@thevillagebistro.com  ",
+	}
+
+	for _, email := range variants {
+		t.Run(email, func(t *testing.T) {
+			session, token, err := svc.CustomerLogin(ctx, tx, email, "supersecret99", false, nil, nil)
+			require.NoError(t, err, "login should succeed regardless of case or padding")
+			assert.NotEmpty(t, token)
+			require.NotNil(t, session)
+			assert.Equal(t, customer.ID, session.ActorID)
+		})
+	}
+}
+
+func TestCustomerLogin_WrongPasswordStillRejected(t *testing.T) {
+	pool := testPool
+	tx := testutil.NewTestTx(t, pool)
+	svc := newAuthService()
+	ctx := context.Background()
+
+	customer := testutil.CreateCustomer(t, tx, testutil.WithEmail("info@thevillagebistro.com"))
+	require.NoError(t, svc.SetPassword(ctx, tx, customer.ID, "supersecret99", testutil.TestActor()))
+
+	// Normalizing the lookup must not weaken the password check itself.
+	_, _, err := svc.CustomerLogin(ctx, tx, "INFO@THEVILLAGEBISTRO.COM", "wrongpassword", false, nil, nil)
+	assert.ErrorIs(t, err, app.ErrInvalidCredentials)
+}
+
+func TestCustomerLogin_UnknownEmailStillRejected(t *testing.T) {
+	pool := testPool
+	tx := testutil.NewTestTx(t, pool)
+	svc := newAuthService()
+	ctx := context.Background()
+
+	_, _, err := svc.CustomerLogin(ctx, tx, "Nobody@example.com", "supersecret99", false, nil, nil)
+	assert.ErrorIs(t, err, app.ErrInvalidCredentials)
+}

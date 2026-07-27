@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/dukerupert/hiri/internal/app"
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/build"
@@ -211,7 +212,9 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Retail account auth routes (magic link, no session required)
 	magicLinkLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkIPLimit, ratelimit.MagicLinkWindow, func(r *http.Request) string {
-		return r.FormValue("email")
+		// Normalized so varying capitalization cannot mint a fresh bucket and
+		// multiply the per-identifier allowance.
+		return domain.NormalizeEmail(r.FormValue("email"))
 	})
 	mux.HandleFunc("GET /account/login", deps.handleAccountLoginPage)
 	mux.Handle("POST /account/login", magicLinkLimit(http.HandlerFunc(deps.handleAccountLoginRequest)))
@@ -261,7 +264,9 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Wholesale auth routes (password, no session required)
 	wholesaleAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.AuthIPLimit, ratelimit.AuthIdentifierLimit, ratelimit.AuthWindow, func(r *http.Request) string {
-		return r.FormValue("email")
+		// Normalized so varying capitalization cannot mint a fresh bucket and
+		// multiply the per-identifier allowance.
+		return domain.NormalizeEmail(r.FormValue("email"))
 	})
 	mux.HandleFunc("GET /wholesale/login", deps.handleWholesaleLoginPage)
 	mux.Handle("POST /wholesale/login", wholesaleAuthLimit(http.HandlerFunc(deps.handleWholesaleLogin)))
@@ -313,7 +318,9 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Staff auth routes (no session required)
 	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {
-		return r.FormValue("email")
+		// Normalized so varying capitalization cannot mint a fresh bucket and
+		// multiply the per-identifier allowance.
+		return domain.NormalizeEmail(r.FormValue("email"))
 	})
 	mux.HandleFunc("GET /auth/staff/login", deps.handleStaffLoginPage)
 	mux.Handle("POST /auth/staff/login", staffAuthLimit(http.HandlerFunc(deps.handleStaffLogin)))

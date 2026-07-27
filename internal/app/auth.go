@@ -75,9 +75,11 @@ func (s *AuthService) WithEmail(env EmailEnv) *AuthService {
 	return s
 }
 
-// StaffLogin authenticates a staff member and creates a session.
+// StaffLogin authenticates a staff member and creates a session. Staff rows are
+// stored with a normalized address (see CreateStaff), so the lookup must
+// normalize too or a capitalized sign-in silently misses the row.
 func (s *AuthService) StaffLogin(ctx context.Context, tx pgx.Tx, email, password string, ipAddress, userAgent *string) (*domain.Session, string, error) {
-	staff, err := s.staff.GetByEmail(ctx, tx, email)
+	staff, err := s.staff.GetByEmail(ctx, tx, domain.NormalizeEmail(email))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, "", ErrInvalidCredentials
@@ -162,9 +164,12 @@ func (s *AuthService) ValidateSession(ctx context.Context, tx pgx.Tx, rawToken s
 	return session, nil
 }
 
-// CustomerLogin authenticates a customer and creates a session.
+// CustomerLogin authenticates a customer and creates a session. The address is
+// normalized first: the lookup is an exact match, so without this a customer
+// whose keyboard capitalizes the first letter fails to authenticate against a
+// row that is plainly there.
 func (s *AuthService) CustomerLogin(ctx context.Context, tx pgx.Tx, email, password string, rememberMe bool, ipAddress, userAgent *string) (*domain.Session, string, error) {
-	customer, err := s.customers.GetByEmail(ctx, tx, email)
+	customer, err := s.customers.GetByEmail(ctx, tx, domain.NormalizeEmail(email))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, "", ErrInvalidCredentials

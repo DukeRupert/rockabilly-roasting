@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -109,4 +110,23 @@ type CustomerGroupMembership struct {
 	CustomerID      uuid.UUID
 	CustomerGroupID uuid.UUID
 	AssignedAt      time.Time
+}
+
+// NormalizeEmail canonicalizes an email address for storage and lookup.
+//
+// Email lookups are exact string matches (`WHERE email = $1`), so an address
+// must be reduced to one canonical form before it is either stored or used to
+// find a row. Without this, "Info@example.com" and "info@example.com" are two
+// different accounts: sign-in fails for the customer who capitalizes, and
+// registration happily creates a duplicate beside the row it could not see.
+//
+// The domain part of an address is case-insensitive per RFC 5321, and while the
+// local part is technically case-sensitive, no mail provider in practice treats
+// it otherwise. Lowercasing the whole address is the pragmatic choice every
+// major platform makes, and matches what cmd/os-migrate already did on import.
+//
+// Apply at every boundary where an address enters the system -- both sides of
+// the comparison must be normalized or the fix only half works.
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }

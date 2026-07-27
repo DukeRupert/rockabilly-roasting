@@ -73,6 +73,10 @@ type ApplyParams struct {
 
 // SubmitApplication creates a new wholesale customer application.
 func (s *WholesaleService) SubmitApplication(ctx context.Context, tx pgx.Tx, p ApplyParams) (*domain.Customer, error) {
+	// Normalize before the duplicate probe, so an applicant who capitalizes
+	// their address cannot slip a second account past the existing-email check.
+	p.Email = domain.NormalizeEmail(p.Email)
+
 	// Check for existing account.
 	existing, err := s.customers.GetByEmail(ctx, tx, p.Email)
 	if err == nil && existing != nil {

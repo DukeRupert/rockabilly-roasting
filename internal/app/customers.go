@@ -44,9 +44,10 @@ func (s *CustomerService) GetCustomer(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return c, nil
 }
 
-// GetCustomerByEmail returns a customer by email.
+// GetCustomerByEmail returns a customer by email. The address is normalized
+// first, so callers may pass raw user input.
 func (s *CustomerService) GetCustomerByEmail(ctx context.Context, tx pgx.Tx, email string) (*domain.Customer, error) {
-	c, err := s.customers.GetByEmail(ctx, tx, email)
+	c, err := s.customers.GetByEmail(ctx, tx, domain.NormalizeEmail(email))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrCustomerNotFound
@@ -65,8 +66,12 @@ func (s *CustomerService) UpdateName(ctx context.Context, tx pgx.Tx, id uuid.UUI
 	return c, nil
 }
 
-// UpdateEmail updates a customer's email after checking uniqueness.
+// UpdateEmail updates a customer's email after checking uniqueness. Normalizing
+// before both the uniqueness probe and the write keeps the check honest: without
+// it, "Info@x.com" would pass a lookup for "info@x.com" and create a duplicate.
 func (s *CustomerService) UpdateEmail(ctx context.Context, tx pgx.Tx, id uuid.UUID, email string) (*domain.Customer, error) {
+	email = domain.NormalizeEmail(email)
+
 	existing, err := s.customers.GetByEmail(ctx, tx, email)
 	if err == nil && existing.ID != id {
 		return nil, ErrEmailAlreadyExists
@@ -156,7 +161,7 @@ func (s *CustomerService) VerifyEmail(ctx context.Context, tx pgx.Tx, id uuid.UU
 // for callers who just want a guest account.
 func (s *CustomerService) CreateRetail(ctx context.Context, tx pgx.Tx, email, firstName, lastName string, phone *string) (*domain.Customer, error) {
 	c, err := s.customers.Create(ctx, tx, store.CreateCustomerParams{
-		Email:     email,
+		Email:     domain.NormalizeEmail(email),
 		FirstName: firstName,
 		LastName:  lastName,
 		Phone:     phone,

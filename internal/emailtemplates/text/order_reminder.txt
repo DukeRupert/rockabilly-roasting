@@ -1,0 +1,15 @@
+{{define "order_reminder.txt"}}Time to Place Your Coffee Order
+
+Hey {{.CompanyName}} -- a quick nudge from the crew at {{.StoreName}}.
+
+To keep your delivery running smooth as a '57 Chevy, get your order in by {{.CutoffLabel}}. That's what lands your beans on schedule next week.
+
+Place your order: {{.OrderURL}}
+
+Need anything else? Just hit reply -- we're always happy to help.
+
+{{.StoreName}}
+{{.StoreURL}}
+
+Don't want these weekly reminders? Reply and we'll take you off the list.
+{{end}}

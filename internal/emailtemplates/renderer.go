@@ -212,6 +212,31 @@ type WholesaleMigratedData struct {
 	StoreURL    string
 }
 
+// OrderReminderData holds data for the weekly wholesale order reminder — the
+// "get your order in before the cutoff" nudge that used to be sent by the
+// standalone rr service against Orderspace.
+type OrderReminderData struct {
+	CompanyName string
+	CutoffLabel string // human cutoff, e.g. "Friday afternoon"
+	OrderURL    string // wholesale portal, replaces the old Orderspace link
+	StoreName   string
+	StoreURL    string
+}
+
+// WholesaleNoticeData holds data for a staff-composed one-off notice sent to
+// the same audience as the weekly reminder (corrections, holiday cutoffs, etc).
+//
+// Paragraphs is plain text, not HTML: staff compose in a textarea and the body
+// is split on blank lines, so the branded shell is preserved and nothing staff
+// type can break the markup.
+type WholesaleNoticeData struct {
+	Heading    string
+	Paragraphs []string
+	OrderURL   string
+	StoreName  string
+	StoreURL   string
+}
+
 // WholesaleSuspendedData holds data for the wholesale suspended notification email.
 type WholesaleSuspendedData struct {
 	CompanyName string

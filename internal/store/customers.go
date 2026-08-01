@@ -84,7 +84,7 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	                 website, wholesale_notes, approved_at, approved_by,
 	                 payment_terms_days, billing_method,
 	                 two_fa_enabled, two_fa_method,
-	                 preferred_local_fulfillment,
+	                 preferred_local_fulfillment, order_reminders_enabled,
 	                 metadata, created_at, updated_at
 	          FROM customers WHERE true`
 	args := []any{}
@@ -144,7 +144,7 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 			&c.Website, &c.WholesaleNotes, &approvedAt, &c.ApprovedBy,
 			&paymentTermsDays, &billingMethod,
 			&c.TwoFAEnabled, &c.TwoFAMethod,
-			&preferredLocal,
+			&preferredLocal, &c.OrderRemindersEnabled,
 			&metadata, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan customer: %w", err)
@@ -619,7 +619,7 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 		        payment_terms_days, billing_method,
 		        qb_customer_id, qb_synced_at,
 		        two_fa_enabled, two_fa_method,
-		        preferred_local_fulfillment,
+		        preferred_local_fulfillment, order_reminders_enabled,
 		        metadata, created_at, updated_at
 		 FROM customers
 		 WHERE account_type = 'wholesale' AND qb_customer_id IS NOT NULL
@@ -648,7 +648,7 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 			&paymentTermsDays, &billingMethod,
 			&c.QBCustomerID, &qbSyncedAt,
 			&c.TwoFAEnabled, &c.TwoFAMethod,
-			&preferredLocal,
+			&preferredLocal, &c.OrderRemindersEnabled,
 			&metadata, &c.CreatedAt, &c.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("scan wholesale customer: %w", err)
@@ -675,33 +675,86 @@ func (s *CustomerStore) ListWholesaleWithQBCustomerID(ctx context.Context, tx pg
 	return customers, rows.Err()
 }
 
+// UpdateOrderRemindersEnabled sets whether the customer receives the weekly
+// wholesale order reminder.
+func (s *CustomerStore) UpdateOrderRemindersEnabled(ctx context.Context, tx pgx.Tx, id uuid.UUID, enabled bool) error {
+	q := sqlcgen.New(tx)
+	if err := q.UpdateCustomerOrderRemindersEnabled(ctx, sqlcgen.UpdateCustomerOrderRemindersEnabledParams{
+		ID:                    id,
+		OrderRemindersEnabled: enabled,
+	}); err != nil {
+		return fmt.Errorf("update order reminders enabled: %w", err)
+	}
+	return nil
+}
+
+// ListOrderReminderRecipients returns approved wholesale customers who placed
+// at least one order in the trailing `since` window and have reminders enabled.
+//
+// Cancelled and refunded orders do not count as activity — an account whose
+// only recent order was cancelled has not actually been buying, and reminding
+// them to "order again" would be wrong. The window is measured against
+// placed_at (when the customer ordered), never created_at, so backfilled and
+// imported orders sort by real-world order date.
+func (s *CustomerStore) ListOrderReminderRecipients(ctx context.Context, tx pgx.Tx, since time.Time) ([]domain.OrderReminderRecipient, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT c.id, c.email, c.company_name, c.first_name, c.last_name,
+		        max(o.placed_at) AS last_order_at
+		 FROM customers c
+		 JOIN orders o ON o.customer_id = c.id
+		 WHERE c.account_type = 'wholesale'
+		   AND c.wholesale_status = 'approved'
+		   AND c.order_reminders_enabled
+		   AND o.channel = 'wholesale'
+		   AND o.status NOT IN ('cancelled', 'refunded')
+		   AND o.placed_at >= $1
+		 GROUP BY c.id, c.email, c.company_name, c.first_name, c.last_name
+		 ORDER BY c.company_name NULLS LAST, c.email`, since)
+	if err != nil {
+		return nil, fmt.Errorf("list order reminder recipients: %w", err)
+	}
+	defer rows.Close()
+
+	recipients := []domain.OrderReminderRecipient{}
+	for rows.Next() {
+		var r domain.OrderReminderRecipient
+		if err := rows.Scan(&r.CustomerID, &r.Email, &r.CompanyName,
+			&r.FirstName, &r.LastName, &r.LastOrderAt); err != nil {
+			return nil, fmt.Errorf("scan order reminder recipient: %w", err)
+		}
+		recipients = append(recipients, r)
+	}
+	return recipients, rows.Err()
+}
+
 // --- Row converters ---
 
 func customerFromRow(r sqlcgen.Customer) *domain.Customer {
 	c := &domain.Customer{
-		ID:               r.ID,
-		Email:            r.Email,
-		EmailVerified:    r.EmailVerified,
-		PasswordHash:     r.PasswordHash,
-		FirstName:        r.FirstName,
-		LastName:         r.LastName,
-		Phone:            r.Phone,
-		TaxExempt:        r.TaxExempt,
-		TaxExemptReason:  r.TaxExemptReason,
-		StripeCustomerID: r.StripeCustomerID,
-		PriceListID:      r.PriceListID,
-		AccountType:      domain.AccountType(r.AccountType),
-		CompanyName:      r.CompanyName,
-		Website:          r.Website,
-		WholesaleNotes:   r.WholesaleNotes,
-		ApprovedAt:       timestampFromPG(r.ApprovedAt),
-		ApprovedBy:       r.ApprovedBy,
-		BillingMethod:    domain.BillingMethod(r.BillingMethod),
-		TwoFAEnabled:     r.TwoFaEnabled,
-		TwoFAMethod:      r.TwoFaMethod,
-		Metadata:         metadataFromJSON(r.Metadata),
-		CreatedAt:        r.CreatedAt,
-		UpdatedAt:        r.UpdatedAt,
+		ID:                    r.ID,
+		Email:                 r.Email,
+		EmailVerified:         r.EmailVerified,
+		PasswordHash:          r.PasswordHash,
+		FirstName:             r.FirstName,
+		LastName:              r.LastName,
+		Phone:                 r.Phone,
+		TaxExempt:             r.TaxExempt,
+		TaxExemptReason:       r.TaxExemptReason,
+		StripeCustomerID:      r.StripeCustomerID,
+		PriceListID:           r.PriceListID,
+		AccountType:           domain.AccountType(r.AccountType),
+		CompanyName:           r.CompanyName,
+		Website:               r.Website,
+		WholesaleNotes:        r.WholesaleNotes,
+		ApprovedAt:            timestampFromPG(r.ApprovedAt),
+		ApprovedBy:            r.ApprovedBy,
+		BillingMethod:         domain.BillingMethod(r.BillingMethod),
+		TwoFAEnabled:          r.TwoFaEnabled,
+		TwoFAMethod:           r.TwoFaMethod,
+		OrderRemindersEnabled: r.OrderRemindersEnabled,
+		Metadata:              metadataFromJSON(r.Metadata),
+		CreatedAt:             r.CreatedAt,
+		UpdatedAt:             r.UpdatedAt,
 	}
 	if r.PaymentTermsDays != nil {
 		v := int(*r.PaymentTermsDays)
@@ -734,4 +787,3 @@ func addressFromRow(r sqlcgen.Address) *domain.Address {
 		IsDefault:   r.IsDefault,
 	}
 }
-

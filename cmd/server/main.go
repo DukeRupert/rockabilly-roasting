@@ -200,6 +200,45 @@ func run() error {
 	}
 	logger.Info("renewal notification send hour configured", "hour", renewalEmailSendHour, "tz", merchantTZName)
 
+	// Weekly wholesale order reminder — the "get your order in before the
+	// cutoff" nudge migrated off the standalone Orderspace-era rr service.
+	//
+	// It carries its own timezone rather than reusing merchantTZ: the old
+	// service ran this on America/Denver while the rest of this app defaults to
+	// America/Los_Angeles, and changing MERCHANT_TIMEZONE to reconcile them
+	// would also move the subscription renewal anchor. Unset means "merchant
+	// local", which is the right default once the two agree.
+	reminderTZ := merchantTZ
+	reminderTZName := merchantTZName
+	if raw := os.Getenv("ORDER_REMINDER_TIMEZONE"); raw != "" {
+		loc, convErr := time.LoadLocation(raw)
+		if convErr != nil {
+			return fmt.Errorf("load ORDER_REMINDER_TIMEZONE %q: %w", raw, convErr)
+		}
+		reminderTZ, reminderTZName = loc, raw
+	}
+	reminderHour := 10
+	if raw := os.Getenv("ORDER_REMINDER_HOUR"); raw != "" {
+		h, convErr := strconv.Atoi(raw)
+		if convErr != nil || h < 0 || h > 23 {
+			return fmt.Errorf("ORDER_REMINDER_HOUR must be an integer 0–23, got %q", raw)
+		}
+		reminderHour = h
+	}
+	reminderWeekday := time.Friday
+	if raw := os.Getenv("ORDER_REMINDER_WEEKDAY"); raw != "" {
+		d, convErr := parseWeekday(raw)
+		if convErr != nil {
+			return convErr
+		}
+		reminderWeekday = d
+	}
+	reminderScheduleNote := fmt.Sprintf("Sends automatically every %s at %s %s.",
+		reminderWeekday, formatHour(reminderHour), reminderTZName)
+	if os.Getenv("DISABLE_ORDER_REMINDERS") != "" {
+		reminderScheduleNote = "Automatic sending is disabled on this deployment (DISABLE_ORDER_REMINDERS)."
+	}
+
 	// QuickBooks Online integration
 	qbCredStore := store.NewQBCredentialStore()
 	var qbClient quickbooks.Client
@@ -359,6 +398,8 @@ func run() error {
 	river.AddWorker(workers, jobs.NewShippoTrackingUpdateWorker(fulfillmentSvc, orderSvc, pool))
 	river.AddWorker(workers, jobs.NewAbandonedOrderCleanupWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewShippedOrderAutoDeliverWorker(orderSvc, pool))
+	river.AddWorker(workers, jobs.NewOrderReminderWorker(wholesaleSvc, pool))
+	river.AddWorker(workers, jobs.NewWholesaleNoticeWorker(wholesaleSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)
 	// See below after riverClient creation.
@@ -397,6 +438,26 @@ func run() error {
 			},
 			&river.PeriodicJobOpts{RunOnStart: true},
 		),
+	}
+	// Weekly wholesale order reminder. No RunOnStart — a deploy must never
+	// fire an unscheduled blast at the whole active wholesale list; the send
+	// only happens when the schedule genuinely comes round.
+	if os.Getenv("DISABLE_ORDER_REMINDERS") == "" {
+		periodicJobs = append(periodicJobs, river.NewPeriodicJob(
+			jobs.NewWeeklySchedule(reminderWeekday, reminderHour, 0, reminderTZ),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.OrderReminderSchedulerArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 24 * time.Hour,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
+		))
+		logger.Info("wholesale order reminder scheduled",
+			"weekday", reminderWeekday.String(), "hour", reminderHour, "tz", reminderTZName)
+	} else {
+		logger.Warn("wholesale order reminders disabled via DISABLE_ORDER_REMINDERS")
 	}
 	// Subscription renewal scheduler — scans for due subscriptions every minute
 	// and enqueues renewal charges (which call Stripe). Defaults on so staging
@@ -472,6 +533,7 @@ func run() error {
 
 	// Register scheduler worker (needs the client for transactional inserts)
 	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient, metricsReg))
+	river.AddWorker(workers, jobs.NewOrderReminderSchedulerWorker(wholesaleSvc, pool, riverClient, metricsReg))
 
 	// BuyLabel needs the river client to enqueue the StoreLabelToR2 follow-up
 	// job atomically with the shipment write.
@@ -565,6 +627,7 @@ func run() error {
 		EmailFrom:              fromAddr,
 		StaffEmail:             staffEmail,
 		MerchantTZ:             merchantTZ,
+		ReminderScheduleNote:   reminderScheduleNote,
 	}
 
 	handler := web.NewRouter(deps)
@@ -677,4 +740,32 @@ func tenantIDFromEnv() uuid.UUID {
 	}
 	// Single-tenant default — a deterministic UUID for this deployment
 	return uuid.MustParse("00000000-0000-0000-0000-000000000001")
+}
+
+// parseWeekday resolves a weekday name (case-insensitive, e.g. "friday") for
+// the ORDER_REMINDER_WEEKDAY override.
+func parseWeekday(s string) (time.Weekday, error) {
+	for d := time.Sunday; d <= time.Saturday; d++ {
+		if strings.EqualFold(s, d.String()) {
+			return d, nil
+		}
+	}
+	return 0, fmt.Errorf("ORDER_REMINDER_WEEKDAY must be a weekday name, got %q", s)
+}
+
+// formatHour renders a 24-hour clock hour as a 12-hour label for staff-facing
+// copy ("10am", "2pm").
+func formatHour(h int) string {
+	suffix := "am"
+	display := h
+	if h >= 12 {
+		suffix = "pm"
+	}
+	if h > 12 {
+		display = h - 12
+	}
+	if display == 0 {
+		display = 12
+	}
+	return fmt.Sprintf("%d%s", display, suffix)
 }

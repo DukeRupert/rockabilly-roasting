@@ -110,3 +110,8 @@ SELECT count(*) FROM addresses WHERE customer_id = $1;
 
 -- name: DeleteAddress :exec
 DELETE FROM addresses WHERE id = $1 AND customer_id = $2;
+
+-- name: UpdateCustomerOrderRemindersEnabled :exec
+UPDATE customers
+SET order_reminders_enabled = $2, updated_at = now()
+WHERE id = $1;

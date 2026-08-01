@@ -1,0 +1,11 @@
+{{define "wholesale_notice.txt"}}{{.Heading}}
+{{range .Paragraphs}}
+{{.}}
+{{end}}
+Go to your account: {{.OrderURL}}
+
+Questions? Just hit reply -- we're always happy to help.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

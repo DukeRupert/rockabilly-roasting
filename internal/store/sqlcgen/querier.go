@@ -256,6 +256,7 @@ type Querier interface {
 	UpdateCustomerEmail(ctx context.Context, arg UpdateCustomerEmailParams) (Customer, error)
 	UpdateCustomerEmailVerified(ctx context.Context, arg UpdateCustomerEmailVerifiedParams) error
 	UpdateCustomerName(ctx context.Context, arg UpdateCustomerNameParams) (Customer, error)
+	UpdateCustomerOrderRemindersEnabled(ctx context.Context, arg UpdateCustomerOrderRemindersEnabledParams) error
 	UpdateCustomerPassword(ctx context.Context, arg UpdateCustomerPasswordParams) error
 	UpdateCustomerPaymentTerms(ctx context.Context, arg UpdateCustomerPaymentTermsParams) error
 	UpdateCustomerPhone(ctx context.Context, arg UpdateCustomerPhoneParams) (Customer, error)

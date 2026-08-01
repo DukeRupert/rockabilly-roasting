@@ -28,6 +28,15 @@ type CustomerShowProps struct {
 }
 
 // availableGroups returns groups the customer is NOT already a member of.
+// boolToggleValue returns the value a toggle form should post: the opposite of
+// the current state, so the single button flips the setting.
+func boolToggleValue(current bool) string {
+	if current {
+		return "false"
+	}
+	return "true"
+}
+
 func (p CustomerShowProps) AvailableGroups() []domain.CustomerGroup {
 	memberIDs := make(map[uuid.UUID]bool, len(p.MemberGroups))
 	for _, g := range p.MemberGroups {
@@ -379,6 +388,26 @@ templ CustomerShowContent(props CustomerShowProps) {
 										<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
 									</svg>
 								</div>
+							</form>
+						</dd>
+					</div>
+					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+						<dt class="text-sm font-medium text-rr-muted">Weekly order reminder</dt>
+						<dd class="mt-1 sm:col-span-2 sm:mt-0">
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/order-reminders", props.Customer.ID)) }
+								class="flex items-center gap-2"
+							>
+								<input type="hidden" name="enabled" value={ boolToggleValue(props.Customer.OrderRemindersEnabled) }/>
+								if props.Customer.OrderRemindersEnabled {
+									<span class="badge badge-green">On</span>
+									<button type="submit" class="btn btn-secondary">Turn off</button>
+								} else {
+									<span class="badge badge-grey">Off</span>
+									<button type="submit" class="btn btn-secondary">Turn on</button>
+								}
+								<span class="text-xs text-rr-muted">Sent Fridays to accounts that ordered in the last 3 weeks.</span>
 							</form>
 						</dd>
 					</div>

@@ -464,6 +464,12 @@ func WithOrderTotals(subtotal, discount, shipping, tax, total int) OrderOption {
 	}
 }
 
+// WithPlacedAt backdates an order so tests can exercise date-window queries
+// (e.g. the order-reminder lookback) without waiting.
+func WithPlacedAt(t time.Time) OrderOption {
+	return func(p *sqlcgen.CreateOrderParams) { p.PlacedAt = t }
+}
+
 func WithShippingMethod(m domain.ShippingMethod) OrderOption {
 	return func(p *sqlcgen.CreateOrderParams) {
 		s := string(m)

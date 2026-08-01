@@ -81,6 +81,10 @@ type Deps struct {
 	EmailFrom              string         // sender address for transactional emails
 	StaffEmail             string         // staff notification recipient
 	MerchantTZ             *time.Location // local timezone for day-bounded queries (e.g. "today's revenue")
+	// ReminderScheduleNote is the human sentence describing when the weekly
+	// wholesale order reminder fires, built from the same env config the
+	// scheduler uses so the admin page can never drift from reality.
+	ReminderScheduleNote string
 }
 
 // MetricsMux returns a handler for the internal metrics listener.
@@ -412,6 +416,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/customers/{id}/send-password-setup", deps.handleAdminCustomerSendPasswordSetup)
 	adminMux.HandleFunc("POST /admin/customers/{id}/send-verification", deps.handleAdminCustomerSendVerification)
 	adminMux.HandleFunc("POST /admin/customers/{id}/send-white-label-invite", deps.handleAdminCustomerSendWhiteLabelInvite)
+	adminMux.Handle("POST /admin/customers/{id}/order-reminders", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminCustomerOrderReminders)))
 
 	// Admin customer groups (access control for restricted products; not pricing)
 	adminMux.HandleFunc("GET /admin/groups", deps.handleAdminGroupList)
@@ -472,6 +477,10 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin wholesale
 	adminMux.HandleFunc("GET /admin/wholesale", deps.handleAdminWholesaleList)
+	adminMux.HandleFunc("GET /admin/wholesale/reminders", deps.handleAdminWholesaleReminders)
+	// Sending mail to the whole active wholesale list is a customer-write action,
+	// not a view — gate it behind the same permission as editing an account.
+	adminMux.Handle("POST /admin/wholesale/reminders/notice", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminWholesaleNotice)))
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/price-list", deps.handleAdminWholesalePriceList)
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/approve", deps.handleAdminWholesaleApprove)
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/decline", deps.handleAdminWholesaleDecline)

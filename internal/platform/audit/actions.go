@@ -62,6 +62,8 @@ const (
 	AuditCustomerStripeIDLinked          = "customer.stripe_customer_id_linked"
 	AuditCustomerPriceListUpdated        = "customer.price_list_updated"
 	AuditCustomerEmailUpdated            = "customer.email_updated"
+	AuditCustomerOrderRemindersEnabled   = "customer.order_reminders_enabled"
+	AuditCustomerOrderRemindersDisabled  = "customer.order_reminders_disabled"
 
 	// Customer group actions
 	AuditCustomerGroupCreated       = "customer_group.created"
@@ -181,6 +183,8 @@ const (
 	AuditEmailWhiteLabelInvite             = "email.white_label_invite"
 	AuditEmailWhiteLabelSubmitted          = "email.white_label_submitted"
 	AuditEmailStaffInvite                  = "email.staff_invite"
+	AuditEmailOrderReminderSent            = "email.order_reminder_sent"
+	AuditEmailWholesaleNoticeSent          = "email.wholesale_notice_sent"
 
 	// Attribute actions
 	AuditAttributeSetCreated      = "attribute_set.created"

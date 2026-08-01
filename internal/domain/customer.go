@@ -69,6 +69,9 @@ type Customer struct {
 	// Persisted only as ShippingMethodPickup or ShippingMethodLocalDelivery;
 	// ShippingMethodShipped is never stored here (it's the non-local fallback).
 	PreferredLocalFulfillment *ShippingMethod
+	// OrderRemindersEnabled controls whether this account receives the weekly
+	// wholesale order reminder. Staff can clear it per customer; defaults true.
+	OrderRemindersEnabled bool
 	Metadata         map[string]any
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -80,6 +83,31 @@ func (c *Customer) IsApprovedWholesale() bool {
 	return c.AccountType == AccountTypeWholesale &&
 		c.WholesaleStatus != nil &&
 		*c.WholesaleStatus == WholesaleStatusApproved
+}
+
+// OrderReminderRecipient is one account on the weekly wholesale order-reminder
+// list: an approved wholesale customer that ordered inside the lookback window
+// and has not opted out. LastOrderAt is carried so the admin preview can show
+// staff why each account qualified.
+type OrderReminderRecipient struct {
+	CustomerID  uuid.UUID
+	Email       string
+	CompanyName *string
+	FirstName   string
+	LastName    string
+	LastOrderAt time.Time
+}
+
+// DisplayName is the label staff recognize an account by — company name for a
+// wholesale account, falling back to the contact's name, then the address.
+func (r OrderReminderRecipient) DisplayName() string {
+	if r.CompanyName != nil && strings.TrimSpace(*r.CompanyName) != "" {
+		return strings.TrimSpace(*r.CompanyName)
+	}
+	if name := strings.TrimSpace(r.FirstName + " " + r.LastName); name != "" {
+		return name
+	}
+	return r.Email
 }
 
 // Address represents a shipping or billing address.

@@ -195,6 +195,7 @@ type Customer struct {
 	BillingMethod             string             `json:"billing_method"`
 	PreferredLocalFulfillment *string            `json:"preferred_local_fulfillment"`
 	PriceListID               *uuid.UUID         `json:"price_list_id"`
+	OrderRemindersEnabled     bool               `json:"order_reminders_enabled"`
 }
 
 type CustomerGroup struct {
@@ -463,6 +464,7 @@ type QbCredential struct {
 	RefreshExpiresAt time.Time `json:"refresh_expires_at"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
+	TenantID         uuid.UUID `json:"tenant_id"`
 }
 
 type ResetToken struct {

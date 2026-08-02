@@ -218,9 +218,15 @@ type WholesaleMigratedData struct {
 type OrderReminderData struct {
 	CompanyName string
 	CutoffLabel string // human cutoff, e.g. "Friday afternoon"
-	OrderURL    string // wholesale portal, replaces the old Orderspace link
-	StoreName   string
-	StoreURL    string
+	// LastItems is the customer's most recent order, printed so they can
+	// decide in the inbox rather than after signing in. Empty when the lookup
+	// failed or they have no completed order — the email still sends.
+	LastItems     []OrderLineItemData
+	LastOrderedOn *time.Time
+	ReorderURL    string // deep link that prefills a cart from LastItems
+	OrderURL      string // wholesale portal, replaces the old Orderspace link
+	StoreName     string
+	StoreURL      string
 }
 
 // WholesaleNoticeData holds data for a staff-composed one-off notice sent to

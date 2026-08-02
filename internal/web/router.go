@@ -296,6 +296,9 @@ func NewRouter(deps *Deps) http.Handler {
 	wholesaleMux.HandleFunc("GET /wholesale/account/orders", deps.handleWholesaleAccountOrders)
 	wholesaleMux.HandleFunc("GET /wholesale/account/orders/{id}", deps.handleWholesaleAccountOrderShow)
 	wholesaleMux.HandleFunc("POST /wholesale/account/orders/{id}/reorder", deps.handleWholesaleReorder)
+	// GET entry point for the reminder email's "Reorder This" button — resolves
+	// the customer's last order server-side (see handleWholesaleReorderLatest).
+	wholesaleMux.HandleFunc("GET /wholesale/reorder", deps.handleWholesaleReorderLatest)
 	wholesaleMux.HandleFunc("GET /wholesale/account/settings", deps.handleWholesaleAccountSettings)
 	wholesaleMux.HandleFunc("POST /wholesale/account/settings", deps.handleWholesaleAccountSettingsUpdate)
 	wholesaleMux.HandleFunc("GET /wholesale/account/addresses", deps.handleWholesaleAccountAddresses)
@@ -306,6 +309,7 @@ func NewRouter(deps *Deps) http.Handler {
 	wholesaleMux.HandleFunc("GET /wholesale/account/security", deps.handleWholesaleAccountSecurity)
 	wholesaleMux.HandleFunc("POST /wholesale/account/security/set", deps.handleWholesaleAccountPasswordSet)
 	wholesaleMux.HandleFunc("POST /wholesale/account/security/change", deps.handleWholesaleAccountPasswordChange)
+	mux.Handle("GET /wholesale/reorder", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("GET /wholesale/portal", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("GET /wholesale/portal/", deps.requireApprovedWholesale(wholesaleMux))
 	mux.Handle("POST /wholesale/portal/{path...}", deps.requireApprovedWholesale(wholesaleMux))

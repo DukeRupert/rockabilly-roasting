@@ -3,9 +3,18 @@
 Hey {{.CompanyName}} -- a quick nudge from the crew at {{.StoreName}}.
 
 To keep your delivery running smooth as a '57 Chevy, get your order in by {{.CutoffLabel}}. That's what lands your beans on schedule next week.
+{{if .LastItems}}
+LAST TIME{{if .LastOrderedOn}} - {{date .LastOrderedOn}}{{end}}
+{{range .LastItems}}  {{.ProductName}} x {{.Quantity}}
+{{end}}
+One click loads this into a new order -- change anything you like before you send it.
 
+Reorder this: {{.ReorderURL}}
+
+Or start a different order: {{.OrderURL}}
+{{else}}
 Place your order: {{.OrderURL}}
-
+{{end}}
 Need anything else? Just hit reply -- we're always happy to help.
 
 {{.StoreName}}

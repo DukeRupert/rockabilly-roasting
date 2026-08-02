@@ -30,16 +30,30 @@ const OrderReminderWindow = 21 * 24 * time.Hour
 // delivery schedule still runs on.
 const OrderReminderCutoffLabel = "Friday afternoon"
 
+// OrderReminderSuppressWindow skips anyone who has already ordered since the
+// last reminder went out. Without it a customer who ordered on Wednesday still
+// gets Friday's "time to place your order" — and a few weeks of that teaches
+// people the email is noise, which costs far more than the missed nudge.
+//
+// It equals the reminder interval by definition: the job runs weekly, so
+// "ordered inside the last 7 days" is exactly "ordered since we last asked".
+const OrderReminderSuppressWindow = 7 * 24 * time.Hour
+
 // ErrEmptyNotice is returned when a staff-composed notice has no subject or
 // no body — a blank blast to every active wholesale account is never intended.
 var ErrEmptyNotice = errors.New("notice subject and body are both required")
+
+// ErrNoPreviousOrder is returned when a reorder is requested for a customer
+// who has no completed wholesale order to copy.
+var ErrNoPreviousOrder = errors.New("no previous wholesale order")
 
 // ListOrderReminderRecipients returns the accounts that would receive this
 // week's reminder. It is the shared audience query: the scheduler enqueues
 // from it and the admin preview renders from it, so what staff see in the
 // preview is exactly who gets mail.
 func (s *WholesaleService) ListOrderReminderRecipients(ctx context.Context, tx pgx.Tx, now time.Time) ([]domain.OrderReminderRecipient, error) {
-	return s.customers.ListOrderReminderRecipients(ctx, tx, now.Add(-OrderReminderWindow))
+	return s.customers.ListOrderReminderRecipients(ctx, tx,
+		now.Add(-OrderReminderWindow), now.Add(-OrderReminderSuppressWindow))
 }
 
 // SetOrderRemindersEnabled turns the weekly reminder on or off for one
@@ -73,13 +87,33 @@ func (s *WholesaleService) SetOrderRemindersEnabled(ctx context.Context, tx pgx.
 // house rule; the audit row is written in its own tx afterwards so a Postmark
 // failure never leaves a record claiming the mail went out.
 func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID) error {
-	var customer *domain.Customer
+	var (
+		customer  *domain.Customer
+		lastItems []emailtemplates.OrderLineItemData
+		lastOn    *time.Time
+	)
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		c, err := s.customers.GetByID(ctx, tx, customerID)
 		if err != nil {
 			return fmt.Errorf("get customer %s: %w", customerID, err)
 		}
 		customer = c
+
+		// The customer's last order is printed in the email so the decision
+		// ("do I need this again?") happens in the inbox instead of after a
+		// login. Best-effort: a reminder with no item list is still useful, so
+		// a lookup failure must not block the send.
+		order, itemsErr := s.lastWholesaleOrder(ctx, tx, customerID)
+		if itemsErr != nil || order == nil {
+			return nil
+		}
+		lineItems, itemsErr := s.orders.ListLineItems(ctx, tx, order.ID)
+		if itemsErr != nil {
+			return nil
+		}
+		lastItems = emailLineItemsFrom(ctx, tx, s.catalog, lineItems)
+		placed := order.PlacedAt
+		lastOn = &placed
 		return nil
 	}); err != nil {
 		return err
@@ -94,11 +128,17 @@ func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.
 	}
 
 	html, text, err := s.email.Renderer.Render("order_reminder", emailtemplates.OrderReminderData{
-		CompanyName: reminderGreeting(customer),
-		CutoffLabel: OrderReminderCutoffLabel,
-		OrderURL:    s.email.BaseURL + "/wholesale",
-		StoreName:   s.email.StoreName,
-		StoreURL:    s.email.BaseURL,
+		CompanyName:   reminderGreeting(customer),
+		CutoffLabel:   OrderReminderCutoffLabel,
+		LastItems:     lastItems,
+		LastOrderedOn: lastOn,
+		// Deep link straight into a cart prefilled from their last order.
+		// Resolved server-side at click time rather than baking an order ID
+		// into a URL that will sit in an inbox.
+		ReorderURL: s.email.BaseURL + "/wholesale/reorder",
+		OrderURL:   s.email.BaseURL + "/wholesale/portal",
+		StoreName:  s.email.StoreName,
+		StoreURL:   s.email.BaseURL,
 	})
 	if err != nil {
 		s.metrics.EmailsSent.WithLabelValues("order_reminder", "failed").Inc()
@@ -132,6 +172,45 @@ func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.
 
 	s.metrics.EmailsSent.WithLabelValues("order_reminder", "sent").Inc()
 	return nil
+}
+
+// lastWholesaleOrder returns the customer's most recent wholesale order, or
+// nil when they have none. Cancelled, refunded and unconfirmed orders are
+// excluded — reordering from an order that never completed would hand the
+// customer back a basket they already abandoned.
+//
+// Shared by the reminder email (to print the item list) and the reorder deep
+// link (to decide what to load), so the two can never disagree about which
+// order "last time" refers to.
+func (s *WholesaleService) lastWholesaleOrder(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (*domain.Order, error) {
+	channel := domain.OrderChannelWholesale
+	orders, err := s.orders.ListOrders(ctx, tx, store.OrderFilter{
+		CustomerID:               &customerID,
+		Channel:                  &channel,
+		ExcludeCancelledRefunded: true,
+		ExcludeUnconfirmed:       true,
+		Limit:                    1, // ListOrders sorts placed_at DESC
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list last wholesale order: %w", err)
+	}
+	if len(orders) == 0 {
+		return nil, nil
+	}
+	return &orders[0], nil
+}
+
+// LastWholesaleOrderID exposes the resolved "last order" to the web layer for
+// the reorder deep link.
+func (s *WholesaleService) LastWholesaleOrderID(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (uuid.UUID, error) {
+	order, err := s.lastWholesaleOrder(ctx, tx, customerID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if order == nil {
+		return uuid.Nil, ErrNoPreviousOrder
+	}
+	return order.ID, nil
 }
 
 // NoticeParams is a staff-composed one-off message to the reminder audience.

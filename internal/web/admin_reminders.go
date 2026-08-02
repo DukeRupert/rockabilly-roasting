@@ -124,6 +124,7 @@ func (d *Deps) reminderProps(r *http.Request, name, role string) (admin.Wholesal
 	return admin.WholesaleRemindersProps{
 		Recipients:   recipients,
 		WindowDays:   int(app.OrderReminderWindow / (24 * time.Hour)),
+		SuppressDays: int(app.OrderReminderSuppressWindow / (24 * time.Hour)),
 		CutoffLabel:  app.OrderReminderCutoffLabel,
 		ScheduleNote: d.ReminderScheduleNote,
 		StaffName:    name,

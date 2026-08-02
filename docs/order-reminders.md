@@ -21,10 +21,46 @@ An account is eligible when **all** of these hold:
 | `account_type = 'wholesale'` and `wholesale_status = 'approved'` | Retail customers and pending/suspended/declined accounts are never reminded |
 | At least one order with `channel = 'wholesale'` placed in the last **21 days** | The reminder is for accounts that are actively buying; a dormant account needs a sales call, not an automated nudge |
 | That order's status is not `cancelled` or `refunded` | A cancelled order is not buying activity |
+| Their **most recent** order is older than **7 days** | Someone who ordered Wednesday doesn't need Friday's nudge. A few weeks of irrelevant reminders teaches people to ignore the email, which costs more than the missed prompt |
 | `customers.order_reminders_enabled = true` | Per-customer opt-out |
 
 The window is measured against `orders.placed_at`, never `created_at`, so
 imported and backfilled orders sort by real-world order date.
+
+The 7-day suppression equals the reminder interval by definition, so the rule
+reads as "skip anyone who has ordered since the last time we asked". It keys off
+the *most recent* order (a `HAVING` on the aggregate), so a customer who ordered
+three weeks ago and again on Wednesday is correctly skipped.
+
+## Reordering from the email
+
+The reminder prints the customer's last order — item names, as labelled in the
+confirmation email, with quantities — so the "do I need this again?" decision
+happens in the inbox rather than after a login. The CTA is **Reorder This**,
+pointing at `GET /wholesale/reorder`.
+
+That route resolves "last order" server-side at click time rather than baking an
+order ID into a URL that sits in an inbox indefinitely, and shares
+`lastWholesaleOrder` with the email so the two can never disagree about which
+order "last time" means. It then runs the same cart-loading path as the
+order-history Reorder button (`reorderIntoCart`): set semantics, retired or
+no-longer-available variants skipped and counted, landing on checkout with the
+explanatory banner.
+
+A mutating GET is acceptable here because the route sits behind the wholesale
+auth guard — inbox link scanners and prefetchers arrive with no session cookie,
+so they get the login redirect and never touch a cart.
+
+Logged-out clicks now round-trip: `requireCustomerSession` carries the requested
+page through `?redirect=`, validated by `safeNextOr` against off-site bounces,
+and the login form preserves it across a failed password attempt. GETs only —
+replaying a POST after login would re-submit something the customer never
+re-confirmed. This fixed a pre-existing gap that dropped the destination for
+*any* wholesale deep link or bookmark hit after session expiry.
+
+If the customer has no completed wholesale order, the link lands on the
+quick-order sheet; the portal's "Same as last time?" card hides itself, so the
+page explains the situation without needing a banner.
 
 Eligibility is re-checked at send time, not just at scan time — an account
 suspended in the gap between the scan and the send (which River retries can
@@ -98,6 +134,8 @@ blast at the whole active wholesale list.
 | Scheduler + per-customer send jobs | `jobs/order_reminder.go` |
 | Notice job | `jobs/wholesale_notice.go` |
 | Admin page + toggle handlers | `web/admin_reminders.go`, `ui/admin/wholesale_reminders.templ` |
+| Reorder deep link | `web/wholesale.go` → `handleWholesaleReorderLatest`, `reorderIntoCart` |
+| Login return-trip | `web/customer_auth.go` → `wholesaleLoginWithReturn`, `safeNextOr` |
 | Email templates | `emailtemplates/{html,text}/order_reminder.*`, `wholesale_notice.*` |
 | Schema | `db/migrations/062_customer_order_reminders.sql` |
 

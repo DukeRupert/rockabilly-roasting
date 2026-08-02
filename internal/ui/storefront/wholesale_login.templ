@@ -1,10 +1,26 @@
 package storefront
 
-import "github.com/dukerupert/hiri/internal/ui/layouts"
+import (
+	"net/url"
+
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
 
 type WholesaleLoginProps struct {
 	Error string
 	Email string
+	// Redirect is the page the customer was trying to reach before being sent
+	// to log in. Carried on the form action so it survives the POST.
+	Redirect string
+}
+
+// loginAction appends the return destination to the form target when there is
+// one, so handleWholesaleLogin can read it back off the query string.
+func loginAction(redirect string) string {
+	if redirect == "" {
+		return "/wholesale/login"
+	}
+	return "/wholesale/login?redirect=" + url.QueryEscape(redirect)
 }
 
 templ WholesaleLoginContent(props WholesaleLoginProps) {
@@ -33,7 +49,7 @@ templ WholesaleLoginContent(props WholesaleLoginProps) {
 						<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">{ props.Error }</p>
 					</div>
 				}
-				<form method="post" action="/wholesale/login" class="space-y-5">
+				<form method="post" action={ templ.SafeURL(loginAction(props.Redirect)) } class="space-y-5">
 					<div>
 						<label for="email" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Email address</label>
 						<input

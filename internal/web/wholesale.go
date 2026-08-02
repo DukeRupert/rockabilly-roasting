@@ -469,8 +469,7 @@ func (d *Deps) handleWholesaleBulkAdd(w http.ResponseWriter, r *http.Request) {
 // shorted. Current prices apply, so the checkout's existing price-change review
 // still governs the final amount.
 func (d *Deps) handleWholesaleReorder(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	customer, ok := auth.CustomerFromContext(ctx)
+	customer, ok := auth.CustomerFromContext(r.Context())
 	if !ok {
 		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
 		return
@@ -482,11 +481,58 @@ func (d *Deps) handleWholesaleReorder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	d.reorderIntoCart(w, r, customer, orderID)
+}
+
+// handleWholesaleReorderLatest is the GET entry point used by the weekly
+// reminder email's "Reorder This" button. Email clients can only issue GET and
+// the email carries no order ID, so the customer's last order is resolved
+// server-side at click time — which also keeps order IDs out of URLs that sit
+// in inboxes indefinitely.
+//
+// A mutating GET is acceptable here precisely because the route is behind the
+// wholesale auth guard: link scanners and inbox prefetchers arrive without a
+// session cookie, so they get the login redirect and never touch a cart.
+func (d *Deps) handleWholesaleReorderLatest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	customer, ok := auth.CustomerFromContext(ctx)
+	if !ok {
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+		return
+	}
+
+	var orderID uuid.UUID
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		orderID, txErr = d.WholesaleService.LastWholesaleOrderID(ctx, tx, customer.ID)
+		return txErr
+	})
+	if errors.Is(err, app.ErrNoPreviousOrder) {
+		// Nothing to copy — send them to the quick-order sheet rather than an
+		// error; they came here to place an order either way. The portal's
+		// "Same as last time?" card hides itself when there is no last order,
+		// so the page explains the situation without a banner.
+		http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
+		return
+	}
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	d.reorderIntoCart(w, r, customer, orderID)
+}
+
+// reorderIntoCart loads every line of orderID into the caller's wholesale cart
+// and redirects to checkout. Shared by the order-history POST and the email
+// GET so both behave identically.
+func (d *Deps) reorderIntoCart(w http.ResponseWriter, r *http.Request, customer *domain.Customer, orderID uuid.UUID) {
+	ctx := r.Context()
 	cartID := getWholesaleCartID(r)
 	var resultCartID uuid.UUID
 	var added, skipped int
 
-	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		// scoping: AsStaff is safe — ownership is enforced immediately below.
 		order, txErr := d.OrderService.GetOrderAsStaff(ctx, tx, orderID)
 		if txErr != nil {

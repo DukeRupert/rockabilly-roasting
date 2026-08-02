@@ -8,11 +8,27 @@ package storefront
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/dukerupert/hiri/internal/ui/layouts"
+import (
+	"net/url"
+
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
 
 type WholesaleLoginProps struct {
 	Error string
 	Email string
+	// Redirect is the page the customer was trying to reach before being sent
+	// to log in. Carried on the form action so it survives the POST.
+	Redirect string
+}
+
+// loginAction appends the return destination to the form target when there is
+// one, so handleWholesaleLogin can read it back off the query string.
+func loginAction(redirect string) string {
+	if redirect == "" {
+		return "/wholesale/login"
+	}
+	return "/wholesale/login?redirect=" + url.QueryEscape(redirect)
 }
 
 func WholesaleLoginContent(props WholesaleLoginProps) templ.Component {
@@ -48,7 +64,7 @@ func WholesaleLoginContent(props WholesaleLoginProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_login.templ`, Line: 33, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_login.templ`, Line: 49, Col: 101}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -59,20 +75,33 @@ func WholesaleLoginContent(props WholesaleLoginProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"post\" action=\"/wholesale/login\" class=\"space-y-5\"><div><label for=\"email\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Email address</label> <input type=\"email\" name=\"email\" id=\"email\" required autocomplete=\"email\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"post\" action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var3 string
-		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Email)
+		var templ_7745c5c3_Var3 templ.SafeURL
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(loginAction(props.Redirect)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_login.templ`, Line: 45, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_login.templ`, Line: 52, Col: 75}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" placeholder=\"you@example.com\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><div><label for=\"password\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Password</label> <input type=\"password\" name=\"password\" id=\"password\" required autocomplete=\"current-password\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><p><a href=\"/account/forgot-password\" class=\"font-oswald font-bold text-rust text-xs underline\" style=\"letter-spacing:0.08em;\">Forgot your password?</a></p><label for=\"remember_me\" class=\"flex items-center gap-2.5 cursor-pointer\"><input type=\"checkbox\" name=\"remember_me\" id=\"remember_me\" class=\"size-4 border-2 border-ink bg-paper focus:outline-none\" style=\"accent-color: var(--color-rust);\"> <span class=\"font-oswald text-ink-soft text-sm\" style=\"letter-spacing:0.04em;\">Remember me</span></label> <button type=\"submit\" class=\"btn-stamp w-full inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Sign in <svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></button></form></div><p class=\"mt-6 text-center font-oswald text-ink-soft text-sm\" style=\"letter-spacing:0.04em;\">Don't have a wholesale account? <a href=\"/wholesale/apply\" class=\"font-bold text-rust hover:text-rust-deep underline underline-offset-2\">Apply here</a>.</p></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" class=\"space-y-5\"><div><label for=\"email\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Email address</label> <input type=\"email\" name=\"email\" id=\"email\" required autocomplete=\"email\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Email)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_login.templ`, Line: 61, Col: 26}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" placeholder=\"you@example.com\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><div><label for=\"password\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Password</label> <input type=\"password\" name=\"password\" id=\"password\" required autocomplete=\"current-password\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><p><a href=\"/account/forgot-password\" class=\"font-oswald font-bold text-rust text-xs underline\" style=\"letter-spacing:0.08em;\">Forgot your password?</a></p><label for=\"remember_me\" class=\"flex items-center gap-2.5 cursor-pointer\"><input type=\"checkbox\" name=\"remember_me\" id=\"remember_me\" class=\"size-4 border-2 border-ink bg-paper focus:outline-none\" style=\"accent-color: var(--color-rust);\"> <span class=\"font-oswald text-ink-soft text-sm\" style=\"letter-spacing:0.04em;\">Remember me</span></label> <button type=\"submit\" class=\"btn-stamp w-full inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Sign in <svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3\"></path></svg></button></form></div><p class=\"mt-6 text-center font-oswald text-ink-soft text-sm\" style=\"letter-spacing:0.04em;\">Don't have a wholesale account? <a href=\"/wholesale/apply\" class=\"font-bold text-rust hover:text-rust-deep underline underline-offset-2\">Apply here</a>.</p></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -96,12 +125,12 @@ func WholesaleLoginPage(props WholesaleLoginProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -122,7 +151,7 @@ func WholesaleLoginPage(props WholesaleLoginProps) templ.Component {
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
 			Title:       "Wholesale Sign In",
 			Description: "Sign in to your Rockabilly Roasting Co. wholesale account to place orders and manage your business account.",
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

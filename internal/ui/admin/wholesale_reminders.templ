@@ -13,7 +13,10 @@ type WholesaleRemindersProps struct {
 	// query the scheduler uses, so this page is a true dry run.
 	Recipients  []domain.OrderReminderRecipient
 	WindowDays  int
-	CutoffLabel string
+	// SuppressDays is the "already ordered this cycle" cutoff — recipients
+	// whose latest order is newer than this are left off the list.
+	SuppressDays int
+	CutoffLabel  string
 	ScheduleNote string
 	// Sent is set after a notice send, so staff get confirmation of the count.
 	Sent      int
@@ -27,7 +30,7 @@ templ WholesaleRemindersContent(props WholesaleRemindersProps) {
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">Order Reminders</h1>
 			<p class="mt-1 text-sm text-rr-muted">
-				{ props.ScheduleNote } Accounts qualify when they placed a wholesale order in the last { strconv.Itoa(props.WindowDays) } days and have reminders switched on.
+				{ props.ScheduleNote } Accounts qualify when they placed a wholesale order in the last { strconv.Itoa(props.WindowDays) } days and have reminders switched on. Anyone who has already ordered in the last { strconv.Itoa(props.SuppressDays) } days is skipped &mdash; they don't need this week's nudge.
 			</p>
 		</div>
 	</div>

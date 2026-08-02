@@ -689,14 +689,22 @@ func (s *CustomerStore) UpdateOrderRemindersEnabled(ctx context.Context, tx pgx.
 }
 
 // ListOrderReminderRecipients returns approved wholesale customers who placed
-// at least one order in the trailing `since` window and have reminders enabled.
+// at least one order in the trailing `since` window, have not ordered again
+// since `suppressSince`, and have reminders enabled.
 //
 // Cancelled and refunded orders do not count as activity — an account whose
 // only recent order was cancelled has not actually been buying, and reminding
 // them to "order again" would be wrong. The window is measured against
 // placed_at (when the customer ordered), never created_at, so backfilled and
 // imported orders sort by real-world order date.
-func (s *CustomerStore) ListOrderReminderRecipients(ctx context.Context, tx pgx.Tx, since time.Time) ([]domain.OrderReminderRecipient, error) {
+//
+// suppressSince is what stops the reminder nagging someone who already
+// ordered this cycle. It applies to the *most recent* order (HAVING on the
+// aggregate), not to individual rows: a customer who ordered three weeks ago
+// and again on Wednesday is suppressed, because their latest order already
+// covers this week. Callers pass the reminder interval, so the rule reads as
+// "skip anyone who has ordered since the last time we asked".
+func (s *CustomerStore) ListOrderReminderRecipients(ctx context.Context, tx pgx.Tx, since, suppressSince time.Time) ([]domain.OrderReminderRecipient, error) {
 	rows, err := tx.Query(ctx,
 		`SELECT c.id, c.email, c.company_name, c.first_name, c.last_name,
 		        max(o.placed_at) AS last_order_at
@@ -709,7 +717,8 @@ func (s *CustomerStore) ListOrderReminderRecipients(ctx context.Context, tx pgx.
 		   AND o.status NOT IN ('cancelled', 'refunded')
 		   AND o.placed_at >= $1
 		 GROUP BY c.id, c.email, c.company_name, c.first_name, c.last_name
-		 ORDER BY c.company_name NULLS LAST, c.email`, since)
+		 HAVING max(o.placed_at) < $2
+		 ORDER BY c.company_name NULLS LAST, c.email`, since, suppressSince)
 	if err != nil {
 		return nil, fmt.Errorf("list order reminder recipients: %w", err)
 	}

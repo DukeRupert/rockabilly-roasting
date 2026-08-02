@@ -19,8 +19,11 @@ import (
 type WholesaleRemindersProps struct {
 	// Recipients is exactly who the next scheduled run would email — the same
 	// query the scheduler uses, so this page is a true dry run.
-	Recipients   []domain.OrderReminderRecipient
-	WindowDays   int
+	Recipients []domain.OrderReminderRecipient
+	WindowDays int
+	// SuppressDays is the "already ordered this cycle" cutoff — recipients
+	// whose latest order is newer than this are left off the list.
+	SuppressDays int
 	CutoffLabel  string
 	ScheduleNote string
 	// Sent is set after a notice send, so staff get confirmation of the count.
@@ -61,7 +64,7 @@ func WholesaleRemindersContent(props WholesaleRemindersProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.ScheduleNote)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 30, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 33, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -74,152 +77,165 @@ func WholesaleRemindersContent(props WholesaleRemindersProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(props.WindowDays))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 30, Col: 123}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 33, Col: 123}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " days and have reminders switched on.</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " days and have reminders switched on. Anyone who has already ordered in the last ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(props.SuppressDays))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 33, Col: 240}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " days is skipped &mdash; they don't need this week's nudge.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.Sent > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"mt-6 border border-rr-border bg-rr-raised p-4\"><p class=\"text-sm text-rr-heading\">Queued ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"mt-6 border border-rr-border bg-rr-raised p-4\"><p class=\"text-sm text-rr-heading\">Queued ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(props.Sent))
+			var templ_7745c5c3_Var5 string
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(props.Sent))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 36, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 39, Col: 71}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, " messages. They send in the background — check the audit log for per-recipient results.</p></div>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " messages. They send in the background — check the audit log for per-recipient results.</p></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<!-- Preview: who is on this week's list --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Next send &mdash; ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(props.Recipients)))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 42, Col: 58}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, " recipients</h2><p class=\"mt-1 text-sm text-rr-muted\">Cutoff wording in the email: &ldquo;")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<!-- Preview: who is on this week's list --><div class=\"mt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Next send &mdash; ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.CutoffLabel)
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(props.Recipients)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 44, Col: 95}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 45, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "&rdquo;.</p><div class=\"mt-3\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, " recipients</h2><p class=\"mt-1 text-sm text-rr-muted\">Cutoff wording in the email: &ldquo;")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(props.CutoffLabel)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 47, Col: 95}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "&rdquo;.</p><div class=\"mt-3\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(props.Recipients) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"border border-dashed border-rr-border p-12 text-center\"><h3 class=\"text-sm font-semibold text-rr-heading\">Nobody is on the list</h3><p class=\"mt-1 text-sm text-rr-muted\">No approved wholesale account has ordered inside the window. Nothing will send.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"border border-dashed border-rr-border p-12 text-center\"><h3 class=\"text-sm font-semibold text-rr-heading\">Nobody is on the list</h3><p class=\"mt-1 text-sm text-rr-muted\">No approved wholesale account has ordered inside the window. Nothing will send.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"overflow-hidden border border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Company</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Email</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Last order</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"overflow-hidden border border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th scope=\"col\" class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Company</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Email</th><th scope=\"col\" class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Last order</th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, r := range props.Recipients {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<tr class=\"row-link\"><td class=\"whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6\"><a href=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<tr class=\"row-link\"><td class=\"whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6\"><a href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var7 templ.SafeURL
-				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/customers/%s", r.CustomerID)))
+				var templ_7745c5c3_Var8 templ.SafeURL
+				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/customers/%s", r.CustomerID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 65, Col: 83}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" class=\"row-link-target font-medium text-rr-heading hover:text-rr-red\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var8 string
-				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(r.DisplayName())
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 66, Col: 28}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 68, Col: 83}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</a></td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-rr-muted\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" class=\"row-link-target font-medium text-rr-heading hover:text-rr-red\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var9 string
-				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(r.Email)
+				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(r.DisplayName())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 69, Col: 80}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 69, Col: 28}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-rr-muted\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</a></td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-rr-muted\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var10 string
-				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(r.LastOrderAt.Format("Jan 2, 2006"))
+				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(r.Email)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 70, Col: 108}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 72, Col: 80}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</td><td class=\"whitespace-nowrap px-3 py-4 text-sm text-rr-muted\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var11 string
+				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(r.LastOrderAt.Format("Jan 2, 2006"))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 73, Col: 108}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</tbody></table></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</tbody></table></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div></div><!-- One-off notice to the same audience --><div class=\"mt-10 border-t border-rr-border pt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Send a one-off notice</h2><p class=\"mt-1 text-sm text-rr-muted\">Goes to every approved wholesale account listed above &mdash; use it for a corrected cutoff or a holiday schedule, not marketing. Plain text only; blank lines start a new paragraph. Every send is recorded in the audit log.</p><form method=\"post\" action=\"/admin/wholesale/reminders/notice\" class=\"mt-4 max-w-2xl space-y-4\"><div><label for=\"subject\" class=\"block text-sm/6 font-medium text-rr-heading\">Subject</label><div class=\"mt-2\"><input type=\"text\" name=\"subject\" id=\"subject\" required maxlength=\"120\" placeholder=\"e.g. Holiday cutoff: order by Wednesday this week\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6\"></div></div><div><label for=\"body\" class=\"block text-sm/6 font-medium text-rr-heading\">Message</label><div class=\"mt-2\"><textarea name=\"body\" id=\"body\" rows=\"8\" required class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6\"></textarea></div></div><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\" onclick=\"return confirm('Send this notice to every wholesale account listed above? This cannot be undone.')\">Send to ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div></div><!-- One-off notice to the same audience --><div class=\"mt-10 border-t border-rr-border pt-8\"><h2 class=\"text-sm font-semibold text-rr-heading\">Send a one-off notice</h2><p class=\"mt-1 text-sm text-rr-muted\">Goes to every approved wholesale account listed above &mdash; use it for a corrected cutoff or a holiday schedule, not marketing. Plain text only; blank lines start a new paragraph. Every send is recorded in the audit log.</p><form method=\"post\" action=\"/admin/wholesale/reminders/notice\" class=\"mt-4 max-w-2xl space-y-4\"><div><label for=\"subject\" class=\"block text-sm/6 font-medium text-rr-heading\">Subject</label><div class=\"mt-2\"><input type=\"text\" name=\"subject\" id=\"subject\" required maxlength=\"120\" placeholder=\"e.g. Holiday cutoff: order by Wednesday this week\" class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6\"></div></div><div><label for=\"body\" class=\"block text-sm/6 font-medium text-rr-heading\">Message</label><div class=\"mt-2\"><textarea name=\"body\" id=\"body\" rows=\"8\" required class=\"block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6\"></textarea></div></div><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\" onclick=\"return confirm('Send this notice to every wholesale account listed above? This cannot be undone.')\">Send to ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var11 string
-		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(props.Recipients)))
+		var templ_7745c5c3_Var12 string
+		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(props.Recipients)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 117, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/wholesale_reminders.templ`, Line: 120, Col: 49}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, " accounts</button></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, " accounts</button></form></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -243,12 +259,12 @@ func WholesaleReminders(props WholesaleRemindersProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var12 == nil {
-			templ_7745c5c3_Var12 = templ.NopComponent
+		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var13 == nil {
+			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var13 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var14 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -271,7 +287,7 @@ func WholesaleReminders(props WholesaleRemindersProps) templ.Component {
 			ActivePath: "/admin/customers",
 			StaffName:  props.StaffName,
 			StaffRole:  props.StaffRole,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var13), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var14), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -26,7 +26,7 @@ func (d *Deps) requireCustomerSession(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie(customerCookieName)
 		if err != nil || cookie.Value == "" {
-			http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+			http.Redirect(w, r, wholesaleLoginWithReturn(r), http.StatusSeeOther)
 			return
 		}
 
@@ -54,13 +54,25 @@ func (d *Deps) requireCustomerSession(next http.Handler) http.Handler {
 				MaxAge:   -1,
 				HttpOnly: true,
 			})
-			http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+			http.Redirect(w, r, wholesaleLoginWithReturn(r), http.StatusSeeOther)
 			return
 		}
 
 		ctx := auth.WithCustomer(r.Context(), customer)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// wholesaleLoginWithReturn builds the login URL carrying the page the customer
+// was actually trying to reach, so an expired session (or a deep link clicked
+// from an email) resumes where it left off instead of dumping them on the
+// portal. Only GETs round-trip: replaying a POST after login would re-submit
+// something the customer never re-confirmed.
+func wholesaleLoginWithReturn(r *http.Request) string {
+	if r.Method != http.MethodGet || r.URL.Path == "" {
+		return "/wholesale/login"
+	}
+	return "/wholesale/login?redirect=" + url.QueryEscape(r.URL.RequestURI())
 }
 
 // optionalCustomerSession loads the customer into context if a valid session
@@ -706,10 +718,12 @@ func (d *Deps) handleWholesaleLoginPage(w http.ResponseWriter, r *http.Request) 
 	// If already logged in, redirect to portal.
 	cookie, err := r.Cookie(customerCookieName)
 	if err == nil && cookie.Value != "" {
-		http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
+		http.Redirect(w, r, safeNextOr(r.URL.Query().Get("redirect"), "/wholesale/portal"), http.StatusSeeOther)
 		return
 	}
-	props := storefront.WholesaleLoginProps{}
+	props := storefront.WholesaleLoginProps{
+		Redirect: safeNextOr(r.URL.Query().Get("redirect"), ""),
+	}
 	if IsHTMX(r) {
 		storefront.WholesaleLoginContent(props).Render(r.Context(), w) //nolint:errcheck
 		return
@@ -723,7 +737,11 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 	rememberMe := r.FormValue("remember_me") == "on"
 
 	if email == "" || password == "" {
-		props := storefront.WholesaleLoginProps{Error: "Email and password are required.", Email: email}
+		props := storefront.WholesaleLoginProps{
+			Error:    "Email and password are required.",
+			Email:    email,
+			Redirect: safeNextOr(r.URL.Query().Get("redirect"), ""),
+		}
 		if IsHTMX(r) {
 			storefront.WholesaleLoginContent(props).Render(r.Context(), w) //nolint:errcheck
 			return
@@ -744,8 +762,9 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		props := storefront.WholesaleLoginProps{
-			Error: "Invalid email or password.",
-			Email: email,
+			Error:    "Invalid email or password.",
+			Email:    email,
+			Redirect: safeNextOr(r.URL.Query().Get("redirect"), ""),
 		}
 		if IsHTMX(r) {
 			storefront.WholesaleLoginContent(props).Render(r.Context(), w) //nolint:errcheck

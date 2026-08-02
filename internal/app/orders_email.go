@@ -22,14 +22,21 @@ import (
 // · 12oz") because grind and size are what a coffee buyer needs to verify;
 // lookups are best-effort so a deleted variant never blocks the email.
 func (s *OrderService) emailLineItems(ctx context.Context, tx pgx.Tx, lineItems []domain.LineItem) []emailtemplates.OrderLineItemData {
+	return emailLineItemsFrom(ctx, tx, s.catalog, lineItems)
+}
+
+// emailLineItemsFrom is the catalog-driven implementation, shared with
+// WholesaleService (the order reminder prints the customer's last order, and
+// must label items exactly as the confirmation email did).
+func emailLineItemsFrom(ctx context.Context, tx pgx.Tx, catalog *store.CatalogStore, lineItems []domain.LineItem) []emailtemplates.OrderLineItemData {
 	items := make([]emailtemplates.OrderLineItemData, len(lineItems))
 	for i, li := range lineItems {
 		productName := "Product"
-		if variant, err := s.catalog.GetVariantByID(ctx, tx, li.VariantID); err == nil {
-			if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
+		if variant, err := catalog.GetVariantByID(ctx, tx, li.VariantID); err == nil {
+			if product, err := catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
 				productName = product.Title
 			}
-			if labels, err := s.catalog.ListVariantOptionLabels(ctx, tx, li.VariantID); err == nil && len(labels) > 0 {
+			if labels, err := catalog.ListVariantOptionLabels(ctx, tx, li.VariantID); err == nil && len(labels) > 0 {
 				productName += " — " + strings.Join(labels, " · ")
 			}
 		}

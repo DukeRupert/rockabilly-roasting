@@ -85,6 +85,10 @@ type Deps struct {
 	// wholesale order reminder fires, built from the same env config the
 	// scheduler uses so the admin page can never drift from reality.
 	ReminderScheduleNote string
+	// UnsubscribeSigner verifies the signed opt-out links in reminder emails.
+	// Never nil — an unconfigured signer rejects every token, and the reminder
+	// omits the link rather than printing one that cannot be verified.
+	UnsubscribeSigner *auth.UnsubscribeSigner
 }
 
 // MetricsMux returns a handler for the internal metrics listener.
@@ -146,6 +150,13 @@ func NewRouter(deps *Deps) http.Handler {
 	})
 	mux.Handle("POST /about/contact", contactIPLimit(http.HandlerFunc(deps.handleContactSubmit)))
 	mux.HandleFunc("GET /wholesale", deps.handleWholesaleLandingPage)
+	// Email opt-out. Public and token-authenticated — no session, because the
+	// whole point is that it works from an inbox. GET only renders a
+	// confirmation (inbox scanners fetch every link); POST is what acts, and
+	// also serves RFC 8058 one-click from Gmail/Apple. See web/unsubscribe.go.
+	mux.HandleFunc("GET /wholesale/unsubscribe", deps.handleUnsubscribePage)
+	mux.HandleFunc("POST /wholesale/unsubscribe", deps.handleUnsubscribe)
+	mux.HandleFunc("POST /wholesale/resubscribe", deps.handleResubscribe)
 	mux.HandleFunc("GET /privacy", deps.handlePrivacyPage)
 	mux.HandleFunc("GET /terms", deps.handleTermsPage)
 	mux.HandleFunc("GET /shipping", deps.handleShippingPage)

@@ -25,6 +25,7 @@ import (
 	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/build"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/help"
@@ -233,6 +234,14 @@ func run() error {
 		}
 		reminderWeekday = d
 	}
+	// Signs the opt-out links in reminder emails. Unset means the reminder
+	// falls back to "reply and we'll take you off the list" — safe, but manual,
+	// so warn loudly rather than failing the boot.
+	unsubscribeSigner := auth.NewUnsubscribeSigner(os.Getenv("UNSUBSCRIBE_SECRET"))
+	if !unsubscribeSigner.Enabled() {
+		logger.Warn("UNSUBSCRIBE_SECRET is not set; reminder emails will omit the one-click opt-out link and ask customers to reply instead")
+	}
+
 	reminderScheduleNote := fmt.Sprintf("Sends automatically every %s at %s %s.",
 		reminderWeekday, formatHour(reminderHour), reminderTZName)
 	if os.Getenv("DISABLE_ORDER_REMINDERS") != "" {
@@ -354,7 +363,8 @@ func run() error {
 		WithTaxCalc(settingsStore, catalogStore).
 		WithRenewalAnchor(merchantTZ, renewalAnchorHour)
 	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
-		WithEmail(emailEnv, authSvc)
+		WithEmail(emailEnv, authSvc).
+		WithUnsubscribeSigner(unsubscribeSigner)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -628,6 +638,7 @@ func run() error {
 		StaffEmail:             staffEmail,
 		MerchantTZ:             merchantTZ,
 		ReminderScheduleNote:   reminderScheduleNote,
+		UnsubscribeSigner:      unsubscribeSigner,
 	}
 
 	handler := web.NewRouter(deps)

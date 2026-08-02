@@ -11,6 +11,12 @@ type Message struct {
 	HTML    string
 	Text    string
 	Tag     string // optional categorization tag (e.g. "magic-link", "invoice")
+	// Headers carries extra SMTP headers. Used for List-Unsubscribe /
+	// List-Unsubscribe-Post (RFC 2369 / RFC 8058), which give Gmail and Apple
+	// Mail a native unsubscribe control — the alternative for a recipient who
+	// wants out is the spam button, and that costs sending reputation on the
+	// same domain as order confirmations and invoices.
+	Headers map[string]string
 }
 
 // TemplatedMessage sends an email using a provider-managed template.

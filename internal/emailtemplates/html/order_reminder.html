@@ -10,7 +10,7 @@
   </td></tr>
   <tr><td style="padding:32px 24px;">
     <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Time to Place Your Coffee Order</h1>
-    <p style="margin:0 0 24px;">Hey {{.CompanyName}} &mdash; a quick nudge from the crew at {{.StoreName}}.</p>
+    <p style="margin:0 0 24px;">Hey {{.CompanyName}} &mdash; a quick nudge from the {{.StoreName}} crew.</p>
     <p style="margin:0 0 24px;">To keep your delivery running smooth as a '57 Chevy, get your order in by <strong>{{.CutoffLabel}}</strong>. That's what lands your beans on schedule next week.</p>
 
     {{if .LastItems}}
@@ -51,7 +51,10 @@
   </td></tr>
   <tr><td style="background-color:#F5F0E6;padding:16px 24px;text-align:center;font-size:12px;color:#666;">
     {{.StoreName}} &middot; <a href="{{.StoreURL}}" style="color:#C0271D;">{{.StoreURL}}</a><br>
-    Don't want these weekly reminders? Reply and we'll take you off the list.
+    {{if .UnsubscribeURL}}Don't want these weekly reminders?
+    <a href="{{.UnsubscribeURL}}" style="color:#6B6257;text-decoration:underline;">Unsubscribe</a>.
+    This only stops the weekly reminder &mdash; order confirmations and invoices keep coming.
+    {{else}}Don't want these weekly reminders? Reply and we'll take you off the list.{{end}}
   </td></tr>
 </table>
 </td></tr>

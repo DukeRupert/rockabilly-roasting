@@ -3,6 +3,7 @@ package email
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/mrz1836/postmark"
 )
@@ -30,6 +31,7 @@ func (s *PostmarkSender) Send(ctx context.Context, msg Message) (*SendResult, er
 		HTMLBody: msg.HTML,
 		TextBody: msg.Text,
 		Tag:      msg.Tag,
+		Headers:  postmarkHeaders(msg.Headers),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("postmark send: %w", err)
@@ -52,4 +54,24 @@ func (s *PostmarkSender) SendTemplate(ctx context.Context, msg TemplatedMessage)
 	}
 
 	return &SendResult{MessageID: resp.MessageID}, nil
+}
+
+// postmarkHeaders converts the provider-agnostic header map into Postmark's
+// slice form. Keys are sorted so the outgoing message is deterministic, which
+// keeps tests and logged payloads stable.
+func postmarkHeaders(h map[string]string) []postmark.Header {
+	if len(h) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(h))
+	for name := range h {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	out := make([]postmark.Header, 0, len(names))
+	for _, name := range names {
+		out = append(out, postmark.Header{Name: name, Value: h[name]})
+	}
+	return out
 }

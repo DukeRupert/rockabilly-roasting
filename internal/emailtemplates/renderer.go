@@ -225,6 +225,9 @@ type OrderReminderData struct {
 	LastOrderedOn *time.Time
 	ReorderURL    string // deep link that prefills a cart from LastItems
 	OrderURL      string // wholesale portal, replaces the old Orderspace link
+	// UnsubscribeURL is the signed one-off opt-out link. Empty when no signing
+	// secret is configured; the footer then falls back to asking them to reply.
+	UnsubscribeURL string
 	StoreName     string
 	StoreURL      string
 }

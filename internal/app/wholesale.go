@@ -13,6 +13,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -28,6 +29,9 @@ type WholesaleService struct {
 	metrics        *metrics.Registry
 	auth           *AuthService // populated via WithEmail; used to mint setup tokens for SendApprovalEmail
 	email          EmailEnv     // populated via WithEmail; required for Send* methods
+	// unsubscribe signs the opt-out links in the weekly reminder. Never nil —
+	// an unconfigured signer reports Enabled() false and the link is omitted.
+	unsubscribe *auth.UnsubscribeSigner
 }
 
 // NewWholesaleService creates a new WholesaleService.
@@ -41,6 +45,7 @@ func NewWholesaleService(
 	metrics *metrics.Registry,
 ) *WholesaleService {
 	return &WholesaleService{
+		unsubscribe:    auth.NewUnsubscribeSigner(""),
 		customers:      customers,
 		customerGroups: customerGroups,
 		catalog:        catalog,
@@ -53,9 +58,16 @@ func NewWholesaleService(
 
 // WithEmail attaches email-send environment and the AuthService used to mint
 // password-setup tokens. Must be called before any of the Send* methods.
-func (s *WholesaleService) WithEmail(env EmailEnv, auth *AuthService) *WholesaleService {
+func (s *WholesaleService) WithEmail(env EmailEnv, authSvc *AuthService) *WholesaleService {
 	s.email = env
-	s.auth = auth
+	s.auth = authSvc
+	return s
+}
+
+// WithUnsubscribeSigner attaches the signer used for reminder opt-out links.
+// Without it the reminder still sends, minus the link.
+func (s *WholesaleService) WithUnsubscribeSigner(signer *auth.UnsubscribeSigner) *WholesaleService {
+	s.unsubscribe = signer
 	return s
 }
 

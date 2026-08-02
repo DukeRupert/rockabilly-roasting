@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -81,6 +82,22 @@ func (s *WholesaleService) SetOrderRemindersEnabled(ctx context.Context, tx pgx.
 	return nil
 }
 
+// SetOrderRemindersFromEmailLink applies a customer's own opt-out (or undo)
+// from the emailed link. Identical in effect to the staff toggle, but the
+// audit row records the customer as the actor so it is obvious afterwards who
+// turned it off.
+func (s *WholesaleService) SetOrderRemindersFromEmailLink(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, enabled bool) error {
+	customer, err := s.customers.GetByID(ctx, tx, customerID)
+	if err != nil {
+		return fmt.Errorf("get customer %s: %w", customerID, err)
+	}
+	return s.SetOrderRemindersEnabled(ctx, tx, Actor{
+		Type: domain.AuditActorTypeCustomer,
+		ID:   &customer.ID,
+		Name: customer.Email,
+	}, customerID, enabled)
+}
+
 // SendOrderReminder emails one wholesale account the weekly order reminder.
 //
 // Sends live outside a transaction (external call first, then write) per the
@@ -127,6 +144,14 @@ func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.
 		return nil
 	}
 
+	// Empty when no signing secret is configured — the template then falls
+	// back to "reply and we'll take you off the list" rather than printing a
+	// link that could never be verified.
+	var unsubscribeURL string
+	if token := s.unsubscribe.Sign(customer.ID); token != "" {
+		unsubscribeURL = s.email.BaseURL + "/wholesale/unsubscribe?t=" + url.QueryEscape(token)
+	}
+
 	html, text, err := s.email.Renderer.Render("order_reminder", emailtemplates.OrderReminderData{
 		CompanyName:   reminderGreeting(customer),
 		CutoffLabel:   OrderReminderCutoffLabel,
@@ -135,10 +160,11 @@ func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.
 		// Deep link straight into a cart prefilled from their last order.
 		// Resolved server-side at click time rather than baking an order ID
 		// into a URL that will sit in an inbox.
-		ReorderURL: s.email.BaseURL + "/wholesale/reorder",
-		OrderURL:   s.email.BaseURL + "/wholesale/portal",
-		StoreName:  s.email.StoreName,
-		StoreURL:   s.email.BaseURL,
+		ReorderURL:     s.email.BaseURL + "/wholesale/reorder",
+		OrderURL:       s.email.BaseURL + "/wholesale/portal",
+		UnsubscribeURL: unsubscribeURL,
+		StoreName:      s.email.StoreName,
+		StoreURL:       s.email.BaseURL,
 	})
 	if err != nil {
 		s.metrics.EmailsSent.WithLabelValues("order_reminder", "failed").Inc()
@@ -152,6 +178,7 @@ func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.
 		HTML:    html,
 		Text:    text,
 		Tag:     "order-reminder",
+		Headers: reminderUnsubscribeHeaders(unsubscribeURL),
 	}); err != nil {
 		s.metrics.EmailsSent.WithLabelValues("order_reminder", "failed").Inc()
 		return fmt.Errorf("send order reminder: %w", err)
@@ -322,4 +349,21 @@ func splitParagraphs(body string) []string {
 		}
 	}
 	return out
+}
+
+// reminderUnsubscribeHeaders builds the RFC 2369 / RFC 8058 opt-out headers so
+// Gmail and Apple Mail render their own unsubscribe control.
+//
+// List-Unsubscribe-Post opts into one-click: the mail provider POSTs the URL
+// directly, which is why the endpoint must accept POST without a form
+// submission. That POST comes from Google, not from a link scanner, so unlike
+// the visible link it can act immediately without a confirmation step.
+func reminderUnsubscribeHeaders(unsubscribeURL string) map[string]string {
+	if unsubscribeURL == "" {
+		return nil
+	}
+	return map[string]string{
+		"List-Unsubscribe":      "<" + unsubscribeURL + ">",
+		"List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+	}
 }

@@ -1,0 +1,129 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+type UnsubscribeProps struct {
+	// Token is echoed back so the confirm button (and the undo button on the
+	// done page) can POST it. The page itself never acts on GET.
+	Token string
+	Email string
+}
+
+// unsubscribeShell wraps the three opt-out outcomes in one paper card, so they
+// read as steps in a single flow rather than three unrelated pages.
+templ unsubscribeShell(eyebrow, heading, script string) {
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)] flex items-center">
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-md lg:max-w-xl w-full px-6 sm:px-10 lg:px-14 py-14 sm:py-20">
+			<div class="text-center mb-8">
+				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+					{ eyebrow }
+				</p>
+				<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;">
+					{ heading }
+					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">{ script }</span>
+				</h1>
+			</div>
+			<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8 text-center">
+				{ children... }
+			</div>
+		</div>
+	</section>
+}
+
+templ UnsubscribeConfirmContent(props UnsubscribeProps) {
+	@unsubscribeShell("Email preferences", "Order", "reminders.") {
+		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+			Stop sending the weekly order reminder to
+			<strong class="text-ink">{ props.Email }</strong>?
+		</p>
+		<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+			Order confirmations, shipping updates and invoices are unaffected &mdash; you'll still get those.
+		</p>
+		<form method="post" action="/wholesale/unsubscribe" class="mt-6">
+			<input type="hidden" name="t" value={ props.Token }/>
+			<button type="submit" class="btn-stamp w-full border-2 border-ink bg-rust text-paper px-5 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
+				Unsubscribe me
+			</button>
+		</form>
+		<a href="/wholesale/portal" class="inline-block mt-4 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+			Keep them coming
+		</a>
+	}
+}
+
+templ UnsubscribeDoneContent(props UnsubscribeProps) {
+	@unsubscribeShell("Email preferences", "You're", "unsubscribed.") {
+		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+			No more weekly order reminders to
+			<strong class="text-ink">{ props.Email }</strong>.
+			Order confirmations and invoices keep coming.
+		</p>
+		<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">Clicked this by mistake?</p>
+		<form method="post" action="/wholesale/resubscribe" class="mt-4">
+			<input type="hidden" name="t" value={ props.Token }/>
+			<button type="submit" class="btn-stamp w-full border-2 border-ink bg-paper text-ink px-5 py-3 font-oswald font-bold text-sm hover:bg-ink hover:text-paper transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">
+				Turn reminders back on
+			</button>
+		</form>
+	}
+}
+
+templ ResubscribeDoneContent(props UnsubscribeProps) {
+	@unsubscribeShell("Email preferences", "Reminders", "back on.") {
+		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+			We'll keep sending the weekly order reminder to
+			<strong class="text-ink">{ props.Email }</strong>.
+		</p>
+		<a href="/wholesale/portal" class="inline-block mt-5 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+			Go to your account
+		</a>
+	}
+}
+
+templ UnsubscribeInvalidContent() {
+	@unsubscribeShell("Email preferences", "Link", "expired.") {
+		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+			We couldn't read that unsubscribe link. It may have been broken in transit by an email client.
+		</p>
+		<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+			Reply to any of our emails and we'll take you off the list by hand.
+		</p>
+	}
+}
+
+templ UnsubscribeConfirmPage(props UnsubscribeProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Email Preferences",
+		Description: "Manage your Rockabilly Roasting Co. order reminder emails.",
+	}) {
+		@UnsubscribeConfirmContent(props)
+	}
+}
+
+templ UnsubscribeDonePage(props UnsubscribeProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Unsubscribed",
+		Description: "You have been unsubscribed from Rockabilly Roasting Co. order reminders.",
+	}) {
+		@UnsubscribeDoneContent(props)
+	}
+}
+
+templ ResubscribeDonePage(props UnsubscribeProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Reminders Back On",
+		Description: "Your Rockabilly Roasting Co. order reminders have been turned back on.",
+	}) {
+		@ResubscribeDoneContent(props)
+	}
+}
+
+templ UnsubscribeInvalidPage() {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Link Not Recognized",
+		Description: "This unsubscribe link could not be read.",
+	}) {
+		@UnsubscribeInvalidContent()
+	}
+}

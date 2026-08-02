@@ -85,6 +85,43 @@ widen to hours) is skipped silently rather than mailed.
     operational, not promotional — but still never goes to an account that is
     no longer approved wholesale.
 
+## Customer opt-out
+
+The reminder footer carries a signed unsubscribe link, and the message carries
+`List-Unsubscribe` / `List-Unsubscribe-Post` headers so Gmail and Apple Mail
+render their own native unsubscribe control. Both land on the same endpoint and
+both do exactly what the staff toggle does — clear
+`customers.order_reminders_enabled` — but the audit row records the **customer**
+as the actor, so it is obvious afterwards who asked to stop.
+
+Tokens are stateless HMACs (`platform/auth/unsubscribe.go`), not rows in
+`magic_link_tokens`. An unsubscribe link must keep working for as long as the
+email sits in an inbox, so there is no sensible expiry to enforce, and a stored
+token would mean one row per recipient per week written purely to support a link
+most people never click. The customer ID travels in the clear and the HMAC is
+what makes it unforgeable — so this token authorizes exactly one low-stakes
+action and must never be treated as proof of identity anywhere else.
+
+**GET never unsubscribes.** `GET /wholesale/unsubscribe` only renders a
+confirmation page; the button POSTs. This is not ceremony: corporate mail
+gateways and inbox scanners (Outlook Safe Links and friends) fetch every link in
+an incoming message, so a GET that acted would let a customer's own IT
+department unsubscribe them without anyone clicking. `POST` also accepts the
+token from the query string, which is what RFC 8058 one-click needs — Gmail
+POSTs the header URL directly, and that request comes from the mail provider
+acting on a real click, so it applies immediately and returns bare `200`.
+
+The done page offers **Turn reminders back on** (`POST /wholesale/resubscribe`),
+because mis-clicks happen and the alternative is the customer emailing staff.
+
+Copy is explicit that this stops *only* the weekly reminder — order
+confirmations, shipping notices and invoices are unaffected.
+
+Set `UNSUBSCRIBE_SECRET` to enable any of this. Unset degrades safely: no link,
+no headers, footer falls back to "reply and we'll take you off the list", and
+the server warns at boot. Rotating the secret invalidates every outstanding link
+in already-delivered mail.
+
 **Per-customer opt-out — customer detail page**
 
 The wholesale settings card has a "Weekly order reminder" On/Off toggle. Both
@@ -103,6 +140,7 @@ All optional; the defaults reproduce the old service's schedule.
 | `ORDER_REMINDER_HOUR` | `10` | 0–23 |
 | `ORDER_REMINDER_TIMEZONE` | `MERCHANT_TIMEZONE` | IANA name |
 | `DISABLE_ORDER_REMINDERS` | unset | Any value stops the weekly job. Use in dev/staging |
+| `UNSUBSCRIBE_SECRET` | unset | Signs opt-out links. Unset = no link, no `List-Unsubscribe` headers, reply-to fallback |
 
 > **Timezone discrepancy — decide before the first prod send.** The old `rr`
 > service hardcoded `America/Denver`, while `MERCHANT_TIMEZONE` here defaults to
@@ -136,6 +174,8 @@ blast at the whole active wholesale list.
 | Admin page + toggle handlers | `web/admin_reminders.go`, `ui/admin/wholesale_reminders.templ` |
 | Reorder deep link | `web/wholesale.go` → `handleWholesaleReorderLatest`, `reorderIntoCart` |
 | Login return-trip | `web/customer_auth.go` → `wholesaleLoginWithReturn`, `safeNextOr` |
+| Opt-out token | `platform/auth/unsubscribe.go` |
+| Opt-out endpoints + pages | `web/unsubscribe.go`, `ui/storefront/unsubscribe.templ` |
 | Email templates | `emailtemplates/{html,text}/order_reminder.*`, `wholesale_notice.*` |
 | Schema | `db/migrations/062_customer_order_reminders.sql` |
 

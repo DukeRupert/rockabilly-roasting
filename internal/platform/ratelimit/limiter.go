@@ -50,6 +50,13 @@ var (
 	WholesaleApplyIPLimit = 3
 	WholesaleApplyWindow  = time.Hour
 
+	// White-label label submissions. Its own bucket, deliberately roomier than
+	// the apply form: the invite link is reusable and the success page invites
+	// "Add another label", so one sitting legitimately means several posts —
+	// plus retries. Still IP-capped since the endpoint is only token-gated.
+	WhiteLabelIPLimit = 10
+	WhiteLabelWindow  = time.Hour
+
 	// Global per-IP.
 	GlobalIPLimit = 300
 	GlobalWindow  = time.Minute
@@ -170,4 +177,5 @@ func SubscribeIPKey(ip string) string            { return "subscribe:ip:" + ip }
 func CheckoutSessionKey(sessionID string) string { return "checkout:sess:" + sessionID }
 func ContactIPKey(ip string) string               { return "contact:ip:" + ip }
 func WholesaleApplyIPKey(ip string) string        { return "wholesale-apply:ip:" + ip }
+func WhiteLabelIPKey(ip string) string            { return "white-label:ip:" + ip }
 func GlobalIPKey(ip string) string               { return "global:ip:" + ip }

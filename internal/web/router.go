@@ -212,8 +212,8 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Wholesale white-label onboarding (public, invite-token gated)
 	mux.HandleFunc("GET /wholesale/white-label", deps.handleWhiteLabelPage)
-	whiteLabelIPLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.WholesaleApplyIPLimit, ratelimit.WholesaleApplyWindow, func(r *http.Request) string {
-		return ratelimit.WholesaleApplyIPKey(ratelimit.ClientIP(r))
+	whiteLabelIPLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.WhiteLabelIPLimit, ratelimit.WhiteLabelWindow, func(r *http.Request) string {
+		return ratelimit.WhiteLabelIPKey(ratelimit.ClientIP(r))
 	})
 	mux.Handle("POST /wholesale/white-label", whiteLabelIPLimit(http.HandlerFunc(deps.handleWhiteLabelSubmit)))
 
@@ -588,12 +588,30 @@ func NewRouter(deps *Deps) http.Handler {
 	return handler
 }
 
+// bodyLimitOverrides raises the default body cap for the handful of routes that
+// stream file uploads through the app. Each entry must be at least as large as
+// the limit the handler itself enforces, plus room for multipart framing —
+// otherwise the middleware truncates the body first and the handler's own
+// (friendlier) size error can never fire.
+//
+// Admin image uploads are absent on purpose: they presign a direct-to-R2 PUT, so
+// the bytes never reach this server.
+var bodyLimitOverrides = map[string]int64{
+	// White-label label art. Handler cap is maxLabelImageBytes (10 MiB).
+	"/wholesale/white-label": maxLabelImageBytes + (1 << 20),
+}
+
 // maxBodySizeMiddleware limits request body size for non-webhook routes.
-// Webhook endpoints manage their own body limits via io.LimitReader.
+// Webhook endpoints manage their own body limits via io.LimitReader; routes in
+// bodyLimitOverrides get their own, larger ceiling.
 func maxBodySizeMiddleware(next http.Handler, maxBytes int64) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/webhooks/") {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
+			limit := maxBytes
+			if override, ok := bodyLimitOverrides[r.URL.Path]; ok {
+				limit = override
+			}
+			r.Body = http.MaxBytesReader(w, r.Body, limit)
 		}
 		next.ServeHTTP(w, r)
 	})

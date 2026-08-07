@@ -129,10 +129,13 @@ templ WhiteLabelContent(props WhiteLabelProps) {
 						</div>
 					}
 					<!-- Native multipart submit (full-page response). hx-boost="false" opts this
-					form out of htmx boosting, which forces url-encoding and drops the file. -->
+					form out of htmx boosting, which forces url-encoding and drops the file.
+					The token is in the action URL as well as a hidden field: if the body is
+					rejected before it parses (oversized upload), the query copy is all the
+					handler has left to re-render this form with. -->
 					<form
 						method="post"
-						action="/wholesale/white-label"
+						action={ templ.SafeURL("/wholesale/white-label?token=" + props.Token) }
 						enctype="multipart/form-data"
 						hx-boost="false"
 						@submit="onSubmit($event)"

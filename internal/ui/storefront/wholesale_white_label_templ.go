@@ -129,100 +129,113 @@ func WhiteLabelContent(props WhiteLabelProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<!-- Native multipart submit (full-page response). hx-boost=\"false\" opts this\n\t\t\t\t\tform out of htmx boosting, which forces url-encoding and drops the file. --><form method=\"post\" action=\"/wholesale/white-label\" enctype=\"multipart/form-data\" hx-boost=\"false\" @submit=\"onSubmit($event)\" class=\"space-y-5\"><input type=\"hidden\" name=\"token\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<!-- Native multipart submit (full-page response). hx-boost=\"false\" opts this\n\t\t\t\t\tform out of htmx boosting, which forces url-encoding and drops the file.\n\t\t\t\t\tThe token is in the action URL as well as a hidden field: if the body is\n\t\t\t\t\trejected before it parses (oversized upload), the query copy is all the\n\t\t\t\t\thandler has left to re-render this form with. --><form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Token)
+			var templ_7745c5c3_Var5 templ.SafeURL
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/wholesale/white-label?token=" + props.Token))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 141, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 138, Col: 75}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\"><div><label for=\"base_product_id\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Base coffee</label> <select name=\"base_product_id\" id=\"base_product_id\" required class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"><option value=\"\" disabled selected=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" enctype=\"multipart/form-data\" hx-boost=\"false\" @submit=\"onSubmit($event)\" class=\"space-y-5\"><input type=\"hidden\" name=\"token\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 string
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.SelectedBaseID == "")
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Token)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 151, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 144, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\">Choose a coffee…</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><div><label for=\"base_product_id\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Base coffee</label> <select name=\"base_product_id\" id=\"base_product_id\" required class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"><option value=\"\" disabled selected=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var7 string
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.SelectedBaseID == "")
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 154, Col: 71}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\">Choose a coffee…</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, c := range props.Choices {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<option value=\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var7 string
-				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 153, Col: 29}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" selected=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<option value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var8 string
-				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID == props.SelectedBaseID)
+				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 153, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 156, Col: 29}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" selected=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var9 string
-				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(c.Title)
+				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID == props.SelectedBaseID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 153, Col: 83}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 156, Col: 71}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</option>")
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var10 string
+				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(c.Title)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 156, Col: 83}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</option>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</select></div><div><label for=\"name\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Your product name</label> <input type=\"text\" name=\"name\" id=\"name\" required maxlength=\"120\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</select></div><div><label for=\"name\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Your product name</label> <input type=\"text\" name=\"name\" id=\"name\" required maxlength=\"120\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var10 string
-			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Name)
+			var templ_7745c5c3_Var11 string
+			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 165, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_white_label.templ`, Line: 168, Col: 26}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" placeholder=\"e.g. Midnight Diner Blend\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><!-- Label image: drop zone with live preview --><div><label for=\"label_image\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Label image</label><!-- Empty state: click or drag --><div x-show=\"!previewURL\" @click=\"$refs.fileInput.click()\" @keydown.enter.prevent=\"$refs.fileInput.click()\" @keydown.space.prevent=\"$refs.fileInput.click()\" @dragover.prevent=\"dragging = true\" @dragleave.prevent=\"dragging = false\" @drop.prevent=\"dropFile($event)\" role=\"button\" tabindex=\"0\" aria-controls=\"label_image\" :class=\"dragging ? 'border-rust bg-rust/5' : 'border-ink/60 hover:border-ink'\" class=\"cursor-pointer border-2 border-dashed bg-paper px-6 py-8 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rust focus-visible:ring-offset-2 focus-visible:ring-offset-cream-hi\"><svg class=\"mx-auto size-9 text-ink/50\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.8\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 7.5 7.5 12M12 7.5V18\"></path></svg><p class=\"font-oswald font-bold text-ink text-sm mt-2\">Drop your label here <span class=\"text-ink-soft font-normal\">or click to browse</span></p><p class=\"font-special text-ink-soft text-xs mt-1\">PNG, JPG, or WebP · up to 10 MB · high-res is best</p></div><!-- Selected state: thumbnail + meta --><div x-show=\"previewURL\" x-cloak class=\"border-2 border-ink bg-paper-warm p-4\"><div class=\"flex items-center gap-4\"><div class=\"shrink-0 size-20 border-2 border-ink bg-paper flex items-center justify-center overflow-hidden\" style=\"box-shadow: var(--shadow-stamp); transform: rotate(-2deg);\"><img :src=\"previewURL\" alt=\"Label preview\" class=\"max-h-full max-w-full object-contain\"></div><div class=\"min-w-0 flex-1 text-left\"><p class=\"font-oswald text-chrome-deep text-[10px] font-semibold\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Your label</p><p class=\"font-oswald font-bold text-ink text-sm truncate\" x-text=\"fileName\"></p><p class=\"font-special text-ink-soft text-xs\" x-text=\"fileSize\"></p><button type=\"button\" @click=\"clearFile()\" :disabled=\"submitting\" class=\"mt-1.5 font-oswald text-rust text-xs font-bold hover:underline disabled:opacity-50 disabled:no-underline\" style=\"letter-spacing:0.06em; text-transform:uppercase;\">Replace</button></div></div></div><template x-if=\"fileError\"><p class=\"mt-2 font-oswald font-bold text-rust text-xs\" style=\"letter-spacing:0.04em;\" x-text=\"fileError\"></p></template><!-- Not natively required: an sr-only required input trips Chrome's\n\t\t\t\t\t\t\t\"not focusable\" block. Presence is enforced server-side (friendly\n\t\t\t\t\t\t\t\"Upload your label image\" error) and surfaced by the dropzone UX. --><input type=\"file\" name=\"label_image\" id=\"label_image\" accept=\"image/png,image/jpeg,image/webp\" x-ref=\"fileInput\" @change=\"pickFile($event)\" class=\"sr-only\"></div><button type=\"submit\" class=\"btn-stamp w-full border-2 border-ink bg-rust text-paper px-6 py-3.5 font-oswald font-bold text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-80\" style=\"letter-spacing:0.16em; text-transform:uppercase;\" :disabled=\"submitting\" :aria-busy=\"submitting\"><span x-show=\"!submitting\" class=\"inline-flex items-center justify-center gap-2\">Submit for review</span> <span x-show=\"submitting\" x-cloak x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0\" x-transition:enter-end=\"opacity-100\" class=\"inline-flex items-center justify-center gap-2\"><svg class=\"size-4 animate-spin\" fill=\"none\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"3\"></circle> <path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z\"></path></svg> Sending…</span></button></form></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" placeholder=\"e.g. Midnight Diner Blend\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><!-- Label image: drop zone with live preview --><div><label for=\"label_image\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Label image</label><!-- Empty state: click or drag --><div x-show=\"!previewURL\" @click=\"$refs.fileInput.click()\" @keydown.enter.prevent=\"$refs.fileInput.click()\" @keydown.space.prevent=\"$refs.fileInput.click()\" @dragover.prevent=\"dragging = true\" @dragleave.prevent=\"dragging = false\" @drop.prevent=\"dropFile($event)\" role=\"button\" tabindex=\"0\" aria-controls=\"label_image\" :class=\"dragging ? 'border-rust bg-rust/5' : 'border-ink/60 hover:border-ink'\" class=\"cursor-pointer border-2 border-dashed bg-paper px-6 py-8 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-rust focus-visible:ring-offset-2 focus-visible:ring-offset-cream-hi\"><svg class=\"mx-auto size-9 text-ink/50\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.8\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 7.5 7.5 12M12 7.5V18\"></path></svg><p class=\"font-oswald font-bold text-ink text-sm mt-2\">Drop your label here <span class=\"text-ink-soft font-normal\">or click to browse</span></p><p class=\"font-special text-ink-soft text-xs mt-1\">PNG, JPG, or WebP · up to 10 MB · high-res is best</p></div><!-- Selected state: thumbnail + meta --><div x-show=\"previewURL\" x-cloak class=\"border-2 border-ink bg-paper-warm p-4\"><div class=\"flex items-center gap-4\"><div class=\"shrink-0 size-20 border-2 border-ink bg-paper flex items-center justify-center overflow-hidden\" style=\"box-shadow: var(--shadow-stamp); transform: rotate(-2deg);\"><img :src=\"previewURL\" alt=\"Label preview\" class=\"max-h-full max-w-full object-contain\"></div><div class=\"min-w-0 flex-1 text-left\"><p class=\"font-oswald text-chrome-deep text-[10px] font-semibold\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Your label</p><p class=\"font-oswald font-bold text-ink text-sm truncate\" x-text=\"fileName\"></p><p class=\"font-special text-ink-soft text-xs\" x-text=\"fileSize\"></p><button type=\"button\" @click=\"clearFile()\" :disabled=\"submitting\" class=\"mt-1.5 font-oswald text-rust text-xs font-bold hover:underline disabled:opacity-50 disabled:no-underline\" style=\"letter-spacing:0.06em; text-transform:uppercase;\">Replace</button></div></div></div><template x-if=\"fileError\"><p class=\"mt-2 font-oswald font-bold text-rust text-xs\" style=\"letter-spacing:0.04em;\" x-text=\"fileError\"></p></template><!-- Not natively required: an sr-only required input trips Chrome's\n\t\t\t\t\t\t\t\"not focusable\" block. Presence is enforced server-side (friendly\n\t\t\t\t\t\t\t\"Upload your label image\" error) and surfaced by the dropzone UX. --><input type=\"file\" name=\"label_image\" id=\"label_image\" accept=\"image/png,image/jpeg,image/webp\" x-ref=\"fileInput\" @change=\"pickFile($event)\" class=\"sr-only\"></div><button type=\"submit\" class=\"btn-stamp w-full border-2 border-ink bg-rust text-paper px-6 py-3.5 font-oswald font-bold text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-80\" style=\"letter-spacing:0.16em; text-transform:uppercase;\" :disabled=\"submitting\" :aria-busy=\"submitting\"><span x-show=\"!submitting\" class=\"inline-flex items-center justify-center gap-2\">Submit for review</span> <span x-show=\"submitting\" x-cloak x-transition:enter=\"transition ease-out duration-200\" x-transition:enter-start=\"opacity-0\" x-transition:enter-end=\"opacity-100\" class=\"inline-flex items-center justify-center gap-2\"><svg class=\"size-4 animate-spin\" fill=\"none\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle class=\"opacity-25\" cx=\"12\" cy=\"12\" r=\"10\" stroke=\"currentColor\" stroke-width=\"3\"></circle> <path class=\"opacity-75\" fill=\"currentColor\" d=\"M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z\"></path></svg> Sending…</span></button></form></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -246,12 +259,12 @@ func WhiteLabelPage(props WhiteLabelProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var11 == nil {
-			templ_7745c5c3_Var11 = templ.NopComponent
+		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var12 == nil {
+			templ_7745c5c3_Var12 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var12 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var13 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -272,7 +285,7 @@ func WhiteLabelPage(props WhiteLabelProps) templ.Component {
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
 			Title:       "Custom Label Setup",
 			Description: "Set up your custom-label coffee with Rockabilly Roasting Co.",
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var12), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var13), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -65,18 +65,13 @@ func (d *Deps) handleWhiteLabelPage(w http.ResponseWriter, r *http.Request) {
 func (d *Deps) handleWhiteLabelSubmit(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	if err := r.ParseMultipartForm(maxLabelImageBytes); err != nil {
-		http.Error(w, "Upload too large or malformed.", http.StatusBadRequest)
-		return
-	}
+	// The token rides in the query string as well as the body so a body that
+	// fails to parse (oversized upload) can still be answered with the form
+	// rather than a dead-end error page — ParseMultipartForm leaves
+	// r.MultipartForm nil on failure, taking the posted token with it.
+	token := r.URL.Query().Get("token")
 
-	token := r.FormValue("token")
-	if token == "" {
-		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
-		return
-	}
-	name := r.FormValue("name")
-	baseIDRaw := r.FormValue("base_product_id")
+	var name, baseIDRaw string
 
 	// Re-render the form with an error, preserving what they typed.
 	renderErr := func(msg string) {
@@ -87,6 +82,30 @@ func (d *Deps) handleWhiteLabelSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 		d.renderWhiteLabel(w, r, props)
 	}
+
+	if err := r.ParseMultipartForm(maxLabelImageBytes); err != nil {
+		if token == "" {
+			http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+			return
+		}
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			renderErr("That image is too large (10 MB max).")
+			return
+		}
+		renderErr("We couldn't read that upload — try again.")
+		return
+	}
+
+	if token == "" {
+		token = r.FormValue("token")
+	}
+	if token == "" {
+		http.Redirect(w, r, "/wholesale/login", http.StatusSeeOther)
+		return
+	}
+	name = r.FormValue("name")
+	baseIDRaw = r.FormValue("base_product_id")
 
 	baseProductID, err := uuid.Parse(baseIDRaw)
 	if err != nil {

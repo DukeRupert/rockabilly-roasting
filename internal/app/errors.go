@@ -97,6 +97,17 @@ var (
 	ErrSetupTokenExpired  = errors.New("setup link expired or already used")
 	ErrPasswordTooShort   = errors.New("password must be at least 10 characters")
 
+	// Customer user (additional wholesale logins) errors
+	ErrCustomerUserNotFound      = errors.New("team member not found")
+	ErrCustomerUserInviteInvalid = errors.New("invite link is invalid, expired, or already used")
+	ErrCustomerUserEmailRequired = errors.New("email address is required")
+	// ErrCustomerUserEmailTaken covers a collision with either an existing
+	// customers row or another customer_users row. Both matter: customers.email
+	// is checked first at login, so an invite that shadows one would send the
+	// invitee to the wrong account.
+	ErrCustomerUserEmailTaken = errors.New("that email address is already in use")
+	ErrNotWholesaleAccount    = errors.New("team members are only available on wholesale accounts")
+
 	// White-label onboarding errors
 	ErrWhiteLabelInviteInvalid = errors.New("white-label invite link is invalid, expired, or already used")
 	ErrWhiteLabelBaseInvalid   = errors.New("selected base coffee is not available for white-label")

@@ -326,6 +326,8 @@ func run() error {
 	invoiceStore := store.NewInvoiceStore()
 	magicLinkStore := store.NewMagicLinkStore()
 	staffInviteTokenStore := store.NewStaffInviteTokenStore()
+	customerUserStore := store.NewCustomerUserStore()
+	customerUserInviteTokenStore := store.NewCustomerUserInviteTokenStore()
 
 	// Email environment shared by every service that sends transactional email.
 	emailEnv := app.EmailEnv{
@@ -340,7 +342,7 @@ func run() error {
 	// Services. Those that send email have email-capable variants attached via WithEmail.
 	catalogSvc := app.NewCatalogService(catalogStore, customerStore, customerGroupStore, auditWriter, metricsReg)
 	orderSvc := app.NewOrderService(orderStore, auditWriter, metricsReg).
-		WithEmail(emailEnv, customerStore, catalogStore, subscriptionStore).
+		WithEmail(emailEnv, customerStore, customerUserStore, catalogStore, subscriptionStore).
 		WithShipments(shippingStore).
 		WithDiscounts(discountStore).
 		WithPricing(pricingStore)
@@ -355,14 +357,16 @@ func run() error {
 	pricingSvc := app.NewPricingService(pricingStore, customerStore).
 		WithSettings(settingsStore)
 	cartSvc := app.NewCartService(cartStore, catalogStore, pricingSvc, catalogSvc)
-	authSvc := app.NewAuthService(staffStore, customerStore, magicLinkStore, staffInviteTokenStore, sessionMgr, auditWriter, metricsReg).
+	authSvc := app.NewAuthService(staffStore, customerStore, customerUserStore, magicLinkStore, staffInviteTokenStore, customerUserInviteTokenStore, sessionMgr, auditWriter, metricsReg).
 		WithEmail(emailEnv)
+	customerUserSvc := app.NewCustomerUserService(customerStore, customerUserStore, sessionMgr, auditWriter, metricsReg).
+		WithEmail(emailEnv, authSvc)
 	staffSvc := app.NewStaffService(staffStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, shippingStore, paymentProvider, auditWriter, metricsReg).
 		WithTaxCalc(settingsStore, catalogStore).
 		WithRenewalAnchor(merchantTZ, renewalAnchorHour)
-	wholesaleSvc := app.NewWholesaleService(customerStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
+	wholesaleSvc := app.NewWholesaleService(customerStore, customerUserStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc).
 		WithUnsubscribeSigner(unsubscribeSigner)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, customerStore, auditWriter, metricsReg).
@@ -381,6 +385,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalWorker(renewalSvc, pool, metricsReg))
 	river.AddWorker(workers, jobs.NewBatchRenewalWorker(renewalSvc, pool, metricsReg))
 	river.AddWorker(workers, jobs.NewMagicLinkSendWorker(authSvc, pool))
+	river.AddWorker(workers, jobs.NewCustomerUserInviteSendWorker(customerUserSvc, pool))
 	river.AddWorker(workers, jobs.NewPasswordResetSendWorker(authSvc, pool))
 	river.AddWorker(workers, jobs.NewEmailVerifySendWorker(authSvc, pool))
 	river.AddWorker(workers, jobs.NewInvoiceSendWorker(invoiceSvc, pool))
@@ -605,6 +610,7 @@ func run() error {
 		SubscriptionService:    subscriptionSvc,
 		DiscountService:        discountSvc,
 		AuthService:            authSvc,
+		CustomerUserService:    customerUserSvc,
 		StaffService:           staffSvc,
 		PricingService:         pricingSvc,
 		CartService:            cartSvc,

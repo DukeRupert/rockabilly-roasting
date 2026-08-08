@@ -23,6 +23,7 @@ type OrderService struct {
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
 	customers     *store.CustomerStore     // populated via WithEmail; required for Send* methods
+	customerUsers *store.CustomerUserStore // populated via WithEmail; resolves extra recipients on wholesale accounts
 	catalog       *store.CatalogStore      // populated via WithEmail; required for Send* methods
 	subscriptions *store.SubscriptionStore // populated via WithEmail; used by SendRenewalReceiptEmail to show next-charge date
 	shipments     *store.ShippingStore     // populated via WithShipments; required for SendOrderShippedEmail
@@ -44,9 +45,10 @@ func NewOrderService(orders *store.OrderStore, audit *audit.AuditWriter, metrics
 // WithEmail attaches email-send environment and the supporting stores required
 // for Send* methods. Must be called before any Send* method is invoked; safe
 // to call at wiring time.
-func (s *OrderService) WithEmail(env EmailEnv, customers *store.CustomerStore, catalog *store.CatalogStore, subscriptions *store.SubscriptionStore) *OrderService {
+func (s *OrderService) WithEmail(env EmailEnv, customers *store.CustomerStore, customerUsers *store.CustomerUserStore, catalog *store.CatalogStore, subscriptions *store.SubscriptionStore) *OrderService {
 	s.email = env
 	s.customers = customers
+	s.customerUsers = customerUsers
 	s.catalog = catalog
 	s.subscriptions = subscriptions
 	return s

@@ -14,6 +14,19 @@ type WholesaleSetupProps struct {
 	Token   string
 	Error   string
 	Success bool
+	// Action is the form target. Empty means the primary wholesale setup flow
+	// (/wholesale/setup); the teammate-invite flow posts to /wholesale/invite
+	// instead. Both set a password from a single-use emailed token, so they
+	// share this page rather than duplicating it.
+	Action string
+}
+
+// setupFormAction defaults the form target to the primary setup route.
+func setupFormAction(action string) templ.SafeURL {
+	if action == "" {
+		return templ.SafeURL("/wholesale/setup")
+	}
+	return templ.SafeURL(action)
 }
 
 func WholesaleSetupContent(props WholesaleSetupProps) templ.Component {
@@ -59,7 +72,7 @@ func WholesaleSetupContent(props WholesaleSetupProps) templ.Component {
 				var templ_7745c5c3_Var2 string
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Error)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_setup.templ`, Line: 66, Col: 102}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_setup.templ`, Line: 79, Col: 102}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -70,25 +83,38 @@ func WholesaleSetupContent(props WholesaleSetupProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<form method=\"post\" action=\"/wholesale/setup\" class=\"space-y-5\"><input type=\"hidden\" name=\"token\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Token)
+			var templ_7745c5c3_Var3 templ.SafeURL
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(setupFormAction(props.Action))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_setup.templ`, Line: 70, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_setup.templ`, Line: 82, Col: 63}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\"><div><label for=\"password\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Password</label> <input type=\"password\" name=\"password\" id=\"password\" required minlength=\"10\" autocomplete=\"new-password\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><div><label for=\"password_confirm\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Confirm password</label> <input type=\"password\" name=\"password_confirm\" id=\"password_confirm\" required minlength=\"10\" autocomplete=\"new-password\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><button type=\"submit\" class=\"btn-stamp w-full inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Set password</button></form></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"space-y-5\"><input type=\"hidden\" name=\"token\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var4 string
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Token)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_setup.templ`, Line: 83, Col: 59}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"><div><label for=\"password\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Password</label> <input type=\"password\" name=\"password\" id=\"password\" required minlength=\"10\" autocomplete=\"new-password\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><div><label for=\"password_confirm\" class=\"font-oswald font-bold text-ink text-[11px] mb-2 block\" style=\"letter-spacing:0.2em; text-transform:uppercase;\">Confirm password</label> <input type=\"password\" name=\"password_confirm\" id=\"password_confirm\" required minlength=\"10\" autocomplete=\"new-password\" class=\"paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink focus:outline-none\" style=\"letter-spacing:0.04em;\"></div><button type=\"submit\" class=\"btn-stamp w-full inline-flex items-center justify-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3.5 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Set password</button></form></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -112,12 +138,12 @@ func WholesaleSetupPage(props WholesaleSetupProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var4 == nil {
-			templ_7745c5c3_Var4 = templ.NopComponent
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -138,7 +164,7 @@ func WholesaleSetupPage(props WholesaleSetupProps) templ.Component {
 		templ_7745c5c3_Err = layouts.Storefront(layouts.StorefrontProps{
 			Title:       "Set Your Password",
 			Description: "Finish activating your Rockabilly Roasting Co. wholesale account.",
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

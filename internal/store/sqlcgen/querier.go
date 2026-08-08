@@ -35,6 +35,8 @@ type Querier interface {
 	CreateCouponCode(ctx context.Context, arg CreateCouponCodeParams) (CouponCode, error)
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
 	CreateCustomerGroup(ctx context.Context, arg CreateCustomerGroupParams) (CustomerGroup, error)
+	CreateCustomerUser(ctx context.Context, arg CreateCustomerUserParams) (CustomerUser, error)
+	CreateCustomerUserInviteToken(ctx context.Context, arg CreateCustomerUserInviteTokenParams) (CustomerUserInviteToken, error)
 	CreateDiscount(ctx context.Context, arg CreateDiscountParams) (Discount, error)
 	CreateEmailVerification(ctx context.Context, arg CreateEmailVerificationParams) (EmailVerification, error)
 	CreateFulfillment(ctx context.Context, arg CreateFulfillmentParams) (Fulfillment, error)
@@ -79,7 +81,12 @@ type Querier interface {
 	DeleteCouponCode(ctx context.Context, id uuid.UUID) error
 	DeleteCustomer(ctx context.Context, id uuid.UUID) error
 	DeleteCustomerGroup(ctx context.Context, id uuid.UUID) error
+	// DeleteCustomerUser is scoped by customer_id as well as id so a caller cannot
+	// revoke a member of an account it does not own — the same ownership-by-query
+	// discipline the customer-scoped store methods use.
+	DeleteCustomerUser(ctx context.Context, arg DeleteCustomerUserParams) (int64, error)
 	DeleteDiscount(ctx context.Context, id uuid.UUID) error
+	DeleteExpiredCustomerUserInviteTokens(ctx context.Context) error
 	DeleteExpiredMagicLinkTokens(ctx context.Context) error
 	DeleteExpiredStaffInviteTokens(ctx context.Context) error
 	DeleteLineItem(ctx context.Context, id uuid.UUID) error
@@ -113,6 +120,11 @@ type Querier interface {
 	GetCustomerByID(ctx context.Context, id uuid.UUID) (Customer, error)
 	GetCustomerByStripeCustomerID(ctx context.Context, stripeCustomerID *string) (Customer, error)
 	GetCustomerGroupByID(ctx context.Context, id uuid.UUID) (CustomerGroup, error)
+	GetCustomerUserByEmail(ctx context.Context, email string) (CustomerUser, error)
+	GetCustomerUserByID(ctx context.Context, id uuid.UUID) (CustomerUser, error)
+	// GetCustomerUserForCustomer is the ownership-scoped fetch: a caller holding an
+	// account id cannot read a member of some other account.
+	GetCustomerUserForCustomer(ctx context.Context, arg GetCustomerUserForCustomerParams) (CustomerUser, error)
 	GetDiscountByID(ctx context.Context, id uuid.UUID) (Discount, error)
 	GetEmailVerificationByTokenHash(ctx context.Context, tokenHash string) (EmailVerification, error)
 	GetFulfillmentByID(ctx context.Context, id uuid.UUID) (Fulfillment, error)
@@ -155,6 +167,7 @@ type Querier interface {
 	GetSubscriptionPlanByID(ctx context.Context, id uuid.UUID) (SubscriptionPlan, error)
 	GetTaxonByID(ctx context.Context, id uuid.UUID) (Taxon, error)
 	GetTaxonBySlug(ctx context.Context, slug string) (Taxon, error)
+	GetValidCustomerUserInviteToken(ctx context.Context, tokenHash string) (CustomerUserInviteToken, error)
 	GetValidMagicLinkToken(ctx context.Context, arg GetValidMagicLinkTokenParams) (MagicLinkToken, error)
 	GetValidStaffInviteToken(ctx context.Context, tokenHash string) (StaffInviteToken, error)
 	GetVariantByID(ctx context.Context, id uuid.UUID) (Variant, error)
@@ -177,6 +190,7 @@ type Querier interface {
 	ListCouponCodesByDiscount(ctx context.Context, discountID uuid.UUID) ([]CouponCode, error)
 	ListCustomerGroups(ctx context.Context) ([]CustomerGroup, error)
 	ListCustomerGroupsByCustomer(ctx context.Context, customerID uuid.UUID) ([]CustomerGroup, error)
+	ListCustomerUsersByCustomer(ctx context.Context, customerID uuid.UUID) ([]CustomerUser, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListFulfillmentItemsByFulfillment(ctx context.Context, fulfillmentID uuid.UUID) ([]FulfillmentItem, error)
 	ListFulfillmentsByOrder(ctx context.Context, orderID uuid.UUID) ([]Fulfillment, error)
@@ -184,6 +198,10 @@ type Querier interface {
 	ListInvoicePaymentsByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoicePayment, error)
 	ListInvoicesByOrder(ctx context.Context, orderID uuid.UUID) ([]Invoice, error)
 	ListLineItemsByOrder(ctx context.Context, orderID uuid.UUID) ([]LineItem, error)
+	// ListNotifiedCustomerUsers returns the additional recipients for an account's
+	// transactional mail. The account's primary contact (customers.email) is not in
+	// this table and is added by the caller.
+	ListNotifiedCustomerUsers(ctx context.Context, customerID uuid.UUID) ([]CustomerUser, error)
 	ListPriceListPricesByProduct(ctx context.Context, arg ListPriceListPricesByProductParams) ([]ListPriceListPricesByProductRow, error)
 	ListPriceListPricesByVariants(ctx context.Context, arg ListPriceListPricesByVariantsParams) ([]ListPriceListPricesByVariantsRow, error)
 	ListPriceLists(ctx context.Context) ([]PriceList, error)
@@ -224,6 +242,7 @@ type Querier interface {
 	// Atomically redeem a coupon — only succeeds if redeemed_at IS NULL.
 	// Returns the row if successful; pgx.ErrNoRows if already redeemed.
 	RedeemCouponCode(ctx context.Context, arg RedeemCouponCodeParams) (CouponCode, error)
+	RedeemCustomerUserInviteToken(ctx context.Context, tokenHash string) (CustomerUserInviteToken, error)
 	RedeemMagicLinkToken(ctx context.Context, arg RedeemMagicLinkTokenParams) (MagicLinkToken, error)
 	RedeemStaffInviteToken(ctx context.Context, tokenHash string) (StaffInviteToken, error)
 	// Reverses a coupon redemption tied to a specific order. Used when an order
@@ -245,6 +264,7 @@ type Querier interface {
 	SetProductGroupVisibility(ctx context.Context, arg SetProductGroupVisibilityParams) error
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)
 	SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error)
+	TouchCustomerUserLastLogin(ctx context.Context, id uuid.UUID) error
 	UnarchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error)
 	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)
 	UpdateAttributeKey(ctx context.Context, arg UpdateAttributeKeyParams) (AttributeKey, error)
@@ -264,6 +284,8 @@ type Querier interface {
 	UpdateCustomerPriceList(ctx context.Context, arg UpdateCustomerPriceListParams) error
 	UpdateCustomerStripeCustomerID(ctx context.Context, arg UpdateCustomerStripeCustomerIDParams) (Customer, error)
 	UpdateCustomerTaxExempt(ctx context.Context, arg UpdateCustomerTaxExemptParams) error
+	UpdateCustomerUserNotifications(ctx context.Context, arg UpdateCustomerUserNotificationsParams) error
+	UpdateCustomerUserPassword(ctx context.Context, arg UpdateCustomerUserPasswordParams) error
 	UpdateDefaultWholesalePriceList(ctx context.Context, defaultWholesalePriceListID *uuid.UUID) (StoreSetting, error)
 	UpdateDiscount(ctx context.Context, arg UpdateDiscountParams) (Discount, error)
 	UpdateFulfillmentStatus(ctx context.Context, arg UpdateFulfillmentStatusParams) (Fulfillment, error)

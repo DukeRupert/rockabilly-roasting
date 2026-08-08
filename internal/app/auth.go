@@ -37,34 +37,40 @@ const MagicLinkSessionDuration = 30 * 24 * time.Hour
 
 // AuthService contains business logic for authentication and session management.
 type AuthService struct {
-	staff        *store.StaffStore
-	customers    *store.CustomerStore
-	magicLinks   *store.MagicLinkStore
-	staffInvites *store.StaffInviteTokenStore
-	sessions     *sessions.Manager
-	audit        *audit.AuditWriter
-	metrics      *metrics.Registry
-	email        EmailEnv // populated via WithEmail; required for SendMagicLink
+	staff               *store.StaffStore
+	customers           *store.CustomerStore
+	customerUsers       *store.CustomerUserStore
+	magicLinks          *store.MagicLinkStore
+	staffInvites        *store.StaffInviteTokenStore
+	customerUserInvites *store.CustomerUserInviteTokenStore
+	sessions            *sessions.Manager
+	audit               *audit.AuditWriter
+	metrics             *metrics.Registry
+	email               EmailEnv // populated via WithEmail; required for SendMagicLink
 }
 
 // NewAuthService creates a new AuthService.
 func NewAuthService(
 	staff *store.StaffStore,
 	customers *store.CustomerStore,
+	customerUsers *store.CustomerUserStore,
 	magicLinks *store.MagicLinkStore,
 	staffInvites *store.StaffInviteTokenStore,
+	customerUserInvites *store.CustomerUserInviteTokenStore,
 	sessions *sessions.Manager,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
 ) *AuthService {
 	return &AuthService{
-		staff:        staff,
-		customers:    customers,
-		magicLinks:   magicLinks,
-		staffInvites: staffInvites,
-		sessions:     sessions,
-		audit:        audit,
-		metrics:      metrics,
+		staff:               staff,
+		customers:           customers,
+		customerUsers:       customerUsers,
+		magicLinks:          magicLinks,
+		staffInvites:        staffInvites,
+		customerUserInvites: customerUserInvites,
+		sessions:            sessions,
+		audit:               audit,
+		metrics:             metrics,
 	}
 }
 
@@ -168,11 +174,19 @@ func (s *AuthService) ValidateSession(ctx context.Context, tx pgx.Tx, rawToken s
 // normalized first: the lookup is an exact match, so without this a customer
 // whose keyboard capitalizes the first letter fails to authenticate against a
 // row that is plainly there.
+//
+// The customers row is tried first and an additional wholesale login
+// (customer_users) only on a miss, so this path is unchanged for every existing
+// account. Inviting a teammate on an address that already belongs to a
+// customers row is rejected at invite time precisely because this ordering
+// would otherwise send them to the wrong account — see CustomerUserService.Invite.
 func (s *AuthService) CustomerLogin(ctx context.Context, tx pgx.Tx, email, password string, rememberMe bool, ipAddress, userAgent *string) (*domain.Session, string, error) {
-	customer, err := s.customers.GetByEmail(ctx, tx, domain.NormalizeEmail(email))
+	normalized := domain.NormalizeEmail(email)
+
+	customer, err := s.customers.GetByEmail(ctx, tx, normalized)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, "", ErrInvalidCredentials
+			return s.customerUserLogin(ctx, tx, normalized, password, rememberMe, ipAddress, userAgent)
 		}
 		return nil, "", fmt.Errorf("customer login lookup: %w", err)
 	}
@@ -234,6 +248,216 @@ func (s *AuthService) CreateCustomerSession(
 	}
 
 	return session, rawToken, nil
+}
+
+// customerUserLogin authenticates an additional login on a wholesale account.
+// Every failure returns ErrInvalidCredentials so the caller cannot distinguish
+// "no such address" from "wrong password" from "invite not yet accepted".
+func (s *AuthService) customerUserLogin(ctx context.Context, tx pgx.Tx, normalizedEmail, password string, rememberMe bool, ipAddress, userAgent *string) (*domain.Session, string, error) {
+	user, err := s.customerUsers.GetByEmail(ctx, tx, normalizedEmail)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, "", ErrInvalidCredentials
+		}
+		return nil, "", fmt.Errorf("customer user login lookup: %w", err)
+	}
+
+	// Invited but never set a password — cannot sign in yet.
+	if user.PasswordHash == nil {
+		return nil, "", ErrInvalidCredentials
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(password)); err != nil {
+		return nil, "", ErrInvalidCredentials
+	}
+
+	if err := s.customerUsers.TouchLastLogin(ctx, tx, user.ID); err != nil {
+		return nil, "", fmt.Errorf("touch customer user last login: %w", err)
+	}
+
+	return s.CreateCustomerUserSession(ctx, tx, user, "password", rememberMe, ipAddress, userAgent)
+}
+
+// CreateCustomerUserSession mints a session for an additional login. The
+// session's ActorID is the customer_users.id — NOT the account id — so session
+// resolution must load the user and then its owning account.
+//
+// The audit entry deliberately stays ActorType=customer with ActorID set to the
+// ACCOUNT, so existing per-account audit queries (audit.ListForCustomer) keep
+// working unchanged. Which human acted is carried in ActorName (their email)
+// and metadata.customer_user_id.
+func (s *AuthService) CreateCustomerUserSession(
+	ctx context.Context,
+	tx pgx.Tx,
+	user *domain.CustomerUser,
+	method string,
+	rememberMe bool,
+	ipAddress, userAgent *string,
+) (*domain.Session, string, error) {
+	duration := sessions.CustomerSessionDuration
+	if rememberMe {
+		duration = sessions.CustomerRememberMeDuration
+	}
+
+	expiresAt := time.Now().Add(duration)
+	session, rawToken, err := s.sessions.GetStore().Create(ctx, tx, domain.SessionActorTypeCustomerUser, user.ID, expiresAt, ipAddress, userAgent)
+	if err != nil {
+		return nil, "", fmt.Errorf("create customer user session: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    domain.AuditActorTypeCustomer,
+		ActorID:      &user.CustomerID,
+		ActorName:    user.Email,
+		Action:       audit.AuditCustomerLogin,
+		ResourceType: "session",
+		ResourceID:   session.ID,
+		Metadata: map[string]any{
+			"method":           method,
+			"customer_user_id": user.ID.String(),
+		},
+	}); err != nil {
+		return nil, "", fmt.Errorf("audit customer user login: %w", err)
+	}
+
+	return session, rawToken, nil
+}
+
+// GetCustomerUserByID returns an additional login by ID. Used by session
+// resolution to turn a customer_user session into an account.
+func (s *AuthService) GetCustomerUserByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.CustomerUser, error) {
+	user, err := s.customerUsers.GetByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCustomerUserNotFound
+		}
+		return nil, fmt.Errorf("get customer user: %w", err)
+	}
+	return user, nil
+}
+
+// CreateCustomerUserInviteToken mints a single-use invite / password-setup
+// token for an additional login and returns the raw token for the email link.
+// Re-inviting simply mints a fresh token, so this serves both first-time setup
+// and later password resets.
+func (s *AuthService) CreateCustomerUserInviteToken(ctx context.Context, tx pgx.Tx, customerUserID uuid.UUID) (rawToken string, err error) {
+	tokenBytes := make([]byte, 32)
+	if _, err := rand.Read(tokenBytes); err != nil {
+		return "", fmt.Errorf("generate customer user invite token: %w", err)
+	}
+	rawToken = hex.EncodeToString(tokenBytes)
+
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	expiresAt := time.Now().Add(SetupTokenDuration)
+	if _, err := s.customerUserInvites.Create(ctx, tx, customerUserID, tokenHash, expiresAt); err != nil {
+		return "", fmt.Errorf("store customer user invite token: %w", err)
+	}
+
+	return rawToken, nil
+}
+
+// LookupCustomerUserInvite validates an invite token without consuming it, so
+// the set-password form can be rendered (or rejected) before submission.
+func (s *AuthService) LookupCustomerUserInvite(ctx context.Context, tx pgx.Tx, rawToken string) (*domain.CustomerUser, error) {
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	token, err := s.customerUserInvites.Lookup(ctx, tx, tokenHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCustomerUserInviteInvalid
+		}
+		return nil, fmt.Errorf("lookup customer user invite: %w", err)
+	}
+	return s.GetCustomerUserByID(ctx, tx, token.CustomerUserID)
+}
+
+// SetCustomerUserPasswordWithToken consumes an invite token and sets the
+// additional login's password. Single-use. Returns ErrCustomerUserInviteInvalid
+// if the token is missing, expired, or already used, and ErrPasswordTooShort if
+// the password is under 10 characters.
+func (s *AuthService) SetCustomerUserPasswordWithToken(ctx context.Context, tx pgx.Tx, rawToken, password string) (*domain.CustomerUser, error) {
+	if len(password) < 10 {
+		return nil, ErrPasswordTooShort
+	}
+
+	hash := sha256.Sum256([]byte(rawToken))
+	tokenHash := hex.EncodeToString(hash[:])
+
+	token, err := s.customerUserInvites.Redeem(ctx, tx, tokenHash)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCustomerUserInviteInvalid
+		}
+		return nil, fmt.Errorf("redeem customer user invite token: %w", err)
+	}
+
+	passwordHash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("hash password: %w", err)
+	}
+
+	if err := s.customerUsers.UpdatePassword(ctx, tx, token.CustomerUserID, string(passwordHash)); err != nil {
+		return nil, fmt.Errorf("update customer user password: %w", err)
+	}
+
+	user, err := s.GetCustomerUserByID(ctx, tx, token.CustomerUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    domain.AuditActorTypeSystem,
+		ActorName:    "customer_user_invite_redeem",
+		Action:       audit.AuditCustomerUserPasswordSet,
+		ResourceType: "customer",
+		ResourceID:   user.CustomerID,
+		Metadata:     map[string]any{"customer_user_id": user.ID.String()},
+	}); err != nil {
+		return nil, fmt.Errorf("audit customer user password set: %w", err)
+	}
+
+	return user, nil
+}
+
+// ChangeCustomerUserPassword updates an additional login's password after
+// verifying the current one. CALLER MUST verify the request is authenticated as
+// this user.
+func (s *AuthService) ChangeCustomerUserPassword(ctx context.Context, tx pgx.Tx, user *domain.CustomerUser, currentPassword, newPassword string, actor Actor) error {
+	if user.PasswordHash == nil {
+		return ErrInvalidCredentials
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(currentPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+	if len(newPassword) < 10 {
+		return ErrPasswordTooShort
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("hash new password: %w", err)
+	}
+
+	if err := s.customerUsers.UpdatePassword(ctx, tx, user.ID, string(hash)); err != nil {
+		return fmt.Errorf("update customer user password: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditCustomerUserPasswordChanged,
+		ResourceType: "customer",
+		ResourceID:   user.CustomerID,
+		Metadata:     map[string]any{"customer_user_id": user.ID.String()},
+	}); err != nil {
+		return fmt.Errorf("audit customer user password change: %w", err)
+	}
+
+	return nil
 }
 
 // GetCustomerByID returns a customer by ID.

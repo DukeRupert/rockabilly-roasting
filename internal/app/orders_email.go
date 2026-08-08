@@ -57,6 +57,7 @@ func (s *OrderService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.
 	var (
 		order        *domain.Order
 		customer     *domain.Customer
+		recipients   []MailRecipient
 		items        []emailtemplates.OrderLineItemData
 		shippingAddr string
 	)
@@ -73,6 +74,14 @@ func (s *OrderService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.
 			return fmt.Errorf("get customer %s: %w", customerID, err)
 		}
 		customer = c
+
+		// The account contact plus any wholesale teammate opted into the
+		// account's mail. A retail customer has no customer_users rows, so this
+		// collapses to just their address and the retail path is unchanged.
+		recipients, err = notificationRecipients(ctx, tx, s.customerUsers, c)
+		if err != nil {
+			return err
+		}
 
 		lineItems, err := s.orders.ListLineItems(ctx, tx, order.ID)
 		if err != nil {
@@ -109,8 +118,13 @@ func (s *OrderService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.
 	}
 
 	if _, err := s.email.Mailer.Send(ctx, email.Message{
-		From:    s.email.FromAddr,
-		To:      customer.Email,
+		From: s.email.FromAddr,
+		// One message to everyone rather than a send each: colleagues on a
+		// shared account should see the same thread. Safe to share here in a
+		// way the reminder is not — a confirmation is transactional and carries
+		// no unsubscribe control, so there is no per-recipient token to get
+		// wrong.
+		To:      strings.Join(recipientEmails(recipients), ", "),
 		Subject: fmt.Sprintf("Order confirmed — %s", order.Number),
 		HTML:    html,
 		Text:    text,

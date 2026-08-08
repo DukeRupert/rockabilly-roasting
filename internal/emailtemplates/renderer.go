@@ -279,6 +279,16 @@ type StaffInviteData struct {
 	StoreURL  string
 }
 
+// CustomerUserInviteData holds data for the email inviting an additional
+// person to sign in on a wholesale account.
+type CustomerUserInviteData struct {
+	Name        string
+	CompanyName string
+	SetupURL    string
+	StoreName   string
+	StoreURL    string
+}
+
 // WhiteLabelSubmittedData holds data for the staff notification sent when a
 // client submits a white-label product for review.
 type WhiteLabelSubmittedData struct {

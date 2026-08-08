@@ -1,0 +1,15 @@
+{{define "customer_user_invite.txt"}}{{.StoreName}}
+==========================================
+
+YOU'RE ON THE ACCOUNT
+
+Hey{{if .Name}} {{.Name}}{{end}} -- you've been added to the {{.CompanyName}} wholesale account. Use this link to set your password, then you can place orders, check history, and reorder straight from the portal. The link is good for 72 hours.
+
+{{.SetupURL}}
+
+Not expecting this? Ignore the email -- the sign-in can't be used until this link is opened and a password is set.
+
+------------------------------------------
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

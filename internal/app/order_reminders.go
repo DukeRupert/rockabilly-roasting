@@ -98,6 +98,12 @@ func (s *WholesaleService) SetOrderRemindersFromEmailLink(ctx context.Context, t
 	}, customerID, enabled)
 }
 
+// notificationRecipients returns the account contact plus any teammate opted
+// into the account's transactional mail.
+func (s *WholesaleService) notificationRecipients(ctx context.Context, tx pgx.Tx, customer *domain.Customer) ([]string, error) {
+	return notificationRecipients(ctx, tx, s.customerUsers, customer)
+}
+
 // SendOrderReminder emails one wholesale account the weekly order reminder.
 //
 // Sends live outside a transaction (external call first, then write) per the
@@ -105,9 +111,10 @@ func (s *WholesaleService) SetOrderRemindersFromEmailLink(ctx context.Context, t
 // failure never leaves a record claiming the mail went out.
 func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID) error {
 	var (
-		customer  *domain.Customer
-		lastItems []emailtemplates.OrderLineItemData
-		lastOn    *time.Time
+		customer   *domain.Customer
+		recipients []string
+		lastItems  []emailtemplates.OrderLineItemData
+		lastOn     *time.Time
 	)
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		c, err := s.customers.GetByID(ctx, tx, customerID)
@@ -115,6 +122,14 @@ func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.
 			return fmt.Errorf("get customer %s: %w", customerID, err)
 		}
 		customer = c
+
+		// The account contact plus any teammate who opted in. Read here rather
+		// than at scan time so a preference changed since the fan-out is
+		// honoured.
+		recipients, err = s.notificationRecipients(ctx, tx, c)
+		if err != nil {
+			return err
+		}
 
 		// The customer's last order is printed in the email so the decision
 		// ("do I need this again?") happens in the inbox instead of after a
@@ -172,8 +187,11 @@ func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.
 	}
 
 	if _, err := s.email.Mailer.Send(ctx, email.Message{
-		From:    s.email.FromAddr,
-		To:      customer.Email,
+		From: s.email.FromAddr,
+		// Everyone on one message rather than one send each: they are colleagues
+		// on a shared account, and a single thread keeps "did anyone order this
+		// week?" answerable from the inbox.
+		To:      strings.Join(recipients, ", "),
 		Subject: "Time to place your coffee order",
 		HTML:    html,
 		Text:    text,

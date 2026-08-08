@@ -296,7 +296,7 @@ func newOrderServiceWithCatalogPricing() *app.OrderService {
 	subscriptionStore := store.NewSubscriptionStore(nil)
 	pricingStore := store.NewPricingStore()
 	return app.NewOrderService(store.NewOrderStore(nil), audit.NewAuditWriter(), metrics.NewRegistry()).
-		WithEmail(app.EmailEnv{}, customerStore, catalogStore, subscriptionStore).
+		WithEmail(app.EmailEnv{}, customerStore, store.NewCustomerUserStore(), catalogStore, subscriptionStore).
 		WithPricing(pricingStore)
 }
 

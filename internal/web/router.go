@@ -49,6 +49,7 @@ type Deps struct {
 	SubscriptionService    *app.SubscriptionService
 	DiscountService        *app.DiscountService
 	AuthService            *app.AuthService
+	CustomerUserService    *app.CustomerUserService
 	StaffService           *app.StaffService
 	PricingService         *app.PricingService
 	CartService            *app.CartService
@@ -209,6 +210,9 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.Handle("POST /wholesale/apply", wholesaleApplyIPLimit(http.HandlerFunc(deps.handleWholesaleApply)))
 	mux.HandleFunc("GET /wholesale/setup", deps.handleWholesaleSetupPage)
 	mux.HandleFunc("POST /wholesale/setup", deps.handleWholesaleSetup)
+	// Teammate invite acceptance — public, authenticated by the emailed token.
+	mux.HandleFunc("GET /wholesale/invite", deps.handleWholesaleInvitePage)
+	mux.HandleFunc("POST /wholesale/invite", deps.handleWholesaleInviteAccept)
 
 	// Wholesale white-label onboarding (public, invite-token gated)
 	mux.HandleFunc("GET /wholesale/white-label", deps.handleWhiteLabelPage)
@@ -317,6 +321,11 @@ func NewRouter(deps *Deps) http.Handler {
 	wholesaleMux.HandleFunc("POST /wholesale/account/addresses/{id}", deps.handleWholesaleAccountAddressUpdate)
 	wholesaleMux.HandleFunc("POST /wholesale/account/addresses/{id}/delete", deps.handleWholesaleAccountAddressDelete)
 	wholesaleMux.HandleFunc("POST /wholesale/account/addresses/{id}/default", deps.handleWholesaleAccountAddressSetDefault)
+	wholesaleMux.HandleFunc("GET /wholesale/account/team", deps.handleWholesaleTeam)
+	wholesaleMux.HandleFunc("POST /wholesale/account/team/invite", deps.handleWholesaleTeamInvite)
+	wholesaleMux.HandleFunc("POST /wholesale/account/team/{id}/resend", deps.handleWholesaleTeamResend)
+	wholesaleMux.HandleFunc("POST /wholesale/account/team/{id}/revoke", deps.handleWholesaleTeamRevoke)
+	wholesaleMux.HandleFunc("POST /wholesale/account/team/{id}/notifications", deps.handleWholesaleTeamNotifications)
 	wholesaleMux.HandleFunc("GET /wholesale/account/security", deps.handleWholesaleAccountSecurity)
 	wholesaleMux.HandleFunc("POST /wholesale/account/security/set", deps.handleWholesaleAccountPasswordSet)
 	wholesaleMux.HandleFunc("POST /wholesale/account/security/change", deps.handleWholesaleAccountPasswordChange)

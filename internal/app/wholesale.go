@@ -21,6 +21,7 @@ import (
 // WholesaleService contains business logic for wholesale customer management and ordering.
 type WholesaleService struct {
 	customers      *store.CustomerStore
+	customerUsers  *store.CustomerUserStore
 	customerGroups *store.CustomerGroupStore
 	catalog        *store.CatalogStore
 	orders         *store.OrderStore
@@ -37,6 +38,7 @@ type WholesaleService struct {
 // NewWholesaleService creates a new WholesaleService.
 func NewWholesaleService(
 	customers *store.CustomerStore,
+	customerUsers *store.CustomerUserStore,
 	customerGroups *store.CustomerGroupStore,
 	catalog *store.CatalogStore,
 	orders *store.OrderStore,
@@ -47,6 +49,7 @@ func NewWholesaleService(
 	return &WholesaleService{
 		unsubscribe:    auth.NewUnsubscribeSigner(""),
 		customers:      customers,
+		customerUsers:  customerUsers,
 		customerGroups: customerGroups,
 		catalog:        catalog,
 		orders:         orders,

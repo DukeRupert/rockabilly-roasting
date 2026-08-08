@@ -179,6 +179,17 @@ type PasswordResetSendArgs struct {
 // Kind returns the job kind identifier.
 func (PasswordResetSendArgs) Kind() string { return "password_reset_send" }
 
+// CustomerUserInviteSendArgs emails an invite / password-setup link to an
+// additional login on a wholesale account. The token is minted in the request
+// transaction; the email links to /wholesale/invite.
+type CustomerUserInviteSendArgs struct {
+	CustomerUserID uuid.UUID `json:"customer_user_id"`
+	RawToken       string    `json:"raw_token"`
+}
+
+// Kind returns the job kind identifier.
+func (CustomerUserInviteSendArgs) Kind() string { return "customer_user_invite_send" }
+
 // EmailVerifySendArgs sends an email-verification message to a customer.
 // The underlying token is a magic-link token; redeeming it verifies the
 // email and signs the customer in. The email copy is framed around

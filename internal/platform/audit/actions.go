@@ -65,6 +65,18 @@ const (
 	AuditCustomerOrderRemindersEnabled   = "customer.order_reminders_enabled"
 	AuditCustomerOrderRemindersDisabled  = "customer.order_reminders_disabled"
 
+	// Customer user actions (additional logins on a wholesale account).
+	// These record against the ACCOUNT (resource_type "customer",
+	// resource_id = customers.id) with the affected login in
+	// metadata.customer_user_id, so an account's audit trail stays in one place.
+	AuditCustomerUserInvited               = "customer_user.invited"
+	AuditCustomerUserInviteResent          = "customer_user.invite_resent"
+	AuditCustomerUserRevoked               = "customer_user.revoked"
+	AuditCustomerUserPasswordSet           = "customer_user.password_set"
+	AuditCustomerUserPasswordChanged       = "customer_user.password_changed"
+	AuditCustomerUserNotificationsEnabled  = "customer_user.notifications_enabled"
+	AuditCustomerUserNotificationsDisabled = "customer_user.notifications_disabled"
+
 	// Customer group actions
 	AuditCustomerGroupCreated       = "customer_group.created"
 	AuditCustomerGroupDeleted       = "customer_group.deleted"
@@ -100,11 +112,11 @@ const (
 	AuditShipmentLabelRefunded        = "shipment.label_refunded"
 	AuditShipmentLabelRefundFailed    = "shipment.label_refund_failed"
 	AuditShipmentStatusUpdated        = "shipment.status_updated"
-	AuditShipmentImported      = "shipment.imported"
-	AuditShippingConfigUpdated = "shipping_config.updated"
-	AuditBoxPresetCreated      = "box_preset.created"
-	AuditBoxPresetUpdated      = "box_preset.updated"
-	AuditBoxPresetDeleted      = "box_preset.deleted"
+	AuditShipmentImported             = "shipment.imported"
+	AuditShippingConfigUpdated        = "shipping_config.updated"
+	AuditBoxPresetCreated             = "box_preset.created"
+	AuditBoxPresetUpdated             = "box_preset.updated"
+	AuditBoxPresetDeleted             = "box_preset.deleted"
 
 	// Email actions for shipping
 	AuditEmailOrderShipped        = "email.order_shipped"

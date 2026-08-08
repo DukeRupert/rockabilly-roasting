@@ -27,8 +27,10 @@ func newAuthService() *app.AuthService {
 	return app.NewAuthService(
 		store.NewStaffStore(),
 		store.NewCustomerStore(),
+		store.NewCustomerUserStore(),
 		store.NewMagicLinkStore(),
 		store.NewStaffInviteTokenStore(),
+		store.NewCustomerUserInviteTokenStore(),
 		sessionMgr,
 		audit.NewAuditWriter(),
 		metrics.NewRegistry(),

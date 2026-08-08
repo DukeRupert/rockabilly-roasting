@@ -12,6 +12,10 @@ type SessionActorType string
 const (
 	SessionActorTypeCustomer SessionActorType = "customer"
 	SessionActorTypeStaff    SessionActorType = "staff"
+	// SessionActorTypeCustomerUser is an additional login on a wholesale
+	// account. ActorID is a customer_users.id, NOT a customers.id — resolve it
+	// to the owning account before scoping any data access.
+	SessionActorTypeCustomerUser SessionActorType = "customer_user"
 )
 
 // Session represents an authenticated session.

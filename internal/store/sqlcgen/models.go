@@ -210,6 +210,29 @@ type CustomerGroupMembership struct {
 	AssignedAt      time.Time `json:"assigned_at"`
 }
 
+type CustomerUser struct {
+	ID                    uuid.UUID          `json:"id"`
+	CustomerID            uuid.UUID          `json:"customer_id"`
+	Email                 string             `json:"email"`
+	PasswordHash          *string            `json:"password_hash"`
+	Name                  string             `json:"name"`
+	Role                  string             `json:"role"`
+	ReceivesNotifications bool               `json:"receives_notifications"`
+	InvitedAt             time.Time          `json:"invited_at"`
+	LastLoginAt           pgtype.Timestamptz `json:"last_login_at"`
+	CreatedAt             time.Time          `json:"created_at"`
+	UpdatedAt             time.Time          `json:"updated_at"`
+}
+
+type CustomerUserInviteToken struct {
+	ID             uuid.UUID          `json:"id"`
+	CustomerUserID uuid.UUID          `json:"customer_user_id"`
+	TokenHash      string             `json:"token_hash"`
+	ExpiresAt      time.Time          `json:"expires_at"`
+	UsedAt         pgtype.Timestamptz `json:"used_at"`
+	CreatedAt      time.Time          `json:"created_at"`
+}
+
 type Discount struct {
 	ID                uuid.UUID          `json:"id"`
 	Name              string             `json:"name"`

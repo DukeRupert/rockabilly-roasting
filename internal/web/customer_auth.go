@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -20,6 +21,77 @@ import (
 
 const customerCookieName = "hiri_customer"
 
+// resolveCustomerSession validates the session cookie and resolves it to the
+// account that owns the data, plus the acting additional login when the session
+// belongs to one rather than to the account's primary sign-in.
+//
+// A customer_user session carries a customer_users.id in ActorID, NOT a
+// customers.id — resolving it to the owning account here is what lets every
+// downstream handler and store method keep scoping by customer as before.
+//
+// Returns ok=false for a missing, expired, or non-customer session; callers
+// decide whether that means redirect or pass through anonymously.
+func (d *Deps) resolveCustomerSession(r *http.Request, rawToken string) (*domain.Customer, *domain.CustomerUser, bool) {
+	var (
+		customer *domain.Customer
+		user     *domain.CustomerUser
+	)
+
+	err := store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
+		sess, txErr := d.AuthService.ValidateSession(r.Context(), tx, rawToken)
+		if txErr != nil {
+			return txErr
+		}
+
+		switch sess.ActorType {
+		case domain.SessionActorTypeCustomer:
+			customer, txErr = d.AuthService.GetCustomerByID(r.Context(), tx, sess.ActorID)
+			return txErr
+
+		case domain.SessionActorTypeCustomerUser:
+			u, txErr := d.AuthService.GetCustomerUserByID(r.Context(), tx, sess.ActorID)
+			if txErr != nil {
+				return txErr
+			}
+			user = u
+			customer, txErr = d.AuthService.GetCustomerByID(r.Context(), tx, u.CustomerID)
+			return txErr
+
+		default:
+			// A staff session presented on the customer cookie. Leave customer
+			// nil so the caller treats it as unauthenticated.
+			return nil
+		}
+	})
+
+	if err != nil || customer == nil {
+		return nil, nil, false
+	}
+	return customer, user, true
+}
+
+// customerContext puts the resolved account — and the acting additional login,
+// when there is one — into the request context.
+func customerContext(r *http.Request, customer *domain.Customer, user *domain.CustomerUser) context.Context {
+	ctx := auth.WithCustomer(r.Context(), customer)
+	if user != nil {
+		ctx = auth.WithCustomerUser(ctx, user)
+	}
+	return ctx
+}
+
+// clearCustomerCookie expires a stale or unusable session cookie so we do not
+// re-validate it on every subsequent request.
+func clearCustomerCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     customerCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+}
+
 // requireCustomerSession validates a customer session from the cookie.
 // On failure, redirects to the customer login page.
 func (d *Deps) requireCustomerSession(next http.Handler) http.Handler {
@@ -30,36 +102,14 @@ func (d *Deps) requireCustomerSession(next http.Handler) http.Handler {
 			return
 		}
 
-		var sess *domain.Session
-		var customer *domain.Customer
-
-		err = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
-			var txErr error
-			sess, txErr = d.AuthService.ValidateSession(r.Context(), tx, cookie.Value)
-			if txErr != nil {
-				return txErr
-			}
-			if sess.ActorType != domain.SessionActorTypeCustomer {
-				return nil
-			}
-			customer, txErr = d.AuthService.GetCustomerByID(r.Context(), tx, sess.ActorID)
-			return txErr
-		})
-
-		if err != nil || sess == nil || customer == nil {
-			http.SetCookie(w, &http.Cookie{
-				Name:     customerCookieName,
-				Value:    "",
-				Path:     "/",
-				MaxAge:   -1,
-				HttpOnly: true,
-			})
+		customer, user, ok := d.resolveCustomerSession(r, cookie.Value)
+		if !ok {
+			clearCustomerCookie(w)
 			http.Redirect(w, r, wholesaleLoginWithReturn(r), http.StatusSeeOther)
 			return
 		}
 
-		ctx := auth.WithCustomer(r.Context(), customer)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(customerContext(r, customer, user)))
 	})
 }
 
@@ -87,36 +137,14 @@ func (d *Deps) optionalCustomerSession(next http.Handler) http.Handler {
 			return
 		}
 
-		var sess *domain.Session
-		var customer *domain.Customer
-
-		err = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
-			var txErr error
-			sess, txErr = d.AuthService.ValidateSession(r.Context(), tx, cookie.Value)
-			if txErr != nil {
-				return txErr
-			}
-			if sess.ActorType != domain.SessionActorTypeCustomer {
-				return nil
-			}
-			customer, txErr = d.AuthService.GetCustomerByID(r.Context(), tx, sess.ActorID)
-			return txErr
-		})
-
-		if err != nil || sess == nil || customer == nil {
-			http.SetCookie(w, &http.Cookie{
-				Name:     customerCookieName,
-				Value:    "",
-				Path:     "/",
-				MaxAge:   -1,
-				HttpOnly: true,
-			})
+		customer, user, ok := d.resolveCustomerSession(r, cookie.Value)
+		if !ok {
+			clearCustomerCookie(w)
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		ctx := auth.WithCustomer(r.Context(), customer)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(customerContext(r, customer, user)))
 	})
 }
 
@@ -132,42 +160,22 @@ func (d *Deps) requireRetailCustomer(next http.Handler) http.Handler {
 			return
 		}
 
-		var sess *domain.Session
-		var customer *domain.Customer
-
-		err = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
-			var txErr error
-			sess, txErr = d.AuthService.ValidateSession(r.Context(), tx, cookie.Value)
-			if txErr != nil {
-				return txErr
-			}
-			if sess.ActorType != domain.SessionActorTypeCustomer {
-				return nil
-			}
-			customer, txErr = d.AuthService.GetCustomerByID(r.Context(), tx, sess.ActorID)
-			return txErr
-		})
-
-		if err != nil || sess == nil || customer == nil {
-			http.SetCookie(w, &http.Cookie{
-				Name:     customerCookieName,
-				Value:    "",
-				Path:     "/",
-				MaxAge:   -1,
-				HttpOnly: true,
-			})
+		customer, user, ok := d.resolveCustomerSession(r, cookie.Value)
+		if !ok {
+			clearCustomerCookie(w)
 			returnTo := url.QueryEscape(r.URL.Path)
 			http.Redirect(w, r, "/account/login?next="+returnTo, http.StatusSeeOther)
 			return
 		}
 
+		// Additional logins only exist on wholesale accounts, so this also
+		// bounces them to the portal.
 		if customer.AccountType == domain.AccountTypeWholesale {
 			http.Redirect(w, r, "/wholesale/portal", http.StatusSeeOther)
 			return
 		}
 
-		ctx := auth.WithCustomer(r.Context(), customer)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(customerContext(r, customer, user)))
 	})
 }
 
@@ -201,15 +209,24 @@ func (d *Deps) requireApprovedWholesale(next http.Handler) http.Handler {
 }
 
 // customerActor builds an Actor from the authenticated customer in context.
+//
+// ID is always the ACCOUNT, never the acting additional login, so every
+// existing per-account audit query keeps working unchanged. When a teammate is
+// acting, their address becomes the actor name — that is the only field that
+// distinguishes "who did this" once several people share one account.
 func customerActor(r *http.Request) app.Actor {
 	customer, ok := auth.CustomerFromContext(r.Context())
 	if !ok {
 		return app.Actor{Type: domain.AuditActorTypeCustomer, Name: "unknown"}
 	}
+	name := customer.Email
+	if user, ok := auth.CustomerUserFromContext(r.Context()); ok {
+		name = user.Email
+	}
 	return app.Actor{
 		Type: domain.AuditActorTypeCustomer,
 		ID:   &customer.ID,
-		Name: customer.Email,
+		Name: name,
 	}
 }
 
@@ -611,14 +628,13 @@ func (d *Deps) handleAccountMagicRedeem(w http.ResponseWriter, r *http.Request) 
 func (d *Deps) handleAccountLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(customerCookieName)
 	if err == nil && cookie.Value != "" {
-		customer, ok := auth.CustomerFromContext(r.Context())
-		if ok {
+		if actor := customerActor(r); actor.ID != nil {
 			_ = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
 				sess, txErr := d.AuthService.ValidateSession(r.Context(), tx, cookie.Value)
 				if txErr != nil {
 					return txErr
 				}
-				return d.AuthService.Logout(r.Context(), tx, sess.ID, customer.ID, customer.Email, domain.AuditActorTypeCustomer)
+				return d.AuthService.Logout(r.Context(), tx, sess.ID, *actor.ID, actor.Name, domain.AuditActorTypeCustomer)
 			})
 		}
 	}
@@ -804,14 +820,13 @@ func (d *Deps) handleWholesaleLogin(w http.ResponseWriter, r *http.Request) {
 func (d *Deps) handleWholesaleLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(customerCookieName)
 	if err == nil && cookie.Value != "" {
-		customer, ok := auth.CustomerFromContext(r.Context())
-		if ok {
+		if actor := customerActor(r); actor.ID != nil {
 			_ = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
 				sess, txErr := d.AuthService.ValidateSession(r.Context(), tx, cookie.Value)
 				if txErr != nil {
 					return txErr
 				}
-				return d.AuthService.Logout(r.Context(), tx, sess.ID, customer.ID, customer.Email, domain.AuditActorTypeCustomer)
+				return d.AuthService.Logout(r.Context(), tx, sess.ID, *actor.ID, actor.Name, domain.AuditActorTypeCustomer)
 			})
 		}
 	}

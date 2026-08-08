@@ -6,6 +6,19 @@ type WholesaleSetupProps struct {
 	Token   string
 	Error   string
 	Success bool
+	// Action is the form target. Empty means the primary wholesale setup flow
+	// (/wholesale/setup); the teammate-invite flow posts to /wholesale/invite
+	// instead. Both set a password from a single-use emailed token, so they
+	// share this page rather than duplicating it.
+	Action string
+}
+
+// setupFormAction defaults the form target to the primary setup route.
+func setupFormAction(action string) templ.SafeURL {
+	if action == "" {
+		return templ.SafeURL("/wholesale/setup")
+	}
+	return templ.SafeURL(action)
 }
 
 templ WholesaleSetupContent(props WholesaleSetupProps) {
@@ -66,7 +79,7 @@ templ WholesaleSetupContent(props WholesaleSetupProps) {
 							<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">{ props.Error }</p>
 						</div>
 					}
-					<form method="post" action="/wholesale/setup" class="space-y-5">
+					<form method="post" action={ setupFormAction(props.Action) } class="space-y-5">
 						<input type="hidden" name="token" value={ props.Token }/>
 						<div>
 							<label for="password" class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Password</label>

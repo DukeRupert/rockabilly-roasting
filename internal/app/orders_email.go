@@ -57,7 +57,7 @@ func (s *OrderService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.
 	var (
 		order        *domain.Order
 		customer     *domain.Customer
-		recipients   []string
+		recipients   []MailRecipient
 		items        []emailtemplates.OrderLineItemData
 		shippingAddr string
 	)
@@ -120,8 +120,11 @@ func (s *OrderService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.
 	if _, err := s.email.Mailer.Send(ctx, email.Message{
 		From: s.email.FromAddr,
 		// One message to everyone rather than a send each: colleagues on a
-		// shared account should see the same thread.
-		To:      strings.Join(recipients, ", "),
+		// shared account should see the same thread. Safe to share here in a
+		// way the reminder is not — a confirmation is transactional and carries
+		// no unsubscribe control, so there is no per-recipient token to get
+		// wrong.
+		To:      strings.Join(recipientEmails(recipients), ", "),
 		Subject: fmt.Sprintf("Order confirmed — %s", order.Number),
 		HTML:    html,
 		Text:    text,

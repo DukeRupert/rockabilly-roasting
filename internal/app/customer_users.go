@@ -14,6 +14,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
@@ -264,6 +265,62 @@ func (s *CustomerUserService) SetNotifications(ctx context.Context, tx pgx.Tx, a
 	return nil
 }
 
+// SetNotificationsFromEmailLink applies a teammate's own opt-out (or undo)
+// from the emailed link. Unlike SetNotifications this is NOT scoped by account:
+// the signed token is the authorization, and the person clicking it is not
+// signed in. It can only ever change the one member the token names.
+func (s *CustomerUserService) SetNotificationsFromEmailLink(ctx context.Context, tx pgx.Tx, customerUserID uuid.UUID, enabled bool) error {
+	user, err := s.customerUsers.GetByID(ctx, tx, customerUserID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrCustomerUserNotFound
+		}
+		return fmt.Errorf("get customer user for opt-out: %w", err)
+	}
+
+	if err := s.customerUsers.UpdateNotifications(ctx, tx, user.ID, enabled); err != nil {
+		return fmt.Errorf("update customer user notifications: %w", err)
+	}
+
+	action := audit.AuditCustomerUserNotificationsDisabled
+	if enabled {
+		action = audit.AuditCustomerUserNotificationsEnabled
+	}
+
+	// Actor is the teammate themself, so the audit trail shows who opted out
+	// rather than attributing it to the account owner.
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    domain.AuditActorTypeCustomer,
+		ActorID:      &user.CustomerID,
+		ActorName:    user.Email,
+		Action:       action,
+		ResourceType: "customer",
+		ResourceID:   user.CustomerID,
+		Metadata: map[string]any{
+			"customer_user_id": user.ID.String(),
+			"enabled":          enabled,
+			"source":           "email_link",
+		},
+	}); err != nil {
+		return fmt.Errorf("audit customer user notifications: %w", err)
+	}
+
+	return nil
+}
+
+// GetForEmailLink returns a member by id for the unsubscribe confirmation page.
+// Token-authorized, so deliberately unscoped by account.
+func (s *CustomerUserService) GetForEmailLink(ctx context.Context, tx pgx.Tx, customerUserID uuid.UUID) (*domain.CustomerUser, error) {
+	user, err := s.customerUsers.GetByID(ctx, tx, customerUserID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrCustomerUserNotFound
+		}
+		return nil, fmt.Errorf("get customer user: %w", err)
+	}
+	return user, nil
+}
+
 // NotificationRecipients returns every address that should receive an account's
 // transactional mail: the account's primary contact plus any member who has
 // opted in. The primary is always first and always included — a wholesale
@@ -272,20 +329,36 @@ func (s *CustomerUserService) SetNotifications(ctx context.Context, tx pgx.Tx, a
 //
 // Addresses are de-duplicated, so a member who somehow shares the primary
 // address is not mailed twice.
-func (s *CustomerUserService) NotificationRecipients(ctx context.Context, tx pgx.Tx, customer *domain.Customer) ([]string, error) {
+func (s *CustomerUserService) NotificationRecipients(ctx context.Context, tx pgx.Tx, customer *domain.Customer) ([]MailRecipient, error) {
 	return notificationRecipients(ctx, tx, s.customerUsers, customer)
 }
 
+// MailRecipient is one addressee for an account's transactional mail, paired
+// with the identity an unsubscribe link must act on. The two travel together so
+// a mailing can never hand someone a link that silences a different address.
+type MailRecipient struct {
+	Email string
+	// Unsubscribe names exactly this addressee — the account contact for the
+	// primary, the member row for a teammate.
+	Unsubscribe auth.UnsubscribeTarget
+}
+
 // notificationRecipients is the single definition of "who gets this account's
-// mail", shared by CustomerUserService and WholesaleService so the team screen
-// and the actual sends can never disagree.
-func notificationRecipients(ctx context.Context, tx pgx.Tx, users *store.CustomerUserStore, customer *domain.Customer) ([]string, error) {
+// mail", shared by CustomerUserService, WholesaleService and OrderService so
+// the team screen and the actual sends can never disagree.
+func notificationRecipients(ctx context.Context, tx pgx.Tx, users *store.CustomerUserStore, customer *domain.Customer) ([]MailRecipient, error) {
 	extra, err := users.ListNotified(ctx, tx, customer.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	out := []string{customer.Email}
+	out := []MailRecipient{{
+		Email: customer.Email,
+		Unsubscribe: auth.UnsubscribeTarget{
+			Audience: auth.UnsubscribeAudienceCustomer,
+			ID:       customer.ID,
+		},
+	}}
 	seen := map[string]struct{}{domain.NormalizeEmail(customer.Email): {}}
 	for _, u := range extra {
 		key := domain.NormalizeEmail(u.Email)
@@ -293,9 +366,26 @@ func notificationRecipients(ctx context.Context, tx pgx.Tx, users *store.Custome
 			continue
 		}
 		seen[key] = struct{}{}
-		out = append(out, u.Email)
+		out = append(out, MailRecipient{
+			Email: u.Email,
+			Unsubscribe: auth.UnsubscribeTarget{
+				Audience: auth.UnsubscribeAudienceCustomerUser,
+				ID:       u.ID,
+			},
+		})
 	}
 	return out, nil
+}
+
+// recipientEmails flattens recipients to bare addresses, for mail that has no
+// per-recipient unsubscribe control (order confirmations are transactional and
+// carry none).
+func recipientEmails(recipients []MailRecipient) []string {
+	out := make([]string, len(recipients))
+	for i, r := range recipients {
+		out[i] = r.Email
+	}
+	return out
 }
 
 // getScoped fetches a member by id constrained to its owning account, mapping a

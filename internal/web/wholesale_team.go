@@ -85,7 +85,8 @@ func (d *Deps) handleWholesaleTeamInvite(w http.ResponseWriter, r *http.Request)
 
 	email := r.FormValue("email")
 	name := r.FormValue("name")
-	receivesNotifications := r.FormValue("receives_notifications") == "1"
+
+	receivesNotifications := inviteWantsNotifications(r)
 
 	var user *domain.CustomerUser
 
@@ -123,6 +124,23 @@ func (d *Deps) handleWholesaleTeamInvite(w http.ResponseWriter, r *http.Request)
 	}
 
 	teamRedirect(w, r, "success", "Invite sent to "+user.Email+".")
+}
+
+// inviteWantsNotifications reads the invite form's email-preference checkbox.
+//
+// New members are subscribed unless the inviter explicitly unticks the box. An
+// unchecked checkbox submits no field at all, which is indistinguishable from a
+// form that never carried the field — so the hidden `notifications_submitted`
+// companion is what tells the two apart. Without it, defaulting to true would
+// silently ignore a deliberate untick.
+func inviteWantsNotifications(r *http.Request) bool {
+	if err := r.ParseForm(); err != nil {
+		return true
+	}
+	if _, submitted := r.Form["notifications_submitted"]; !submitted {
+		return true
+	}
+	return r.FormValue("receives_notifications") == "1"
 }
 
 // teamInviteErrorMessage maps the expected validation failures to copy for the

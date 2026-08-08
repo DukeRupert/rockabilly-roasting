@@ -186,7 +186,7 @@ func WholesaleTeamContent(props WholesaleTeamProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" autocomplete=\"off\" placeholder=\"Sam Rivera\" class=\"paper-input w-full border-2 border-ink bg-cream-hi px-3.5 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none\" style=\"letter-spacing:0.04em;\"></div></div><label class=\"flex items-start gap-3 cursor-pointer\"><input type=\"checkbox\" name=\"receives_notifications\" value=\"1\" class=\"mt-0.5 size-4 shrink-0 border-2 border-ink accent-rust\"> <span class=\"font-oswald text-ink text-sm\" style=\"letter-spacing:0.04em;\">Send them order confirmations and the weekly reminder <span class=\"block font-oswald text-chrome-deep text-xs mt-0.5\">Off by default — the account contact always gets these.</span></span></label><div class=\"pt-1\"><button type=\"submit\" class=\"btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Send invite</button></div><p class=\"font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.04em;\">They'll get an email with a link to set their own password. The link is good for 72 hours.</p></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" autocomplete=\"off\" placeholder=\"Sam Rivera\" class=\"paper-input w-full border-2 border-ink bg-cream-hi px-3.5 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none\" style=\"letter-spacing:0.04em;\"></div></div><!-- Marks the checkbox as present in the submission. An unchecked\n\t\t\t\t\t     box sends nothing at all, which is indistinguishable from a\n\t\t\t\t\t     form that never had the field — and the default is ON, so\n\t\t\t\t\t     that ambiguity would silently re-subscribe. --><input type=\"hidden\" name=\"notifications_submitted\" value=\"1\"> <label class=\"flex items-start gap-3 cursor-pointer\"><input type=\"checkbox\" name=\"receives_notifications\" value=\"1\" checked class=\"mt-0.5 size-4 shrink-0 border-2 border-ink accent-rust\"> <span class=\"font-oswald text-ink text-sm\" style=\"letter-spacing:0.04em;\">Send them order confirmations and the weekly reminder <span class=\"block font-oswald text-chrome-deep text-xs mt-0.5\">They can opt out themselves from any of those emails.</span></span></label><div class=\"pt-1\"><button type=\"submit\" class=\"btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Send invite</button></div><p class=\"font-oswald text-chrome-deep text-xs\" style=\"letter-spacing:0.04em;\">They'll get an email with a link to set their own password. The link is good for 72 hours.</p></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -230,7 +230,7 @@ func teamMemberRow(m domain.CustomerUser, actingUserID string) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(m.DisplayName())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 113, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 118, Col: 21}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -258,7 +258,7 @@ func teamMemberRow(m domain.CustomerUser, actingUserID string) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(m.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 119, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 124, Col: 78}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -286,7 +286,7 @@ func teamMemberRow(m domain.CustomerUser, actingUserID string) templ.Component {
 		var templ_7745c5c3_Var12 templ.SafeURL
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/wholesale/account/team/" + m.ID.String() + "/notifications"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 126, Col: 107}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 131, Col: 107}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -299,7 +299,7 @@ func teamMemberRow(m domain.CustomerUser, actingUserID string) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(toggleTarget(m.ReceivesNotifications))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 127, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 132, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 		if templ_7745c5c3_Err != nil {
@@ -349,7 +349,7 @@ func teamMemberRow(m domain.CustomerUser, actingUserID string) templ.Component {
 		var templ_7745c5c3_Var16 templ.SafeURL
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/wholesale/account/team/" + m.ID.String() + "/resend"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 138, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 143, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -377,7 +377,7 @@ func teamMemberRow(m domain.CustomerUser, actingUserID string) templ.Component {
 		var templ_7745c5c3_Var17 templ.SafeURL
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/wholesale/account/team/" + m.ID.String() + "/revoke"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 148, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 153, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -390,7 +390,7 @@ func teamMemberRow(m domain.CustomerUser, actingUserID string) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.ResolveAttributeValue(teamRevokeConfirm(m, actingUserID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 150, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/wholesale_team.templ`, Line: 155, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
 		if templ_7745c5c3_Err != nil {

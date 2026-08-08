@@ -25,11 +25,11 @@ CREATE TABLE customer_users (
     password_hash text,
     name          text NOT NULL DEFAULT '',
     role          text NOT NULL DEFAULT 'member' CHECK (role IN ('member')),
-    -- Transactional mail (order confirmations, the weekly reminder) goes to the
-    -- account's primary contact by default. An invited user opts in per-account
-    -- rather than inheriting, so adding a teammate never silently changes who
-    -- gets billed-facing email.
-    receives_notifications boolean NOT NULL DEFAULT false,
+    -- Transactional mail (order confirmations, the weekly reminder). Defaults
+    -- to true to match customers.order_reminders_enabled (migration 062):
+    -- everyone is subscribed until they say otherwise, and the opt-out is the
+    -- unsubscribe link in the mail itself, which acts on this row alone.
+    receives_notifications boolean NOT NULL DEFAULT true,
     invited_at    timestamptz NOT NULL DEFAULT now(),
     last_login_at timestamptz,
     created_at    timestamptz NOT NULL DEFAULT now(),

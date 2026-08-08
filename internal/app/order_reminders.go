@@ -100,7 +100,7 @@ func (s *WholesaleService) SetOrderRemindersFromEmailLink(ctx context.Context, t
 
 // notificationRecipients returns the account contact plus any teammate opted
 // into the account's transactional mail.
-func (s *WholesaleService) notificationRecipients(ctx context.Context, tx pgx.Tx, customer *domain.Customer) ([]string, error) {
+func (s *WholesaleService) notificationRecipients(ctx context.Context, tx pgx.Tx, customer *domain.Customer) ([]MailRecipient, error) {
 	return notificationRecipients(ctx, tx, s.customerUsers, customer)
 }
 
@@ -112,7 +112,7 @@ func (s *WholesaleService) notificationRecipients(ctx context.Context, tx pgx.Tx
 func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID) error {
 	var (
 		customer   *domain.Customer
-		recipients []string
+		recipients []MailRecipient
 		lastItems  []emailtemplates.OrderLineItemData
 		lastOn     *time.Time
 	)
@@ -159,47 +159,66 @@ func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.
 		return nil
 	}
 
-	// Empty when no signing secret is configured — the template then falls
-	// back to "reply and we'll take you off the list" rather than printing a
-	// link that could never be verified.
-	var unsubscribeURL string
-	if token := s.unsubscribe.Sign(customer.ID); token != "" {
-		unsubscribeURL = s.email.BaseURL + "/wholesale/unsubscribe?t=" + url.QueryEscape(token)
+	// One message per recipient rather than a shared To: line. An opt-out has
+	// to silence only the address that clicked it, and both the in-body link
+	// and the RFC 8058 List-Unsubscribe header are per-message — a single
+	// message to everyone could only ever carry one token, so whoever clicked
+	// would unsubscribe somebody else.
+	//
+	// Sends are attempted for all recipients even if one fails, so a single bad
+	// address does not silence the rest of the account. Errors are joined and
+	// returned: River will retry the job, which re-sends to recipients who
+	// already got it. For a weekly reminder a rare duplicate is a better
+	// failure than a silent miss.
+	var sendErrs []error
+	for _, recipient := range recipients {
+		// Empty when no signing secret is configured — the template then falls
+		// back to "reply and we'll take you off the list" rather than printing
+		// a link that could never be verified.
+		var unsubscribeURL string
+		if token := s.unsubscribe.Sign(recipient.Unsubscribe); token != "" {
+			unsubscribeURL = s.email.BaseURL + "/wholesale/unsubscribe?t=" + url.QueryEscape(token)
+		}
+
+		html, text, err := s.email.Renderer.Render("order_reminder", emailtemplates.OrderReminderData{
+			CompanyName:   reminderGreeting(customer),
+			CutoffLabel:   OrderReminderCutoffLabel,
+			LastItems:     lastItems,
+			LastOrderedOn: lastOn,
+			// Deep link straight into a cart prefilled from their last order.
+			// Resolved server-side at click time rather than baking an order ID
+			// into a URL that will sit in an inbox.
+			ReorderURL:     s.email.BaseURL + "/wholesale/reorder",
+			OrderURL:       s.email.BaseURL + "/wholesale/portal",
+			UnsubscribeURL: unsubscribeURL,
+			StoreName:      s.email.StoreName,
+			StoreURL:       s.email.BaseURL,
+		})
+		if err != nil {
+			s.metrics.EmailsSent.WithLabelValues("order_reminder", "failed").Inc()
+			sendErrs = append(sendErrs, fmt.Errorf("render order reminder for %s: %w", recipient.Email, err))
+			continue
+		}
+
+		if _, err := s.email.Mailer.Send(ctx, email.Message{
+			From:    s.email.FromAddr,
+			To:      recipient.Email,
+			Subject: "Time to place your coffee order",
+			HTML:    html,
+			Text:    text,
+			Tag:     "order-reminder",
+			Headers: reminderUnsubscribeHeaders(unsubscribeURL),
+		}); err != nil {
+			s.metrics.EmailsSent.WithLabelValues("order_reminder", "failed").Inc()
+			sendErrs = append(sendErrs, fmt.Errorf("send order reminder to %s: %w", recipient.Email, err))
+			continue
+		}
+
+		s.metrics.EmailsSent.WithLabelValues("order_reminder", "sent").Inc()
 	}
 
-	html, text, err := s.email.Renderer.Render("order_reminder", emailtemplates.OrderReminderData{
-		CompanyName:   reminderGreeting(customer),
-		CutoffLabel:   OrderReminderCutoffLabel,
-		LastItems:     lastItems,
-		LastOrderedOn: lastOn,
-		// Deep link straight into a cart prefilled from their last order.
-		// Resolved server-side at click time rather than baking an order ID
-		// into a URL that will sit in an inbox.
-		ReorderURL:     s.email.BaseURL + "/wholesale/reorder",
-		OrderURL:       s.email.BaseURL + "/wholesale/portal",
-		UnsubscribeURL: unsubscribeURL,
-		StoreName:      s.email.StoreName,
-		StoreURL:       s.email.BaseURL,
-	})
-	if err != nil {
-		s.metrics.EmailsSent.WithLabelValues("order_reminder", "failed").Inc()
-		return fmt.Errorf("render order reminder template: %w", err)
-	}
-
-	if _, err := s.email.Mailer.Send(ctx, email.Message{
-		From: s.email.FromAddr,
-		// Everyone on one message rather than one send each: they are colleagues
-		// on a shared account, and a single thread keeps "did anyone order this
-		// week?" answerable from the inbox.
-		To:      strings.Join(recipients, ", "),
-		Subject: "Time to place your coffee order",
-		HTML:    html,
-		Text:    text,
-		Tag:     "order-reminder",
-		Headers: reminderUnsubscribeHeaders(unsubscribeURL),
-	}); err != nil {
-		s.metrics.EmailsSent.WithLabelValues("order_reminder", "failed").Inc()
-		return fmt.Errorf("send order reminder: %w", err)
+	if len(sendErrs) > 0 {
+		return errors.Join(sendErrs...)
 	}
 
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
@@ -209,13 +228,18 @@ func (s *WholesaleService) SendOrderReminder(ctx context.Context, pool *pgxpool.
 			Action:       audit.AuditEmailOrderReminderSent,
 			ResourceType: "customer",
 			ResourceID:   customer.ID,
-			Metadata:     map[string]any{"company": reminderGreeting(customer)},
+			Metadata: map[string]any{
+				"company": reminderGreeting(customer),
+				// One audit row per account, not per message — the reminder is
+				// an account-level event. The count is here so it is still
+				// obvious afterwards how many people were mailed.
+				"recipients": len(recipients),
+			},
 		})
 	}); err != nil {
 		return fmt.Errorf("audit order reminder: %w", err)
 	}
 
-	s.metrics.EmailsSent.WithLabelValues("order_reminder", "sent").Inc()
 	return nil
 }
 

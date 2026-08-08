@@ -3,9 +3,9 @@ package web
 import (
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
@@ -27,13 +27,13 @@ import (
 // handleUnsubscribePage renders the opt-out confirmation. Read-only.
 func (d *Deps) handleUnsubscribePage(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("t")
-	customerID, err := d.UnsubscribeSigner.Verify(token)
+	target, err := d.UnsubscribeSigner.Verify(token)
 	if err != nil {
 		d.renderUnsubscribeInvalid(w, r)
 		return
 	}
 
-	email, err := d.unsubscribeRecipientEmail(r, customerID)
+	email, err := d.unsubscribeRecipientEmail(r, target)
 	if err != nil {
 		d.renderUnsubscribeInvalid(w, r)
 		return
@@ -53,15 +53,13 @@ func (d *Deps) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
 		token = r.URL.Query().Get("t")
 	}
 
-	customerID, err := d.UnsubscribeSigner.Verify(token)
+	target, err := d.UnsubscribeSigner.Verify(token)
 	if err != nil {
 		d.renderUnsubscribeInvalid(w, r)
 		return
 	}
 
-	if err := store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
-		return d.WholesaleService.SetOrderRemindersFromEmailLink(r.Context(), tx, customerID, false)
-	}); err != nil {
+	if err := d.applyUnsubscribe(r, target, false); err != nil {
 		Error(w, r, err)
 		return
 	}
@@ -73,7 +71,7 @@ func (d *Deps) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	email, _ := d.unsubscribeRecipientEmail(r, customerID)
+	email, _ := d.unsubscribeRecipientEmail(r, target)
 	storefront.UnsubscribeDonePage(storefront.UnsubscribeProps{
 		Token: token,
 		Email: email,
@@ -83,21 +81,34 @@ func (d *Deps) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
 // handleResubscribe undoes an opt-out. Mis-clicks happen, and the alternative
 // to an undo button is the customer emailing staff to be put back on.
 func (d *Deps) handleResubscribe(w http.ResponseWriter, r *http.Request) {
-	customerID, err := d.UnsubscribeSigner.Verify(r.FormValue("t"))
+	target, err := d.UnsubscribeSigner.Verify(r.FormValue("t"))
 	if err != nil {
 		d.renderUnsubscribeInvalid(w, r)
 		return
 	}
 
-	if err := store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
-		return d.WholesaleService.SetOrderRemindersFromEmailLink(r.Context(), tx, customerID, true)
-	}); err != nil {
+	if err := d.applyUnsubscribe(r, target, true); err != nil {
 		Error(w, r, err)
 		return
 	}
 
-	email, _ := d.unsubscribeRecipientEmail(r, customerID)
+	email, _ := d.unsubscribeRecipientEmail(r, target)
 	storefront.ResubscribeDonePage(storefront.UnsubscribeProps{Email: email}).Render(r.Context(), w) //nolint:errcheck
+}
+
+// applyUnsubscribe flips the preference for exactly the recipient the token
+// names. A teammate's opt-out must never reach into the account-wide flag —
+// several people share one mailing, and silencing all of them because one
+// clicked is the failure this indirection exists to prevent.
+func (d *Deps) applyUnsubscribe(r *http.Request, target auth.UnsubscribeTarget, enabled bool) error {
+	return store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
+		switch target.Audience {
+		case auth.UnsubscribeAudienceCustomerUser:
+			return d.CustomerUserService.SetNotificationsFromEmailLink(r.Context(), tx, target.ID, enabled)
+		default:
+			return d.WholesaleService.SetOrderRemindersFromEmailLink(r.Context(), tx, target.ID, enabled)
+		}
+	})
 }
 
 // isOneClickUnsubscribe detects the RFC 8058 POST, which carries exactly
@@ -107,11 +118,20 @@ func isOneClickUnsubscribe(r *http.Request) bool {
 }
 
 // unsubscribeRecipientEmail looks up the address to show on the confirmation
-// page, so the customer can see which account they are acting on.
-func (d *Deps) unsubscribeRecipientEmail(r *http.Request, customerID uuid.UUID) (string, error) {
+// page, so the reader can see exactly which address is being silenced — which
+// matters more now that several colleagues receive the same mailing.
+func (d *Deps) unsubscribeRecipientEmail(r *http.Request, target auth.UnsubscribeTarget) (string, error) {
 	var email string
 	err := store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
-		c, txErr := d.CustomerService.GetCustomer(r.Context(), tx, customerID)
+		if target.Audience == auth.UnsubscribeAudienceCustomerUser {
+			u, txErr := d.CustomerUserService.GetForEmailLink(r.Context(), tx, target.ID)
+			if txErr != nil {
+				return txErr
+			}
+			email = u.Email
+			return nil
+		}
+		c, txErr := d.CustomerService.GetCustomer(r.Context(), tx, target.ID)
 		if txErr != nil {
 			return txErr
 		}

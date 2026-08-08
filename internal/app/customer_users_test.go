@@ -11,6 +11,7 @@ import (
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/store"
@@ -42,14 +43,16 @@ func TestInvite_CreatesPendingMember(t *testing.T) {
 	account := testutil.CreateCustomer(t, tx)
 	approveWholesaleCustomer(t, tx, account.ID)
 
-	user, rawToken, err := svc.Invite(ctx, tx, testActor(account.ID), account.ID, "Manager@Cafe.com", "Sam Rivera", false)
+	// Subscribed on the way in — new members are opt-in and unsubscribe
+	// themselves from the link in the mail.
+	user, rawToken, err := svc.Invite(ctx, tx, testActor(account.ID), account.ID, "Manager@Cafe.com", "Sam Rivera", true)
 	require.NoError(t, err)
 
 	// Normalized on the way in, matching customers.email (migration 061).
 	assert.Equal(t, "manager@cafe.com", user.Email)
 	assert.Equal(t, "Sam Rivera", user.Name)
 	assert.Equal(t, domain.CustomerUserRoleMember, user.Role)
-	assert.False(t, user.ReceivesNotifications)
+	assert.True(t, user.ReceivesNotifications)
 	assert.NotEmpty(t, rawToken)
 
 	// Cannot sign in until the invite is accepted.
@@ -178,7 +181,68 @@ func TestNotificationRecipients(t *testing.T) {
 	require.NoError(t, err)
 
 	// Primary contact always first, always present.
-	assert.Equal(t, []string{"owner@cafe.com", "loud@cafe.com"}, got)
+	assert.Equal(t, []string{"owner@cafe.com", "loud@cafe.com"}, recipientAddrs(got))
+}
+
+// recipientAddrs flattens recipients for assertions that only care about who
+// was mailed, not which unsubscribe identity each address carries.
+func recipientAddrs(rs []app.MailRecipient) []string {
+	out := make([]string, len(rs))
+	for i, r := range rs {
+		out[i] = r.Email
+	}
+	return out
+}
+
+// The whole point of per-recipient opt-out: one teammate unsubscribing must
+// drop only their own address, leaving the account contact and every other
+// teammate still receiving mail.
+func TestSetNotificationsFromEmailLink_SilencesOnlyThatMember(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerUserService()
+	ctx := context.Background()
+
+	account := testutil.CreateCustomer(t, tx, testutil.WithEmail("owner@cafe.com"))
+	approveWholesaleCustomer(t, tx, account.ID)
+	account.Email = "owner@cafe.com"
+
+	quitter, _, err := svc.Invite(ctx, tx, testActor(account.ID), account.ID, "quitter@cafe.com", "", true)
+	require.NoError(t, err)
+	_, _, err = svc.Invite(ctx, tx, testActor(account.ID), account.ID, "stays@cafe.com", "", true)
+	require.NoError(t, err)
+
+	require.NoError(t, svc.SetNotificationsFromEmailLink(ctx, tx, quitter.ID, false))
+
+	got, err := svc.NotificationRecipients(ctx, tx, account)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"owner@cafe.com", "stays@cafe.com"}, recipientAddrs(got))
+}
+
+// Each recipient must carry an unsubscribe target naming itself — the account
+// contact resolves to the customer row, a teammate to their own member row.
+func TestNotificationRecipients_CarryOwnUnsubscribeTarget(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newCustomerUserService()
+	ctx := context.Background()
+
+	account := testutil.CreateCustomer(t, tx, testutil.WithEmail("owner@cafe.com"))
+	approveWholesaleCustomer(t, tx, account.ID)
+	account.Email = "owner@cafe.com"
+
+	member, _, err := svc.Invite(ctx, tx, testActor(account.ID), account.ID, "mate@cafe.com", "", true)
+	require.NoError(t, err)
+
+	got, err := svc.NotificationRecipients(ctx, tx, account)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+
+	assert.Equal(t, auth.UnsubscribeAudienceCustomer, got[0].Unsubscribe.Audience)
+	assert.Equal(t, account.ID, got[0].Unsubscribe.ID)
+
+	assert.Equal(t, auth.UnsubscribeAudienceCustomerUser, got[1].Unsubscribe.Audience)
+	assert.Equal(t, member.ID, got[1].Unsubscribe.ID,
+		"a teammate's link must name their member row, not the account")
 }
 
 // Order confirmations run this helper for every order, retail included. A
@@ -196,7 +260,7 @@ func TestNotificationRecipients_RetailIsUnchanged(t *testing.T) {
 
 	got, err := svc.NotificationRecipients(ctx, tx, retail)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"shopper@example.com"}, got)
+	assert.Equal(t, []string{"shopper@example.com"}, recipientAddrs(got))
 }
 
 func TestNotificationRecipients_PrimaryOnlyWhenNoTeam(t *testing.T) {
@@ -210,5 +274,5 @@ func TestNotificationRecipients_PrimaryOnlyWhenNoTeam(t *testing.T) {
 
 	got, err := svc.NotificationRecipients(ctx, tx, account)
 	require.NoError(t, err)
-	assert.Equal(t, []string{"solo@cafe.com"}, got)
+	assert.Equal(t, []string{"solo@cafe.com"}, recipientAddrs(got))
 }

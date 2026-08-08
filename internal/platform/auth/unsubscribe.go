@@ -25,12 +25,32 @@ var ErrInvalidUnsubscribeToken = errors.New("invalid unsubscribe token")
 // would mean one row per recipient per week, written on every send, purely to
 // support a link most people never click.
 //
-// The customer ID travels in the clear; the HMAC is what makes the link
+// The recipient ID travels in the clear; the HMAC is what makes the link
 // unforgeable. That is deliberate — this authorizes exactly one low-stakes
 // action (turn my own reminders off) and nothing else, so it must never be
 // accepted as proof of identity anywhere else in the app.
 type UnsubscribeSigner struct {
 	secret []byte
+}
+
+// UnsubscribeAudience distinguishes whose preference a token turns off. A
+// wholesale account can have several people on one mailing, and an opt-out must
+// only ever silence the address that clicked it.
+type UnsubscribeAudience string
+
+const (
+	// UnsubscribeAudienceCustomer targets the account's own contact address,
+	// stored as customers.order_reminders_enabled.
+	UnsubscribeAudienceCustomer UnsubscribeAudience = "c"
+	// UnsubscribeAudienceCustomerUser targets one invited teammate, stored as
+	// customer_users.receives_notifications.
+	UnsubscribeAudienceCustomerUser UnsubscribeAudience = "u"
+)
+
+// UnsubscribeTarget is the single recipient a token authorizes an opt-out for.
+type UnsubscribeTarget struct {
+	Audience UnsubscribeAudience
+	ID       uuid.UUID
 }
 
 // NewUnsubscribeSigner returns a signer for the given secret. An empty secret
@@ -46,39 +66,59 @@ func NewUnsubscribeSigner(secret string) *UnsubscribeSigner {
 // Enabled reports whether a secret is configured.
 func (s *UnsubscribeSigner) Enabled() bool { return s != nil && len(s.secret) > 0 }
 
-// Sign returns an opaque token authorizing an opt-out for customerID.
-// Returns "" when the signer is disabled.
-func (s *UnsubscribeSigner) Sign(customerID uuid.UUID) string {
+// Sign returns an opaque token authorizing an opt-out for exactly one
+// recipient. Returns "" when the signer is disabled.
+//
+// The audience prefix is inside the signed payload, so a token minted for a
+// teammate cannot be edited into one that silences the whole account.
+func (s *UnsubscribeSigner) Sign(target UnsubscribeTarget) string {
 	if !s.Enabled() {
 		return ""
 	}
-	id := customerID.String()
-	return id + "." + s.mac(id)
+	payload := string(target.Audience) + ":" + target.ID.String()
+	return payload + "." + s.mac(payload)
 }
 
-// Verify checks a token's signature and returns the customer it authorizes.
-func (s *UnsubscribeSigner) Verify(token string) (uuid.UUID, error) {
+// Verify checks a token's signature and returns the recipient it authorizes.
+//
+// Bare "<uuid>.<mac>" tokens — the format minted before opt-outs became
+// per-recipient — are still accepted and resolve to the account contact, so
+// links already sitting in inboxes keep working.
+func (s *UnsubscribeSigner) Verify(token string) (UnsubscribeTarget, error) {
 	if !s.Enabled() {
-		return uuid.Nil, ErrInvalidUnsubscribeToken
+		return UnsubscribeTarget{}, ErrInvalidUnsubscribeToken
 	}
 	// SplitN, not Split: an attacker-supplied extra "." must not silently
 	// shift which segment is treated as the signature.
 	parts := strings.SplitN(token, ".", 2)
 	if len(parts) != 2 {
-		return uuid.Nil, ErrInvalidUnsubscribeToken
+		return UnsubscribeTarget{}, ErrInvalidUnsubscribeToken
 	}
-	id, sig := parts[0], parts[1]
+	payload, sig := parts[0], parts[1]
 
-	// Compare before parsing the UUID, so a malformed ID and a bad signature
-	// take the same path and cost the same.
-	if !hmac.Equal([]byte(sig), []byte(s.mac(id))) {
-		return uuid.Nil, ErrInvalidUnsubscribeToken
+	// Compare before parsing anything, so a malformed payload and a bad
+	// signature take the same path and cost the same.
+	if !hmac.Equal([]byte(sig), []byte(s.mac(payload))) {
+		return UnsubscribeTarget{}, ErrInvalidUnsubscribeToken
 	}
-	customerID, err := uuid.Parse(id)
+
+	audience := UnsubscribeAudienceCustomer
+	rawID := payload
+	if prefix, rest, found := strings.Cut(payload, ":"); found {
+		switch UnsubscribeAudience(prefix) {
+		case UnsubscribeAudienceCustomer, UnsubscribeAudienceCustomerUser:
+			audience = UnsubscribeAudience(prefix)
+		default:
+			return UnsubscribeTarget{}, ErrInvalidUnsubscribeToken
+		}
+		rawID = rest
+	}
+
+	id, err := uuid.Parse(rawID)
 	if err != nil {
-		return uuid.Nil, ErrInvalidUnsubscribeToken
+		return UnsubscribeTarget{}, ErrInvalidUnsubscribeToken
 	}
-	return customerID, nil
+	return UnsubscribeTarget{Audience: audience, ID: id}, nil
 }
 
 func (s *UnsubscribeSigner) mac(id string) string {

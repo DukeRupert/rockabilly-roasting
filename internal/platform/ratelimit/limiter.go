@@ -50,6 +50,12 @@ var (
 	WholesaleApplyIPLimit = 3
 	WholesaleApplyWindow  = time.Hour
 
+	// Newsletter signup. The footer form appears on every storefront page, so
+	// a real visitor might resubmit after a typo — but nobody legitimately
+	// subscribes more than a handful of addresses from one IP in an hour.
+	NewsletterIPLimit = 5
+	NewsletterWindow  = time.Hour
+
 	// White-label label submissions. Its own bucket, deliberately roomier than
 	// the apply form: the invite link is reusable and the success page invites
 	// "Add another label", so one sitting legitimately means several posts —
@@ -177,5 +183,6 @@ func SubscribeIPKey(ip string) string            { return "subscribe:ip:" + ip }
 func CheckoutSessionKey(sessionID string) string { return "checkout:sess:" + sessionID }
 func ContactIPKey(ip string) string               { return "contact:ip:" + ip }
 func WholesaleApplyIPKey(ip string) string        { return "wholesale-apply:ip:" + ip }
+func NewsletterIPKey(ip string) string            { return "newsletter:ip:" + ip }
 func WhiteLabelIPKey(ip string) string            { return "white-label:ip:" + ip }
 func GlobalIPKey(ip string) string               { return "global:ip:" + ip }

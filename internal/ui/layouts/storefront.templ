@@ -407,16 +407,19 @@ templ Storefront(props StorefrontProps) {
 							<p class="font-oswald text-paper-warm text-sm mb-4 leading-relaxed">
 								Roast drops, fresh deals, nothing else. No spam — just the good stuff.
 							</p>
+							<!--
+								Posts to Hiri, not straight to Broadwave. The list name and API key
+								live in the server env now — keeping the key out of page source is the
+								point, and routing through Hiri is what lets the honeypot and the
+								per-IP rate limiter actually run.
+							-->
 							<form
 								method="post"
-								action="https://broadwave.fireflysoftware.dev/api/subscribe"
+								action="/newsletter/subscribe"
 								hx-target="#newsletter-status"
 								hx-swap="innerHTML"
 								class="flex flex-col gap-2"
 							>
-								<input type="hidden" name="api_key" value="bw_1ae328f598638462f357e01d43adf6d6"/>
-								<input type="hidden" name="list" value="rockabilly-roasting-newsletter"/>
-								<input type="hidden" name="redirect" value="https://rockabillyroasting.com/newsletter/thanks"/>
 								<label for="newsletter-email" class="sr-only">Email address</label>
 								<input
 									type="email"

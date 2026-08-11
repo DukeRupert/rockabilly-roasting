@@ -22,6 +22,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/help"
 	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
+	"github.com/dukerupert/hiri/internal/platform/newsletter"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
@@ -76,12 +77,15 @@ type Deps struct {
 	RateLimiter            *ratelimit.Limiter
 	TurnstileVerifier      *turnstile.Verifier // verifies Cloudflare Turnstile tokens; no-op when no secret configured
 	TurnstileSiteKey       string              // public site key embedded in widget; empty disables widget
-	SecureCookies          bool
-	BaseURL                string // public site URL, e.g. "https://rockabillyroasting.com"
-	Mailer                 email.Sender
-	EmailFrom              string         // sender address for transactional emails
-	StaffEmail             string         // staff notification recipient
-	MerchantTZ             *time.Location // local timezone for day-bounded queries (e.g. "today's revenue")
+	// Newsletter posts footer signups to Broadwave server-side, keeping the API
+	// key out of page source. No-op when BROADWAVE_API_KEY/LIST are unset.
+	Newsletter    *newsletter.Client
+	SecureCookies bool
+	BaseURL       string // public site URL, e.g. "https://rockabillyroasting.com"
+	Mailer        email.Sender
+	EmailFrom     string         // sender address for transactional emails
+	StaffEmail    string         // staff notification recipient
+	MerchantTZ    *time.Location // local timezone for day-bounded queries (e.g. "today's revenue")
 	// ReminderScheduleNote is the human sentence describing when the weekly
 	// wholesale order reminder fires, built from the same env config the
 	// scheduler uses so the admin page can never drift from reality.
@@ -162,6 +166,13 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /terms", deps.handleTermsPage)
 	mux.HandleFunc("GET /shipping", deps.handleShippingPage)
 	mux.HandleFunc("GET /newsletter/thanks", deps.handleNewsletterThanksPage)
+	// Newsletter signup proxies to Broadwave so the API key stays server-side.
+	// Rate-limited per IP because the endpoint is unauthenticated and writes to
+	// a third-party mailing list — the footer form was being scripted.
+	newsletterIPLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.NewsletterIPLimit, ratelimit.NewsletterWindow, func(r *http.Request) string {
+		return ratelimit.NewsletterIPKey(ratelimit.ClientIP(r))
+	})
+	mux.Handle("POST /newsletter/subscribe", newsletterIPLimit(http.HandlerFunc(deps.handleNewsletterSubscribe)))
 	mux.HandleFunc("GET /help", deps.handleHelpIndex)
 	mux.HandleFunc("GET /help/{slug}", deps.handleHelpArticle)
 

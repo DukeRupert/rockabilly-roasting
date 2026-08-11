@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html"
 	"net/http"
+	"net/mail"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	mediapkg "github.com/dukerupert/hiri/internal/platform/media"
+	"github.com/dukerupert/hiri/internal/platform/newsletter"
+	"github.com/dukerupert/hiri/internal/platform/ratelimit"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
@@ -518,6 +521,96 @@ func (d *Deps) handleNewsletterThanksPage(w http.ResponseWriter, r *http.Request
 		return
 	}
 	storefront.NewsletterThanksPage(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// newsletterStatus renders the inline result fragment the footer form swaps
+// into #newsletter-status. Kept here rather than in ui/ because it is two
+// spans of text with no layout of its own.
+func newsletterStatus(w http.ResponseWriter, msg string, ok bool) {
+	cls := "font-oswald text-sm text-candle"
+	if !ok {
+		cls = "font-oswald text-sm text-paper-warm"
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, `<p class=%q>%s</p>`, cls, html.EscapeString(msg))
+}
+
+// handleNewsletterSubscribe proxies a footer signup to Broadwave.
+//
+// The form used to post to Broadwave directly with the API key in a hidden
+// input, which meant (a) the credential was readable in every page's source and
+// (b) nothing of ours was in the path, so the rate limiter and honeypot below
+// could not run. Anything a bot scraped from the page it could replay against
+// Broadwave forever. Now the key lives in the server's env and this endpoint is
+// the only way in.
+func (d *Deps) handleNewsletterSubscribe(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	// Success response, shared by the real path and the honeypot path so a bot
+	// cannot tell a hit from a miss.
+	accept := func() {
+		if IsHTMX(r) {
+			newsletterStatus(w, "You're on the list. Watch your inbox.", true)
+			return
+		}
+		http.Redirect(w, r, "/newsletter/thanks", http.StatusSeeOther)
+	}
+
+	// Honeypot — hidden field no real user can see, let alone fill.
+	if strings.TrimSpace(r.FormValue("website")) != "" {
+		d.Logger.Info("newsletter honeypot triggered", "ip", ratelimit.ClientIP(r))
+		accept()
+		return
+	}
+
+	addr := domain.NormalizeEmail(r.FormValue("email"))
+	if addr == "" || len(addr) > 254 {
+		if IsHTMX(r) {
+			newsletterStatus(w, "That email doesn't look right. Try again?", false)
+			return
+		}
+		http.Error(w, "Invalid email address", http.StatusBadRequest)
+		return
+	}
+	if _, err := mail.ParseAddress(addr); err != nil {
+		if IsHTMX(r) {
+			newsletterStatus(w, "That email doesn't look right. Try again?", false)
+			return
+		}
+		http.Error(w, "Invalid email address", http.StatusBadRequest)
+		return
+	}
+
+	// No Turnstile here yet, deliberately: the footer form is on every
+	// storefront page, so a widget would pull Cloudflare's script site-wide.
+	// Honeypot + per-IP limit + a server-held key is the first line. If spam
+	// persists, adding the widget means threading TurnstileSiteKey through the
+	// storefront layout props and verifying the token above this call.
+	if err := d.Newsletter.Subscribe(ctx, addr); err != nil {
+		if errors.Is(err, newsletter.ErrRejected) {
+			d.Logger.Info("newsletter subscribe rejected", "error", err)
+			if IsHTMX(r) {
+				newsletterStatus(w, "We couldn't add that address. Try another?", false)
+				return
+			}
+			http.Error(w, "Could not subscribe that address", http.StatusBadRequest)
+			return
+		}
+		d.Logger.Error("newsletter subscribe failed", "error", err)
+		if IsHTMX(r) {
+			newsletterStatus(w, "Something went sideways. Try again in a bit.", false)
+			return
+		}
+		http.Error(w, "Subscription temporarily unavailable", http.StatusServiceUnavailable)
+		return
+	}
+
+	accept()
 }
 
 // handleTermsPage renders the terms of service page.

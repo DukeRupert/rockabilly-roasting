@@ -32,6 +32,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/media"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
+	"github.com/dukerupert/hiri/internal/platform/newsletter"
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
@@ -108,6 +109,19 @@ func run() error {
 		logger.Info("turnstile verification enabled")
 	} else {
 		logger.Info("turnstile verification disabled (no secret configured)")
+	}
+
+	// Newsletter (Broadwave). The footer form posts here rather than to
+	// Broadwave directly so this key never reaches the browser.
+	newsletterClient := newsletter.New(
+		os.Getenv("BROADWAVE_BASE_URL"),
+		os.Getenv("BROADWAVE_API_KEY"),
+		os.Getenv("BROADWAVE_LIST"),
+	)
+	if newsletterClient.Enabled() {
+		logger.Info("newsletter signup enabled", "list", newsletterClient.List)
+	} else {
+		logger.Warn("newsletter signup disabled (BROADWAVE_API_KEY/BROADWAVE_LIST not set) — footer form will silently accept without subscribing")
 	}
 
 	// Configure trusted reverse proxy CIDRs for accurate client IP extraction.
@@ -637,6 +651,7 @@ func run() error {
 		RateLimiter:            rateLimiter,
 		TurnstileVerifier:      turnstileVerifier,
 		TurnstileSiteKey:       turnstileSiteKey,
+		Newsletter:             newsletterClient,
 		SecureCookies:          secureCookies,
 		BaseURL:                baseURL,
 		Mailer:                 mailer,

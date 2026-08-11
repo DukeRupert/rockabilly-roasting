@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,12 +14,66 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/store"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
 	"github.com/dukerupert/hiri/internal/ui/storefront"
 )
 
 // maxLabelImageBytes caps the white-label label upload. Labels are small; this
 // guards against oversized uploads on a public (token-gated) endpoint.
 const maxLabelImageBytes = 10 << 20 // 10 MiB
+
+// whiteLabelPending is the ?white_label= value that filters /admin/catalog down to
+// submissions awaiting staff review. The admin UI builds the same query string in
+// whiteLabelQueueHref (ui/admin/product_list.templ) — keep the two in step.
+const whiteLabelPending = "pending"
+
+// countPendingWhiteLabel returns the number of white-label submissions still
+// awaiting staff review. "Pending" is inferred — a submission lands as a draft
+// product carrying the onboarding metadata stamp, and publishing it (draft →
+// active) or archiving it is what clears it from the queue. There is no separate
+// reviewed flag, so a submission left in draft stays on the queue indefinitely,
+// which is the behaviour we want: it can't be forgotten.
+func (d *Deps) countPendingWhiteLabel(ctx context.Context, tx pgx.Tx) (int, error) {
+	yes := true
+	draft := domain.ProductStatusDraft
+	return d.CatalogService.CountProducts(ctx, tx, store.ProductFilter{
+		Status:     &draft,
+		WhiteLabel: &yes,
+	})
+}
+
+// withAdminBadges attaches the sidebar "needs attention" counts to the request
+// context so the admin layout can paint them without every page's props carrying
+// them. It only runs for GET requests — a POST renders a redirect, not a sidebar —
+// and a failed count is logged and swallowed: a badge is not worth 500ing a page
+// the staff member actually asked for.
+func (d *Deps) withAdminBadges(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			next.ServeHTTP(w, r)
+			return
+		}
+		var badges domain.AdminBadges
+		err := store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
+			count, txErr := d.countPendingWhiteLabel(r.Context(), tx)
+			if txErr != nil {
+				return txErr
+			}
+			badges.WhiteLabelPending = count
+			return nil
+		})
+		if err != nil {
+			d.Logger.ErrorContext(r.Context(), "count admin sidebar badges", "error", err)
+		}
+		next.ServeHTTP(w, r.WithContext(domain.WithAdminBadges(r.Context(), badges)))
+	})
+}
+
+// handleAdminNavBadges serves the sidebar badge fragment the Catalog row polls.
+// The count itself is already on the context courtesy of withAdminBadges.
+func (d *Deps) handleAdminNavBadges(w http.ResponseWriter, r *http.Request) {
+	layouts.CatalogNavBadge(domain.AdminBadgesFrom(r.Context()).WhiteLabelPending).Render(r.Context(), w) //nolint:errcheck
+}
 
 // --- Wholesale white-label onboarding (token from invite email) ---
 

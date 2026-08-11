@@ -1,10 +1,21 @@
 package layouts
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/components/icon"
-	"strings"
 )
+
+// pluralSuffix returns "s" for any count but one. Local to layouts — admin has its
+// own twin (pluralS) and neither package imports the other.
+func pluralSuffix(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
 
 type AdminProps struct {
 	Title      string
@@ -99,7 +110,37 @@ func navIconColor(active bool) string {
 // the mobile drawer and the desktop rail so they can't drift. The
 // data-sidebar-label spans let the desktop collapse toggle fade the text to an
 // icon-only rail; the mobile drawer never collapses, so they simply stay shown.
+// CatalogNavBadge is the white-label review count painted on the Catalog sidebar
+// row. It polls itself rather than relying on the page render: admin navigation is
+// htmx with hx-target="#main-content", so the sidebar is only rebuilt on a full
+// page load. Without the poll a submission arriving mid-session would stay
+// invisible until the staff member happened to hard-refresh — the exact failure
+// the badge exists to prevent.
+//
+// It always renders, count or not, so there is something for htmx to swap.
+// Exported because web serves it as a standalone fragment at /admin/nav-badges.
+templ CatalogNavBadge(count int) {
+	<span
+		id="nav-badge-white-label"
+		hx-get="/admin/nav-badges"
+		hx-trigger="every 60s"
+		hx-swap="outerHTML"
+		class="ml-auto"
+	>
+		if count > 0 {
+			<span
+				data-sidebar-label
+				class="badge badge-indigo transition-opacity duration-200"
+				title={ fmt.Sprintf("%d white-label submission%s awaiting review", count, pluralSuffix(count)) }
+			>
+				{ fmt.Sprintf("%d", count) }
+			</span>
+		}
+	</span>
+}
+
 templ adminNav(activePath string) {
+	{{ badges := domain.AdminBadgesFrom(ctx) }}
 	<nav data-admin-sidebar-nav class="flex flex-1 flex-col">
 		<ul role="list" class="-mx-2 flex flex-1 flex-col gap-y-1">
 			for _, item := range adminNavItems() {
@@ -107,6 +148,9 @@ templ adminNav(activePath string) {
 					<a href={ templ.SafeURL(item.Href) } title={ item.Label } class={ navItemClasses(resolveActiveNav(activePath) == item.Href) }>
 						@item.IconFn(icon.Props{Class: navIconColor(resolveActiveNav(activePath) == item.Href)})
 						<span data-sidebar-label class="transition-opacity duration-200">{ item.Label }</span>
+						if item.Href == "/admin/catalog" {
+							@CatalogNavBadge(badges.WhiteLabelPending)
+						}
 					</a>
 				</li>
 			}

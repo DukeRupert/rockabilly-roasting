@@ -20,12 +20,13 @@ import (
 
 // White-label products are stamped with these metadata keys so staff and the
 // admin UI can recognise an onboarding submission and trace it back to its base
-// coffee and the customer who owns it.
+// coffee and the customer who owns it. The values live in domain — store filters
+// on the stamp and the admin UI reads it, and neither may import app.
 const (
-	WhiteLabelMetaSource     = "source"
-	WhiteLabelSourceValue    = "white_label_onboarding"
-	WhiteLabelMetaBaseID     = "base_product_id"
-	WhiteLabelMetaCustomerID = "white_label_customer_id"
+	WhiteLabelMetaSource     = domain.ProductMetaSource
+	WhiteLabelSourceValue    = domain.ProductSourceWhiteLabel
+	WhiteLabelMetaBaseID     = domain.ProductMetaWhiteLabelBaseID
+	WhiteLabelMetaCustomerID = domain.ProductMetaWhiteLabelCustomer
 )
 
 // WhiteLabelService owns the wholesale white-label onboarding flow: minting

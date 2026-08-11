@@ -18,6 +18,28 @@ const (
 	ProductVisibilityPrivate ProductVisibility = "private"
 )
 
+// Product metadata keys stamped on products created by the wholesale white-label
+// onboarding flow, so staff and the admin UI can recognise a submission and trace
+// it back to its base coffee and the client who owns it. They live in domain
+// because every layer needs them: app writes the stamp, store filters on it, and
+// the admin UI reads it to flag a row.
+const (
+	ProductMetaSource             = "source"
+	ProductSourceWhiteLabel       = "white_label_onboarding"
+	ProductMetaWhiteLabelBaseID   = "base_product_id"
+	ProductMetaWhiteLabelCustomer = "white_label_customer_id"
+)
+
+// IsWhiteLabelSubmission reports whether a product was created through the
+// wholesale white-label onboarding flow.
+func IsWhiteLabelSubmission(meta map[string]any) bool {
+	if meta == nil {
+		return false
+	}
+	src, _ := meta[ProductMetaSource].(string)
+	return src == ProductSourceWhiteLabel
+}
+
 // SalesChannel identifies a purchasing surface. Variants carry per-channel
 // availability so a size can be sold retail-only or wholesale-only.
 type SalesChannel string

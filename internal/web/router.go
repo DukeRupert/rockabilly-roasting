@@ -378,6 +378,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/categories/{id}/delete", deps.handleAdminCategoryDelete)
 
 	// Admin catalog — products
+	adminMux.HandleFunc("GET /admin/nav-badges", deps.handleAdminNavBadges)
 	adminMux.HandleFunc("GET /admin/catalog", deps.handleAdminProductList)
 	adminMux.HandleFunc("GET /admin/catalog/new", deps.handleAdminProductNew)
 	adminMux.HandleFunc("POST /admin/catalog", deps.handleAdminProductCreate)
@@ -573,12 +574,12 @@ func NewRouter(deps *Deps) http.Handler {
 	})
 
 	// Mount admin mux behind session middleware
-	mux.Handle("GET /admin/", deps.requireStaffSession(adminMux))
-	mux.Handle("POST /admin/{path...}", deps.requireStaffSession(adminMux))
+	mux.Handle("GET /admin/", deps.requireStaffSession(deps.withAdminBadges(adminMux)))
+	mux.Handle("POST /admin/{path...}", deps.requireStaffSession(deps.withAdminBadges(adminMux)))
 	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
-	mux.Handle("POST /auth/staff/logout", deps.requireStaffSession(adminMux))
+	mux.Handle("POST /auth/staff/logout", deps.requireStaffSession(deps.withAdminBadges(adminMux)))
 
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)

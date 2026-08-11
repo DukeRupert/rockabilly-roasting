@@ -36,6 +36,13 @@ Once the backing coffee for each label is chosen, either path works:
    is created cloned from that coffee → staff review and publish.
    (`WhiteLabelService.SendInviteEmail` → `internal/web/whitelabel.go`.)
 
+   Submissions surface in the admin panel, not just the notification email: the
+   dashboard's **Pending review** band, a **White-label review** tab on
+   `/admin/catalog` (`?white_label=pending`), and a count badge on the Catalog
+   sidebar row. A submission stays on that queue until it's published (draft →
+   active) or archived — there's no separate reviewed flag, so nothing gets lost
+   if the email is missed.
+
 Either way the product should end up: **private visibility, granted to Bunker only, active** once
 reviewed. Confirm it appears in Bunker's wholesale catalog and nowhere else.
 

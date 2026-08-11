@@ -279,10 +279,13 @@ type ProductFilter struct {
 	Subscribable *bool
 	IsFeatured   *bool
 	Visibility   *VisibilityContext
-	Search       string // ILIKE search on title and description
-	Attributes   []AttributeFilter
-	Limit        int
-	Offset       int
+	// WhiteLabel filters on the wholesale white-label onboarding metadata stamp:
+	// true selects only submissions, false only everything else.
+	WhiteLabel *bool
+	Search     string // ILIKE search on title and description
+	Attributes []AttributeFilter
+	Limit      int
+	Offset     int
 }
 
 // visibilityClause returns the SQL predicate restricting products to those the given
@@ -391,6 +394,17 @@ func productFilterWhere(f ProductFilter) (string, []any, int) {
 	if f.IsFeatured != nil {
 		where += fmt.Sprintf(" AND is_featured = $%d", argN)
 		args = append(args, *f.IsFeatured)
+		argN++
+	}
+	if f.WhiteLabel != nil {
+		// metadata->>'source' is NULL for every product that predates the flow, so
+		// the negative arm needs IS DISTINCT FROM to keep those rows.
+		if *f.WhiteLabel {
+			where += fmt.Sprintf(" AND metadata->>'source' = $%d", argN)
+		} else {
+			where += fmt.Sprintf(" AND metadata->>'source' IS DISTINCT FROM $%d", argN)
+		}
+		args = append(args, domain.ProductSourceWhiteLabel)
 		argN++
 	}
 	if f.Search != "" {

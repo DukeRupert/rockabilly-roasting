@@ -40,6 +40,7 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 
 	statusFilter := r.URL.Query().Get("status")
 	taxonFilter := r.URL.Query().Get("taxon")
+	whiteLabelFilter := r.URL.Query().Get("white_label")
 	search := r.URL.Query().Get("q")
 	pageStr := r.URL.Query().Get("page")
 
@@ -63,6 +64,17 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 		if id, err := uuid.Parse(taxonFilter); err == nil {
 			filter.TaxonID = &id
 		}
+	}
+
+	// ?white_label=pending is the review queue: submissions still sitting in draft.
+	// "Pending" is inferred rather than stored — publishing a submission (draft →
+	// active) or archiving it is what takes it off the queue.
+	if whiteLabelFilter == whiteLabelPending {
+		yes := true
+		filter.WhiteLabel = &yes
+		draft := domain.ProductStatusDraft
+		filter.Status = &draft
+		statusFilter = "" // the status tabs and this tab are mutually exclusive
 	}
 
 	var products []domain.Product
@@ -104,14 +116,17 @@ func (d *Deps) handleAdminProductList(w http.ResponseWriter, r *http.Request) {
 		TaxonMap:     taxonMap,
 		StatusFilter: statusFilter,
 		TaxonFilter:  taxonFilter,
-		Search:       search,
-		TotalCount:   totalCount,
-		Page:         page,
-		PerPage:      perPage,
-		HasMore:      hasMore,
-		MerchantTZ:   d.MerchantTZ,
-		StaffName:    name,
-		StaffRole:    role,
+		WhiteLabel:   whiteLabelFilter == whiteLabelPending,
+		// Same count the sidebar badge uses — already computed by withAdminBadges.
+		WhiteLabelPending: domain.AdminBadgesFrom(ctx).WhiteLabelPending,
+		Search:            search,
+		TotalCount:        totalCount,
+		Page:              page,
+		PerPage:           perPage,
+		HasMore:           hasMore,
+		MerchantTZ:        d.MerchantTZ,
+		StaffName:         name,
+		StaffRole:         role,
 	}
 	if IsHTMX(r) {
 		admin.ProductListContent(props).Render(ctx, w) //nolint:errcheck

@@ -29,17 +29,6 @@ func whiteLabelCustomerLabel(c domain.Customer) string {
 	return fmt.Sprintf("%s (%s)", name, c.Email)
 }
 
-// isWhiteLabelProduct reports whether a product was created through the wholesale
-// white-label onboarding flow (stamped in metadata by the app layer). The literal
-// matches app.WhiteLabelSourceValue — the ui package can't import app.
-func isWhiteLabelProduct(meta map[string]any) bool {
-	if meta == nil {
-		return false
-	}
-	src, _ := meta["source"].(string)
-	return src == "white_label_onboarding"
-}
-
 type OptionWithValues struct {
 	Option domain.ProductOption
 	Values []domain.ProductOptionValue
@@ -79,7 +68,7 @@ templ ProductEditContent(props ProductEditProps) {
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">{ props.Product.Title }</h1>
-			if isWhiteLabelProduct(props.Product.Metadata) {
+			if domain.IsWhiteLabelSubmission(props.Product.Metadata) {
 				<span class="badge badge-indigo mt-1 inline-block">White-label submission — review &amp; publish</span>
 			}
 		</div>

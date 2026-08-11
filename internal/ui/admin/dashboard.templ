@@ -56,6 +56,10 @@ type DashboardProps struct {
 
 	// Pending review
 	PendingWholesale int
+	// PendingWhiteLabel is white-label submissions still sitting in draft. Without
+	// this the only notice staff get is the submission email — miss it and the
+	// request is invisible.
+	PendingWhiteLabel int
 
 	// Urgent action queues
 	OnHold              []domain.Order
@@ -125,7 +129,7 @@ func (p DashboardProps) urgentCount() int {
 }
 
 func (p DashboardProps) reviewCount() int {
-	return p.PendingWholesale
+	return p.PendingWholesale + p.PendingWhiteLabel
 }
 
 func (p DashboardProps) retailCount() int {
@@ -244,6 +248,23 @@ templ DashboardContent(props DashboardProps) {
 										{ fmt.Sprintf("%d wholesale application", props.PendingWholesale) }{ pluralS(props.PendingWholesale) }
 									</p>
 									<p class="text-xs text-rr-muted mt-0.5">New accounts waiting on approval.</p>
+								</div>
+							</div>
+							<div class="flex items-center gap-3 shrink-0">
+								<span class="label-font text-rr-amber" style="font-size:0.6rem;">Review</span>
+								@chevronRight()
+							</div>
+						</a>
+					}
+					if props.PendingWhiteLabel > 0 {
+						<a href="/admin/catalog?white_label=pending" class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors">
+							<div class="flex items-center gap-3 min-w-0">
+								<span class="inline-block size-2 rounded-full bg-rr-amber shrink-0"></span>
+								<div class="min-w-0">
+									<p class="text-sm font-medium text-rr-heading">
+										{ fmt.Sprintf("%d white-label submission", props.PendingWhiteLabel) }{ pluralS(props.PendingWhiteLabel) }
+									</p>
+									<p class="text-xs text-rr-muted mt-0.5">Wholesale custom labels waiting on review and pricing.</p>
 								</div>
 							</div>
 							<div class="flex items-center gap-3 shrink-0">

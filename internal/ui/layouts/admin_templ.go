@@ -9,10 +9,21 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/components/icon"
-	"strings"
 )
+
+// pluralSuffix returns "s" for any count but one. Local to layouts — admin has its
+// own twin (pluralS) and neither package imports the other.
+func pluralSuffix(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
 
 type AdminProps struct {
 	Title      string
@@ -107,7 +118,16 @@ func navIconColor(active bool) string {
 // the mobile drawer and the desktop rail so they can't drift. The
 // data-sidebar-label spans let the desktop collapse toggle fade the text to an
 // icon-only rail; the mobile drawer never collapses, so they simply stay shown.
-func adminNav(activePath string) templ.Component {
+// CatalogNavBadge is the white-label review count painted on the Catalog sidebar
+// row. It polls itself rather than relying on the page render: admin navigation is
+// htmx with hx-target="#main-content", so the sidebar is only rebuilt on a full
+// page load. Without the poll a submission arriving mid-session would stay
+// invisible until the staff member happened to hard-refresh — the exact failure
+// the badge exists to prevent.
+//
+// It always renders, count or not, so there is something for htmx to swap.
+// Exported because web serves it as a standalone fragment at /admin/nav-badges.
+func CatalogNavBadge(count int) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -128,60 +148,126 @@ func adminNav(activePath string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<nav data-admin-sidebar-nav class=\"flex flex-1 flex-col\"><ul role=\"list\" class=\"-mx-2 flex flex-1 flex-col gap-y-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<span id=\"nav-badge-white-label\" hx-get=\"/admin/nav-badges\" hx-trigger=\"every 60s\" hx-swap=\"outerHTML\" class=\"ml-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		for _, item := range adminNavItems() {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<li>")
+		if count > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<span data-sidebar-label class=\"badge badge-indigo transition-opacity duration-200\" title=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var2 = []any{navItemClasses(resolveActiveNav(activePath) == item.Href)}
-			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
+			var templ_7745c5c3_Var2 string
+			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d white-label submission%s awaiting review", count, pluralSuffix(count)))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 134, Col: 98}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<a href=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var3 templ.SafeURL
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
+			var templ_7745c5c3_Var3 string
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 107, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 136, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" title=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(item.Label)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 107, Col: 60}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</span>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func adminNav(activePath string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		badges := domain.AdminBadgesFrom(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<nav data-admin-sidebar-nav class=\"flex flex-1 flex-col\"><ul role=\"list\" class=\"-mx-2 flex flex-1 flex-col gap-y-1\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, item := range adminNavItems() {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" class=\"")
+			var templ_7745c5c3_Var5 = []any{navItemClasses(resolveActiveNav(activePath) == item.Href)}
+			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var5...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var2).String())
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<a href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var6 templ.SafeURL
+			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 148, Col: 39}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" title=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var7 string
+			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(item.Label)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 148, Col: 60}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" class=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var8 string
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var5).String())
 			if templ_7745c5c3_Err != nil {
 				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 1, Col: 0}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -189,25 +275,35 @@ func adminNav(activePath string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<span data-sidebar-label class=\"transition-opacity duration-200\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<span data-sidebar-label class=\"transition-opacity duration-200\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var6 string
-			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
+			var templ_7745c5c3_Var9 string
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 109, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 150, Col: 83}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</span></a></li>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</span> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if item.Href == "/admin/catalog" {
+				templ_7745c5c3_Err = CatalogNavBadge(badges.WhiteLabelPending).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</a></li>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</ul></nav>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</ul></nav>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -231,25 +327,25 @@ func Admin(props AdminProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var7 == nil {
-			templ_7745c5c3_Var7 = templ.NopComponent
+		templ_7745c5c3_Var10 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var10 == nil {
+			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<!doctype html><html lang=\"en\" class=\"h-full\" style=\"background:#F6EFE1;\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<!doctype html><html lang=\"en\" class=\"h-full\" style=\"background:#F6EFE1;\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(props.Title)
+		var templ_7745c5c3_Var11 string
+		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(props.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 123, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 167, Col: 23}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " - Rockabilly Roasting Admin</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/static/favicon-32x32.png\"><link rel=\"icon\" type=\"image/png\" sizes=\"16x16\" href=\"/static/favicon-16x16.png\"><link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/static/apple-touch-icon.png\"><link rel=\"manifest\" href=\"/static/site.webmanifest\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Inter:wght@400;500;600;700&family=Special+Elite&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/image-uploader.js\"></script><script defer src=\"/static/js/chart.min.js\"></script><script defer src=\"/static/js/admin-charts.js\"></script><script defer src=\"/static/js/alpine.min.js\"></script><script src=\"/static/js/htmx.min.js\"></script><style>[x-cloak] { display: none !important; }</style><style>\n\t\t\t\t/* Admin — warm professional. A working tool, not a brand showcase.\n\t\t\t\t   Overrides the rr-* tokens so existing utility classes (bg-rr-surface,\n\t\t\t\t   text-rr-heading, etc.) pick up the quieter palette without per-page\n\t\t\t\t   rewrites. Rust/amber are kept as accent vars but reserved for\n\t\t\t\t   primary CTAs and row affordances — never chrome. */\n\t\t\t\t:root {\n\t\t\t\t\t--color-rr-bg: #FAFAF6 !important;       /* warm off-white */\n\t\t\t\t\t--color-rr-surface: #FFFFFF !important;  /* clean elevated */\n\t\t\t\t\t--color-rr-raised: #F0EEE8 !important;   /* soft warm hover */\n\t\t\t\t\t--color-rr-border: #E5E2DA !important;   /* hairline rule */\n\t\t\t\t\t--color-rr-muted: #6B6862 !important;    /* muted text */\n\t\t\t\t\t--color-rr-body: #1A1A1A !important;     /* soft ink body */\n\t\t\t\t\t--color-rr-heading: #0E0D0C !important;  /* ink */\n\t\t\t\t\t--color-rr-red: #B4351D !important;      /* rust — primary CTA only */\n\t\t\t\t\t--color-rr-red-lt: #D4492D !important;   /* rust hover */\n\t\t\t\t\t--color-rr-red-dark: #8A240F !important; /* rust pressed */\n\t\t\t\t\t--color-rr-amber: #F2A03D !important;    /* candle — row affordances */\n\t\t\t\t\t--color-rr-brick: #8A4A30 !important;    /* unused in chrome */\n\t\t\t\t\t/* Redirect the Oswald token to Inter inside admin — any existing\n\t\t\t\t\t   `font-oswald` utility on an admin page renders as Inter without\n\t\t\t\t\t   per-file rewrites. Storefront keeps the real Oswald. */\n\t\t\t\t\t--font-oswald: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif !important;\n\t\t\t\t}\n\t\t\t\tbody { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }\n\t\t\t\t/* label-font uses a hardcoded family in input.css; override inside admin. */\n\t\t\t\t.label-font {\n\t\t\t\t\tfont-family: 'Inter', system-ui, -apple-system, sans-serif !important;\n\t\t\t\t\tfont-weight: 600 !important;\n\t\t\t\t\tletter-spacing: 0.06em !important;\n\t\t\t\t\tfont-size: 0.6875rem !important;\n\t\t\t\t}\n\t\t\t\t/* ── Desktop sidebar collapse ──\n\t\t\t\t   One attribute (`.is-collapsed`) drives the whole transition on a\n\t\t\t\t   single 200ms timeline so width, padding, labels and icon centering\n\t\t\t\t   never desync. Each label collapses its OWN max-width in lock-step\n\t\t\t\t   (and never wraps), so the icon column is never shoved by reflowing\n\t\t\t\t   text — the layout-shift that made the old fade look janky. Scoped to\n\t\t\t\t   lg+ since collapse is desktop-only; the [data-dropdown-trigger] match\n\t\t\t\t   is the user-menu avatar, kept inside #desktop-sidebar so the\n\t\t\t\t   always-expanded mobile drawer is untouched. */\n\t\t\t\t@media (min-width: 1024px) {\n\t\t\t\t\t#desktop-sidebar { transition: width 200ms ease; }\n\t\t\t\t\t#desktop-sidebar-inner { transition: padding 200ms ease; }\n\t\t\t\t\t#main-content-wrapper { transition: padding 200ms ease; }\n\n\t\t\t\t\t#desktop-sidebar [data-sidebar-label] {\n\t\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t\t\toverflow: hidden;\n\t\t\t\t\t\tmax-width: 12rem;\n\t\t\t\t\t\topacity: 1;\n\t\t\t\t\t\ttransition: max-width 200ms ease, opacity 200ms ease;\n\t\t\t\t\t}\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-sidebar-label] {\n\t\t\t\t\t\tmax-width: 0;\n\t\t\t\t\t\topacity: 0;\n\t\t\t\t\t}\n\n\t\t\t\t\t/* Collapsed rail: center the icon column, the header chevron and the\n\t\t\t\t\t   user avatar so the 64px rail reads as a tidy stack, not a\n\t\t\t\t\t   left-ragged one. */\n\t\t\t\t\t#desktop-sidebar.is-collapsed nav[data-admin-sidebar-nav] a,\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-sidebar-header],\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-sidebar-toggle],\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-dropdown-trigger] {\n\t\t\t\t\t\tjustify-content: center;\n\t\t\t\t\t\tgap: 0;\n\t\t\t\t\t}\n\n\t\t\t\t\t/* The chevron points \"<\" to collapse; flip it to \">\" once collapsed\n\t\t\t\t\t   so it always reads as \"this opens/closes the rail.\" */\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-sidebar-chevron] {\n\t\t\t\t\t\ttransform: rotate(180deg);\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t/* Suppress the transition while restoring a collapsed rail on hard\n\t\t\t\t   load — otherwise the sidebar visibly slams shut on every refresh. */\n\t\t\t\t.sidebar-no-anim #desktop-sidebar,\n\t\t\t\t.sidebar-no-anim #desktop-sidebar *,\n\t\t\t\t.sidebar-no-anim #main-content-wrapper {\n\t\t\t\t\ttransition: none !important;\n\t\t\t\t}\n\n\t\t\t\t@media (prefers-reduced-motion: reduce) {\n\t\t\t\t\t#desktop-sidebar,\n\t\t\t\t\t#desktop-sidebar-inner,\n\t\t\t\t\t#main-content-wrapper,\n\t\t\t\t\t#desktop-sidebar [data-sidebar-label],\n\t\t\t\t\t#desktop-sidebar [data-sidebar-chevron] {\n\t\t\t\t\t\ttransition: none;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\t/* Page title utility — Alfa Slab display, matches storefront headlines */\n\t\t\t\t.admin-page-title {\n\t\t\t\t\tfont-family: 'Alfa Slab One', 'Rockwell', Georgia, serif;\n\t\t\t\t\tfont-weight: 400;\n\t\t\t\t\tfont-size: 1.75rem;\n\t\t\t\t\tline-height: 0.95;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.01em;\n\t\t\t\t\tcolor: var(--color-rr-heading);\n\t\t\t\t}\n\n\t\t\t\t/* ── Admin status badges ── */\n\t\t\t\t.badge {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.35rem;\n\t\t\t\t\tpadding: 0.2rem 0.6rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tborder: 1px solid transparent;\n\t\t\t\t\tfont-family: 'Barlow', sans-serif;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tletter-spacing: 0.14em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tfont-size: 0.65rem;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t\t.badge-dot::before {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\twidth: 5px;\n\t\t\t\t\theight: 5px;\n\t\t\t\t\tborder-radius: 50%;\n\t\t\t\t\tbackground: currentColor;\n\t\t\t\t\tflex-shrink: 0;\n\t\t\t\t}\n\t\t\t\t.badge-green      { background:#DFF0E4; color:#2A6644; border-color:#A8D4B8; }\n\t\t\t\t.badge-green-solid { background:#2A6644; color:#F0FAF4; border-color:#1E4E32; }\n\t\t\t\t.badge-amber      { background:#FBF0D8; color:#7A4E08; border-color:#E8C070; }\n\t\t\t\t.badge-slate      { background:#E4EAF0; color:#2E4A60; border-color:#A8BED0; }\n\t\t\t\t.badge-teal       { background:#D8F0EE; color:#0A5E5C; border-color:#7ACCC8; }\n\t\t\t\t.badge-teal-solid { background:#0A7870; color:#F0FAFA; border-color:#065858; }\n\t\t\t\t.badge-red        { background:#FAE4E4; color:#7A1210; border-color:#E0A8A8; }\n\t\t\t\t.badge-grey       { background:#E8E0D8; color:#5A5048; border-color:#B8ACA0; }\n\t\t\t\t.badge-pastdue    { background:#FCE8D8; color:#7A3010; border-color:#E8B090; }\n\t\t\t\t.badge-partial    { background:#EEF0D8; color:#4A5218; border-color:#C0C888; }\n\t\t\t\t.badge-blue       { background:#DBEAFE; color:#1E40AF; border-color:#93C5FD; }\n\t\t\t\t.badge-indigo     { background:#E0E7FF; color:#3730A3; border-color:#A5B4FC; }\n\t\t\t\t.badge-neutral    { background:#E4DAC8; color:#5A5048; border-color:#B8ACA0; }\n\n\t\t\t\t/* ── Admin action buttons ── */\n\t\t\t\t.btn-secondary {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: var(--color-rr-heading);\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-secondary:hover { background: var(--color-rr-raised); }\n\n\t\t\t\t.btn-danger {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: #7A1210;\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-danger:hover { background: #FAE4E4; }\n\n\t\t\t\t.btn-confirm {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: #2A6644;\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-confirm:hover { background: #DFF0E4; }\n\n\t\t\t\t/* ── Clickable table rows ── */\n\t\t\t\t.row-link {\n\t\t\t\t\tposition: relative;\n\t\t\t\t\t/* Safari/WebKit ignores `position: relative` on <tr>, so the\n\t\t\t\t\t   .row-link-target::after overlay below is NOT clipped to its row\n\t\t\t\t\t   there — it escapes to the viewport and stacks across the whole\n\t\t\t\t\t   page, swallowing clicks on the tabs/filters above the table and\n\t\t\t\t\t   routing them to a random order's detail page. A transform DOES\n\t\t\t\t\t   establish a containing block on <tr> in WebKit, which clips the\n\t\t\t\t\t   overlay back to its row. See WebKit bug 240961. */\n\t\t\t\t\ttransform: translate(0);\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\ttransition: background-color 150ms linear, box-shadow 150ms linear;\n\t\t\t\t}\n\t\t\t\t.row-link:hover {\n\t\t\t\t\tbackground: var(--color-rr-raised);\n\t\t\t\t\tbox-shadow: inset 4px 0 0 var(--color-rr-amber);\n\t\t\t\t}\n\t\t\t\t/* Stale rows keep a persistent rust flag on the leading edge —\n\t\t\t\t   the paper-and-ink equivalent of a sticky note \"this is waiting.\" */\n\t\t\t\t.row-link.row-link-stale {\n\t\t\t\t\tbox-shadow: inset 4px 0 0 var(--color-rr-red);\n\t\t\t\t}\n\t\t\t\t.row-link.row-link-stale:hover {\n\t\t\t\t\tbox-shadow: inset 4px 0 0 var(--color-rr-red);\n\t\t\t\t}\n\t\t\t\t@media (prefers-reduced-motion: reduce) {\n\t\t\t\t\t.row-link { transition: none; }\n\t\t\t\t}\n\t\t\t\t.row-link .row-link-target::after {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tposition: absolute;\n\t\t\t\t\tinset: 0;\n\t\t\t\t}\n\t\t\t\t/* Keep other interactive elements above the overlay */\n\t\t\t\t.row-link a:not(.row-link-target),\n\t\t\t\t.row-link button,\n\t\t\t\t.row-link form { position: relative; z-index: 1; }\n\t\t\t</style></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML show:window:top\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-rr-heading/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border\"><div class=\"flex h-16 shrink-0 items-center\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, " - Rockabilly Roasting Admin</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/static/rockabilly-logo.svg\"><link rel=\"icon\" type=\"image/png\" sizes=\"32x32\" href=\"/static/favicon-32x32.png\"><link rel=\"icon\" type=\"image/png\" sizes=\"16x16\" href=\"/static/favicon-16x16.png\"><link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/static/apple-touch-icon.png\"><link rel=\"manifest\" href=\"/static/site.webmanifest\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Inter:wght@400;500;600;700&family=Special+Elite&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/css/output.css\"><script defer src=\"/static/js/image-uploader.js\"></script><script defer src=\"/static/js/chart.min.js\"></script><script defer src=\"/static/js/admin-charts.js\"></script><script defer src=\"/static/js/alpine.min.js\"></script><script src=\"/static/js/htmx.min.js\"></script><style>[x-cloak] { display: none !important; }</style><style>\n\t\t\t\t/* Admin — warm professional. A working tool, not a brand showcase.\n\t\t\t\t   Overrides the rr-* tokens so existing utility classes (bg-rr-surface,\n\t\t\t\t   text-rr-heading, etc.) pick up the quieter palette without per-page\n\t\t\t\t   rewrites. Rust/amber are kept as accent vars but reserved for\n\t\t\t\t   primary CTAs and row affordances — never chrome. */\n\t\t\t\t:root {\n\t\t\t\t\t--color-rr-bg: #FAFAF6 !important;       /* warm off-white */\n\t\t\t\t\t--color-rr-surface: #FFFFFF !important;  /* clean elevated */\n\t\t\t\t\t--color-rr-raised: #F0EEE8 !important;   /* soft warm hover */\n\t\t\t\t\t--color-rr-border: #E5E2DA !important;   /* hairline rule */\n\t\t\t\t\t--color-rr-muted: #6B6862 !important;    /* muted text */\n\t\t\t\t\t--color-rr-body: #1A1A1A !important;     /* soft ink body */\n\t\t\t\t\t--color-rr-heading: #0E0D0C !important;  /* ink */\n\t\t\t\t\t--color-rr-red: #B4351D !important;      /* rust — primary CTA only */\n\t\t\t\t\t--color-rr-red-lt: #D4492D !important;   /* rust hover */\n\t\t\t\t\t--color-rr-red-dark: #8A240F !important; /* rust pressed */\n\t\t\t\t\t--color-rr-amber: #F2A03D !important;    /* candle — row affordances */\n\t\t\t\t\t--color-rr-brick: #8A4A30 !important;    /* unused in chrome */\n\t\t\t\t\t/* Redirect the Oswald token to Inter inside admin — any existing\n\t\t\t\t\t   `font-oswald` utility on an admin page renders as Inter without\n\t\t\t\t\t   per-file rewrites. Storefront keeps the real Oswald. */\n\t\t\t\t\t--font-oswald: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif !important;\n\t\t\t\t}\n\t\t\t\tbody { font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }\n\t\t\t\t/* label-font uses a hardcoded family in input.css; override inside admin. */\n\t\t\t\t.label-font {\n\t\t\t\t\tfont-family: 'Inter', system-ui, -apple-system, sans-serif !important;\n\t\t\t\t\tfont-weight: 600 !important;\n\t\t\t\t\tletter-spacing: 0.06em !important;\n\t\t\t\t\tfont-size: 0.6875rem !important;\n\t\t\t\t}\n\t\t\t\t/* ── Desktop sidebar collapse ──\n\t\t\t\t   One attribute (`.is-collapsed`) drives the whole transition on a\n\t\t\t\t   single 200ms timeline so width, padding, labels and icon centering\n\t\t\t\t   never desync. Each label collapses its OWN max-width in lock-step\n\t\t\t\t   (and never wraps), so the icon column is never shoved by reflowing\n\t\t\t\t   text — the layout-shift that made the old fade look janky. Scoped to\n\t\t\t\t   lg+ since collapse is desktop-only; the [data-dropdown-trigger] match\n\t\t\t\t   is the user-menu avatar, kept inside #desktop-sidebar so the\n\t\t\t\t   always-expanded mobile drawer is untouched. */\n\t\t\t\t@media (min-width: 1024px) {\n\t\t\t\t\t#desktop-sidebar { transition: width 200ms ease; }\n\t\t\t\t\t#desktop-sidebar-inner { transition: padding 200ms ease; }\n\t\t\t\t\t#main-content-wrapper { transition: padding 200ms ease; }\n\n\t\t\t\t\t#desktop-sidebar [data-sidebar-label] {\n\t\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t\t\toverflow: hidden;\n\t\t\t\t\t\tmax-width: 12rem;\n\t\t\t\t\t\topacity: 1;\n\t\t\t\t\t\ttransition: max-width 200ms ease, opacity 200ms ease;\n\t\t\t\t\t}\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-sidebar-label] {\n\t\t\t\t\t\tmax-width: 0;\n\t\t\t\t\t\topacity: 0;\n\t\t\t\t\t}\n\n\t\t\t\t\t/* Collapsed rail: center the icon column, the header chevron and the\n\t\t\t\t\t   user avatar so the 64px rail reads as a tidy stack, not a\n\t\t\t\t\t   left-ragged one. */\n\t\t\t\t\t#desktop-sidebar.is-collapsed nav[data-admin-sidebar-nav] a,\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-sidebar-header],\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-sidebar-toggle],\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-dropdown-trigger] {\n\t\t\t\t\t\tjustify-content: center;\n\t\t\t\t\t\tgap: 0;\n\t\t\t\t\t}\n\n\t\t\t\t\t/* The chevron points \"<\" to collapse; flip it to \">\" once collapsed\n\t\t\t\t\t   so it always reads as \"this opens/closes the rail.\" */\n\t\t\t\t\t#desktop-sidebar.is-collapsed [data-sidebar-chevron] {\n\t\t\t\t\t\ttransform: rotate(180deg);\n\t\t\t\t\t}\n\t\t\t\t}\n\n\t\t\t\t/* Suppress the transition while restoring a collapsed rail on hard\n\t\t\t\t   load — otherwise the sidebar visibly slams shut on every refresh. */\n\t\t\t\t.sidebar-no-anim #desktop-sidebar,\n\t\t\t\t.sidebar-no-anim #desktop-sidebar *,\n\t\t\t\t.sidebar-no-anim #main-content-wrapper {\n\t\t\t\t\ttransition: none !important;\n\t\t\t\t}\n\n\t\t\t\t@media (prefers-reduced-motion: reduce) {\n\t\t\t\t\t#desktop-sidebar,\n\t\t\t\t\t#desktop-sidebar-inner,\n\t\t\t\t\t#main-content-wrapper,\n\t\t\t\t\t#desktop-sidebar [data-sidebar-label],\n\t\t\t\t\t#desktop-sidebar [data-sidebar-chevron] {\n\t\t\t\t\t\ttransition: none;\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\t/* Page title utility — Alfa Slab display, matches storefront headlines */\n\t\t\t\t.admin-page-title {\n\t\t\t\t\tfont-family: 'Alfa Slab One', 'Rockwell', Georgia, serif;\n\t\t\t\t\tfont-weight: 400;\n\t\t\t\t\tfont-size: 1.75rem;\n\t\t\t\t\tline-height: 0.95;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tletter-spacing: 0.01em;\n\t\t\t\t\tcolor: var(--color-rr-heading);\n\t\t\t\t}\n\n\t\t\t\t/* ── Admin status badges ── */\n\t\t\t\t.badge {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.35rem;\n\t\t\t\t\tpadding: 0.2rem 0.6rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tborder: 1px solid transparent;\n\t\t\t\t\tfont-family: 'Barlow', sans-serif;\n\t\t\t\t\tfont-weight: 700;\n\t\t\t\t\tletter-spacing: 0.14em;\n\t\t\t\t\ttext-transform: uppercase;\n\t\t\t\t\tfont-size: 0.65rem;\n\t\t\t\t\tline-height: 1.6;\n\t\t\t\t\twhite-space: nowrap;\n\t\t\t\t}\n\t\t\t\t.badge-dot::before {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tdisplay: block;\n\t\t\t\t\twidth: 5px;\n\t\t\t\t\theight: 5px;\n\t\t\t\t\tborder-radius: 50%;\n\t\t\t\t\tbackground: currentColor;\n\t\t\t\t\tflex-shrink: 0;\n\t\t\t\t}\n\t\t\t\t.badge-green      { background:#DFF0E4; color:#2A6644; border-color:#A8D4B8; }\n\t\t\t\t.badge-green-solid { background:#2A6644; color:#F0FAF4; border-color:#1E4E32; }\n\t\t\t\t.badge-amber      { background:#FBF0D8; color:#7A4E08; border-color:#E8C070; }\n\t\t\t\t.badge-slate      { background:#E4EAF0; color:#2E4A60; border-color:#A8BED0; }\n\t\t\t\t.badge-teal       { background:#D8F0EE; color:#0A5E5C; border-color:#7ACCC8; }\n\t\t\t\t.badge-teal-solid { background:#0A7870; color:#F0FAFA; border-color:#065858; }\n\t\t\t\t.badge-red        { background:#FAE4E4; color:#7A1210; border-color:#E0A8A8; }\n\t\t\t\t.badge-grey       { background:#E8E0D8; color:#5A5048; border-color:#B8ACA0; }\n\t\t\t\t.badge-pastdue    { background:#FCE8D8; color:#7A3010; border-color:#E8B090; }\n\t\t\t\t.badge-partial    { background:#EEF0D8; color:#4A5218; border-color:#C0C888; }\n\t\t\t\t.badge-blue       { background:#DBEAFE; color:#1E40AF; border-color:#93C5FD; }\n\t\t\t\t.badge-indigo     { background:#E0E7FF; color:#3730A3; border-color:#A5B4FC; }\n\t\t\t\t.badge-neutral    { background:#E4DAC8; color:#5A5048; border-color:#B8ACA0; }\n\n\t\t\t\t/* ── Admin action buttons ── */\n\t\t\t\t.btn-secondary {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: var(--color-rr-heading);\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-secondary:hover { background: var(--color-rr-raised); }\n\n\t\t\t\t.btn-danger {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: #7A1210;\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-danger:hover { background: #FAE4E4; }\n\n\t\t\t\t.btn-confirm {\n\t\t\t\t\tdisplay: inline-flex;\n\t\t\t\t\talign-items: center;\n\t\t\t\t\tgap: 0.375rem;\n\t\t\t\t\tborder-radius: 2px;\n\t\t\t\t\tpadding: 0.5rem 0.75rem;\n\t\t\t\t\tfont-size: 0.875rem;\n\t\t\t\t\tfont-weight: 600;\n\t\t\t\t\tbackground: var(--color-rr-surface);\n\t\t\t\t\tcolor: #2A6644;\n\t\t\t\t\tbox-shadow: 0 1px 2px rgba(0,0,0,0.05);\n\t\t\t\t\toutline: 1px solid var(--color-rr-border);\n\t\t\t\t\toutline-offset: -1px;\n\t\t\t\t}\n\t\t\t\t.btn-confirm:hover { background: #DFF0E4; }\n\n\t\t\t\t/* ── Clickable table rows ── */\n\t\t\t\t.row-link {\n\t\t\t\t\tposition: relative;\n\t\t\t\t\t/* Safari/WebKit ignores `position: relative` on <tr>, so the\n\t\t\t\t\t   .row-link-target::after overlay below is NOT clipped to its row\n\t\t\t\t\t   there — it escapes to the viewport and stacks across the whole\n\t\t\t\t\t   page, swallowing clicks on the tabs/filters above the table and\n\t\t\t\t\t   routing them to a random order's detail page. A transform DOES\n\t\t\t\t\t   establish a containing block on <tr> in WebKit, which clips the\n\t\t\t\t\t   overlay back to its row. See WebKit bug 240961. */\n\t\t\t\t\ttransform: translate(0);\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\ttransition: background-color 150ms linear, box-shadow 150ms linear;\n\t\t\t\t}\n\t\t\t\t.row-link:hover {\n\t\t\t\t\tbackground: var(--color-rr-raised);\n\t\t\t\t\tbox-shadow: inset 4px 0 0 var(--color-rr-amber);\n\t\t\t\t}\n\t\t\t\t/* Stale rows keep a persistent rust flag on the leading edge —\n\t\t\t\t   the paper-and-ink equivalent of a sticky note \"this is waiting.\" */\n\t\t\t\t.row-link.row-link-stale {\n\t\t\t\t\tbox-shadow: inset 4px 0 0 var(--color-rr-red);\n\t\t\t\t}\n\t\t\t\t.row-link.row-link-stale:hover {\n\t\t\t\t\tbox-shadow: inset 4px 0 0 var(--color-rr-red);\n\t\t\t\t}\n\t\t\t\t@media (prefers-reduced-motion: reduce) {\n\t\t\t\t\t.row-link { transition: none; }\n\t\t\t\t}\n\t\t\t\t.row-link .row-link-target::after {\n\t\t\t\t\tcontent: '';\n\t\t\t\t\tposition: absolute;\n\t\t\t\t\tinset: 0;\n\t\t\t\t}\n\t\t\t\t/* Keep other interactive elements above the overlay */\n\t\t\t\t.row-link a:not(.row-link-target),\n\t\t\t\t.row-link button,\n\t\t\t\t.row-link form { position: relative; z-index: 1; }\n\t\t\t</style></head><body class=\"h-full overflow-x-hidden\" hx-boost=\"true\" hx-target=\"#main-content\" hx-swap=\"innerHTML show:window:top\"><!-- Mobile sidebar overlay --><div id=\"mobile-sidebar\" class=\"relative z-50 lg:hidden hidden\" role=\"dialog\" aria-modal=\"true\"><!-- Backdrop --><div id=\"mobile-sidebar-backdrop\" class=\"fixed inset-0 bg-rr-heading/80 transition-opacity\"></div><div class=\"fixed inset-0 flex\"><div id=\"mobile-sidebar-panel\" class=\"relative mr-16 flex w-full max-w-xs flex-1\"><!-- Close button --><div class=\"absolute left-full top-0 flex w-16 justify-center pt-5\"><button type=\"button\" id=\"mobile-sidebar-close\" class=\"-m-2.5 p-2.5\"><span class=\"sr-only\">Close sidebar</span> <svg class=\"size-6 text-white\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18L18 6M6 6l12 12\"></path></svg></button></div><!-- Mobile sidebar content --><div class=\"flex grow flex-col gap-y-5 overflow-y-auto bg-rr-surface px-6 pb-4 border-r border-rr-border\"><div class=\"flex h-16 shrink-0 items-center\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -257,7 +353,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div><div class=\"flex flex-1 flex-col\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div><div class=\"flex flex-1 flex-col\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -265,7 +361,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"mt-auto\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div class=\"mt-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -273,7 +369,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div></div></div></div></div></div><!-- Desktop sidebar (expanded by default for desktop-first use) --><div id=\"desktop-sidebar\" class=\"hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col\"><div id=\"desktop-sidebar-inner\" class=\"flex grow flex-col gap-y-5 bg-rr-surface border-r border-rr-border px-6 pb-4\"><div data-sidebar-header class=\"flex h-16 shrink-0 items-center justify-between gap-x-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div></div></div></div></div></div><!-- Desktop sidebar (expanded by default for desktop-first use) --><div id=\"desktop-sidebar\" class=\"hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col\"><div id=\"desktop-sidebar-inner\" class=\"flex grow flex-col gap-y-5 bg-rr-surface border-r border-rr-border px-6 pb-4\"><div data-sidebar-header class=\"flex h-16 shrink-0 items-center justify-between gap-x-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -285,7 +381,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div><!-- Nav (flex-1) fills the column and pins the user menu to the\n\t\t\t\t\t     bottom. No overflow container here: the seven-item nav never\n\t\t\t\t\t     needs to scroll, and an overflow context would both clip the\n\t\t\t\t\t     menu's upward dropdown and turn the nav's -mx-2 gutter bleed\n\t\t\t\t\t     into a stray horizontal scrollbar. -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><!-- Nav (flex-1) fills the column and pins the user menu to the\n\t\t\t\t\t     bottom. No overflow container here: the seven-item nav never\n\t\t\t\t\t     needs to scroll, and an overflow context would both clip the\n\t\t\t\t\t     menu's upward dropdown and turn the nav's -mx-2 gutter bleed\n\t\t\t\t\t     into a stray horizontal scrollbar. -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -293,7 +389,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"shrink-0 border-t border-rr-border pt-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"shrink-0 border-t border-rr-border pt-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -301,7 +397,7 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div></div></div><!-- Main content area --><div id=\"main-content-wrapper\" class=\"lg:pl-72 overflow-x-hidden\"><!-- Mobile top bar — drawer trigger + brand. Hidden on desktop, where\n\t\t\t\t     the sidebar is always visible and carries the user menu itself,\n\t\t\t\t     so the whole bar disappears and the content reclaims the height. --><div class=\"sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 lg:hidden\"><button type=\"button\" id=\"mobile-menu-btn\" class=\"-m-2.5 p-2.5 text-rr-body\"><span class=\"sr-only\">Open sidebar</span> <svg class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg></button><div class=\"h-6 w-px bg-rr-border\" aria-hidden=\"true\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div></div></div><!-- Main content area --><div id=\"main-content-wrapper\" class=\"lg:pl-72 overflow-x-hidden\"><!-- Mobile top bar — drawer trigger + brand. Hidden on desktop, where\n\t\t\t\t     the sidebar is always visible and carries the user menu itself,\n\t\t\t\t     so the whole bar disappears and the content reclaims the height. --><div class=\"sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-rr-border bg-rr-surface px-4 lg:hidden\"><button type=\"button\" id=\"mobile-menu-btn\" class=\"-m-2.5 p-2.5 text-rr-body\"><span class=\"sr-only\">Open sidebar</span> <svg class=\"size-6\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.5\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5\"></path></svg></button><div class=\"h-6 w-px bg-rr-border\" aria-hidden=\"true\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -309,15 +405,15 @@ func Admin(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div><main class=\"py-10 lg:py-8\"><div id=\"main-content\" class=\"px-4 sm:px-6 lg:px-8\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div><main class=\"py-10 lg:py-8\"><div id=\"main-content\" class=\"px-4 sm:px-6 lg:px-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templ_7745c5c3_Var7.Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = templ_7745c5c3_Var10.Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"assertive\"></div></div><script>\n\t\t\t\t// Desktop sidebar toggle. The CSS (keyed on .is-collapsed) owns the\n\t\t\t\t// labels, icon centering and chevron flip on a single timeline; JS\n\t\t\t\t// just flips the state class, the width/padding utilities it animates,\n\t\t\t\t// the a11y attributes, and the persisted preference.\n\t\t\t\tfunction toggleSidebar() {\n\t\t\t\t\tvar sb = document.getElementById('desktop-sidebar');\n\t\t\t\t\tvar inner = document.getElementById('desktop-sidebar-inner');\n\t\t\t\t\tvar wrapper = document.getElementById('main-content-wrapper');\n\t\t\t\t\tvar toggle = sb.querySelector('[data-sidebar-toggle]');\n\t\t\t\t\tvar collapsed = sb.classList.toggle('is-collapsed');\n\n\t\t\t\t\tsb.classList.toggle('lg:w-72', !collapsed);\n\t\t\t\t\tsb.classList.toggle('lg:w-16', collapsed);\n\t\t\t\t\tinner.classList.toggle('px-6', !collapsed);\n\t\t\t\t\tinner.classList.toggle('px-2', collapsed);\n\t\t\t\t\twrapper.classList.toggle('lg:pl-72', !collapsed);\n\t\t\t\t\twrapper.classList.toggle('lg:pl-16', collapsed);\n\n\t\t\t\t\tif (toggle) {\n\t\t\t\t\t\ttoggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');\n\t\t\t\t\t\ttoggle.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');\n\t\t\t\t\t}\n\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', collapsed ? 'true' : 'false');\n\t\t\t\t}\n\n\t\t\t\t(function() {\n\t\t\t\t\t// Restore sidebar state from localStorage (default: expanded).\n\t\t\t\t\t// Suppress the transition for the restore so a collapsed rail\n\t\t\t\t\t// doesn't visibly slam shut on every hard page load.\n\t\t\t\t\tif (localStorage.getItem('sidebar-collapsed') === 'true') {\n\t\t\t\t\t\tdocument.body.classList.add('sidebar-no-anim');\n\t\t\t\t\t\ttoggleSidebar();\n\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\t\tdocument.body.classList.remove('sidebar-no-anim');\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile sidebar\n\t\t\t\t\tvar sidebar = document.getElementById('mobile-sidebar');\n\t\t\t\t\tvar openBtn = document.getElementById('mobile-menu-btn');\n\t\t\t\t\tvar closeBtn = document.getElementById('mobile-sidebar-close');\n\t\t\t\t\tvar backdrop = document.getElementById('mobile-sidebar-backdrop');\n\n\t\t\t\t\tfunction openSidebar() {\n\t\t\t\t\t\tsidebar.classList.remove('hidden');\n\t\t\t\t\t}\n\t\t\t\t\tfunction closeSidebar() {\n\t\t\t\t\t\tsidebar.classList.add('hidden');\n\t\t\t\t\t}\n\n\t\t\t\t\tif (openBtn) openBtn.addEventListener('click', openSidebar);\n\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', closeSidebar);\n\t\t\t\t\tif (backdrop) backdrop.addEventListener('click', closeSidebar);\n\n\t\t\t\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\t\t\t\tif (e.key === 'Escape') closeSidebar();\n\t\t\t\t\t});\n\n\t\t\t\t\t// Dropdown menus\n\t\t\t\t\tdocument.querySelectorAll('[data-dropdown]').forEach(function(dropdown) {\n\t\t\t\t\t\tvar trigger = dropdown.querySelector('[data-dropdown-trigger]');\n\t\t\t\t\t\tvar menu = dropdown.querySelector('[data-dropdown-menu]');\n\n\t\t\t\t\t\tif (trigger && menu) {\n\t\t\t\t\t\t\ttrigger.addEventListener('click', function(e) {\n\t\t\t\t\t\t\t\te.stopPropagation();\n\t\t\t\t\t\t\t\tvar isOpen = !menu.classList.contains('hidden');\n\t\t\t\t\t\t\t\t// Close all other dropdowns\n\t\t\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\tif (!isOpen) {\n\t\t\t\t\t\t\t\t\tmenu.classList.remove('hidden');\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\n\t\t\t\t\tdocument.addEventListener('click', function() {\n\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t// Active nav highlighting after htmx navigation\n\t\t\t\tvar activeLink = 'group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-heading';\n\t\t\t\tvar inactiveLink = 'group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-medium text-rr-body hover:bg-rr-raised hover:text-rr-heading';\n\t\t\t\tvar activeIcon = 'size-5 shrink-0 text-rr-heading';\n\t\t\t\tvar inactiveIcon = 'size-5 shrink-0 text-rr-muted group-hover:text-rr-heading';\n\n\t\t\t\t// Twin of resolveActiveNav in admin.templ — maps any admin path to the\n\t\t\t\t// flat sidebar row that owns it (section-tab and wholesale sub-pages\n\t\t\t\t// resolve to their parent). Keep the two in sync.\n\t\t\t\tfunction resolveActiveNav(path) {\n\t\t\t\t\tif (path === '/admin') return '/admin';\n\t\t\t\t\tif (path.indexOf('/admin/orders') === 0) return '/admin/orders';\n\t\t\t\t\tif (path === '/admin/fulfillment' || path.indexOf('/admin/fulfillment/') === 0 ||\n\t\t\t\t\t\tpath.indexOf('/admin/wholesale/fulfillment') === 0) return '/admin/fulfillment';\n\t\t\t\t\tif (path.indexOf('/admin/catalog') === 0 || path.indexOf('/admin/categories') === 0 ||\n\t\t\t\t\t\tpath.indexOf('/admin/attributes') === 0) return '/admin/catalog';\n\t\t\t\t\tif (path.indexOf('/admin/customers') === 0 || path.indexOf('/admin/groups') === 0 ||\n\t\t\t\t\t\tpath.indexOf('/admin/price-lists') === 0 || path.indexOf('/admin/wholesale') === 0) return '/admin/customers';\n\t\t\t\t\tif (path.indexOf('/admin/subscriptions') === 0 || path.indexOf('/admin/plans') === 0) return '/admin/subscriptions';\n\t\t\t\t\tif (path.indexOf('/admin/discounts') === 0) return '/admin/discounts';\n\t\t\t\t\treturn path;\n\t\t\t\t}\n\n\t\t\t\tfunction updateActiveNav() {\n\t\t\t\t\t// Prefer an explicit marker the swapped content may carry. The order\n\t\t\t\t\t// detail page lives at the same /admin/orders/{id} URL for both\n\t\t\t\t\t// channels, so the path alone can't say which nav item is right — the\n\t\t\t\t\t// marker disambiguates (e.g. \"/admin/orders/wholesale\").\n\t\t\t\t\tvar marker = document.querySelector('#main-content [data-active-path]');\n\t\t\t\t\tvar path = marker ? marker.getAttribute('data-active-path') : window.location.pathname;\n\t\t\t\t\tvar resolved = resolveActiveNav(path);\n\t\t\t\t\t// Scoped to the sidebar so we don't trample page-level tab navs\n\t\t\t\t\t// (e.g. orders/fulfillment view tabs) that also link to /admin/*.\n\t\t\t\t\tvar links = document.querySelectorAll('nav[data-admin-sidebar-nav] a[href^=\"/admin\"]');\n\t\t\t\t\tlinks.forEach(function(a) {\n\t\t\t\t\t\tvar isActive = a.getAttribute('href') === resolved;\n\t\t\t\t\t\ta.className = isActive ? activeLink : inactiveLink;\n\t\t\t\t\t\tvar icon = a.querySelector('svg');\n\t\t\t\t\t\tif (icon) icon.className = isActive ? activeIcon : inactiveIcon;\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:afterSettle', updateActiveNav);\n\n\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t// Force initial off-screen state, then slide in on next frame\n\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t});\n\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\tvar btn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\tif (btn) btn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div></main><!-- Toast live region --><div id=\"toast-container\" aria-live=\"assertive\"></div></div><script>\n\t\t\t\t// Desktop sidebar toggle. The CSS (keyed on .is-collapsed) owns the\n\t\t\t\t// labels, icon centering and chevron flip on a single timeline; JS\n\t\t\t\t// just flips the state class, the width/padding utilities it animates,\n\t\t\t\t// the a11y attributes, and the persisted preference.\n\t\t\t\tfunction toggleSidebar() {\n\t\t\t\t\tvar sb = document.getElementById('desktop-sidebar');\n\t\t\t\t\tvar inner = document.getElementById('desktop-sidebar-inner');\n\t\t\t\t\tvar wrapper = document.getElementById('main-content-wrapper');\n\t\t\t\t\tvar toggle = sb.querySelector('[data-sidebar-toggle]');\n\t\t\t\t\tvar collapsed = sb.classList.toggle('is-collapsed');\n\n\t\t\t\t\tsb.classList.toggle('lg:w-72', !collapsed);\n\t\t\t\t\tsb.classList.toggle('lg:w-16', collapsed);\n\t\t\t\t\tinner.classList.toggle('px-6', !collapsed);\n\t\t\t\t\tinner.classList.toggle('px-2', collapsed);\n\t\t\t\t\twrapper.classList.toggle('lg:pl-72', !collapsed);\n\t\t\t\t\twrapper.classList.toggle('lg:pl-16', collapsed);\n\n\t\t\t\t\tif (toggle) {\n\t\t\t\t\t\ttoggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');\n\t\t\t\t\t\ttoggle.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');\n\t\t\t\t\t}\n\t\t\t\t\tlocalStorage.setItem('sidebar-collapsed', collapsed ? 'true' : 'false');\n\t\t\t\t}\n\n\t\t\t\t(function() {\n\t\t\t\t\t// Restore sidebar state from localStorage (default: expanded).\n\t\t\t\t\t// Suppress the transition for the restore so a collapsed rail\n\t\t\t\t\t// doesn't visibly slam shut on every hard page load.\n\t\t\t\t\tif (localStorage.getItem('sidebar-collapsed') === 'true') {\n\t\t\t\t\t\tdocument.body.classList.add('sidebar-no-anim');\n\t\t\t\t\t\ttoggleSidebar();\n\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\t\t\tdocument.body.classList.remove('sidebar-no-anim');\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\t// Mobile sidebar\n\t\t\t\t\tvar sidebar = document.getElementById('mobile-sidebar');\n\t\t\t\t\tvar openBtn = document.getElementById('mobile-menu-btn');\n\t\t\t\t\tvar closeBtn = document.getElementById('mobile-sidebar-close');\n\t\t\t\t\tvar backdrop = document.getElementById('mobile-sidebar-backdrop');\n\n\t\t\t\t\tfunction openSidebar() {\n\t\t\t\t\t\tsidebar.classList.remove('hidden');\n\t\t\t\t\t}\n\t\t\t\t\tfunction closeSidebar() {\n\t\t\t\t\t\tsidebar.classList.add('hidden');\n\t\t\t\t\t}\n\n\t\t\t\t\tif (openBtn) openBtn.addEventListener('click', openSidebar);\n\t\t\t\t\tif (closeBtn) closeBtn.addEventListener('click', closeSidebar);\n\t\t\t\t\tif (backdrop) backdrop.addEventListener('click', closeSidebar);\n\n\t\t\t\t\tdocument.addEventListener('keydown', function(e) {\n\t\t\t\t\t\tif (e.key === 'Escape') closeSidebar();\n\t\t\t\t\t});\n\n\t\t\t\t\t// Dropdown menus\n\t\t\t\t\tdocument.querySelectorAll('[data-dropdown]').forEach(function(dropdown) {\n\t\t\t\t\t\tvar trigger = dropdown.querySelector('[data-dropdown-trigger]');\n\t\t\t\t\t\tvar menu = dropdown.querySelector('[data-dropdown-menu]');\n\n\t\t\t\t\t\tif (trigger && menu) {\n\t\t\t\t\t\t\ttrigger.addEventListener('click', function(e) {\n\t\t\t\t\t\t\t\te.stopPropagation();\n\t\t\t\t\t\t\t\tvar isOpen = !menu.classList.contains('hidden');\n\t\t\t\t\t\t\t\t// Close all other dropdowns\n\t\t\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\tif (!isOpen) {\n\t\t\t\t\t\t\t\t\tmenu.classList.remove('hidden');\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t}\n\t\t\t\t\t});\n\n\t\t\t\t\tdocument.addEventListener('click', function() {\n\t\t\t\t\t\tdocument.querySelectorAll('[data-dropdown-menu]').forEach(function(m) {\n\t\t\t\t\t\t\tm.classList.add('hidden');\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t// Active nav highlighting after htmx navigation\n\t\t\t\tvar activeLink = 'group flex items-center gap-x-3 rounded-sm bg-rr-raised p-1.5 text-sm font-semibold text-rr-heading';\n\t\t\t\tvar inactiveLink = 'group flex items-center gap-x-3 rounded-sm p-1.5 text-sm font-medium text-rr-body hover:bg-rr-raised hover:text-rr-heading';\n\t\t\t\tvar activeIcon = 'size-5 shrink-0 text-rr-heading';\n\t\t\t\tvar inactiveIcon = 'size-5 shrink-0 text-rr-muted group-hover:text-rr-heading';\n\n\t\t\t\t// Twin of resolveActiveNav in admin.templ — maps any admin path to the\n\t\t\t\t// flat sidebar row that owns it (section-tab and wholesale sub-pages\n\t\t\t\t// resolve to their parent). Keep the two in sync.\n\t\t\t\tfunction resolveActiveNav(path) {\n\t\t\t\t\tif (path === '/admin') return '/admin';\n\t\t\t\t\tif (path.indexOf('/admin/orders') === 0) return '/admin/orders';\n\t\t\t\t\tif (path === '/admin/fulfillment' || path.indexOf('/admin/fulfillment/') === 0 ||\n\t\t\t\t\t\tpath.indexOf('/admin/wholesale/fulfillment') === 0) return '/admin/fulfillment';\n\t\t\t\t\tif (path.indexOf('/admin/catalog') === 0 || path.indexOf('/admin/categories') === 0 ||\n\t\t\t\t\t\tpath.indexOf('/admin/attributes') === 0) return '/admin/catalog';\n\t\t\t\t\tif (path.indexOf('/admin/customers') === 0 || path.indexOf('/admin/groups') === 0 ||\n\t\t\t\t\t\tpath.indexOf('/admin/price-lists') === 0 || path.indexOf('/admin/wholesale') === 0) return '/admin/customers';\n\t\t\t\t\tif (path.indexOf('/admin/subscriptions') === 0 || path.indexOf('/admin/plans') === 0) return '/admin/subscriptions';\n\t\t\t\t\tif (path.indexOf('/admin/discounts') === 0) return '/admin/discounts';\n\t\t\t\t\treturn path;\n\t\t\t\t}\n\n\t\t\t\tfunction updateActiveNav() {\n\t\t\t\t\t// Prefer an explicit marker the swapped content may carry. The order\n\t\t\t\t\t// detail page lives at the same /admin/orders/{id} URL for both\n\t\t\t\t\t// channels, so the path alone can't say which nav item is right — the\n\t\t\t\t\t// marker disambiguates (e.g. \"/admin/orders/wholesale\").\n\t\t\t\t\tvar marker = document.querySelector('#main-content [data-active-path]');\n\t\t\t\t\tvar path = marker ? marker.getAttribute('data-active-path') : window.location.pathname;\n\t\t\t\t\tvar resolved = resolveActiveNav(path);\n\t\t\t\t\t// Scoped to the sidebar so we don't trample page-level tab navs\n\t\t\t\t\t// (e.g. orders/fulfillment view tabs) that also link to /admin/*.\n\t\t\t\t\tvar links = document.querySelectorAll('nav[data-admin-sidebar-nav] a[href^=\"/admin\"]');\n\t\t\t\t\tlinks.forEach(function(a) {\n\t\t\t\t\t\tvar isActive = a.getAttribute('href') === resolved;\n\t\t\t\t\t\ta.className = isActive ? activeLink : inactiveLink;\n\t\t\t\t\t\tvar icon = a.querySelector('svg');\n\t\t\t\t\t\tif (icon) icon.className = isActive ? activeIcon : inactiveIcon;\n\t\t\t\t\t});\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:afterSettle', updateActiveNav);\n\n\t\t\t\t// Toast slide-in/out and auto-dismiss\n\t\t\t\tfunction dismissToast(el) {\n\t\t\t\t\tif (!el || el.dataset.dismissing) return;\n\t\t\t\t\tel.dataset.dismissing = 'true';\n\t\t\t\t\tel.style.opacity = '0';\n\t\t\t\t\tel.style.transform = 'translateX(100%)';\n\t\t\t\t\tel.addEventListener('transitionend', function() { el.remove(); }, { once: true });\n\t\t\t\t}\n\n\t\t\t\tdocument.addEventListener('htmx:oobAfterSwap', function(evt) {\n\t\t\t\t\tvar toast = evt.detail.target.querySelector('[data-toast]');\n\t\t\t\t\tif (!toast) return;\n\t\t\t\t\t// Force initial off-screen state, then slide in on next frame\n\t\t\t\t\ttoast.style.transform = 'translateX(100%)';\n\t\t\t\t\ttoast.style.opacity = '0';\n\t\t\t\t\trequestAnimationFrame(function() {\n\t\t\t\t\t\ttoast.style.transform = 'translateX(0)';\n\t\t\t\t\t\ttoast.style.opacity = '1';\n\t\t\t\t\t});\n\t\t\t\t\tsetTimeout(function() { dismissToast(toast); }, 5000);\n\t\t\t\t\tvar btn = toast.querySelector('[data-toast-close]');\n\t\t\t\t\tif (btn) btn.addEventListener('click', function() { dismissToast(toast); });\n\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -341,12 +437,12 @@ func adminLogo() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var9 == nil {
-			templ_7745c5c3_Var9 = templ.NopComponent
+		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var12 == nil {
+			templ_7745c5c3_Var12 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<a href=\"/admin\" class=\"flex items-center gap-2\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-7 w-auto flex-shrink-0\"> <span class=\"text-lg tracking-wide text-rr-heading uppercase\" style=\"font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;\">Rockabilly</span></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "<a href=\"/admin\" class=\"flex items-center gap-2\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-7 w-auto flex-shrink-0\"> <span class=\"text-lg tracking-wide text-rr-heading uppercase\" style=\"font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;\">Rockabilly</span></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -373,12 +469,12 @@ func adminSidebarBrand() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var10 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var10 == nil {
-			templ_7745c5c3_Var10 = templ.NopComponent
+		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var13 == nil {
+			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<a href=\"/admin\" data-sidebar-label class=\"flex items-center gap-2 overflow-hidden\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-7 w-auto shrink-0\"> <span class=\"text-lg tracking-wide text-rr-heading uppercase\" style=\"font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;\">Rockabilly</span></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<a href=\"/admin\" data-sidebar-label class=\"flex items-center gap-2 overflow-hidden\"><img src=\"/static/rockabilly-logo.svg\" alt=\"Rockabilly Roasting Co.\" class=\"h-7 w-auto shrink-0\"> <span class=\"text-lg tracking-wide text-rr-heading uppercase\" style=\"font-family: 'Alfa Slab One', Rockwell, Georgia, serif; letter-spacing: 0.02em;\">Rockabilly</span></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -406,12 +502,12 @@ func adminSidebarToggle() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var11 == nil {
-			templ_7745c5c3_Var11 = templ.NopComponent
+		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var14 == nil {
+			templ_7745c5c3_Var14 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<button type=\"button\" onclick=\"toggleSidebar()\" data-sidebar-toggle aria-expanded=\"true\" aria-controls=\"desktop-sidebar\" title=\"Collapse sidebar\" class=\"group flex shrink-0 items-center justify-center rounded-sm p-2 text-rr-muted hover:bg-rr-raised hover:text-rr-red transition-colors\"><span class=\"sr-only\">Toggle sidebar</span> <svg data-sidebar-chevron class=\"size-5 shrink-0 transition-transform duration-200\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.75\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 19.5 8.25 12l7.5-7.5\"></path></svg></button>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<button type=\"button\" onclick=\"toggleSidebar()\" data-sidebar-toggle aria-expanded=\"true\" aria-controls=\"desktop-sidebar\" title=\"Collapse sidebar\" class=\"group flex shrink-0 items-center justify-center rounded-sm p-2 text-rr-muted hover:bg-rr-raised hover:text-rr-red transition-colors\"><span class=\"sr-only\">Toggle sidebar</span> <svg data-sidebar-chevron class=\"size-5 shrink-0 transition-transform duration-200\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"1.75\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M15.75 19.5 8.25 12l7.5-7.5\"></path></svg></button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -435,61 +531,61 @@ func adminUserFooter(props AdminProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var12 == nil {
-			templ_7745c5c3_Var12 = templ.NopComponent
+		templ_7745c5c3_Var15 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var15 == nil {
+			templ_7745c5c3_Var15 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"relative\" data-dropdown><button type=\"button\" data-dropdown-trigger class=\"flex w-full items-center gap-x-4 rounded-sm px-2 py-3 text-sm/6 font-semibold text-rr-heading hover:bg-rr-raised\"><span class=\"inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-rr-red\"><span class=\"text-sm font-medium text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<div class=\"relative\" data-dropdown><button type=\"button\" data-dropdown-trigger class=\"flex w-full items-center gap-x-4 rounded-sm px-2 py-3 text-sm/6 font-semibold text-rr-heading hover:bg-rr-raised\"><span class=\"inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-rr-red\"><span class=\"text-sm font-medium text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var13 string
-		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
+		var templ_7745c5c3_Var16 string
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 636, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 680, Col: 81}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</span></span> <span data-sidebar-label class=\"flex-1 text-left transition-opacity duration-200\"><span class=\"block text-sm font-semibold text-rr-heading\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var14 string
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 639, Col: 79}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</span></span> <span data-sidebar-label class=\"flex-1 text-left transition-opacity duration-200\"><span class=\"block text-sm font-semibold text-rr-heading\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</span> <span class=\"block text-xs text-rr-muted\">")
+		var templ_7745c5c3_Var17 string
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 683, Col: 79}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 string
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 640, Col: 63}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</span> <span class=\"block text-xs text-rr-muted\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</span></span> <svg data-sidebar-label class=\"size-5 text-rr-muted transition-opacity duration-200\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z\" clip-rule=\"evenodd\"></path></svg></button><div data-dropdown-menu class=\"hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border\"><a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Settings</a> ")
+		var templ_7745c5c3_Var18 string
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 684, Col: 63}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</span></span> <svg data-sidebar-label class=\"size-5 text-rr-muted transition-opacity duration-200\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z\" clip-rule=\"evenodd\"></path></svg></button><div data-dropdown-menu class=\"hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border\"><a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Settings</a> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if domain.StaffRole(props.StaffRole).CanManageStaff() {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<a href=\"/admin/staff\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Team</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<a href=\"/admin/staff\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Team</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<a href=\"/admin/audit\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Audit log</a> <a href=\"/admin/help\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Help</a><div class=\"my-1 border-t border-rr-border\"></div><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<a href=\"/admin/audit\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Audit log</a> <a href=\"/admin/help\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Help</a><div class=\"my-1 border-t border-rr-border\"></div><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

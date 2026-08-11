@@ -148,6 +148,12 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// White-label submissions awaiting review
+		props.PendingWhiteLabel, txErr = d.countPendingWhiteLabel(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+
 		// Revenue trend — period from ?days= (7/30/90), defaults to 30
 		props.Revenue, txErr = d.buildRevenueProps(ctx, tx, revenueDays(r), todayStart)
 		if txErr != nil {

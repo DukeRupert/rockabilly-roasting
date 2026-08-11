@@ -244,3 +244,59 @@ func TestWhiteLabelInviteToken_PurposeIsolation(t *testing.T) {
 	_, err = auth.RedeemWhiteLabelInvite(ctx, tx, setupRaw)
 	assert.ErrorIs(t, err, app.ErrWhiteLabelInviteInvalid)
 }
+
+// TestWhiteLabelFilter_SelectsPendingSubmissions covers the admin review queue's
+// backing filter: submissions still in draft must be findable without the staff
+// notification email, and ordinary catalog products must never leak into it.
+func TestWhiteLabelFilter_SelectsPendingSubmissions(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	svc := newWhiteLabelService()
+	catalog := newCatalogService()
+
+	base, _, _ := baseCoffee(t, tx)
+	customer := approvedWholesaleCustomer(t, tx)
+
+	submitted, err := svc.SubmitWhiteLabel(ctx, tx, customer.ID, app.WhiteLabelSubmission{
+		BaseProductID: base.ID,
+		Name:          "Greaser Blend",
+		LabelR2Key:    "white-label/greaser.png",
+	}, customerActor(customer))
+	require.NoError(t, err)
+
+	yes, no := true, false
+	draft := domain.ProductStatusDraft
+
+	// The pending queue: white-label submissions still in draft.
+	pending, err := catalog.ListProducts(ctx, tx, store.ProductFilter{
+		Status:     &draft,
+		WhiteLabel: &yes,
+	})
+	require.NoError(t, err)
+	require.Len(t, pending, 1)
+	assert.Equal(t, submitted.ID, pending[0].ID)
+
+	count, err := catalog.CountProducts(ctx, tx, store.ProductFilter{Status: &draft, WhiteLabel: &yes})
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+
+	// The negative arm must keep products whose metadata has no source key at all
+	// — every product predating the white-label flow looks like that.
+	others, err := catalog.ListProducts(ctx, tx, store.ProductFilter{WhiteLabel: &no})
+	require.NoError(t, err)
+	ids := make([]uuid.UUID, len(others))
+	for i, p := range others {
+		ids[i] = p.ID
+	}
+	assert.Contains(t, ids, base.ID)
+	assert.NotContains(t, ids, submitted.ID)
+
+	// Publishing clears it from the queue — that's how "reviewed" is expressed.
+	staffID := testutil.CreateStaff(t, tx)
+	_, err = catalog.UpdateProductStatus(ctx, tx, submitted.ID, domain.ProductStatusActive, testutil.TestActorFromStaff(staffID))
+	require.NoError(t, err)
+
+	count, err = catalog.CountProducts(ctx, tx, store.ProductFilter{Status: &draft, WhiteLabel: &yes})
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+}

@@ -180,7 +180,7 @@ func (s *WhiteLabelService) SubmitWhiteLabel(ctx context.Context, tx pgx.Tx, cus
 		return nil, fmt.Errorf("create white-label product: %w", err)
 	}
 
-	if err := s.cloneVariants(ctx, tx, base, product.ID, actor); err != nil {
+	if err := s.cloneVariants(ctx, tx, base, product.ID, customer, actor); err != nil {
 		return nil, err
 	}
 
@@ -247,9 +247,10 @@ func (s *WhiteLabelService) validateBase(ctx context.Context, tx pgx.Tx, basePro
 
 // cloneVariants copies the base coffee's orderable wholesale variants (sizes,
 // weight, MOQ) and their base prices onto the new product. Cloned variants are
-// wholesale-only — the white-label product is never sold retail. New SKUs are
-// prefixed with the new product's short ID to stay unique across submissions.
-func (s *WhiteLabelService) cloneVariants(ctx context.Context, tx pgx.Tx, base *domain.Product, productID uuid.UUID, actor Actor) error {
+// wholesale-only — the white-label product is never sold retail. New SKUs carry
+// the client's name so staff can tell whose label a SKU belongs to on sight —
+// see whiteLabelSKUPrefix.
+func (s *WhiteLabelService) cloneVariants(ctx context.Context, tx pgx.Tx, base *domain.Product, productID uuid.UUID, customer *domain.Customer, actor Actor) error {
 	baseVariants, err := s.catalog.ListVariants(ctx, tx, base.ID)
 	if err != nil {
 		return fmt.Errorf("list base variants: %w", err)
@@ -259,11 +260,20 @@ func (s *WhiteLabelService) cloneVariants(ctx context.Context, tx pgx.Tx, base *
 		return fmt.Errorf("list base prices: %w", err)
 	}
 
-	skuPrefix := "WL-" + shortID(productID)
+	// Resolve the prefix against the exact set of variants we're about to create,
+	// so every variant in one submission shares it.
+	cloning := make([]domain.Variant, 0, len(baseVariants))
 	for _, v := range baseVariants {
-		if v.ArchivedAt != nil || !v.WholesaleAvailable {
-			continue
+		if v.ArchivedAt == nil && v.WholesaleAvailable {
+			cloning = append(cloning, v)
 		}
+	}
+	skuPrefix, err := s.whiteLabelSKUPrefix(ctx, tx, customer, cloning)
+	if err != nil {
+		return err
+	}
+
+	for _, v := range cloning {
 		newVariant, err := s.catalog.CreateVariant(ctx, tx, store.CreateVariantParams{
 			ProductID:          productID,
 			SKU:                fmt.Sprintf("%s-%s", skuPrefix, v.SKU),
@@ -292,6 +302,103 @@ func (s *WhiteLabelService) cloneVariants(ctx context.Context, tx pgx.Tx, base *
 	return nil
 }
 
+// maxCustomerSKUToken caps the client segment of a white-label SKU. Long enough
+// to stay recognisable, short enough that the full SKU (prefix + base SKU) reads
+// on a packing slip.
+const maxCustomerSKUToken = 12
+
+// whiteLabelSKUPrefix resolves the shared leading segment of a submission's SKUs:
+//
+//	WL-<CLIENT>            first submission            → WL-BUNKER-CHOP-12OZ
+//	WL-<CLIENT>-<n>        nth clash on the same base  → WL-BUNKER-2-CHOP-12OZ
+//
+// Naming the client is the point — a SKU should say whose label it is without a
+// lookup. The client segment alone can't guarantee uniqueness, though: the invite
+// link is reusable, so one client can submit two labels off the same base coffee
+// and produce identical SKUs. The numeric suffix settles those, and only appears
+// when there's an actual clash, so the common case stays clean.
+//
+// It also absorbs the case where two clients truncate to the same token — a
+// correct SKU that reads ambiguously beats a collision, but see the caveat in
+// customerSKUToken.
+func (s *WhiteLabelService) whiteLabelSKUPrefix(ctx context.Context, tx pgx.Tx, customer *domain.Customer, cloning []domain.Variant) (string, error) {
+	token := customerSKUToken(customer)
+	for i := 1; i < 1000; i++ {
+		prefix := "WL-" + token
+		if i > 1 {
+			prefix = fmt.Sprintf("WL-%s-%d", token, i)
+		}
+		free, err := s.skuPrefixFree(ctx, tx, prefix, cloning)
+		if err != nil {
+			return "", err
+		}
+		if free {
+			return prefix, nil
+		}
+	}
+	return "", fmt.Errorf("could not find a free SKU prefix for %q", token)
+}
+
+// skuPrefixFree reports whether every SKU the prefix would produce is unclaimed.
+// All-or-nothing: a prefix is only usable if the whole submission fits under it.
+func (s *WhiteLabelService) skuPrefixFree(ctx context.Context, tx pgx.Tx, prefix string, cloning []domain.Variant) (bool, error) {
+	for _, v := range cloning {
+		_, err := s.catalog.GetVariantBySKU(ctx, tx, fmt.Sprintf("%s-%s", prefix, v.SKU))
+		if errors.Is(err, ErrVariantNotFound) {
+			continue
+		}
+		if err != nil {
+			return false, fmt.Errorf("check white-label sku uniqueness: %w", err)
+		}
+		return false, nil
+	}
+	return true, nil
+}
+
+// customerSKUToken derives the client segment of a white-label SKU: the company
+// name, uppercased and stripped to alphanumerics so it survives barcode scanners,
+// spreadsheets, and the SKU's own dash separators.
+//
+// Falls back through last name and email local part for the odd wholesale account
+// with no company on file, and finally to a slice of the customer ID — unreadable,
+// but a SKU that exists beats one that doesn't.
+//
+// Caveat: the token is truncated, so two clients whose names agree in the first
+// maxCustomerSKUToken characters produce the same token. whiteLabelSKUPrefix keeps
+// those unique via the numeric suffix, but the SKU no longer tells them apart at a
+// glance — staff would need the product's customer-access panel.
+func customerSKUToken(c *domain.Customer) string {
+	candidates := []string{}
+	if c.CompanyName != nil {
+		candidates = append(candidates, *c.CompanyName)
+	}
+	candidates = append(candidates, c.LastName)
+	if at := strings.IndexByte(c.Email, '@'); at > 0 {
+		candidates = append(candidates, c.Email[:at])
+	}
+	for _, candidate := range candidates {
+		if token := skuToken(candidate); token != "" {
+			return token
+		}
+	}
+	return strings.ToUpper(shortID(c.ID))
+}
+
+// skuToken uppercases a string and keeps only its alphanumerics, capped at
+// maxCustomerSKUToken characters.
+func skuToken(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToUpper(s) {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+		}
+		if b.Len() >= maxCustomerSKUToken {
+			break
+		}
+	}
+	return b.String()
+}
+
 // uniqueSlug derives a URL slug from the product name, appending a numeric suffix
 // until it is free. Two clients can pick the same name, so collisions are normal.
 func (s *WhiteLabelService) uniqueSlug(ctx context.Context, tx pgx.Tx, name string) (string, error) {
@@ -313,7 +420,8 @@ func (s *WhiteLabelService) uniqueSlug(ctx context.Context, tx pgx.Tx, name stri
 	return "", fmt.Errorf("could not find a free slug for %q", name)
 }
 
-// shortID returns the first 8 hex chars of a UUID — enough to disambiguate SKUs.
+// shortID returns the first 8 hex chars of a UUID. Last-resort SKU token for a
+// customer with no usable name or email.
 func shortID(id uuid.UUID) string {
 	return strings.ReplaceAll(id.String(), "-", "")[:8]
 }

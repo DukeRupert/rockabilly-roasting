@@ -32,6 +32,11 @@ func newWhiteLabelService() *app.WhiteLabelService {
 // approvedWholesaleCustomer creates a wholesale customer and approves it.
 func approvedWholesaleCustomer(t *testing.T, tx pgx.Tx) *domain.Customer {
 	t.Helper()
+	return approvedWholesaleCustomerNamed(t, tx, "Midnight Diner")
+}
+
+func approvedWholesaleCustomerNamed(t *testing.T, tx pgx.Tx, company string) *domain.Customer {
+	t.Helper()
 	ctx := context.Background()
 	wsvc := newWholesaleService()
 	staffID := testutil.CreateStaff(t, tx)
@@ -41,7 +46,7 @@ func approvedWholesaleCustomer(t *testing.T, tx pgx.Tx) *domain.Customer {
 		Email:       fmt.Sprintf("wl-%s@example.com", uuid.New().String()[:8]),
 		FirstName:   "Wanda",
 		LastName:    "Label",
-		CompanyName: "Midnight Diner",
+		CompanyName: company,
 	})
 	require.NoError(t, err)
 	c, err = wsvc.ApproveApplication(ctx, tx, c.ID, actor)
@@ -299,4 +304,112 @@ func TestWhiteLabelFilter_SelectsPendingSubmissions(t *testing.T) {
 	count, err = catalog.CountProducts(ctx, tx, store.ProductFilter{Status: &draft, WhiteLabel: &yes})
 	require.NoError(t, err)
 	assert.Equal(t, 0, count)
+}
+
+// namedBaseCoffee builds an active coffee with a single wholesale variant under
+// the given SKU, so a test can use more than one base without the bases
+// themselves colliding on SKU.
+func namedBaseCoffee(t *testing.T, tx pgx.Tx, title, sku string) *domain.Product {
+	t.Helper()
+	p := testutil.CreateProduct(t, tx,
+		testutil.WithProductTitle(title),
+		testutil.WithProductStatus(domain.ProductStatusActive))
+	v := testutil.CreateVariant(t, tx, p.ID,
+		testutil.WithSKU(sku), testutil.WithChannelAvailability(true, true))
+	testutil.SetBasePriceForVariant(t, tx, v.ID, 2500, "USD")
+	return p
+}
+
+func submitLabel(t *testing.T, tx pgx.Tx, svc *app.WhiteLabelService, c *domain.Customer, baseID uuid.UUID, name string) *domain.Product {
+	t.Helper()
+	p, err := svc.SubmitWhiteLabel(context.Background(), tx, c.ID, app.WhiteLabelSubmission{
+		BaseProductID: baseID,
+		Name:          name,
+		LabelR2Key:    "white-label/label.png",
+	}, customerActor(c))
+	require.NoError(t, err)
+	return p
+}
+
+func soleSKU(t *testing.T, tx pgx.Tx, catalog *app.CatalogService, productID uuid.UUID) string {
+	t.Helper()
+	variants, err := catalog.ListVariants(context.Background(), tx, productID)
+	require.NoError(t, err)
+	require.Len(t, variants, 1)
+	return variants[0].SKU
+}
+
+// TestWhiteLabelSKU_NamesTheClient covers the SKU format: staff should be able to
+// read a white-label SKU and know whose label it is without a lookup.
+func TestWhiteLabelSKU_NamesTheClient(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newWhiteLabelService()
+	catalog := newCatalogService()
+
+	base, wsVariant, _ := baseCoffee(t, tx)
+	customer := approvedWholesaleCustomerNamed(t, tx, "Midnight Diner")
+
+	product := submitLabel(t, tx, svc, customer, base.ID, "Midnight Diner Blend")
+
+	// Company name, uppercased and stripped to alphanumerics (capped at 12), then
+	// the base variant's SKU verbatim. No random component.
+	assert.Equal(t, "WL-MIDNIGHTDINE-"+wsVariant.SKU, soleSKU(t, tx, catalog, product.ID))
+}
+
+// TestWhiteLabelSKU_SuffixesOnlyOnClash covers the disambiguator: the invite link
+// is reusable, so one client can submit two labels off the same coffee. Those must
+// stay unique, but a second label on a *different* coffee must not pick up a
+// suffix it doesn't need.
+func TestWhiteLabelSKU_SuffixesOnlyOnClash(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newWhiteLabelService()
+	catalog := newCatalogService()
+
+	base, wsVariant, _ := baseCoffee(t, tx)
+	other := namedBaseCoffee(t, tx, "Greaser", "GREASE-12OZ")
+	customer := approvedWholesaleCustomerNamed(t, tx, "The Bunker")
+
+	first := submitLabel(t, tx, svc, customer, base.ID, "Bunker House")
+	assert.Equal(t, "WL-THEBUNKER-"+wsVariant.SKU, soleSKU(t, tx, catalog, first.ID))
+
+	// Same client, same base coffee — would collide, so it takes a suffix.
+	second := submitLabel(t, tx, svc, customer, base.ID, "Bunker Dark")
+	assert.Equal(t, "WL-THEBUNKER-2-"+wsVariant.SKU, soleSKU(t, tx, catalog, second.ID))
+
+	// Same client, different base coffee — no collision, so no suffix.
+	third := submitLabel(t, tx, svc, customer, other.ID, "Bunker Light")
+	assert.Equal(t, "WL-THEBUNKER-GREASE-12OZ", soleSKU(t, tx, catalog, third.ID))
+}
+
+// TestWhiteLabelSKU_DistinctClientsDistinctSKUs is the whole point of the change:
+// two clients basing labels on the same coffee are told apart by the SKU alone.
+func TestWhiteLabelSKU_DistinctClientsDistinctSKUs(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newWhiteLabelService()
+	catalog := newCatalogService()
+
+	base, wsVariant, _ := baseCoffee(t, tx)
+	bunker := approvedWholesaleCustomerNamed(t, tx, "The Bunker")
+	diner := approvedWholesaleCustomerNamed(t, tx, "Midnight Diner")
+
+	a := submitLabel(t, tx, svc, bunker, base.ID, "Bunker House")
+	b := submitLabel(t, tx, svc, diner, base.ID, "Diner House")
+
+	assert.Equal(t, "WL-THEBUNKER-"+wsVariant.SKU, soleSKU(t, tx, catalog, a.ID))
+	assert.Equal(t, "WL-MIDNIGHTDINE-"+wsVariant.SKU, soleSKU(t, tx, catalog, b.ID))
+}
+
+// TestWhiteLabelSKU_FallsBackWhenNoCompany covers a wholesale account with no
+// company on file — the SKU still has to be generated, so the token falls back to
+// the contact's last name.
+func TestWhiteLabelSKU_FallsBackWhenNoCompany(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newWhiteLabelService()
+	catalog := newCatalogService()
+
+	base, wsVariant, _ := baseCoffee(t, tx)
+	customer := approvedWholesaleCustomerNamed(t, tx, "")
+
+	product := submitLabel(t, tx, svc, customer, base.ID, "No Company Blend")
+	assert.Equal(t, "WL-LABEL-"+wsVariant.SKU, soleSKU(t, tx, catalog, product.ID))
 }

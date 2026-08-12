@@ -207,6 +207,17 @@ func (s *OrderService) TopProducts(ctx context.Context, tx pgx.Tx, from, to time
 	return rows, nil
 }
 
+// ListDeliveryLoad returns per-product unit and weight totals across the
+// orders matching the filter — the delivery load list's rollup. Read-only; no
+// audit record.
+func (s *OrderService) ListDeliveryLoad(ctx context.Context, tx pgx.Tx, f store.OrderFilter) ([]domain.DeliveryLoadLine, error) {
+	lines, err := s.orders.ListDeliveryLoad(ctx, tx, f)
+	if err != nil {
+		return nil, fmt.Errorf("list delivery load: %w", err)
+	}
+	return lines, nil
+}
+
 // ListLineItems returns all line items for an order.
 func (s *OrderService) ListLineItems(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) ([]domain.LineItem, error) {
 	items, err := s.orders.ListLineItems(ctx, tx, orderID)

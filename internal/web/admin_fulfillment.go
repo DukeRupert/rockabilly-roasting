@@ -42,7 +42,7 @@ var fulfillmentDeliveredStatuses = []domain.FulfillmentStatus{
 // queue, defaulting to "needs_action" when unrecognized or empty.
 func normalizeFulfillmentView(v string) string {
 	switch v {
-	case "needs_action", "ready_to_ship", "shipped", "delivered", "all":
+	case "needs_action", "ready_to_ship", "shipped", "delivered", "all", "load_list":
 		return v
 	default:
 		return "needs_action"
@@ -109,6 +109,15 @@ func (d *Deps) renderFulfillmentList(w http.ResponseWriter, r *http.Request, cha
 	}
 
 	view := normalizeFulfillmentView(r.URL.Query().Get("view"))
+
+	// The load list is a different shape of page — a rollup over the delivery
+	// queue rather than a page of order rows — so it gets its own render path
+	// instead of threading an unused filter/pagination pass.
+	if view == "load_list" {
+		d.renderFulfillmentLoadList(w, r, channel, basePath, title)
+		return
+	}
+
 	pageStr := r.URL.Query().Get("page")
 
 	page := 1

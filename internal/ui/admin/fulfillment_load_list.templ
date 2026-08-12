@@ -1,0 +1,504 @@
+package admin
+
+import (
+	"fmt"
+	"net/url"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+// LoadListProps drives the delivery load list — the pre-departure check that
+// answers "do I have enough of each coffee on the van?". Lines is the
+// per-product rollup; Orders is the roster those totals were computed from,
+// with Selected marking which ones are counted.
+type LoadListProps struct {
+	// BasePath is the owning fulfillment queue ("/admin/fulfillment" or
+	// "/admin/wholesale/fulfillment") so the tab strip and the totals/print
+	// endpoints stay on the right channel.
+	BasePath string
+	// Channel is the query-param form of the channel ("retail" / "wholesale"),
+	// forwarded to the totals fragment and print sheet so they scope the same
+	// way the page did.
+	Channel    string
+	Lines      []domain.DeliveryLoadLine
+	Orders     []LoadListOrder
+	MerchantTZ *time.Location
+	Now        time.Time
+}
+
+// LoadListOrder is one row of the roster under the totals: an order in the
+// delivery queue plus whether it's currently counted toward the load.
+type LoadListOrder struct {
+	OrderRow
+	Selected bool
+}
+
+// loadListTotalGrams sums the rollup — the single number a driver checks
+// against what's actually stacked in the van.
+func loadListTotalGrams(lines []domain.DeliveryLoadLine) int {
+	total := 0
+	for _, l := range lines {
+		total += l.WeightGrams
+	}
+	return total
+}
+
+// loadListTotalUnits sums bag counts across every product.
+func loadListTotalUnits(lines []domain.DeliveryLoadLine) int {
+	total := 0
+	for _, l := range lines {
+		total += l.Units
+	}
+	return total
+}
+
+// loadListMissingWeightUnits counts bags that contribute nothing to the pound
+// totals because their variant has no weight configured. Non-zero means the
+// displayed load is an undercount, which the sheet says out loud.
+func loadListMissingWeightUnits(lines []domain.DeliveryLoadLine) int {
+	total := 0
+	for _, l := range lines {
+		total += l.UnitsMissingWeight
+	}
+	return total
+}
+
+// loadListSelectedCount reports how many roster rows are counted.
+func loadListSelectedCount(orders []LoadListOrder) int {
+	n := 0
+	for _, o := range orders {
+		if o.Selected {
+			n++
+		}
+	}
+	return n
+}
+
+// formatLoadPounds renders a gram total as pounds. Mirrors the dashboard's
+// formatter: one decimal below 100 lb (a half-pound bag still reads
+// distinctly), whole pounds above it (nobody loads 142.3 lb by eye).
+func formatLoadPounds(grams int) string {
+	const gramsPerPound = 453.59237
+	lbs := float64(grams) / gramsPerPound
+	if lbs >= 100 {
+		return fmt.Sprintf("%.0f", lbs)
+	}
+	return fmt.Sprintf("%.1f", lbs)
+}
+
+// loadListTotalsHref is the htmx endpoint the totals panel re-fetches from
+// when staff check or uncheck a row. The channel rides along so the fragment
+// scopes to the same queue.
+func loadListTotalsHref(channel string) string {
+	v := url.Values{}
+	v.Set("channel", channel)
+	return "/admin/fulfillment/load-list/totals?" + v.Encode()
+}
+
+// loadListPrintAction is the form action for the printable sheet. The form is
+// a plain GET, so the checked rows serialize themselves as repeated ids
+// params — no JavaScript involved in carrying the selection across.
+func loadListPrintAction() string {
+	return "/admin/fulfillment/load-list/print"
+}
+
+// LoadListContent is the "Load list" tab body: totals on top for the go/no-go
+// check, the roster of delivery orders underneath for adjusting which ones
+// ride along.
+//
+// The whole tab is one GET form. Submitting it opens the print sheet with the
+// current selection; changing any checkbox re-fetches just the totals panel
+// over htmx. That keeps the server the only place load math happens — the
+// numbers a driver trusts are never computed in the browser.
+templ LoadListContent(props LoadListProps) {
+	<!-- hx-boost="false" is load-bearing: the admin layout boosts every form
+	     on the page, which would swallow this one's target="_blank" and swap
+	     the print sheet into the admin shell instead of opening a print tab. -->
+	<form
+		id="load-list-form"
+		method="get"
+		action={ templ.SafeURL(loadListPrintAction()) }
+		target="_blank"
+		hx-boost="false"
+	>
+		<input type="hidden" name="channel" value={ props.Channel }/>
+		<!-- scope=selection tells the handlers that the ids list is
+		     authoritative even when it's empty — otherwise "nothing checked"
+		     is indistinguishable from "form never submitted", and unchecking
+		     the last row would silently show the full load again. -->
+		<input type="hidden" name="scope" value="selection"/>
+		@LoadListTotals(props)
+		@loadListRoster(props)
+	</form>
+}
+
+// LoadListTotals is the per-product rollup, swapped in place over htmx when
+// the selection changes. Rendered standalone by the totals endpoint, so it
+// carries its own htmx attributes and re-arms itself on every swap.
+templ LoadListTotals(props LoadListProps) {
+	{{ totalGrams := loadListTotalGrams(props.Lines) }}
+	{{ missing := loadListMissingWeightUnits(props.Lines) }}
+	<div
+		id="load-list-totals"
+		hx-get={ loadListTotalsHref(props.Channel) }
+		hx-trigger="change from:#load-list-form"
+		hx-include="#load-list-form"
+		hx-target="this"
+		hx-swap="outerHTML"
+	>
+		<header class="flex flex-wrap items-end justify-between gap-3 mb-2">
+			<div>
+				<h2 class="text-rr-heading font-semibold tracking-wide uppercase text-sm">On board</h2>
+				<p class="mt-1 text-xs text-rr-muted">
+					Totals across
+					<span class="font-semibold text-rr-heading tabular-nums">{ fmt.Sprintf("%d", loadListSelectedCount(props.Orders)) }</span>
+					{ " " }
+					if loadListSelectedCount(props.Orders) == 1 {
+						delivery order.
+					} else {
+						delivery orders.
+					}
+					Check the coffee on the van against this before you pull out.
+				</p>
+			</div>
+			<button
+				type="submit"
+				title="Open a print-ready load sheet for the checked orders in a new tab."
+				class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+			>
+				Print load sheet
+			</button>
+		</header>
+		if len(props.Lines) == 0 {
+			<div class="border border-rr-border bg-rr-surface px-6 py-10 text-center">
+				<p class="text-sm text-rr-body">Nothing to load.</p>
+				<p class="mt-1 text-xs text-rr-muted">No delivery orders are checked, or none are waiting in this queue.</p>
+			</div>
+		} else {
+			<div class="overflow-hidden border border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Coffee</th>
+							<th scope="col" class="px-3 py-3.5 text-right text-sm font-semibold text-rr-heading">Bags</th>
+							<th scope="col" class="px-3 py-3.5 pr-4 text-right text-sm font-semibold text-rr-heading sm:pr-6">Pounds</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, line := range props.Lines {
+							<tr>
+								<td class="py-3 pl-4 pr-3 text-sm sm:pl-6">
+									<span class="font-semibold text-rr-heading">{ line.Title }</span>
+									if line.UnitsMissingWeight > 0 {
+										<span
+											class="badge badge-amber ml-2"
+											title="Some variants on this product have no weight set in the catalog, so their bags add nothing to the pound total."
+										>
+											{ fmt.Sprintf("%d bag(s) unweighed", line.UnitsMissingWeight) }
+										</span>
+									}
+								</td>
+								<td class="whitespace-nowrap px-3 py-3 text-right text-sm text-rr-body tabular-nums">
+									{ fmt.Sprintf("%d", line.Units) }
+								</td>
+								<td class="whitespace-nowrap px-3 py-3 pr-4 text-right text-sm font-semibold text-rr-heading tabular-nums sm:pr-6">
+									{ formatLoadPounds(line.WeightGrams) }
+								</td>
+							</tr>
+						}
+					</tbody>
+					<tfoot class="bg-rr-raised">
+						<tr>
+							<td class="py-3 pl-4 pr-3 text-sm font-semibold uppercase tracking-wide text-rr-heading sm:pl-6">Total</td>
+							<td class="whitespace-nowrap px-3 py-3 text-right text-sm font-semibold text-rr-heading tabular-nums">
+								{ fmt.Sprintf("%d", loadListTotalUnits(props.Lines)) }
+							</td>
+							<td class="whitespace-nowrap px-3 py-3 pr-4 text-right text-base font-semibold text-rr-heading tabular-nums sm:pr-6">
+								{ formatLoadPounds(totalGrams) } lb
+							</td>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+			if missing > 0 {
+				<p class="mt-2 text-xs text-rr-red">
+					{ fmt.Sprintf("%d bag(s)", missing) } have no weight set in the catalog and are not counted in the pound totals — the real load is heavier than shown.
+				</p>
+			}
+		}
+	</div>
+}
+
+// loadListRoster is the per-order checklist under the totals. Everything in
+// the delivery queue starts checked; unchecking is the escape hatch for the
+// outlier that isn't riding along today (a hold, a reschedule, a second run).
+templ loadListRoster(props LoadListProps) {
+	<section class="mt-8" x-data="{}">
+		<header class="flex flex-wrap items-end justify-between gap-3 mb-2">
+			<div class="flex items-baseline gap-3">
+				<h2 class="text-rr-heading font-semibold tracking-wide uppercase text-sm">Orders on this run</h2>
+				<span class="text-xs text-rr-muted tabular-nums">{ fmt.Sprintf("%d", len(props.Orders)) }</span>
+			</div>
+			<p class="text-xs text-rr-muted">Uncheck anything that isn't going out today — the totals follow.</p>
+		</header>
+		if len(props.Orders) == 0 {
+			<div class="border border-rr-border bg-rr-surface px-6 py-10 text-center">
+				<p class="text-sm text-rr-body">No local delivery orders are waiting.</p>
+			</div>
+		} else {
+			<div class="overflow-hidden border border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="relative w-10 px-3 py-3.5 sm:pl-6">
+								<input
+									type="checkbox"
+									aria-label="Select all delivery orders"
+									class="size-4 cursor-pointer accent-rr-red"
+									checked?={ loadListSelectedCount(props.Orders) == len(props.Orders) }
+									@change="$el.closest('table').querySelectorAll('tbody input[type=checkbox]').forEach(c => c.checked = $el.checked); $el.closest('form').dispatchEvent(new Event('change', {bubbles: true}))"
+								/>
+							</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">Order</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">State</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Placed</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, row := range props.Orders {
+							@loadListRosterRow(row, props)
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</section>
+}
+
+templ loadListRosterRow(row LoadListOrder, props LoadListProps) {
+	{{ stale := orderIsStale(row.Order, props.Now) }}
+	<tr class={ "row-link", templ.KV("row-link-stale", stale) }>
+		<td class="relative z-10 w-10 px-3 py-4 sm:pl-6" @click.stop>
+			<input
+				type="checkbox"
+				name="ids"
+				aria-label={ fmt.Sprintf("Include order %s in the load", row.Order.Number) }
+				class="size-4 cursor-pointer accent-rr-red"
+				value={ row.Order.ID.String() }
+				checked?={ row.Selected }
+				@click.stop
+			/>
+		</td>
+		<td class="py-4 pl-4 pr-3 text-sm">
+			<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) } class="row-link-target block">
+				<div class="flex items-baseline gap-2 leading-none">
+					<span class="font-bold text-rr-heading tabular-nums tracking-wide uppercase" style="font-size:0.95rem;">{ row.Order.Number }</span>
+					if row.AccountType == domain.AccountTypeWholesale {
+						<span class="label-font text-[#0A5E5C]" title="Wholesale customer">Wholesale</span>
+					}
+				</div>
+				<div class="mt-1.5 text-sm text-rr-body">{ row.CustomerName }</div>
+			</a>
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm">
+			<div class="flex flex-wrap items-center gap-1.5">
+				@FulfillmentStatusBadge(row.Order.FulfillmentStatus)
+				if row.AccountPastDue {
+					<span class="badge badge-pastdue" title="This account has invoices past terms — hold fulfillment until it's current.">Account past due</span>
+				}
+			</div>
+		</td>
+		<td class={ "hidden whitespace-nowrap px-3 py-4 text-sm tabular-nums md:table-cell", templ.KV("text-rr-red font-semibold", stale), templ.KV("text-rr-muted", !stale) }>
+			{ relativeOrderDate(row.Order.PlacedAt, props.MerchantTZ, props.Now) }
+		</td>
+	</tr>
+}
+
+// LoadListPrintProps is the input for the standalone printable load sheet.
+// Everything is resolved by the handler; the document does no data loading.
+type LoadListPrintProps struct {
+	Lines      []domain.DeliveryLoadLine
+	Orders     []LoadListOrder
+	ChannelLbl string // "Retail" / "Wholesale", shown in the masthead
+	Printed    time.Time
+	MerchantTZ *time.Location
+}
+
+// loadListPrintDate renders the sheet's timestamp in the merchant's timezone —
+// a load sheet is only meaningful for the run it was printed for.
+func loadListPrintDate(t time.Time, tz *time.Location) string {
+	if tz == nil {
+		tz = time.UTC
+	}
+	return t.In(tz).Format("Mon Jan 2, 2006 · 3:04 PM")
+}
+
+// LoadListPrint is the driver's paper copy: the same per-product pound totals
+// as the tab, plus the order roster they cover, laid out for a printed page
+// and firing the print dialog on load. Standalone document — it uses the
+// storefront paper-and-ink palette directly rather than the admin token layer,
+// matching how packing slips and invoices print.
+templ LoadListPrint(props LoadListPrintProps) {
+	{{ totalGrams := loadListTotalGrams(props.Lines) }}
+	{{ missing := loadListMissingWeightUnits(props.Lines) }}
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Delivery Load Sheet</title>
+			<style>
+				* { margin: 0; padding: 0; box-sizing: border-box; }
+				:root {
+					--paper: #F6EFE1;
+					--ink: #0E0D0C;
+					--rust: #B4351D;
+					--muted: #6B6258;
+				}
+				body {
+					font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+					font-size: 12px;
+					line-height: 1.55;
+					color: var(--ink);
+					background: var(--paper);
+					padding: 32px 36px;
+				}
+				.sheet { max-width: 780px; margin: 0 auto; }
+				.masthead {
+					display: flex;
+					justify-content: space-between;
+					align-items: flex-start;
+					border-bottom: 3px solid var(--ink);
+					padding-bottom: 16px;
+					margin-bottom: 20px;
+					gap: 24px;
+				}
+				.masthead h1 { font-size: 20px; letter-spacing: 0.06em; text-transform: uppercase; }
+				.masthead .meta { text-align: right; color: var(--muted); font-size: 11px; }
+				h2 {
+					font-size: 11px;
+					letter-spacing: 0.09em;
+					text-transform: uppercase;
+					color: var(--muted);
+					margin-bottom: 6px;
+				}
+				table { width: 100%; border-collapse: collapse; }
+				th, td { padding: 7px 8px; text-align: left; }
+				thead th {
+					border-bottom: 2px solid var(--ink);
+					font-size: 10px;
+					letter-spacing: 0.08em;
+					text-transform: uppercase;
+				}
+				tbody td { border-bottom: 1px solid rgba(14,13,12,0.15); }
+				.num { text-align: right; font-variant-numeric: tabular-nums; }
+				.lbs { font-weight: 700; font-size: 14px; }
+				/* The grand total is the number the whole sheet exists for —
+				   it gets the heavy rule and the largest type on the page. */
+				tfoot td {
+					border-top: 2px solid var(--ink);
+					font-weight: 700;
+					padding-top: 10px;
+				}
+				tfoot .grand { font-size: 17px; }
+				.note { margin-top: 8px; font-size: 11px; color: var(--rust); }
+				.roster { margin-top: 28px; }
+				.roster td { font-size: 11px; }
+				.tick {
+					display: inline-block;
+					width: 12px;
+					height: 12px;
+					border: 1.5px solid var(--ink);
+				}
+				.empty { padding: 24px 0; color: var(--muted); }
+				@media print {
+					body { padding: 0; background: #fff; }
+					.roster { page-break-inside: auto; }
+				}
+			</style>
+		</head>
+		<body onload="window.print()">
+			<div class="sheet">
+				<div class="masthead">
+					<div>
+						<h1>Delivery Load Sheet</h1>
+						<div style="color: var(--muted); font-size: 11px;">Rockabilly Roasting Co.</div>
+					</div>
+					<div class="meta">
+						<div>{ loadListPrintDate(props.Printed, props.MerchantTZ) }</div>
+						<div>{ props.ChannelLbl } &middot; { fmt.Sprintf("%d order(s)", len(props.Orders)) }</div>
+					</div>
+				</div>
+				<h2>Coffee on board</h2>
+				if len(props.Lines) == 0 {
+					<p class="empty">No orders selected &mdash; nothing to load.</p>
+				} else {
+					<table>
+						<thead>
+							<tr>
+								<th style="width: 24px;"></th>
+								<th>Coffee</th>
+								<th class="num">Bags</th>
+								<th class="num">Pounds</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, line := range props.Lines {
+								<tr>
+									<td><span class="tick"></span></td>
+									<td>
+										{ line.Title }
+										if line.UnitsMissingWeight > 0 {
+											<span style="color: var(--rust);">
+												&nbsp;({ fmt.Sprintf("%d unweighed", line.UnitsMissingWeight) })
+											</span>
+										}
+									</td>
+									<td class="num">{ fmt.Sprintf("%d", line.Units) }</td>
+									<td class="num lbs">{ formatLoadPounds(line.WeightGrams) }</td>
+								</tr>
+							}
+						</tbody>
+						<tfoot>
+							<tr>
+								<td></td>
+								<td>Total</td>
+								<td class="num">{ fmt.Sprintf("%d", loadListTotalUnits(props.Lines)) }</td>
+								<td class="num grand">{ formatLoadPounds(totalGrams) } lb</td>
+							</tr>
+						</tfoot>
+					</table>
+					if missing > 0 {
+						<p class="note">
+							{ fmt.Sprintf("%d bag(s)", missing) } have no weight in the catalog and are not in the pound totals &mdash; the real load is heavier than shown.
+						</p>
+					}
+				}
+				if len(props.Orders) > 0 {
+					<div class="roster">
+						<h2>Stops</h2>
+						<table>
+							<thead>
+								<tr>
+									<th style="width: 24px;"></th>
+									<th>Order</th>
+									<th>Customer</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, o := range props.Orders {
+									<tr>
+										<td><span class="tick"></span></td>
+										<td>{ o.Order.Number }</td>
+										<td>{ o.CustomerName }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			</div>
+		</body>
+	</html>
+}

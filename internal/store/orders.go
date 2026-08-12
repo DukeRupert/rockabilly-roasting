@@ -273,7 +273,16 @@ type OrderFilter struct {
 	PaymentStatuses     []domain.PaymentStatus     // IN filter; empty = no constraint
 	// Channel narrows to a single sales channel (retail / wholesale). Nil leaves
 	// the channel unconstrained — dashboards and revenue counts span both.
-	Channel    *domain.OrderChannel
+	Channel *domain.OrderChannel
+	// ShippingMethod narrows to a single fulfillment method (shipped / local
+	// delivery / pickup). Nil leaves it unconstrained. Orders with no method
+	// set never match a non-nil filter.
+	ShippingMethod *domain.ShippingMethod
+	// OrderIDs restricts the result to an explicit set of orders. Empty leaves
+	// the set unconstrained; a non-empty list is ANDed with every other filter
+	// (it narrows, it does not widen). Used by the delivery load list when
+	// staff hand-pick which orders ride along.
+	OrderIDs   []uuid.UUID
 	CustomerID *uuid.UUID
 	PlacedFrom          *time.Time
 	PlacedTo            *time.Time
@@ -355,6 +364,23 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 			}
 			query += fmt.Sprintf("$%d", argN)
 			args = append(args, string(s))
+			argN++
+		}
+		query += ")"
+	}
+	if f.ShippingMethod != nil {
+		query += fmt.Sprintf(" AND shipping_method = $%d", argN)
+		args = append(args, string(*f.ShippingMethod))
+		argN++
+	}
+	if len(f.OrderIDs) > 0 {
+		query += " AND id IN ("
+		for i, id := range f.OrderIDs {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, id)
 			argN++
 		}
 		query += ")"
@@ -502,6 +528,23 @@ func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) 
 		}
 		query += ")"
 	}
+	if f.ShippingMethod != nil {
+		query += fmt.Sprintf(" AND shipping_method = $%d", argN)
+		args = append(args, string(*f.ShippingMethod))
+		argN++
+	}
+	if len(f.OrderIDs) > 0 {
+		query += " AND id IN ("
+		for i, id := range f.OrderIDs {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, id)
+			argN++
+		}
+		query += ")"
+	}
 	if f.CustomerID != nil {
 		query += fmt.Sprintf(" AND customer_id = $%d", argN)
 		args = append(args, *f.CustomerID)
@@ -591,12 +634,15 @@ func (s *OrderStore) CountOrdersByView(ctx context.Context, tx pgx.Tx, search st
 //   - Shipped    = shipped + partially_shipped
 //   - Delivered  = delivered + partially_delivered
 //   - All        = every order excluding unconfirmed
+//   - LoadList   = the NeedsAction bucket narrowed to local delivery — the
+//     orders a driver would be loading for the next run
 type FulfillmentViewCounts struct {
 	NeedsAction int
 	ReadyToShip int
 	Shipped     int
 	Delivered   int
 	All         int
+	LoadList    int
 }
 
 // CountFulfillmentViews returns counts for every tab on the admin fulfillment
@@ -614,7 +660,8 @@ func (s *OrderStore) CountFulfillmentViews(ctx context.Context, tx pgx.Tx, chann
 		COUNT(*) FILTER (WHERE fulfillment_status = 'fulfilled' AND status NOT IN ('cancelled', 'refunded'))                                                              AS ready_to_ship,
 		COUNT(*) FILTER (WHERE fulfillment_status IN ('shipped', 'partially_shipped'))                                                                                    AS shipped,
 		COUNT(*) FILTER (WHERE fulfillment_status IN ('delivered', 'partially_delivered'))                                                                                AS delivered,
-		COUNT(*)                                                                                                                                                          AS total
+		COUNT(*)                                                                                                                                                          AS total,
+		COUNT(*) FILTER (WHERE fulfillment_status IN ('unfulfilled', 'partially_fulfilled', 'fulfilled', 'ready_for_pickup') AND status NOT IN ('cancelled', 'refunded') AND shipping_method = 'local_delivery') AS load_list
 	FROM orders
 	WHERE NOT (status = 'pending' AND payment_status = 'awaiting')`
 	args := []any{}
@@ -625,7 +672,7 @@ func (s *OrderStore) CountFulfillmentViews(ctx context.Context, tx pgx.Tx, chann
 		args = append(args, string(*channel))
 	}
 	var c FulfillmentViewCounts
-	if err := tx.QueryRow(ctx, query, args...).Scan(&c.NeedsAction, &c.ReadyToShip, &c.Shipped, &c.Delivered, &c.All); err != nil {
+	if err := tx.QueryRow(ctx, query, args...).Scan(&c.NeedsAction, &c.ReadyToShip, &c.Shipped, &c.Delivered, &c.All, &c.LoadList); err != nil {
 		return FulfillmentViewCounts{}, fmt.Errorf("count fulfillment views: %w", err)
 	}
 	return c, nil
@@ -864,6 +911,94 @@ func (s *OrderStore) TopProducts(ctx context.Context, tx pgx.Tx, from, to time.T
 		ps.WeightGrams = int(weight)
 		ps.Revenue = int(revenue)
 		out = append(out, ps)
+	}
+	return out, rows.Err()
+}
+
+// ListDeliveryLoad returns per-product totals across the orders matching the
+// filter — the "how many pounds of each coffee go on the van" rollup behind
+// the fulfillment queue's load list.
+//
+// Only the filter fields that make sense for a load-out are honoured
+// (Channel, ShippingMethod, FulfillmentStatuses, OrderIDs); the rest are
+// ignored because a driver's manifest has no use for search or pagination.
+// Cancelled, refunded, and unconfirmed orders are always excluded — the same
+// exclusions the fulfillment queue itself applies, so the manifest and the
+// rows it summarises never disagree.
+//
+// Rows are ordered heaviest-first so the coffees that dominate the load sort
+// to the top of the sheet, with title as the tiebreak for a stable order.
+func (s *OrderStore) ListDeliveryLoad(ctx context.Context, tx pgx.Tx, f OrderFilter) (_ []domain.DeliveryLoadLine, err error) {
+	defer trackQuery(s.metrics, "orders.delivery_load", time.Now(), &err)
+	query := `
+		SELECT p.id, p.title,
+		       COALESCE(SUM(li.quantity), 0)::int                               AS units,
+		       COALESCE(SUM(li.quantity * COALESCE(v.weight_grams, 0)), 0)::int AS weight_grams,
+		       COALESCE(SUM(li.quantity) FILTER (WHERE v.weight_grams IS NULL), 0)::int AS units_missing_weight
+		FROM line_items li
+		JOIN orders   o ON o.id = li.order_id
+		JOIN variants v ON v.id = li.variant_id
+		JOIN products p ON p.id = v.product_id
+		WHERE o.status NOT IN ('cancelled', 'refunded')
+		  AND NOT (o.status = 'pending' AND o.payment_status = 'awaiting')`
+	args := []any{}
+	argN := 1
+
+	if f.Channel != nil {
+		query += fmt.Sprintf(" AND o.channel = $%d", argN)
+		args = append(args, string(*f.Channel))
+		argN++
+	}
+	if f.ShippingMethod != nil {
+		query += fmt.Sprintf(" AND o.shipping_method = $%d", argN)
+		args = append(args, string(*f.ShippingMethod))
+		argN++
+	}
+	if len(f.FulfillmentStatuses) > 0 {
+		query += " AND o.fulfillment_status IN ("
+		for i, st := range f.FulfillmentStatuses {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, string(st))
+			argN++
+		}
+		query += ")"
+	}
+	if len(f.OrderIDs) > 0 {
+		query += " AND o.id IN ("
+		for i, id := range f.OrderIDs {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, id)
+			argN++
+		}
+		query += ")"
+	}
+	query += `
+		GROUP BY p.id, p.title
+		ORDER BY weight_grams DESC, units DESC, p.title ASC`
+
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list delivery load: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.DeliveryLoadLine
+	for rows.Next() {
+		var l domain.DeliveryLoadLine
+		var units, weight, missing int32
+		if err := rows.Scan(&l.ProductID, &l.Title, &units, &weight, &missing); err != nil {
+			return nil, fmt.Errorf("scan delivery load: %w", err)
+		}
+		l.Units = int(units)
+		l.WeightGrams = int(weight)
+		l.UnitsMissingWeight = int(missing)
+		out = append(out, l)
 	}
 	return out, rows.Err()
 }

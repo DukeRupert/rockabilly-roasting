@@ -177,6 +177,24 @@ type ProductSales struct {
 	Revenue     int
 }
 
+// DeliveryLoadLine is one product's total across a set of local-delivery
+// orders — how much of that coffee has to be on the van before it leaves.
+// Units is the bag count; WeightGrams is quantity × variant weight summed
+// across every matching line item.
+//
+// UnitsMissingWeight counts the bags whose variant has no weight_grams
+// configured. Those contribute nothing to WeightGrams, so the load list
+// surfaces the count rather than quietly under-reporting the load — a driver
+// trusting a short total is exactly the failure this feature exists to
+// prevent.
+type DeliveryLoadLine struct {
+	ProductID          uuid.UUID
+	Title              string
+	Units              int
+	WeightGrams        int
+	UnitsMissingWeight int
+}
+
 // Adjustment represents an order-level or line-item-level adjustment.
 type Adjustment struct {
 	ID         uuid.UUID

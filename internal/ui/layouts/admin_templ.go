@@ -126,6 +126,11 @@ func navIconColor(active bool) string {
 // the badge exists to prevent.
 //
 // It always renders, count or not, so there is something for htmx to swap.
+//
+// hx-target="this" is load-bearing: <body> carries hx-target="#main-content"
+// for hx-boost, and hx-target inherits. Without the explicit override the poll
+// swapped its own tiny fragment over the entire main-content div, blanking the
+// page (and destroying the boost target) after the first tick.
 // Exported because web serves it as a standalone fragment at /admin/nav-badges.
 func CatalogNavBadge(count int) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -148,7 +153,7 @@ func CatalogNavBadge(count int) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<span id=\"nav-badge-white-label\" hx-get=\"/admin/nav-badges\" hx-trigger=\"every 60s\" hx-swap=\"outerHTML\" class=\"ml-auto\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<span id=\"nav-badge-white-label\" hx-get=\"/admin/nav-badges\" hx-trigger=\"every 60s\" hx-target=\"this\" hx-swap=\"outerHTML\" class=\"ml-auto\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -160,7 +165,7 @@ func CatalogNavBadge(count int) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d white-label submission%s awaiting review", count, pluralSuffix(count)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 134, Col: 98}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 140, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 			if templ_7745c5c3_Err != nil {
@@ -173,7 +178,7 @@ func CatalogNavBadge(count int) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", count))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 136, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 142, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -235,7 +240,7 @@ func adminNav(activePath string) templ.Component {
 			var templ_7745c5c3_Var6 templ.SafeURL
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(item.Href))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 148, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 154, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -248,7 +253,7 @@ func adminNav(activePath string) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 148, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 154, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 			if templ_7745c5c3_Err != nil {
@@ -282,7 +287,7 @@ func adminNav(activePath string) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(item.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 150, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 156, Col: 83}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -339,7 +344,7 @@ func Admin(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(props.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 167, Col: 23}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 173, Col: 23}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -543,7 +548,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(staffInitials(props.StaffName))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 680, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 686, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -556,7 +561,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 683, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 689, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -569,7 +574,7 @@ func adminUserFooter(props AdminProps) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(props.StaffRole)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 684, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/layouts/admin.templ`, Line: 690, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {

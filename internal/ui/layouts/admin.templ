@@ -118,12 +118,18 @@ func navIconColor(active bool) string {
 // the badge exists to prevent.
 //
 // It always renders, count or not, so there is something for htmx to swap.
+//
+// hx-target="this" is load-bearing: <body> carries hx-target="#main-content"
+// for hx-boost, and hx-target inherits. Without the explicit override the poll
+// swapped its own tiny fragment over the entire main-content div, blanking the
+// page (and destroying the boost target) after the first tick.
 // Exported because web serves it as a standalone fragment at /admin/nav-badges.
 templ CatalogNavBadge(count int) {
 	<span
 		id="nav-badge-white-label"
 		hx-get="/admin/nav-badges"
 		hx-trigger="every 60s"
+		hx-target="this"
 		hx-swap="outerHTML"
 		class="ml-auto"
 	>

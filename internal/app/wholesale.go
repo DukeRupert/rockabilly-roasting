@@ -33,6 +33,20 @@ type WholesaleService struct {
 	// unsubscribe signs the opt-out links in the weekly reminder. Never nil —
 	// an unconfigured signer reports Enabled() false and the link is omitted.
 	unsubscribe *auth.UnsubscribeSigner
+
+	// shipping + merchantTZ resolve the local-delivery run a wholesale order
+	// rides. Both are optional: without them a wholesale local-delivery order
+	// is placed with no promised date, exactly as before.
+	shipping   *store.ShippingStore
+	merchantTZ *time.Location
+}
+
+// WithDeliverySchedule attaches what PlaceWholesaleOrder needs to stamp a
+// local-delivery date on the order.
+func (s *WholesaleService) WithDeliverySchedule(shipping *store.ShippingStore, loc *time.Location) *WholesaleService {
+	s.shipping = shipping
+	s.merchantTZ = loc
+	return s
 }
 
 // NewWholesaleService creates a new WholesaleService.
@@ -507,24 +521,28 @@ func (s *WholesaleService) PlaceWholesaleOrder(ctx context.Context, tx pgx.Tx, p
 	orderNumber := fmt.Sprintf("WO-%d", time.Now().UnixMilli())
 	customerID := p.CustomerID
 
+	placedAt := time.Now()
+	scheduledDelivery := scheduleLocalDelivery(ctx, tx, s.shipping, p.ShippingMethod, placedAt, s.merchantTZ)
+
 	order, err := s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
-		Number:            orderNumber,
-		CustomerID:        &customerID,
-		Channel:           domain.OrderChannelWholesale,
-		Status:            domain.OrderStatusConfirmed,
-		PaymentStatus:     domain.PaymentStatusPendingInvoice,
-		FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
-		CurrencyCode:      p.CurrencyCode,
-		Subtotal:          subtotal,
-		ShippingTotal:     p.ShippingCents,
-		TaxTotal:          p.TaxCents,
-		Total:             total,
-		ShippingAddressID: p.ShippingAddressID,
-		BillingAddressID:  p.BillingAddressID,
-		ShippingMethod:    p.ShippingMethod,
-		Notes:             p.Notes,
-		Metadata:          p.Metadata,
-		PlacedAt:          time.Now(),
+		Number:                orderNumber,
+		CustomerID:            &customerID,
+		Channel:               domain.OrderChannelWholesale,
+		Status:                domain.OrderStatusConfirmed,
+		PaymentStatus:         domain.PaymentStatusPendingInvoice,
+		FulfillmentStatus:     domain.FulfillmentStatusUnfulfilled,
+		CurrencyCode:          p.CurrencyCode,
+		Subtotal:              subtotal,
+		ShippingTotal:         p.ShippingCents,
+		TaxTotal:              p.TaxCents,
+		Total:                 total,
+		ShippingAddressID:     p.ShippingAddressID,
+		BillingAddressID:      p.BillingAddressID,
+		ShippingMethod:        p.ShippingMethod,
+		ScheduledDeliveryDate: scheduledDelivery,
+		Notes:                 p.Notes,
+		Metadata:              p.Metadata,
+		PlacedAt:              placedAt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create wholesale order: %w", err)

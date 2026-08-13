@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -62,7 +63,8 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 			LocalDeliveryEnabled:    cfg.LocalDeliveryEnabled,
 			LocalPickupEnabled:      cfg.LocalPickupEnabled,
 			LocalPickupInstructions: cfg.LocalPickupInstructions,
-			LocalDeliveryDays:       cfg.LocalDeliveryDays,
+			LocalDeliveryWeekdays:   cfg.LocalDeliveryWeekdays,
+			LocalDeliveryCutoff:     formatCutoffInput(cfg.LocalDeliveryCutoffMinutes),
 			OriginName:              cfg.OriginName,
 			OriginStreet1:           cfg.OriginStreet1,
 			OriginStreet2:           cfg.OriginStreet2,
@@ -141,25 +143,40 @@ func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.
 		originCountry = "US"
 	}
 
+	cutoffMinutes, err := parseCutoffInput(r.FormValue("local_delivery_cutoff"))
+	if err != nil {
+		http.Redirect(w, r, "/admin/settings?flash=Invalid+delivery+cutoff+time", http.StatusSeeOther)
+		return
+	}
+	weekdays := parseWeekdayCheckboxes(r.Form["local_delivery_weekdays"])
+	// A delivery schedule with no days is unschedulable: checkout and the
+	// confirmation email would silently drop back to vague phrasing with no
+	// hint as to why. Refuse it rather than let the route quietly go dark.
+	if r.FormValue("local_delivery_enabled") != "" && len(weekdays) == 0 {
+		http.Redirect(w, r, "/admin/settings?flash=Pick+at+least+one+local+delivery+day", http.StatusSeeOther)
+		return
+	}
+
 	cfg := domain.ShippingConfig{
-		FlatRateCents:           flatRateCents,
-		FreeShippingThreshold:   threshold,
-		Currency:                "usd",
-		LocalZipCodes:           zips,
-		LocalDeliveryEnabled:    r.FormValue("local_delivery_enabled") != "",
-		LocalPickupEnabled:      r.FormValue("local_pickup_enabled") != "",
-		LocalPickupInstructions: strings.TrimSpace(r.FormValue("local_pickup_instructions")),
-		LocalDeliveryDays:       strings.TrimSpace(r.FormValue("local_delivery_days")),
-		OriginName:              strings.TrimSpace(r.FormValue("origin_name")),
-		OriginStreet1:           strings.TrimSpace(r.FormValue("origin_street1")),
-		OriginStreet2:           strings.TrimSpace(r.FormValue("origin_street2")),
-		OriginCity:              strings.TrimSpace(r.FormValue("origin_city")),
-		OriginState:             strings.ToUpper(strings.TrimSpace(r.FormValue("origin_state"))),
-		OriginZip:               strings.TrimSpace(r.FormValue("origin_zip")),
-		OriginCountry:           originCountry,
-		OriginEmail:             strings.TrimSpace(r.FormValue("origin_email")),
-		OriginPhone:             strings.TrimSpace(r.FormValue("origin_phone")),
-		TareWeightOz:            tareOz,
+		FlatRateCents:              flatRateCents,
+		FreeShippingThreshold:      threshold,
+		Currency:                   "usd",
+		LocalZipCodes:              zips,
+		LocalDeliveryEnabled:       r.FormValue("local_delivery_enabled") != "",
+		LocalPickupEnabled:         r.FormValue("local_pickup_enabled") != "",
+		LocalPickupInstructions:    strings.TrimSpace(r.FormValue("local_pickup_instructions")),
+		LocalDeliveryWeekdays:      weekdays,
+		LocalDeliveryCutoffMinutes: cutoffMinutes,
+		OriginName:                 strings.TrimSpace(r.FormValue("origin_name")),
+		OriginStreet1:              strings.TrimSpace(r.FormValue("origin_street1")),
+		OriginStreet2:              strings.TrimSpace(r.FormValue("origin_street2")),
+		OriginCity:                 strings.TrimSpace(r.FormValue("origin_city")),
+		OriginState:                strings.ToUpper(strings.TrimSpace(r.FormValue("origin_state"))),
+		OriginZip:                  strings.TrimSpace(r.FormValue("origin_zip")),
+		OriginCountry:              originCountry,
+		OriginEmail:                strings.TrimSpace(r.FormValue("origin_email")),
+		OriginPhone:                strings.TrimSpace(r.FormValue("origin_phone")),
+		TareWeightOz:               tareOz,
 	}
 
 	actor := staffActor(r)
@@ -220,6 +237,60 @@ func parseDollarsCents(raw string) (int, error) {
 		return 0, fmt.Errorf("negative amount")
 	}
 	return int(dollars*100 + 0.5), nil
+}
+
+// parseCutoffInput converts an <input type="time"> value ("09:00") into minutes
+// past midnight. An empty value means the browser sent nothing — fall back to
+// 9am rather than midnight, which would silently push every same-day order to
+// the following run.
+func parseCutoffInput(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return defaultCutoffMinutes, nil
+	}
+	// Some browsers append seconds ("09:00:00") when the input has a step.
+	t, err := time.Parse("15:04:05", raw)
+	if err != nil {
+		t, err = time.Parse("15:04", raw)
+		if err != nil {
+			return 0, fmt.Errorf("parse cutoff %q: %w", raw, err)
+		}
+	}
+	return t.Hour()*60 + t.Minute(), nil
+}
+
+// formatCutoffInput renders minutes past midnight back into the "09:00" form an
+// <input type="time"> expects.
+func formatCutoffInput(minutes int) string {
+	if minutes < 0 || minutes > 1439 {
+		minutes = defaultCutoffMinutes
+	}
+	return fmt.Sprintf("%02d:%02d", minutes/60, minutes%60)
+}
+
+// defaultCutoffMinutes mirrors the column default in migration 064 (9:00am).
+const defaultCutoffMinutes = 9 * 60
+
+// parseWeekdayCheckboxes converts the submitted weekday checkbox values into
+// time.Weekday. Values are Go weekday numbers ("0".."6") as rendered by the
+// form; anything out of range is dropped rather than rejected, so a hand-crafted
+// POST cannot store a weekday the schedule search will never match.
+func parseWeekdayCheckboxes(raw []string) []time.Weekday {
+	out := make([]time.Weekday, 0, len(raw))
+	seen := map[time.Weekday]bool{}
+	for _, v := range raw {
+		n, err := strconv.Atoi(strings.TrimSpace(v))
+		if err != nil || n < 0 || n > 6 {
+			continue
+		}
+		day := time.Weekday(n)
+		if seen[day] {
+			continue
+		}
+		seen[day] = true
+		out = append(out, day)
+	}
+	return out
 }
 
 // parseZipList splits a free-form user-entered list of zips on any of ",",

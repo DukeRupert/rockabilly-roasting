@@ -73,7 +73,7 @@ func (d *Deps) fillLocalFulfillmentPrefs(ctx context.Context, customerID uuid.UU
 		props.ShowLocalFulfillment = true
 		props.LocalDeliveryEnabled = cfg.LocalDeliveryEnabled
 		props.LocalPickupEnabled = cfg.LocalPickupEnabled
-		props.LocalDeliveryDays = cfg.LocalDeliveryDays
+		props.LocalDeliveryDays = cfg.DeliveryDaysLabel()
 		props.LocalPickupNote = cfg.LocalPickupInstructions
 		return nil
 	}) // best-effort; if it fails the section just doesn't render

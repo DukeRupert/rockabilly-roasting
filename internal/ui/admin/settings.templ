@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"github.com/google/uuid"
@@ -28,8 +29,13 @@ type ShippingSettings struct {
 	LocalDeliveryEnabled    bool
 	LocalPickupEnabled      bool
 	LocalPickupInstructions string
-	LocalDeliveryDays       string
-	OriginName              string
+	// LocalDeliveryWeekdays are the days the van runs, and LocalDeliveryCutoff
+	// the order-by time as an <input type="time"> value ("09:00"). Together
+	// they drive the delivery date quoted at checkout and in the confirmation
+	// email — this is a live scheduling rule, not display copy.
+	LocalDeliveryWeekdays []time.Weekday
+	LocalDeliveryCutoff   string
+	OriginName            string
 	OriginStreet1           string
 	OriginStreet2           string
 	OriginCity              string
@@ -45,6 +51,46 @@ type ShippingSettings struct {
 // zeros are kept (so 0 → "0.00") for consistency with the dollar inputs.
 func formatTareOz(oz float64) string {
 	return fmt.Sprintf("%.2f", oz)
+}
+
+// weekdayOrder lists the week Sunday-first for the delivery-day checkboxes, so
+// the row reads in calendar order however the days were stored.
+func weekdayOrder() []time.Weekday {
+	return []time.Weekday{
+		time.Sunday, time.Monday, time.Tuesday, time.Wednesday,
+		time.Thursday, time.Friday, time.Saturday,
+	}
+}
+
+// weekdayValue renders a weekday as its Go numeric form for the checkbox value.
+// The handler parses it back with the same numbering.
+func weekdayValue(d time.Weekday) string {
+	return strconv.Itoa(int(d))
+}
+
+// hasWeekday reports whether a day is in the configured delivery schedule.
+func hasWeekday(days []time.Weekday, day time.Weekday) bool {
+	for _, d := range days {
+		if d == day {
+			return true
+		}
+	}
+	return false
+}
+
+// deliveryScheduleSummary echoes the saved schedule back in the exact wording
+// customers see, so staff can confirm the rule reads the way they meant without
+// opening a storefront tab.
+func deliveryScheduleSummary(s ShippingSettings) string {
+	cfg := domain.ShippingConfig{LocalDeliveryWeekdays: s.LocalDeliveryWeekdays}
+	label := cfg.DeliveryDaysLabel()
+	if label == "" {
+		return ""
+	}
+	if s.LocalDeliveryCutoff == "" {
+		return "Out for delivery on " + label + "."
+	}
+	return "Out for delivery on " + label + ", order by " + s.LocalDeliveryCutoff + "."
 }
 
 type SettingsProps struct {
@@ -205,17 +251,46 @@ templ SettingsContent(props SettingsProps) {
 								<span class="block text-xs text-rr-muted">Customer's order is hand-delivered on the configured days.</span>
 							</span>
 						</label>
-						<div class="ml-7 sm:max-w-md">
-							<label for="local-delivery-days" class="block text-sm font-medium text-rr-heading">Delivery days (display string)</label>
-							<input
-								id="local-delivery-days"
-								type="text"
-								name="local_delivery_days"
-								value={ props.Shipping.LocalDeliveryDays }
-								placeholder="Mondays and Thursdays"
-								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-							/>
-							<p class="mt-1 text-xs text-rr-muted">Shown to the customer on receipts and "out for delivery" emails. Cosmetic — staff still chooses when to dispatch.</p>
+						<div class="ml-7 space-y-3">
+							<div>
+								<span class="block text-sm font-medium text-rr-heading">Delivery days</span>
+								<div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-2">
+									for _, day := range weekdayOrder() {
+										<label class="flex items-center gap-2">
+											<input
+												type="checkbox"
+												name="local_delivery_weekdays"
+												value={ weekdayValue(day) }
+												checked?={ hasWeekday(props.Shipping.LocalDeliveryWeekdays, day) }
+												class="size-4 rounded-sm border border-rr-border"
+											/>
+											<span class="text-sm text-rr-heading">{ day.String() }</span>
+										</label>
+									}
+								</div>
+								<p class="mt-1 text-xs text-rr-muted">The days the van actually runs. Used to work out each order's delivery date — not just display copy.</p>
+							</div>
+							<div class="sm:max-w-xs">
+								<label for="local-delivery-cutoff" class="block text-sm font-medium text-rr-heading">Order-by cutoff</label>
+								<input
+									id="local-delivery-cutoff"
+									type="time"
+									name="local_delivery_cutoff"
+									value={ props.Shipping.LocalDeliveryCutoff }
+									class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								/>
+								<p class="mt-1 text-xs text-rr-muted">
+									Orders placed before this time on a delivery day go out that day. At or after it, they wait for the next one.
+									if props.MerchantTZ != nil {
+										{ " Times are " + props.MerchantTZ.String() + "." }
+									}
+								</p>
+							</div>
+							if len(props.Shipping.LocalDeliveryWeekdays) > 0 {
+								<p class="text-xs text-rr-muted">
+									Customers currently see: <span class="font-medium text-rr-heading">{ deliveryScheduleSummary(props.Shipping) }</span>
+								</p>
+							}
 						</div>
 						<label class="flex items-start gap-3">
 							<input

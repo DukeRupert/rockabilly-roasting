@@ -16,7 +16,7 @@ Hiri is a single-merchant ecommerce platform written in Go. It deploys as a **si
 - **Metrics:** Prometheus, **Logging:** `log/slog` (JSON), **Errors:** Sentry
 - **Migrations:** Goose + plain SQL in `db/migrations/`
 - **Testing:** `testify` (assert + require) with testcontainers-go for Postgres
-- **External services:** Stripe (payments + tax), EasyPost (shipping), Cloudflare Images (product media), Cloudflare R2 (shipping labels, S3-compatible), Postmark (email via `mrz1836/postmark`)
+- **External services:** Stripe (payments + tax), EasyPost (shipping), Cloudflare R2 (S3-compatible; one bucket holds both product images and shipping labels) served through Cloudflare Image Transformations (`/cdn-cgi/image/`, not the Cloudflare Images product), Postmark (email via `mrz1836/postmark`)
 
 ## Local Development Setup
 

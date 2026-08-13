@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -761,8 +762,12 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 	if shipCfg != nil {
 		props.LocalDeliveryEnabled = shipCfg.LocalDeliveryEnabled
 		props.LocalZipCodes = shipCfg.LocalZipCodes
-		props.LocalDeliveryDays = shipCfg.LocalDeliveryDays
+		props.LocalDeliveryDays = shipCfg.DeliveryDaysLabel()
 		props.LocalPickupInstructions = shipCfg.LocalPickupInstructions
+		if date, ok := shipCfg.NextDeliveryDate(time.Now(), d.MerchantTZ); ok {
+			props.LocalDeliveryDate = domain.DeliveryDateLabel(date)
+			props.LocalDeliveryCutoff = shipCfg.CutoffLabel()
+		}
 	}
 
 	if status != 0 && !IsHTMX(r) {

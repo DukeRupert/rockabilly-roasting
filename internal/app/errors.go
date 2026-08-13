@@ -149,6 +149,18 @@ var (
 	// a fix-it message so they can switch to pickup or shipping.
 	ErrFulfillmentUnavailable = errors.New("fulfillment method not available for address")
 
+	// ErrPickupUnavailable signals the merchant does not currently offer pickup,
+	// so a customer following a "switch to pickup" link has nowhere to switch
+	// to. Distinct from ErrOrderNotSwitchable: nothing about the order is wrong,
+	// the shop just has pickup turned off.
+	ErrPickupUnavailable = errors.New("pickup is not currently offered")
+
+	// ErrOrderNotSwitchable signals an order can no longer be moved to pickup —
+	// it was never on local delivery, or it has already been packed, dispatched,
+	// or cancelled. Surfaced to the customer as "too late, call the shop"
+	// rather than as a failure.
+	ErrOrderNotSwitchable = errors.New("order can no longer be switched to pickup")
+
 	// Status errors
 	ErrInvalidOrderStatus = errors.New("invalid order status transition")
 

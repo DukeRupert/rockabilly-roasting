@@ -38,6 +38,8 @@
   let eligibleLocalMethods = $state<LocalFulfillmentMethod[]>([]);
   let localPickupInstructions = $state('');
   let localDeliveryDays = $state('');
+  let localDeliveryDate = $state('');
+  let localDeliveryCutoff = $state('');
   let preferredLocalFulfillment = $state<CheckoutFulfillmentMethod | ''>('');
   let chosenShippingMethod = $state<CheckoutFulfillmentMethod | ''>('');
   let totals = $state<PaymentIntentResponse | null>(null);
@@ -167,6 +169,8 @@
     eligibleLocalMethods = e.eligible_local_methods ?? [];
     localPickupInstructions = e.local_pickup_instructions ?? '';
     localDeliveryDays = e.local_delivery_days ?? '';
+    localDeliveryDate = e.local_delivery_date ?? '';
+    localDeliveryCutoff = e.local_delivery_cutoff ?? '';
     preferredLocalFulfillment = e.preferred_local_fulfillment ?? '';
     // A local-eligible customer always has a real choice: the eligible local
     // method(s) plus "ship it to me". Default to the saved preference when it's
@@ -347,6 +351,8 @@
               {eligibleLocalMethods}
               {localPickupInstructions}
               {localDeliveryDays}
+              {localDeliveryDate}
+              {localDeliveryCutoff}
               shippingMethod={chosenShippingMethod}
               {pricingVersion}
               onShippingMethodChange={handleShippingMethodChange}

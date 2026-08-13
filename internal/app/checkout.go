@@ -34,6 +34,18 @@ type CheckoutService struct {
 	// Optional — required by ConfirmCheckoutPayment.
 	carts    *store.CartStore
 	enqueuer JobEnqueuer
+
+	// merchantTZ is the zone the local-delivery cutoff is judged in. Nil falls
+	// back to UTC, which only misplaces the cutoff in dev — production wires
+	// MERCHANT_TIMEZONE.
+	merchantTZ *time.Location
+}
+
+// WithMerchantTZ sets the zone used to resolve local-delivery dates against the
+// order-by cutoff.
+func (s *CheckoutService) WithMerchantTZ(loc *time.Location) *CheckoutService {
+	s.merchantTZ = loc
+	return s
 }
 
 // NewCheckoutService creates a new CheckoutService.
@@ -98,7 +110,8 @@ func (s *CheckoutService) UpdateShippingConfig(ctx context.Context, tx pgx.Tx, c
 			"local_delivery_enabled":    cfg.LocalDeliveryEnabled,
 			"local_pickup_enabled":      cfg.LocalPickupEnabled,
 			"local_pickup_instructions": cfg.LocalPickupInstructions,
-			"local_delivery_days":       cfg.LocalDeliveryDays,
+			"local_delivery_weekdays":   weekdayNames(cfg.LocalDeliveryWeekdays),
+			"local_delivery_cutoff":     cfg.CutoffLabel(),
 			"origin_name":               cfg.OriginName,
 			"origin_street1":            cfg.OriginStreet1,
 			"origin_street2":            cfg.OriginStreet2,
@@ -118,7 +131,8 @@ func (s *CheckoutService) UpdateShippingConfig(ctx context.Context, tx pgx.Tx, c
 				"local_delivery_enabled":    before.LocalDeliveryEnabled,
 				"local_pickup_enabled":      before.LocalPickupEnabled,
 				"local_pickup_instructions": before.LocalPickupInstructions,
-				"local_delivery_days":       before.LocalDeliveryDays,
+				"local_delivery_weekdays":   weekdayNames(before.LocalDeliveryWeekdays),
+				"local_delivery_cutoff":     before.CutoffLabel(),
 				"origin_name":               before.OriginName,
 				"origin_street1":            before.OriginStreet1,
 				"origin_street2":            before.OriginStreet2,
@@ -132,6 +146,17 @@ func (s *CheckoutService) UpdateShippingConfig(ctx context.Context, tx pgx.Tx, c
 			},
 		},
 	})
+}
+
+// weekdayNames renders delivery weekdays as names for the audit log. Raw
+// integers would make a staff member reading the log translate Go's weekday
+// numbering in their head to see that the route changed.
+func weekdayNames(days []time.Weekday) []string {
+	out := make([]string, 0, len(days))
+	for _, d := range days {
+		out = append(out, d.String())
+	}
+	return out
 }
 
 // CalculateShipping returns the shipping cost in cents for a given subtotal
@@ -284,6 +309,12 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 	orderNumber := generateOrderNumber()
 	customerID := p.CustomerID
 
+	// Resolved here rather than trusting anything the client sent: the customer
+	// may have sat on the checkout page across the cutoff, in which case the
+	// date quoted on the payment step is stale and this is the real one.
+	placedAt := time.Now()
+	scheduledDelivery := scheduleLocalDelivery(ctx, tx, s.shipping, p.ShippingMethod, placedAt, s.merchantTZ)
+
 	order, err := s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
 		Number:            orderNumber,
 		CustomerID:        &customerID,
@@ -299,10 +330,11 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		ShippingAddressID: p.ShippingAddressID,
 		BillingAddressID:  p.BillingAddressID,
 		SubscriptionID:    p.SubscriptionID,
-		ShippingMethod:    p.ShippingMethod,
-		Notes:             p.Notes,
-		Metadata:          p.Metadata,
-		PlacedAt:          time.Now(),
+		ShippingMethod:        p.ShippingMethod,
+		ScheduledDeliveryDate: scheduledDelivery,
+		Notes:                 p.Notes,
+		Metadata:              p.Metadata,
+		PlacedAt:              placedAt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create order: %w", err)

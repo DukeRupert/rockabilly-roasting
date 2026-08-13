@@ -94,6 +94,11 @@ type Deps struct {
 	// Never nil — an unconfigured signer rejects every token, and the reminder
 	// omits the link rather than printing one that cannot be verified.
 	UnsubscribeSigner *auth.UnsubscribeSigner
+	// OrderActionSigner verifies the signed "switch to pickup" links in order
+	// confirmation emails. Never nil — an unconfigured signer rejects every
+	// token, and the confirmation email omits the offer rather than printing a
+	// link that cannot be verified.
+	OrderActionSigner *auth.OrderActionSigner
 }
 
 // MetricsMux returns a handler for the internal metrics listener.
@@ -162,6 +167,14 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("GET /wholesale/unsubscribe", deps.handleUnsubscribePage)
 	mux.HandleFunc("POST /wholesale/unsubscribe", deps.handleUnsubscribe)
 	mux.HandleFunc("POST /wholesale/resubscribe", deps.handleResubscribe)
+	// Switch a local-delivery order to shop pickup from the confirmation email.
+	// Public and token-authenticated for the same reason as the opt-out above —
+	// it has to work straight from an inbox, with no session. GET only renders
+	// a confirmation because inbox scanners fetch every link; POST acts. The
+	// token authorizes one order and one action, and never signs anyone in.
+	// See web/switch_to_pickup.go.
+	mux.HandleFunc("GET /orders/switch-to-pickup", deps.handleSwitchToPickupPage)
+	mux.HandleFunc("POST /orders/switch-to-pickup", deps.handleSwitchToPickup)
 	mux.HandleFunc("GET /privacy", deps.handlePrivacyPage)
 	mux.HandleFunc("GET /terms", deps.handleTermsPage)
 	mux.HandleFunc("GET /shipping", deps.handleShippingPage)

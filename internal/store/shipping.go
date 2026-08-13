@@ -31,15 +31,16 @@ func (s *ShippingStore) GetConfig(ctx context.Context, tx pgx.Tx) (*domain.Shipp
 		return nil, fmt.Errorf("get shipping config: %w", err)
 	}
 	return &domain.ShippingConfig{
-		FlatRateCents:           int(row.FlatRateCents),
-		FreeShippingThreshold:   int32PtrToIntPtr(row.FreeShippingThreshold),
-		Currency:                row.Currency,
-		LocalZipCodes:           row.LocalZipCodes,
-		LocalDeliveryEnabled:    row.LocalDeliveryEnabled,
-		LocalPickupEnabled:      row.LocalPickupEnabled,
-		LocalPickupInstructions: row.LocalPickupInstructions,
-		LocalDeliveryDays:       row.LocalDeliveryDays,
-		OriginName:              row.OriginName,
+		FlatRateCents:              int(row.FlatRateCents),
+		FreeShippingThreshold:      int32PtrToIntPtr(row.FreeShippingThreshold),
+		Currency:                   row.Currency,
+		LocalZipCodes:              row.LocalZipCodes,
+		LocalDeliveryEnabled:       row.LocalDeliveryEnabled,
+		LocalPickupEnabled:         row.LocalPickupEnabled,
+		LocalPickupInstructions:    row.LocalPickupInstructions,
+		LocalDeliveryWeekdays:      weekdaysFromPG(row.LocalDeliveryWeekdays),
+		LocalDeliveryCutoffMinutes: int(row.LocalDeliveryCutoffMinutes),
+		OriginName:                 row.OriginName,
 		OriginStreet1:           row.OriginStreet1,
 		OriginStreet2:           row.OriginStreet2,
 		OriginCity:              row.OriginCity,
@@ -76,7 +77,13 @@ func (s *ShippingStore) UpdateConfig(ctx context.Context, tx pgx.Tx, cfg domain.
 		LocalDeliveryEnabled:    cfg.LocalDeliveryEnabled,
 		LocalPickupEnabled:      cfg.LocalPickupEnabled,
 		LocalPickupInstructions: cfg.LocalPickupInstructions,
-		LocalDeliveryDays:       cfg.LocalDeliveryDays,
+		// local_delivery_days is legacy free text superseded by
+		// local_delivery_weekdays; the label is derived now. Written back as-is
+		// so the column keeps whatever the merchant last typed until it is
+		// dropped.
+		LocalDeliveryDays:          cfg.DeliveryDaysLabel(),
+		LocalDeliveryWeekdays:      weekdaysToPG(cfg.LocalDeliveryWeekdays),
+		LocalDeliveryCutoffMinutes: int32(cfg.LocalDeliveryCutoffMinutes),
 	})
 	if err != nil {
 		return fmt.Errorf("update shipping config: %w", err)

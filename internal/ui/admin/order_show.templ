@@ -792,7 +792,7 @@ templ OrderShowContent(props OrderShowProps) {
 		}
 	</div>
 	<!-- Shipping method & delivery date -->
-	if props.Order.ShippingMethod != nil || props.Order.RequestedDeliveryDate != nil || (props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "") {
+	if props.Order.ShippingMethod != nil || props.Order.RequestedDeliveryDate != nil || props.Order.ScheduledDeliveryDate != nil || (props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "") {
 		<div class="mt-4 border border-rr-border bg-rr-surface p-4">
 			<div class="flex flex-wrap items-center gap-4">
 				if props.Order.ShippingMethod != nil {
@@ -809,6 +809,15 @@ templ OrderShowContent(props OrderShowProps) {
 					<div class="flex items-center gap-2">
 						<span class="text-sm font-medium text-rr-muted">Delivery date:</span>
 						<span class="text-sm text-rr-heading">{ props.Order.RequestedDeliveryDate.In(props.MerchantTZ).Format("January 2, 2006") }</span>
+					</div>
+				}
+				<!-- The run this order was promised at checkout, distinct from the
+					imported "requested" date above. Shown so staff can honour the
+					date the customer was actually told. -->
+				if props.Order.ScheduledDeliveryDate != nil {
+					<div class="flex items-center gap-2">
+						<span class="text-sm font-medium text-rr-muted">Promised delivery:</span>
+						<span class="text-sm font-medium text-rr-heading">{ props.Order.ScheduledDeliveryDate.Format("Monday, January 2") }</span>
 					</div>
 				}
 				if props.Order.CustomerPONumber != nil && *props.Order.CustomerPONumber != "" {

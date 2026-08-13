@@ -76,6 +76,27 @@ type OrderConfirmData struct {
 	ShippingAddr  string
 	StoreName     string
 	StoreURL      string
+
+	// --- Local delivery ---
+	//
+	// DeliveryDate is the run this order was booked on ("Thursday, August 13"),
+	// set only for local-delivery orders with a configured schedule. Empty for
+	// everything else, which collapses the whole delivery block out of both
+	// templates — a shipped order must not be told about the van.
+	DeliveryDate string
+	// DeliveryCutoff is the order-by time that decided that date ("9am"), so a
+	// customer who just missed it understands why they're waiting and what to
+	// beat next time.
+	DeliveryCutoff string
+	// SwitchToPickupURL is the signed one-click link offering pickup instead of
+	// waiting for the run. Empty when pickup is switched off in admin, or when
+	// no signing secret is configured — in both cases the templates fall back
+	// to "reply and we'll sort it" rather than printing a dead link.
+	SwitchToPickupURL string
+	// PickupInstructions is the shop address and hours, shown alongside the
+	// offer so the customer can judge whether collecting is actually easier
+	// before they click.
+	PickupInstructions string
 }
 
 // OrderLineItemData is a line item for email rendering.

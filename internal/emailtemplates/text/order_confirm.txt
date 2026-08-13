@@ -17,7 +17,16 @@ Tax:       {{cents .TaxTotal}}
 Total:     {{cents .OrderTotal}}
 {{if .ShippingAddr}}
 Ships to: {{.ShippingAddr}}
+{{end}}{{if .DeliveryDate}}
+OUT FOR DELIVERY: {{.DeliveryDate}}
+{{if .DeliveryCutoff}}Orders in by {{.DeliveryCutoff}} on a delivery day ride that day's run. Yours is booked on the next one.
 {{end}}
+Don't want to wait? We can have it packed and waiting at the shop instead.
+{{if .SwitchToPickupURL}}Switch to pickup: {{.SwitchToPickupURL}}
+{{else}}Just reply to this email and we'll switch it over.
+{{end}}{{if .PickupInstructions}}
+Pickup: {{.PickupInstructions}}
+{{end}}{{end}}
 {{.StoreName}}
 {{.StoreURL}}
 {{end}}

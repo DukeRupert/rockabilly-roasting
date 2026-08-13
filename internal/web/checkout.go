@@ -93,6 +93,17 @@ type checkoutAddressResponse struct {
 	EligibleLocalMethods    []string `json:"eligible_local_methods"`
 	LocalPickupInstructions string   `json:"local_pickup_instructions,omitempty"`
 	LocalDeliveryDays       string   `json:"local_delivery_days,omitempty"`
+	// LocalDeliveryDate is the specific run an order placed right now would
+	// ride ("Thursday, August 13"), and LocalDeliveryCutoff the order-by time
+	// that decided it ("9am"). Both empty when no delivery schedule is
+	// configured — the client falls back to LocalDeliveryDays phrasing.
+	//
+	// Computed at address time so the customer sees the real date before
+	// paying rather than discovering it in the confirmation email. The order
+	// is scheduled against a freshly computed date at placement, so a checkout
+	// left open across the cutoff cannot lock in a stale promise.
+	LocalDeliveryDate   string `json:"local_delivery_date,omitempty"`
+	LocalDeliveryCutoff string `json:"local_delivery_cutoff,omitempty"`
 	// PreferredLocalFulfillment is the customer's saved choice ("pickup" or
 	// "local_delivery"), or "" if they haven't set one. Used as the default
 	// selection so repeat customers don't re-pick at every checkout.
@@ -507,7 +518,11 @@ func (d *Deps) handleCheckoutAddress(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(methods) > 0 {
 			resp.LocalPickupInstructions = cfg.LocalPickupInstructions
-			resp.LocalDeliveryDays = cfg.LocalDeliveryDays
+			resp.LocalDeliveryDays = cfg.DeliveryDaysLabel()
+			if date, ok := cfg.NextDeliveryDate(time.Now(), d.MerchantTZ); ok {
+				resp.LocalDeliveryDate = domain.DeliveryDateLabel(date)
+				resp.LocalDeliveryCutoff = cfg.CutoffLabel()
+			}
 			if customer.PreferredLocalFulfillment != nil {
 				resp.PreferredLocalFulfillment = string(*customer.PreferredLocalFulfillment)
 			}

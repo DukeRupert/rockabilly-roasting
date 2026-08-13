@@ -264,6 +264,13 @@ type Querier interface {
 	SetProductGroupVisibility(ctx context.Context, arg SetProductGroupVisibilityParams) error
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)
 	SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error)
+	// Moves a local-delivery order to pickup and drops the delivery promise in one
+	// statement, so an order can never be left as pickup while still advertising a
+	// delivery date. The WHERE clause is the guard: it matches only an order that
+	// is still on local delivery, which makes a replayed click (the customer
+	// refreshing the confirmation page, or a mail client prefetching the link)
+	// return no rows instead of clobbering an order staff have since moved on.
+	SwitchOrderToPickup(ctx context.Context, id uuid.UUID) (Order, error)
 	TouchCustomerUserLastLogin(ctx context.Context, id uuid.UUID) error
 	UnarchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error)
 	UpdateAddress(ctx context.Context, arg UpdateAddressParams) (Address, error)

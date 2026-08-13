@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -60,6 +62,7 @@ func (s *OrderService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.
 		recipients   []MailRecipient
 		items        []emailtemplates.OrderLineItemData
 		shippingAddr string
+		delivery     deliveryOffer
 	)
 
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
@@ -93,24 +96,30 @@ func (s *OrderService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.
 		if addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID); err == nil {
 			shippingAddr = emailtemplates.FormatRecipientAddress(addr.FirstName, addr.LastName, addr.Line1, addr.Line2, addr.City, addr.State, addr.PostalCode)
 		}
+
+		delivery = s.deliveryOfferFor(ctx, tx, order)
 		return nil
 	}); err != nil {
 		return err
 	}
 
 	html, text, err := s.email.Renderer.Render("order_confirm", emailtemplates.OrderConfirmData{
-		CustomerName:  customer.FirstName,
-		OrderNumber:   order.Number,
-		OrderDate:     order.PlacedAt,
-		Items:         items,
-		Subtotal:      order.Subtotal,
-		DiscountTotal: order.DiscountTotal,
-		ShippingTotal: order.ShippingTotal,
-		TaxTotal:      order.TaxTotal,
-		OrderTotal:    order.Total,
-		ShippingAddr:  shippingAddr,
-		StoreName:     s.email.StoreName,
-		StoreURL:      s.email.BaseURL,
+		CustomerName:       customer.FirstName,
+		OrderNumber:        order.Number,
+		OrderDate:          order.PlacedAt,
+		Items:              items,
+		Subtotal:           order.Subtotal,
+		DiscountTotal:      order.DiscountTotal,
+		ShippingTotal:      order.ShippingTotal,
+		TaxTotal:           order.TaxTotal,
+		OrderTotal:         order.Total,
+		ShippingAddr:       shippingAddr,
+		StoreName:          s.email.StoreName,
+		StoreURL:           s.email.BaseURL,
+		DeliveryDate:       delivery.Date,
+		DeliveryCutoff:     delivery.Cutoff,
+		SwitchToPickupURL:  delivery.SwitchURL,
+		PickupInstructions: delivery.PickupInstructions,
 	})
 	if err != nil {
 		s.metrics.EmailsSent.WithLabelValues("order_confirm", "failed").Inc()
@@ -149,6 +158,61 @@ func (s *OrderService) SendConfirmationEmail(ctx context.Context, pool *pgxpool.
 
 	s.metrics.EmailsSent.WithLabelValues("order_confirm", "sent").Inc()
 	return nil
+}
+
+// deliveryOffer is the local-delivery block of an order confirmation: when the
+// order arrives, and the way out if that is too long to wait.
+type deliveryOffer struct {
+	Date               string
+	Cutoff             string
+	SwitchURL          string
+	PickupInstructions string
+}
+
+// deliveryOfferFor assembles that block, or returns the zero value — which
+// renders nothing at all — for any order that isn't a scheduled local delivery.
+//
+// Every piece degrades independently and silently. A missing shipping config, a
+// pickup-disabled shop, or an unconfigured signing secret each drop only the
+// part they affect: the customer may still be told their delivery date without
+// being offered a switch, and in the worst case simply gets the confirmation
+// they always got. A confirmation email is not worth failing over an offer.
+func (s *OrderService) deliveryOfferFor(ctx context.Context, tx pgx.Tx, order *domain.Order) deliveryOffer {
+	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodLocalDelivery {
+		return deliveryOffer{}
+	}
+	if order.ScheduledDeliveryDate == nil {
+		return deliveryOffer{}
+	}
+
+	offer := deliveryOffer{Date: domain.DeliveryDateLabel(*order.ScheduledDeliveryDate)}
+
+	if s.shipments == nil {
+		return offer
+	}
+	cfg, err := s.shipments.GetConfig(ctx, tx)
+	if err != nil || cfg == nil {
+		return offer
+	}
+	offer.Cutoff = cfg.CutoffLabel()
+
+	// The offer is only made when the shop can honour it. Read live rather than
+	// baked in at placement, so turning pickup off stops new offers going out.
+	if !cfg.LocalPickupEnabled {
+		return offer
+	}
+	offer.PickupInstructions = cfg.LocalPickupInstructions
+
+	if s.orderActions == nil || !s.orderActions.Enabled() {
+		return offer
+	}
+	token := s.orderActions.Sign(auth.OrderActionSwitchToPickup, order.ID, time.Now())
+	if token == "" {
+		return offer
+	}
+	offer.SwitchURL = fmt.Sprintf("%s/orders/switch-to-pickup?t=%s",
+		strings.TrimRight(s.email.BaseURL, "/"), url.QueryEscape(token))
+	return offer
 }
 
 // SendRenewalReceiptEmail sends a subscription-renewal receipt for a renewal
@@ -515,7 +579,7 @@ func (s *OrderService) SendOrderOutForDeliveryEmail(ctx context.Context, pool *p
 		if s.shipments != nil {
 			cfg, err := s.shipments.GetConfig(ctx, tx)
 			if err == nil {
-				deliveryDays = cfg.LocalDeliveryDays
+				deliveryDays = cfg.DeliveryDaysLabel()
 			}
 		}
 		if addr, err := s.customers.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID); err == nil {

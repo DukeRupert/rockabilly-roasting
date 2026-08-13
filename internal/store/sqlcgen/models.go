@@ -384,6 +384,7 @@ type Order struct {
 	RequestedDeliveryDate pgtype.Timestamptz `json:"requested_delivery_date"`
 	OverdueReminderStage  int16              `json:"overdue_reminder_stage"`
 	Channel               string             `json:"channel"`
+	ScheduledDeliveryDate pgtype.Date        `json:"scheduled_delivery_date"`
 }
 
 type Price struct {
@@ -543,24 +544,26 @@ type Shipment struct {
 }
 
 type ShippingConfig struct {
-	FlatRateCents           int32          `json:"flat_rate_cents"`
-	FreeShippingThreshold   *int32         `json:"free_shipping_threshold"`
-	Currency                string         `json:"currency"`
-	LocalZipCodes           []string       `json:"local_zip_codes"`
-	OriginName              string         `json:"origin_name"`
-	OriginStreet1           string         `json:"origin_street1"`
-	OriginStreet2           string         `json:"origin_street2"`
-	OriginCity              string         `json:"origin_city"`
-	OriginState             string         `json:"origin_state"`
-	OriginZip               string         `json:"origin_zip"`
-	OriginCountry           string         `json:"origin_country"`
-	TareWeightOz            pgtype.Numeric `json:"tare_weight_oz"`
-	LocalDeliveryEnabled    bool           `json:"local_delivery_enabled"`
-	LocalPickupEnabled      bool           `json:"local_pickup_enabled"`
-	LocalPickupInstructions string         `json:"local_pickup_instructions"`
-	LocalDeliveryDays       string         `json:"local_delivery_days"`
-	OriginEmail             string         `json:"origin_email"`
-	OriginPhone             string         `json:"origin_phone"`
+	FlatRateCents              int32          `json:"flat_rate_cents"`
+	FreeShippingThreshold      *int32         `json:"free_shipping_threshold"`
+	Currency                   string         `json:"currency"`
+	LocalZipCodes              []string       `json:"local_zip_codes"`
+	OriginName                 string         `json:"origin_name"`
+	OriginStreet1              string         `json:"origin_street1"`
+	OriginStreet2              string         `json:"origin_street2"`
+	OriginCity                 string         `json:"origin_city"`
+	OriginState                string         `json:"origin_state"`
+	OriginZip                  string         `json:"origin_zip"`
+	OriginCountry              string         `json:"origin_country"`
+	TareWeightOz               pgtype.Numeric `json:"tare_weight_oz"`
+	LocalDeliveryEnabled       bool           `json:"local_delivery_enabled"`
+	LocalPickupEnabled         bool           `json:"local_pickup_enabled"`
+	LocalPickupInstructions    string         `json:"local_pickup_instructions"`
+	LocalDeliveryDays          string         `json:"local_delivery_days"`
+	OriginEmail                string         `json:"origin_email"`
+	OriginPhone                string         `json:"origin_phone"`
+	LocalDeliveryWeekdays      []int16        `json:"local_delivery_weekdays"`
+	LocalDeliveryCutoffMinutes int32          `json:"local_delivery_cutoff_minutes"`
 }
 
 type Staff struct {

@@ -20,6 +20,16 @@
     eligibleLocalMethods: LocalFulfillmentMethod[];
     localPickupInstructions: string;
     localDeliveryDays: string;
+    // The specific delivery run this order would ride, and the order-by cutoff
+    // that decided it. Shown in place of the vaguer localDeliveryDays when the
+    // merchant has a schedule configured — a customer choosing between delivery
+    // and pickup needs to know it's Thursday, not "Mondays and Thursdays".
+    //
+    // Snapshot from the address step. Someone who sits on this page across the
+    // cutoff sees a stale date; the server recomputes at placement and the
+    // confirmation email carries the authoritative one.
+    localDeliveryDate: string;
+    localDeliveryCutoff: string;
     shippingMethod: CheckoutFulfillmentMethod | '';
     // Bumped by the parent when cart pricing changes (coupon applied or
     // removed) — triggers a payment-intent recreate, like a method switch.
@@ -37,6 +47,8 @@
     eligibleLocalMethods,
     localPickupInstructions,
     localDeliveryDays,
+    localDeliveryDate,
+    localDeliveryCutoff,
     shippingMethod,
     pricingVersion,
     onShippingMethodChange,
@@ -229,10 +241,13 @@
               <span class="block font-oswald text-ink-soft text-xs mt-0.5">
                 {#if method === 'pickup'}
                   {localPickupInstructions || "We'll email you when your order's ready."}
+                {:else if localDeliveryDate}
+                  Out for delivery {localDeliveryDate}.{#if localDeliveryCutoff}
+                    Orders in by {localDeliveryCutoff} ride that day's run.{/if}
+                {:else if localDeliveryDays}
+                  Out for delivery on {localDeliveryDays}.
                 {:else}
-                  {localDeliveryDays
-                    ? `Out for delivery on ${localDeliveryDays}.`
-                    : "We'll email you when your order goes out for delivery."}
+                  We'll email you when your order goes out for delivery.
                 {/if}
               </span>
             </span>

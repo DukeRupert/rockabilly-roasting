@@ -128,6 +128,15 @@ type Order struct {
 	QBSyncedAt             *time.Time
 	ShippingMethod         *ShippingMethod
 	RequestedDeliveryDate  *time.Time
+	// ScheduledDeliveryDate is the local-delivery run this order was promised
+	// to when it was placed, resolved against the delivery weekdays and cutoff
+	// in ShippingConfig. Nil for every other fulfillment method, and for local
+	// orders placed before the schedule existed.
+	//
+	// It is frozen at placement rather than recomputed on read: it is a promise
+	// already sent in the confirmation email, so changing the route in admin
+	// settings must not silently rewrite what a customer was told.
+	ScheduledDeliveryDate  *time.Time
 	CustomerPONumber       *string
 	InternalNote           *string
 	Notes                  *string

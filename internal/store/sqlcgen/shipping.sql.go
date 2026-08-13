@@ -187,7 +187,7 @@ func (q *Queries) GetShipmentLabelKey(ctx context.Context, id uuid.UUID) (*strin
 }
 
 const getShippingConfig = `-- name: GetShippingConfig :one
-SELECT flat_rate_cents, free_shipping_threshold, currency, local_zip_codes, origin_name, origin_street1, origin_street2, origin_city, origin_state, origin_zip, origin_country, tare_weight_oz, local_delivery_enabled, local_pickup_enabled, local_pickup_instructions, local_delivery_days, origin_email, origin_phone FROM shipping_config LIMIT 1
+SELECT flat_rate_cents, free_shipping_threshold, currency, local_zip_codes, origin_name, origin_street1, origin_street2, origin_city, origin_state, origin_zip, origin_country, tare_weight_oz, local_delivery_enabled, local_pickup_enabled, local_pickup_instructions, local_delivery_days, origin_email, origin_phone, local_delivery_weekdays, local_delivery_cutoff_minutes FROM shipping_config LIMIT 1
 `
 
 func (q *Queries) GetShippingConfig(ctx context.Context) (ShippingConfig, error) {
@@ -212,6 +212,8 @@ func (q *Queries) GetShippingConfig(ctx context.Context) (ShippingConfig, error)
 		&i.LocalDeliveryDays,
 		&i.OriginEmail,
 		&i.OriginPhone,
+		&i.LocalDeliveryWeekdays,
+		&i.LocalDeliveryCutoffMinutes,
 	)
 	return i, err
 }
@@ -515,28 +517,32 @@ SET flat_rate_cents = $1,
     local_pickup_instructions = $15,
     local_delivery_days = $16,
     origin_email = $17,
-    origin_phone = $18
+    origin_phone = $18,
+    local_delivery_weekdays = $19,
+    local_delivery_cutoff_minutes = $20
 `
 
 type UpdateShippingConfigParams struct {
-	FlatRateCents           int32          `json:"flat_rate_cents"`
-	FreeShippingThreshold   *int32         `json:"free_shipping_threshold"`
-	Currency                string         `json:"currency"`
-	LocalZipCodes           []string       `json:"local_zip_codes"`
-	OriginName              string         `json:"origin_name"`
-	OriginStreet1           string         `json:"origin_street1"`
-	OriginStreet2           string         `json:"origin_street2"`
-	OriginCity              string         `json:"origin_city"`
-	OriginState             string         `json:"origin_state"`
-	OriginZip               string         `json:"origin_zip"`
-	OriginCountry           string         `json:"origin_country"`
-	TareWeightOz            pgtype.Numeric `json:"tare_weight_oz"`
-	LocalDeliveryEnabled    bool           `json:"local_delivery_enabled"`
-	LocalPickupEnabled      bool           `json:"local_pickup_enabled"`
-	LocalPickupInstructions string         `json:"local_pickup_instructions"`
-	LocalDeliveryDays       string         `json:"local_delivery_days"`
-	OriginEmail             string         `json:"origin_email"`
-	OriginPhone             string         `json:"origin_phone"`
+	FlatRateCents              int32          `json:"flat_rate_cents"`
+	FreeShippingThreshold      *int32         `json:"free_shipping_threshold"`
+	Currency                   string         `json:"currency"`
+	LocalZipCodes              []string       `json:"local_zip_codes"`
+	OriginName                 string         `json:"origin_name"`
+	OriginStreet1              string         `json:"origin_street1"`
+	OriginStreet2              string         `json:"origin_street2"`
+	OriginCity                 string         `json:"origin_city"`
+	OriginState                string         `json:"origin_state"`
+	OriginZip                  string         `json:"origin_zip"`
+	OriginCountry              string         `json:"origin_country"`
+	TareWeightOz               pgtype.Numeric `json:"tare_weight_oz"`
+	LocalDeliveryEnabled       bool           `json:"local_delivery_enabled"`
+	LocalPickupEnabled         bool           `json:"local_pickup_enabled"`
+	LocalPickupInstructions    string         `json:"local_pickup_instructions"`
+	LocalDeliveryDays          string         `json:"local_delivery_days"`
+	OriginEmail                string         `json:"origin_email"`
+	OriginPhone                string         `json:"origin_phone"`
+	LocalDeliveryWeekdays      []int16        `json:"local_delivery_weekdays"`
+	LocalDeliveryCutoffMinutes int32          `json:"local_delivery_cutoff_minutes"`
 }
 
 func (q *Queries) UpdateShippingConfig(ctx context.Context, arg UpdateShippingConfigParams) error {
@@ -559,6 +565,8 @@ func (q *Queries) UpdateShippingConfig(ctx context.Context, arg UpdateShippingCo
 		arg.LocalDeliveryDays,
 		arg.OriginEmail,
 		arg.OriginPhone,
+		arg.LocalDeliveryWeekdays,
+		arg.LocalDeliveryCutoffMinutes,
 	)
 	return err
 }

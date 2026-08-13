@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -67,7 +68,17 @@ type ShippingConfig struct {
 	LocalDeliveryEnabled    bool
 	LocalPickupEnabled      bool
 	LocalPickupInstructions string // shown to customer at checkout + in the ready-for-pickup email
-	LocalDeliveryDays       string // display string, e.g. "Mondays and Thursdays"
+
+	// LocalDeliveryWeekdays are the days the van runs. Empty means no schedule
+	// is configured, which disables date computation entirely — callers fall
+	// back to method-only messaging rather than inventing a date.
+	LocalDeliveryWeekdays []time.Weekday
+
+	// LocalDeliveryCutoffMinutes is the order-by time on a delivery day,
+	// expressed as minutes past local midnight (540 = 9:00am). An order placed
+	// at or after the cutoff on a delivery day rides the *next* run, not that
+	// morning's — the van is already loaded.
+	LocalDeliveryCutoffMinutes int
 
 	// Origin address. OriginEmail and OriginPhone are required by USPS via
 	// Shippo when buying labels — purchases fail without them. The other
@@ -176,6 +187,128 @@ func (c ShippingConfig) WholesaleMethodAllowed(shipToZip string, method Shipping
 		}
 	}
 	return false
+}
+
+// --- Local delivery schedule ---
+
+// HasDeliverySchedule reports whether a delivery date can be computed: local
+// delivery must be switched on and at least one weekday configured. When this
+// is false the storefront and emails describe the method without promising a
+// date, rather than guessing one.
+func (c ShippingConfig) HasDeliverySchedule() bool {
+	return c.LocalDeliveryEnabled && len(c.LocalDeliveryWeekdays) > 0
+}
+
+// NextDeliveryDate returns the delivery day an order placed at now would ride,
+// as local midnight on that date in loc.
+//
+// The rule the shop works to: an order placed before the cutoff on a delivery
+// day goes out on that day's run; at or after the cutoff it waits for the next
+// one. Placement on a non-delivery day always rolls forward to the next
+// scheduled weekday, cutoff untouched — there is no run that day to miss.
+//
+// The boundary is exclusive at the cutoff minute: 08:59 makes today's van,
+// 09:00 does not. Staff start loading at nine, so nine itself is already late.
+//
+// ok is false when no schedule is configured (see HasDeliverySchedule).
+func (c ShippingConfig) NextDeliveryDate(now time.Time, loc *time.Location) (time.Time, bool) {
+	if !c.HasDeliverySchedule() {
+		return time.Time{}, false
+	}
+	if loc == nil {
+		loc = time.UTC
+	}
+
+	local := now.In(loc)
+	minutesIn := local.Hour()*60 + local.Minute()
+
+	// Midnight on the placement date, in the merchant's zone. Every candidate
+	// is derived from this by calendar-day arithmetic rather than by adding
+	// 24h durations, so a DST transition inside the search window shifts the
+	// wall clock without shifting which date we land on.
+	base := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
+
+	// Search today plus a full week. The eighth offset matters: with a
+	// single-weekday schedule, an order placed past that day's cutoff has to
+	// roll to the same weekday seven days out, which a 0..6 window would miss.
+	// offset 0 is today and is the only candidate the cutoff can disqualify.
+	for offset := 0; offset <= 7; offset++ {
+		candidate := base.AddDate(0, 0, offset)
+		if !c.deliversOn(candidate.Weekday()) {
+			continue
+		}
+		if offset == 0 && minutesIn >= c.LocalDeliveryCutoffMinutes {
+			continue
+		}
+		return candidate, true
+	}
+	return time.Time{}, false
+}
+
+// deliversOn reports whether the van runs on the given weekday.
+func (c ShippingConfig) deliversOn(day time.Weekday) bool {
+	for _, d := range c.LocalDeliveryWeekdays {
+		if d == day {
+			return true
+		}
+	}
+	return false
+}
+
+// DeliveryDaysLabel renders the schedule as customer-facing prose — "Mondays
+// and Thursdays". Derived from LocalDeliveryWeekdays rather than stored
+// alongside them, so the sentence a customer reads and the arithmetic that
+// picks their date cannot drift apart.
+//
+// Days are listed in week order starting Sunday regardless of how they were
+// entered, so the label reads the same however admin ordered the checkboxes.
+func (c ShippingConfig) DeliveryDaysLabel() string {
+	names := make([]string, 0, len(c.LocalDeliveryWeekdays))
+	for day := time.Sunday; day <= time.Saturday; day++ {
+		if c.deliversOn(day) {
+			names = append(names, day.String()+"s")
+		}
+	}
+	switch len(names) {
+	case 0:
+		return ""
+	case 1:
+		return names[0]
+	case 2:
+		return names[0] + " and " + names[1]
+	default:
+		return strings.Join(names[:len(names)-1], ", ") + ", and " + names[len(names)-1]
+	}
+}
+
+// CutoffLabel renders the cutoff as a short customer-facing time — "9am",
+// "9:30am". Minutes are omitted on the hour because "9am" is how the shop says
+// it, and a cutoff is only persuasive if it reads like a deadline.
+func (c ShippingConfig) CutoffLabel() string {
+	h := c.LocalDeliveryCutoffMinutes / 60
+	m := c.LocalDeliveryCutoffMinutes % 60
+
+	suffix := "am"
+	if h >= 12 {
+		suffix = "pm"
+	}
+	display := h % 12
+	if display == 0 {
+		display = 12
+	}
+
+	if m == 0 {
+		return fmt.Sprintf("%d%s", display, suffix)
+	}
+	return fmt.Sprintf("%d:%02d%s", display, m, suffix)
+}
+
+// DeliveryDateLabel formats a computed delivery date the way it is spoken to a
+// customer — "Thursday, August 14". Shared by checkout, the confirmation email,
+// and admin so the same promise is worded identically everywhere it appears.
+// The year is omitted: a delivery date is always within the week.
+func DeliveryDateLabel(t time.Time) string {
+	return t.Format("Monday, January 2")
 }
 
 // normalizeZip trims whitespace and strips a ZIP+4 suffix so "99336-1234 "

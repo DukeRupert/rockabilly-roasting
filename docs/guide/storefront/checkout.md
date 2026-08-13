@@ -60,6 +60,20 @@ Some discounts have a minimum order amount. If your cart does not meet the minim
 
 ### Step 4: Payment
 
+#### How you'll get it
+
+If your ZIP is inside the local delivery zone, you choose how the order reaches you before paying:
+
+- **Free local delivery** -- shows the actual day it goes out ("Out for delivery Thursday, August 13"), not just the general schedule, along with the order-by cutoff that decided it. Orders placed before the cutoff on a delivery day ride that day's run; after it, they wait for the next one.
+- **Free pickup at the shop** -- shown when the shop has pickup switched on, with the address and hours.
+- **Ship it to me** -- always offered. Opting out of free local fulfillment means paying the standard shipping rate.
+
+Outside the local zone, there's no choice to make and the order simply ships.
+
+The date shown is worked out when you save your address. If you leave checkout open past the cutoff, the order is placed against a freshly calculated date and your confirmation email carries the real one.
+
+#### Totals
+
 After your address is saved, the system calculates your final total:
 
 - **Subtotal** -- The total price of all items in your cart
@@ -104,6 +118,20 @@ Once your order is confirmed:
 1. **Confirmation email** -- You will receive an email at the address you provided during checkout with your order details.
 2. **Order processing** -- The Rockabilly Roasting team reviews and prepares your order. Your coffee is roasted fresh.
 3. **Fulfillment** -- Your order is packed and shipped. You will be notified when it is on its way.
+
+### If you chose local delivery
+
+Your confirmation email names the delivery run your order is booked on, and the order-by cutoff that decided it.
+
+If that's longer than you want to wait, the email includes a **Switch to pickup** link. It opens a page showing your current delivery date and the shop's address and hours; nothing changes until you press the button. Once you confirm, your order is packed and held at the shop, and you get an email when it's ready to collect.
+
+A few things worth knowing:
+
+- The link expires after 14 days, and stops working once your order has been packed or sent out. Either way, reply to your confirmation email and the shop can sort it by hand.
+- Local delivery and pickup are both free, so switching never changes what you paid.
+- Changed your mind after switching? Get in touch and the shop will put it back on the van.
+
+If the shop isn't offering pickup at the moment, the email asks you to reply instead.
 
 ## Common Issues
 

@@ -70,6 +70,12 @@ export interface AddressResponse {
   eligible_local_methods: LocalFulfillmentMethod[];
   local_pickup_instructions?: string;
   local_delivery_days?: string;
+  // The specific run an order placed now would ride ("Thursday, August 13"),
+  // and the order-by cutoff that decided it ("9am"). Absent when the merchant
+  // has no delivery schedule configured, in which case the UI falls back to the
+  // vaguer local_delivery_days phrasing.
+  local_delivery_date?: string;
+  local_delivery_cutoff?: string;
   preferred_local_fulfillment?: CheckoutFulfillmentMethod;
 }
 

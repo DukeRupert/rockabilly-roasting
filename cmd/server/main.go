@@ -256,6 +256,23 @@ func run() error {
 		logger.Warn("UNSUBSCRIBE_SECRET is not set; reminder emails will omit the one-click opt-out link and ask customers to reply instead")
 	}
 
+	// Signs the "switch to pickup" links in order confirmations. Falls back to
+	// UNSUBSCRIBE_SECRET so this feature works on existing deployments without a
+	// new variable — the token's purpose is inside the signed payload, so
+	// sharing a key cannot let one link stand in for the other. Set
+	// ORDER_ACTION_SECRET to rotate the two independently.
+	//
+	// Unset, orders still place normally; the confirmation email just omits the
+	// pickup offer and tells the customer to reply instead.
+	orderActionSecret := os.Getenv("ORDER_ACTION_SECRET")
+	if strings.TrimSpace(orderActionSecret) == "" {
+		orderActionSecret = os.Getenv("UNSUBSCRIBE_SECRET")
+	}
+	orderActionSigner := auth.NewOrderActionSigner(orderActionSecret)
+	if !orderActionSigner.Enabled() {
+		logger.Warn("neither ORDER_ACTION_SECRET nor UNSUBSCRIBE_SECRET is set; order confirmations will omit the switch-to-pickup link and ask customers to reply instead")
+	}
+
 	reminderScheduleNote := fmt.Sprintf("Sends automatically every %s at %s %s.",
 		reminderWeekday, formatHour(reminderHour), reminderTZName)
 	if os.Getenv("DISABLE_ORDER_REMINDERS") != "" {
@@ -359,7 +376,8 @@ func run() error {
 		WithEmail(emailEnv, customerStore, customerUserStore, catalogStore, subscriptionStore).
 		WithShipments(shippingStore).
 		WithDiscounts(discountStore).
-		WithPricing(pricingStore)
+		WithPricing(pricingStore).
+		WithOrderActionSigner(orderActionSigner)
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore).
@@ -367,7 +385,8 @@ func run() error {
 		WithRenewalAnchor(merchantTZ, renewalAnchorHour)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
-	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg)
+	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg).
+		WithMerchantTZ(merchantTZ)
 	pricingSvc := app.NewPricingService(pricingStore, customerStore).
 		WithSettings(settingsStore)
 	cartSvc := app.NewCartService(cartStore, catalogStore, pricingSvc, catalogSvc)
@@ -379,10 +398,12 @@ func run() error {
 		WithEmail(emailEnv, authSvc)
 	renewalSvc := app.NewRenewalService(subscriptionStore, orderStore, customerStore, pricingStore, shippingStore, paymentProvider, auditWriter, metricsReg).
 		WithTaxCalc(settingsStore, catalogStore).
-		WithRenewalAnchor(merchantTZ, renewalAnchorHour)
+		WithRenewalAnchor(merchantTZ, renewalAnchorHour).
+		WithMerchantTZ(merchantTZ)
 	wholesaleSvc := app.NewWholesaleService(customerStore, customerUserStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc).
-		WithUnsubscribeSigner(unsubscribeSigner)
+		WithUnsubscribeSigner(unsubscribeSigner).
+		WithDeliverySchedule(shippingStore, merchantTZ)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -660,6 +681,7 @@ func run() error {
 		MerchantTZ:             merchantTZ,
 		ReminderScheduleNote:   reminderScheduleNote,
 		UnsubscribeSigner:      unsubscribeSigner,
+		OrderActionSigner:      orderActionSigner,
 	}
 
 	handler := web.NewRouter(deps)

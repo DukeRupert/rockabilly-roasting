@@ -48,6 +48,20 @@ type WholesaleCheckoutProps struct {
 	LocalZipCodes           []string
 	LocalDeliveryDays       string
 	LocalPickupInstructions string
+
+	// LocalDeliveryDate is the specific run this order would ride if placed
+	// now — "Thursday, August 13" — resolved against the delivery weekdays and
+	// the order-by cutoff. Empty when no schedule is configured, in which case
+	// the radio falls back to the general LocalDeliveryDays phrasing.
+	//
+	// It is a snapshot taken when the page rendered. A buyer who leaves
+	// checkout open across the cutoff sees a stale date; the order is placed
+	// against a freshly computed one, and the confirmation email carries the
+	// authoritative answer.
+	LocalDeliveryDate string
+	// LocalDeliveryCutoff is the order-by time ("9am") named alongside the
+	// date, so the buyer can see why it is that day and what to beat next time.
+	LocalDeliveryCutoff string
 }
 
 // minQtyAttr is the qty input's min: the wholesale minimum when set, else 1
@@ -291,7 +305,14 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 								<input type="radio" name="fulfillment_method" value="local_delivery" x-model="method" class="mt-1 accent-rust"/>
 								<span class="font-oswald text-sm text-ink leading-relaxed">
 									<span class="font-bold">Free local delivery</span>
-									if props.LocalDeliveryDays != "" {
+									if props.LocalDeliveryDate != "" {
+										<br/>
+										<span class="text-chrome-deep">{ "Out for delivery " + props.LocalDeliveryDate + "." }</span>
+										if props.LocalDeliveryCutoff != "" {
+											<br/>
+											<span class="text-chrome-deep">{ "Orders in by " + props.LocalDeliveryCutoff + " ride that day's run." }</span>
+										}
+									} else if props.LocalDeliveryDays != "" {
 										<br/>
 										<span class="text-chrome-deep">{ "Out for delivery on " + props.LocalDeliveryDays + "." }</span>
 									}

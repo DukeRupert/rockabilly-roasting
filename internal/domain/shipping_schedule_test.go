@@ -1,0 +1,237 @@
+package domain
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// pacific is the merchant zone the cutoff is actually evaluated in. Loading it
+// (rather than using a fixed offset) is the point of several cases below: a
+// fixed offset would hide the DST bugs they exist to catch.
+func pacific(t *testing.T) *time.Location {
+	t.Helper()
+	loc, err := time.LoadLocation("America/Los_Angeles")
+	require.NoError(t, err)
+	return loc
+}
+
+// monThuAt9 is the client's live configuration: van runs Monday and Thursday,
+// order by 9am to make that day's run.
+func monThuAt9() ShippingConfig {
+	return ShippingConfig{
+		LocalDeliveryEnabled:       true,
+		LocalDeliveryWeekdays:      []time.Weekday{time.Monday, time.Thursday},
+		LocalDeliveryCutoffMinutes: 9 * 60,
+	}
+}
+
+func TestNextDeliveryDate(t *testing.T) {
+	loc := pacific(t)
+	cfg := monThuAt9()
+
+	// August 2026: 10th is a Monday, 13th a Thursday, 17th the next Monday.
+	at := func(month time.Month, day, hour, min int) time.Time {
+		return time.Date(2026, month, day, hour, min, 0, 0, loc)
+	}
+
+	tests := []struct {
+		name      string
+		placedAt  time.Time
+		wantMonth time.Month
+		wantDay   int
+	}{
+		{"monday well before cutoff makes today's run", at(time.August, 10, 6, 30), time.August, 10},
+		{"monday one minute before cutoff still makes it", at(time.August, 10, 8, 59), time.August, 10},
+		{"monday exactly at cutoff misses it", at(time.August, 10, 9, 0), time.August, 13},
+		{"monday after cutoff rolls to thursday", at(time.August, 10, 9, 1), time.August, 13},
+		{"monday evening rolls to thursday", at(time.August, 10, 22, 0), time.August, 13},
+		{"tuesday rolls to thursday regardless of hour", at(time.August, 11, 5, 0), time.August, 13},
+		{"tuesday late evening still thursday", at(time.August, 11, 23, 59), time.August, 13},
+		{"wednesday rolls to thursday", at(time.August, 12, 14, 0), time.August, 13},
+		{"thursday before cutoff makes today's run", at(time.August, 13, 8, 0), time.August, 13},
+		{"thursday after cutoff rolls to next monday", at(time.August, 13, 9, 30), time.August, 17},
+		{"friday rolls to monday", at(time.August, 14, 10, 0), time.August, 17},
+		{"saturday rolls to monday", at(time.August, 15, 12, 0), time.August, 17},
+		{"sunday rolls to monday", at(time.August, 16, 20, 0), time.August, 17},
+		{"sunday before dawn still rolls to monday", at(time.August, 16, 2, 0), time.August, 17},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := cfg.NextDeliveryDate(tc.placedAt, loc)
+			require.True(t, ok)
+
+			assert.Equal(t, tc.wantDay, got.Day())
+			assert.Equal(t, tc.wantMonth, got.Month())
+			assert.Equal(t, 2026, got.Year())
+
+			// The result is a date, so it must land on local midnight — anything
+			// else would store the wrong day once truncated to a `date` column.
+			assert.Equal(t, 0, got.Hour())
+			assert.Equal(t, 0, got.Minute())
+			assert.Equal(t, loc, got.Location())
+
+			// Whatever comes back must actually be a day the van runs.
+			assert.True(t, cfg.deliversOn(got.Weekday()),
+				"resolved %s, which is not a delivery weekday", got.Weekday())
+		})
+	}
+}
+
+// The cutoff is a wall-clock rule ("9am"), not an elapsed-hours rule, so it has
+// to hold its local hour across a DST transition rather than sliding by one.
+func TestNextDeliveryDateAcrossDSTTransitions(t *testing.T) {
+	loc := pacific(t)
+	cfg := monThuAt9()
+
+	t.Run("spring forward weekend", func(t *testing.T) {
+		// DST begins Sunday 2026-03-08. An order that Sunday evening is for
+		// Monday the 9th — the clock change in between must not skip a day.
+		got, ok := cfg.NextDeliveryDate(time.Date(2026, time.March, 8, 20, 0, 0, 0, loc), loc)
+		require.True(t, ok)
+		assert.Equal(t, time.March, got.Month())
+		assert.Equal(t, 9, got.Day())
+		assert.Equal(t, 0, got.Hour(), "must still be local midnight after the clocks moved")
+	})
+
+	t.Run("cutoff still bites the morning after springing forward", func(t *testing.T) {
+		// Monday 2026-03-09, 9:30am local — the day after the transition. If the
+		// comparison were done in UTC or via 24h arithmetic this would read as
+		// 8:30 and wrongly make the same-day run.
+		got, ok := cfg.NextDeliveryDate(time.Date(2026, time.March, 9, 9, 30, 0, 0, loc), loc)
+		require.True(t, ok)
+		assert.Equal(t, 12, got.Day(), "should roll to Thursday the 12th")
+	})
+
+	t.Run("fall back weekend", func(t *testing.T) {
+		// DST ends Sunday 2026-11-01.
+		got, ok := cfg.NextDeliveryDate(time.Date(2026, time.November, 1, 20, 0, 0, 0, loc), loc)
+		require.True(t, ok)
+		assert.Equal(t, 2, got.Day())
+		assert.Equal(t, 0, got.Hour())
+	})
+}
+
+// Placement times arrive as UTC from Postgres; the cutoff must be judged in the
+// merchant's zone, not the instant's own.
+func TestNextDeliveryDateConvertsIntoMerchantZone(t *testing.T) {
+	loc := pacific(t)
+	cfg := monThuAt9()
+
+	// 2026-08-10 15:30 UTC is 08:30 Pacific — a Monday, before the cutoff.
+	got, ok := cfg.NextDeliveryDate(time.Date(2026, time.August, 10, 15, 30, 0, 0, time.UTC), loc)
+	require.True(t, ok)
+	assert.Equal(t, 10, got.Day(), "08:30 Pacific should make Monday's run")
+
+	// 2026-08-10 16:30 UTC is 09:30 Pacific — same Monday, past the cutoff.
+	got, ok = cfg.NextDeliveryDate(time.Date(2026, time.August, 10, 16, 30, 0, 0, time.UTC), loc)
+	require.True(t, ok)
+	assert.Equal(t, 13, got.Day(), "09:30 Pacific should roll to Thursday")
+
+	// Late Monday Pacific is already Tuesday in UTC. Judging the date in UTC
+	// would skip Monday's window entirely and still land on Thursday by luck —
+	// but the reverse case (early Monday UTC) would be wrong, so assert the
+	// zone conversion directly rather than trusting the coincidence.
+	got, ok = cfg.NextDeliveryDate(time.Date(2026, time.August, 11, 3, 0, 0, 0, time.UTC), loc)
+	require.True(t, ok)
+	assert.Equal(t, 13, got.Day(), "Monday 20:00 Pacific is past cutoff → Thursday")
+}
+
+func TestNextDeliveryDateUnschedulable(t *testing.T) {
+	loc := pacific(t)
+	now := time.Date(2026, time.August, 11, 10, 0, 0, 0, loc)
+
+	t.Run("no weekdays configured", func(t *testing.T) {
+		cfg := ShippingConfig{LocalDeliveryEnabled: true, LocalDeliveryCutoffMinutes: 540}
+		_, ok := cfg.NextDeliveryDate(now, loc)
+		assert.False(t, ok)
+		assert.False(t, cfg.HasDeliverySchedule())
+	})
+
+	t.Run("local delivery switched off", func(t *testing.T) {
+		cfg := monThuAt9()
+		cfg.LocalDeliveryEnabled = false
+		_, ok := cfg.NextDeliveryDate(now, loc)
+		assert.False(t, ok)
+		assert.False(t, cfg.HasDeliverySchedule())
+	})
+
+	t.Run("nil location falls back to UTC rather than panicking", func(t *testing.T) {
+		cfg := monThuAt9()
+		got, ok := cfg.NextDeliveryDate(time.Date(2026, time.August, 11, 10, 0, 0, 0, time.UTC), nil)
+		require.True(t, ok)
+		assert.Equal(t, 13, got.Day())
+	})
+}
+
+// A single-day schedule must roll a full week rather than returning the same
+// day it just disqualified.
+func TestNextDeliveryDateSingleWeekdayRollsAWeek(t *testing.T) {
+	loc := pacific(t)
+	cfg := ShippingConfig{
+		LocalDeliveryEnabled:       true,
+		LocalDeliveryWeekdays:      []time.Weekday{time.Monday},
+		LocalDeliveryCutoffMinutes: 9 * 60,
+	}
+
+	got, ok := cfg.NextDeliveryDate(time.Date(2026, time.August, 10, 11, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 17, got.Day(), "past Monday's cutoff should mean the following Monday")
+	assert.Equal(t, time.Monday, got.Weekday())
+}
+
+func TestDeliveryDaysLabel(t *testing.T) {
+	tests := []struct {
+		name     string
+		weekdays []time.Weekday
+		want     string
+	}{
+		{"none", nil, ""},
+		{"one", []time.Weekday{time.Monday}, "Mondays"},
+		{"two", []time.Weekday{time.Monday, time.Thursday}, "Mondays and Thursdays"},
+		{"three", []time.Weekday{time.Monday, time.Wednesday, time.Friday}, "Mondays, Wednesdays, and Fridays"},
+		{"normalizes to week order", []time.Weekday{time.Thursday, time.Monday}, "Mondays and Thursdays"},
+		{"sunday sorts first", []time.Weekday{time.Saturday, time.Sunday}, "Sundays and Saturdays"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := ShippingConfig{LocalDeliveryWeekdays: tc.weekdays}
+			assert.Equal(t, tc.want, cfg.DeliveryDaysLabel())
+		})
+	}
+}
+
+func TestCutoffLabel(t *testing.T) {
+	tests := []struct {
+		minutes int
+		want    string
+	}{
+		{0, "12am"},
+		{9 * 60, "9am"},
+		{9*60 + 30, "9:30am"},
+		{11*60 + 5, "11:05am"},
+		{12 * 60, "12pm"},
+		{13 * 60, "1pm"},
+		{16*60 + 45, "4:45pm"},
+		{23 * 60, "11pm"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.want, func(t *testing.T) {
+			cfg := ShippingConfig{LocalDeliveryCutoffMinutes: tc.minutes}
+			assert.Equal(t, tc.want, cfg.CutoffLabel())
+		})
+	}
+}
+
+func TestDeliveryDateLabel(t *testing.T) {
+	loc := pacific(t)
+	assert.Equal(t, "Thursday, August 13",
+		DeliveryDateLabel(time.Date(2026, time.August, 13, 0, 0, 0, 0, loc)))
+	assert.Equal(t, "Monday, September 7",
+		DeliveryDateLabel(time.Date(2026, time.September, 7, 0, 0, 0, 0, loc)))
+}

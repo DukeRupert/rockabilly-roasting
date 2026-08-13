@@ -1,0 +1,174 @@
+package storefront
+
+import "github.com/dukerupert/hiri/internal/ui/layouts"
+
+// SwitchToPickupReason names why the switch could not be offered, so the page
+// can say something useful instead of a generic failure.
+type SwitchToPickupReason string
+
+const (
+	// SwitchToPickupReasonInvalid covers a link we cannot verify — malformed,
+	// tampered with, or signed under a rotated secret. Deliberately vague.
+	SwitchToPickupReasonInvalid SwitchToPickupReason = "invalid"
+	// SwitchToPickupReasonExpired is a genuine link that has aged out.
+	SwitchToPickupReasonExpired SwitchToPickupReason = "expired"
+	// SwitchToPickupReasonTooLate is an order already packed, dispatched, or
+	// cancelled.
+	SwitchToPickupReasonTooLate SwitchToPickupReason = "too_late"
+	// SwitchToPickupReasonPickupOff is the shop not currently offering pickup.
+	SwitchToPickupReasonPickupOff SwitchToPickupReason = "pickup_off"
+)
+
+type SwitchToPickupProps struct {
+	// Token is echoed back so the confirm button can POST it. The page never
+	// acts on GET — see web/switch_to_pickup.go for why.
+	Token       string
+	OrderNumber string
+	// DeliveryDate is the run the customer is currently booked on, named so
+	// they can weigh the wait against a trip to the shop.
+	DeliveryDate       string
+	PickupInstructions string
+	Reason             SwitchToPickupReason
+}
+
+// switchToPickupShell wraps every outcome in one paper card so the flow reads
+// as a single conversation rather than a set of unrelated pages. Mirrors
+// unsubscribeShell — both are one-off pages a customer reaches from an email.
+templ switchToPickupShell(eyebrow, heading, script string) {
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)] flex items-center">
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-md lg:max-w-xl w-full px-6 sm:px-10 lg:px-14 py-14 sm:py-20">
+			<div class="text-center mb-8">
+				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+					{ eyebrow }
+				</p>
+				<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;">
+					{ heading }
+					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">{ script }</span>
+				</h1>
+			</div>
+			<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8 text-center">
+				{ children... }
+			</div>
+		</div>
+	</section>
+}
+
+templ SwitchToPickupConfirmContent(props SwitchToPickupProps) {
+	@switchToPickupShell("Order "+props.OrderNumber, "Grab it", "at the shop?") {
+		if props.DeliveryDate != "" {
+			<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+				Your order is booked on the delivery run for
+				<strong class="text-ink">{ props.DeliveryDate }</strong>.
+			</p>
+		} else {
+			<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+				Your order is booked for local delivery.
+			</p>
+		}
+		<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+			Don't want to wait? Switch it to pickup and we'll have it packed and waiting at the shop &mdash; usually the same day we roast it.
+		</p>
+		if props.PickupInstructions != "" {
+			<p class="font-mono text-ink text-xs mt-4 border-2 border-ink bg-paper p-3 leading-relaxed">
+				{ props.PickupInstructions }
+			</p>
+		}
+		<form method="post" action="/orders/switch-to-pickup" class="mt-6">
+			<input type="hidden" name="t" value={ props.Token }/>
+			<button type="submit" class="btn-stamp w-full border-2 border-ink bg-rust text-paper px-5 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
+				Switch to pickup
+			</button>
+		</form>
+		<a href="/" class="inline-block mt-4 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+			No thanks &mdash; deliver it
+		</a>
+	}
+}
+
+templ SwitchToPickupDoneContent(props SwitchToPickupProps) {
+	@switchToPickupShell("Order "+props.OrderNumber, "Waiting", "at the shop.") {
+		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+			Order <strong class="text-ink">{ props.OrderNumber }</strong> is switched to pickup. We'll email you the moment it's packed and ready.
+		</p>
+		if props.PickupInstructions != "" {
+			<p class="font-mono text-ink text-xs mt-4 border-2 border-ink bg-paper p-3 leading-relaxed">
+				{ props.PickupInstructions }
+			</p>
+		}
+		<p class="font-oswald text-ink-soft text-sm mt-4 leading-relaxed">
+			Changed your mind? Give us a shout and we'll put it back on the van.
+		</p>
+		<a href="/" class="inline-block mt-5 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+			Back to the shop
+		</a>
+	}
+}
+
+templ SwitchToPickupProblemContent(props SwitchToPickupProps) {
+	switch props.Reason {
+		case SwitchToPickupReasonExpired:
+			@switchToPickupShell("Pickup switch", "Link", "expired.") {
+				<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+					That link has aged out. If the order hasn't gone out yet, we can still switch it by hand.
+				</p>
+				<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+					Reply to your confirmation email and we'll sort it.
+				</p>
+			}
+		case SwitchToPickupReasonTooLate:
+			@switchToPickupShell("Pickup switch", "Already", "on its way.") {
+				<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+					This one's past the point we can change it &mdash; it's packed or already out for delivery.
+				</p>
+				<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+					Reply to your confirmation email and we'll figure it out with you.
+				</p>
+			}
+		case SwitchToPickupReasonPickupOff:
+			@switchToPickupShell("Pickup switch", "Pickup's", "closed.") {
+				<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+					We're not doing shop pickup at the moment, so your order stays on the delivery run.
+				</p>
+				<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+					Reply to your confirmation email if you need it sooner.
+				</p>
+			}
+		default:
+			@switchToPickupShell("Pickup switch", "Link", "not recognized.") {
+				<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+					We couldn't read that link. Email clients sometimes break them in transit.
+				</p>
+				<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+					Reply to your confirmation email and we'll switch the order over by hand.
+				</p>
+			}
+	}
+}
+
+templ SwitchToPickupConfirmPage(props SwitchToPickupProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Switch to Pickup",
+		Description: "Switch your Rockabilly Roasting Co. order from local delivery to pickup at the shop.",
+	}) {
+		@SwitchToPickupConfirmContent(props)
+	}
+}
+
+templ SwitchToPickupDonePage(props SwitchToPickupProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Ready for Pickup",
+		Description: "Your Rockabilly Roasting Co. order is switched to pickup at the shop.",
+	}) {
+		@SwitchToPickupDoneContent(props)
+	}
+}
+
+templ SwitchToPickupProblemPage(props SwitchToPickupProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Switch to Pickup",
+		Description: "We couldn't switch this order to pickup.",
+	}) {
+		@SwitchToPickupProblemContent(props)
+	}
+}

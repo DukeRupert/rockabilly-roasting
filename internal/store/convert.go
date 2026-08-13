@@ -116,6 +116,52 @@ func dateToPG(s *string) pgtype.Date {
 	return pgtype.Date{Time: t, Valid: true}
 }
 
+// dateTimeToPG converts a *time.Time to pgtype.Date, keeping only the calendar
+// date. Nil becomes SQL NULL.
+//
+// The wall-clock date is taken as-is rather than converted to UTC first: values
+// reaching here are already midnight in the merchant's zone, and converting
+// would push an evening-side date back a day.
+func dateTimeToPG(t *time.Time) pgtype.Date {
+	if t == nil {
+		return pgtype.Date{Valid: false}
+	}
+	y, m, d := t.Date()
+	return pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
+}
+
+// weekdaysFromPG converts the smallint[] stored in shipping_config into
+// time.Weekday values. Out-of-range entries are dropped rather than returned as
+// nonsense weekdays — the column has no CHECK constraint, and a bad row should
+// degrade to "no schedule" instead of resolving deliveries to a day that does
+// not exist.
+func weekdaysFromPG(days []int16) []time.Weekday {
+	out := make([]time.Weekday, 0, len(days))
+	for _, d := range days {
+		if d < 0 || d > 6 {
+			continue
+		}
+		out = append(out, time.Weekday(d))
+	}
+	return out
+}
+
+// weekdaysToPG converts time.Weekday values to the smallint[] representation,
+// dropping duplicates and out-of-range days so the stored schedule is always
+// canonical regardless of what the admin form submitted.
+func weekdaysToPG(days []time.Weekday) []int16 {
+	out := make([]int16, 0, len(days))
+	for day := time.Sunday; day <= time.Saturday; day++ {
+		for _, d := range days {
+			if d == day {
+				out = append(out, int16(day))
+				break
+			}
+		}
+	}
+	return out
+}
+
 // int32PtrToIntPtr converts *int32 to *int.
 func int32PtrToIntPtr(p *int32) *int {
 	if p == nil {

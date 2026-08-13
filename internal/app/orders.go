@@ -13,6 +13,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -31,6 +32,17 @@ type OrderService struct {
 	discounts     *store.DiscountStore     // populated via WithDiscounts; required for CancelOrder coupon release
 	enqueuer      JobEnqueuer              // populated via WithEnqueuer; required for ready-for-pickup / out-for-delivery email enqueue
 	pricing       *store.PricingStore      // populated via WithPricing; required for ChangeLineItemVariant price-match guard
+	// orderActions signs the switch-to-pickup link in order confirmations.
+	// Optional: without it the email offers the switch by reply instead.
+	orderActions *auth.OrderActionSigner
+}
+
+// WithOrderActionSigner wires the signer used to mint one-click order links in
+// transactional email. Without it, confirmations still send — they just ask the
+// customer to reply rather than printing a link nothing could verify.
+func (s *OrderService) WithOrderActionSigner(signer *auth.OrderActionSigner) *OrderService {
+	s.orderActions = signer
+	return s
 }
 
 // NewOrderService creates a new OrderService.
@@ -723,6 +735,98 @@ func (s *OrderService) MarkReadyForPickup(ctx context.Context, tx pgx.Tx, id uui
 	}
 
 	return order, nil
+}
+
+// SwitchToPickup moves a local-delivery order to pickup at the customer's
+// request, following the one-click link in their confirmation email.
+//
+// changed is false when the order is already on pickup. That is a success, not
+// an error: a customer who clicks the link twice, or whose mail client prefetches
+// it, should see "you're set for pickup" rather than a failure page.
+//
+// No totals change. Local delivery and pickup are both free
+// (ShippingConfig.CalculateForMethod), so the switch cannot alter what was
+// charged — which is what makes it safe to expose without re-authentication.
+//
+// The order must still be unfulfilled. Once it has been packed, dispatched, or
+// cancelled the answer is a phone call to the shop, not a database write.
+func (s *OrderService) SwitchToPickup(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (_ *domain.Order, changed bool, err error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, false, ErrOrderNotFound
+		}
+		return nil, false, fmt.Errorf("get order for switch-to-pickup: %w", err)
+	}
+
+	// Already switched — report success without touching the row.
+	if order.ShippingMethod != nil && *order.ShippingMethod == domain.ShippingMethodPickup {
+		return order, false, nil
+	}
+	if order.ShippingMethod == nil || *order.ShippingMethod != domain.ShippingMethodLocalDelivery {
+		return nil, false, ErrOrderNotSwitchable
+	}
+	if order.FulfillmentStatus != domain.FulfillmentStatusUnfulfilled {
+		return nil, false, ErrOrderNotSwitchable
+	}
+	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
+		return nil, false, ErrOrderNotSwitchable
+	}
+
+	// Offering pickup for an order the shop cannot actually fulfill that way
+	// would strand it in a queue nobody works. Checked against live config
+	// rather than the emailed link, so turning pickup off in admin closes the
+	// door on links already sitting in inboxes.
+	if s.shipments == nil {
+		return nil, false, ErrPickupUnavailable
+	}
+	cfg, err := s.shipments.GetConfig(ctx, tx)
+	if err != nil {
+		return nil, false, fmt.Errorf("get shipping config for switch-to-pickup: %w", err)
+	}
+	if !cfg.LocalPickupEnabled {
+		return nil, false, ErrPickupUnavailable
+	}
+
+	updated, ok, err := s.orders.SwitchOrderToPickup(ctx, tx, id)
+	if err != nil {
+		return nil, false, fmt.Errorf("switch order to pickup: %w", err)
+	}
+	if !ok {
+		// Lost a race with staff editing the method between the read above and
+		// this write.
+		return nil, false, ErrOrderNotSwitchable
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderSwitchedToPickup,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        updated,
+		Metadata: map[string]any{
+			"from":                   string(domain.ShippingMethodLocalDelivery),
+			"released_delivery_date": formatScheduledDate(order.ScheduledDeliveryDate),
+			"via":                    "confirmation_email_link",
+		},
+	}); err != nil {
+		return nil, false, fmt.Errorf("audit switch-to-pickup: %w", err)
+	}
+
+	return updated, true, nil
+}
+
+// formatScheduledDate renders a delivery date for the audit log, or "" when the
+// order carried none. Recording the date the order gave up makes it possible to
+// answer "what were they originally promised?" after the column has been
+// cleared.
+func formatScheduledDate(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format("2006-01-02")
 }
 
 // MarkPickedUp transitions a ready_for_pickup order to delivered/complete.

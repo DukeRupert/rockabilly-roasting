@@ -3,8 +3,8 @@ INSERT INTO orders (id, number, customer_id, status, payment_status, fulfillment
                     currency_code, subtotal, discount_total, shipping_total, tax_total, total,
                     shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
                     tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at,
-                    shipping_method, requested_delivery_date, channel)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+                    shipping_method, requested_delivery_date, channel, scheduled_delivery_date)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
 RETURNING *;
 
 -- name: GetOrderByID :one
@@ -64,6 +64,21 @@ RETURNING *;
 UPDATE orders
 SET requested_delivery_date = $2, updated_at = now()
 WHERE id = $1
+RETURNING *;
+
+-- name: SwitchOrderToPickup :one
+-- Moves a local-delivery order to pickup and drops the delivery promise in one
+-- statement, so an order can never be left as pickup while still advertising a
+-- delivery date. The WHERE clause is the guard: it matches only an order that
+-- is still on local delivery, which makes a replayed click (the customer
+-- refreshing the confirmation page, or a mail client prefetching the link)
+-- return no rows instead of clobbering an order staff have since moved on.
+UPDATE orders
+SET shipping_method = 'pickup',
+    scheduled_delivery_date = NULL,
+    updated_at = now()
+WHERE id = $1
+  AND shipping_method = 'local_delivery'
 RETURNING *;
 
 -- name: DeleteOrder :exec

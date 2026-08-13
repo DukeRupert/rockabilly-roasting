@@ -32,6 +32,20 @@ type RenewalService struct {
 	catalog       *store.CatalogStore  // populated via WithTaxCalc; needed to read per-product tax exemption
 	renewalLoc    *time.Location       // populated via WithRenewalAnchor; nil disables renewal-time anchoring
 	renewalHour   int                  // hour-of-day (0–23) in renewalLoc that renewals fire at
+
+	// merchantTZ is the zone the local-delivery cutoff is judged in. Kept
+	// separate from renewalLoc deliberately: the anchor governs when renewals
+	// fire and could be retuned for billing reasons, while this governs what
+	// day a customer is told their coffee arrives. They happen to be the same
+	// zone today, and neither should silently move the other.
+	merchantTZ *time.Location
+}
+
+// WithMerchantTZ sets the zone used to resolve local-delivery dates on renewal
+// orders against the order-by cutoff.
+func (s *RenewalService) WithMerchantTZ(loc *time.Location) *RenewalService {
+	s.merchantTZ = loc
+	return s
 }
 
 // NewRenewalService creates a new RenewalService.
@@ -373,24 +387,26 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		orderNumber := fmt.Sprintf("SUB-%d", time.Now().UnixMilli())
 		customerID := customer.ID
 		subID := sub.ID
+		renewalPlacedAt := time.Now()
 
 		var txErr error
 		order, txErr = s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
-			Number:            orderNumber,
-			CustomerID:        &customerID,
-			Status:            domain.OrderStatusConfirmed,
-			PaymentStatus:     domain.PaymentStatusCaptured,
-			FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
-			CurrencyCode:      "USD",
-			Subtotal:          subtotalCents,
-			ShippingTotal:     shippingCents,
-			TaxTotal:          taxCents,
-			Total:             totalCents,
-			ShippingAddressID: sub.ShippingAddressID,
-			BillingAddressID:  sub.ShippingAddressID,
-			SubscriptionID:    &subID,
-			ShippingMethod:    shipMethod,
-			PlacedAt:          time.Now(),
+			Number:                orderNumber,
+			CustomerID:            &customerID,
+			Status:                domain.OrderStatusConfirmed,
+			PaymentStatus:         domain.PaymentStatusCaptured,
+			FulfillmentStatus:     domain.FulfillmentStatusUnfulfilled,
+			CurrencyCode:          "USD",
+			Subtotal:              subtotalCents,
+			ShippingTotal:         shippingCents,
+			TaxTotal:              taxCents,
+			Total:                 totalCents,
+			ShippingAddressID:     sub.ShippingAddressID,
+			BillingAddressID:      sub.ShippingAddressID,
+			SubscriptionID:        &subID,
+			ShippingMethod:        shipMethod,
+			ScheduledDeliveryDate: scheduleLocalDelivery(ctx, tx, s.shipping, shipMethod, renewalPlacedAt, s.merchantTZ),
+			PlacedAt:              renewalPlacedAt,
 			Metadata: map[string]any{
 				"subscription_renewal": true,
 				"period_start":         sub.CurrentPeriodEnd.Format(time.RFC3339),
@@ -666,24 +682,26 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	err = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		orderNumber := fmt.Sprintf("SUB-%d", time.Now().UnixMilli())
 		customerID := customer.ID
+		renewalPlacedAt := time.Now()
 
 		var txErr error
 		order, txErr = s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
-			Number:            orderNumber,
-			CustomerID:        &customerID,
-			Status:            domain.OrderStatusConfirmed,
-			PaymentStatus:     domain.PaymentStatusCaptured,
-			FulfillmentStatus: domain.FulfillmentStatusUnfulfilled,
-			CurrencyCode:      "USD",
-			Subtotal:          subtotalCents,
-			ShippingTotal:     shippingCents,
-			TaxTotal:          taxCents,
-			Total:             orderTotal,
-			ShippingAddressID: addr.ID,
-			BillingAddressID:  addr.ID,
-			SubscriptionID:    nil, // batched — use subscription_orders for linking
-			ShippingMethod:    shipMethod,
-			PlacedAt:          time.Now(),
+			Number:                orderNumber,
+			CustomerID:            &customerID,
+			Status:                domain.OrderStatusConfirmed,
+			PaymentStatus:         domain.PaymentStatusCaptured,
+			FulfillmentStatus:     domain.FulfillmentStatusUnfulfilled,
+			CurrencyCode:          "USD",
+			Subtotal:              subtotalCents,
+			ShippingTotal:         shippingCents,
+			TaxTotal:              taxCents,
+			Total:                 orderTotal,
+			ShippingAddressID:     addr.ID,
+			BillingAddressID:      addr.ID,
+			SubscriptionID:        nil, // batched — use subscription_orders for linking
+			ShippingMethod:        shipMethod,
+			ScheduledDeliveryDate: scheduleLocalDelivery(ctx, tx, s.shipping, shipMethod, renewalPlacedAt, s.merchantTZ),
+			PlacedAt:              renewalPlacedAt,
 			Metadata: map[string]any{
 				"subscription_renewal": true,
 				"batch_size":           len(items),

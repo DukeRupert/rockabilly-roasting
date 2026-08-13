@@ -47,6 +47,66 @@ func TestRender_OrderConfirm(t *testing.T) {
 	assert.Contains(t, text, "ORD-123")
 	assert.Contains(t, text, "Jane")
 	assert.Contains(t, text, "$36.00")
+
+	// A shipped order carries no delivery date, so the whole local-delivery
+	// block must collapse — a mailed order must never be told about the van.
+	assert.NotContains(t, html, "Out for delivery")
+	assert.NotContains(t, html, "Switch to pickup")
+	assert.NotContains(t, text, "OUT FOR DELIVERY")
+	assert.NotContains(t, text, "switch-to-pickup")
+}
+
+// The delivery block is the whole point of the cutoff feature: it tells the
+// customer which run they made and offers the way out if it's too far off.
+func TestRender_OrderConfirmLocalDelivery(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	base := OrderConfirmData{
+		CustomerName:   "Jane",
+		OrderNumber:    "ORD-124",
+		OrderDate:      time.Date(2026, 8, 10, 0, 0, 0, 0, time.UTC),
+		Items:          []OrderLineItemData{{ProductName: "Dark Roast 12oz", Quantity: 1, UnitPrice: 1800, Total: 1800}},
+		Subtotal:       1800,
+		OrderTotal:     1800,
+		StoreName:      "Rockabilly Roasting",
+		StoreURL:       "https://rockabillyroasting.com",
+		DeliveryDate:   "Thursday, August 13",
+		DeliveryCutoff: "9am",
+	}
+
+	t.Run("with a switch link", func(t *testing.T) {
+		data := base
+		data.SwitchToPickupURL = "https://rockabillyroasting.com/orders/switch-to-pickup?t=abc.def"
+		data.PickupInstructions = "101 W Kennewick Ave, Tue–Sat 8a–4p"
+
+		html, text, err := r.Render("order_confirm", data)
+		require.NoError(t, err)
+
+		for _, out := range []string{html, text} {
+			assert.Contains(t, out, "Thursday, August 13")
+			assert.Contains(t, out, "9am")
+			assert.Contains(t, out, "switch-to-pickup?t=abc.def")
+			assert.Contains(t, out, "101 W Kennewick Ave")
+		}
+		// With a working link, don't also tell them to reply — one call to action.
+		assert.NotContains(t, text, "reply to this email and we'll switch")
+	})
+
+	t.Run("without a signer, falls back to reply", func(t *testing.T) {
+		// SwitchToPickupURL empty models an unset signing secret or a
+		// pickup-disabled shop. The date must still land, and the offer must
+		// degrade to a reply rather than rendering a dead link.
+		html, text, err := r.Render("order_confirm", base)
+		require.NoError(t, err)
+
+		assert.Contains(t, html, "Thursday, August 13")
+		assert.Contains(t, text, "Thursday, August 13")
+		assert.NotContains(t, html, "href=\"\"")
+		assert.NotContains(t, html, "switch-to-pickup")
+		assert.NotContains(t, text, "switch-to-pickup")
+		assert.Contains(t, strings.ToLower(text), "reply to this email")
+	})
 }
 
 func TestRender_OrderShipped(t *testing.T) {

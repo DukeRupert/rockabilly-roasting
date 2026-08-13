@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -50,6 +51,9 @@ type CreateOrderParams struct {
 	StripeTaxID           *string
 	ShippingMethod        *domain.ShippingMethod
 	RequestedDeliveryDate *time.Time
+	// ScheduledDeliveryDate is the local-delivery run this order was promised.
+	// Nil for every other method; see domain.Order.ScheduledDeliveryDate.
+	ScheduledDeliveryDate *time.Time
 	Notes                 *string
 	Metadata              map[string]any
 	PlacedAt              time.Time
@@ -92,6 +96,7 @@ func (s *OrderStore) CreateOrder(ctx context.Context, tx pgx.Tx, p CreateOrderPa
 		StripeTaxID:           p.StripeTaxID,
 		ShippingMethod:        shippingMethod,
 		RequestedDeliveryDate: timestampToPG(p.RequestedDeliveryDate),
+		ScheduledDeliveryDate: dateTimeToPG(p.ScheduledDeliveryDate),
 		Notes:                 p.Notes,
 		Metadata:              metadataToJSON(p.Metadata),
 		PlacedAt:              p.PlacedAt,
@@ -185,6 +190,22 @@ func (s *OrderStore) UpdateOrderShippingMethod(ctx context.Context, tx pgx.Tx, i
 		return nil, fmt.Errorf("update order shipping method: %w", err)
 	}
 	return orderFromRow(row), nil
+}
+
+// SwitchOrderToPickup moves a local-delivery order to pickup and clears its
+// delivery promise. ok is false when the order was not on local delivery — it
+// was already switched, or staff changed the method — which lets the caller
+// treat a replayed click as a no-op rather than an error.
+func (s *OrderStore) SwitchOrderToPickup(ctx context.Context, tx pgx.Tx, id uuid.UUID) (_ *domain.Order, ok bool, err error) {
+	defer trackQuery(s.metrics, "orders.switch_to_pickup", time.Now(), &err)
+	row, err := sqlcgen.New(tx).SwitchOrderToPickup(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("switch order to pickup: %w", err)
+	}
+	return orderFromRow(row), true, nil
 }
 
 // UpdateOrderStripePaymentIntentID sets the Stripe PaymentIntent ID on an order.
@@ -1519,6 +1540,7 @@ func orderFromRow(r sqlcgen.Order) *domain.Order {
 		QBInvoiceNo:              r.QbInvoiceNo,
 		QBSyncedAt:               timestampFromPG(r.QbSyncedAt),
 		RequestedDeliveryDate:    timestampFromPG(r.RequestedDeliveryDate),
+		ScheduledDeliveryDate:    dateFromPG(r.ScheduledDeliveryDate),
 		CustomerPONumber:         r.CustomerPoNumber,
 		InternalNote:             r.InternalNote,
 		Notes:                    r.Notes,

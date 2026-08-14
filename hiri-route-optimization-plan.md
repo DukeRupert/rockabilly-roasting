@@ -484,7 +484,11 @@ Verified with a four-stop Tri-Cities `/trip` (see the known-good baseline in
 - **Test:** table-driven tests with a mocked OSRM response; one integration test
   against the live container
 
-### Step 4 — Route persistence + admin flow
+### Step 4 — Route persistence + admin flow ✅ done 2026-08-14
+Migration 067, `store.RouteStore`, `RouteService.WithPersistence`, admin review
+page at `/admin/routes/{id}`, "Plan route" on the Load list tab. Wired into
+`main.go`; prod needs `OSRM_BASE_URL=http://osrm:5000` and
+`GOOGLE_GEOCODING_API_KEY` in `.env`.
 - Migration `067_delivery_routes.sql` (`delivery_routes`, `route_stops`)
 - "Plan delivery route" action on the Load list tab: runs the planner, saves a
   `draft` route, shows ordered stops with a review list (addresses, ETAs,

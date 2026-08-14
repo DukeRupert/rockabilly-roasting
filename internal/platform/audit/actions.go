@@ -207,4 +207,11 @@ const (
 	AuditAttributeKeyUpdated      = "attribute_key.updated"
 	AuditAttributeKeyDeleted      = "attribute_key.deleted"
 	AuditProductAttributesUpdated = "product.attributes_updated"
+
+	// Delivery route actions
+	AuditRoutePlanned     = "delivery_route.planned"
+	AuditRouteActivated   = "delivery_route.activated"
+	AuditRouteCompleted   = "delivery_route.completed"
+	AuditRouteStopRemoved = "delivery_route.stop_removed"
+	AuditRouteStopSkipped = "delivery_route.stop_skipped"
 )

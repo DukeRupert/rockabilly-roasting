@@ -229,6 +229,15 @@ var (
 	// ErrOriginNotGeocodable means the configured origin exists but cannot be
 	// placed on the map — every route starts there, so planning cannot proceed.
 	ErrOriginNotGeocodable = errors.New("roastery origin address could not be geocoded")
+	ErrRouteNotFound       = errors.New("delivery route not found")
+	// ErrRouteAlreadyActive guards a driver mid-run: re-planning a date whose
+	// route is already out with a driver would swap the stop list under them.
+	ErrRouteAlreadyActive = errors.New("a route for this date is already active; complete it before re-planning")
+	// ErrRouteNotActivatable means the route is gone or already active.
+	// Re-activating would mint a second token and break the link the driver
+	// already has open.
+	ErrRouteNotActivatable = errors.New("only a draft route can be activated")
+	ErrRouteEmpty          = errors.New("a route needs at least one stop before it can be activated")
 )
 
 // MOQViolationError carries the per-line minimum/multiple violations so

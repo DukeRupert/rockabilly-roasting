@@ -47,6 +47,7 @@ type Deps struct {
 	CatalogService         *app.CatalogService
 	CheckoutService        *app.CheckoutService
 	FulfillmentService     *app.FulfillmentService
+	RouteService           *app.RouteService
 	SubscriptionService    *app.SubscriptionService
 	DiscountService        *app.DiscountService
 	AuthService            *app.AuthService
@@ -506,6 +507,15 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("GET /admin/wholesale/fulfillment", deps.handleAdminWholesaleFulfillmentList)
 	adminMux.HandleFunc("GET /admin/fulfillment/load-list/totals", deps.handleAdminFulfillmentLoadListTotals)
 	adminMux.HandleFunc("GET /admin/fulfillment/load-list/print", deps.handleAdminFulfillmentLoadListPrint)
+
+	// Delivery route planning. Gated on orders:fulfill — the same permission
+	// that guards the fulfillment queue these routes are planned from.
+	adminMux.Handle("POST /admin/fulfillment/route/plan", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRoutePlan)))
+	adminMux.Handle("GET /admin/routes", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteList)))
+	adminMux.Handle("GET /admin/routes/{id}", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteShow)))
+	adminMux.Handle("POST /admin/routes/{id}/activate", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteActivate)))
+	adminMux.Handle("POST /admin/routes/{id}/complete", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteComplete)))
+	adminMux.Handle("POST /admin/routes/{id}/stops/{stopID}/remove", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteStopRemove)))
 	adminMux.HandleFunc("GET /admin/orders/{id}/rates", deps.handleAdminShipmentRates)
 	adminMux.HandleFunc("POST /admin/orders/{id}/label", deps.handleAdminShipmentLabelBuy)
 	adminMux.HandleFunc("POST /admin/orders/labels", deps.handleAdminShipmentBulkLabelCreate)

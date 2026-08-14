@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/routing"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -48,6 +49,11 @@ type RouteService struct {
 	shipping  *store.ShippingStore
 	geocoding *GeocodingService
 	router    *routing.Client
+
+	// Persistence is optional at construction: planning is read-only, and the
+	// admin flow attaches these with WithPersistence at wiring time.
+	routes *store.RouteStore
+	audit  *audit.AuditWriter
 }
 
 // NewRouteService creates a RouteService.

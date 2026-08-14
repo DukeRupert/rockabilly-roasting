@@ -28,6 +28,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/build"
 	"github.com/dukerupert/hiri/internal/platform/email"
+	"github.com/dukerupert/hiri/internal/platform/geocode"
 	"github.com/dukerupert/hiri/internal/platform/help"
 	"github.com/dukerupert/hiri/internal/platform/logging"
 	"github.com/dukerupert/hiri/internal/platform/media"
@@ -36,6 +37,7 @@ import (
 	"github.com/dukerupert/hiri/internal/platform/payments"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/platform/ratelimit"
+	"github.com/dukerupert/hiri/internal/platform/routing"
 	hiresentry "github.com/dukerupert/hiri/internal/platform/sentry"
 	"github.com/dukerupert/hiri/internal/platform/sessions"
 	"github.com/dukerupert/hiri/internal/platform/shipping"
@@ -359,6 +361,8 @@ func run() error {
 	staffInviteTokenStore := store.NewStaffInviteTokenStore()
 	customerUserStore := store.NewCustomerUserStore()
 	customerUserInviteTokenStore := store.NewCustomerUserInviteTokenStore()
+	geocodeStore := store.NewGeocodeStore(metricsReg)
+	routeStore := store.NewRouteStore(metricsReg)
 
 	// Email environment shared by every service that sends transactional email.
 	emailEnv := app.EmailEnv{
@@ -412,6 +416,18 @@ func run() error {
 	customerGroupSvc := app.NewCustomerGroupService(customerGroupStore, auditWriter, metricsReg)
 	priceListSvc := app.NewPriceListService(priceListStore, auditWriter, metricsReg).
 		WithSettings(settingsStore)
+	// Delivery route planning. Both externals degrade to a clear error rather
+	// than a wrong answer: an empty geocoding key serves whatever is already
+	// cached and refuses new lookups, and an empty OSRM URL refuses to plan
+	// rather than handing a driver an unoptimized route that looks fine.
+	geocodingSvc := app.NewGeocodingService(geocodeStore, geocode.NewGoogleGeocoder(os.Getenv("GOOGLE_GEOCODING_API_KEY")))
+	osrmClient := routing.NewClient(os.Getenv("OSRM_BASE_URL"))
+	routeSvc := app.NewRouteService(orderStore, customerStore, shippingStore, geocodingSvc, osrmClient).
+		WithPersistence(routeStore, auditWriter)
+	if !osrmClient.Enabled() {
+		logger.Warn("OSRM_BASE_URL is empty — delivery route planning is disabled")
+	}
+
 	auditQuerySvc := app.NewAuditQueryService(auditStore)
 	webhookSvc := app.NewWebhookService(webhookStore)
 
@@ -638,6 +654,7 @@ func run() error {
 		Metrics:                metricsReg,
 		Sessions:               sessionMgr,
 		OrderService:           orderSvc,
+		RouteService:           routeSvc,
 		CustomerService:        customerSvc,
 		CatalogService:         catalogSvc,
 		CheckoutService:        checkoutSvc,

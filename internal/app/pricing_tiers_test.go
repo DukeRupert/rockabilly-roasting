@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/testutil"
@@ -281,4 +282,213 @@ func TestExistingPriceReadsIgnoreTiers(t *testing.T) {
 	bases, err := pricing.ListBasePricesByVariants(ctx, tx, []uuid.UUID{f.variantID}, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, 1500, bases[f.variantID])
+}
+
+// --- PricingService: quantity-aware resolution ---
+
+// tieredCustomerFixture puts a wholesale customer on a price list holding a
+// three-rung ladder, which is the shape the client's Wholesale 2025/2026 lists
+// will take.
+func newTieredCustomerFixture(t *testing.T, tx pgx.Tx) (customerID, variantID uuid.UUID) {
+	t.Helper()
+	ctx := context.Background()
+	pricing := store.NewPricingStore()
+
+	list := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx, testutil.WithPriceList(list.ID))
+	approveWholesaleCustomer(t, tx, customer.ID)
+
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+	testutil.CreatePriceListPrice(t, tx, list.ID, variant.ID, 1100, "USD")
+
+	ps, err := pricing.GetOrCreatePriceSet(ctx, tx, variant.ID)
+	require.NoError(t, err)
+	_, err = pricing.SetTierPrice(ctx, tx, ps.ID, list.ID, 12, 1000, "USD")
+	require.NoError(t, err)
+	_, err = pricing.SetTierPrice(ctx, tx, ps.ID, list.ID, 24, 950, "USD")
+	require.NoError(t, err)
+
+	return customer.ID, variant.ID
+}
+
+func TestResolveForCustomer_QuantitySelectsTheRung(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+	customerID, variantID := newTieredCustomerFixture(t, tx)
+
+	for _, tc := range []struct {
+		qty  int
+		want int64
+	}{
+		{1, 1100}, {11, 1100}, {12, 1000}, {23, 1000}, {24, 950}, {500, 950},
+	} {
+		got, err := svc.ResolveForCustomer(ctx, tx, variantID, customerID, tc.qty, "USD")
+		require.NoError(t, err)
+		assert.Equal(t, tc.want, got, "qty %d", tc.qty)
+	}
+}
+
+func TestResolveForCustomer_AgreesWithLadder(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+	customerID, variantID := newTieredCustomerFixture(t, tx)
+
+	ladder, err := svc.LadderForCustomer(ctx, tx, variantID, customerID, "USD")
+	require.NoError(t, err)
+
+	// The two surfaces must not drift: whatever the order sheet renders from the
+	// ladder is what the cart will charge.
+	for qty := 1; qty <= 30; qty++ {
+		got, err := svc.ResolveForCustomer(ctx, tx, variantID, customerID, qty, "USD")
+		require.NoError(t, err)
+		assert.Equal(t, int64(ladder.UnitPriceAt(qty)), got, "qty %d", qty)
+	}
+}
+
+func TestLadderForCustomer_BasePriceIsASingleRung(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+
+	customer := testutil.CreateCustomer(t, tx) // retail, no price list
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+
+	ladder, err := svc.LadderForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	require.NoError(t, err)
+	assert.False(t, ladder.IsTiered())
+	assert.Equal(t, 1500, ladder.UnitPriceAt(1))
+	assert.Equal(t, 1500, ladder.UnitPriceAt(1000), "no quantity earns a discount off base")
+}
+
+func TestResolveForCustomer_RetailIgnoresTiers(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+	pricing := store.NewPricingStore()
+
+	// A tiered wholesale list exists, but this customer is retail and assigned to
+	// nothing — volume pricing must not reach them at any quantity.
+	list := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx)
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+	testutil.CreatePriceListPrice(t, tx, list.ID, variant.ID, 1100, "USD")
+
+	ps, err := pricing.GetOrCreatePriceSet(ctx, tx, variant.ID)
+	require.NoError(t, err)
+	_, err = pricing.SetTierPrice(ctx, tx, ps.ID, list.ID, 12, 500, "USD")
+	require.NoError(t, err)
+
+	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 100, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1500), got)
+}
+
+func TestResolveForCustomerBatch_PricesEachLineAtItsOwnQuantity(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+	pricing := store.NewPricingStore()
+
+	list := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx, testutil.WithPriceList(list.ID))
+	approveWholesaleCustomer(t, tx, customer.ID)
+	product := testutil.CreateProduct(t, tx)
+
+	tiered := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("T"))
+	other := testutil.CreateVariant(t, tx, product.ID, testutil.WithSKU("O"))
+	testutil.CreatePriceListPrice(t, tx, list.ID, tiered.ID, 1100, "USD")
+	testutil.CreatePriceListPrice(t, tx, list.ID, other.ID, 800, "USD")
+
+	ps, err := pricing.GetOrCreatePriceSet(ctx, tx, tiered.ID)
+	require.NoError(t, err)
+	_, err = pricing.SetTierPrice(ctx, tx, ps.ID, list.ID, 12, 1000, "USD")
+	require.NoError(t, err)
+
+	// Per-line scope: 24 of one coffee does not discount 6 of another.
+	got, err := svc.ResolveForCustomerBatch(ctx, tx, customer.ID,
+		map[uuid.UUID]int{tiered.ID: 24, other.ID: 6}, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, 1000, got[tiered.ID])
+	assert.Equal(t, 800, got[other.ID])
+
+	got, err = svc.ResolveForCustomerBatch(ctx, tx, customer.ID,
+		map[uuid.UUID]int{tiered.ID: 6, other.ID: 24}, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, 1100, got[tiered.ID], "same variant, smaller line, opening price")
+}
+
+func TestSetTierPrice_Validation(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+
+	list := testutil.CreatePriceList(t, tx)
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+
+	err := svc.SetTierPrice(ctx, tx, variant.ID, list.ID, 1, 1000, "USD")
+	assert.ErrorIs(t, err, app.ErrInvalidTierQuantity, "quantity 1 is the list price, not a break")
+
+	err = svc.SetTierPrice(ctx, tx, variant.ID, list.ID, 12, -1, "USD")
+	assert.ErrorIs(t, err, app.ErrInvalidPrice)
+
+	require.NoError(t, svc.SetTierPrice(ctx, tx, variant.ID, list.ID, 12, 1000, "USD"))
+}
+
+func TestDeletePriceListPrice_TakesTheWholeLadder(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+	pricing := store.NewPricingStore()
+
+	list := testutil.CreatePriceList(t, tx)
+	customer := testutil.CreateCustomer(t, tx, testutil.WithPriceList(list.ID))
+	approveWholesaleCustomer(t, tx, customer.ID)
+	product := testutil.CreateProduct(t, tx)
+	variant := testutil.CreateVariant(t, tx, product.ID)
+	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
+	testutil.CreatePriceListPrice(t, tx, list.ID, variant.ID, 1100, "USD")
+	require.NoError(t, svc.SetTierPrice(ctx, tx, variant.ID, list.ID, 12, 1000, "USD"))
+
+	require.NoError(t, svc.DeletePriceListPrice(ctx, tx, variant.ID, list.ID, "USD"))
+
+	// Removing a variant from a list must not strand its breaks as a ladder with
+	// no floor — otherwise 12 units would still resolve 1000 while 1 unit
+	// resolved nothing on the list at all.
+	ladder, err := pricing.GetTierLadder(ctx, tx, variant.ID, list.ID, "USD")
+	require.NoError(t, err)
+	assert.True(t, ladder.IsEmpty())
+
+	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 12, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1500), got, "falls all the way back to base")
+}
+
+func TestDeleteTierPrice_KeepsTheListPrice(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newPricingService()
+	ctx := context.Background()
+	customerID, variantID := newTieredCustomerFixture(t, tx)
+
+	require.NoError(t, svc.DeleteTierPrice(ctx, tx, variantID, mustPriceListID(t, tx, customerID), 24, "USD"))
+
+	got, err := svc.ResolveForCustomer(ctx, tx, variantID, customerID, 24, "USD")
+	require.NoError(t, err)
+	assert.Equal(t, int64(1000), got, "falls to the 12 rung, not off the list")
+}
+
+func mustPriceListID(t *testing.T, tx pgx.Tx, customerID uuid.UUID) uuid.UUID {
+	t.Helper()
+	customer, err := store.NewCustomerStore().GetByID(context.Background(), tx, customerID)
+	require.NoError(t, err)
+	require.NotNil(t, customer.PriceListID)
+	return *customer.PriceListID
 }

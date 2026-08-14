@@ -126,16 +126,44 @@ func (s *CartService) AddItemForCustomer(ctx context.Context, tx pgx.Tx, cartID,
 		return nil, err
 	}
 
-	price, err := s.pricing.ResolveForCustomer(ctx, tx, variantID, customerID, currencyCode)
+	// Adding to a line that already exists must price the quantity the line will
+	// end up holding, not the quantity being added — 12 added to 12 is 24 units
+	// and earns the 24 rung. Resolving the delta would leave the buyer on the
+	// rung for a quantity they no longer have.
+	existing, err := s.lineQuantity(ctx, tx, cartID, variantID)
+	if err != nil {
+		return nil, err
+	}
+	resulting := existing + quantity
+
+	price, err := s.pricing.ResolveForCustomer(ctx, tx, variantID, customerID, resulting, currencyCode)
 	if err != nil {
 		return nil, err
 	}
 
-	item, err := s.carts.UpsertCartItem(ctx, tx, cartID, variantID, quantity, int(price))
+	// Set rather than upsert: the resulting quantity is already computed above,
+	// and UpsertCartItem would increment it a second time while keeping the
+	// stale unit price.
+	item, err := s.carts.SetCartItemByVariant(ctx, tx, cartID, variantID, resulting, int(price))
 	if err != nil {
 		return nil, fmt.Errorf("add item to cart: %w", err)
 	}
 	return item, nil
+}
+
+// lineQuantity returns the current quantity of a variant's cart line, or 0 when
+// the cart has no line for it.
+func (s *CartService) lineQuantity(ctx context.Context, tx pgx.Tx, cartID, variantID uuid.UUID) (int, error) {
+	items, err := s.carts.ListCartItems(ctx, tx, cartID)
+	if err != nil {
+		return 0, fmt.Errorf("list cart items: %w", err)
+	}
+	for _, item := range items {
+		if item.VariantID == variantID {
+			return item.Quantity, nil
+		}
+	}
+	return 0, nil
 }
 
 // SetItemForCustomer makes the cart line for a variant exactly quantity at the
@@ -168,7 +196,9 @@ func (s *CartService) SetItemForCustomer(ctx context.Context, tx pgx.Tx, cartID,
 		return nil, err
 	}
 
-	price, err := s.pricing.ResolveForCustomer(ctx, tx, variantID, customerID, currencyCode)
+	// Set semantics: quantity is the whole truth for this line, so it is also
+	// the quantity the volume rung is chosen by.
+	price, err := s.pricing.ResolveForCustomer(ctx, tx, variantID, customerID, quantity, currencyCode)
 	if err != nil {
 		return nil, err
 	}

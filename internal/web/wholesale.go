@@ -837,11 +837,11 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			return app.ErrCartEmpty
 		}
 
-		variantIDs := make([]uuid.UUID, len(cartItems))
-		for i, ci := range cartItems {
-			variantIDs[i] = ci.VariantID
+		quantities := make(map[uuid.UUID]int, len(cartItems))
+		for _, ci := range cartItems {
+			quantities[ci.VariantID] = ci.Quantity
 		}
-		freshPrices, txErr := d.PricingService.ResolveForCustomerBatch(ctx, tx, customer.ID, variantIDs, "USD")
+		freshPrices, txErr := d.PricingService.ResolveForCustomerBatch(ctx, tx, customer.ID, quantities, "USD")
 		if txErr != nil {
 			return txErr
 		}

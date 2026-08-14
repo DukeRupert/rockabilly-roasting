@@ -157,7 +157,7 @@ func TestResolveForCustomer_WholesaleUsesDefaultList(t *testing.T) {
 	// Set the store-wide default.
 	require.NoError(t, store.NewSettingsStore().SetDefaultWholesalePriceListID(ctx, tx, &priceList.ID))
 
-	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, int64(1100), got, "wholesale customer should see the default list price")
 }
@@ -181,7 +181,7 @@ func TestResolveForCustomer_DefaultListFallsBackToBaseForMissingVariant(t *testi
 
 	require.NoError(t, store.NewSettingsStore().SetDefaultWholesalePriceListID(ctx, tx, &priceList.ID))
 
-	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, int64(1500), got, "variant not on the default list should fall back to base")
 }
@@ -203,7 +203,7 @@ func TestResolveForCustomer_DefaultListIgnoredForRetail(t *testing.T) {
 
 	require.NoError(t, store.NewSettingsStore().SetDefaultWholesalePriceListID(ctx, tx, &priceList.ID))
 
-	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, int64(1500), got, "retail customer should ignore the default wholesale list")
 }
@@ -228,7 +228,7 @@ func TestResolveForCustomer_ExplicitListOverridesDefault(t *testing.T) {
 
 	require.NoError(t, store.NewSettingsStore().SetDefaultWholesalePriceListID(ctx, tx, &defaultList.ID))
 
-	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	got, err := pricing.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, int64(900), got, "customer's own list should win over the default")
 }

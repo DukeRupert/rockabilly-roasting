@@ -167,6 +167,9 @@ var (
 	// Price errors
 	ErrPriceNotFound     = errors.New("price not found")
 	ErrInvalidPrice      = errors.New("price must not be negative")
+	// ErrInvalidTierQuantity is returned for a volume break below 2. Quantity 1
+	// is the list price itself, which is set through SetPriceListPrice.
+	ErrInvalidTierQuantity = errors.New("volume break must start at 2 or more")
 	ErrPriceListNotFound = errors.New("price list not found")
 
 	// Cart errors (item-level)

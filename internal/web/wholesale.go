@@ -313,6 +313,7 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 				MinQty:       v.MinQty,
 				Multiple:     v.Multiple,
 				CartQty:      cartQty[v.ID],
+				Ladder:       v.Ladder,
 			}
 		}
 		imageURL := ""
@@ -643,7 +644,33 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 // renderWholesaleCheckout renders the wholesale checkout page. If banner is true,
 // the price-change banner is shown. errMsg, when non-empty, is surfaced as an
 // inline error. status=0 means 200.
+// dropOf and dropNameOf unwrap an optional drop notice for the template props.
+func dropOf(d *wholesaleDropNotice) *domain.Drop {
+	if d == nil {
+		return nil
+	}
+	return d.Drop
+}
+
+func dropNameOf(d *wholesaleDropNotice) string {
+	if d == nil {
+		return ""
+	}
+	return d.ProductName
+}
+
+// wholesaleDropNotice carries the volume rung a quantity change just cost the
+// buyer, so the re-rendered checkout can say so. nil when nothing was lost.
+type wholesaleDropNotice struct {
+	Drop        *domain.Drop
+	ProductName string
+}
+
 func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, customer *domain.Customer, banner bool, errMsg string, status int) {
+	d.renderWholesaleCheckoutWithDrop(w, r, customer, banner, errMsg, status, nil)
+}
+
+func (d *Deps) renderWholesaleCheckoutWithDrop(w http.ResponseWriter, r *http.Request, customer *domain.Customer, banner bool, errMsg string, status int, drop *wholesaleDropNotice) {
 	ctx := r.Context()
 
 	companyName := ""
@@ -688,6 +715,17 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 			return txErr
 		}
 
+		// Ladders for the whole cart in one read, so each line can show its
+		// breaks and how close it is to the next one.
+		variantIDs := make([]uuid.UUID, len(cartItems))
+		for i, ci := range cartItems {
+			variantIDs[i] = ci.VariantID
+		}
+		ladders, txErr := d.PricingService.LaddersForCustomerBatch(ctx, tx, customer.ID, variantIDs, "USD")
+		if txErr != nil {
+			return txErr
+		}
+
 		for _, ci := range cartItems {
 			variant, txErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
 			if txErr != nil {
@@ -711,6 +749,7 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 				LineTotal:   lineTotal,
 				MinQty:      variant.WholesaleMinQty,
 				Multiple:    variant.WholesaleMultiple,
+				Ladder:      ladders[ci.VariantID],
 			})
 
 			cartItemsForMOQ = append(cartItemsForMOQ, domain.CartItem{VariantID: ci.VariantID, Quantity: ci.Quantity})
@@ -755,6 +794,8 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 		Notice:            reorderNotice(r),
 		CartCount:         d.wholesaleCartItemCount(r),
 		PriceChangeBanner: banner,
+		Drop:              dropOf(drop),
+		DropProductName:   dropNameOf(drop),
 		MOQProblems:       moqProblems,
 		Addresses:         addresses,
 		DefaultAddressID:  defaultAddressID,
@@ -1131,16 +1172,35 @@ func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var notice *wholesaleDropNotice
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CartService.UpdateItemQuantityForCustomer(ctx, tx, *cartID, itemID, quantity, customer.ID, "USD")
-		return txErr
+		line, txErr := d.CartService.UpdateItemQuantityForCustomer(ctx, tx, *cartID, itemID, quantity, customer.ID, "USD")
+		if txErr != nil {
+			return txErr
+		}
+		if line.Drop == nil {
+			return nil
+		}
+		// Name the coffee in the notice — a bare "your price went up" makes the
+		// buyer hunt for which line it was.
+		notice = &wholesaleDropNotice{Drop: line.Drop}
+		variant, txErr := d.CatalogService.GetVariant(ctx, tx, line.Item.VariantID)
+		if txErr != nil {
+			return txErr
+		}
+		product, txErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
+		if txErr != nil {
+			return txErr
+		}
+		notice.ProductName = product.Title
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
 		return
 	}
 
-	d.handleWholesaleCheckoutPage(w, r)
+	d.renderWholesaleCheckoutWithDrop(w, r, customer, false, "", 0, notice)
 }
 
 // handleWholesaleCartRemove removes a cart item inline.

@@ -20,6 +20,9 @@ type WholesaleCheckoutItem struct {
 	// Wholesale ordering rules, shown as a hint and enforced by Place Order.
 	MinQty   *int
 	Multiple *int
+	// Ladder is the customer's volume ladder for this variant — the same value
+	// the line was priced from, so the breaks shown are the breaks they'd get.
+	Ladder domain.TierLadder
 }
 
 type WholesaleCheckoutProps struct {
@@ -32,6 +35,11 @@ type WholesaleCheckoutProps struct {
 	Notice            string
 	CartCount         int
 	PriceChangeBanner bool
+	// Drop is set when the quantity change that produced this render pushed a
+	// line below a volume break and raised its unit price. Advisory only — the
+	// change is already saved.
+	Drop            *domain.Drop
+	DropProductName string
 	// MOQProblems lists cart lines that would fail wholesale minimum/multiple
 	// validation at Place Order, pre-formatted one per line.
 	MOQProblems []string
@@ -164,6 +172,20 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 				</p>
 			</div>
 		}
+		<!--
+			Told after the fact, never in the way: the quantity the buyer asked
+			for is already saved at the new price. This says what changed so they
+			learn it here rather than at the total.
+		-->
+		if props.Drop != nil {
+			<div class="border-2 border-ink bg-paper-warm p-4" role="status">
+				<p class="font-oswald text-sm text-ink">
+					<span class="font-bold">{ props.DropProductName } — price went up.</span>
+					{ " " }
+					{ dropLine(*props.Drop) }
+				</p>
+			</div>
+		}
 		if len(props.MOQProblems) > 0 {
 			<div class="border-2 border-rust bg-paper-warm p-4" role="alert">
 				<p class="font-oswald font-bold text-sm text-rust uppercase" style="letter-spacing:0.1em;">Below wholesale minimums</p>
@@ -204,14 +226,27 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 					<tbody class="block sm:table-row-group">
 						for _, item := range props.Items {
 							<tr class="block border-2 border-ink mb-3 last:mb-0 px-3 py-2 sm:table-row sm:border-x-0 sm:border-t-0 sm:border-b sm:border-ink/15 sm:last:border-b-0 sm:p-0">
-								<td class="block py-1 font-oswald font-bold text-ink text-base sm:table-cell sm:px-4 sm:py-3 sm:text-sm">{ item.ProductName }</td>
+								<td class="block py-1 sm:table-cell sm:px-4 sm:py-3">
+									<span class="font-oswald font-bold text-ink text-base sm:text-sm">{ item.ProductName }</span>
+									if u := upgradeFor(item); u != nil {
+										<span class="mt-1 flex items-start gap-1.5 font-oswald text-[11px] text-ink-soft leading-snug" style="letter-spacing:0.02em;">
+											<span class="text-rust" aria-hidden="true">★</span>
+											{ upgradeLine(*u) }
+										</span>
+									}
+								</td>
 								<td class="flex items-center justify-between gap-4 py-1 sm:table-cell sm:px-4 sm:py-3">
 									<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">SKU</span>
 									<span class="font-special text-sm text-chrome-deep">{ item.SKU }</span>
 								</td>
 								<td class="flex items-center justify-between gap-4 py-1 sm:table-cell sm:px-4 sm:py-3 sm:text-right">
 									<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Unit Price</span>
-									<span class="font-special text-sm text-ink">{ formatCents(item.UnitPrice) }</span>
+									<span class="inline-flex flex-col items-end gap-0.5">
+										<span class="font-special text-sm text-ink">{ formatCents(item.UnitPrice) }</span>
+										if hint := ladderHint(item.Ladder); hint != "" {
+											<span class="font-oswald text-[10px] text-chrome-deep whitespace-nowrap" style="letter-spacing:0.04em;">{ hint }</span>
+										}
+									</span>
 								</td>
 								<td class="flex items-center justify-between gap-4 py-1 sm:table-cell sm:px-4 sm:py-3 sm:text-center">
 									<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Qty</span>

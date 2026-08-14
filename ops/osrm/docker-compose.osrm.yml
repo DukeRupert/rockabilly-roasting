@@ -1,0 +1,73 @@
+# OSRM routing service for delivery route planning.
+#
+# This is the reference copy of the service block that lives in the production
+# compose file at /opt/rockabilly-roasting/docker-compose.yml. Merge the `osrm:`
+# service below into that file's existing `services:` map — do not copy this
+# file over it, and do not run it standalone (the network it joins is defined
+# by the production file).
+#
+# The container ONLY serves. It never preprocesses — the dataset arrives
+# prepared from angmar.dev via osrm-build.sh + osrm-install.sh, because
+# osrm-extract peaks at 4.3GB (measured) and prod has 3.7GB with no swap.
+
+services:
+  osrm:
+    # Must match OSRM_IMAGE in osrm-build.sh: osrm-routed refuses to load a
+    # dataset prepared by a different version. Bump both together and rebuild.
+    image: ghcr.io/project-osrm/osrm-backend:v26.6.5-debian
+    container_name: rr-osrm
+    restart: unless-stopped
+
+    # --mmap lets the kernel page the dataset in on demand instead of loading
+    # it all into RSS. On a 3.7GB box where ~2.8GB is doing useful work as
+    # Postgres page cache, that difference matters.
+    #
+    # --algorithm mld must match how the data was prepared (osrm-partition +
+    # osrm-customize); the default is CH, which would refuse this dataset.
+    #
+    # --max-table-size bounds the distance matrix /trip builds internally. A
+    # roundtrip over N stops needs N+1; 100 covers any real delivery day.
+    command: >
+      osrm-routed
+      --algorithm mld
+      --mmap
+      --max-table-size 100
+      /data/washington-latest.osrm
+
+    volumes:
+      # Prepared .osrm.* fileset, installed by osrm-install.sh. Read-only: the
+      # router never writes here, and a stray write would corrupt the dataset
+      # under itself.
+      - ./osrm-data:/data:ro
+
+    # NO ports section, deliberately. OSRM ships with no authentication of any
+    # kind — it is designed to sit on a private network. Publishing 5000 would
+    # put an open routing API on the public internet. The app reaches it at
+    # http://osrm:5000 over rr-network.
+    expose:
+      - "5000"
+
+    networks:
+      - rr-network
+
+    # TCP liveness only. The osrm-backend image has no curl or wget, so a
+    # semantic /nearest check isn't available from inside the container; Hiri's
+    # own OSRM client (step 3) is what verifies the router actually routes.
+    # This catches the common failure — a container that started but could not
+    # load its dataset.
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c '</dev/tcp/127.0.0.1/5000' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+    # Steady state is ~1GB with --mmap. High enough not to trip on normal
+    # operation, low enough that a leak gets restarted instead of taking the
+    # box down — which on 3.7GB with no swap means taking Postgres with it.
+    mem_limit: 2g
+
+    logging:
+      driver: journald
+      options:
+        tag: rr-osrm

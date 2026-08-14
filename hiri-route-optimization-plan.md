@@ -92,11 +92,14 @@ keeps a swap to the free US Census geocoder cheap if billing ever annoys.
 
 Two very different numbers, and conflating them is what oversizes the box:
 
+Measured 2026-08-14 on the real hosts (estimates in the first draft were close
+on the build side and far too pessimistic on the serving side):
+
 | Phase | Frequency | Peak RAM | Disk |
 |---|---|---|---|
-| `osrm-extract` (car profile) | Once at deploy, then quarterly | **~3–5GB** | 344MB pbf in |
-| `osrm-partition` + `osrm-customize` | Same | ~1–2GB | ~2–3GB of `.osrm.*` out |
-| `osrm-routed --algorithm mld` | **Always on** | **~1–1.5GB** RSS, plus ~1–2GB of page cache it will use if free | reads the `.osrm.*` set |
+| `osrm-extract` (car profile) | Once at deploy, then quarterly | **4.29GB** | 344MB pbf in |
+| `osrm-partition` + `osrm-customize` | Same | 1.07GB | 1.5GB of `.osrm.*` out |
+| `osrm-routed --algorithm mld --mmap` | **Always on** | **69MB RSS** (data sits in reclaimable page cache) | reads the `.osrm.*` set |
 
 Preprocessing is the spike; serving is cheap. So:
 
@@ -443,7 +446,9 @@ admin route view, printable alongside the existing load sheet.
 Each step is independently testable and committable. **Stop after each step for
 review.**
 
-### Step 1 — Geocoding service + cache
+### Step 1 — Geocoding service + cache ✅ done 2026-08-14
+Migration 066, `platform/geocode`, `app.GeocodingService`, `cmd/geocode-warm`.
+Not yet wired into the server — step 3 is its first consumer.
 - Migration `066_geocoded_addresses.sql`
 - Address normalization (unit tests: casing, whitespace, `St`/`Street`,
   `Apt`/`#` handling)
@@ -455,7 +460,10 @@ review.**
 - **Test:** unit tests for normalization; integration test against a handful of
   known Tri-Cities addresses; verify cache hit on second call
 
-### Step 2 — OSRM deployment
+### Step 2 — OSRM deployment ✅ done 2026-08-14
+Live on prod: `rr-osrm` on `rr-network`, reachable at `http://osrm:5000`.
+Verified with a four-stop Tri-Cities `/trip` (see the known-good baseline in
+`ops/osrm/README.md`).
 - Mage target `osrm:build` — run on **angmar.dev**: download the Washington PBF,
   run extract → partition → customize, tar the `.osrm.*` set, `scp` to prod
   (see §2 — prod cannot preprocess; 3.7GB RAM, no swap)

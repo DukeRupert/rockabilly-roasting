@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
@@ -32,6 +33,10 @@ type QuickOrderVariant struct {
 	// CartQty is what's already in the buyer's cart for this variant; the row
 	// pre-fills with it so the sheet reflects the current order.
 	CartQty int
+	// Ladder is the customer's volume ladder for this variant. The sheet prices
+	// rows as the buyer types, so it carries the whole ladder rather than one
+	// resolved price.
+	Ladder domain.TierLadder
 }
 
 type QuickOrderProduct struct {
@@ -133,9 +138,34 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 				q: '',
 				match(hay) { const n = this.q.toLowerCase().trim(); return !n || hay.includes(n); },
 				get hits() { return Array.from(this.$root.querySelectorAll('[data-filter]')).filter(el => this.match(el.dataset.filter)).length; },
+				// --- Volume pricing, mirrored from domain.TierLadder ---
+				// The sheet reprices as the buyer types, so it has to pick rungs
+				// client-side. This is a display echo only: every write goes
+				// through the server, which prices the line from the same ladder
+				// and reprices it if these two ever disagree.
+				//
+				// Deliberately small: which price is in force, and which rung
+				// earned it. The sheet does not compute what reaching the next
+				// rung would save — that nudge lives on the cart, in Go, where it
+				// is exact. Keeping it off the sheet keeps its thresholds, its
+				// rounding and its arithmetic out of the browser entirely.
+				rungs(el) { try { return JSON.parse(el.dataset.ladder || '[]'); } catch { return []; } },
+				unitPriceAt(rungs, q) {
+					if (!rungs.length) return 0;
+					let price = rungs[0][1];
+					for (const [min, amt] of rungs) { if (min > q) break; price = amt; }
+					return price;
+				},
+				// Mirrors TierLadder.TierAt: the highest break the quantity has
+				// reached, or 0 while it is still on the base price.
+				activeRung(rungs, q) {
+					let active = 0;
+					for (const [min] of rungs) { if (min > q) break; if (min > 1) active = min; }
+					return active;
+				},
 				recompute() {
 					let units = 0, cents = 0;
-					this.$root.querySelectorAll('input[data-price]').forEach(el => {
+					this.$root.querySelectorAll('input[data-ladder]').forEach(el => {
 						const q = parseInt(el.value, 10) || 0;
 						// Flag quantities that break the wholesale minimum or case
 						// multiple via native validation, so submit stops at the
@@ -147,10 +177,30 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 						if (q > 0 && min && q < min) problem = 'Minimum for this item is ' + min + '.';
 						else if (q > 0 && mult && q % mult !== 0) problem = 'This item comes in multiples of ' + mult + '.';
 						el.setCustomValidity(problem);
-						const price = parseInt(el.dataset.price, 10) || 0;
+
+						// Unit price is a function of quantity now, so the row's
+						// price is recomputed rather than read off a fixed value.
+						const rungs = this.rungs(el);
+						const row = el.closest('tr');
+						const price = this.unitPriceAt(rungs, q > 0 ? q : (min || 1));
+						const unitCell = row?.querySelector('[data-unit-price]');
+						if (unitCell) unitCell.textContent = this.money(price);
+
+						// Move the weight onto the rung this quantity has earned.
+						// Only classes move — the rung text is Go's to write, and
+						// this is the only thing the sheet decides about a ladder
+						// besides which price is in force.
+						const active = this.activeRung(rungs, q);
+						row?.querySelectorAll('[data-rung]').forEach(r => {
+							const on = parseInt(r.dataset.rung, 10) === active;
+							r.classList.toggle('text-ink', on);
+							r.classList.toggle('font-semibold', on);
+							r.classList.toggle('text-ink-soft', !on);
+						});
+
 						// Extended price per row, so a buyer working to a budget
 						// never does qty × unit in their head.
-						const lineTotal = el.closest('tr')?.querySelector('[data-line-total]');
+						const lineTotal = row?.querySelector('[data-line-total]');
 						if (lineTotal) lineTotal.textContent = q > 0 ? this.money(q * price) : '—';
 						if (q > 0) { units += q; cents += q * price; }
 					});
@@ -222,7 +272,13 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 									for _, optName := range product.Options {
 										<th class="px-4 py-2.5">{ optName }</th>
 									}
-									<th class="px-4 py-2.5">Unit Price</th>
+									<!--
+									Fixed width, so re-marking the ladder's active rung as
+									quantities change cannot resize the column and shove the
+									qty input sideways under the cursor — which is exactly
+									when it must not move.
+								-->
+								<th class="px-4 py-2.5 w-72">Unit Price</th>
 									<th class="px-4 py-2.5 text-center">Qty</th>
 									<th class="px-4 py-2.5 text-right">Total</th>
 								</tr>
@@ -244,12 +300,21 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 										<td class="flex items-baseline justify-between gap-4 py-1.5 sm:table-cell sm:whitespace-nowrap sm:px-4 sm:py-2.5">
 											<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Unit Price</span>
 											<span>
-												<span class="font-special text-base text-ink">{ formatCents(variant.UnitPrice) }</span>
+												<span class="font-special text-base text-ink" data-unit-price>{ formatCents(variant.UnitPrice) }</span>
 												if hint := moqHint(variant.MinQty, variant.Multiple); hint != "" {
 													<span class="ml-1.5 font-oswald text-[11px] text-chrome-deep" style="letter-spacing:0.04em;">
 														{ hint }
 													</span>
 												}
+												<!--
+													The ladder, with the rung in force carrying the
+													weight. Rendered in Go, rungs and all; the script
+													only moves emphasis between them and never formats
+													a price, which is what keeps the two in step.
+												-->
+												<span class="block font-oswald text-xs leading-snug" style="letter-spacing:0.04em;">
+													@ladderNote(variant.Ladder, variant.CartQty)
+												</span>
 											</span>
 										</td>
 										<td class="flex items-center justify-between gap-4 py-1.5 sm:table-cell sm:px-4 sm:py-2.5 sm:text-center">
@@ -264,7 +329,7 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 													value={ fmt.Sprint(variant.CartQty) }
 												}
 												aria-label={ "Quantity for " + variant.SKU }
-												data-price={ fmt.Sprint(variant.UnitPrice) }
+												data-ladder={ ladderJSON(variant.Ladder) }
 												if variant.MinQty != nil {
 													data-min={ fmt.Sprint(*variant.MinQty) }
 												}

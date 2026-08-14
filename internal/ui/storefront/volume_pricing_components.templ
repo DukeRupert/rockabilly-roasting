@@ -1,0 +1,85 @@
+package storefront
+
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+// ladderBreaks returns a ladder's volume breaks, dropping the base rung — that
+// price is already displayed beside the note.
+func ladderBreaks(l domain.TierLadder) []domain.PriceTier {
+	rungs := l.Rungs()
+	breaks := make([]domain.PriceTier, 0, len(rungs))
+	for _, t := range rungs {
+		if t.MinQuantity > 1 {
+			breaks = append(breaks, t)
+		}
+	}
+	return breaks
+}
+
+// activeBreak returns the threshold of the break a quantity has earned, or 0
+// when it has earned none and is still paying the base price.
+func activeBreak(l domain.TierLadder, quantity int) int {
+	t := l.TierAt(quantity)
+	if t.MinQuantity > 1 {
+		return t.MinQuantity
+	}
+	return 0
+}
+
+// ladderRungClass weights a rung by whether the buyer has earned it. The one in
+// force reads as ink; the rest stay muted. Without this the ladder is a price
+// list the buyer has to locate themselves in — it says what is available but
+// never that they already have it.
+func ladderRungClass(active bool) string {
+	if active {
+		return "text-ink font-semibold"
+	}
+	return "text-ink-soft"
+}
+
+// ladderNote renders a ladder's breaks with the earned one emphasized.
+//
+// Each rung is addressable by its threshold so the order sheet can re-mark the
+// active one as quantities change without reformatting any of it in JavaScript.
+// The text is rendered once, here, in Go.
+templ ladderNote(l domain.TierLadder, quantity int) {
+	for i, t := range ladderBreaks(l) {
+		if i > 0 {
+			{ " · " }
+		}
+		<span
+			class={ "whitespace-nowrap", ladderRungClass(t.MinQuantity == activeBreak(l, quantity)) }
+			data-rung={ strconv.Itoa(t.MinQuantity) }
+		>{ fmt.Sprintf("%d+ %s", t.MinQuantity, formatCents(t.Amount)) }</span>
+	}
+}
+
+// priceNoteText renders a drop or an upgrade — the two notes that are sentences
+// rather than a price list.
+//
+// The upgrade carries an amber diamond. A marker rather than coloured text
+// because amber cannot be read at this size on paper, and rust, which can, means
+// "this is a link" everywhere else in the storefront.
+//
+// This is the second time a glyph has been put on this note; the first was a ★
+// that was removed for being a bullet on a one-item list and for appearing on
+// the cart but not the sheet. This one does a job the text cannot do and appears
+// wherever the note does.
+templ priceNoteText(note PriceNote) {
+	<span
+		class={ "inline-flex items-baseline justify-end gap-1 font-oswald text-xs leading-snug text-right sm:max-w-[15rem]", priceNoteClass(note.Kind) }
+		style="letter-spacing:0.02em;"
+		if note.Kind == PriceNoteDrop {
+			role="status"
+		}
+	>
+		if note.Kind == PriceNoteUpgrade {
+			<span class="shrink-0 text-candle-deep" aria-hidden="true">◆</span>
+		}
+		<span>{ note.Text }</span>
+	</span>
+}

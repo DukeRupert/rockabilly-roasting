@@ -2,13 +2,16 @@ package web
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
@@ -289,6 +292,10 @@ func (d *Deps) buildPriceListProduct(ctx context.Context, tx pgx.Tx, p domain.Pr
 	if err != nil {
 		return admin.ProductPriceListPricing{}, err
 	}
+	ladders, err := d.PricingService.ListTierLaddersByProduct(ctx, tx, p.ID, "USD")
+	if err != nil {
+		return admin.ProductPriceListPricing{}, err
+	}
 
 	// Order rows by size then grind, matching the base-pricing and subscription
 	// pages, instead of the catalog's arbitrary variant order.
@@ -320,6 +327,12 @@ func (d *Deps) buildPriceListProduct(ctx context.Context, tx pgx.Tx, p domain.Pr
 		}
 		if vp.ListPrices == nil {
 			vp.ListPrices = make(map[uuid.UUID]int)
+		}
+		vp.ListBreaks = make(map[uuid.UUID][]domain.PriceTier, len(ladders[v.ID]))
+		for listID, ladder := range ladders[v.ID] {
+			if breaks := breaksAbove(ladder); len(breaks) > 0 {
+				vp.ListBreaks[listID] = breaks
+			}
 		}
 		vps[i] = vp
 	}
@@ -356,4 +369,223 @@ func parsePriceListForm(r *http.Request) ([]priceOp, error) {
 	}
 
 	return ops, nil
+}
+
+// --- Volume breaks (per product, per price list) ---
+
+// handleAdminPriceListTiers renders the volume-break editor for one product on
+// one price list: every variant's ladder on one screen. Breaks are edited here
+// rather than in the pricing grid because the grid is a variant-by-list matrix
+// with one price per cell, and a ladder is a third dimension it cannot hold.
+func (d *Deps) handleAdminPriceListTiers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	listID, err := uuid.Parse(r.PathValue("listID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	productID, err := uuid.Parse(r.PathValue("productID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var props admin.PriceListTiersProps
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		list, txErr := d.PriceListService.Get(ctx, tx, listID)
+		if txErr != nil {
+			return txErr
+		}
+		product, txErr := d.CatalogService.GetProduct(ctx, tx, productID)
+		if txErr != nil {
+			return txErr
+		}
+		rows, txErr := d.buildVariantTierRows(ctx, tx, *product, listID)
+		if txErr != nil {
+			return txErr
+		}
+		props.List = *list
+		props.Product = *product
+		props.Variants = rows
+		return nil
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	props.StaffName, props.StaffRole = staffNameRole(r)
+
+	if IsHTMX(r) {
+		admin.PriceListTiersContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.PriceListTiers(props).Render(ctx, w) //nolint:errcheck
+}
+
+// buildVariantTierRows assembles each variant's list price and its breaks above
+// it, in the same size-then-grind order the pricing grid uses.
+func (d *Deps) buildVariantTierRows(ctx context.Context, tx pgx.Tx, p domain.Product, listID uuid.UUID) ([]admin.VariantTierRow, error) {
+	pp, err := d.buildPriceListProduct(ctx, tx, p)
+	if err != nil {
+		return nil, err
+	}
+	ladders, err := d.PricingService.ListTierLaddersByProduct(ctx, tx, p.ID, "USD")
+	if err != nil {
+		return nil, err
+	}
+
+	rows := make([]admin.VariantTierRow, 0, len(pp.Variants))
+	for _, vp := range pp.Variants {
+		row := admin.VariantTierRow{Variant: vp.Variant}
+		if cents, ok := vp.ListPrices[listID]; ok {
+			c := cents
+			row.ListPrice = &c
+		}
+		row.Breaks = breaksAbove(ladders[vp.Variant.ID][listID])
+		rows = append(rows, row)
+	}
+	return rows, nil
+}
+
+// breaksAbove drops a ladder's base rung, leaving only the volume breaks. The
+// base rung is the list price, which is edited on the pricing grid and shown
+// here read-only — rendering it as an editable break would give staff two places
+// to change one number.
+func breaksAbove(ladder domain.TierLadder) []domain.PriceTier {
+	rungs := ladder.Rungs()
+	breaks := make([]domain.PriceTier, 0, len(rungs))
+	for _, t := range rungs {
+		if t.MinQuantity > 1 {
+			breaks = append(breaks, t)
+		}
+	}
+	return breaks
+}
+
+// handleAdminPriceListTiersUpdate saves a product's ladders on one list. The
+// submitted rows are the whole truth: every break not present after the save is
+// removed, so clearing a quantity deletes that rung.
+func (d *Deps) handleAdminPriceListTiersUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	listID, err := uuid.Parse(r.PathValue("listID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	productID, err := uuid.Parse(r.PathValue("productID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	submitted, err := parseTierForm(r)
+	if err != nil {
+		d.renderTierError(w, r, listID, productID, err.Error())
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		for variantID, breaks := range submitted {
+			// Replace rather than diff: the form carries every break for the
+			// variant, so clearing the ladder first is what makes a removed row
+			// actually disappear.
+			if txErr := d.PricingService.ClearTierPrices(ctx, tx, variantID, listID, "USD"); txErr != nil {
+				return txErr
+			}
+			for _, t := range breaks {
+				if txErr := d.PricingService.SetTierPrice(ctx, tx, variantID, listID, t.MinQuantity, t.Amount, "USD"); txErr != nil {
+					return txErr
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, app.ErrInvalidTierQuantity) || errors.Is(err, app.ErrInvalidPrice) {
+			d.renderTierError(w, r, listID, productID, "Breaks must start at 2 or more, with a price of at least $0.00")
+			return
+		}
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/price-lists/%s/products/%s/tiers", listID, productID), http.StatusSeeOther)
+}
+
+// renderTierError reports a bad submission without discarding the page.
+func (d *Deps) renderTierError(w http.ResponseWriter, r *http.Request, listID, productID uuid.UUID, msg string) {
+	if IsHTMX(r) {
+		w.Header().Set("HX-Reswap", "none")
+		toast.Toast(toast.VariantError, msg).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	http.Error(w, msg, http.StatusBadRequest)
+}
+
+// parseTierForm collects the submitted break rows per variant. Rows with both
+// fields blank are skipped — the editor always renders one empty slot — but a
+// row with only one field filled is an error rather than a silent drop, since
+// dropping it would look to staff like the save worked.
+func parseTierForm(r *http.Request) (map[uuid.UUID][]domain.PriceTier, error) {
+	out := map[uuid.UUID][]domain.PriceTier{}
+	seen := map[uuid.UUID]map[int]bool{}
+
+	for key := range r.PostForm {
+		if !strings.HasPrefix(key, "tier_qty:") {
+			continue
+		}
+		rest := strings.TrimPrefix(key, "tier_qty:")
+		idx := strings.LastIndex(rest, ":")
+		if idx < 0 {
+			continue
+		}
+		variantID, parseErr := uuid.Parse(rest[:idx])
+		if parseErr != nil {
+			continue
+		}
+		if _, ok := out[variantID]; !ok {
+			out[variantID] = nil
+			seen[variantID] = map[int]bool{}
+		}
+
+		qtyRaw := strings.TrimSpace(r.PostForm.Get(key))
+		priceRaw := strings.TrimSpace(r.PostForm.Get("tier_price:" + rest))
+
+		// A blank quantity drops the row. The quantity is what identifies a
+		// break, so clearing it is an unambiguous "remove this" — and since the
+		// save replaces the whole ladder, a row that is not resubmitted is a row
+		// that is deleted. Requiring the price be cleared too would make the
+		// obvious gesture fail.
+		if qtyRaw == "" {
+			continue
+		}
+		// The reverse is genuinely ambiguous: a break at a quantity with no
+		// price means nothing, and silently dropping it would look to staff
+		// exactly like a successful save.
+		if priceRaw == "" {
+			return nil, fmt.Errorf("A break at a quantity needs a price")
+		}
+
+		qty, convErr := strconv.Atoi(qtyRaw)
+		if convErr != nil || qty < 2 {
+			return nil, fmt.Errorf("A break must start at a quantity of 2 or more")
+		}
+		cents, ok := parseDollars(priceRaw)
+		if !ok || cents < 0 {
+			return nil, fmt.Errorf("Break prices must be a valid amount")
+		}
+		if seen[variantID][qty] {
+			return nil, fmt.Errorf("Each quantity can only have one break")
+		}
+		seen[variantID][qty] = true
+		out[variantID] = append(out[variantID], domain.PriceTier{MinQuantity: qty, Amount: cents})
+	}
+	return out, nil
 }

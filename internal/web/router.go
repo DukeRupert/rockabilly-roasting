@@ -479,6 +479,8 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/price-lists/{id}/delete", deps.handleAdminPriceListDelete)
 	adminMux.HandleFunc("GET /admin/price-lists/prices", deps.handleAdminPriceListPrices)
 	adminMux.HandleFunc("POST /admin/price-lists/prices/bulk", deps.handleAdminPriceListPriceBulkUpdate)
+	adminMux.HandleFunc("GET /admin/price-lists/{listID}/products/{productID}/tiers", deps.handleAdminPriceListTiers)
+	adminMux.HandleFunc("POST /admin/price-lists/{listID}/products/{productID}/tiers", deps.handleAdminPriceListTiersUpdate)
 
 	// Admin subscription plans
 	adminMux.HandleFunc("GET /admin/plans", deps.handleAdminPlanList)

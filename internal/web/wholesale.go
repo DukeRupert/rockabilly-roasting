@@ -313,6 +313,7 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 				MinQty:       v.MinQty,
 				Multiple:     v.Multiple,
 				CartQty:      cartQty[v.ID],
+				Ladder:       v.Ladder,
 			}
 		}
 		imageURL := ""
@@ -643,7 +644,19 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 // renderWholesaleCheckout renders the wholesale checkout page. If banner is true,
 // the price-change banner is shown. errMsg, when non-empty, is surfaced as an
 // inline error. status=0 means 200.
+// wholesaleDropNotice carries the volume rung a quantity change just cost the
+// buyer, together with the line it happened on so the re-rendered checkout can
+// say so where it happened. nil when nothing was lost.
+type wholesaleDropNotice struct {
+	Drop      *domain.Drop
+	VariantID uuid.UUID
+}
+
 func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, customer *domain.Customer, banner bool, errMsg string, status int) {
+	d.renderWholesaleCheckoutWithDrop(w, r, customer, banner, errMsg, status, nil)
+}
+
+func (d *Deps) renderWholesaleCheckoutWithDrop(w http.ResponseWriter, r *http.Request, customer *domain.Customer, banner bool, errMsg string, status int, drop *wholesaleDropNotice) {
 	ctx := r.Context()
 
 	companyName := ""
@@ -688,6 +701,17 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 			return txErr
 		}
 
+		// Ladders for the whole cart in one read, so each line can show its
+		// breaks and how close it is to the next one.
+		variantIDs := make([]uuid.UUID, len(cartItems))
+		for i, ci := range cartItems {
+			variantIDs[i] = ci.VariantID
+		}
+		ladders, txErr := d.PricingService.LaddersForCustomerBatch(ctx, tx, customer.ID, variantIDs, "USD")
+		if txErr != nil {
+			return txErr
+		}
+
 		for _, ci := range cartItems {
 			variant, txErr := d.CatalogService.GetVariant(ctx, tx, ci.VariantID)
 			if txErr != nil {
@@ -701,7 +725,7 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 			lineTotal := ci.UnitPrice * ci.Quantity
 			subtotal += lineTotal
 
-			checkoutItems = append(checkoutItems, storefront.WholesaleCheckoutItem{
+			item := storefront.WholesaleCheckoutItem{
 				ItemID:      ci.ID,
 				VariantID:   ci.VariantID,
 				ProductName: product.Title,
@@ -711,7 +735,12 @@ func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, c
 				LineTotal:   lineTotal,
 				MinQty:      variant.WholesaleMinQty,
 				Multiple:    variant.WholesaleMultiple,
-			})
+				Ladder:      ladders[ci.VariantID],
+			}
+			if drop != nil && drop.VariantID == ci.VariantID {
+				item.Drop = drop.Drop
+			}
+			checkoutItems = append(checkoutItems, item)
 
 			cartItemsForMOQ = append(cartItemsForMOQ, domain.CartItem{VariantID: ci.VariantID, Quantity: ci.Quantity})
 			variantsForMOQ = append(variantsForMOQ, *variant)
@@ -837,26 +866,16 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			return app.ErrCartEmpty
 		}
 
-		variantIDs := make([]uuid.UUID, len(cartItems))
-		for i, ci := range cartItems {
-			variantIDs[i] = ci.VariantID
-		}
-		freshPrices, txErr := d.PricingService.ResolveForCustomerBatch(ctx, tx, customer.ID, variantIDs, "USD")
+		// Last line of defence before money moves: if anything repriced while
+		// this cart sat, rewrite it and send the buyer back to look rather than
+		// charging a total they were never shown. CartService owns the
+		// repricing rule — this handler only reacts to the outcome.
+		moved, txErr := d.CartService.RepriceCart(ctx, tx, cart.ID, customer.ID, "USD")
 		if txErr != nil {
 			return txErr
 		}
-		for _, ci := range cartItems {
-			if ci.UnitPrice != freshPrices[ci.VariantID] {
-				stale = true
-				// Set semantics: rewrite the line at the fresh price with the
-				// same quantity. (The old AddItemForCustomer call here doubled
-				// the quantity and never touched the price.)
-				if _, txErr := d.CartService.SetItemForCustomer(ctx, tx, cart.ID, ci.VariantID, ci.Quantity, customer.ID, "USD"); txErr != nil {
-					return txErr
-				}
-			}
-		}
-		if stale {
+		if len(moved) > 0 {
+			stale = true
 			return nil
 		}
 
@@ -1112,9 +1131,16 @@ func (d *Deps) resolveWholesaleAddress(ctx context.Context, tx pgx.Tx, customer 
 	return addr.ID, nil
 }
 
-// handleWholesaleCartUpdate updates the quantity of a cart item inline.
+// handleWholesaleCartUpdate updates the quantity of a cart item inline, at the
+// customer's price for the new quantity.
 func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	customer, ok := auth.CustomerFromContext(ctx)
+	if !ok {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
 
 	cartID := getWholesaleCartID(r)
 	if cartID == nil {
@@ -1134,16 +1160,23 @@ func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var notice *wholesaleDropNotice
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CartService.UpdateItemQuantity(ctx, tx, *cartID, itemID, quantity)
-		return txErr
+		line, txErr := d.CartService.UpdateItemQuantityForCustomer(ctx, tx, *cartID, itemID, quantity, customer.ID, "USD")
+		if txErr != nil {
+			return txErr
+		}
+		if line.Drop != nil {
+			notice = &wholesaleDropNotice{Drop: line.Drop, VariantID: line.Item.VariantID}
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
 		return
 	}
 
-	d.handleWholesaleCheckoutPage(w, r)
+	d.renderWholesaleCheckoutWithDrop(w, r, customer, false, "", 0, notice)
 }
 
 // handleWholesaleCartRemove removes a cart item inline.

@@ -28,7 +28,7 @@ func TestResolveForCustomer_BaseWhenNoList(t *testing.T) {
 	variant := testutil.CreateVariant(t, tx, product.ID)
 	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
 
-	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	require.NoError(t, err)
 	testutil.AssertResolvedPrice(t, 1500, int(got))
 }
@@ -45,7 +45,7 @@ func TestResolveForCustomer_PriceListOverridesBase(t *testing.T) {
 	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
 	testutil.CreatePriceListPrice(t, tx, priceList.ID, variant.ID, 1100, "USD")
 
-	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	require.NoError(t, err)
 	testutil.AssertResolvedPrice(t, 1100, int(got))
 }
@@ -62,7 +62,7 @@ func TestResolveForCustomer_FallsBackToBaseWhenVariantMissingFromList(t *testing
 	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
 	// Note: no list price for this variant — falls back to base.
 
-	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	require.NoError(t, err)
 	testutil.AssertResolvedPrice(t, 1500, int(got))
 }
@@ -78,7 +78,7 @@ func TestResolveForCustomer_ErrPriceNotFound(t *testing.T) {
 	variant := testutil.CreateVariant(t, tx, product.ID)
 	// No base, no list price.
 
-	_, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	_, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	assert.ErrorIs(t, err, app.ErrPriceNotFound)
 }
 
@@ -91,7 +91,7 @@ func TestResolveForCustomer_ErrCustomerNotFound(t *testing.T) {
 	variant := testutil.CreateVariant(t, tx, product.ID)
 	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
 
-	_, err := svc.ResolveForCustomer(ctx, tx, variant.ID, uuid.New(), "USD")
+	_, err := svc.ResolveForCustomer(ctx, tx, variant.ID, uuid.New(), 1, "USD")
 	assert.ErrorIs(t, err, app.ErrCustomerNotFound)
 }
 
@@ -109,7 +109,7 @@ func TestResolveForCustomerBatch_NoListUsesBase(t *testing.T) {
 	testutil.SetBasePriceForVariant(t, tx, v2.ID, 2000, "USD")
 	testutil.SetBasePriceForVariant(t, tx, v3.ID, 3000, "USD")
 
-	got, err := svc.ResolveForCustomerBatch(ctx, tx, customer.ID, []uuid.UUID{v1.ID, v2.ID, v3.ID}, "USD")
+	got, err := svc.ResolveForCustomerBatch(ctx, tx, customer.ID, map[uuid.UUID]int{v1.ID: 1, v2.ID: 1, v3.ID: 1}, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, 1000, got[v1.ID])
 	assert.Equal(t, 2000, got[v2.ID])
@@ -134,7 +134,7 @@ func TestResolveForCustomerBatch_PriceListOverridesBase(t *testing.T) {
 	testutil.CreatePriceListPrice(t, tx, priceList.ID, v2.ID, 2000, "USD")
 	testutil.CreatePriceListPrice(t, tx, priceList.ID, v3.ID, 3000, "USD")
 
-	got, err := svc.ResolveForCustomerBatch(ctx, tx, customer.ID, []uuid.UUID{v1.ID, v2.ID, v3.ID}, "USD")
+	got, err := svc.ResolveForCustomerBatch(ctx, tx, customer.ID, map[uuid.UUID]int{v1.ID: 1, v2.ID: 1, v3.ID: 1}, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, 1000, got[v1.ID])
 	assert.Equal(t, 2000, got[v2.ID])
@@ -155,7 +155,7 @@ func TestResolveForCustomerBatch_VariantWithoutBasePrice(t *testing.T) {
 	testutil.SetBasePriceForVariant(t, tx, v3.ID, 3000, "USD")
 	// v2 has no base price — should be omitted from the map.
 
-	got, err := svc.ResolveForCustomerBatch(ctx, tx, customer.ID, []uuid.UUID{v1.ID, v2.ID, v3.ID}, "USD")
+	got, err := svc.ResolveForCustomerBatch(ctx, tx, customer.ID, map[uuid.UUID]int{v1.ID: 1, v2.ID: 1, v3.ID: 1}, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, 1000, got[v1.ID])
 	assert.Equal(t, 3000, got[v3.ID])
@@ -180,7 +180,7 @@ func TestSetPriceListPrice_Inserts(t *testing.T) {
 	require.NotNil(t, price.PriceListID)
 	assert.Equal(t, priceList.ID, *price.PriceListID)
 
-	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, int64(1100), got)
 }
@@ -227,7 +227,7 @@ func TestDeletePriceListPrice_RemovesRow(t *testing.T) {
 
 	require.NoError(t, svc.DeletePriceListPrice(ctx, tx, variant.ID, priceList.ID, "USD"))
 
-	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, "USD")
+	got, err := svc.ResolveForCustomer(ctx, tx, variant.ID, customer.ID, 1, "USD")
 	require.NoError(t, err)
 	// Falls back to base.
 	assert.Equal(t, int64(1500), got)
@@ -274,7 +274,7 @@ func TestResolveForCustomerBatch_MixedListAndBase(t *testing.T) {
 	testutil.CreatePriceListPrice(t, tx, priceList.ID, v2.ID, 2000, "USD")
 	// v3 has only base — list miss should fall back to base.
 
-	got, err := svc.ResolveForCustomerBatch(ctx, tx, customer.ID, []uuid.UUID{v1.ID, v2.ID, v3.ID}, "USD")
+	got, err := svc.ResolveForCustomerBatch(ctx, tx, customer.ID, map[uuid.UUID]int{v1.ID: 1, v2.ID: 1, v3.ID: 1}, "USD")
 	require.NoError(t, err)
 	assert.Equal(t, 1000, got[v1.ID])
 	assert.Equal(t, 2000, got[v2.ID])

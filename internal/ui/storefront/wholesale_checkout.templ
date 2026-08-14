@@ -20,6 +20,13 @@ type WholesaleCheckoutItem struct {
 	// Wholesale ordering rules, shown as a hint and enforced by Place Order.
 	MinQty   *int
 	Multiple *int
+	// Ladder is the customer's volume ladder for this variant — the same value
+	// the line was priced from, so the breaks shown are the breaks they'd get.
+	Ladder domain.TierLadder
+	// Drop is set on the one line whose quantity change just cost it a volume
+	// rung. It rides on the item rather than the page so it renders where it
+	// happened, which also means it needs no product name to identify itself.
+	Drop *domain.Drop
 }
 
 type WholesaleCheckoutProps struct {
@@ -211,7 +218,20 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 								</td>
 								<td class="flex items-center justify-between gap-4 py-1 sm:table-cell sm:px-4 sm:py-3 sm:text-right">
 									<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Unit Price</span>
-									<span class="font-special text-sm text-ink">{ formatCents(item.UnitPrice) }</span>
+									<span class="inline-flex flex-col items-end gap-0.5">
+										<span class="font-special text-sm text-ink">{ formatCents(item.UnitPrice) }</span>
+										if note := priceNoteFor(item); note.Kind == PriceNoteLadder {
+											<!--
+												The ladder is markup, not a string, so the rung the
+												buyer has earned can carry weight the others don't.
+											-->
+											<span class="font-oswald text-xs leading-snug text-right sm:max-w-[15rem]" style="letter-spacing:0.02em;">
+												@ladderNote(item.Ladder, item.Quantity)
+											</span>
+										} else if note.Kind != PriceNoteNone {
+											@priceNoteText(note)
+										}
+									</span>
 								</td>
 								<td class="flex items-center justify-between gap-4 py-1 sm:table-cell sm:px-4 sm:py-3 sm:text-center">
 									<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Qty</span>

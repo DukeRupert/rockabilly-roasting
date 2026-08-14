@@ -306,9 +306,22 @@ type QuickOrderVariant struct {
 	ID           uuid.UUID
 	SKU          string
 	OptionValues []string // Values matching the product's option columns
-	UnitPrice    int      // Cents
+	UnitPrice    int      // Cents, at the opening quantity
+	Ladder       domain.TierLadder
 	MinQty       *int
 	Multiple     *int
+}
+
+// OpeningQuantity is the quantity a quick-order row is priced at before the
+// buyer types anything — the smallest quantity they could order.
+func (v QuickOrderVariant) OpeningQuantity() int {
+	if v.MinQty != nil && *v.MinQty > 0 {
+		return *v.MinQty
+	}
+	if v.Multiple != nil && *v.Multiple > 0 {
+		return *v.Multiple
+	}
+	return 1
 }
 
 // QuickOrderProduct represents a product with all its variants for the quick order page.
@@ -394,7 +407,10 @@ func (s *WholesaleService) QuickOrderCatalog(
 		})
 	}
 
-	priceMap, err := pricing.ResolveForCustomerBatch(ctx, tx, customerID, allVariantIDs, currencyCode)
+	// Ladders, not resolved prices: the order sheet renders before any quantity
+	// exists, and each row needs its whole ladder both to show the breaks and to
+	// requote itself as the buyer types.
+	ladders, err := pricing.LaddersForCustomerBatch(ctx, tx, customerID, allVariantIDs, currencyCode)
 	if err != nil {
 		return nil, fmt.Errorf("resolve prices for wholesale catalog: %w", err)
 	}
@@ -428,14 +444,16 @@ func (s *WholesaleService) QuickOrderCatalog(
 				}
 			}
 
-			qVariants = append(qVariants, QuickOrderVariant{
+			qv := QuickOrderVariant{
 				ID:           v.ID,
 				SKU:          v.SKU,
 				OptionValues: optValues,
-				UnitPrice:    priceMap[v.ID],
+				Ladder:       ladders[v.ID],
 				MinQty:       v.WholesaleMinQty,
 				Multiple:     v.WholesaleMultiple,
-			})
+			}
+			qv.UnitPrice = qv.Ladder.UnitPriceAt(qv.OpeningQuantity())
+			qVariants = append(qVariants, qv)
 		}
 
 		result = append(result, QuickOrderProduct{

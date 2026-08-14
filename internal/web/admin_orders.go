@@ -1284,6 +1284,10 @@ func (d *Deps) handleAdminVariantSearch(w http.ResponseWriter, r *http.Request) 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var sErr error
 		results, sErr = d.CatalogService.SearchVariants(ctx, tx, query, 20)
+		if sErr != nil {
+			return sErr
+		}
+		results, sErr = d.PricingService.AttachVariantLadders(ctx, tx, results, "USD")
 		return sErr
 	})
 	if err != nil {

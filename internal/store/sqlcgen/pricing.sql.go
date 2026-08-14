@@ -117,6 +117,50 @@ func (q *Queries) DeletePriceListPrice(ctx context.Context, arg DeletePriceListP
 	return err
 }
 
+const deleteTierPrice = `-- name: DeleteTierPrice :exec
+DELETE FROM prices
+WHERE price_set_id = $1
+  AND currency_code = $2
+  AND price_list_id = $3
+  AND min_quantity = $4
+`
+
+type DeleteTierPriceParams struct {
+	PriceSetID   uuid.UUID  `json:"price_set_id"`
+	CurrencyCode string     `json:"currency_code"`
+	PriceListID  *uuid.UUID `json:"price_list_id"`
+	MinQuantity  *int32     `json:"min_quantity"`
+}
+
+func (q *Queries) DeleteTierPrice(ctx context.Context, arg DeleteTierPriceParams) error {
+	_, err := q.db.Exec(ctx, deleteTierPrice,
+		arg.PriceSetID,
+		arg.CurrencyCode,
+		arg.PriceListID,
+		arg.MinQuantity,
+	)
+	return err
+}
+
+const deleteTierPricesForList = `-- name: DeleteTierPricesForList :exec
+DELETE FROM prices
+WHERE price_set_id = $1
+  AND currency_code = $2
+  AND price_list_id = $3
+  AND min_quantity IS NOT NULL
+`
+
+type DeleteTierPricesForListParams struct {
+	PriceSetID   uuid.UUID  `json:"price_set_id"`
+	CurrencyCode string     `json:"currency_code"`
+	PriceListID  *uuid.UUID `json:"price_list_id"`
+}
+
+func (q *Queries) DeleteTierPricesForList(ctx context.Context, arg DeleteTierPricesForListParams) error {
+	_, err := q.db.Exec(ctx, deleteTierPricesForList, arg.PriceSetID, arg.CurrencyCode, arg.PriceListID)
+	return err
+}
+
 const getBasePrice = `-- name: GetBasePrice :one
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
        p.min_quantity, p.max_quantity,
@@ -167,6 +211,62 @@ func (q *Queries) GetPriceListByID(ctx context.Context, id uuid.UUID) (PriceList
 		&i.EndsAt,
 	)
 	return i, err
+}
+
+const getPriceListLadder = `-- name: GetPriceListLadder :many
+
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity,
+       p.price_list_id, p.starts_at, p.ends_at
+FROM price_sets ps
+JOIN prices p ON p.price_set_id = ps.id
+WHERE ps.variant_id = $1
+  AND p.currency_code = $2
+  AND p.price_list_id = $3
+ORDER BY p.min_quantity NULLS FIRST
+`
+
+type GetPriceListLadderParams struct {
+	VariantID    uuid.UUID  `json:"variant_id"`
+	CurrencyCode string     `json:"currency_code"`
+	PriceListID  *uuid.UUID `json:"price_list_id"`
+}
+
+// Volume tier queries (migration 065).
+//
+// Unlike every query above, these deliberately omit the `min_quantity IS NULL`
+// filter: they return a variant's whole ladder — base rung plus breaks — for
+// assembly into a domain.TierLadder. The filter stays on the queries above so
+// that base-price and flat-list-price callers resolve exactly what they
+// resolved before tiers existed.
+func (q *Queries) GetPriceListLadder(ctx context.Context, arg GetPriceListLadderParams) ([]Price, error) {
+	rows, err := q.db.Query(ctx, getPriceListLadder, arg.VariantID, arg.CurrencyCode, arg.PriceListID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Price{}
+	for rows.Next() {
+		var i Price
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceSetID,
+			&i.Amount,
+			&i.CurrencyCode,
+			&i.MinQuantity,
+			&i.MaxQuantity,
+			&i.PriceListID,
+			&i.StartsAt,
+			&i.EndsAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getPriceListPrice = `-- name: GetPriceListPrice :one
@@ -316,6 +416,196 @@ func (q *Queries) ListBasePricesByVariants(ctx context.Context, arg ListBasePric
 	items := []ListBasePricesByVariantsRow{}
 	for rows.Next() {
 		var i ListBasePricesByVariantsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceSetID,
+			&i.Amount,
+			&i.CurrencyCode,
+			&i.MinQuantity,
+			&i.MaxQuantity,
+			&i.PriceListID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.VariantID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listLaddersByVariantsAllLists = `-- name: ListLaddersByVariantsAllLists :many
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity,
+       p.price_list_id, p.starts_at, p.ends_at,
+       ps.variant_id, pl.name AS price_list_name
+FROM price_sets ps
+JOIN prices p ON p.price_set_id = ps.id
+JOIN price_lists pl ON pl.id = p.price_list_id
+WHERE ps.variant_id = ANY($1::uuid[])
+  AND p.currency_code = $2
+ORDER BY ps.variant_id, pl.name, p.min_quantity NULLS FIRST
+`
+
+type ListLaddersByVariantsAllListsParams struct {
+	Column1      []uuid.UUID `json:"column_1"`
+	CurrencyCode string      `json:"currency_code"`
+}
+
+type ListLaddersByVariantsAllListsRow struct {
+	ID            uuid.UUID          `json:"id"`
+	PriceSetID    uuid.UUID          `json:"price_set_id"`
+	Amount        int32              `json:"amount"`
+	CurrencyCode  string             `json:"currency_code"`
+	MinQuantity   *int32             `json:"min_quantity"`
+	MaxQuantity   *int32             `json:"max_quantity"`
+	PriceListID   *uuid.UUID         `json:"price_list_id"`
+	StartsAt      pgtype.Timestamptz `json:"starts_at"`
+	EndsAt        pgtype.Timestamptz `json:"ends_at"`
+	VariantID     uuid.UUID          `json:"variant_id"`
+	PriceListName string             `json:"price_list_name"`
+}
+
+func (q *Queries) ListLaddersByVariantsAllLists(ctx context.Context, arg ListLaddersByVariantsAllListsParams) ([]ListLaddersByVariantsAllListsRow, error) {
+	rows, err := q.db.Query(ctx, listLaddersByVariantsAllLists, arg.Column1, arg.CurrencyCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLaddersByVariantsAllListsRow{}
+	for rows.Next() {
+		var i ListLaddersByVariantsAllListsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceSetID,
+			&i.Amount,
+			&i.CurrencyCode,
+			&i.MinQuantity,
+			&i.MaxQuantity,
+			&i.PriceListID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.VariantID,
+			&i.PriceListName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPriceListLaddersByProduct = `-- name: ListPriceListLaddersByProduct :many
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity,
+       p.price_list_id, p.starts_at, p.ends_at,
+       ps.variant_id
+FROM variants v
+JOIN price_sets ps ON ps.variant_id = v.id
+JOIN prices p ON p.price_set_id = ps.id
+WHERE v.product_id = $1
+  AND p.currency_code = $2
+  AND p.price_list_id IS NOT NULL
+ORDER BY ps.variant_id, p.price_list_id, p.min_quantity NULLS FIRST
+`
+
+type ListPriceListLaddersByProductParams struct {
+	ProductID    uuid.UUID `json:"product_id"`
+	CurrencyCode string    `json:"currency_code"`
+}
+
+type ListPriceListLaddersByProductRow struct {
+	ID           uuid.UUID          `json:"id"`
+	PriceSetID   uuid.UUID          `json:"price_set_id"`
+	Amount       int32              `json:"amount"`
+	CurrencyCode string             `json:"currency_code"`
+	MinQuantity  *int32             `json:"min_quantity"`
+	MaxQuantity  *int32             `json:"max_quantity"`
+	PriceListID  *uuid.UUID         `json:"price_list_id"`
+	StartsAt     pgtype.Timestamptz `json:"starts_at"`
+	EndsAt       pgtype.Timestamptz `json:"ends_at"`
+	VariantID    uuid.UUID          `json:"variant_id"`
+}
+
+func (q *Queries) ListPriceListLaddersByProduct(ctx context.Context, arg ListPriceListLaddersByProductParams) ([]ListPriceListLaddersByProductRow, error) {
+	rows, err := q.db.Query(ctx, listPriceListLaddersByProduct, arg.ProductID, arg.CurrencyCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPriceListLaddersByProductRow{}
+	for rows.Next() {
+		var i ListPriceListLaddersByProductRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceSetID,
+			&i.Amount,
+			&i.CurrencyCode,
+			&i.MinQuantity,
+			&i.MaxQuantity,
+			&i.PriceListID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.VariantID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPriceListLaddersByVariants = `-- name: ListPriceListLaddersByVariants :many
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity,
+       p.price_list_id, p.starts_at, p.ends_at,
+       ps.variant_id
+FROM price_sets ps
+JOIN prices p ON p.price_set_id = ps.id
+WHERE ps.variant_id = ANY($1::uuid[])
+  AND p.currency_code = $2
+  AND p.price_list_id = $3
+ORDER BY ps.variant_id, p.min_quantity NULLS FIRST
+`
+
+type ListPriceListLaddersByVariantsParams struct {
+	Column1      []uuid.UUID `json:"column_1"`
+	CurrencyCode string      `json:"currency_code"`
+	PriceListID  *uuid.UUID  `json:"price_list_id"`
+}
+
+type ListPriceListLaddersByVariantsRow struct {
+	ID           uuid.UUID          `json:"id"`
+	PriceSetID   uuid.UUID          `json:"price_set_id"`
+	Amount       int32              `json:"amount"`
+	CurrencyCode string             `json:"currency_code"`
+	MinQuantity  *int32             `json:"min_quantity"`
+	MaxQuantity  *int32             `json:"max_quantity"`
+	PriceListID  *uuid.UUID         `json:"price_list_id"`
+	StartsAt     pgtype.Timestamptz `json:"starts_at"`
+	EndsAt       pgtype.Timestamptz `json:"ends_at"`
+	VariantID    uuid.UUID          `json:"variant_id"`
+}
+
+func (q *Queries) ListPriceListLaddersByVariants(ctx context.Context, arg ListPriceListLaddersByVariantsParams) ([]ListPriceListLaddersByVariantsRow, error) {
+	rows, err := q.db.Query(ctx, listPriceListLaddersByVariants, arg.Column1, arg.CurrencyCode, arg.PriceListID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListPriceListLaddersByVariantsRow{}
+	for rows.Next() {
+		var i ListPriceListLaddersByVariantsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.PriceSetID,
@@ -579,6 +869,48 @@ func (q *Queries) UpsertPriceListPrice(ctx context.Context, arg UpsertPriceListP
 		arg.Amount,
 		arg.CurrencyCode,
 		arg.PriceListID,
+	)
+	var i Price
+	err := row.Scan(
+		&i.ID,
+		&i.PriceSetID,
+		&i.Amount,
+		&i.CurrencyCode,
+		&i.MinQuantity,
+		&i.MaxQuantity,
+		&i.PriceListID,
+		&i.StartsAt,
+		&i.EndsAt,
+	)
+	return i, err
+}
+
+const upsertTierPrice = `-- name: UpsertTierPrice :one
+INSERT INTO prices (id, price_set_id, amount, currency_code, price_list_id, min_quantity)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (price_set_id, currency_code, price_list_id, min_quantity)
+    WHERE price_list_id IS NOT NULL AND min_quantity IS NOT NULL
+DO UPDATE SET amount = EXCLUDED.amount
+RETURNING id, price_set_id, amount, currency_code, min_quantity, max_quantity, price_list_id, starts_at, ends_at
+`
+
+type UpsertTierPriceParams struct {
+	ID           uuid.UUID  `json:"id"`
+	PriceSetID   uuid.UUID  `json:"price_set_id"`
+	Amount       int32      `json:"amount"`
+	CurrencyCode string     `json:"currency_code"`
+	PriceListID  *uuid.UUID `json:"price_list_id"`
+	MinQuantity  *int32     `json:"min_quantity"`
+}
+
+func (q *Queries) UpsertTierPrice(ctx context.Context, arg UpsertTierPriceParams) (Price, error) {
+	row := q.db.QueryRow(ctx, upsertTierPrice,
+		arg.ID,
+		arg.PriceSetID,
+		arg.Amount,
+		arg.CurrencyCode,
+		arg.PriceListID,
+		arg.MinQuantity,
 	)
 	var i Price
 	err := row.Scan(

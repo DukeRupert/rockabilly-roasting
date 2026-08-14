@@ -196,16 +196,187 @@ func (s *PricingStore) ListPriceListPricesByProduct(ctx context.Context, tx pgx.
 	return prices, nil
 }
 
+// GetTierLadder returns the full volume price ladder for a variant on a price
+// list — base rung plus any quantity breaks. An empty ladder means the variant
+// has no entry on that list at all; callers fall back to the base price.
+func (s *PricingStore) GetTierLadder(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, priceListID uuid.UUID, currencyCode string) (domain.TierLadder, error) {
+	rows, err := sqlcgen.New(tx).GetPriceListLadder(ctx, sqlcgen.GetPriceListLadderParams{
+		VariantID:    variantID,
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+	})
+	if err != nil {
+		return domain.TierLadder{}, fmt.Errorf("get tier ladder for variant %s list %s: %w", variantID, priceListID, err)
+	}
+	tiers := make([]domain.PriceTier, 0, len(rows))
+	for _, r := range rows {
+		tiers = append(tiers, tierFromRow(r.Amount, r.MinQuantity))
+	}
+	return domain.NewTierLadder(tiers), nil
+}
+
+// ListTierLaddersByVariants returns volume price ladders for the given variants
+// on a price list, keyed by variant ID. Variants with no entry on the list are
+// omitted from the map rather than mapped to an empty ladder, matching the
+// omit-on-miss behavior of the other batch readers.
+func (s *PricingStore) ListTierLaddersByVariants(ctx context.Context, tx pgx.Tx, variantIDs []uuid.UUID, priceListID uuid.UUID, currencyCode string) (map[uuid.UUID]domain.TierLadder, error) {
+	rows, err := sqlcgen.New(tx).ListPriceListLaddersByVariants(ctx, sqlcgen.ListPriceListLaddersByVariantsParams{
+		Column1:      variantIDs,
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list tier ladders by variants for list %s: %w", priceListID, err)
+	}
+	byVariant := make(map[uuid.UUID][]domain.PriceTier)
+	for _, r := range rows {
+		byVariant[r.VariantID] = append(byVariant[r.VariantID], tierFromRow(r.Amount, r.MinQuantity))
+	}
+	ladders := make(map[uuid.UUID]domain.TierLadder, len(byVariant))
+	for id, tiers := range byVariant {
+		ladders[id] = domain.NewTierLadder(tiers)
+	}
+	return ladders, nil
+}
+
+// ListTierLaddersByProduct returns volume price ladders for every variant of a
+// product across all price lists, keyed by variant ID then price list ID. Backs
+// the admin price-list editor, which shows a whole product's ladders at once.
+func (s *PricingStore) ListTierLaddersByProduct(ctx context.Context, tx pgx.Tx, productID uuid.UUID, currencyCode string) (map[uuid.UUID]map[uuid.UUID]domain.TierLadder, error) {
+	rows, err := sqlcgen.New(tx).ListPriceListLaddersByProduct(ctx, sqlcgen.ListPriceListLaddersByProductParams{
+		ProductID:    productID,
+		CurrencyCode: currencyCode,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list tier ladders for product %s: %w", productID, err)
+	}
+	tiers := make(map[uuid.UUID]map[uuid.UUID][]domain.PriceTier)
+	for _, r := range rows {
+		if r.PriceListID == nil {
+			continue
+		}
+		if tiers[r.VariantID] == nil {
+			tiers[r.VariantID] = make(map[uuid.UUID][]domain.PriceTier)
+		}
+		tiers[r.VariantID][*r.PriceListID] = append(tiers[r.VariantID][*r.PriceListID], tierFromRow(r.Amount, r.MinQuantity))
+	}
+	ladders := make(map[uuid.UUID]map[uuid.UUID]domain.TierLadder, len(tiers))
+	for variantID, byList := range tiers {
+		ladders[variantID] = make(map[uuid.UUID]domain.TierLadder, len(byList))
+		for listID, ts := range byList {
+			ladders[variantID][listID] = domain.NewTierLadder(ts)
+		}
+	}
+	return ladders, nil
+}
+
+// SetTierPrice creates or updates one rung of a ladder. minQuantity is the
+// threshold at which the rung takes effect and must be 2 or greater — the base
+// rung is written through SetPriceListPrice, which stores it as min_quantity
+// NULL. Rewriting an existing threshold replaces its amount.
+func (s *PricingStore) SetTierPrice(ctx context.Context, tx pgx.Tx, priceSetID uuid.UUID, priceListID uuid.UUID, minQuantity, amount int, currencyCode string) (*domain.Price, error) {
+	minQty := int32(minQuantity)
+	row, err := sqlcgen.New(tx).UpsertTierPrice(ctx, sqlcgen.UpsertTierPriceParams{
+		ID:           uuid.New(),
+		PriceSetID:   priceSetID,
+		Amount:       int32(amount),
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+		MinQuantity:  &minQty,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("upsert tier price at qty %d for list %s: %w", minQuantity, priceListID, err)
+	}
+	return priceFromRow(row), nil
+}
+
+// DeleteTierPrice removes one rung from a ladder, leaving the rest intact.
+func (s *PricingStore) DeleteTierPrice(ctx context.Context, tx pgx.Tx, priceSetID uuid.UUID, priceListID uuid.UUID, minQuantity int, currencyCode string) error {
+	minQty := int32(minQuantity)
+	return sqlcgen.New(tx).DeleteTierPrice(ctx, sqlcgen.DeleteTierPriceParams{
+		PriceSetID:   priceSetID,
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+		MinQuantity:  &minQty,
+	})
+}
+
+// DeleteTierPricesForList removes every rung above the base for a variant on a
+// price list, leaving the base price alone. Callers removing a variant from a
+// list entirely must call this alongside DeletePriceListPrice — deleting only
+// the base would strand the breaks as a ladder with no floor.
+func (s *PricingStore) DeleteTierPricesForList(ctx context.Context, tx pgx.Tx, priceSetID uuid.UUID, priceListID uuid.UUID, currencyCode string) error {
+	return sqlcgen.New(tx).DeleteTierPricesForList(ctx, sqlcgen.DeleteTierPricesForListParams{
+		PriceSetID:   priceSetID,
+		CurrencyCode: currencyCode,
+		PriceListID:  &priceListID,
+	})
+}
+
+// tierFromRow maps a price row onto a ladder rung. A NULL min_quantity is the
+// base rung, which domain.NewTierLadder canonicalizes to a threshold of 1.
+func tierFromRow(amount int32, minQuantity *int32) domain.PriceTier {
+	t := domain.PriceTier{Amount: int(amount)}
+	if minQuantity != nil {
+		t.MinQuantity = int(*minQuantity)
+	}
+	return t
+}
+
 func priceFromRow(r sqlcgen.Price) *domain.Price {
 	return &domain.Price{
-		ID:              r.ID,
-		PriceSetID:      r.PriceSetID,
-		Amount:          int(r.Amount),
-		CurrencyCode:    r.CurrencyCode,
-		MinQuantity:     int32PtrToIntPtr(r.MinQuantity),
-		MaxQuantity:     int32PtrToIntPtr(r.MaxQuantity),
-		PriceListID:     r.PriceListID,
-		StartsAt:        timestampFromPG(r.StartsAt),
-		EndsAt:          timestampFromPG(r.EndsAt),
+		ID:           r.ID,
+		PriceSetID:   r.PriceSetID,
+		Amount:       int(r.Amount),
+		CurrencyCode: r.CurrencyCode,
+		MinQuantity:  int32PtrToIntPtr(r.MinQuantity),
+		MaxQuantity:  int32PtrToIntPtr(r.MaxQuantity),
+		PriceListID:  r.PriceListID,
+		StartsAt:     timestampFromPG(r.StartsAt),
+		EndsAt:       timestampFromPG(r.EndsAt),
 	}
+}
+
+// ListLaddersByVariants returns each variant's ladders across every price list
+// it appears on, keyed by variant ID and ordered by list name. Lists the variant
+// is absent from are omitted.
+func (s *PricingStore) ListLaddersByVariants(ctx context.Context, tx pgx.Tx, variantIDs []uuid.UUID, currencyCode string) (map[uuid.UUID][]domain.ListLadder, error) {
+	rows, err := sqlcgen.New(tx).ListLaddersByVariantsAllLists(ctx, sqlcgen.ListLaddersByVariantsAllListsParams{
+		Column1:      variantIDs,
+		CurrencyCode: currencyCode,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list ladders by variants: %w", err)
+	}
+
+	type key struct {
+		variantID uuid.UUID
+		listID    uuid.UUID
+	}
+	tiers := map[key][]domain.PriceTier{}
+	names := map[key]string{}
+	var order []key
+	for _, r := range rows {
+		if r.PriceListID == nil {
+			continue
+		}
+		k := key{variantID: r.VariantID, listID: *r.PriceListID}
+		if _, seen := tiers[k]; !seen {
+			order = append(order, k)
+			names[k] = r.PriceListName
+		}
+		tiers[k] = append(tiers[k], tierFromRow(r.Amount, r.MinQuantity))
+	}
+
+	// Rebuild in query order so list names stay alphabetical per variant; ranging
+	// the map would shuffle them between renders.
+	out := map[uuid.UUID][]domain.ListLadder{}
+	for _, k := range order {
+		out[k.variantID] = append(out[k.variantID], domain.ListLadder{
+			PriceListID: k.listID,
+			ListName:    names[k],
+			Ladder:      domain.NewTierLadder(tiers[k]),
+		})
+	}
+	return out, nil
 }

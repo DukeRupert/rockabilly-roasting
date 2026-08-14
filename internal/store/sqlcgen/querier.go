@@ -101,6 +101,8 @@ type Querier interface {
 	DeleteProductOption(ctx context.Context, id uuid.UUID) error
 	DeleteProductOptionValue(ctx context.Context, id uuid.UUID) error
 	DeleteTaxon(ctx context.Context, id uuid.UUID) error
+	DeleteTierPrice(ctx context.Context, arg DeleteTierPriceParams) error
+	DeleteTierPricesForList(ctx context.Context, arg DeleteTierPricesForListParams) error
 	DeleteVariant(ctx context.Context, id uuid.UUID) error
 	DeleteVariantOptionValuesByVariant(ctx context.Context, variantID uuid.UUID) error
 	GetAddress(ctx context.Context, arg GetAddressParams) (Address, error)
@@ -146,6 +148,14 @@ type Querier interface {
 	// coupon redemption) don't double-fire.
 	GetOrderByStripePaymentIntentIDForUpdate(ctx context.Context, stripePaymentIntentID *string) (Order, error)
 	GetPriceListByID(ctx context.Context, id uuid.UUID) (PriceList, error)
+	// Volume tier queries (migration 065).
+	//
+	// Unlike every query above, these deliberately omit the `min_quantity IS NULL`
+	// filter: they return a variant's whole ladder — base rung plus breaks — for
+	// assembly into a domain.TierLadder. The filter stays on the queries above so
+	// that base-price and flat-list-price callers resolve exactly what they
+	// resolved before tiers existed.
+	GetPriceListLadder(ctx context.Context, arg GetPriceListLadderParams) ([]Price, error)
 	GetPriceListPrice(ctx context.Context, arg GetPriceListPriceParams) (Price, error)
 	GetPriceSetByVariant(ctx context.Context, variantID uuid.UUID) (PriceSet, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
@@ -197,11 +207,14 @@ type Querier interface {
 	ListInvoiceLinesByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceLine, error)
 	ListInvoicePaymentsByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoicePayment, error)
 	ListInvoicesByOrder(ctx context.Context, orderID uuid.UUID) ([]Invoice, error)
+	ListLaddersByVariantsAllLists(ctx context.Context, arg ListLaddersByVariantsAllListsParams) ([]ListLaddersByVariantsAllListsRow, error)
 	ListLineItemsByOrder(ctx context.Context, orderID uuid.UUID) ([]LineItem, error)
 	// ListNotifiedCustomerUsers returns the additional recipients for an account's
 	// transactional mail. The account's primary contact (customers.email) is not in
 	// this table and is added by the caller.
 	ListNotifiedCustomerUsers(ctx context.Context, customerID uuid.UUID) ([]CustomerUser, error)
+	ListPriceListLaddersByProduct(ctx context.Context, arg ListPriceListLaddersByProductParams) ([]ListPriceListLaddersByProductRow, error)
+	ListPriceListLaddersByVariants(ctx context.Context, arg ListPriceListLaddersByVariantsParams) ([]ListPriceListLaddersByVariantsRow, error)
 	ListPriceListPricesByProduct(ctx context.Context, arg ListPriceListPricesByProductParams) ([]ListPriceListPricesByProductRow, error)
 	ListPriceListPricesByVariants(ctx context.Context, arg ListPriceListPricesByVariantsParams) ([]ListPriceListPricesByVariantsRow, error)
 	ListPriceLists(ctx context.Context) ([]PriceList, error)
@@ -351,6 +364,7 @@ type Querier interface {
 	UpsertCartItem(ctx context.Context, arg UpsertCartItemParams) (CartItem, error)
 	UpsertPriceListPrice(ctx context.Context, arg UpsertPriceListPriceParams) (Price, error)
 	UpsertProductAttributeValue(ctx context.Context, arg UpsertProductAttributeValueParams) error
+	UpsertTierPrice(ctx context.Context, arg UpsertTierPriceParams) (Price, error)
 }
 
 var _ Querier = (*Queries)(nil)

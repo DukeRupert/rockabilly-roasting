@@ -23,6 +23,10 @@ type VariantPriceListPricing struct {
 	Variant    domain.Variant
 	PriceCents *int
 	ListPrices map[uuid.UUID]int
+	// ListBreaks holds the volume breaks above the list price, keyed by price
+	// list ID. Only the thresholds are shown here — the grid's job is to say
+	// which cells carry a ladder, not to edit one.
+	ListBreaks map[uuid.UUID][]domain.PriceTier
 }
 
 // priceListDollars renders the price for a given list ID as a dollar string, or
@@ -132,6 +136,10 @@ templ priceListProductBlock(lists []domain.PriceList, pp ProductPriceListPricing
 								if list.Status != domain.PriceListStatusActive {
 									<span class="ml-1 font-normal text-rr-muted">({ string(list.Status) })</span>
 								}
+								<a
+									href={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s/products/%s/tiers", list.ID, pp.Product.ID)) }
+									class="ml-2 font-normal text-rr-red hover:text-rr-red-lt"
+								>Breaks</a>
 							</th>
 						}
 					</tr>
@@ -170,6 +178,7 @@ templ priceListProductBlock(lists []domain.PriceList, pp ProductPriceListPricing
 											class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 										/>
 										<input type="hidden" id={ "plprev-" + list.ID.String() + "-" + vp.Variant.ID.String() } name={ "list_prev:" + list.ID.String() + ":" + vp.Variant.ID.String() } value={ priceListDollars(vp.ListPrices, list.ID) }/>
+										@TierSummary(vp.ListBreaks[list.ID])
 									</div>
 								</td>
 							}

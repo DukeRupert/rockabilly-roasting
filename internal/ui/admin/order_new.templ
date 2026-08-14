@@ -503,6 +503,12 @@ templ VariantSearchResults(results []domain.VariantSearchResult, query string) {
 						<span class="min-w-0">
 							<span class="block truncate font-medium text-rr-heading">{ r.ProductTitle }</span>
 							<span class="block truncate text-xs text-rr-muted">{ r.SKU }</span>
+							for _, ll := range r.ListLadders {
+								<span class="block truncate text-xs text-rr-muted">
+									{ ll.ListName + ":" }
+									@ladderBreaks(ll.Ladder)
+								</span>
+							}
 						</span>
 						<span class="shrink-0 tabular-nums text-rr-body">
 							if r.BasePriceCents != nil {

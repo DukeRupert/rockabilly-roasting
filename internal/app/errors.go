@@ -165,12 +165,12 @@ var (
 	ErrInvalidOrderStatus = errors.New("invalid order status transition")
 
 	// Price errors
-	ErrPriceNotFound     = errors.New("price not found")
-	ErrInvalidPrice      = errors.New("price must not be negative")
+	ErrPriceNotFound = errors.New("price not found")
+	ErrInvalidPrice  = errors.New("price must not be negative")
 	// ErrInvalidTierQuantity is returned for a volume break below 2. Quantity 1
 	// is the list price itself, which is set through SetPriceListPrice.
 	ErrInvalidTierQuantity = errors.New("volume break must start at 2 or more")
-	ErrPriceListNotFound = errors.New("price list not found")
+	ErrPriceListNotFound   = errors.New("price list not found")
 
 	// Cart errors (item-level)
 	ErrInvalidQuantity = errors.New("quantity must be greater than zero")
@@ -212,6 +212,13 @@ var (
 	// Label / shipment errors
 	ErrShipmentNoPhysicalItems = errors.New("order has no physical items to ship")
 	ErrNoBoxPreset             = errors.New("no box presets configured")
+
+	// Geocoding errors. The split matters to the caller: an address the
+	// provider cannot match needs a human to correct it, while an unavailable
+	// provider means try the same address again later.
+	ErrAddressNotGeocodable  = errors.New("address could not be geocoded")
+	ErrGeocoderUnavailable   = errors.New("geocoding provider unavailable")
+	ErrGeocoderNotConfigured = errors.New("geocoding provider is not configured")
 )
 
 // MOQViolationError carries the per-line minimum/multiple violations so

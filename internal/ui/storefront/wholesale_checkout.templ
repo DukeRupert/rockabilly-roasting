@@ -229,13 +229,7 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 												@ladderNote(item.Ladder, item.Quantity)
 											</span>
 										} else if note.Kind != PriceNoteNone {
-											<span
-												class={ "font-oswald text-xs leading-snug text-right sm:max-w-[15rem]", priceNoteClass(note.Kind) }
-												style="letter-spacing:0.02em;"
-												if note.Kind == PriceNoteDrop {
-													role="status"
-												}
-											>{ note.Text }</span>
+											@priceNoteText(note)
 										}
 									</span>
 								</td>

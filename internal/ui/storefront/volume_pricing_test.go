@@ -126,10 +126,13 @@ func TestPriceNoteFor(t *testing.T) {
 		assert.Empty(t, note.Text)
 	})
 
-	t.Run("each kind is styled by what it is", func(t *testing.T) {
+	t.Run("sentences are ink, the price list is muted", func(t *testing.T) {
+		// Neither note is coloured to signal itself. Amber cannot be read at this
+		// size on paper, and rust means "link" everywhere else — so the upgrade
+		// is marked by an amber glyph beside ink text, not by tinted words.
 		assert.Equal(t, "text-ink", priceNoteClass(PriceNoteDrop))
-		assert.Equal(t, "text-rust", priceNoteClass(PriceNoteUpgrade))
-		assert.Equal(t, "text-chrome-deep", priceNoteClass(PriceNoteLadder))
+		assert.Equal(t, "text-ink", priceNoteClass(PriceNoteUpgrade))
+		assert.Equal(t, "text-ink-soft", priceNoteClass(PriceNoteLadder))
 	})
 }
 
@@ -149,12 +152,4 @@ func TestOrderMultiple(t *testing.T) {
 	assert.Equal(t, 1, orderMultiple(nil))
 	assert.Equal(t, 1, orderMultiple(&zero))
 	assert.Equal(t, 1, orderMultiple(&neg))
-}
-
-func TestNudgeConstantsMatchDomain(t *testing.T) {
-	// The order sheet reads these off the form and reimplements the proximity
-	// rule in JS. Publishing the Go values is what keeps the two in step, so a
-	// change to domain must reach the page rather than being hardcoded twice.
-	assert.Equal(t, "0.1", nudgePctAttr())
-	assert.Equal(t, "3", nudgeFloorAttr())
 }

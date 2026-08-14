@@ -2,7 +2,6 @@ package storefront
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -46,21 +45,11 @@ func ladderJSON(l domain.TierLadder) string {
 	return "[" + strings.Join(parts, ",") + "]"
 }
 
-// nudgePctAttr and nudgeFloorAttr publish the Go proximity thresholds to the
-// order sheet's script, so the client and server agree on when a break is close
-// enough to mention rather than each carrying its own copy of the numbers.
-func nudgePctAttr() string {
-	return strconv.FormatFloat(domain.NudgeProximityPct, 'f', -1, 64)
-}
-
-func nudgeFloorAttr() string {
-	return strconv.Itoa(domain.NudgeProximityFloor)
-}
-
 // upgradeFor returns the volume upgrade worth showing on a cart line, or nil.
-// The cart re-renders on every quantity change, so its nudge is computed here in
-// Go rather than in the browser — exact, and with no second implementation to
-// drift.
+//
+// The cart is the only surface that nudges. It re-renders on every quantity
+// change, so this is computed in Go against the same ladder that priced the
+// line — exact, and with nothing mirrored in the browser to drift from it.
 func upgradeFor(item WholesaleCheckoutItem) *domain.Upgrade {
 	u, ok := item.Ladder.Upgrade(item.Quantity, orderMultiple(item.Multiple))
 	if !ok {
@@ -147,18 +136,22 @@ func priceNoteFor(item WholesaleCheckoutItem) PriceNote {
 	return PriceNote{Kind: PriceNoteNone}
 }
 
-// priceNoteClass styles a note by what it is. A drop is ink — it reports
-// something that already happened to the buyer's money and should read as
-// ordinary text, not an alarm. An upgrade is rust, the one colour on paper with
-// enough contrast at this size to pull the eye. A ladder is muted; it is
-// reference, not news.
+// priceNoteClass styles a note by what it is. A drop and an upgrade are both
+// ink: they are sentences the buyer has to read, and ink is what is legible at
+// this size on paper. A ladder is muted — reference, not news.
+//
+// The upgrade is distinguished by an amber marker rather than by coloured text.
+// Amber is the brand's colour for a highlight, but #F2A03D on bone paper fails
+// contrast well before 12px, so it cannot carry words. Rust could, but rust is
+// locked to calls to action and links, and a nudge is neither — spending it here
+// would blunt it everywhere it does mean "click this".
 func priceNoteClass(kind PriceNoteKind) string {
 	switch kind {
-	case PriceNoteDrop:
-		return "text-ink"
-	case PriceNoteUpgrade:
-		return "text-rust"
+	case PriceNoteLadder:
+		return "text-ink-soft"
+	case PriceNoteNone:
+		return ""
 	default:
-		return "text-chrome-deep"
+		return "text-ink"
 	}
 }

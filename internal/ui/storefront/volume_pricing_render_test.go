@@ -94,11 +94,11 @@ func TestPortalRendersLadder(t *testing.T) {
 	assertRungEmphasis(t, html, "12", false)
 	assertRungEmphasis(t, html, "24", false)
 	assert.Contains(t, html, "data-unit-price", "unit price cell must be addressable for live requoting")
-	assert.Contains(t, html, "data-ladder-note", "the script swaps between these two")
-	assert.Contains(t, html, "data-nudge-note")
-	assert.Contains(t, html, `data-nudge-pct="0.1"`)
-	assert.Contains(t, html, `data-nudge-floor="3"`)
-
+	// The sheet shows the ladder and nothing else: no nudge slot, and no
+	// thresholds published for arithmetic it no longer does.
+	assert.NotContains(t, html, "data-nudge-note")
+	assert.NotContains(t, html, "data-nudge-pct")
+	assert.NotContains(t, html, "data-nudge-floor")
 	assert.NotContains(t, html, "data-price=", "the fixed per-row price is gone; quantity decides it now")
 }
 
@@ -129,6 +129,8 @@ func TestCheckoutRendersUpgradeNudge(t *testing.T) {
 
 	assertNoUninvokedComponents(t, html)
 	assert.Contains(t, html, "Add 1 more and pay $2.00 less", "one unit short of a break is the nudge worth showing")
+	// Marked in amber, worded in ink.
+	assert.Contains(t, html, `<span class="shrink-0 text-candle-deep" aria-hidden="true">◆</span>`)
 	// One note per line: the nudge already names the rung, so repeating the
 	// whole ladder beside it restates rather than informs.
 	assertNoLadder(t, html)
@@ -143,6 +145,7 @@ func TestCheckoutFallsBackToLadderWhenNoNudge(t *testing.T) {
 	})
 
 	assertNoUninvokedComponents(t, html)
+	assert.NotContains(t, html, "◆", "the marker belongs to the nudge, not the price list")
 	assert.Contains(t, html, "12+ $10.00", "far from a break, show what exists")
 	assert.Contains(t, html, "24+ $9.50")
 	assert.NotContains(t, html, "Add ")

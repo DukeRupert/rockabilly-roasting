@@ -20,27 +20,24 @@ import (
 // standing risk in this feature: if they drift, the sheet quotes a price the
 // cart will not honor.
 //
+// The mirror is now two functions — which price is in force, and which rung
+// earned it. Upgrade arithmetic used to live here too; moving the nudge to the
+// cart took its thresholds, rounding and case-multiple rules out of the browser,
+// and out of this test with them.
+//
 // This runs the script the page actually ships — extracted from the rendered
 // markup, not a copy — against the Go ladder over a grid of quantities, and
 // fails on the first disagreement. Skipped when node is unavailable, so it
 // never blocks a machine without it.
 
 type parityCase struct {
-	Rungs    [][2]int `json:"rungs"`
-	Qty      int      `json:"qty"`
-	Multiple int      `json:"multiple"`
+	Rungs [][2]int `json:"rungs"`
+	Qty   int      `json:"qty"`
 }
 
 type parityResult struct {
 	UnitPrice  int `json:"unitPrice"`
 	ActiveRung int `json:"activeRung"`
-	Upgrade    *struct {
-		Add         int `json:"add"`
-		Target      int `json:"target"`
-		Unit        int `json:"unit"`
-		UnitSaving  int `json:"unitSaving"`
-		TotalSaving int `json:"totalSaving"`
-	} `json:"upgrade"`
 }
 
 func TestOrderSheetScriptMatchesGoLadder(t *testing.T) {
@@ -62,13 +59,10 @@ func TestOrderSheetScriptMatchesGoLadder(t *testing.T) {
 			{MinQuantity: 1, Amount: 900}, {MinQuantity: 12, Amount: 1100},
 		}),
 	}
-	multiples := []int{1, 6, 20}
-
 	var cases []parityCase
 	type key struct {
-		name     string
-		qty      int
-		multiple int
+		name string
+		qty  int
 	}
 	var keys []key
 	for name, l := range ladders {
@@ -76,11 +70,9 @@ func TestOrderSheetScriptMatchesGoLadder(t *testing.T) {
 		for _, r := range l.Rungs() {
 			rungs = append(rungs, [2]int{r.MinQuantity, r.Amount})
 		}
-		for _, m := range multiples {
-			for qty := 1; qty <= 40; qty++ {
-				cases = append(cases, parityCase{Rungs: rungs, Qty: qty, Multiple: m})
-				keys = append(keys, key{name, qty, m})
-			}
+		for qty := 1; qty <= 40; qty++ {
+			cases = append(cases, parityCase{Rungs: rungs, Qty: qty})
+			keys = append(keys, key{name, qty})
 		}
 	}
 
@@ -90,24 +82,17 @@ func TestOrderSheetScriptMatchesGoLadder(t *testing.T) {
 	for i, c := range cases {
 		k := keys[i]
 		l := ladders[k.name]
-		where := fmt.Sprintf("%s, qty %d, multiple %d", k.name, k.qty, k.multiple)
+		where := fmt.Sprintf("%s, qty %d", k.name, k.qty)
 
 		assert.Equal(t, l.UnitPriceAt(c.Qty), got[i].UnitPrice, "unit price disagrees — %s", where)
 		assert.Equal(t, activeBreak(l, c.Qty), got[i].ActiveRung, "active rung disagrees — %s", where)
+	}
 
-		wantUp, wantOK := l.Upgrade(c.Qty, c.Multiple)
-		if !wantOK {
-			assert.Nil(t, got[i].Upgrade, "script offered an upgrade Go withholds — %s", where)
-			continue
-		}
-		if !assert.NotNil(t, got[i].Upgrade, "script withheld an upgrade Go offers — %s", where) {
-			continue
-		}
-		assert.Equal(t, wantUp.AddQty, got[i].Upgrade.Add, "add quantity — %s", where)
-		assert.Equal(t, wantUp.TargetQty, got[i].Upgrade.Target, "target quantity — %s", where)
-		assert.Equal(t, wantUp.TargetUnitPrice, got[i].Upgrade.Unit, "target unit price — %s", where)
-		assert.Equal(t, wantUp.UnitSavingCents, got[i].Upgrade.UnitSaving, "unit saving — %s", where)
-		assert.Equal(t, wantUp.TotalSavingCents, got[i].Upgrade.TotalSaving, "total saving — %s", where)
+	// The sheet must not have grown pricing logic back. Anything beyond picking
+	// a rung belongs on the server, where there is one implementation of it.
+	script := portalScript(t)
+	for _, gone := range []string{"upgrade(", "nudgeText", "ceilTo", "nudgePct", "nudgeFloor"} {
+		assert.NotContains(t, script, gone, "nudge arithmetic is the cart's job, in Go")
 	}
 }
 
@@ -121,17 +106,15 @@ func runSheetScript(t *testing.T, node string, cases []parityCase) []parityResul
 
 	harness := fmt.Sprintf(`
 const sheet = (%s);
-// The script reads its thresholds off the form, exactly as it does in the page.
-sheet.$root = { dataset: { nudgePct: %q, nudgeFloor: %q }, querySelectorAll: () => [] };
+sheet.$root = { querySelectorAll: () => [] };
 const cases = JSON.parse(process.argv[2]);
 const out = cases.map(c => {
   const el = { dataset: { ladder: JSON.stringify(c.rungs) } };
   const rungs = sheet.rungs(el);
-  const u = sheet.upgrade(rungs, c.qty, c.multiple);
-  return { unitPrice: sheet.unitPriceAt(rungs, c.qty), activeRung: sheet.activeRung(rungs, c.qty), upgrade: u };
+  return { unitPrice: sheet.unitPriceAt(rungs, c.qty), activeRung: sheet.activeRung(rungs, c.qty) };
 });
 process.stdout.write(JSON.stringify(out));
-`, portalScript(t), nudgePctAttr(), nudgeFloorAttr())
+`, portalScript(t))
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "parity.mjs")

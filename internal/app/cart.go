@@ -256,7 +256,110 @@ func (s *CartService) assertVariantAccessible(ctx context.Context, tx pgx.Tx, v 
 	return nil
 }
 
-// UpdateItemQuantity sets the quantity of a cart item.
+// RepricedLine is a cart line whose unit price was rewritten, together with the
+// volume rung it lost if the write moved it down one.
+type RepricedLine struct {
+	Item *domain.CartItem
+	// Drop is non-nil only when a quantity reduction crossed below a volume
+	// break and raised the unit price. It is advisory — the write has already
+	// happened at the new price — and exists so a buyer learns their price moved
+	// when they move it, rather than discovering it at checkout.
+	Drop *domain.Drop
+}
+
+// UpdateItemQuantityForCustomer sets a cart line's quantity and reprices it at
+// the customer's rung for that quantity. cartID is used for ownership
+// verification — the item must belong to this cart.
+//
+// This is the customer-facing quantity control. UpdateItemQuantity, which does
+// not reprice, remains only for the anonymous retail cart, where prices are
+// always single-rung.
+func (s *CartService) UpdateItemQuantityForCustomer(ctx context.Context, tx pgx.Tx, cartID, itemID uuid.UUID, quantity int, customerID uuid.UUID, currencyCode string) (RepricedLine, error) {
+	if quantity <= 0 {
+		return RepricedLine{}, ErrInvalidQuantity
+	}
+
+	items, err := s.carts.ListCartItems(ctx, tx, cartID)
+	if err != nil {
+		return RepricedLine{}, fmt.Errorf("list cart items: %w", err)
+	}
+	var current *domain.CartItem
+	for i := range items {
+		if items[i].ID == itemID {
+			current = &items[i]
+			break
+		}
+	}
+	if current == nil {
+		return RepricedLine{}, ErrCartNotFound
+	}
+
+	ladder, err := s.pricing.LadderForCustomer(ctx, tx, current.VariantID, customerID, currencyCode)
+	if err != nil {
+		return RepricedLine{}, err
+	}
+
+	// Read the drop off the same ladder that sets the price, so the notice and
+	// the charge cannot disagree.
+	var drop *domain.Drop
+	if d, ok := ladder.Drop(current.Quantity, quantity); ok {
+		drop = &d
+	}
+
+	updated, err := s.carts.SetCartItemByVariant(ctx, tx, cartID, current.VariantID, quantity, ladder.UnitPriceAt(quantity))
+	if err != nil {
+		return RepricedLine{}, fmt.Errorf("update cart item quantity: %w", err)
+	}
+	return RepricedLine{Item: updated, Drop: drop}, nil
+}
+
+// RepriceCart rewrites every line whose stored unit price no longer matches the
+// customer's current price at that line's quantity, and returns only the lines
+// that moved. Idempotent: a second call on an unchanged cart returns nothing.
+//
+// This is the guard against a cart that has sat while its price list changed
+// underneath it. Returned lines carry no Drop — nothing about the buyer's
+// quantities changed, only what those quantities cost.
+func (s *CartService) RepriceCart(ctx context.Context, tx pgx.Tx, cartID, customerID uuid.UUID, currencyCode string) ([]RepricedLine, error) {
+	items, err := s.carts.ListCartItems(ctx, tx, cartID)
+	if err != nil {
+		return nil, fmt.Errorf("list cart items: %w", err)
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+
+	quantities := make(map[uuid.UUID]int, len(items))
+	for _, ci := range items {
+		quantities[ci.VariantID] = ci.Quantity
+	}
+	fresh, err := s.pricing.ResolveForCustomerBatch(ctx, tx, customerID, quantities, currencyCode)
+	if err != nil {
+		return nil, err
+	}
+
+	var moved []RepricedLine
+	for _, ci := range items {
+		price, ok := fresh[ci.VariantID]
+		if !ok || price == ci.UnitPrice {
+			continue
+		}
+		updated, err := s.carts.SetCartItemByVariant(ctx, tx, cartID, ci.VariantID, ci.Quantity, price)
+		if err != nil {
+			return nil, fmt.Errorf("reprice cart item: %w", err)
+		}
+		moved = append(moved, RepricedLine{Item: updated})
+	}
+	return moved, nil
+}
+
+// UpdateItemQuantity sets the quantity of a cart item without repricing it.
+//
+// Retail only. Anonymous carts are priced from base prices, which are always
+// single-rung, so quantity cannot change the unit price. A customer cart must
+// use UpdateItemQuantityForCustomer instead — leaving the price untouched there
+// would strand the line on the rung for a quantity it no longer holds.
+//
 // cartID is used for ownership verification — the item must belong to this cart.
 func (s *CartService) UpdateItemQuantity(ctx context.Context, tx pgx.Tx, cartID, itemID uuid.UUID, quantity int) (*domain.CartItem, error) {
 	if quantity <= 0 {

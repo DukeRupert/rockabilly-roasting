@@ -837,26 +837,16 @@ func (d *Deps) handleWholesaleCheckoutConfirm(w http.ResponseWriter, r *http.Req
 			return app.ErrCartEmpty
 		}
 
-		quantities := make(map[uuid.UUID]int, len(cartItems))
-		for _, ci := range cartItems {
-			quantities[ci.VariantID] = ci.Quantity
-		}
-		freshPrices, txErr := d.PricingService.ResolveForCustomerBatch(ctx, tx, customer.ID, quantities, "USD")
+		// Last line of defence before money moves: if anything repriced while
+		// this cart sat, rewrite it and send the buyer back to look rather than
+		// charging a total they were never shown. CartService owns the
+		// repricing rule — this handler only reacts to the outcome.
+		moved, txErr := d.CartService.RepriceCart(ctx, tx, cart.ID, customer.ID, "USD")
 		if txErr != nil {
 			return txErr
 		}
-		for _, ci := range cartItems {
-			if ci.UnitPrice != freshPrices[ci.VariantID] {
-				stale = true
-				// Set semantics: rewrite the line at the fresh price with the
-				// same quantity. (The old AddItemForCustomer call here doubled
-				// the quantity and never touched the price.)
-				if _, txErr := d.CartService.SetItemForCustomer(ctx, tx, cart.ID, ci.VariantID, ci.Quantity, customer.ID, "USD"); txErr != nil {
-					return txErr
-				}
-			}
-		}
-		if stale {
+		if len(moved) > 0 {
+			stale = true
 			return nil
 		}
 
@@ -1112,9 +1102,16 @@ func (d *Deps) resolveWholesaleAddress(ctx context.Context, tx pgx.Tx, customer 
 	return addr.ID, nil
 }
 
-// handleWholesaleCartUpdate updates the quantity of a cart item inline.
+// handleWholesaleCartUpdate updates the quantity of a cart item inline, at the
+// customer's price for the new quantity.
 func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	customer, ok := auth.CustomerFromContext(ctx)
+	if !ok {
+		http.Error(w, "not authenticated", http.StatusUnauthorized)
+		return
+	}
 
 	cartID := getWholesaleCartID(r)
 	if cartID == nil {
@@ -1135,7 +1132,7 @@ func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request)
 	}
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		_, txErr := d.CartService.UpdateItemQuantity(ctx, tx, *cartID, itemID, quantity)
+		_, txErr := d.CartService.UpdateItemQuantityForCustomer(ctx, tx, *cartID, itemID, quantity, customer.ID, "USD")
 		return txErr
 	})
 	if err != nil {

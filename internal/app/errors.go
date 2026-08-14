@@ -219,6 +219,16 @@ var (
 	ErrAddressNotGeocodable  = errors.New("address could not be geocoded")
 	ErrGeocoderUnavailable   = errors.New("geocoding provider unavailable")
 	ErrGeocoderNotConfigured = errors.New("geocoding provider is not configured")
+
+	// Route planning errors.
+	ErrNoDeliveryStops = errors.New("no local delivery orders to route")
+	// ErrOriginNotConfigured means shipping_config has no usable origin
+	// address. The roastery address is the ship-from EasyPost already uses, so
+	// this is a settings gap rather than a missing route feature.
+	ErrOriginNotConfigured = errors.New("roastery origin address is not configured")
+	// ErrOriginNotGeocodable means the configured origin exists but cannot be
+	// placed on the map — every route starts there, so planning cannot proceed.
+	ErrOriginNotGeocodable = errors.New("roastery origin address could not be geocoded")
 )
 
 // MOQViolationError carries the per-line minimum/multiple violations so

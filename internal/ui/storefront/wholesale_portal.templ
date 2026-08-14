@@ -204,7 +204,9 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 						if (nudge) {
 							const u = this.upgrade(rungs, q, mult);
 							nudge.textContent = u ? this.nudgeText(u) : '';
-							nudge.classList.toggle('hidden', !u);
+							// invisible, not hidden: the element keeps its box, so
+							// showing a nudge never reflows the row.
+							nudge.classList.toggle('invisible', !u);
 						}
 
 						// Extended price per row, so a buyer working to a budget
@@ -283,7 +285,14 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 									}
 									<th class="px-4 py-2.5">Unit Price</th>
 									<th class="px-4 py-2.5 text-center">Qty</th>
-									<th class="px-4 py-2.5 text-right">Total</th>
+									<!--
+										Fixed width, because the nudge lives in this column and
+										appears the moment a typed quantity nears a break. Left
+										to size itself, the column would widen and shove the qty
+										input sideways under the cursor — mid-edit, which is
+										precisely when it must not move.
+									-->
+									<th class="px-4 py-2.5 text-right w-64">Total</th>
 								</tr>
 							</thead>
 							<tbody class="block sm:table-row-group">
@@ -345,7 +354,7 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 											<span class="inline-flex flex-col items-end gap-0.5">
 												<span class="font-special text-base text-ink" data-line-total>&mdash;</span>
 												<!-- Filled by recompute() when a break is within reach. -->
-												<span class="hidden font-oswald text-[11px] text-rust text-right leading-snug whitespace-normal max-w-[16rem]" style="letter-spacing:0.02em;" data-nudge role="status"></span>
+												<span class="invisible font-oswald text-[11px] text-rust text-right leading-snug whitespace-normal" style="letter-spacing:0.02em;" data-nudge role="status"></span>
 											</span>
 										</td>
 									</tr>

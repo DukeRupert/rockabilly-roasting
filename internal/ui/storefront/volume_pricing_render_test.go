@@ -3,6 +3,7 @@ package storefront
 import (
 	"bytes"
 	"context"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -41,6 +42,35 @@ func renderCheckout(t *testing.T, props WholesaleCheckoutProps) string {
 	return buf.String()
 }
 
+// rungClass returns the classes on a rendered ladder rung. The ladder is markup
+// now, not a run of text, so assertions have to read it as markup — a contains
+// check on "12+ $10.00 · 24+ $9.50" would pass vacuously forever.
+func rungClass(html, minQty string) (string, bool) {
+	m := regexp.MustCompile(`<span class="([^"]*)" data-rung="` + minQty + `">`).FindStringSubmatch(html)
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
+}
+
+// assertRungEmphasis checks a rung is rendered, and whether it carries the
+// weight of the rung the buyer has earned.
+func assertRungEmphasis(t *testing.T, html, minQty string, wantActive bool) {
+	t.Helper()
+	cls, ok := rungClass(html, minQty)
+	if !assert.True(t, ok, "rung %s+ was not rendered", minQty) {
+		return
+	}
+	assert.Equal(t, wantActive, strings.Contains(cls, "font-semibold"),
+		"rung %s+ emphasis; classes were %q", minQty, cls)
+}
+
+// assertNoLadder asserts the ladder yielded its slot to something outranking it.
+func assertNoLadder(t *testing.T, html string) {
+	t.Helper()
+	assert.NotContains(t, html, "data-rung=", "ladder must yield the slot, not sit beside it")
+}
+
 // assertNoUninvokedComponents guards the failure mode that shipped in the admin
 // typeahead: templ rendering "@component(args)" to the page as text.
 func assertNoUninvokedComponents(t *testing.T, html string) {
@@ -61,9 +91,11 @@ func TestPortalRendersLadder(t *testing.T) {
 
 	assertNoUninvokedComponents(t, html)
 	assert.Contains(t, html, `data-ladder="[[1,1100],[12,1000],[24,950]]"`, "sheet needs the whole ladder to reprice as the buyer types")
-	assert.Contains(t, html, "12+ $10.00 · 24+ $9.50", "breaks are readable without typing a quantity")
+	assertRungEmphasis(t, html, "12", false)
+	assertRungEmphasis(t, html, "24", false)
 	assert.Contains(t, html, "data-unit-price", "unit price cell must be addressable for live requoting")
-	assert.Contains(t, html, "data-price-note", "the one note slot must exist for the script to swap")
+	assert.Contains(t, html, "data-ladder-note", "the script swaps between these two")
+	assert.Contains(t, html, "data-nudge-note")
 	assert.Contains(t, html, `data-nudge-pct="0.1"`)
 	assert.Contains(t, html, `data-nudge-floor="3"`)
 
@@ -76,7 +108,7 @@ func TestPortalFlatPriceStaysQuiet(t *testing.T) {
 
 	assertNoUninvokedComponents(t, html)
 	assert.Contains(t, html, `data-ladder="[[1,1100]]"`)
-	assert.NotContains(t, html, "+ $11.00", "a flat price has no breaks to advertise")
+	assertNoLadder(t, html)
 }
 
 func TestCheckoutRendersUpgradeNudge(t *testing.T) {
@@ -99,7 +131,7 @@ func TestCheckoutRendersUpgradeNudge(t *testing.T) {
 	assert.Contains(t, html, "Add 1 more and pay $2.00 less", "one unit short of a break is the nudge worth showing")
 	// One note per line: the nudge already names the rung, so repeating the
 	// whole ladder beside it restates rather than informs.
-	assert.NotContains(t, html, "12+ $10.00 · 24+ $9.50", "ladder must yield to the nudge, not sit next to it")
+	assertNoLadder(t, html)
 }
 
 func TestCheckoutFallsBackToLadderWhenNoNudge(t *testing.T) {
@@ -111,8 +143,40 @@ func TestCheckoutFallsBackToLadderWhenNoNudge(t *testing.T) {
 	})
 
 	assertNoUninvokedComponents(t, html)
-	assert.Contains(t, html, "12+ $10.00 · 24+ $9.50", "far from a break, show what exists")
+	assert.Contains(t, html, "12+ $10.00", "far from a break, show what exists")
+	assert.Contains(t, html, "24+ $9.50")
 	assert.NotContains(t, html, "Add ")
+
+	// At 2 the buyer has earned nothing, so no rung carries weight.
+	assertRungEmphasis(t, html, "12", false)
+	assertRungEmphasis(t, html, "24", false)
+}
+
+func TestCheckoutMarksTheEarnedRung(t *testing.T) {
+	// The ladder should say "you have this one", not merely list what exists.
+	for _, tc := range []struct {
+		qty            int
+		twelve, twenty bool
+	}{
+		{qty: 11, twelve: false, twenty: false},
+		{qty: 12, twelve: true, twenty: false},
+		{qty: 23, twelve: true, twenty: false},
+		{qty: 40, twelve: false, twenty: true},
+	} {
+		html := renderCheckout(t, WholesaleCheckoutProps{
+			Items: []WholesaleCheckoutItem{{
+				ItemID: uuid.New(), ProductName: "Ethiopia", SKU: "E",
+				Quantity: tc.qty, UnitPrice: testLadder().UnitPriceAt(tc.qty), Ladder: testLadder(),
+			}},
+		})
+		// Quantities near a break show the nudge instead, which is the ranking
+		// working as intended; only assert emphasis where the ladder rendered.
+		if _, ok := rungClass(html, "12"); !ok {
+			continue
+		}
+		assertRungEmphasis(t, html, "12", tc.twelve)
+		assertRungEmphasis(t, html, "24", tc.twenty)
+	}
 }
 
 func TestCheckoutTopRungSaysNothing(t *testing.T) {
@@ -151,7 +215,7 @@ func TestCheckoutRendersDropNotice(t *testing.T) {
 	// A drop outranks the nudge and the ladder, absorbing the nudge rather than
 	// discarding it — the way back is in the same sentence.
 	assert.NotContains(t, html, "Add 1 more", "the drop owns the slot this render")
-	assert.NotContains(t, html, "12+ $10.00 · 24+ $9.50")
+	assertNoLadder(t, html)
 }
 
 func TestCheckoutWithoutDropRendersNoNotice(t *testing.T) {

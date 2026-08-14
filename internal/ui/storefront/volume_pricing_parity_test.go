@@ -32,8 +32,9 @@ type parityCase struct {
 }
 
 type parityResult struct {
-	UnitPrice int `json:"unitPrice"`
-	Upgrade   *struct {
+	UnitPrice  int `json:"unitPrice"`
+	ActiveRung int `json:"activeRung"`
+	Upgrade    *struct {
 		Add         int `json:"add"`
 		Target      int `json:"target"`
 		Unit        int `json:"unit"`
@@ -92,6 +93,7 @@ func TestOrderSheetScriptMatchesGoLadder(t *testing.T) {
 		where := fmt.Sprintf("%s, qty %d, multiple %d", k.name, k.qty, k.multiple)
 
 		assert.Equal(t, l.UnitPriceAt(c.Qty), got[i].UnitPrice, "unit price disagrees — %s", where)
+		assert.Equal(t, activeBreak(l, c.Qty), got[i].ActiveRung, "active rung disagrees — %s", where)
 
 		wantUp, wantOK := l.Upgrade(c.Qty, c.Multiple)
 		if !wantOK {
@@ -126,7 +128,7 @@ const out = cases.map(c => {
   const el = { dataset: { ladder: JSON.stringify(c.rungs) } };
   const rungs = sheet.rungs(el);
   const u = sheet.upgrade(rungs, c.qty, c.multiple);
-  return { unitPrice: sheet.unitPriceAt(rungs, c.qty), upgrade: u };
+  return { unitPrice: sheet.unitPriceAt(rungs, c.qty), activeRung: sheet.activeRung(rungs, c.qty), upgrade: u };
 });
 process.stdout.write(JSON.stringify(out));
 `, portalScript(t), nudgePctAttr(), nudgeFloorAttr())

@@ -220,9 +220,17 @@ templ WholesaleCheckoutContent(props WholesaleCheckoutProps) {
 									<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Unit Price</span>
 									<span class="inline-flex flex-col items-end gap-0.5">
 										<span class="font-special text-sm text-ink">{ formatCents(item.UnitPrice) }</span>
-										if note := priceNoteFor(item); note.Kind != PriceNoteNone {
+										if note := priceNoteFor(item); note.Kind == PriceNoteLadder {
+											<!--
+												The ladder is markup, not a string, so the rung the
+												buyer has earned can carry weight the others don't.
+											-->
+											<span class="font-oswald text-xs leading-snug text-right sm:max-w-[15rem]" style="letter-spacing:0.02em;">
+												@ladderNote(item.Ladder, item.Quantity)
+											</span>
+										} else if note.Kind != PriceNoteNone {
 											<span
-												class={ "font-oswald text-[11px] leading-snug text-right sm:max-w-[15rem]", priceNoteClass(note.Kind) }
+												class={ "font-oswald text-xs leading-snug text-right sm:max-w-[15rem]", priceNoteClass(note.Kind) }
 												style="letter-spacing:0.02em;"
 												if note.Kind == PriceNoteDrop {
 													role="status"

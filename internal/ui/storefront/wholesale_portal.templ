@@ -153,7 +153,14 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 					for (const [min, amt] of rungs) { if (min > q) break; price = amt; }
 					return price;
 				},
-				// Mirrors TierLadder.Upgrade: round the target up to a whole case
+				// Mirrors TierLadder.TierAt: the highest break the quantity has
+					// reached, or 0 while it is still on the base price.
+					activeRung(rungs, q) {
+						let active = 0;
+						for (const [min] of rungs) { if (min > q) break; if (min > 1) active = min; }
+						return active;
+					},
+					// Mirrors TierLadder.Upgrade: round the target up to a whole case
 				// so the ask is orderable, price the rounded target rather than
 				// the rung it aimed at, and widen the window to one case for the
 				// same reason.
@@ -201,15 +208,24 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 						if (unitCell) unitCell.textContent = this.money(price);
 
 						// One slot: the nudge when a break is within reach, the
-						// ladder otherwise. Never both, and never empty for a
-						// laddered variant, so the row does not reflow.
-						const note = row?.querySelector('[data-price-note]');
-						if (note) {
-							const u = this.upgrade(rungs, q, mult);
-							note.textContent = u ? this.nudgeText(u) : (el.dataset.hint || '');
-							note.classList.toggle('text-rust', !!u);
-							note.classList.toggle('text-chrome-deep', !u);
+						// ladder otherwise. Never both.
+						const u = this.upgrade(rungs, q, mult);
+						const ladderNote = row?.querySelector('[data-ladder-note]');
+						const nudgeNote = row?.querySelector('[data-nudge-note]');
+						if (ladderNote && nudgeNote) {
+							nudgeNote.textContent = u ? this.nudgeText(u) : '';
+							nudgeNote.classList.toggle('hidden', !u);
+							ladderNote.classList.toggle('hidden', !!u);
 						}
+						// Move the weight onto the rung this quantity has earned.
+						// Only classes move — the rung text is Go's to write.
+						const active = this.activeRung(rungs, q);
+						row?.querySelectorAll('[data-rung]').forEach(r => {
+							const on = parseInt(r.dataset.rung, 10) === active;
+							r.classList.toggle('text-ink', on);
+							r.classList.toggle('font-semibold', on);
+							r.classList.toggle('text-ink-soft', !on);
+						});
 
 						// Extended price per row, so a buyer working to a budget
 						// never does qty × unit in their head.
@@ -321,14 +337,23 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 													</span>
 												}
 												<!--
-													One note, swapped in place by recompute(): the
-													ladder when no break is near, the nudge when one
-													is. Saying both restates rather than informs —
-													the nudge already names the rung it aims at.
-													Seeded server-side so it reads correctly before
-													any script runs.
+													One note, two possible contents, swapped by
+													recompute(): the ladder when no break is near, the
+													nudge when one is. Saying both restates rather
+													than informs — the nudge already names the rung it
+													aims at.
+
+													The ladder is rendered in Go, rungs and all, and
+													the script only moves emphasis between them. It
+													never formats a price, which is the whole reason
+													the two stay in step.
 												-->
-												<span class="block font-oswald text-[11px] leading-snug text-chrome-deep" style="letter-spacing:0.04em;" data-price-note>{ ladderHint(variant.Ladder) }</span>
+												<span class="block font-oswald text-xs leading-snug" style="letter-spacing:0.04em;">
+													<span data-ladder-note>
+														@ladderNote(variant.Ladder, variant.CartQty)
+													</span>
+													<span class="hidden text-rust" data-nudge-note></span>
+												</span>
 											</span>
 										</td>
 										<td class="flex items-center justify-between gap-4 py-1.5 sm:table-cell sm:px-4 sm:py-2.5 sm:text-center">
@@ -344,7 +369,6 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 												}
 												aria-label={ "Quantity for " + variant.SKU }
 												data-ladder={ ladderJSON(variant.Ladder) }
-											data-hint={ ladderHint(variant.Ladder) }
 												if variant.MinQty != nil {
 													data-min={ fmt.Sprint(*variant.MinQty) }
 												}

@@ -557,11 +557,20 @@ func parseTierForm(r *http.Request) (map[uuid.UUID][]domain.PriceTier, error) {
 
 		qtyRaw := strings.TrimSpace(r.PostForm.Get(key))
 		priceRaw := strings.TrimSpace(r.PostForm.Get("tier_price:" + rest))
-		if qtyRaw == "" && priceRaw == "" {
+
+		// A blank quantity drops the row. The quantity is what identifies a
+		// break, so clearing it is an unambiguous "remove this" — and since the
+		// save replaces the whole ladder, a row that is not resubmitted is a row
+		// that is deleted. Requiring the price be cleared too would make the
+		// obvious gesture fail.
+		if qtyRaw == "" {
 			continue
 		}
-		if qtyRaw == "" || priceRaw == "" {
-			return nil, fmt.Errorf("Every break needs both a quantity and a price")
+		// The reverse is genuinely ambiguous: a break at a quantity with no
+		// price means nothing, and silently dropping it would look to staff
+		// exactly like a successful save.
+		if priceRaw == "" {
+			return nil, fmt.Errorf("A break at a quantity needs a price")
 		}
 
 		qty, convErr := strconv.Atoi(qtyRaw)

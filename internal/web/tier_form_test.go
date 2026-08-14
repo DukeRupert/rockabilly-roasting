@@ -58,17 +58,28 @@ func TestParseTierForm(t *testing.T) {
 		assert.Empty(t, got[v1])
 	})
 
-	t.Run("half-filled rows are an error, not a silent drop", func(t *testing.T) {
-		// Dropping these would look to staff exactly like a successful save.
+	t.Run("clearing a quantity removes the break, price left or not", func(t *testing.T) {
+		// The editor tells staff to clear a quantity to remove a break, and the
+		// save replaces the whole ladder — so a row without a quantity is simply
+		// not rewritten. Requiring the price be cleared too would make the
+		// documented gesture fail.
+		got, err := parseTierForm(tierFormRequest(t, url.Values{
+			"tier_qty:" + v1.String() + ":0":   {""},
+			"tier_price:" + v1.String() + ":0": {"11.00"},
+			"tier_qty:" + v1.String() + ":1":   {"24"},
+			"tier_price:" + v1.String() + ":1": {"10.25"},
+		}))
+		require.NoError(t, err)
+		assert.Equal(t, []domain.PriceTier{{MinQuantity: 24, Amount: 1025}}, got[v1])
+	})
+
+	t.Run("a quantity with no price is an error, not a silent drop", func(t *testing.T) {
+		// Unlike a cleared quantity, this is ambiguous — a break at a quantity
+		// with no price means nothing, and dropping it would look to staff
+		// exactly like a successful save.
 		_, err := parseTierForm(tierFormRequest(t, url.Values{
 			"tier_qty:" + v1.String() + ":0":   {"12"},
 			"tier_price:" + v1.String() + ":0": {""},
-		}))
-		assert.Error(t, err)
-
-		_, err = parseTierForm(tierFormRequest(t, url.Values{
-			"tier_qty:" + v1.String() + ":0":   {""},
-			"tier_price:" + v1.String() + ":0": {"10.00"},
 		}))
 		assert.Error(t, err)
 	})

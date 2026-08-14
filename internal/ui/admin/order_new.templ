@@ -505,7 +505,8 @@ templ VariantSearchResults(results []domain.VariantSearchResult, query string) {
 							<span class="block truncate text-xs text-rr-muted">{ r.SKU }</span>
 							for _, ll := range r.ListLadders {
 								<span class="block truncate text-xs text-rr-muted">
-									{ ll.ListName }: @ladderBreaks(ll.Ladder)
+									{ ll.ListName + ":" }
+									@ladderBreaks(ll.Ladder)
 								</span>
 							}
 						</span>

@@ -26,10 +26,20 @@ type VariantTierRow struct {
 	Breaks    []domain.PriceTier
 }
 
-// tierRowsToRender pads a variant's authored breaks with one blank row so there
-// is always somewhere to type the next one without a round trip.
+// blankTierSlots is how many empty rows each variant gets below its authored
+// breaks. Two, so a ladder can be built from nothing in a single pass — a
+// typical one is two rungs, and with a single slot each rung would cost its own
+// save round trip.
+const blankTierSlots = 2
+
+// tierRowsToRender pads a variant's authored breaks with empty rows to type the
+// next ones into.
 func tierRowsToRender(breaks []domain.PriceTier) []domain.PriceTier {
-	return append(append([]domain.PriceTier{}, breaks...), domain.PriceTier{})
+	out := append([]domain.PriceTier{}, breaks...)
+	for range blankTierSlots {
+		out = append(out, domain.PriceTier{})
+	}
+	return out
 }
 
 func tierQtyValue(t domain.PriceTier) string {
@@ -65,6 +75,9 @@ templ PriceListTiersContent(props PriceListTiersProps) {
 				<p class="mt-1 text-sm text-rr-muted">
 					{ props.Product.Title } on <span class="font-semibold text-rr-heading">{ props.List.Name }</span>.
 					A break reprices the <em>whole</em> line once the quantity reaches it — 24 bags at the 24+ price, not 12 at one price and 12 at another.
+				</p>
+				<p class="mt-1 text-sm text-rr-muted">
+					Clear a quantity to remove that break. Everything saves together.
 				</p>
 			</div>
 			<div class="mt-4 flex items-center gap-3 sm:ml-16 sm:mt-0 sm:flex-none">
@@ -170,9 +183,6 @@ templ variantTierBlock(row VariantTierRow) {
 					}
 				</tbody>
 			</table>
-			<p class="border-t border-rr-border px-4 py-2 text-xs text-rr-muted">
-				Clear a quantity to remove that break. Save to add another row.
-			</p>
 		}
 	</div>
 }

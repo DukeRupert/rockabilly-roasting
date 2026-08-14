@@ -34,10 +34,20 @@ type VariantTierRow struct {
 	Breaks    []domain.PriceTier
 }
 
-// tierRowsToRender pads a variant's authored breaks with one blank row so there
-// is always somewhere to type the next one without a round trip.
+// blankTierSlots is how many empty rows each variant gets below its authored
+// breaks. Two, so a ladder can be built from nothing in a single pass — a
+// typical one is two rungs, and with a single slot each rung would cost its own
+// save round trip.
+const blankTierSlots = 2
+
+// tierRowsToRender pads a variant's authored breaks with empty rows to type the
+// next ones into.
 func tierRowsToRender(breaks []domain.PriceTier) []domain.PriceTier {
-	return append(append([]domain.PriceTier{}, breaks...), domain.PriceTier{})
+	out := append([]domain.PriceTier{}, breaks...)
+	for range blankTierSlots {
+		out = append(out, domain.PriceTier{})
+	}
+	return out
 }
 
 func tierQtyValue(t domain.PriceTier) string {
@@ -89,7 +99,7 @@ func PriceListTiersContent(props PriceListTiersProps) templ.Component {
 		var templ_7745c5c3_Var2 templ.SafeURL
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s/products/%s/tiers", props.List.ID, props.Product.ID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 60, Col: 113}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 70, Col: 113}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -102,7 +112,7 @@ func PriceListTiersContent(props PriceListTiersProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Product.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 66, Col: 26}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 76, Col: 26}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -115,13 +125,13 @@ func PriceListTiersContent(props PriceListTiersProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(props.List.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 66, Col: 93}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 76, Col: 93}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</span>. A break reprices the <em>whole</em> line once the quantity reaches it — 24 bags at the 24+ price, not 12 at one price and 12 at another.</p></div><div class=\"mt-4 flex items-center gap-3 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/price-lists/prices\" class=\"block rounded-sm bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading shadow-xs border border-rr-border hover:bg-rr-raised\">Back to pricing</a> <button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Save breaks</button></div></div><div class=\"mt-8 space-y-6\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</span>. A break reprices the <em>whole</em> line once the quantity reaches it — 24 bags at the 24+ price, not 12 at one price and 12 at another.</p><p class=\"mt-1 text-sm text-rr-muted\">Clear a quantity to remove that break. Everything saves together.</p></div><div class=\"mt-4 flex items-center gap-3 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/price-lists/prices\" class=\"block rounded-sm bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading shadow-xs border border-rr-border hover:bg-rr-raised\">Back to pricing</a> <button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Save breaks</button></div></div><div class=\"mt-8 space-y-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -169,7 +179,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(row.Variant.SKU)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 99, Col: 81}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 112, Col: 81}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -197,7 +207,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(priceToDollars(*row.ListPrice))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 106, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 119, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -225,7 +235,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs("")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 114, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 127, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -238,7 +248,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(" ")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 116, Col: 9}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 129, Col: 9}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -261,7 +271,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(tierFieldName("tier_qty", row.Variant.ID, i))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 134, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 147, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 				if templ_7745c5c3_Err != nil {
@@ -274,7 +284,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(tierQtyValue(t))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 138, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 151, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 				if templ_7745c5c3_Err != nil {
@@ -287,7 +297,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(tierFieldName("tier_price", row.Variant.ID, i))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 149, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 162, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 				if templ_7745c5c3_Err != nil {
@@ -300,7 +310,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(tierPriceValue(t))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 153, Col: 35}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 166, Col: 35}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 				if templ_7745c5c3_Err != nil {
@@ -319,7 +329,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 						var templ_7745c5c3_Var14 string
 						templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(priceToDollars(*row.ListPrice - t.Amount))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 161, Col: 54}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 174, Col: 54}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 						if templ_7745c5c3_Err != nil {
@@ -346,7 +356,7 @@ func variantTierBlock(row VariantTierRow) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</tbody></table><p class=\"border-t border-rr-border px-4 py-2 text-xs text-rr-muted\">Clear a quantity to remove that break. Save to add another row.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</tbody></table>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -445,7 +455,7 @@ func TierSummary(breaks []domain.PriceTier) templ.Component {
 					var templ_7745c5c3_Var18 string
 					templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(" · ")
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 199, Col: 13}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 209, Col: 13}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 					if templ_7745c5c3_Err != nil {
@@ -459,7 +469,7 @@ func TierSummary(breaks []domain.PriceTier) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(t.MinQuantity))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 201, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 211, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -509,7 +519,7 @@ func ladderBreaks(ladder domain.TierLadder) templ.Component {
 					var templ_7745c5c3_Var21 string
 					templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(" · ")
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 214, Col: 12}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 224, Col: 12}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 					if templ_7745c5c3_Err != nil {
@@ -523,7 +533,7 @@ func ladderBreaks(ladder domain.TierLadder) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(t.MinQuantity))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 216, Col: 32}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 226, Col: 32}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -536,7 +546,7 @@ func ladderBreaks(ladder domain.TierLadder) templ.Component {
 				var templ_7745c5c3_Var23 string
 				templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(priceToDollars(t.Amount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 216, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/price_list_tiers.templ`, Line: 226, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 				if templ_7745c5c3_Err != nil {

@@ -644,26 +644,12 @@ func (d *Deps) handleWholesaleCheckoutPage(w http.ResponseWriter, r *http.Reques
 // renderWholesaleCheckout renders the wholesale checkout page. If banner is true,
 // the price-change banner is shown. errMsg, when non-empty, is surfaced as an
 // inline error. status=0 means 200.
-// dropOf and dropNameOf unwrap an optional drop notice for the template props.
-func dropOf(d *wholesaleDropNotice) *domain.Drop {
-	if d == nil {
-		return nil
-	}
-	return d.Drop
-}
-
-func dropNameOf(d *wholesaleDropNotice) string {
-	if d == nil {
-		return ""
-	}
-	return d.ProductName
-}
-
 // wholesaleDropNotice carries the volume rung a quantity change just cost the
-// buyer, so the re-rendered checkout can say so. nil when nothing was lost.
+// buyer, together with the line it happened on so the re-rendered checkout can
+// say so where it happened. nil when nothing was lost.
 type wholesaleDropNotice struct {
-	Drop        *domain.Drop
-	ProductName string
+	Drop      *domain.Drop
+	VariantID uuid.UUID
 }
 
 func (d *Deps) renderWholesaleCheckout(w http.ResponseWriter, r *http.Request, customer *domain.Customer, banner bool, errMsg string, status int) {
@@ -739,7 +725,7 @@ func (d *Deps) renderWholesaleCheckoutWithDrop(w http.ResponseWriter, r *http.Re
 			lineTotal := ci.UnitPrice * ci.Quantity
 			subtotal += lineTotal
 
-			checkoutItems = append(checkoutItems, storefront.WholesaleCheckoutItem{
+			item := storefront.WholesaleCheckoutItem{
 				ItemID:      ci.ID,
 				VariantID:   ci.VariantID,
 				ProductName: product.Title,
@@ -750,7 +736,11 @@ func (d *Deps) renderWholesaleCheckoutWithDrop(w http.ResponseWriter, r *http.Re
 				MinQty:      variant.WholesaleMinQty,
 				Multiple:    variant.WholesaleMultiple,
 				Ladder:      ladders[ci.VariantID],
-			})
+			}
+			if drop != nil && drop.VariantID == ci.VariantID {
+				item.Drop = drop.Drop
+			}
+			checkoutItems = append(checkoutItems, item)
 
 			cartItemsForMOQ = append(cartItemsForMOQ, domain.CartItem{VariantID: ci.VariantID, Quantity: ci.Quantity})
 			variantsForMOQ = append(variantsForMOQ, *variant)
@@ -794,8 +784,6 @@ func (d *Deps) renderWholesaleCheckoutWithDrop(w http.ResponseWriter, r *http.Re
 		Notice:            reorderNotice(r),
 		CartCount:         d.wholesaleCartItemCount(r),
 		PriceChangeBanner: banner,
-		Drop:              dropOf(drop),
-		DropProductName:   dropNameOf(drop),
 		MOQProblems:       moqProblems,
 		Addresses:         addresses,
 		DefaultAddressID:  defaultAddressID,
@@ -1178,21 +1166,9 @@ func (d *Deps) handleWholesaleCartUpdate(w http.ResponseWriter, r *http.Request)
 		if txErr != nil {
 			return txErr
 		}
-		if line.Drop == nil {
-			return nil
+		if line.Drop != nil {
+			notice = &wholesaleDropNotice{Drop: line.Drop, VariantID: line.Item.VariantID}
 		}
-		// Name the coffee in the notice — a bare "your price went up" makes the
-		// buyer hunt for which line it was.
-		notice = &wholesaleDropNotice{Drop: line.Drop}
-		variant, txErr := d.CatalogService.GetVariant(ctx, tx, line.Item.VariantID)
-		if txErr != nil {
-			return txErr
-		}
-		product, txErr := d.CatalogService.GetProduct(ctx, tx, variant.ProductID)
-		if txErr != nil {
-			return txErr
-		}
-		notice.ProductName = product.Title
 		return nil
 	})
 	if err != nil {

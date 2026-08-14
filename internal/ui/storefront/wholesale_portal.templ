@@ -200,13 +200,15 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 						const unitCell = row?.querySelector('[data-unit-price]');
 						if (unitCell) unitCell.textContent = this.money(price);
 
-						const nudge = row?.querySelector('[data-nudge]');
-						if (nudge) {
+						// One slot: the nudge when a break is within reach, the
+						// ladder otherwise. Never both, and never empty for a
+						// laddered variant, so the row does not reflow.
+						const note = row?.querySelector('[data-price-note]');
+						if (note) {
 							const u = this.upgrade(rungs, q, mult);
-							nudge.textContent = u ? this.nudgeText(u) : '';
-							// invisible, not hidden: the element keeps its box, so
-							// showing a nudge never reflows the row.
-							nudge.classList.toggle('invisible', !u);
+							note.textContent = u ? this.nudgeText(u) : (el.dataset.hint || '');
+							note.classList.toggle('text-rust', !!u);
+							note.classList.toggle('text-chrome-deep', !u);
 						}
 
 						// Extended price per row, so a buyer working to a budget
@@ -283,16 +285,16 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 									for _, optName := range product.Options {
 										<th class="px-4 py-2.5">{ optName }</th>
 									}
-									<th class="px-4 py-2.5">Unit Price</th>
-									<th class="px-4 py-2.5 text-center">Qty</th>
 									<!--
-										Fixed width, because the nudge lives in this column and
-										appears the moment a typed quantity nears a break. Left
-										to size itself, the column would widen and shove the qty
-										input sideways under the cursor — mid-edit, which is
-										precisely when it must not move.
-									-->
-									<th class="px-4 py-2.5 text-right w-64">Total</th>
+									Fixed width, because the price note under this column
+									swaps between a ladder and a longer nudge as quantities
+									change. Left to size itself, the column would resize
+									mid-edit and shove the qty input sideways under the
+									cursor — which is exactly when it must not move.
+								-->
+								<th class="px-4 py-2.5 w-72">Unit Price</th>
+									<th class="px-4 py-2.5 text-center">Qty</th>
+									<th class="px-4 py-2.5 text-right">Total</th>
 								</tr>
 							</thead>
 							<tbody class="block sm:table-row-group">
@@ -318,11 +320,15 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 														{ hint }
 													</span>
 												}
-												if hint := ladderHint(variant.Ladder); hint != "" {
-													<span class="block font-oswald text-[11px] text-chrome-deep" style="letter-spacing:0.04em;">
-														{ hint }
-													</span>
-												}
+												<!--
+													One note, swapped in place by recompute(): the
+													ladder when no break is near, the nudge when one
+													is. Saying both restates rather than informs —
+													the nudge already names the rung it aims at.
+													Seeded server-side so it reads correctly before
+													any script runs.
+												-->
+												<span class="block font-oswald text-[11px] leading-snug text-chrome-deep" style="letter-spacing:0.04em;" data-price-note>{ ladderHint(variant.Ladder) }</span>
 											</span>
 										</td>
 										<td class="flex items-center justify-between gap-4 py-1.5 sm:table-cell sm:px-4 sm:py-2.5 sm:text-center">
@@ -338,6 +344,7 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 												}
 												aria-label={ "Quantity for " + variant.SKU }
 												data-ladder={ ladderJSON(variant.Ladder) }
+											data-hint={ ladderHint(variant.Ladder) }
 												if variant.MinQty != nil {
 													data-min={ fmt.Sprint(*variant.MinQty) }
 												}
@@ -351,11 +358,7 @@ templ WholesalePortalContent(props WholesalePortalProps) {
 										</td>
 										<td class="flex items-baseline justify-between gap-4 py-1.5 sm:table-cell sm:whitespace-nowrap sm:px-4 sm:py-2.5 sm:text-right">
 											<span class="sm:hidden font-oswald font-bold text-[10px] text-chrome-deep uppercase" style="letter-spacing:0.12em;">Total</span>
-											<span class="inline-flex flex-col items-end gap-0.5">
-												<span class="font-special text-base text-ink" data-line-total>&mdash;</span>
-												<!-- Filled by recompute() when a break is within reach. -->
-												<span class="invisible font-oswald text-[11px] text-rust text-right leading-snug whitespace-normal" style="letter-spacing:0.02em;" data-nudge role="status"></span>
-											</span>
+											<span class="font-special text-base text-ink" data-line-total>&mdash;</span>
 										</td>
 									</tr>
 								}

@@ -18,13 +18,6 @@ import (
 // is emitted as literal text rather than invoked, and nothing but the output
 // shows it.
 
-func renderToString(t *testing.T, c interface{ Render(context.Context, *bytes.Buffer) error }) string {
-	t.Helper()
-	var buf bytes.Buffer
-	require.NoError(t, c.Render(context.Background(), &buf))
-	return buf.String()
-}
-
 func renderPortal(t *testing.T, v QuickOrderVariant) string {
 	t.Helper()
 	var buf bytes.Buffer
@@ -70,7 +63,7 @@ func TestPortalRendersLadder(t *testing.T) {
 	assert.Contains(t, html, `data-ladder="[[1,1100],[12,1000],[24,950]]"`, "sheet needs the whole ladder to reprice as the buyer types")
 	assert.Contains(t, html, "12+ $10.00 · 24+ $9.50", "breaks are readable without typing a quantity")
 	assert.Contains(t, html, "data-unit-price", "unit price cell must be addressable for live requoting")
-	assert.Contains(t, html, "data-nudge", "nudge slot must exist for the script to fill")
+	assert.Contains(t, html, "data-price-note", "the one note slot must exist for the script to swap")
 	assert.Contains(t, html, `data-nudge-pct="0.1"`)
 	assert.Contains(t, html, `data-nudge-floor="3"`)
 
@@ -104,7 +97,22 @@ func TestCheckoutRendersUpgradeNudge(t *testing.T) {
 
 	assertNoUninvokedComponents(t, html)
 	assert.Contains(t, html, "Add 1 more and pay $2.00 less", "one unit short of a break is the nudge worth showing")
-	assert.Contains(t, html, "12+ $10.00 · 24+ $9.50")
+	// One note per line: the nudge already names the rung, so repeating the
+	// whole ladder beside it restates rather than informs.
+	assert.NotContains(t, html, "12+ $10.00 · 24+ $9.50", "ladder must yield to the nudge, not sit next to it")
+}
+
+func TestCheckoutFallsBackToLadderWhenNoNudge(t *testing.T) {
+	html := renderCheckout(t, WholesaleCheckoutProps{
+		Items: []WholesaleCheckoutItem{{
+			ItemID: uuid.New(), ProductName: "Ethiopia", SKU: "E",
+			Quantity: 2, UnitPrice: 1100, LineTotal: 2200, Ladder: testLadder(),
+		}},
+	})
+
+	assertNoUninvokedComponents(t, html)
+	assert.Contains(t, html, "12+ $10.00 · 24+ $9.50", "far from a break, show what exists")
+	assert.NotContains(t, html, "Add ")
 }
 
 func TestCheckoutTopRungSaysNothing(t *testing.T) {
@@ -124,18 +132,26 @@ func TestCheckoutRendersDropNotice(t *testing.T) {
 	require.True(t, ok)
 
 	html := renderCheckout(t, WholesaleCheckoutProps{
-		Drop:            &drop,
-		DropProductName: "Ethiopia",
 		Items: []WholesaleCheckoutItem{{
 			ItemID: uuid.New(), ProductName: "Ethiopia", SKU: "E",
-			Quantity: 23, UnitPrice: 1000, LineTotal: 23000, Ladder: testLadder(),
+			Quantity: 23, UnitPrice: 1000, LineTotal: 23000,
+			Ladder: testLadder(), Drop: &drop,
 		}},
 	})
 
 	assertNoUninvokedComponents(t, html)
-	assert.Contains(t, html, "Ethiopia — price went up.")
-	assert.Contains(t, html, "Now $10.00 each — you were getting $9.50 at 24+.")
+	assert.Contains(t, html, "Now $10.00 each — add 1 back to get $9.50 again.")
 	assert.Contains(t, html, `role="status"`, "advisory, not an alert — nothing was blocked")
+
+	// Rendered on the line it happened to, so position identifies it. A cart
+	// routinely holds two lines of one coffee in different grinds, where naming
+	// the product would point at both.
+	assert.NotContains(t, html, "Ethiopia — price went up")
+
+	// A drop outranks the nudge and the ladder, absorbing the nudge rather than
+	// discarding it — the way back is in the same sentence.
+	assert.NotContains(t, html, "Add 1 more", "the drop owns the slot this render")
+	assert.NotContains(t, html, "12+ $10.00 · 24+ $9.50")
 }
 
 func TestCheckoutWithoutDropRendersNoNotice(t *testing.T) {

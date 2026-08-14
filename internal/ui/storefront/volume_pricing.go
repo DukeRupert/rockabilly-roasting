@@ -85,7 +85,80 @@ func upgradeLine(u domain.Upgrade) string {
 // dropLine tells a buyer their unit price just went up because they ordered
 // fewer. Stated plainly and after the fact: the reduction is theirs to make, and
 // it has already been applied.
+//
+// It does not name the coffee. It is rendered on the line it describes, so
+// position identifies it — and naming it would be worse than redundant here,
+// since a cart routinely holds two lines of the same coffee in different grinds.
 func dropLine(d domain.Drop) string {
 	return fmt.Sprintf("Now %s each — you were getting %s at %d+.",
 		formatCents(d.ToUnitPrice), formatCents(d.FromUnitPrice), d.LostTierMinQty)
+}
+
+// PriceNoteKind selects how a line's price note is styled and, more importantly,
+// says what kind of thing it is.
+type PriceNoteKind string
+
+const (
+	PriceNoteNone    PriceNoteKind = ""
+	PriceNoteDrop    PriceNoteKind = "drop"
+	PriceNoteUpgrade PriceNoteKind = "upgrade"
+	PriceNoteLadder  PriceNoteKind = "ladder"
+)
+
+// PriceNote is the one line of small type under a line's unit price.
+//
+// One line, one slot, whatever the state. The three things worth saying about a
+// volume price — you just lost a rung, you are near a rung, these rungs exist —
+// are the same fact at different distances, so saying two of them at once
+// restates rather than informs. They rank: what just happened to you, then what
+// is within reach, then what exists.
+type PriceNote struct {
+	Text string
+	Kind PriceNoteKind
+}
+
+// dropLineWithReturn states the new price and, when the rung is still within
+// reach, what it takes to get back to it.
+//
+// A drop and the upgrade that undoes it are the same thought, and immediately
+// after a reduction they are nearly always both true — the buyer has just
+// stepped one unit below a break. Rendered as two sentences they would repeat
+// each other; the price the upgrade targets is the price the drop just lost. So
+// they merge: what it costs now, and what it takes to undo.
+func dropLineWithReturn(d domain.Drop, u *domain.Upgrade) string {
+	if u == nil {
+		return dropLine(d)
+	}
+	return fmt.Sprintf("Now %s each — add %d back to get %s again.",
+		formatCents(d.ToUnitPrice), u.AddQty, formatCents(u.TargetUnitPrice))
+}
+
+// priceNoteFor picks the single note a cart line should carry.
+func priceNoteFor(item WholesaleCheckoutItem) PriceNote {
+	if item.Drop != nil {
+		return PriceNote{Text: dropLineWithReturn(*item.Drop, upgradeFor(item)), Kind: PriceNoteDrop}
+	}
+	if u := upgradeFor(item); u != nil {
+		return PriceNote{Text: upgradeLine(*u), Kind: PriceNoteUpgrade}
+	}
+	if hint := ladderHint(item.Ladder); hint != "" {
+		return PriceNote{Text: hint, Kind: PriceNoteLadder}
+	}
+	return PriceNote{Kind: PriceNoteNone}
+}
+
+// priceNoteClass styles a note by what it is. A drop is ink — it reports
+// something that already happened to the buyer's money and should read as
+// ordinary text, not an alarm. An upgrade is rust, the one colour on paper with
+// enough contrast at this size to pull the eye. A ladder is muted; it is
+// reference, not news.
+func priceNoteClass(kind PriceNoteKind) string {
+	switch kind {
+	case PriceNoteDrop:
+		return "text-ink"
+	case PriceNoteUpgrade:
+		return "text-rust"
+	default:
+		return "text-chrome-deep"
+	}
 }

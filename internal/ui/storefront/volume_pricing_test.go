@@ -84,10 +84,60 @@ func TestUpgradeLine(t *testing.T) {
 	})
 }
 
+func TestPriceNoteFor(t *testing.T) {
+	drop, ok := testLadder().Drop(24, 23)
+	require.True(t, ok)
+
+	t.Run("a drop outranks everything, and carries the way back", func(t *testing.T) {
+		// Stepping one below a break makes both statements true at once, and
+		// they overlap — the price the upgrade targets is the one just lost. One
+		// sentence: what it costs now, and what undoes it.
+		note := priceNoteFor(WholesaleCheckoutItem{Ladder: testLadder(), Quantity: 23, Drop: &drop})
+		assert.Equal(t, PriceNoteDrop, note.Kind)
+		assert.Equal(t, "Now $10.00 each — add 1 back to get $9.50 again.", note.Text)
+	})
+
+	t.Run("a drop out of reach of any rung just reports itself", func(t *testing.T) {
+		// Dropped from 24 to 2 — far below every break, so there is no short way
+		// back to offer and pretending otherwise would be noise.
+		far, ok := testLadder().Drop(24, 2)
+		require.True(t, ok)
+		note := priceNoteFor(WholesaleCheckoutItem{Ladder: testLadder(), Quantity: 2, Drop: &far})
+		assert.Equal(t, PriceNoteDrop, note.Kind)
+		assert.Equal(t, "Now $11.00 each — you were getting $9.50 at 24+.", note.Text)
+	})
+
+	t.Run("a reachable break outranks the ladder", func(t *testing.T) {
+		note := priceNoteFor(WholesaleCheckoutItem{Ladder: testLadder(), Quantity: 23})
+		assert.Equal(t, PriceNoteUpgrade, note.Kind)
+		assert.Contains(t, note.Text, "Add 1 more")
+	})
+
+	t.Run("the ladder is the fallback", func(t *testing.T) {
+		note := priceNoteFor(WholesaleCheckoutItem{Ladder: testLadder(), Quantity: 2})
+		assert.Equal(t, PriceNoteLadder, note.Kind)
+		assert.Equal(t, "12+ $10.00 · 24+ $9.50", note.Text)
+	})
+
+	t.Run("a flat price says nothing at all", func(t *testing.T) {
+		flat := domain.NewTierLadder([]domain.PriceTier{{MinQuantity: 1, Amount: 1100}})
+		note := priceNoteFor(WholesaleCheckoutItem{Ladder: flat, Quantity: 5})
+		assert.Equal(t, PriceNoteNone, note.Kind)
+		assert.Empty(t, note.Text)
+	})
+
+	t.Run("each kind is styled by what it is", func(t *testing.T) {
+		assert.Equal(t, "text-ink", priceNoteClass(PriceNoteDrop))
+		assert.Equal(t, "text-rust", priceNoteClass(PriceNoteUpgrade))
+		assert.Equal(t, "text-chrome-deep", priceNoteClass(PriceNoteLadder))
+	})
+}
+
 func TestDropLine(t *testing.T) {
 	d, ok := testLadder().Drop(24, 23)
 	require.True(t, ok)
-	// Past tense and after the fact — the reduction is already saved.
+	// Past tense and after the fact — the reduction is already saved. No product
+	// name: it renders on the line it describes.
 	assert.Equal(t, "Now $10.00 each — you were getting $9.50 at 24+.", dropLine(d))
 }
 

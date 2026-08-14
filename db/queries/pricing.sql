@@ -142,6 +142,18 @@ WHERE v.product_id = $1
   AND p.price_list_id IS NOT NULL
 ORDER BY ps.variant_id, p.price_list_id, p.min_quantity NULLS FIRST;
 
+-- name: ListLaddersByVariantsAllLists :many
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity,
+       p.price_list_id, p.starts_at, p.ends_at,
+       ps.variant_id, pl.name AS price_list_name
+FROM price_sets ps
+JOIN prices p ON p.price_set_id = ps.id
+JOIN price_lists pl ON pl.id = p.price_list_id
+WHERE ps.variant_id = ANY($1::uuid[])
+  AND p.currency_code = $2
+ORDER BY ps.variant_id, pl.name, p.min_quantity NULLS FIRST;
+
 -- name: UpsertTierPrice :one
 INSERT INTO prices (id, price_set_id, amount, currency_code, price_list_id, min_quantity)
 VALUES ($1, $2, $3, $4, $5, $6)

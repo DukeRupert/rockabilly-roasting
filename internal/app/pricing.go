@@ -201,6 +201,22 @@ func (s *PricingService) DeleteTierPrice(ctx context.Context, tx pgx.Tx, variant
 	return nil
 }
 
+// ClearTierPrices removes every volume break for a variant on a price list,
+// leaving the list price itself in place. This is the write behind replacing a
+// whole ladder: the editor submits every break it wants to survive, so clearing
+// first is what makes a removed row actually disappear.
+func (s *PricingService) ClearTierPrices(ctx context.Context, tx pgx.Tx, variantID uuid.UUID, priceListID uuid.UUID, currencyCode string) error {
+	ps, err := s.pricing.GetOrCreatePriceSet(ctx, tx, variantID)
+	if err != nil {
+		return fmt.Errorf("get price set: %w", err)
+	}
+
+	if err := s.pricing.DeleteTierPricesForList(ctx, tx, ps.ID, priceListID, currencyCode); err != nil {
+		return fmt.Errorf("clear tier prices: %w", err)
+	}
+	return nil
+}
+
 // ListTierLaddersByProduct returns the volume ladders for every variant of a
 // product across all price lists, keyed by variant ID then price list ID. Backs
 // the admin price-list editor.
@@ -362,4 +378,35 @@ func (s *PricingService) LaddersForCustomerBatch(ctx context.Context, tx pgx.Tx,
 		ladders[id] = domain.NewTierLadder([]domain.PriceTier{{MinQuantity: 1, Amount: amount}})
 	}
 	return ladders, nil
+}
+
+// AttachVariantLadders fills each search result's ListLadders so the manual-order
+// typeahead can show what volume breaks exist.
+//
+// The typeahead deliberately does not resolve a customer's tiered price: it runs
+// before the customer is known — the manual-order form's customer is an email
+// that may be looked up or created on submit — and before any quantity is
+// entered. Guessing a price from a half-typed email would be wrong silently.
+// Showing the ladders lets staff pick the right figure themselves, which they
+// already do routinely since the prefilled price is editable.
+func (s *PricingService) AttachVariantLadders(ctx context.Context, tx pgx.Tx, results []domain.VariantSearchResult, currencyCode string) ([]domain.VariantSearchResult, error) {
+	if len(results) == 0 {
+		return results, nil
+	}
+	ids := make([]uuid.UUID, len(results))
+	for i, r := range results {
+		ids[i] = r.VariantID
+	}
+	ladders, err := s.pricing.ListLaddersByVariants(ctx, tx, ids, currencyCode)
+	if err != nil {
+		return nil, fmt.Errorf("list ladders for variant search: %w", err)
+	}
+	for i, r := range results {
+		for _, ll := range ladders[r.VariantID] {
+			if ll.Ladder.IsTiered() {
+				results[i].ListLadders = append(results[i].ListLadders, ll)
+			}
+		}
+	}
+	return results, nil
 }

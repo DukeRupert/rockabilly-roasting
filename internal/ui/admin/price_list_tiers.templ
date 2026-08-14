@@ -1,0 +1,219 @@
+package admin
+
+import (
+	"fmt"
+	"strconv"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/google/uuid"
+)
+
+type PriceListTiersProps struct {
+	List      domain.PriceList
+	Product   domain.Product
+	Variants  []VariantTierRow
+	StaffName string
+	StaffRole string
+}
+
+// VariantTierRow is one variant's ladder on the list being edited. ListPrice is
+// nil when the variant has no entry on this list at all — breaks cannot be
+// authored against it until it does, because a ladder with no floor prices high
+// quantities while pricing low ones off a different list entirely.
+type VariantTierRow struct {
+	Variant   domain.Variant
+	ListPrice *int
+	Breaks    []domain.PriceTier
+}
+
+// tierRowsToRender pads a variant's authored breaks with one blank row so there
+// is always somewhere to type the next one without a round trip.
+func tierRowsToRender(breaks []domain.PriceTier) []domain.PriceTier {
+	return append(append([]domain.PriceTier{}, breaks...), domain.PriceTier{})
+}
+
+func tierQtyValue(t domain.PriceTier) string {
+	if t.MinQuantity == 0 {
+		return ""
+	}
+	return strconv.Itoa(t.MinQuantity)
+}
+
+func tierPriceValue(t domain.PriceTier) string {
+	if t.MinQuantity == 0 {
+		return ""
+	}
+	return priceToDollars(t.Amount)
+}
+
+// tierFieldName builds the form key for one break slot. The index is positional
+// within the rendered rows, not the threshold — the threshold is itself editable,
+// so it cannot also be the identity of the field.
+func tierFieldName(prefix string, variantID uuid.UUID, i int) string {
+	return fmt.Sprintf("%s:%s:%d", prefix, variantID.String(), i)
+}
+
+templ PriceListTiersContent(props PriceListTiersProps) {
+	<form
+		id="price-list-tiers-content"
+		method="post"
+		action={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s/products/%s/tiers", props.List.ID, props.Product.ID)) }
+	>
+		<div class="sm:flex sm:items-center">
+			<div class="sm:flex-auto">
+				<h1 class="admin-page-title">Volume breaks</h1>
+				<p class="mt-1 text-sm text-rr-muted">
+					{ props.Product.Title } on <span class="font-semibold text-rr-heading">{ props.List.Name }</span>.
+					A break reprices the <em>whole</em> line once the quantity reaches it — 24 bags at the 24+ price, not 12 at one price and 12 at another.
+				</p>
+			</div>
+			<div class="mt-4 flex items-center gap-3 sm:ml-16 sm:mt-0 sm:flex-none">
+				<a
+					href="/admin/price-lists/prices"
+					class="block rounded-sm bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading shadow-xs border border-rr-border hover:bg-rr-raised"
+				>
+					Back to pricing
+				</a>
+				<button
+					type="submit"
+					class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt"
+				>
+					Save breaks
+				</button>
+			</div>
+		</div>
+		<div class="mt-8 space-y-6">
+			for _, row := range props.Variants {
+				@variantTierBlock(row)
+			}
+		</div>
+	</form>
+}
+
+// variantTierBlock renders one variant's ladder: its list price as the floor,
+// then a quantity/price pair per break, plus one blank slot.
+templ variantTierBlock(row VariantTierRow) {
+	<div class="border border-rr-border bg-rr-surface">
+		<div class="flex items-center justify-between border-b border-rr-border px-4 py-3">
+			<div class="flex items-center gap-2">
+				<span class="font-mono text-sm font-medium text-rr-heading">{ row.Variant.SKU }</span>
+				if row.Variant.IsDefault {
+					<span class="badge badge-green">Default</span>
+				}
+			</div>
+			<div class="text-sm text-rr-muted">
+				if row.ListPrice != nil {
+					List price <span class="font-mono text-rr-heading">${ priceToDollars(*row.ListPrice) }</span>
+				} else {
+					<span class="badge badge-amber">Not on this list</span>
+				}
+			</div>
+		</div>
+		if row.ListPrice == nil {
+			<p class="px-4 py-3 text-sm text-rr-muted">
+				Set a price for this variant on { "" }
+				<a href="/admin/price-lists/prices" class="text-rr-red hover:text-rr-red-lt">the pricing grid</a>
+				{ " " }first. Breaks need a list price underneath them to fall back to.
+			</p>
+		} else {
+			<table class="min-w-full divide-y divide-rr-border">
+				<thead class="bg-rr-raised">
+					<tr>
+						<th scope="col" class="py-2 pl-4 pr-3 text-left text-xs font-semibold text-rr-heading sm:pl-6">At quantity</th>
+						<th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-rr-heading">Unit price</th>
+						<th scope="col" class="px-3 py-2 text-left text-xs font-semibold text-rr-muted">Saving</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-rr-border">
+					for i, t := range tierRowsToRender(row.Breaks) {
+						<tr>
+							<td class="whitespace-nowrap py-2 pl-4 pr-3 text-sm sm:pl-6">
+								<div class="flex items-center gap-1">
+									<input
+										type="number"
+										name={ tierFieldName("tier_qty", row.Variant.ID, i) }
+										min="2"
+										step="1"
+										placeholder="qty"
+										value={ tierQtyValue(t) }
+										class="w-24 rounded-sm py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
+									/>
+									<span class="text-rr-muted">+</span>
+								</div>
+							</td>
+							<td class="whitespace-nowrap px-3 py-2 text-sm">
+								<div class="flex items-center gap-1">
+									<span class="text-rr-muted">$</span>
+									<input
+										type="number"
+										name={ tierFieldName("tier_price", row.Variant.ID, i) }
+										step="0.01"
+										min="0"
+										placeholder="price"
+										value={ tierPriceValue(t) }
+										class="w-24 rounded-sm py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
+									/>
+								</div>
+							</td>
+							<td class="whitespace-nowrap px-3 py-2 text-sm text-rr-muted">
+								if t.MinQuantity > 0 && row.ListPrice != nil {
+									if t.Amount < *row.ListPrice {
+										${ priceToDollars(*row.ListPrice - t.Amount) } off
+									} else {
+										<span class="badge badge-red">Not a discount</span>
+									}
+								} else {
+									<span class="italic">&mdash;</span>
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+			<p class="border-t border-rr-border px-4 py-2 text-xs text-rr-muted">
+				Clear a quantity to remove that break. Save to add another row.
+			</p>
+		}
+	</div>
+}
+
+templ PriceListTiers(props PriceListTiersProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Volume breaks",
+		ActivePath: "/admin/price-lists",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@PriceListTiersContent(props)
+	}
+}
+
+// TierSummary renders a cell's ladder as a compact "12+ · 24+" marker in the
+// pricing grid, so staff can see which cells carry breaks without opening each
+// one. Renders nothing when the variant has no breaks on that list.
+templ TierSummary(breaks []domain.PriceTier) {
+	if len(breaks) > 0 {
+		<span class="ml-1 whitespace-nowrap text-xs text-rr-muted">
+			for i, t := range breaks {
+				if i > 0 {
+					{ " · " }
+				}
+				{ strconv.Itoa(t.MinQuantity) }+
+			}
+		</span>
+	}
+}
+
+// ladderBreaks renders a ladder's volume breaks as "12+ $10.00 · 24+ $9.50",
+// skipping the base rung. Used where staff need to see what breaks exist
+// without leaving the screen they are on.
+templ ladderBreaks(ladder domain.TierLadder) {
+	for i, t := range ladder.Rungs() {
+		if t.MinQuantity > 1 {
+			if i > 1 {
+				{ " · " }
+			}
+			{ strconv.Itoa(t.MinQuantity) }+ ${ priceToDollars(t.Amount) }
+		}
+	}
+}

@@ -158,6 +158,11 @@ type VariantSearchResult struct {
 	ProductTitle   string
 	SKU            string
 	BasePriceCents *int
+	// ListLadders carries the variant's volume breaks per price list, for
+	// display only. The typeahead cannot resolve a customer's tiered price —
+	// it runs before the order's customer and quantity are known — so it shows
+	// staff what breaks exist and lets them enter the right figure.
+	ListLadders []ListLadder
 }
 
 // FilterVariantsForChannel returns only the variants orderable on the given channel,

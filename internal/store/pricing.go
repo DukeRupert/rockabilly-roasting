@@ -336,3 +336,47 @@ func priceFromRow(r sqlcgen.Price) *domain.Price {
 		EndsAt:       timestampFromPG(r.EndsAt),
 	}
 }
+
+// ListLaddersByVariants returns each variant's ladders across every price list
+// it appears on, keyed by variant ID and ordered by list name. Lists the variant
+// is absent from are omitted.
+func (s *PricingStore) ListLaddersByVariants(ctx context.Context, tx pgx.Tx, variantIDs []uuid.UUID, currencyCode string) (map[uuid.UUID][]domain.ListLadder, error) {
+	rows, err := sqlcgen.New(tx).ListLaddersByVariantsAllLists(ctx, sqlcgen.ListLaddersByVariantsAllListsParams{
+		Column1:      variantIDs,
+		CurrencyCode: currencyCode,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list ladders by variants: %w", err)
+	}
+
+	type key struct {
+		variantID uuid.UUID
+		listID    uuid.UUID
+	}
+	tiers := map[key][]domain.PriceTier{}
+	names := map[key]string{}
+	var order []key
+	for _, r := range rows {
+		if r.PriceListID == nil {
+			continue
+		}
+		k := key{variantID: r.VariantID, listID: *r.PriceListID}
+		if _, seen := tiers[k]; !seen {
+			order = append(order, k)
+			names[k] = r.PriceListName
+		}
+		tiers[k] = append(tiers[k], tierFromRow(r.Amount, r.MinQuantity))
+	}
+
+	// Rebuild in query order so list names stay alphabetical per variant; ranging
+	// the map would shuffle them between renders.
+	out := map[uuid.UUID][]domain.ListLadder{}
+	for _, k := range order {
+		out[k.variantID] = append(out[k.variantID], domain.ListLadder{
+			PriceListID: k.listID,
+			ListName:    names[k],
+			Ladder:      domain.NewTierLadder(tiers[k]),
+		})
+	}
+	return out, nil
+}

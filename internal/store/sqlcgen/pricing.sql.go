@@ -438,6 +438,70 @@ func (q *Queries) ListBasePricesByVariants(ctx context.Context, arg ListBasePric
 	return items, nil
 }
 
+const listLaddersByVariantsAllLists = `-- name: ListLaddersByVariantsAllLists :many
+SELECT p.id, p.price_set_id, p.amount, p.currency_code,
+       p.min_quantity, p.max_quantity,
+       p.price_list_id, p.starts_at, p.ends_at,
+       ps.variant_id, pl.name AS price_list_name
+FROM price_sets ps
+JOIN prices p ON p.price_set_id = ps.id
+JOIN price_lists pl ON pl.id = p.price_list_id
+WHERE ps.variant_id = ANY($1::uuid[])
+  AND p.currency_code = $2
+ORDER BY ps.variant_id, pl.name, p.min_quantity NULLS FIRST
+`
+
+type ListLaddersByVariantsAllListsParams struct {
+	Column1      []uuid.UUID `json:"column_1"`
+	CurrencyCode string      `json:"currency_code"`
+}
+
+type ListLaddersByVariantsAllListsRow struct {
+	ID            uuid.UUID          `json:"id"`
+	PriceSetID    uuid.UUID          `json:"price_set_id"`
+	Amount        int32              `json:"amount"`
+	CurrencyCode  string             `json:"currency_code"`
+	MinQuantity   *int32             `json:"min_quantity"`
+	MaxQuantity   *int32             `json:"max_quantity"`
+	PriceListID   *uuid.UUID         `json:"price_list_id"`
+	StartsAt      pgtype.Timestamptz `json:"starts_at"`
+	EndsAt        pgtype.Timestamptz `json:"ends_at"`
+	VariantID     uuid.UUID          `json:"variant_id"`
+	PriceListName string             `json:"price_list_name"`
+}
+
+func (q *Queries) ListLaddersByVariantsAllLists(ctx context.Context, arg ListLaddersByVariantsAllListsParams) ([]ListLaddersByVariantsAllListsRow, error) {
+	rows, err := q.db.Query(ctx, listLaddersByVariantsAllLists, arg.Column1, arg.CurrencyCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListLaddersByVariantsAllListsRow{}
+	for rows.Next() {
+		var i ListLaddersByVariantsAllListsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PriceSetID,
+			&i.Amount,
+			&i.CurrencyCode,
+			&i.MinQuantity,
+			&i.MaxQuantity,
+			&i.PriceListID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.VariantID,
+			&i.PriceListName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPriceListLaddersByProduct = `-- name: ListPriceListLaddersByProduct :many
 SELECT p.id, p.price_set_id, p.amount, p.currency_code,
        p.min_quantity, p.max_quantity,

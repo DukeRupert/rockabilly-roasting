@@ -61,6 +61,16 @@ type PriceList struct {
 	EndsAt   *time.Time
 }
 
+// ListLadder is a variant's ladder on one named price list. Used where a
+// variant's pricing has to be shown across several lists at once — the admin
+// variant typeahead, which prefills a base price but must show staff what volume
+// breaks exist, since it cannot know which customer the order is for.
+type ListLadder struct {
+	PriceListID uuid.UUID
+	ListName    string
+	Ladder      TierLadder
+}
+
 // Nudge proximity thresholds. A volume upgrade is only suggested when the buyer
 // is within max(NudgeProximityFloor, ceil(NudgeProximityPct * next rung)) units
 // of the next rung.

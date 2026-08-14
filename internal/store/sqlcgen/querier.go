@@ -207,6 +207,7 @@ type Querier interface {
 	ListInvoiceLinesByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceLine, error)
 	ListInvoicePaymentsByInvoice(ctx context.Context, invoiceID uuid.UUID) ([]InvoicePayment, error)
 	ListInvoicesByOrder(ctx context.Context, orderID uuid.UUID) ([]Invoice, error)
+	ListLaddersByVariantsAllLists(ctx context.Context, arg ListLaddersByVariantsAllListsParams) ([]ListLaddersByVariantsAllListsRow, error)
 	ListLineItemsByOrder(ctx context.Context, orderID uuid.UUID) ([]LineItem, error)
 	// ListNotifiedCustomerUsers returns the additional recipients for an account's
 	// transactional mail. The account's primary contact (customers.email) is not in

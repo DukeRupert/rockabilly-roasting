@@ -19,6 +19,7 @@ Each tab shows a live count; the active tab is "stamped" (ink border + offset sh
 | **Shipped** | Orders handed to a carrier (shipped / partially shipped). |
 | **Delivered** | Orders confirmed delivered (delivered / partially delivered). |
 | **All** | Every order regardless of fulfillment status (still excludes unconfirmed intents). |
+| **Load list** | How many pounds of each coffee the delivery van needs. See [Load List](#load-list-loading-the-delivery-van) below. |
 
 ### Two View Modes
 
@@ -161,6 +162,41 @@ For orders with shipping method "Local Delivery":
 
 ---
 
+## Load List — Loading the Delivery Van
+
+The **Load list** tab answers one question before the van pulls out: *do we have enough of each coffee on board to fill every delivery order?*
+
+Without it, that check meant opening each delivery order and adding bags up by hand. The tab does the arithmetic for the whole run.
+
+### What it shows
+
+**On board** — one row per coffee, with the bag count and the total pounds, heaviest first, and a grand total at the bottom. That total is the number to check the van against.
+
+**Orders on this run** — the delivery orders those totals cover. Everything waiting in the local-delivery queue starts checked.
+
+The tab is scoped to the queue you're in: `/admin/fulfillment` covers retail delivery orders, `/admin/wholesale/fulfillment` covers wholesale. Orders that are cancelled, refunded, or not yet paid never appear.
+
+### Using it
+
+1. Open **Fulfillment → Load list** once the day's delivery orders are packed.
+2. Uncheck anything that isn't going out today — an order on hold, a reschedule, a second run. The totals update as you check and uncheck.
+3. Read the pound totals and confirm the van matches.
+4. Click **Print load sheet** for a paper copy to carry: the same totals with a tick box beside each coffee, plus the list of stops. The print dialog opens on its own.
+
+Unchecking only affects the load list — it doesn't change the order, cancel anything, or notify the customer. It's just a way to say "this one isn't on this run." Reload the page and everything is checked again.
+
+### Pounds are coffee, not freight
+
+The totals come from each variant's weight in the catalog: a 12 oz bag counts as 0.75 lb, a 5 lb bag as 5 lb. That's the weight of the coffee itself, not the packed box — the right number for "did we roast and bag enough," which is what this check is for.
+
+If a coffee shows an amber **"N bag(s) unweighed"** badge, some of its bags have no weight set in the catalog and are **not** included in the pound total — the real load is heavier than shown. Fix the variant's weight in [Catalog](catalog.md) so the total can be trusted.
+
+### This is a check, not a handoff
+
+The load list doesn't change any order's state. Once the van is loaded and rolling, go back to the **Needs action** tab, select the delivery orders, and use **Out for delivery** to notify customers and advance the orders.
+
+---
+
 ## Quick Reference
 
 | Action | Button / control | Result |
@@ -174,3 +210,5 @@ For orders with shipping method "Local Delivery":
 | Hand off a local delivery | Out for Local Delivery | Out for delivery; customer emailed |
 | Undo a transition | Revert Fulfillment / Revert Shipment | Steps the order back one stage |
 | Print packing slip | Packing Slip button | Opens printable page in new tab |
+| Check the delivery load | Fulfillment → **Load list** tab | Pounds of each coffee needed for the run; uncheck orders that aren't going today |
+| Carry the load list | **Print load sheet** | Printable totals + stop list, with tick boxes |

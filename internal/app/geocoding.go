@@ -31,6 +31,18 @@ type GeocodingService struct {
 	geocodes *store.GeocodeStore
 	geocoder geocode.Geocoder
 	metrics  *metrics.Registry
+	shipping *store.ShippingStore
+}
+
+// WithOrigin lets the cache warmer include the roastery address.
+//
+// Every route starts there, so an origin that cannot be geocoded fails
+// planning outright — and it is the one address the customer-order sweep never
+// covers. Warming it turns that from a first-run surprise into a pre-flight
+// check.
+func (s *GeocodingService) WithOrigin(shipping *store.ShippingStore) *GeocodingService {
+	s.shipping = shipping
+	return s
 }
 
 // WithMetrics attaches the Prometheus registry so the cache hit rate is
@@ -241,32 +253,61 @@ func (s *GeocodingService) CountCachedAddresses(ctx context.Context, tx pgx.Tx) 
 	return s.geocodes.CountGeocodedAddresses(ctx, tx)
 }
 
-// WarmCache geocodes every address that has appeared on a local-delivery order,
-// so the first real route plan reads from cache instead of firing a burst of
-// billable lookups — and so any address the provider cannot pin is discovered
-// in the office rather than by a driver at the curb.
+// WarmResult is what the cache warmer did, plus the roastery origin it
+// resolved. The origin is reported separately because it fails differently:
+// one bad customer address costs one stop, an unroutable origin costs every
+// route.
+type WarmResult struct {
+	Resolution
+	// OriginAddress is the roastery address as geocoded, empty if no origin is
+	// configured. Look it up in Resolved/Failed to see how it fared.
+	OriginAddress string
+}
+
+// WarmCache geocodes the roastery origin plus every address that has appeared
+// on a local-delivery order, so the first real route plan reads from cache
+// instead of firing a burst of billable lookups — and so any address the
+// provider cannot pin is discovered in the office rather than by a driver at
+// the curb.
 //
 // Safe to re-run: addresses already cached cost nothing and come back as hits.
 //
 // Must not be called inside a transaction — it resolves, and therefore calls
 // out to the provider. See the type comment.
-func (s *GeocodingService) WarmCache(ctx context.Context, pool *pgxpool.Pool, limit int) (Resolution, error) {
+func (s *GeocodingService) WarmCache(ctx context.Context, pool *pgxpool.Pool, limit int) (WarmResult, error) {
 	var addresses []domain.Address
+	var origin string
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		var txErr error
 		addresses, txErr = s.geocodes.ListLocalDeliveryAddresses(ctx, tx, limit)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+		if s.shipping != nil {
+			cfg, cfgErr := s.shipping.GetConfig(ctx, tx)
+			if cfgErr != nil {
+				return cfgErr
+			}
+			origin = formatOriginAddress(cfg)
+		}
+		return nil
 	}); err != nil {
-		return Resolution{}, fmt.Errorf("list delivery addresses: %w", err)
+		return WarmResult{}, fmt.Errorf("list delivery addresses: %w", err)
 	}
 
-	raw := make([]string, 0, len(addresses))
+	raw := make([]string, 0, len(addresses)+1)
+	// Origin first, so it is resolved even if the address list is truncated by
+	// the limit.
+	if origin != "" {
+		raw = append(raw, origin)
+	}
 	for _, a := range addresses {
 		if formatted := domain.FormatAddressForGeocoding(a); formatted != "" {
 			raw = append(raw, formatted)
 		}
 	}
-	return s.ResolveMany(ctx, pool, raw)
+	res, err := s.ResolveMany(ctx, pool, raw)
+	return WarmResult{Resolution: res, OriginAddress: origin}, err
 }
 
 // recordLookup counts one address resolution. Recorded after the write

@@ -272,3 +272,26 @@ func TestRouteProgress(t *testing.T) {
 	p = domain.Progress(stops)
 	assert.True(t, p.Complete(), "all stops resolved, even with skips")
 }
+
+// The origin is the one address the customer-order sweep never covers, and it
+// fails differently: a bad customer address costs one stop, an unroutable
+// origin costs every route. So the warmer must resolve it too.
+func TestWarmCache_IncludesTheRoasteryOrigin(t *testing.T) {
+	ctx := context.Background()
+	seedDeliveryOrders(t, []string{"100 First St"})
+
+	stub := geocoderFor(map[string]geocode.Result{
+		"1234 W 4th Ave, Kennewick, WA 99336": {Lat: 46.2087, Lng: -119.1372, Confidence: "ROOFTOP"},
+		"100 First St, Portland, OR 97201":    {Lat: 46.21, Lng: -119.14, Confidence: "ROOFTOP"},
+	})
+	svc := newGeocodingService(t, stub).WithOrigin(store.NewShippingStore())
+
+	res, err := svc.WarmCache(ctx, testPool, 100)
+	require.NoError(t, err)
+
+	assert.Equal(t, "1234 W 4th Ave, Kennewick, WA 99336", res.OriginAddress)
+	origin, ok := res.Resolved[res.OriginAddress]
+	require.True(t, ok, "the origin must be warmed, not just the customer addresses")
+	assert.InDelta(t, 46.2087, origin.Lat, 0.0001)
+	assert.Len(t, res.Resolved, 2, "origin + one delivery address")
+}

@@ -67,7 +67,8 @@ func main() {
 	if apiKey == "" {
 		log.Fatal("GOOGLE_GEOCODING_API_KEY is empty — set it in .env, or pass --dry-run to see the working set without geocoding")
 	}
-	svc := app.NewGeocodingService(geocodeStore, geocode.NewGoogleGeocoder(apiKey))
+	svc := app.NewGeocodingService(geocodeStore, geocode.NewGoogleGeocoder(apiKey)).
+		WithOrigin(store.NewShippingStore())
 
 	before, err := countCached(ctx, pool, geocodeStore)
 	if err != nil {
@@ -85,6 +86,18 @@ func main() {
 	}
 
 	fmt.Printf("\nGeocode cache warmed\n")
+	// The origin gets its own line: every route starts there, so it failing is
+	// a different severity from one customer address failing.
+	if res.OriginAddress != "" {
+		if g, ok := res.Resolved[res.OriginAddress]; ok {
+			fmt.Printf("  roastery origin     : OK [%s] %s\n", g.Confidence, res.OriginAddress)
+		} else {
+			fmt.Printf("  roastery origin     : FAILED — %v\n", res.Failed[res.OriginAddress])
+			fmt.Printf("                        no route can be planned until this resolves\n")
+		}
+	} else {
+		fmt.Printf("  roastery origin     : not configured in shipping settings\n")
+	}
 	fmt.Printf("  addresses processed : %d\n", len(res.Resolved)+len(res.Failed))
 	fmt.Printf("  already cached      : %d\n", res.CacheHits)
 	fmt.Printf("  new lookups (billed): %d\n", res.Lookups)
@@ -135,7 +148,11 @@ func reportDryRun(ctx context.Context, pool *pgxpool.Pool, geocodeStore *store.G
 		return err
 	}
 
-	var hits, misses int
+	var hits int
+	// Count DISTINCT normalized keys, not rows. Several spellings of one
+	// address share a cache key and cost a single lookup, so counting rows
+	// overstates the bill — which is the number this report exists to give.
+	misses := make(map[string]bool)
 	fmt.Printf("Local-delivery addresses on file: %d\n\n", len(addresses))
 	for _, a := range addresses {
 		formatted := domain.FormatAddressForGeocoding(a)
@@ -145,10 +162,17 @@ func reportDryRun(ctx context.Context, pool *pgxpool.Pool, geocodeStore *store.G
 			fmt.Printf("  [cached] %s\n", formatted)
 			continue
 		}
-		misses++
+		if misses[key] {
+			fmt.Printf("  [dedup]  %s\n", formatted)
+			continue
+		}
+		misses[key] = true
 		fmt.Printf("  [LOOKUP] %s\n", formatted)
 	}
-	fmt.Printf("\n%d already cached, %d would be looked up (billed).\n", hits, misses)
+	fmt.Printf("\n%d already cached, %d would be looked up (billed).\n", hits, len(misses))
+	if dupes := len(addresses) - hits - len(misses); dupes > 0 {
+		fmt.Printf("%d row(s) share an address with another and cost nothing extra.\n", dupes)
+	}
 	return nil
 }
 

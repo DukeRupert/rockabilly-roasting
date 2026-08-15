@@ -421,7 +421,8 @@ func run() error {
 	// cached and refuses new lookups, and an empty OSRM URL refuses to plan
 	// rather than handing a driver an unoptimized route that looks fine.
 	geocodingSvc := app.NewGeocodingService(geocodeStore, geocode.NewGoogleGeocoder(os.Getenv("GOOGLE_GEOCODING_API_KEY"))).
-		WithMetrics(metricsReg)
+		WithMetrics(metricsReg).
+		WithOrigin(shippingStore)
 	osrmClient := routing.NewClient(os.Getenv("OSRM_BASE_URL"))
 	routeSvc := app.NewRouteService(orderStore, customerStore, shippingStore, geocodingSvc, osrmClient).
 		WithPersistence(routeStore, auditWriter).

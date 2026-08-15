@@ -20,18 +20,19 @@ func driverProps() storefront.DriverRouteProps {
 			{
 				ID: uuid.New(), Position: 1, CustomerName: "Bunker Coffee",
 				Address: "100 First St, Kennewick, WA 99336", Notes: "Side door",
-				Status: domain.RouteStopPending, Lat: 46.2087, Lng: -119.1372,
+				Status:    domain.RouteStopPending,
+				GoogleURL: domain.GoogleMapsStopURL(domain.RouteStop{Lat: 46.2087, Lng: -119.1372}),
+				AppleURL:  domain.AppleMapsStopURL(domain.RouteStop{Lat: 46.2087, Lng: -119.1372}),
 			},
 			{
 				ID: uuid.New(), Position: 2, CustomerName: "Jane Doe",
 				Address: "200 Second St, Pasco, WA 99301",
-				Status:  domain.RouteStopDelivered, Lat: 46.2396, Lng: -119.1006,
+				Status:  domain.RouteStopDelivered,
 			},
 			{
 				ID: uuid.New(), Position: 3, CustomerName: "Cafe Rojo",
 				Address: "300 Third St, Richland, WA 99352",
 				Status:  domain.RouteStopSkipped, SkipReason: "nobody home",
-				Lat: 46.2857, Lng: -119.2845,
 			},
 		},
 		Progress:  domain.RouteProgress{Total: 3, Delivered: 1, Skipped: 1},
@@ -57,7 +58,7 @@ func TestDriverRoutePageRenders(t *testing.T) {
 	// Navigation must carry coordinates, never the address text — an address
 	// handed to a maps app gets re-geocoded and can land on a different pin.
 	assert.Contains(t, html, "destination=46.208700,-119.137200")
-	assert.Contains(t, html, "maps.apple.com/?daddr=46.208700,-119.137200")
+	assert.Contains(t, html, "maps.apple.com/?dirflg=d&amp;daddr=46.208700,-119.137200")
 	assert.NotContains(t, html, "destination=100+First+St")
 
 	// The token in the URL is a credential.

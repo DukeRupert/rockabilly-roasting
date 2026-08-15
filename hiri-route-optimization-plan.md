@@ -511,7 +511,10 @@ when every stop resolves. Chunked "Navigate all" and the QR code are step 6.
   delivered/complete; double-tap is a no-op; a completed route's token 404s;
   one-handed phone usability (manual check)
 
-### Step 6 — Deep links, chunking, QR
+### Step 6 — Deep links, chunking, QR ✅ done 2026-08-14
+`domain.GoogleMapsNavChunks` (10-stop chunking, resolved stops excluded), QR at
+`/admin/routes/{id}/qr.png`. **Still needs a real-device check** — open the
+generated links on an iPhone and an Android and confirm stop order and pins.
 - Google Maps multi-stop URL builder with 10-stop chunking (unit-test the chunk
   math at 9, 10, 11, 20 stops)
 - Apple Maps per-stop links

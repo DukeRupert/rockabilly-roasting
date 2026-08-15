@@ -522,6 +522,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.Handle("POST /admin/fulfillment/route/plan", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRoutePlan)))
 	adminMux.Handle("GET /admin/routes", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteList)))
 	adminMux.Handle("GET /admin/routes/{id}", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteShow)))
+	adminMux.Handle("GET /admin/routes/{id}/qr.png", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteQR)))
 	adminMux.Handle("POST /admin/routes/{id}/activate", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteActivate)))
 	adminMux.Handle("POST /admin/routes/{id}/complete", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteComplete)))
 	adminMux.Handle("POST /admin/routes/{id}/stops/{stopID}/remove", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteStopRemove)))

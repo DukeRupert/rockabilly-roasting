@@ -24,6 +24,10 @@ type DriverRouteProps struct {
 	OriginLat float64
 	OriginLng float64
 	Roundtrip bool
+	// NavChunks are "navigate the next N stops" links. A Google Maps URL holds
+	// ten stops, so a longer run becomes several sequential links rather than
+	// one that the maps app silently truncates.
+	NavChunks []domain.NavChunk
 }
 
 // DriverStop is one delivery as the driver sees it.
@@ -35,23 +39,12 @@ type DriverStop struct {
 	Notes        string
 	Status       domain.RouteStopStatus
 	SkipReason   string
-	Lat          float64
-	Lng          float64
-}
-
-// googleMapsStopURL builds a single-stop Google Maps navigation link.
-//
-// Always lat/lng, never the address text: an address handed to the maps app
-// gets re-geocoded there, and it can land on a different pin than the one we
-// planned the route around. Coordinates are exactly where the driver should be.
-func googleMapsStopURL(s DriverStop) string {
-	return fmt.Sprintf("https://www.google.com/maps/dir/?api=1&destination=%.6f,%.6f&travelmode=driving", s.Lat, s.Lng)
-}
-
-// appleMapsStopURL is the Apple Maps equivalent. Apple has no multi-stop URL
-// scheme, so per-stop navigation is all it can offer.
-func appleMapsStopURL(s DriverStop) string {
-	return fmt.Sprintf("https://maps.apple.com/?daddr=%.6f,%.6f&dirflg=d", s.Lat, s.Lng)
+	// GoogleURL and AppleURL are built by domain.GoogleMapsStopURL /
+	// AppleMapsStopURL in the handler. The view does not construct navigation
+	// URLs: there is one tested implementation, and coordinate formatting is
+	// too easy to get subtly wrong in two places.
+	GoogleURL string
+	AppleURL  string
 }
 
 // nextStop returns the first unresolved stop — the one the driver is heading
@@ -122,6 +115,36 @@ templ DriverRouteBody(props DriverRouteProps) {
 				</p>
 			}
 		</header>
+		if !props.Completed && len(props.NavChunks) > 0 {
+			<!-- Google only; Apple Maps has no multi-stop URL scheme at all. -->
+			<section class="border-2 border-ink bg-paper p-3">
+				<p class="font-oswald text-xs uppercase text-ink-soft" style="letter-spacing:0.18em;">
+					if len(props.NavChunks) == 1 {
+						Navigate the whole run
+					} else {
+						Navigate in { fmt.Sprintf("%d", len(props.NavChunks)) } legs
+					}
+				</p>
+				<div class="mt-2 space-y-2">
+					for _, chunk := range props.NavChunks {
+						<a
+							href={ templ.SafeURL(chunk.URL) }
+							target="_blank"
+							rel="noopener"
+							class="block border-2 border-ink bg-ink px-3 py-3 text-center font-oswald text-sm font-semibold uppercase text-paper"
+							style="letter-spacing:0.08em;"
+						>
+							{ chunk.Label() }
+						</a>
+					}
+				</div>
+				if len(props.NavChunks) > 1 {
+					<p class="mt-2 font-oswald text-xs text-ink-soft">
+						Google Maps holds ten stops per route. Work through the legs in order.
+					</p>
+				}
+			</section>
+		}
 		if props.Completed {
 			<div class="border-2 border-ink bg-cream-hi p-6 text-center">
 				<p class="font-slab uppercase text-ink text-lg">Run complete</p>
@@ -201,7 +224,7 @@ templ driverStopCard(token string, stop DriverStop) {
 templ navigateButtons(stop DriverStop) {
 	<div class="mt-3 flex gap-2">
 		<a
-			href={ templ.SafeURL(googleMapsStopURL(stop)) }
+			href={ templ.SafeURL(stop.GoogleURL) }
 			target="_blank"
 			rel="noopener"
 			class="flex-1 border-2 border-ink bg-rust px-3 py-3 text-center font-oswald text-sm font-semibold uppercase text-paper"
@@ -210,7 +233,7 @@ templ navigateButtons(stop DriverStop) {
 			Google Maps
 		</a>
 		<a
-			href={ templ.SafeURL(appleMapsStopURL(stop)) }
+			href={ templ.SafeURL(stop.AppleURL) }
 			target="_blank"
 			rel="noopener"
 			class="flex-1 border-2 border-ink bg-cream-hi px-3 py-3 text-center font-oswald text-sm font-semibold uppercase text-ink"

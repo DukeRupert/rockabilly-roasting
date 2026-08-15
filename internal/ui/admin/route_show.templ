@@ -142,12 +142,37 @@ templ RouteShowContent(props RouteShowProps) {
 			</div>
 		}
 		if props.DriverURL != "" {
+			<!-- The QR is the handoff: the driver scans it off this screen (or a
+			     printout) with their camera and the stop list is on their phone.
+			     No typing a token, no app, no account. -->
 			<div class="border border-rr-border bg-rr-surface px-4 py-3">
-				<h2 class="text-xs uppercase tracking-wide text-rr-muted label-font">Driver link</h2>
-				<p class="mt-1 text-sm text-rr-body break-all">{ props.DriverURL }</p>
-				<p class="mt-1 text-xs text-rr-muted">
-					Opens the stop list on the driver's phone — no login. Stops working when the route ends.
-				</p>
+				<h2 class="text-xs uppercase tracking-wide text-rr-muted label-font">Driver handoff</h2>
+				<div class="mt-2 flex flex-wrap items-start gap-4">
+					<img
+						src={ fmt.Sprintf("/admin/routes/%s/qr.png", props.Route.ID) }
+						alt="QR code linking to the driver's stop list"
+						width="180"
+						height="180"
+						class="border border-rr-border bg-white p-2"
+					/>
+					<div class="min-w-0 flex-1">
+						<p class="text-sm text-rr-body">
+							Have the driver scan this with their phone camera. It opens the stop
+							list — no login needed.
+						</p>
+						<p class="mt-2 text-xs text-rr-muted break-all">{ props.DriverURL }</p>
+						<p class="mt-2 text-xs text-rr-muted">
+							The link stops working as soon as the route ends.
+						</p>
+						<button
+							type="button"
+							onclick="window.print()"
+							class="btn-secondary mt-3"
+						>
+							Print
+						</button>
+					</div>
+				</div>
 			</div>
 		}
 		@routeStopsTable(props)

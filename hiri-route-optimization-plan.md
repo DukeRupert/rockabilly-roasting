@@ -573,3 +573,74 @@ Still open:
 | OSRM ops unqualified | Off-box preprocessing, mandatory | Prod measured at 3.7GB RAM, no swap; extract peaks ~5GB |
 | Driver page auth from scratch | Stored token, patterns from `switch_to_pickup.go` | Signed-link precedent exists |
 | New permission implied | Reuse `orders:fulfill` | Same gate as the Load list |
+
+---
+
+## 9. v1.1 candidates
+
+Both of these came out of the first live exercise on prod (2026-08-15), not from
+speculation. Neither blocks the Monday run.
+
+### 9.1 Collapse repeat stops at one address
+
+**What happened.** The first real route put `1461 Oxford Ave, Richland` at
+positions 5 and 6 — two separate orders going to the same door. Routing handled
+it correctly (identical coordinates, adjacent positions, zero drive time
+between), but the driver sees two identical cards in a row and taps Delivered
+twice at one doorstep. It works; it reads like a bug.
+
+**The change.** Group consecutive stops sharing a coordinate into one card:
+
+- One position number, one address, one Navigate button
+- Both order numbers listed, and both sets of delivery notes
+- One **Delivered** that closes every order in the group in the same
+  transaction — the existing `MarkStopDelivered` already runs inside the
+  caller's tx, so this is a loop, not a new transaction shape
+- **Skip** stays per-order. Two orders to one address can fail differently:
+  the household's order is fine and the neighbour's is wrong, or one of the two
+  bundles was left behind at the shop.
+
+Grouping belongs in the view layer (`driverRouteProps` in
+`internal/web/driver_route.go`), not in `route_stops`. The stops are genuinely
+distinct rows — one per order, which is what makes fulfillment work — and
+merging them in the database would break the `(route_id, order_id)` uniqueness
+that keeps an order off a route twice.
+
+**Watch out for:** only collapse *consecutive* stops. Two orders to one address
+that OSRM separated (it shouldn't, but a tie could) must not be silently merged
+into one visit.
+
+### 9.2 Manual pin override
+
+**What happened.** Warming the cache produced 4 `GEOMETRIC_CENTER` results out
+of 115 — Google found the street but not the building. Two are on long
+arterials (Clearwater Ave, Sandifur Pkwy) where the street midpoint can be
+several blocks from the door. A fifth address, `12519 Rock Creek Drive, Pasco`,
+came back `ROOFTOP` — full confidence — with a pin **west of the Columbia**,
+which is Richland-side despite a Pasco address. High confidence is not the same
+as correct.
+
+There is currently no way to fix any of these short of editing the customer's
+address and hoping the geocoder lands somewhere better.
+
+**The change.** Let staff pin an address by hand:
+
+- On the route review page, a low-confidence stop gets a "correct this pin"
+  affordance
+- Staff supply coordinates (pasted from Google Maps' right-click → copy
+  coordinates, which is how anyone actually does this)
+- Store the override on `geocoded_addresses` — a nullable
+  `override_lat`/`override_lng` plus who set it and when, rather than
+  overwriting the provider's answer, so a re-geocode can never quietly undo a
+  human correction
+- `confidence` becomes `MANUAL` for display; `Precise()` should treat it as
+  trustworthy, since a human looked at it
+
+**Why not fix the address instead:** sometimes the address is right and the
+geocoder is wrong (rural routes, new subdivisions, trailer parks — see
+`90 S Verbena ST TRLR 22`, where no geocoder will ever find unit 22). Editing
+the customer's address to chase a better pin corrupts the record the invoice
+and the label print from.
+
+**Only worth building if it recurs.** One bad pin a quarter is a phone call to
+the customer; one a week is a feature.

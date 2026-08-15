@@ -238,6 +238,15 @@ var (
 	// already has open.
 	ErrRouteNotActivatable = errors.New("only a draft route can be activated")
 	ErrRouteEmpty          = errors.New("a route needs at least one stop before it can be activated")
+	// ErrRouteStopNotFound covers both "no such stop" and "that stop is on a
+	// different route". The driver page must not distinguish them: its share
+	// token grants one route, and a stop id from another route should look
+	// exactly like one that does not exist.
+	ErrRouteStopNotFound = errors.New("route stop not found")
+	// ErrStopAlreadyDelivered guards the skip path — undoing a delivery would
+	// mean un-completing the order behind it, which is a staff action in admin,
+	// not something to do from a phone in a van.
+	ErrStopAlreadyDelivered = errors.New("this stop is already marked delivered")
 )
 
 // MOQViolationError carries the per-line minimum/multiple violations so

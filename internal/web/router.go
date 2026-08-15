@@ -502,6 +502,15 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/variant", deps.handleAdminSubscriptionVariantUpdate)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/plan", deps.handleAdminSubscriptionPlanUpdate)
 
+	// Delivery driver page. Public and token-authenticated: the driver scans a
+	// QR at packout and works from their own phone, with no account. The token
+	// grants exactly one route and stops working when that route completes.
+	// Both stop actions are POST-only so a link prefetcher cannot resolve a
+	// delivery on the driver's behalf.
+	mux.HandleFunc("GET /routes/{token}", deps.handleDriverRoute)
+	mux.HandleFunc("POST /routes/{token}/stops/{stopID}/delivered", deps.handleDriverStopDelivered)
+	mux.HandleFunc("POST /routes/{token}/stops/{stopID}/skip", deps.handleDriverStopSkipped)
+
 	// Admin fulfillment & shipping
 	adminMux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)
 	adminMux.HandleFunc("GET /admin/wholesale/fulfillment", deps.handleAdminWholesaleFulfillmentList)

@@ -499,7 +499,10 @@ page at `/admin/routes/{id}`, "Plan route" on the Load list tab. Wired into
 - **Test:** plan → review → activate; re-plan replaces rather than duplicates
   (partial unique index); permission gate is `orders:fulfill`
 
-### Step 5 — Driver page
+### Step 5 — Driver page ✅ done 2026-08-14
+`OrderService.MarkLocallyDelivered` (new transition), driver page at
+`/routes/{token}` with per-stop Navigate + Delivered + Skip, auto-completion
+when every stop resolves. Chunked "Navigate all" and the QR code are step 6.
 - `OrderService.MarkLocallyDelivered` (see §3) + audit action
 - Token-authenticated mobile page: ordered stops, per-stop Navigate, Delivered
   toggle wired to `MarkLocallyDelivered`, progress header

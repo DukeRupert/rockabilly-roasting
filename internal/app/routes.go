@@ -52,8 +52,9 @@ type RouteService struct {
 
 	// Persistence is optional at construction: planning is read-only, and the
 	// admin flow attaches these with WithPersistence at wiring time.
-	routes *store.RouteStore
-	audit  *audit.AuditWriter
+	routes   *store.RouteStore
+	audit    *audit.AuditWriter
+	orderSvc *OrderService
 }
 
 // NewRouteService creates a RouteService.

@@ -423,7 +423,8 @@ func run() error {
 	geocodingSvc := app.NewGeocodingService(geocodeStore, geocode.NewGoogleGeocoder(os.Getenv("GOOGLE_GEOCODING_API_KEY")))
 	osrmClient := routing.NewClient(os.Getenv("OSRM_BASE_URL"))
 	routeSvc := app.NewRouteService(orderStore, customerStore, shippingStore, geocodingSvc, osrmClient).
-		WithPersistence(routeStore, auditWriter)
+		WithPersistence(routeStore, auditWriter).
+		WithOrderService(orderSvc)
 	if !osrmClient.Enabled() {
 		logger.Warn("OSRM_BASE_URL is empty — delivery route planning is disabled")
 	}

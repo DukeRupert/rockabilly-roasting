@@ -238,6 +238,7 @@ func (d *Deps) renderFulfillmentList(w http.ResponseWriter, r *http.Request, cha
 			Shipped:     counts.Shipped,
 			Delivered:   counts.Delivered,
 			All:         counts.All,
+			LoadList:    counts.LoadList,
 		},
 		TotalCount:  totalCount,
 		Page:        page,

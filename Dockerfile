@@ -64,7 +64,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     CGO_ENABLED=0 GOOS=linux go build -o /app/migrate ./cmd/migrate && \
     CGO_ENABLED=0 GOOS=linux go build -o /app/os-migrate ./cmd/os-migrate && \
     CGO_ENABLED=0 GOOS=linux go build -o /app/sentrycheck ./cmd/sentrycheck && \
-    CGO_ENABLED=0 GOOS=linux go build -o /app/fix-pending-paid ./cmd/fix-pending-paid
+    CGO_ENABLED=0 GOOS=linux go build -o /app/fix-pending-paid ./cmd/fix-pending-paid && \
+    CGO_ENABLED=0 GOOS=linux go build -o /app/geocode-warm ./cmd/geocode-warm
 
 # Stage 3: Minimal runtime
 FROM alpine:3.21
@@ -80,6 +81,11 @@ COPY --from=builder /app/migrate ./migrate
 COPY --from=builder /app/os-migrate ./os-migrate
 COPY --from=builder /app/sentrycheck ./sentrycheck
 COPY --from=builder /app/fix-pending-paid ./fix-pending-paid
+# geocode-warm belongs in the image rather than being run from a checkout on
+# the host: the container egresses IPv4 through the host NAT, which is the
+# address the Google API key is restricted to. The host itself prefers IPv6 and
+# would be denied.
+COPY --from=builder /app/geocode-warm ./geocode-warm
 COPY --from=builder /go/bin/goose /usr/local/bin/goose
 
 # Copy static assets

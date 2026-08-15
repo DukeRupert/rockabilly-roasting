@@ -311,3 +311,33 @@ func WCMigrate(args ...string) error {
 	cmdArgs = append(cmdArgs, args...)
 	return sh.RunV("go", cmdArgs...)
 }
+
+// GeocodeWarm geocodes the addresses on local-delivery orders so the first
+// route plan reads from cache instead of firing a burst of billable lookups,
+// and reports any address the provider could not pin precisely.
+// Set DATABASE_URL and GOOGLE_GEOCODING_API_KEY.
+//
+// For a no-spend preview of the working set, run the command directly:
+//
+//	go run ./cmd/geocode-warm --dry-run
+func GeocodeWarm() error {
+	return sh.RunV("go", "run", "./cmd/geocode-warm")
+}
+
+// OSRM namespace groups routing-dataset commands. See ops/osrm/README.md.
+type OSRM mg.Namespace
+
+// Build builds the OSRM routing dataset: download the Washington extract, run
+// the MLD pipeline, package a tarball.
+//
+// Run this on angmar.dev, NOT on prod — osrm-extract peaks around 5GB and prod
+// has 3.7GB with no swap. The script refuses to run on a host too small for it.
+func (OSRM) Build() error {
+	return sh.RunV("bash", "ops/osrm/osrm-build.sh")
+}
+
+// Push builds the OSRM routing dataset and scp's it to the production host,
+// where osrm-install.sh unpacks it. Same host requirement as Build.
+func (OSRM) Push() error {
+	return sh.RunV("bash", "ops/osrm/osrm-build.sh", "--push")
+}

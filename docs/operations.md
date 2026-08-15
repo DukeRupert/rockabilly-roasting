@@ -72,10 +72,25 @@ SENTRY_DSN=... go run ./cmd/sentrycheck
 
 ---
 
+### `cmd/geocode-warm` — warm the delivery address geocode cache
+
+Geocodes every address that has appeared on a local-delivery order, so the first route plan reads from cache instead of firing a burst of billable Google lookups. The second thing it does matters more: it reports the addresses Google could not pin precisely, which are the ones that would send a driver to the wrong building. Safe to re-run — cached addresses cost nothing.
+
+```bash
+go run ./cmd/geocode-warm --dry-run    # show the working set and projected lookups; no API key needed
+mage geocodeWarm                       # warm the cache for real
+go run ./cmd/geocode-warm --limit 50   # cap the working set
+```
+
+Needs `DATABASE_URL` and `GOOGLE_GEOCODING_API_KEY` (except `--dry-run`). Exits non-zero if any address failed to geocode — those are stops that cannot be routed until a human fixes the address.
+
+---
+
 ## Operational runbooks
 
 | Runbook | Covers |
 |---------|--------|
+| [`../ops/osrm/README.md`](../ops/osrm/README.md) | OSRM routing dataset: build on angmar, serve on prod, quarterly refresh, version pinning, why port 5000 is never published |
 | [`backup-restore-runbook.md`](backup-restore-runbook.md) | Daily `pg_dump` to Cloudflare R2 (live since 2026-04-24), full restore procedure, verification steps |
 | [`orderspace-migration-runbook.md`](orderspace-migration-runbook.md) | Batched wholesale migration: `cmd/os-report` census, `cmd/os-migrate` importer, `cmd/os-welcome` invites, per-batch procedure, rehearsing on a prod copy, SKU map, verification queries |
 | [`stripe-setup.md`](stripe-setup.md) | Stripe API keys, webhook endpoints, Stripe Tax configuration |

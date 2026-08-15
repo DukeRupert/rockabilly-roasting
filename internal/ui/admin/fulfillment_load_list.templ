@@ -103,6 +103,13 @@ func loadListPrintAction() string {
 	return "/admin/fulfillment/load-list/print"
 }
 
+// loadListPlanRouteAction is where the "Plan route" button posts. The same
+// checked rows that decide the load totals decide the route's stops, so the
+// van and the stop list can never disagree about which orders are going out.
+func loadListPlanRouteAction() string {
+	return "/admin/fulfillment/route/plan"
+}
+
 // LoadListContent is the "Load list" tab body: totals on top for the go/no-go
 // check, the roster of delivery orders underneath for adjusting which ones
 // ride along.
@@ -162,13 +169,39 @@ templ LoadListTotals(props LoadListProps) {
 					Check the coffee on the van against this before you pull out.
 				</p>
 			</div>
-			<button
-				type="submit"
-				title="Open a print-ready load sheet for the checked orders in a new tab."
-				class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
-			>
-				Print load sheet
-			</button>
+			<div class="flex items-center gap-2">
+				<button
+					type="submit"
+					title="Open a print-ready load sheet for the checked orders in a new tab."
+					class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+				>
+					Print load sheet
+				</button>
+				<!-- Same form, different verb: formmethod/formaction override the
+				     GET-to-print submit so the checked ids POST to the planner
+				     instead. formtarget="_self" is required — the form carries
+				     target="_blank" for the print sheet, and without this the
+				     planned route would open in a stray tab. -->
+				<button
+					type="submit"
+					formmethod="post"
+					formaction={ templ.SafeURL(loadListPlanRouteAction()) }
+					formtarget="_self"
+					title="Work out the driving order for the checked orders and save it as a draft route."
+					class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90"
+				>
+					Plan route
+				</button>
+				<!-- Without this the routes index is only reachable by typing the
+				     URL: an active route needs to be findable after staff have
+				     navigated away from it mid-run. -->
+				<a
+					href="/admin/routes"
+					class="inline-flex items-center text-sm text-rr-muted underline hover:text-rr-heading"
+				>
+					Routes
+				</a>
+			</div>
 		</header>
 		if len(props.Lines) == 0 {
 			<div class="border border-rr-border bg-rr-surface px-6 py-10 text-center">

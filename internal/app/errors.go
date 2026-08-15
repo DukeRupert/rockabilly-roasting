@@ -165,12 +165,12 @@ var (
 	ErrInvalidOrderStatus = errors.New("invalid order status transition")
 
 	// Price errors
-	ErrPriceNotFound     = errors.New("price not found")
-	ErrInvalidPrice      = errors.New("price must not be negative")
+	ErrPriceNotFound = errors.New("price not found")
+	ErrInvalidPrice  = errors.New("price must not be negative")
 	// ErrInvalidTierQuantity is returned for a volume break below 2. Quantity 1
 	// is the list price itself, which is set through SetPriceListPrice.
 	ErrInvalidTierQuantity = errors.New("volume break must start at 2 or more")
-	ErrPriceListNotFound = errors.New("price list not found")
+	ErrPriceListNotFound   = errors.New("price list not found")
 
 	// Cart errors (item-level)
 	ErrInvalidQuantity = errors.New("quantity must be greater than zero")
@@ -212,6 +212,41 @@ var (
 	// Label / shipment errors
 	ErrShipmentNoPhysicalItems = errors.New("order has no physical items to ship")
 	ErrNoBoxPreset             = errors.New("no box presets configured")
+
+	// Geocoding errors. The split matters to the caller: an address the
+	// provider cannot match needs a human to correct it, while an unavailable
+	// provider means try the same address again later.
+	ErrAddressNotGeocodable  = errors.New("address could not be geocoded")
+	ErrGeocoderUnavailable   = errors.New("geocoding provider unavailable")
+	ErrGeocoderNotConfigured = errors.New("geocoding provider is not configured")
+
+	// Route planning errors.
+	ErrNoDeliveryStops = errors.New("no local delivery orders to route")
+	// ErrOriginNotConfigured means shipping_config has no usable origin
+	// address. The roastery address is the ship-from EasyPost already uses, so
+	// this is a settings gap rather than a missing route feature.
+	ErrOriginNotConfigured = errors.New("roastery origin address is not configured")
+	// ErrOriginNotGeocodable means the configured origin exists but cannot be
+	// placed on the map — every route starts there, so planning cannot proceed.
+	ErrOriginNotGeocodable = errors.New("roastery origin address could not be geocoded")
+	ErrRouteNotFound       = errors.New("delivery route not found")
+	// ErrRouteAlreadyActive guards a driver mid-run: re-planning a date whose
+	// route is already out with a driver would swap the stop list under them.
+	ErrRouteAlreadyActive = errors.New("a route for this date is already active; complete it before re-planning")
+	// ErrRouteNotActivatable means the route is gone or already active.
+	// Re-activating would mint a second token and break the link the driver
+	// already has open.
+	ErrRouteNotActivatable = errors.New("only a draft route can be activated")
+	ErrRouteEmpty          = errors.New("a route needs at least one stop before it can be activated")
+	// ErrRouteStopNotFound covers both "no such stop" and "that stop is on a
+	// different route". The driver page must not distinguish them: its share
+	// token grants one route, and a stop id from another route should look
+	// exactly like one that does not exist.
+	ErrRouteStopNotFound = errors.New("route stop not found")
+	// ErrStopAlreadyDelivered guards the skip path — undoing a delivery would
+	// mean un-completing the order behind it, which is a staff action in admin,
+	// not something to do from a phone in a van.
+	ErrStopAlreadyDelivered = errors.New("this stop is already marked delivered")
 )
 
 // MOQViolationError carries the per-line minimum/multiple violations so

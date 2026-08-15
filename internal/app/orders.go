@@ -869,6 +869,72 @@ func (s *OrderService) MarkPickedUp(ctx context.Context, tx pgx.Tx, id uuid.UUID
 	return order, nil
 }
 
+// MarkLocallyDelivered closes out a local delivery: the driver handed the
+// coffee over at the door.
+//
+// This exists because neither sibling fits. MarkOrderDelivered guards on
+// shipped/partially_shipped, and a van delivery is never "shipped" — there is
+// no carrier and no tracking number. ReconcileDelivery recomputes from shipment
+// rows, of which these orders have none. MarkPickedUp is the closest shape
+// (ready_for_pickup → delivered + complete, audited, no email) and this is its
+// delivery-side counterpart.
+//
+// Guarded to the pre-handoff fulfillment states so a double-tap on the driver's
+// phone is a no-op rather than a second audit entry: callers treat
+// ErrInvalidOrderStatus as "already done, carry on".
+//
+// No email. The customer just watched someone hand them a bag of coffee; a
+// receipt confirming it arrived would be noise.
+func (s *OrderService) MarkLocallyDelivered(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for local delivery: %w", err)
+	}
+
+	switch order.FulfillmentStatus {
+	case domain.FulfillmentStatusUnfulfilled,
+		domain.FulfillmentStatusPartiallyFulfilled,
+		domain.FulfillmentStatusFulfilled:
+		// allowed — these are the states a queued delivery order sits in
+	default:
+		return nil, fmt.Errorf("order is not awaiting local delivery: %w", ErrInvalidOrderStatus)
+	}
+
+	from := order.FulfillmentStatus
+	order, err = s.orders.UpdateOrderFulfillmentStatus(ctx, tx, id, domain.FulfillmentStatusDelivered)
+	if err != nil {
+		return nil, fmt.Errorf("set delivered: %w", err)
+	}
+	// Unlike the carrier path, order status advances too: a hand-delivered
+	// order is finished, with nothing left to reconcile.
+	order, err = s.orders.UpdateOrderStatus(ctx, tx, id, domain.OrderStatusComplete)
+	if err != nil {
+		return nil, fmt.Errorf("complete order: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderDelivered,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+		Metadata: map[string]any{
+			"from_status": string(from),
+			"to_status":   string(domain.FulfillmentStatusDelivered),
+			"source":      "driver_route",
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit local delivery: %w", err)
+	}
+
+	return order, nil
+}
+
 // MarkOrderDelivered advances a shipped order to delivered. It is the blunt,
 // signal-free transition used by the auto-deliver sweep: carrier delivery is
 // never reported for these orders, so after a grace window the package is

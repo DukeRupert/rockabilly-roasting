@@ -54,11 +54,17 @@ mage db:rollback  # roll back last migration
 mage db:status    # show migration status
 mage db:create <name>  # create new migration file
 
+# Delivery route optimization — see ops/osrm/README.md
+mage geocodeWarm  # warm the delivery geocode cache (--dry-run via `go run ./cmd/geocode-warm`)
+mage osrm:build   # build the OSRM routing dataset — RUN ON angmar.dev, never prod
+mage osrm:push    # same, then scp the dataset to prod
+
 # One-off commands (separate main packages under cmd/) — see docs/operations.md
 go run ./cmd/support-reply --to person@example.com --name Alex --dry-run  # send a templated support email
 go run ./cmd/seed        # same thing mage seed runs
 go run ./cmd/sentrycheck # verify Sentry wiring
-mage wcMigrate           # WooCommerce subscription importer (cmd/migrate) — archived; --dry-run, --mapping flags
+go run ./cmd/geocode-warm --dry-run  # preview the geocode working set (no API key needed)
+go run ./cmd/migrate     # WooCommerce subscription importer — archived; --dry-run, --mapping flags
 go run ./cmd/os-migrate  # Orderspace wholesale importer — archived
 
 # Run a single test (use go test directly)

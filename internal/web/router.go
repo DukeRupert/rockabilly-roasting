@@ -47,6 +47,7 @@ type Deps struct {
 	CatalogService         *app.CatalogService
 	CheckoutService        *app.CheckoutService
 	FulfillmentService     *app.FulfillmentService
+	RouteService           *app.RouteService
 	SubscriptionService    *app.SubscriptionService
 	DiscountService        *app.DiscountService
 	AuthService            *app.AuthService
@@ -501,11 +502,30 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/variant", deps.handleAdminSubscriptionVariantUpdate)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/plan", deps.handleAdminSubscriptionPlanUpdate)
 
+	// Delivery driver page. Public and token-authenticated: the driver scans a
+	// QR at packout and works from their own phone, with no account. The token
+	// grants exactly one route and stops working when that route completes.
+	// Both stop actions are POST-only so a link prefetcher cannot resolve a
+	// delivery on the driver's behalf.
+	mux.HandleFunc("GET /routes/{token}", deps.handleDriverRoute)
+	mux.HandleFunc("POST /routes/{token}/stops/{stopID}/delivered", deps.handleDriverStopDelivered)
+	mux.HandleFunc("POST /routes/{token}/stops/{stopID}/skip", deps.handleDriverStopSkipped)
+
 	// Admin fulfillment & shipping
 	adminMux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)
 	adminMux.HandleFunc("GET /admin/wholesale/fulfillment", deps.handleAdminWholesaleFulfillmentList)
 	adminMux.HandleFunc("GET /admin/fulfillment/load-list/totals", deps.handleAdminFulfillmentLoadListTotals)
 	adminMux.HandleFunc("GET /admin/fulfillment/load-list/print", deps.handleAdminFulfillmentLoadListPrint)
+
+	// Delivery route planning. Gated on orders:fulfill — the same permission
+	// that guards the fulfillment queue these routes are planned from.
+	adminMux.Handle("POST /admin/fulfillment/route/plan", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRoutePlan)))
+	adminMux.Handle("GET /admin/routes", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteList)))
+	adminMux.Handle("GET /admin/routes/{id}", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteShow)))
+	adminMux.Handle("GET /admin/routes/{id}/qr.png", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteQR)))
+	adminMux.Handle("POST /admin/routes/{id}/activate", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteActivate)))
+	adminMux.Handle("POST /admin/routes/{id}/complete", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteComplete)))
+	adminMux.Handle("POST /admin/routes/{id}/stops/{stopID}/remove", deps.requirePermission(auth.PermUpdateFulfillment, http.HandlerFunc(deps.handleAdminRouteStopRemove)))
 	adminMux.HandleFunc("GET /admin/orders/{id}/rates", deps.handleAdminShipmentRates)
 	adminMux.HandleFunc("POST /admin/orders/{id}/label", deps.handleAdminShipmentLabelBuy)
 	adminMux.HandleFunc("POST /admin/orders/labels", deps.handleAdminShipmentBulkLabelCreate)

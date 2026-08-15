@@ -7,6 +7,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/logging"
+	"github.com/dukerupert/hiri/internal/platform/routing"
 	"github.com/dukerupert/hiri/internal/ui/components/toast"
 )
 
@@ -61,6 +62,34 @@ func mapError(err error) (int, string) {
 		// product/SKU exists to a viewer who may not see it.
 		errors.Is(err, app.ErrProductNotAccessible):
 		return http.StatusNotFound, "not found"
+
+	case errors.Is(err, app.ErrRouteNotFound):
+		return http.StatusNotFound, "that delivery route no longer exists"
+
+	// Route planning failures get specific messages rather than a generic
+	// conflict: each one names a different thing for staff to go fix, and the
+	// difference between "no orders" and "the shop address is wrong" is the
+	// whole message.
+	case errors.Is(err, app.ErrNoDeliveryStops):
+		return http.StatusConflict, "no local delivery orders are waiting to be routed"
+	case errors.Is(err, app.ErrRouteAlreadyActive):
+		return http.StatusConflict, "a route for this delivery day is already out with a driver — complete it before planning a new one"
+	case errors.Is(err, app.ErrRouteNotActivatable):
+		return http.StatusConflict, "this route has already been activated"
+	case errors.Is(err, app.ErrRouteEmpty):
+		return http.StatusConflict, "a route needs at least one stop"
+	case errors.Is(err, app.ErrOriginNotConfigured):
+		return http.StatusConflict, "set the roastery address in shipping settings before planning a route"
+	case errors.Is(err, app.ErrOriginNotGeocodable):
+		return http.StatusConflict, "the roastery address could not be placed on the map — check it in shipping settings"
+	case errors.Is(err, app.ErrGeocoderNotConfigured):
+		return http.StatusServiceUnavailable, "address lookup is not configured, so routes cannot be planned"
+	case errors.Is(err, app.ErrGeocoderUnavailable):
+		return http.StatusServiceUnavailable, "address lookup is temporarily unavailable — try again shortly"
+	case errors.Is(err, routing.ErrUnavailable), errors.Is(err, routing.ErrNotConfigured):
+		return http.StatusServiceUnavailable, "the routing service is unavailable, so stop order cannot be optimized"
+	case errors.Is(err, routing.ErrTooManyStops):
+		return http.StatusConflict, "too many stops for one route — split the run"
 
 	case errors.Is(err, app.ErrInvalidCredentials):
 		return http.StatusUnauthorized, "invalid credentials"

@@ -197,6 +197,63 @@ The load list doesn't change any order's state. Once the van is loaded and rolli
 
 ---
 
+## Route Planning — What Order to Drive In
+
+The load list says *what goes in the van*. **Plan route**, on the same tab, says *what order to drive it in*, and hands the result to the driver's phone.
+
+This replaces exporting addresses into a third-party routing app by hand. The stop order is worked out on our own server; the driver's phone still does turn-by-turn in Google or Apple Maps.
+
+### Planning
+
+1. On the **Load list** tab, check the orders going out — the same checkboxes that drive the pound totals.
+2. Click **Plan route**. It takes a few seconds: each address is placed on the map, then the driving order is worked out.
+3. You land on the route's review page.
+
+The route covers **both retail and wholesale** deliveries, even though the load list is split into separate tabs. One van makes one run, so a cafe and a house on the same street should be next to each other rather than on two routes that cross.
+
+### Reviewing
+
+The review page shows the stop order, total drive time and distance, and each stop's customer, address, and delivery notes.
+
+Two things to look for:
+
+- **"N delivery order(s) could not be placed on the map."** Those orders are **not** on the route and will not be delivered. Almost always a bad address — fix it on the order, then plan again.
+- **Remove & re-plan** on any stop drops it and works out the best order for what's left. The order itself is untouched: it stays in the delivery queue and turns up on the next run.
+
+Re-planning replaces the draft. There's only ever one route per delivery day, so there's no way to hand a driver an out-of-date sheet by accident.
+
+### Handing it to the driver
+
+Click **Activate & get driver link**. That produces a **QR code**.
+
+The driver scans it with their phone camera — no app, no login, no typing. It opens their stop list, which shows:
+
+- The next stop, large, at the top
+- **Google Maps** and **Apple Maps** buttons per stop
+- **Navigate stops 1–10** links for the whole run (Google Maps holds ten stops per link, so longer runs are split into legs to work through in order)
+- **Delivered** and **Skip this stop** buttons
+
+Print the QR if the driver would rather carry paper.
+
+### While the run is going
+
+**Delivered** marks the order delivered and complete in Hiri straight away — you'll see it move in the fulfillment queue while the van is still out.
+
+**Skip this stop** asks for a short reason ("wrong address", "nobody home"). A skip is about *today's run only*: the order isn't touched, stays in the delivery queue, and appears on the next route automatically. The reason shows on the route so you can fix whatever caused it before the next van goes out.
+
+Once every stop is delivered or skipped, the route completes on its own and the driver's link stops working. You can also end it early with **End route**.
+
+### If planning won't run
+
+| Message | What to do |
+|---------|-----------|
+| "A route for this delivery day is already out with a driver" | The route is active. End it before planning a new one — this stops a driver's stop list being swapped mid-run. |
+| "No local delivery orders are waiting to be routed" | Nothing is checked, or the queue is empty. |
+| "Set the roastery address in shipping settings" | The route starts from the shop. Fill in the origin address under [Settings](settings.md). |
+| "Address lookup is temporarily unavailable" | The address service is having a moment. Try again shortly; nothing was lost. |
+
+---
+
 ## Quick Reference
 
 | Action | Button / control | Result |

@@ -420,11 +420,13 @@ func run() error {
 	// than a wrong answer: an empty geocoding key serves whatever is already
 	// cached and refuses new lookups, and an empty OSRM URL refuses to plan
 	// rather than handing a driver an unoptimized route that looks fine.
-	geocodingSvc := app.NewGeocodingService(geocodeStore, geocode.NewGoogleGeocoder(os.Getenv("GOOGLE_GEOCODING_API_KEY")))
+	geocodingSvc := app.NewGeocodingService(geocodeStore, geocode.NewGoogleGeocoder(os.Getenv("GOOGLE_GEOCODING_API_KEY"))).
+		WithMetrics(metricsReg)
 	osrmClient := routing.NewClient(os.Getenv("OSRM_BASE_URL"))
 	routeSvc := app.NewRouteService(orderStore, customerStore, shippingStore, geocodingSvc, osrmClient).
 		WithPersistence(routeStore, auditWriter).
-		WithOrderService(orderSvc)
+		WithOrderService(orderSvc).
+		WithMetrics(metricsReg)
 	if !osrmClient.Enabled() {
 		logger.Warn("OSRM_BASE_URL is empty — delivery route planning is disabled")
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/geocode"
+	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
 )
 
@@ -29,6 +30,15 @@ import (
 type GeocodingService struct {
 	geocodes *store.GeocodeStore
 	geocoder geocode.Geocoder
+	metrics  *metrics.Registry
+}
+
+// WithMetrics attaches the Prometheus registry so the cache hit rate is
+// observable. Every miss is a billed Google call, so the ratio is the number
+// worth watching once the cache is warm.
+func (s *GeocodingService) WithMetrics(m *metrics.Registry) *GeocodingService {
+	s.metrics = m
+	return s
 }
 
 // NewGeocodingService creates a GeocodingService. geocoder may be nil or
@@ -149,15 +159,18 @@ func (s *GeocodingService) ResolveMany(ctx context.Context, pool *pgxpool.Pool, 
 		if hit, ok := cached[key]; ok {
 			res.Resolved[raw] = hit
 			res.CacheHits++
+			s.recordLookup("cache", "hit")
 			continue
 		}
 
 		geocoded, err := s.lookupAndCache(ctx, pool, raw, key)
 		if err != nil {
 			res.Failed[raw] = err
+			s.recordLookup("provider", "failed")
 			continue
 		}
 		res.Lookups++
+		s.recordLookup("provider", "resolved")
 		res.Resolved[raw] = *geocoded
 		// Seed the local map so a repeat of the same address later in the
 		// batch is not a second billable lookup.
@@ -254,4 +267,13 @@ func (s *GeocodingService) WarmCache(ctx context.Context, pool *pgxpool.Pool, li
 		}
 	}
 	return s.ResolveMany(ctx, pool, raw)
+}
+
+// recordLookup counts one address resolution. Recorded after the write
+// transaction has committed, per the metrics rule in CLAUDE.md.
+func (s *GeocodingService) recordLookup(source, outcome string) {
+	if s.metrics == nil {
+		return
+	}
+	s.metrics.GeocodeLookups.WithLabelValues(source, outcome).Inc()
 }

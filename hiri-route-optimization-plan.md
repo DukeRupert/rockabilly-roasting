@@ -522,7 +522,11 @@ generated links on an iPhone and an Android and confirm stop order and pins.
 - **Test:** open generated links on a real iPhone and Android; verify stop order
   is preserved and pins land correctly
 
-### Step 7 — Polish + rollout
+### Step 7 — Polish + rollout ✅ code done 2026-08-14 (walkthrough outstanding)
+Prometheus metrics (routes planned, stops/route, drive time, stops resolved,
+geocode cache hit rate), a Routes link from the Load list tab, and the
+delivery-day workflow written up in `docs/guide/admin/fulfillment.md`.
+Auto-completion and "End route" landed earlier, in steps 5 and 4.
 - Route completion: auto-complete when all stops resolve, plus explicit
   "End route"
 - Metrics via the existing Prometheus setup: routes planned, stops per route,

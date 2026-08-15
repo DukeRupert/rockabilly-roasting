@@ -192,6 +192,15 @@ templ LoadListTotals(props LoadListProps) {
 				>
 					Plan route
 				</button>
+				<!-- Without this the routes index is only reachable by typing the
+				     URL: an active route needs to be findable after staff have
+				     navigated away from it mid-run. -->
+				<a
+					href="/admin/routes"
+					class="inline-flex items-center text-sm text-rr-muted underline hover:text-rr-heading"
+				>
+					Routes
+				</a>
 			</div>
 		</header>
 		if len(props.Lines) == 0 {

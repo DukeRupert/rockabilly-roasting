@@ -84,11 +84,13 @@ func (s *RouteService) PlanAndSaveRoute(
 		return nil, nil, fmt.Errorf("check existing route: %w", err)
 	}
 	if existing != nil && existing.Status == domain.RouteStatusActive {
+		s.recordPlanOutcome("refused_active")
 		return nil, nil, ErrRouteAlreadyActive
 	}
 
 	plan, err := s.PlanRoute(ctx, pool, opts)
 	if err != nil {
+		s.recordPlanOutcome("failed")
 		return nil, nil, err
 	}
 
@@ -149,7 +151,16 @@ func (s *RouteService) PlanAndSaveRoute(
 		saved = &SavedRoute{Route: *route, Stops: persisted}
 		return nil
 	}); err != nil {
+		s.recordPlanOutcome("failed")
 		return nil, nil, fmt.Errorf("save route: %w", err)
+	}
+
+	// After commit, per the metrics rule: a counter that moved for a rolled
+	// back transaction is a lie that never corrects itself.
+	if s.metrics != nil {
+		s.metrics.RoutesPlanned.WithLabelValues("planned").Inc()
+		s.metrics.RouteStops.Observe(float64(len(saved.Stops)))
+		s.metrics.RouteDuration.Observe(plan.TotalDurationSeconds)
 	}
 
 	return saved, plan, nil
@@ -302,4 +313,12 @@ func newShareToken() (string, error) {
 		return "", fmt.Errorf("generate route share token: %w", err)
 	}
 	return hex.EncodeToString(b), nil
+}
+
+// recordPlanOutcome counts a planning attempt.
+func (s *RouteService) recordPlanOutcome(outcome string) {
+	if s.metrics == nil {
+		return
+	}
+	s.metrics.RoutesPlanned.WithLabelValues(outcome).Inc()
 }

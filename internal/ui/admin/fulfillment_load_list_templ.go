@@ -286,7 +286,7 @@ func LoadListTotals(props LoadListProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" formtarget=\"_self\" title=\"Work out the driving order for the checked orders and save it as a draft route.\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90\">Plan route</button></div></header>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" formtarget=\"_self\" title=\"Work out the driving order for the checked orders and save it as a draft route.\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90\">Plan route</button><!-- Without this the routes index is only reachable by typing the\n\t\t\t\t     URL: an active route needs to be findable after staff have\n\t\t\t\t     navigated away from it mid-run. --><a href=\"/admin/routes\" class=\"inline-flex items-center text-sm text-rr-muted underline hover:text-rr-heading\">Routes</a></div></header>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -308,7 +308,7 @@ func LoadListTotals(props LoadListProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(line.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 216, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 225, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -326,7 +326,7 @@ func LoadListTotals(props LoadListProps) templ.Component {
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d bag(s) unweighed", line.UnitsMissingWeight))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 222, Col: 72}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 231, Col: 72}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -344,7 +344,7 @@ func LoadListTotals(props LoadListProps) templ.Component {
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", line.Units))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 227, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 236, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -357,7 +357,7 @@ func LoadListTotals(props LoadListProps) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(formatLoadPounds(line.WeightGrams))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 230, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 239, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -375,7 +375,7 @@ func LoadListTotals(props LoadListProps) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", loadListTotalUnits(props.Lines)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 239, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 248, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -388,7 +388,7 @@ func LoadListTotals(props LoadListProps) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(formatLoadPounds(totalGrams))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 242, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 251, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -406,7 +406,7 @@ func LoadListTotals(props LoadListProps) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d bag(s)", missing))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 250, Col: 40}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 259, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -457,7 +457,7 @@ func loadListRoster(props LoadListProps) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(props.Orders)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 265, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 274, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
@@ -553,7 +553,7 @@ func loadListRosterRow(row LoadListOrder, props LoadListProps) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("Include order %s in the load", row.Order.Number))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 310, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 319, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 		if templ_7745c5c3_Err != nil {
@@ -566,7 +566,7 @@ func loadListRosterRow(row LoadListOrder, props LoadListProps) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.ResolveAttributeValue(row.Order.ID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 312, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 321, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
 		if templ_7745c5c3_Err != nil {
@@ -589,7 +589,7 @@ func loadListRosterRow(row LoadListOrder, props LoadListProps) templ.Component {
 		var templ_7745c5c3_Var23 templ.SafeURL
 		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 318, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 327, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
@@ -602,7 +602,7 @@ func loadListRosterRow(row LoadListOrder, props LoadListProps) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(row.Order.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 320, Col: 127}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 329, Col: 127}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -625,7 +625,7 @@ func loadListRosterRow(row LoadListOrder, props LoadListProps) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(row.CustomerName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 325, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 334, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -674,7 +674,7 @@ func loadListRosterRow(row LoadListOrder, props LoadListProps) templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(relativeOrderDate(row.Order.PlacedAt, props.MerchantTZ, props.Now))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 337, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 346, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
@@ -742,7 +742,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 		var templ_7745c5c3_Var30 string
 		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(loadListPrintDate(props.Printed, props.MerchantTZ))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 453, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 462, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
@@ -755,7 +755,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 		var templ_7745c5c3_Var31 string
 		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(props.ChannelLbl)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 454, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 463, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
@@ -768,7 +768,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 		var templ_7745c5c3_Var32 string
 		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d order(s)", len(props.Orders)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 454, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 463, Col: 88}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 		if templ_7745c5c3_Err != nil {
@@ -796,7 +796,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 				var templ_7745c5c3_Var33 string
 				templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(line.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 475, Col: 22}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 484, Col: 22}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 				if templ_7745c5c3_Err != nil {
@@ -814,7 +814,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 					var templ_7745c5c3_Var34 string
 					templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d unweighed", line.UnitsMissingWeight))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 478, Col: 73}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 487, Col: 73}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 					if templ_7745c5c3_Err != nil {
@@ -832,7 +832,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 				var templ_7745c5c3_Var35 string
 				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", line.Units))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 482, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 491, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 				if templ_7745c5c3_Err != nil {
@@ -845,7 +845,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 				var templ_7745c5c3_Var36 string
 				templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(formatLoadPounds(line.WeightGrams))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 483, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 492, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 				if templ_7745c5c3_Err != nil {
@@ -863,7 +863,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", loadListTotalUnits(props.Lines)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 491, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 500, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {
@@ -876,7 +876,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 			var templ_7745c5c3_Var38 string
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(formatLoadPounds(totalGrams))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 492, Col: 60}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 501, Col: 60}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -894,7 +894,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 				var templ_7745c5c3_Var39 string
 				templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d bag(s)", missing))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 498, Col: 42}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 507, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 				if templ_7745c5c3_Err != nil {
@@ -919,7 +919,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 				var templ_7745c5c3_Var40 string
 				templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(o.Order.Number)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 517, Col: 30}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 526, Col: 30}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 				if templ_7745c5c3_Err != nil {
@@ -932,7 +932,7 @@ func LoadListPrint(props LoadListPrintProps) templ.Component {
 				var templ_7745c5c3_Var41 string
 				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(o.CustomerName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 518, Col: 30}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/fulfillment_load_list.templ`, Line: 527, Col: 30}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 				if templ_7745c5c3_Err != nil {

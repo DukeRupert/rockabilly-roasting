@@ -51,7 +51,24 @@ type Registry struct {
 
 	// Email
 	EmailsSent *prometheus.CounterVec
+
+	// Delivery routes
+	RoutesPlanned      *prometheus.CounterVec
+	RouteStops         prometheus.Histogram
+	RouteDuration      prometheus.Histogram
+	RouteStopsResolved *prometheus.CounterVec
+	GeocodeLookups     *prometheus.CounterVec
 }
+
+// routeStopBuckets span a delivery day: a handful of stops on a quiet Monday,
+// up to the ~99 the router will take. Fine-grained at the low end because the
+// difference between 5 and 15 stops is a different kind of day; coarse past 40,
+// where the only question is "is this run unusually big?".
+var routeStopBuckets = []float64{1, 3, 5, 8, 12, 20, 30, 40, 60, 100}
+
+// routeDurationBuckets are drive-time seconds. The Tri-Cities baseline run is
+// ~50 minutes, so the interesting range is 15 minutes to about three hours.
+var routeDurationBuckets = []float64{900, 1800, 2700, 3600, 5400, 7200, 10800}
 
 // NewRegistry creates and registers all application metrics.
 func NewRegistry() *Registry {
@@ -213,6 +230,38 @@ func NewRegistry() *Registry {
 			Name: "emails_sent_total",
 			Help: "Total transactional emails sent.",
 		}, []string{"kind", "status"}),
+
+		// --- Delivery routes ---
+
+		RoutesPlanned: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "delivery_routes_planned_total",
+			Help: "Delivery routes planned, by outcome.",
+		}, []string{"outcome"}),
+
+		RouteStops: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "delivery_route_stops",
+			Help:    "Stops per planned delivery route.",
+			Buckets: routeStopBuckets,
+		}),
+
+		RouteDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "delivery_route_duration_seconds",
+			Help:    "Estimated drive time of a planned delivery route.",
+			Buckets: routeDurationBuckets,
+		}),
+
+		RouteStopsResolved: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "delivery_route_stops_resolved_total",
+			Help: "Route stops closed out by the driver, by outcome (delivered/skipped).",
+		}, []string{"outcome"}),
+
+		// The ratio that matters: hits should dominate once the cache is warm,
+		// because every miss is a billed Google call. A sustained rise in
+		// misses means addresses are churning or the cache was cleared.
+		GeocodeLookups: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "geocode_lookups_total",
+			Help: "Address geocode resolutions, by source (cache/provider) and outcome.",
+		}, []string{"source", "outcome"}),
 	}
 
 	reg.MustRegister(
@@ -250,6 +299,12 @@ func NewRegistry() *Registry {
 		m.RateLimitHitsTotal,
 		// Email
 		m.EmailsSent,
+		// Delivery routes
+		m.RoutesPlanned,
+		m.RouteStops,
+		m.RouteDuration,
+		m.RouteStopsResolved,
+		m.GeocodeLookups,
 	)
 
 	return m

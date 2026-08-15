@@ -57,7 +57,7 @@ func (d *Deps) handleDriverRoute(w http.ResponseWriter, r *http.Request) {
 // browser preloader mark the whole route done. Same reasoning as the
 // switch-to-pickup flow.
 func (d *Deps) handleDriverStopDelivered(w http.ResponseWriter, r *http.Request) {
-	d.updateDriverStop(w, r, func(tx pgx.Tx, routeID, stopID uuid.UUID) (*app.SavedRoute, error) {
+	d.updateDriverStop(w, r, "delivered", func(tx pgx.Tx, routeID, stopID uuid.UUID) (*app.SavedRoute, error) {
 		return d.RouteService.MarkStopDelivered(r.Context(), tx, routeID, stopID, driverActor())
 	})
 }
@@ -70,7 +70,7 @@ func (d *Deps) handleDriverStopSkipped(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	reason := r.FormValue("reason")
-	d.updateDriverStop(w, r, func(tx pgx.Tx, routeID, stopID uuid.UUID) (*app.SavedRoute, error) {
+	d.updateDriverStop(w, r, "skipped", func(tx pgx.Tx, routeID, stopID uuid.UUID) (*app.SavedRoute, error) {
 		return d.RouteService.MarkStopSkipped(r.Context(), tx, routeID, stopID, reason, driverActor())
 	})
 }
@@ -84,6 +84,7 @@ func (d *Deps) handleDriverStopSkipped(w http.ResponseWriter, r *http.Request) {
 func (d *Deps) updateDriverStop(
 	w http.ResponseWriter,
 	r *http.Request,
+	outcome string,
 	apply func(tx pgx.Tx, routeID, stopID uuid.UUID) (*app.SavedRoute, error),
 ) {
 	token := r.PathValue("token")
@@ -111,6 +112,13 @@ func (d *Deps) updateDriverStop(
 		}
 		storefront.DriverRouteGonePage().Render(r.Context(), w) //nolint:errcheck
 		return
+	}
+
+	// Counted here rather than in the service: these methods take the caller's
+	// transaction, so the handler is the first place that knows the write
+	// actually committed.
+	if d.Metrics != nil {
+		d.Metrics.RouteStopsResolved.WithLabelValues(outcome).Inc()
 	}
 
 	props := driverRouteProps(token, saved)

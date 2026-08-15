@@ -12,6 +12,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/platform/routing"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -55,6 +56,14 @@ type RouteService struct {
 	routes   *store.RouteStore
 	audit    *audit.AuditWriter
 	orderSvc *OrderService
+	metrics  *metrics.Registry
+}
+
+// WithMetrics attaches the Prometheus registry. Optional: every recording site
+// nil-checks, so tests and one-off tools can skip it.
+func (s *RouteService) WithMetrics(m *metrics.Registry) *RouteService {
+	s.metrics = m
+	return s
 }
 
 // NewRouteService creates a RouteService.

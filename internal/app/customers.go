@@ -325,6 +325,17 @@ func (s *CustomerService) CountCustomers(ctx context.Context, tx pgx.Tx, f store
 	return count, nil
 }
 
+// SuggestCustomers returns fuzzy (trigram) matches for a search term, best
+// match first. Intended as the "did you mean" fallback when an exact search
+// returns nothing — see store.SuggestCustomers for why it ignores filters.
+func (s *CustomerService) SuggestCustomers(ctx context.Context, tx pgx.Tx, term string, limit int) ([]domain.Customer, error) {
+	customers, err := s.customers.SuggestCustomers(ctx, tx, term, limit)
+	if err != nil {
+		return nil, fmt.Errorf("suggest customers: %w", err)
+	}
+	return customers, nil
+}
+
 // CountAddresses returns the number of addresses for a customer.
 func (s *CustomerService) CountAddresses(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (int, error) {
 	count, err := s.customers.CountAddresses(ctx, tx, customerID)

@@ -66,27 +66,47 @@ func (s *CustomerStore) GetByEmail(ctx context.Context, tx pgx.Tx, email string)
 	return customerFromRow(row), nil
 }
 
+// CustomerSort identifies how the list query should order results. Sorting is
+// a closed enum rather than a column name so the HTTP layer can never reach a
+// raw identifier into the ORDER BY.
+type CustomerSort string
+
+const (
+	CustomerSortCreatedDesc CustomerSort = "created_desc"
+	CustomerSortCreatedAsc  CustomerSort = "created_asc"
+	CustomerSortNameAsc     CustomerSort = "name_asc"
+	CustomerSortNameDesc    CustomerSort = "name_desc"
+	CustomerSortEmailAsc    CustomerSort = "email_asc"
+	CustomerSortEmailDesc   CustomerSort = "email_desc"
+)
+
 // CustomerFilter holds optional filters for listing customers.
 type CustomerFilter struct {
 	AccountType     *domain.AccountType
 	WholesaleStatus *domain.WholesaleStatus
-	Search          string // ILIKE on name or email
+	EmailVerified   *bool
+	Search          string // ILIKE on name, email, or company name
+	Sort            CustomerSort
 	Limit           int
 	Offset          int
 }
 
-// List returns customers matching the given filter (staff-only).
-// This method is hand-written because sqlc cannot generate dynamic WHERE clauses.
-func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) ([]domain.Customer, error) {
-	query := `SELECT id, email, email_verified, password_hash, first_name, last_name, phone,
+// customerColumns is the select list shared by every query that scans into a
+// domain.Customer via scanCustomers.
+const customerColumns = `id, email, email_verified, password_hash, first_name, last_name, phone,
 	                 tax_exempt, tax_exempt_reason, stripe_customer_id,
 	                 price_list_id, account_type, wholesale_status, company_name,
 	                 website, wholesale_notes, approved_at, approved_by,
 	                 payment_terms_days, billing_method,
 	                 two_fa_enabled, two_fa_method,
 	                 preferred_local_fulfillment, order_reminders_enabled,
-	                 metadata, created_at, updated_at
-	          FROM customers WHERE true`
+	                 metadata, created_at, updated_at`
+
+// customerWhere grows query with the filter's WHERE clauses and returns the
+// query, its args, and the next free placeholder number. List and
+// CountCustomers must filter identically or the pagination totals lie, so both
+// build their WHERE here rather than each keeping its own copy.
+func customerWhere(query string, f CustomerFilter) (string, []any, int) {
 	args := []any{}
 	argN := 1
 
@@ -100,13 +120,46 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 		args = append(args, string(*f.WholesaleStatus))
 		argN++
 	}
+	if f.EmailVerified != nil {
+		query += fmt.Sprintf(" AND email_verified = $%d", argN)
+		args = append(args, *f.EmailVerified)
+		argN++
+	}
 	if f.Search != "" {
-		query += fmt.Sprintf(" AND (first_name || ' ' || last_name ILIKE $%d OR email ILIKE $%d)", argN, argN)
+		query += fmt.Sprintf(" AND (first_name || ' ' || last_name ILIKE $%d OR email ILIKE $%d OR coalesce(company_name, '') ILIKE $%d)", argN, argN, argN)
 		args = append(args, "%"+f.Search+"%")
 		argN++
 	}
 
-	query += " ORDER BY created_at DESC"
+	return query, args, argN
+}
+
+// customerOrderBy maps the sort enum to SQL. Name sorts run on last name first
+// because staff scan the list the way they'd scan a rolodex. The default
+// matches the historical behaviour: newest signups on top.
+func customerOrderBy(sort CustomerSort) string {
+	switch sort {
+	case CustomerSortCreatedAsc:
+		return " ORDER BY created_at ASC"
+	case CustomerSortNameAsc:
+		return " ORDER BY last_name ASC, first_name ASC"
+	case CustomerSortNameDesc:
+		return " ORDER BY last_name DESC, first_name DESC"
+	case CustomerSortEmailAsc:
+		return " ORDER BY email ASC"
+	case CustomerSortEmailDesc:
+		return " ORDER BY email DESC"
+	default:
+		return " ORDER BY created_at DESC"
+	}
+}
+
+// List returns customers matching the given filter (staff-only).
+// This method is hand-written because sqlc cannot generate dynamic WHERE clauses.
+func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) ([]domain.Customer, error) {
+	query, args, argN := customerWhere(`SELECT `+customerColumns+` FROM customers WHERE true`, f)
+
+	query += customerOrderBy(f.Sort)
 
 	limit := f.Limit
 	if limit <= 0 {
@@ -127,6 +180,11 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 	}
 	defer rows.Close()
 
+	return scanCustomers(rows)
+}
+
+// scanCustomers drains rows selected with customerColumns into domain values.
+func scanCustomers(rows pgx.Rows) ([]domain.Customer, error) {
 	var customers []domain.Customer
 	for rows.Next() {
 		var c domain.Customer
@@ -172,31 +230,55 @@ func (s *CustomerStore) List(ctx context.Context, tx pgx.Tx, f CustomerFilter) (
 
 // CountCustomers returns the number of customers matching the given filter.
 func (s *CustomerStore) CountCustomers(ctx context.Context, tx pgx.Tx, f CustomerFilter) (int, error) {
-	query := `SELECT COUNT(*) FROM customers WHERE true`
-	args := []any{}
-	argN := 1
-
-	if f.AccountType != nil {
-		query += fmt.Sprintf(" AND account_type = $%d", argN)
-		args = append(args, string(*f.AccountType))
-		argN++
-	}
-	if f.WholesaleStatus != nil {
-		query += fmt.Sprintf(" AND wholesale_status = $%d", argN)
-		args = append(args, string(*f.WholesaleStatus))
-		argN++
-	}
-	if f.Search != "" {
-		query += fmt.Sprintf(" AND (first_name || ' ' || last_name ILIKE $%d OR email ILIKE $%d)", argN, argN)
-		args = append(args, "%"+f.Search+"%")
-		argN++ //nolint:ineffassign
-	}
+	query, args, _ := customerWhere(`SELECT COUNT(*) FROM customers WHERE true`, f)
 
 	var count int
 	if err := tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {
 		return 0, fmt.Errorf("count customers: %w", err)
 	}
 	return count, nil
+}
+
+// SuggestCustomers returns customers whose name, email, or company is a fuzzy
+// (trigram) match for term, best match first.
+//
+// This backs the "did you mean" fallback on the admin list when an exact search
+// returns nothing, so it deliberately ignores the caller's other filters: the
+// operator has already found nothing where they were looking, and the useful
+// answer is "here's who you probably meant" wherever that account lives. The
+// `%` operator uses pg_trgm's similarity threshold (0.3 by default), so a term
+// with no near match returns an empty slice rather than noise.
+func (s *CustomerStore) SuggestCustomers(ctx context.Context, tx pgx.Tx, term string, limit int) ([]domain.Customer, error) {
+	if term == "" {
+		return nil, nil
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+
+	// The score is computed in a subquery so the outer select list stays
+	// exactly customerColumns and scanCustomers can be reused.
+	query := `SELECT ` + customerColumns + ` FROM (
+	              SELECT *, GREATEST(
+	                  similarity(first_name || ' ' || last_name, $1),
+	                  similarity(email, $1),
+	                  similarity(coalesce(company_name, ''), $1)
+	              ) AS match_score
+	              FROM customers
+	              WHERE (first_name || ' ' || last_name) % $1
+	                 OR email % $1
+	                 OR coalesce(company_name, '') % $1
+	          ) matches
+	          ORDER BY match_score DESC, last_name ASC
+	          LIMIT $2`
+
+	rows, err := tx.Query(ctx, query, term, limit)
+	if err != nil {
+		return nil, fmt.Errorf("suggest customers: %w", err)
+	}
+	defer rows.Close()
+
+	return scanCustomers(rows)
 }
 
 // UpdateName sets a customer's first and last name.

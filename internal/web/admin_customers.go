@@ -19,23 +19,32 @@ import (
 func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	search := r.URL.Query().Get("q")
-	pageStr := r.URL.Query().Get("page")
+	q := r.URL.Query()
+	search := strings.TrimSpace(q.Get("q"))
 
 	page := 1
-	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+	if p, err := strconv.Atoi(q.Get("page")); err == nil && p > 0 {
 		page = p
 	}
+
+	typeFilter := normalizeCustomerType(q.Get("type"))
+	statusFilter := normalizeCustomerStatus(q.Get("status"))
+	verifiedFilter := normalizeCustomerVerified(q.Get("verified"))
+	sort := normalizeCustomerSort(q.Get("sort"))
 
 	perPage := 25
 	filter := store.CustomerFilter{
 		Search: search,
+		Sort:   sort,
 		Limit:  perPage + 1,
 		Offset: (page - 1) * perPage,
 	}
+	applyCustomerFilters(typeFilter, statusFilter, verifiedFilter, &filter)
 
 	var customers []domain.Customer
+	var suggestions []domain.Customer
 	var totalCount int
+	counts := map[string]int{}
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -44,7 +53,34 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		totalCount, txErr = d.CustomerService.CountCustomers(ctx, tx, filter)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+
+		// Pill counts vary only the account-type dimension, so each number is
+		// exactly what clicking that pill would show. Wholesale status is left
+		// out because it's a sub-filter of the wholesale pill — clicking a type
+		// pill clears it, so counting with it applied would understate every
+		// pill (and force them all to the wholesale number).
+		for _, t := range customerTypeValues {
+			f := filter
+			f.Limit, f.Offset = 0, 0
+			applyCustomerFilters(t, "", verifiedFilter, &f)
+			counts[t], txErr = d.CustomerService.CountCustomers(ctx, tx, f)
+			if txErr != nil {
+				return txErr
+			}
+		}
+
+		// Only reach for fuzzy matches when an actual search term found nothing
+		// — otherwise the operator is just paging an empty filter combination.
+		if len(customers) == 0 && search != "" {
+			suggestions, txErr = d.CustomerService.SuggestCustomers(ctx, tx, search, 5)
+			if txErr != nil {
+				return txErr
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -58,15 +94,21 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.CustomerListProps{
-		Customers:  customers,
-		Search:     search,
-		TotalCount: totalCount,
-		Page:       page,
-		PerPage:    perPage,
-		HasMore:    hasMore,
-		MerchantTZ: d.MerchantTZ,
-		StaffName:  name,
-		StaffRole:  role,
+		Customers:      customers,
+		Suggestions:    suggestions,
+		Search:         search,
+		TypeFilter:     typeFilter,
+		StatusFilter:   statusFilter,
+		VerifiedFilter: verifiedFilter,
+		Sort:           string(sort),
+		Counts:         counts,
+		TotalCount:     totalCount,
+		Page:           page,
+		PerPage:        perPage,
+		HasMore:        hasMore,
+		MerchantTZ:     d.MerchantTZ,
+		StaffName:      name,
+		StaffRole:      role,
 	}
 
 	if IsHTMX(r) {
@@ -74,6 +116,84 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.CustomerList(props).Render(ctx, w) //nolint:errcheck
+}
+
+// customerTypeValues are the account-type pills on the admin customer list, in
+// display order. "" is the "All" pill.
+var customerTypeValues = []string{"", "retail", "wholesale"}
+
+// normalizeCustomerType clamps the ?type= param to the account types we know.
+// Unrecognised values fall back to "all" rather than erroring — a stale or
+// hand-edited URL should show the operator a list, not a 400.
+func normalizeCustomerType(v string) string {
+	switch v {
+	case "retail", "wholesale":
+		return v
+	default:
+		return ""
+	}
+}
+
+// normalizeCustomerStatus clamps ?status= to the wholesale status values.
+func normalizeCustomerStatus(v string) string {
+	switch v {
+	case "pending", "approved", "suspended", "declined":
+		return v
+	default:
+		return ""
+	}
+}
+
+// normalizeCustomerVerified clamps ?verified= to yes/no/all.
+func normalizeCustomerVerified(v string) string {
+	switch v {
+	case "yes", "no":
+		return v
+	default:
+		return ""
+	}
+}
+
+// normalizeCustomerSort clamps ?sort= to the closed sort enum.
+func normalizeCustomerSort(v string) store.CustomerSort {
+	switch store.CustomerSort(v) {
+	case store.CustomerSortCreatedAsc,
+		store.CustomerSortNameAsc,
+		store.CustomerSortNameDesc,
+		store.CustomerSortEmailAsc,
+		store.CustomerSortEmailDesc:
+		return store.CustomerSort(v)
+	default:
+		return store.CustomerSortCreatedDesc
+	}
+}
+
+// applyCustomerFilters translates the normalized query params onto a store
+// filter. A wholesale status implies the wholesale account type — the column is
+// NULL for retail rows, so pairing the two would always return nothing.
+func applyCustomerFilters(typeFilter, statusFilter, verifiedFilter string, f *store.CustomerFilter) {
+	f.AccountType = nil
+	f.WholesaleStatus = nil
+	f.EmailVerified = nil
+
+	switch typeFilter {
+	case "retail":
+		f.AccountType = ptrTo(domain.AccountTypeRetail)
+	case "wholesale":
+		f.AccountType = ptrTo(domain.AccountTypeWholesale)
+	}
+
+	if statusFilter != "" {
+		f.WholesaleStatus = ptrTo(domain.WholesaleStatus(statusFilter))
+		f.AccountType = ptrTo(domain.AccountTypeWholesale)
+	}
+
+	switch verifiedFilter {
+	case "yes":
+		f.EmailVerified = ptrTo(true)
+	case "no":
+		f.EmailVerified = ptrTo(false)
+	}
 }
 
 func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {

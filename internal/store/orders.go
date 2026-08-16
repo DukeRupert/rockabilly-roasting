@@ -322,23 +322,90 @@ type OrderFilter struct {
 	// OnlySubscription narrows to subscription-originated orders (true) or
 	// one-time orders (false). Nil leaves the source unconstrained.
 	OnlySubscription *bool
-	Limit            int
-	Offset           int
+	// TotalMin / TotalMax bound the order total, in cents, inclusive. Nil
+	// leaves that end unbounded.
+	TotalMin *int
+	TotalMax *int
+	// Sort orders the result. The zero value sorts newest-placed first, which
+	// is what every caller got before sorting existed.
+	Sort  OrderSort
+	Limit int
+	Offset int
 }
 
-// ListOrders returns orders matching the given filter (hand-written for dynamic WHERE).
-func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (_ []domain.Order, err error) {
-	defer trackQuery(s.metrics, "orders.list", time.Now(), &err)
-	query := `SELECT id, number, customer_id, channel, status, payment_status, fulfillment_status,
-	                 currency_code, subtotal, discount_total, shipping_total, tax_total, total,
-	                 shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
-	                 tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
-	                 shipping_method, requested_delivery_date,
-	                 customer_po_number, internal_note,
-	                 notes, metadata, placed_at, created_at, updated_at
-	          FROM orders WHERE true`
+// OrderSort identifies how the list query should order results. Like
+// CustomerSort, it's a closed enum rather than a column name so the HTTP layer
+// can never reach a raw identifier into the ORDER BY.
+type OrderSort string
+
+const (
+	OrderSortPlacedDesc OrderSort = "placed_desc"
+	OrderSortPlacedAsc  OrderSort = "placed_asc"
+	OrderSortTotalDesc  OrderSort = "total_desc"
+	OrderSortTotalAsc   OrderSort = "total_asc"
+	OrderSortNumberAsc  OrderSort = "number_asc"
+	OrderSortNumberDesc OrderSort = "number_desc"
+)
+
+// orderOrderBy maps the sort enum to SQL. The default matches the historical
+// behaviour every caller depends on: newest placed first.
+func orderOrderBy(sort OrderSort) string {
+	switch sort {
+	case OrderSortPlacedAsc:
+		return " ORDER BY placed_at ASC"
+	case OrderSortTotalDesc:
+		return " ORDER BY total DESC, placed_at DESC"
+	case OrderSortTotalAsc:
+		return " ORDER BY total ASC, placed_at DESC"
+	case OrderSortNumberAsc:
+		return " ORDER BY number ASC"
+	case OrderSortNumberDesc:
+		return " ORDER BY number DESC"
+	default:
+		return " ORDER BY placed_at DESC"
+	}
+}
+
+// orderSearchClause is the SQL fragment matching a free-text term against an
+// order. It lives here because three separate queries (ListOrders,
+// CountOrders, CountOrdersByView) must interpret a search term identically —
+// if they drift, the tab counts stop agreeing with the rows on screen.
+//
+// The customer half is a correlated EXISTS rather than a join so the outer
+// query keeps its simple `FROM orders` shape and its unqualified columns.
+func orderSearchClause(argN int) string {
+	return fmt.Sprintf(
+		" AND (number ILIKE $%d OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id"+
+			" AND (c.first_name || ' ' || c.last_name ILIKE $%d OR c.email ILIKE $%d"+
+			" OR coalesce(c.company_name, '') ILIKE $%d)))",
+		argN, argN, argN, argN)
+}
+
+// orderWhere grows query with the filter's WHERE clauses and returns the query,
+// its args, and the next free placeholder number.
+//
+// ListOrders and CountOrders must filter identically or the "X–Y of Z"
+// pagination total contradicts the rows on screen, so both build their WHERE
+// here. SumOrderRevenue and ListDeliveryLoad also take an OrderFilter but
+// deliberately keep their own narrower clause sets — they answer different
+// questions (revenue totals, load sheets) and honour only the subset of the
+// filter that makes sense for them.
+func orderWhere(query string, f OrderFilter) (string, []any, int) {
 	args := []any{}
 	argN := 1
+
+	appendIn := func(column string, values []string) {
+		query += " AND " + column + " IN ("
+		for i, v := range values {
+			if i > 0 {
+				query += ", "
+			}
+			query += fmt.Sprintf("$%d", argN)
+			args = append(args, v)
+			argN++
+		}
+		query += ")"
+	}
 
 	if f.Channel != nil {
 		query += fmt.Sprintf(" AND channel = $%d", argN)
@@ -346,48 +413,33 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 		argN++
 	}
 	if len(f.Statuses) > 0 {
-		query += " AND status IN ("
+		vals := make([]string, len(f.Statuses))
 		for i, s := range f.Statuses {
-			if i > 0 {
-				query += ", "
-			}
-			query += fmt.Sprintf("$%d", argN)
-			args = append(args, string(s))
-			argN++
+			vals[i] = string(s)
 		}
-		query += ")"
+		appendIn("status", vals)
 	} else if f.Status != nil {
 		query += fmt.Sprintf(" AND status = $%d", argN)
 		args = append(args, string(*f.Status))
 		argN++
 	}
 	if len(f.FulfillmentStatuses) > 0 {
-		query += " AND fulfillment_status IN ("
+		vals := make([]string, len(f.FulfillmentStatuses))
 		for i, s := range f.FulfillmentStatuses {
-			if i > 0 {
-				query += ", "
-			}
-			query += fmt.Sprintf("$%d", argN)
-			args = append(args, string(s))
-			argN++
+			vals[i] = string(s)
 		}
-		query += ")"
+		appendIn("fulfillment_status", vals)
 	} else if f.FulfillmentStatus != nil {
 		query += fmt.Sprintf(" AND fulfillment_status = $%d", argN)
 		args = append(args, string(*f.FulfillmentStatus))
 		argN++
 	}
 	if len(f.PaymentStatuses) > 0 {
-		query += " AND payment_status IN ("
+		vals := make([]string, len(f.PaymentStatuses))
 		for i, s := range f.PaymentStatuses {
-			if i > 0 {
-				query += ", "
-			}
-			query += fmt.Sprintf("$%d", argN)
-			args = append(args, string(s))
-			argN++
+			vals[i] = string(s)
 		}
-		query += ")"
+		appendIn("payment_status", vals)
 	}
 	if f.ShippingMethod != nil {
 		query += fmt.Sprintf(" AND shipping_method = $%d", argN)
@@ -421,8 +473,18 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 		args = append(args, *f.PlacedTo)
 		argN++
 	}
+	if f.TotalMin != nil {
+		query += fmt.Sprintf(" AND total >= $%d", argN)
+		args = append(args, *f.TotalMin)
+		argN++
+	}
+	if f.TotalMax != nil {
+		query += fmt.Sprintf(" AND total <= $%d", argN)
+		args = append(args, *f.TotalMax)
+		argN++
+	}
 	if f.Search != "" {
-		query += fmt.Sprintf(" AND (number ILIKE $%d OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.first_name || ' ' || c.last_name ILIKE $%d OR c.email ILIKE $%d)))", argN, argN, argN)
+		query += orderSearchClause(argN)
 		args = append(args, "%"+f.Search+"%")
 		argN++
 	}
@@ -433,7 +495,24 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 		query += " AND status NOT IN ('cancelled', 'refunded')"
 	}
 
-	query += " ORDER BY placed_at DESC"
+	return query, args, argN
+}
+
+// ListOrders returns orders matching the given filter (hand-written for dynamic WHERE).
+func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (_ []domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.list", time.Now(), &err)
+	query := `SELECT id, number, customer_id, channel, status, payment_status, fulfillment_status,
+	                 currency_code, subtotal, discount_total, shipping_total, tax_total, total,
+	                 shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
+	                 tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
+	                 shipping_method, requested_delivery_date,
+	                 customer_po_number, internal_note,
+	                 notes, metadata, placed_at, created_at, updated_at
+	          FROM orders WHERE true`
+
+	query, args, argN := orderWhere(query, f)
+
+	query += orderOrderBy(f.Sort)
 
 	limit := f.Limit
 	if limit <= 0 {
@@ -496,102 +575,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 // CountOrders returns the number of orders matching the given filter.
 func (s *OrderStore) CountOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (_ int, err error) {
 	defer trackQuery(s.metrics, "orders.count", time.Now(), &err)
-	query := `SELECT COUNT(*) FROM orders WHERE true`
-	args := []any{}
-	argN := 1
-
-	if f.Channel != nil {
-		query += fmt.Sprintf(" AND channel = $%d", argN)
-		args = append(args, string(*f.Channel))
-		argN++
-	}
-	if len(f.Statuses) > 0 {
-		query += " AND status IN ("
-		for i, s := range f.Statuses {
-			if i > 0 {
-				query += ", "
-			}
-			query += fmt.Sprintf("$%d", argN)
-			args = append(args, string(s))
-			argN++
-		}
-		query += ")"
-	} else if f.Status != nil {
-		query += fmt.Sprintf(" AND status = $%d", argN)
-		args = append(args, string(*f.Status))
-		argN++
-	}
-	if len(f.FulfillmentStatuses) > 0 {
-		query += " AND fulfillment_status IN ("
-		for i, s := range f.FulfillmentStatuses {
-			if i > 0 {
-				query += ", "
-			}
-			query += fmt.Sprintf("$%d", argN)
-			args = append(args, string(s))
-			argN++
-		}
-		query += ")"
-	} else if f.FulfillmentStatus != nil {
-		query += fmt.Sprintf(" AND fulfillment_status = $%d", argN)
-		args = append(args, string(*f.FulfillmentStatus))
-		argN++
-	}
-	if len(f.PaymentStatuses) > 0 {
-		query += " AND payment_status IN ("
-		for i, s := range f.PaymentStatuses {
-			if i > 0 {
-				query += ", "
-			}
-			query += fmt.Sprintf("$%d", argN)
-			args = append(args, string(s))
-			argN++
-		}
-		query += ")"
-	}
-	if f.ShippingMethod != nil {
-		query += fmt.Sprintf(" AND shipping_method = $%d", argN)
-		args = append(args, string(*f.ShippingMethod))
-		argN++
-	}
-	if len(f.OrderIDs) > 0 {
-		query += " AND id IN ("
-		for i, id := range f.OrderIDs {
-			if i > 0 {
-				query += ", "
-			}
-			query += fmt.Sprintf("$%d", argN)
-			args = append(args, id)
-			argN++
-		}
-		query += ")"
-	}
-	if f.CustomerID != nil {
-		query += fmt.Sprintf(" AND customer_id = $%d", argN)
-		args = append(args, *f.CustomerID)
-		argN++
-	}
-	if f.PlacedFrom != nil {
-		query += fmt.Sprintf(" AND placed_at >= $%d", argN)
-		args = append(args, *f.PlacedFrom)
-		argN++
-	}
-	if f.PlacedTo != nil {
-		query += fmt.Sprintf(" AND placed_at <= $%d", argN)
-		args = append(args, *f.PlacedTo)
-		argN++
-	}
-	if f.Search != "" {
-		query += fmt.Sprintf(" AND (number ILIKE $%d OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.first_name || ' ' || c.last_name ILIKE $%d OR c.email ILIKE $%d)))", argN, argN, argN)
-		args = append(args, "%"+f.Search+"%")
-		argN++ //nolint:ineffassign
-	}
-	if f.ExcludeUnconfirmed {
-		query += " AND NOT (status = 'pending' AND payment_status = 'awaiting')"
-	}
-	if f.ExcludeCancelledRefunded {
-		query += " AND status NOT IN ('cancelled', 'refunded')"
-	}
+	query, args, _ := orderWhere(`SELECT COUNT(*) FROM orders WHERE true`, f)
 
 	var count int
 	if err := tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {
@@ -636,7 +620,7 @@ func (s *OrderStore) CountOrdersByView(ctx context.Context, tx pgx.Tx, search st
 		argN++
 	}
 	if search != "" {
-		query += fmt.Sprintf(" AND (number ILIKE $%d OR EXISTS (SELECT 1 FROM customers c WHERE c.id = orders.customer_id AND (c.first_name || ' ' || c.last_name ILIKE $%d OR c.email ILIKE $%d)))", argN, argN, argN)
+		query += orderSearchClause(argN)
 		args = append(args, "%"+search+"%")
 	}
 

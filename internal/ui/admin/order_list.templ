@@ -127,10 +127,21 @@ type OrderListProps struct {
 	Title      string
 	Subtitle   string
 	Rows       []OrderRow
-	View       string // one of: needs_action | on_hold | shipped | archive | all
-	Counts     OrderViewCounts
-	Search     string
-	TotalCount int
+	View   string // one of: needs_action | on_hold | shipped | archive | all
+	Counts OrderViewCounts
+	Search string
+	// Suggestions holds fuzzy customer matches shown when a search finds no
+	// orders — the near-miss is almost always a half-remembered name.
+	Suggestions []domain.Customer
+	Sort        string
+	Payment     string // payment status filter, "" for any
+	Fulfillment string // fulfillment status filter, "" for any
+	Range       string // date preset key, "" for any, "custom" for From/To
+	From        string // yyyy-mm-dd, only when Range == "custom"
+	To          string // yyyy-mm-dd, only when Range == "custom"
+	Min         string // raw dollar input, echoed back to the form
+	Max         string
+	TotalCount  int
 	Page       int
 	PerPage    int
 	HasMore    bool
@@ -193,6 +204,86 @@ func orderViewHref(basePath, view, search string) string {
 	return basePath + "?" + v.Encode()
 }
 
+// orderSortHeader renders a clickable column header. Inactive columns keep a
+// dimmed ↕ so they read as sortable before you hover them.
+templ orderSortHeader(props OrderListProps, col, label string) {
+	<a
+		href={ templ.SafeURL(orderSortURL(props, col)) }
+		class="inline-flex items-center gap-1 hover:text-rr-red"
+		if orderSortIndicator(col, props.Sort) != "" {
+			aria-current="true"
+		}
+	>
+		{ label }
+		if ind := orderSortIndicator(col, props.Sort); ind != "" {
+			<span class="text-rr-red">{ ind }</span>
+		} else {
+			<span class="text-rr-border" aria-hidden="true">↕</span>
+		}
+	</a>
+}
+
+// orderPillRow renders one labelled row of filter pills.
+templ orderPillRow(props OrderListProps, label, dimension, active string, pills []orderPill) {
+	<div class="flex flex-wrap items-center gap-2">
+		<span class="label-font text-xs uppercase tracking-wide text-rr-muted">{ label }</span>
+		for _, f := range pills {
+			<a
+				href={ templ.SafeURL(orderFilterURL(props, dimension, f.Value)) }
+				class={ orderPillClasses(active == f.Value) }
+				if active == f.Value {
+					aria-current="page"
+				}
+			>
+				{ f.Label }
+			</a>
+		}
+	</div>
+}
+
+// orderHiddenState emits hidden inputs for the filter state a GET form must
+// preserve. `except` names the fields that form owns as real inputs — emitting
+// them twice would send both values and the stale one could win.
+templ orderHiddenState(props OrderListProps, except ...string) {
+	for _, f := range orderStateFields(props, except...) {
+		<input type="hidden" name={ f.Value } value={ f.Label }/>
+	}
+}
+
+// orderStateFields lists the current filter state as name/value pairs, minus
+// the excluded names. Reuses orderPill purely as a string pair.
+func orderStateFields(props OrderListProps, except ...string) []orderPill {
+	all := []orderPill{
+		{"view", props.View},
+		{"q", props.Search},
+		{"sort", props.Sort},
+		{"payment", props.Payment},
+		{"fulfillment", props.Fulfillment},
+		{"range", props.Range},
+		{"from", props.From},
+		{"to", props.To},
+		{"min", props.Min},
+		{"max", props.Max},
+	}
+	out := make([]orderPill, 0, len(all))
+	for _, f := range all {
+		if f.Label == "" {
+			continue
+		}
+		skip := false
+		for _, e := range except {
+			if f.Value == e {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
 // orderTabClass returns the class for an order-view tab. The active tab gets
 // the paper-and-ink stamp treatment: ink border, hard offset shadow, cream
 // surface — visually pasted on top of the row of inactive labels.
@@ -252,7 +343,7 @@ templ OrderListContent(props OrderListProps) {
 			     (ink border + hard offset shadow) so the current bucket is unmissable. -->
 			<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Order views">
 				for _, tab := range props.tabs() {
-					<a href={ templ.SafeURL(orderViewHref(props.BasePath, tab.Key, props.Search)) } class={ orderTabClass(props.View == tab.Key) }>
+					<a href={ templ.SafeURL(orderListURL(props, 1, tab.Key, props.Sort, props.Payment, props.Fulfillment, props.Range, props.From, props.To, props.Min, props.Max, props.Search)) } class={ orderTabClass(props.View == tab.Key) }>
 						<span>{ tab.Label }</span>
 						<span class={ orderTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
 					</a>
@@ -267,17 +358,65 @@ templ OrderListContent(props OrderListProps) {
 					type="search"
 					name="q"
 					value={ props.Search }
-					placeholder="Search orders, names, emails"
-					hx-get={ orderViewHref(props.BasePath, props.View, "") }
+					placeholder="Search orders, names, companies"
+					hx-get={ props.BasePath }
 					hx-trigger="input changed delay:300ms, search"
 					hx-target="#main-content"
 					hx-push-url="true"
-					hx-include="[name='view']"
+					hx-include="[name='view'],[name='sort'],[name='payment'],[name='fulfillment'],[name='range'],[name='from'],[name='to'],[name='min'],[name='max']"
 					class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 				/>
+				<!-- Carried with the search request so typing never drops the
+				     active filters. Every name here must appear in hx-include above. -->
 				<input type="hidden" name="view" value={ props.View }/>
+				<input type="hidden" name="sort" value={ props.Sort }/>
+				<input type="hidden" name="payment" value={ props.Payment }/>
+				<input type="hidden" name="fulfillment" value={ props.Fulfillment }/>
+				<input type="hidden" name="range" value={ props.Range }/>
+				<input type="hidden" name="from" value={ props.From }/>
+				<input type="hidden" name="to" value={ props.To }/>
+				<input type="hidden" name="min" value={ props.Min }/>
+				<input type="hidden" name="max" value={ props.Max }/>
 			</div>
 		</div>
+		<!-- Secondary filter rows. Kept visually quieter than the view tabs:
+		     the tabs are the primary workflow split, these narrow within it. -->
+		<div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+			@orderPillRow(props, "Payment", "payment", props.Payment, orderPaymentPills)
+			@orderPillRow(props, "Fulfillment", "fulfillment", props.Fulfillment, orderFulfillmentPills)
+			@orderPillRow(props, "Placed", "range", props.Range, orderRangePills)
+		</div>
+		if props.Range == "custom" {
+			<!-- GET form: custom dates and the amount range submit together. -->
+			<form method="get" action={ templ.SafeURL(props.BasePath) } class="mt-3 flex flex-wrap items-end gap-3">
+				@orderHiddenState(props, "range", "from", "to", "min", "max")
+				<input type="hidden" name="range" value="custom"/>
+				<div>
+					<label for="orders-from" class="label-font block text-xs uppercase tracking-wide text-rr-muted">From</label>
+					<input id="orders-from" type="date" name="from" value={ props.From } class="mt-1 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+				</div>
+				<div>
+					<label for="orders-to" class="label-font block text-xs uppercase tracking-wide text-rr-muted">To</label>
+					<input id="orders-to" type="date" name="to" value={ props.To } class="mt-1 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+				</div>
+				<button type="submit" class="btn-secondary">Apply</button>
+			</form>
+		}
+		<form method="get" action={ templ.SafeURL(props.BasePath) } class="mt-3 flex flex-wrap items-end gap-3">
+			@orderHiddenState(props, "min", "max")
+			<div>
+				<label for="orders-min" class="label-font block text-xs uppercase tracking-wide text-rr-muted">Min total</label>
+				<input id="orders-min" type="text" inputmode="decimal" name="min" value={ props.Min } placeholder="$0" class="mt-1 w-24 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+			</div>
+			<div>
+				<label for="orders-max" class="label-font block text-xs uppercase tracking-wide text-rr-muted">Max total</label>
+				<input id="orders-max" type="text" inputmode="decimal" name="max" value={ props.Max } placeholder="$∞" class="mt-1 w-24 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+			</div>
+			<button type="submit" class="btn-secondary">Apply</button>
+			if anyOrderFilterActive(props) {
+				<a href={ templ.SafeURL(props.BasePath) } class="pb-1 text-sm font-medium text-rr-red hover:text-rr-red-lt">Clear all</a>
+			}
+		</form>
 	</section>
 	<!-- Order table -->
 	<div class="mt-4">
@@ -286,7 +425,52 @@ templ OrderListContent(props OrderListProps) {
 				<!-- Empty: search returned no matches -->
 				<div class="border border-rr-border bg-rr-surface px-6 py-14 text-center">
 					<h2 class="admin-page-title text-2xl">No match.</h2>
-					<p class="mt-3 text-sm text-rr-body">Nothing for &ldquo;{ props.Search }&rdquo;. Try a different angle &mdash; name, email, or order number.</p>
+					<p class="mt-3 text-sm text-rr-body">{ orderNoMatchMessage(props) }</p>
+					<!-- Closest customers, ignoring the active filters — the operator
+					     has already found nothing where they were looking. Each links
+					     to that customer's orders. -->
+					if len(props.Suggestions) > 0 {
+						<div class="mx-auto mt-8 max-w-md border-t border-rr-border pt-6 text-left">
+							<p class="label-font text-xs uppercase tracking-wide text-rr-muted">Did you mean</p>
+							<ul class="mt-3 divide-y divide-rr-border border border-rr-border">
+								for _, c := range props.Suggestions {
+									<li>
+										<a
+											href={ templ.SafeURL(orderListURL(props, 1, "all", "", "", "", "", "", "", "", "", c.Email)) }
+											class="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-rr-raised"
+										>
+											<span>
+												<span class="font-medium text-rr-heading">{ c.FirstName } { c.LastName }</span>
+												if c.CompanyName != nil && *c.CompanyName != "" {
+													<span class="text-rr-muted">&nbsp;&middot; { *c.CompanyName }</span>
+												}
+												<span class="block text-xs text-rr-muted">{ c.Email }</span>
+											</span>
+											<span class="shrink-0 text-xs font-semibold text-rr-red">Orders &rarr;</span>
+										</a>
+									</li>
+								}
+							</ul>
+						</div>
+					}
+					if anyOrderFilterActive(props) {
+						<div class="mt-6">
+							<a href={ templ.SafeURL(props.BasePath) } class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised">
+								Clear search and filters
+							</a>
+						</div>
+					}
+				</div>
+			} else if orderFiltersBeyondSearchActive(props) {
+				<!-- Empty: no search term, but the filters excluded everything. -->
+				<div class="border border-rr-border bg-rr-surface px-6 py-14 text-center">
+					<h2 class="admin-page-title text-2xl">Nothing matches.</h2>
+					<p class="mt-3 text-sm text-rr-body">No orders match the current filters.</p>
+					<div class="mt-6">
+						<a href={ templ.SafeURL(props.BasePath) } class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised">
+							Clear all filters
+						</a>
+					</div>
 				</div>
 			} else if props.Counts.All > 0 {
 				<!-- Empty: this bucket is empty but other tabs have orders. -->
@@ -379,11 +563,17 @@ templ OrderListContent(props OrderListProps) {
 										@change="selected = $event.target.checked ? [...allIds] : []"
 									/>
 								</th>
-								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">Order</th>
+								<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading">
+									@orderSortHeader(props, "number", "Order")
+								</th>
 								<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">State</th>
 								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Shipping</th>
-								<th scope="col" class="px-3 py-3.5 pr-4 sm:pr-6 text-right text-sm font-semibold text-rr-heading">Total</th>
-								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Placed</th>
+								<th scope="col" class="px-3 py-3.5 pr-4 sm:pr-6 text-right text-sm font-semibold text-rr-heading">
+									@orderSortHeader(props, "total", "Total")
+								</th>
+								<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">
+									@orderSortHeader(props, "placed", "Placed")
+								</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-rr-border bg-rr-surface">
@@ -460,7 +650,7 @@ templ orderPagination(props OrderListProps) {
 		<div class="-mt-px flex w-0 flex-1">
 			if props.Page > 1 {
 				<a
-					href={ templ.SafeURL(orderPageHref(props.BasePath, props.Page-1, props.View, props.Search)) }
+					href={ templ.SafeURL(orderPageHref(props, props.Page-1)) }
 					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 				>
 					Previous
@@ -475,7 +665,7 @@ templ orderPagination(props OrderListProps) {
 		<div class="-mt-px flex w-0 flex-1 justify-end">
 			if props.HasMore {
 				<a
-					href={ templ.SafeURL(orderPageHref(props.BasePath, props.Page+1, props.View, props.Search)) }
+					href={ templ.SafeURL(orderPageHref(props, props.Page+1)) }
 					class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 				>
 					Next
@@ -496,14 +686,197 @@ templ OrderList(props OrderListProps) {
 	}
 }
 
-func orderPageHref(basePath string, page int, view, search string) string {
+// orderListURL builds a list URL carrying the entire filter state. Every
+// control on the page routes through here so none of them silently drops
+// another's state — the bug that makes filter UIs feel broken.
+func orderListURL(p OrderListProps, page int, view, sort, payment, fulfillment, rangeKey, from, to, min, max, search string) string {
 	v := url.Values{}
-	v.Set("page", fmt.Sprintf("%d", page))
+	if page > 1 {
+		v.Set("page", fmt.Sprintf("%d", page))
+	}
 	if view != "" && view != "needs_action" {
 		v.Set("view", view)
 	}
 	if search != "" {
 		v.Set("q", search)
 	}
-	return basePath + "?" + v.Encode()
+	if sort != "" && sort != "placed_desc" {
+		v.Set("sort", sort)
+	}
+	if payment != "" {
+		v.Set("payment", payment)
+	}
+	if fulfillment != "" {
+		v.Set("fulfillment", fulfillment)
+	}
+	if rangeKey != "" {
+		v.Set("range", rangeKey)
+		if rangeKey == "custom" {
+			if from != "" {
+				v.Set("from", from)
+			}
+			if to != "" {
+				v.Set("to", to)
+			}
+		}
+	}
+	if min != "" {
+		v.Set("min", min)
+	}
+	if max != "" {
+		v.Set("max", max)
+	}
+	if len(v) == 0 {
+		return p.BasePath
+	}
+	return p.BasePath + "?" + v.Encode()
+}
+
+// orderStateURL is the everything-preserved URL for the current props.
+func orderStateURL(p OrderListProps, page int) string {
+	return orderListURL(p, page, p.View, p.Sort, p.Payment, p.Fulfillment, p.Range, p.From, p.To, p.Min, p.Max, p.Search)
+}
+
+// orderPageHref builds a pagination href, carrying every active filter.
+func orderPageHref(p OrderListProps, page int) string {
+	return orderStateURL(p, page)
+}
+
+// orderFilterURL changes one filter dimension and resets to page 1 — paging is
+// only meaningful relative to a result set.
+func orderFilterURL(p OrderListProps, dimension, value string) string {
+	payment, fulfillment, rangeKey := p.Payment, p.Fulfillment, p.Range
+	from, to := p.From, p.To
+	switch dimension {
+	case "payment":
+		payment = value
+	case "fulfillment":
+		fulfillment = value
+	case "range":
+		rangeKey = value
+		if value != "custom" {
+			from, to = "", ""
+		}
+	}
+	return orderListURL(p, 1, p.View, p.Sort, payment, fulfillment, rangeKey, from, to, p.Min, p.Max, p.Search)
+}
+
+// orderSortURL builds the href for a sortable column header.
+func orderSortURL(p OrderListProps, col string) string {
+	return orderListURL(p, 1, p.View, orderSortToggle(col, p.Sort), p.Payment, p.Fulfillment, p.Range, p.From, p.To, p.Min, p.Max, p.Search)
+}
+
+// orderSortToggle returns the next sort value when a header is clicked.
+// Clicking the active column flips direction; an inactive column starts in the
+// more useful direction (biggest money first, newest date first, A–Z numbers).
+func orderSortToggle(col, current string) string {
+	switch col {
+	case "placed":
+		if current == "placed_desc" || current == "" {
+			return "placed_asc"
+		}
+		return "placed_desc"
+	case "total":
+		if current == "total_desc" {
+			return "total_asc"
+		}
+		return "total_desc"
+	case "number":
+		if current == "number_asc" {
+			return "number_desc"
+		}
+		return "number_asc"
+	}
+	return ""
+}
+
+// orderSortIndicator returns the arrow for a column, or "" if it isn't active.
+func orderSortIndicator(col, current string) string {
+	switch current {
+	case "placed_asc":
+		if col == "placed" {
+			return "↑"
+		}
+	case "", "placed_desc":
+		if col == "placed" {
+			return "↓"
+		}
+	case "total_asc":
+		if col == "total" {
+			return "↑"
+		}
+	case "total_desc":
+		if col == "total" {
+			return "↓"
+		}
+	case "number_asc":
+		if col == "number" {
+			return "↑"
+		}
+	case "number_desc":
+		if col == "number" {
+			return "↓"
+		}
+	}
+	return ""
+}
+
+// anyOrderFilterActive reports whether anything beyond the default view is
+// narrowing the list — drives the "Clear all" escape hatch.
+func anyOrderFilterActive(p OrderListProps) bool {
+	return p.Search != "" || p.Payment != "" || p.Fulfillment != "" ||
+		p.Range != "" || p.Min != "" || p.Max != "" || p.Sort != "" && p.Sort != "placed_desc"
+}
+
+// orderFiltersBeyondSearchActive reports whether a filter other than the search
+// term is narrowing the list, so the empty state can say which is to blame.
+func orderFiltersBeyondSearchActive(p OrderListProps) bool {
+	return p.Payment != "" || p.Fulfillment != "" || p.Range != "" || p.Min != "" || p.Max != ""
+}
+
+// orderNoMatchMessage is built in Go so punctuation lands tight against the
+// closing quote — templ inserts whitespace between adjacent expressions.
+func orderNoMatchMessage(p OrderListProps) string {
+	if orderFiltersBeyondSearchActive(p) {
+		return fmt.Sprintf("Nothing for %q with the current filters.", p.Search)
+	}
+	return fmt.Sprintf("Nothing for %q. Try a different angle — name, email, company, or order number.", p.Search)
+}
+
+type orderPill struct {
+	Value string
+	Label string
+}
+
+var orderPaymentPills = []orderPill{
+	{"", "Any"},
+	{"captured", "Captured"},
+	{"awaiting", "Awaiting"},
+	{"pending_invoice", "Invoiced"},
+	{"refunded", "Refunded"},
+	{"failed", "Failed"},
+}
+
+var orderFulfillmentPills = []orderPill{
+	{"", "Any"},
+	{"unfulfilled", "Unfulfilled"},
+	{"fulfilled", "Fulfilled"},
+	{"delivered", "Delivered"},
+}
+
+var orderRangePills = []orderPill{
+	{"", "All time"},
+	{"today", "Today"},
+	{"7d", "7 days"},
+	{"30d", "30 days"},
+	{"month", "This month"},
+	{"custom", "Custom"},
+}
+
+func orderPillClasses(active bool) string {
+	base := "inline-flex items-center rounded-sm border px-2.5 py-1 text-sm font-medium"
+	if active {
+		return base + " border-rr-heading bg-rr-heading text-rr-bg"
+	}
+	return base + " border-rr-border bg-rr-surface text-rr-body hover:bg-rr-raised"
 }

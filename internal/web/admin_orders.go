@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -49,29 +50,44 @@ func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel d
 		subtitle = "Wholesale account orders — invoiced, with PO numbers and negotiated shipping."
 	}
 
-	view := normalizeOrderView(r.URL.Query().Get("view"))
-	search := r.URL.Query().Get("q")
-	pageStr := r.URL.Query().Get("page")
+	q := r.URL.Query()
+	view := normalizeOrderView(q.Get("view"))
+	search := strings.TrimSpace(q.Get("q"))
 
 	page := 1
-	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+	if p, err := strconv.Atoi(q.Get("page")); err == nil && p > 0 {
 		page = p
 	}
 
+	sort := normalizeOrderSort(q.Get("sort"))
+	payment := normalizeOrderPayment(q.Get("payment"))
+	fulfillment := normalizeOrderFulfillment(q.Get("fulfillment"))
+	dateRange := normalizeOrderRange(q.Get("range"))
+	from, to := orderDateBounds(dateRange, q.Get("from"), q.Get("to"), d.MerchantTZ, time.Now())
+	minTotal, minRaw := parseDollarFilter(q.Get("min"))
+	maxTotal, maxRaw := parseDollarFilter(q.Get("max"))
+
 	perPage := 25
 	filter := store.OrderFilter{
-		Channel: &channel,
-		Search:  search,
-		Limit:   perPage + 1,
-		Offset:  (page - 1) * perPage,
+		Channel:    &channel,
+		Search:     search,
+		Sort:       sort,
+		PlacedFrom: from,
+		PlacedTo:   to,
+		TotalMin:   minTotal,
+		TotalMax:   maxTotal,
+		Limit:      perPage + 1,
+		Offset:     (page - 1) * perPage,
 	}
 	applyOrderViewFilter(view, &filter)
+	applyOrderStatusFilters(payment, fulfillment, &filter)
 
 	var orders []domain.Order
 	var rows []admin.OrderRow
 	var totalCount int
 	var counts store.OrderViewCounts
 	var failedLabelIDs map[uuid.UUID]bool
+	var suggestions []domain.Customer
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -123,6 +139,17 @@ func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel d
 				rows[i].LabelFailed = true
 			}
 		}
+
+		// Only reach for fuzzy matches when an actual search term found nothing.
+		// Suggestions are customers, not orders: the common miss is a
+		// half-remembered name, and every customer links back to their orders.
+		if len(rows) == 0 && search != "" {
+			suggested, sErr := d.CustomerService.SuggestCustomers(ctx, tx, search, 5)
+			if sErr != nil {
+				return sErr
+			}
+			suggestions = suggested
+		}
 		return nil
 	})
 	if err != nil {
@@ -149,15 +176,24 @@ func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel d
 			Archive:     counts.Archive,
 			All:         counts.All,
 		},
-		Search:     search,
-		TotalCount: totalCount,
-		Page:       page,
-		PerPage:    perPage,
-		HasMore:    hasMore,
-		MerchantTZ: d.MerchantTZ,
-		Now:        time.Now(),
-		StaffName:  name,
-		StaffRole:  role,
+		Search:      search,
+		Suggestions: suggestions,
+		Sort:        string(sort),
+		Payment:     payment,
+		Fulfillment: fulfillment,
+		Range:       dateRange,
+		From:        minRawDate(q.Get("from"), dateRange),
+		To:          minRawDate(q.Get("to"), dateRange),
+		Min:         minRaw,
+		Max:         maxRaw,
+		TotalCount:  totalCount,
+		Page:        page,
+		PerPage:     perPage,
+		HasMore:     hasMore,
+		MerchantTZ:  d.MerchantTZ,
+		Now:         time.Now(),
+		StaffName:   name,
+		StaffRole:   role,
 	}
 
 	if IsHTMX(r) {
@@ -165,6 +201,131 @@ func (d *Deps) renderOrderList(w http.ResponseWriter, r *http.Request, channel d
 		return
 	}
 	admin.OrderList(props).Render(ctx, w) //nolint:errcheck
+}
+
+// normalizeOrderSort clamps ?sort= to the closed sort enum. Anything else
+// falls back to newest-placed-first rather than erroring.
+func normalizeOrderSort(v string) store.OrderSort {
+	switch store.OrderSort(v) {
+	case store.OrderSortPlacedAsc,
+		store.OrderSortTotalAsc,
+		store.OrderSortTotalDesc,
+		store.OrderSortNumberAsc,
+		store.OrderSortNumberDesc:
+		return store.OrderSort(v)
+	default:
+		return store.OrderSortPlacedDesc
+	}
+}
+
+// normalizeOrderPayment clamps ?payment= to the payment status values.
+func normalizeOrderPayment(v string) string {
+	switch v {
+	case "awaiting", "captured", "refunded", "partially_refunded", "failed", "pending_invoice":
+		return v
+	default:
+		return ""
+	}
+}
+
+// normalizeOrderFulfillment clamps ?fulfillment= to the fulfillment status values.
+func normalizeOrderFulfillment(v string) string {
+	switch v {
+	case "unfulfilled", "partially_fulfilled", "fulfilled", "delivered":
+		return v
+	default:
+		return ""
+	}
+}
+
+// normalizeOrderRange clamps ?range= to a known date preset. "custom" means
+// the from/to fields drive the bounds instead.
+func normalizeOrderRange(v string) string {
+	switch v {
+	case "today", "7d", "30d", "month", "custom":
+		return v
+	default:
+		return ""
+	}
+}
+
+// applyOrderStatusFilters layers the payment and fulfillment pickers onto the
+// filter. They're independent of the view tabs, which constrain `status` — a
+// staffer can be in "Open" and still narrow to unfulfilled-and-captured.
+func applyOrderStatusFilters(payment, fulfillment string, f *store.OrderFilter) {
+	if payment != "" {
+		f.PaymentStatuses = []domain.PaymentStatus{domain.PaymentStatus(payment)}
+	}
+	if fulfillment != "" {
+		fs := domain.FulfillmentStatus(fulfillment)
+		f.FulfillmentStatus = &fs
+	}
+}
+
+// orderDateBounds resolves the date filter into a half-open [from, to] pair.
+//
+// Boundaries are computed in the merchant's timezone, not UTC: "today" has to
+// mean the shop's today, or a staffer in Denver looking at a Los Angeles shop
+// sees orders drop off the list hours early. `now` is a parameter so the
+// behaviour is testable without freezing the clock.
+func orderDateBounds(rangeKey, fromRaw, toRaw string, tz *time.Location, now time.Time) (*time.Time, *time.Time) {
+	if tz == nil {
+		tz = time.UTC
+	}
+	local := now.In(tz)
+	startOfToday := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, tz)
+
+	switch rangeKey {
+	case "today":
+		return ptrTo(startOfToday), nil
+	case "7d":
+		return ptrTo(startOfToday.AddDate(0, 0, -6)), nil
+	case "30d":
+		return ptrTo(startOfToday.AddDate(0, 0, -29)), nil
+	case "month":
+		return ptrTo(time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, tz)), nil
+	case "custom":
+		var from, to *time.Time
+		if t, err := time.ParseInLocation("2006-01-02", fromRaw, tz); err == nil {
+			from = ptrTo(t)
+		}
+		if t, err := time.ParseInLocation("2006-01-02", toRaw, tz); err == nil {
+			// The user means the whole of the end day, so bound at its last
+			// instant rather than midnight — otherwise "to: today" silently
+			// excludes everything placed today.
+			to = ptrTo(t.AddDate(0, 0, 1).Add(-time.Nanosecond))
+		}
+		return from, to
+	}
+	return nil, nil
+}
+
+// minRawDate echoes a custom date input back to the form, but only when the
+// custom range is active — otherwise a stale from/to would show under a preset.
+func minRawDate(raw, rangeKey string) string {
+	if rangeKey != "custom" {
+		return ""
+	}
+	if _, err := time.Parse("2006-01-02", raw); err != nil {
+		return ""
+	}
+	return raw
+}
+
+// parseDollarFilter reads a dollar amount into cents. It returns the parsed
+// value (nil when absent or unparseable) alongside the raw string, so the form
+// can echo back exactly what the user typed instead of silently blanking it.
+func parseDollarFilter(raw string) (*int, string) {
+	raw = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(raw), "$"))
+	if raw == "" {
+		return nil, ""
+	}
+	dollars, err := strconv.ParseFloat(raw, 64)
+	if err != nil || dollars < 0 {
+		return nil, raw
+	}
+	cents := int(math.Round(dollars * 100))
+	return &cents, raw
 }
 
 // normalizeOrderView returns the canonical view key for the orders list,

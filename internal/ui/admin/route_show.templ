@@ -148,6 +148,9 @@ templ RouteShowContent(props RouteShowProps) {
 			<div class="border border-rr-border bg-rr-surface px-4 py-3">
 				<h2 class="text-xs uppercase tracking-wide text-rr-muted label-font">Driver handoff</h2>
 				<div class="mt-2 flex flex-wrap items-start gap-4">
+					<!-- Pure white is intentional here and is NOT a paper-purity bug: the
+					     quiet zone around a QR code wants maximum contrast so a phone
+					     camera locks on. Every other admin surface uses bg-rr-surface. -->
 					<img
 						src={ fmt.Sprintf("/admin/routes/%s/qr.png", props.Route.ID) }
 						alt="QR code linking to the driver's stop list"

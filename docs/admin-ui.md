@@ -14,13 +14,20 @@ This doc is the **enforceable** companion to that brief: what classes to reach f
 
 | Token | Hex (admin scope) | Use for |
 | --- | --- | --- |
-| `bg-rr-bg` | `#FAFAF6` | Page background |
-| `bg-rr-surface` | `#FFFFFF` | Cards, panels, elevated surfaces |
-| `bg-rr-raised` | `#F0EEE8` | Hover rows, active nav bg, subtle emphasis |
+| `bg-rr-bg` | `#F6EFE1` | Page background — kraft paper |
+| `bg-rr-surface` | `#FFFBF1` | Cards, panels, elevated surfaces — cream-hi, never `#FFFFFF` |
+| `bg-rr-raised` | `#ECE0C6` | Hover rows, active nav bg, subtle emphasis |
 | `text-rr-heading` | `#0E0D0C` | Headings, primary text, active nav |
 | `text-rr-body` | `#1A1A1A` | Body copy |
 | `text-rr-muted` | `#6B6862` | Captions, labels, secondary info |
-| `border-rr-border` | `#E5E2DA` | All borders — always 1px |
+| `border-rr-border` | `#DCD1B8` | All borders — always 1px |
+
+Surfaces are warm, and each step has to be visible against the **next one out**.
+The content area never paints `bg-rr-bg` — the layout sets kraft paper inline on
+`<html>`, so paper is what "raised" elements actually sit on. Raised and border
+were previously cool greys (`#F0EEE8` / `#E5E2DA`) chosen against a `#FAFAF6`
+page that never renders; on paper that was a ~2% step and it disappeared. If you
+add a new surface token, check it against `#F6EFE1`, not against white.
 
 ### Accents (use sparingly)
 

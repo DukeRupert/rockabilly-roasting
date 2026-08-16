@@ -193,10 +193,16 @@ templ Admin(props AdminProps) {
 				   rewrites. Rust/amber are kept as accent vars but reserved for
 				   primary CTAs and row affordances — never chrome. */
 				:root {
-					--color-rr-bg: #FAFAF6 !important;       /* warm off-white */
-					--color-rr-surface: #FFFFFF !important;  /* clean elevated */
-					--color-rr-raised: #F0EEE8 !important;   /* soft warm hover */
-					--color-rr-border: #E5E2DA !important;   /* hairline rule */
+					/* Surfaces are warm, and each step must be visible against the
+					   NEXT one out. The page is kraft paper (#F6EFE1, set inline on
+					   <html> above) — nothing in the content area paints bg-rr-bg, so
+					   paper is what every "raised" element actually sits on. The old
+					   cool-grey raised (#F0EEE8) was picked against a #FAFAF6 page
+					   that never renders; on paper it was a ~2% step and vanished. */
+					--color-rr-bg: #F6EFE1 !important;       /* kraft paper — matches <html> */
+					--color-rr-surface: #FFFBF1 !important;  /* cream-hi — elevated, still paper */
+					--color-rr-raised: #ECE0C6 !important;   /* paper-warm recess */
+					--color-rr-border: #DCD1B8 !important;   /* hairline rule */
 					--color-rr-muted: #6B6862 !important;    /* muted text */
 					--color-rr-body: #1A1A1A !important;     /* soft ink body */
 					--color-rr-heading: #0E0D0C !important;  /* ink */

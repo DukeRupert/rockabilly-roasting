@@ -164,17 +164,19 @@ For orders with shipping method "Local Delivery":
 
 ## Load List — Loading the Delivery Van
 
-The **Load list** tab answers one question before the van pulls out: *do we have enough of each coffee on board to fill every delivery order?*
+The **Load list** page answers one question before the van pulls out: *do we have enough of each coffee on board to fill every delivery order?*
 
-Without it, that check meant opening each delivery order and adding bags up by hand. The tab does the arithmetic for the whole run.
+Without it, that check meant opening each delivery order and adding bags up by hand. The page does the arithmetic for the whole run.
 
 ### What it shows
 
 **On board** — one row per coffee, with the bag count and the total pounds, heaviest first, and a grand total at the bottom. That total is the number to check the van against.
 
-**Orders on this run** — the delivery orders those totals cover. Everything waiting in the local-delivery queue starts checked.
+**Orders on this run** — the delivery orders those totals cover. Everything waiting in the local-delivery queue starts checked, with a **Retail** or **Wholesale** badge on each stop so you can see the mix you're loading.
 
-The tab is scoped to the queue you're in: `/admin/fulfillment` covers retail delivery orders, `/admin/wholesale/fulfillment` covers wholesale. Orders that are cancelled, refunded, or not yet paid never appear.
+**Both channels by default.** The load list lives at `/admin/fulfillment/load-list` and covers retail *and* wholesale deliveries together, because one van makes one run. The **All · Retail · Wholesale** switch at the top narrows it for the days when only one channel is going out — wholesale today, retail tomorrow. Narrowing carries through to the print sheet and to **Plan route**, so the van, the paper, and the driver's stop list can't disagree.
+
+Orders that are cancelled, refunded, or not yet paid never appear.
 
 ### Using it
 
@@ -199,17 +201,19 @@ The load list doesn't change any order's state. Once the van is loaded and rolli
 
 ## Route Planning — What Order to Drive In
 
-The load list says *what goes in the van*. **Plan route**, on the same tab, says *what order to drive it in*, and hands the result to the driver's phone.
+The load list says *what goes in the van*. **Plan route**, on the same page, says *what order to drive it in*, and hands the result to the driver's phone.
 
 This replaces exporting addresses into a third-party routing app by hand. The stop order is worked out on our own server; the driver's phone still does turn-by-turn in Google or Apple Maps.
 
 ### Planning
 
-1. On the **Load list** tab, check the orders going out — the same checkboxes that drive the pound totals.
+1. On the **Load list** page, check the orders going out — the same checkboxes that drive the pound totals.
 2. Click **Plan route**. It takes a few seconds: each address is placed on the map, then the driving order is worked out.
 3. You land on the route's review page.
 
-The route covers **both retail and wholesale** deliveries, even though the load list is split into separate tabs. One van makes one run, so a cafe and a house on the same street should be next to each other rather than on two routes that cross.
+The route covers exactly what the load list is showing. Left on **All**, that means **both retail and wholesale** together — one van makes one run, so a cafe and a house on the same street end up next to each other rather than on two routes that cross. Narrow the scope first if only one channel is going out.
+
+If you uncheck every order and click **Plan route**, nothing is planned and you land back on the load list.
 
 ### Reviewing
 
@@ -267,5 +271,5 @@ Once every stop is delivered or skipped, the route completes on its own and the 
 | Hand off a local delivery | Out for Local Delivery | Out for delivery; customer emailed |
 | Undo a transition | Revert Fulfillment / Revert Shipment | Steps the order back one stage |
 | Print packing slip | Packing Slip button | Opens printable page in new tab |
-| Check the delivery load | Fulfillment → **Load list** tab | Pounds of each coffee needed for the run; uncheck orders that aren't going today |
+| Check the delivery load | Fulfillment → **Load list** | Pounds of each coffee needed for the run; uncheck orders that aren't going today |
 | Carry the load list | **Print load sheet** | Printable totals + stop list, with tick boxes |

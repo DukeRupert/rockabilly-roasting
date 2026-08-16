@@ -146,6 +146,10 @@ type orderViewTab struct {
 	Key   string
 	Label string
 	Count int
+	// Href overrides the derived "base path + ?view=" link. Set only by tabs
+	// that point at a page of their own rather than another view of the same
+	// list — the fulfillment queue's Load list is the one case.
+	Href string
 }
 
 func (p OrderListProps) tabs() []orderViewTab {

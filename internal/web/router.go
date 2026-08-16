@@ -514,6 +514,7 @@ func NewRouter(deps *Deps) http.Handler {
 	// Admin fulfillment & shipping
 	adminMux.HandleFunc("GET /admin/fulfillment", deps.handleAdminFulfillmentList)
 	adminMux.HandleFunc("GET /admin/wholesale/fulfillment", deps.handleAdminWholesaleFulfillmentList)
+	adminMux.HandleFunc("GET /admin/fulfillment/load-list", deps.handleAdminLoadList)
 	adminMux.HandleFunc("GET /admin/fulfillment/load-list/totals", deps.handleAdminFulfillmentLoadListTotals)
 	adminMux.HandleFunc("GET /admin/fulfillment/load-list/print", deps.handleAdminFulfillmentLoadListPrint)
 

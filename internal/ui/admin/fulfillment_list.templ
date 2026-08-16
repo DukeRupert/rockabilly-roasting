@@ -20,7 +20,10 @@ type FulfillmentViewCounts struct {
 	Shipped     int
 	Delivered   int
 	All         int
-	LoadList    int
+	// LoadList is the combined both-channels delivery count — the Load list tab
+	// leads to a page that spans channels, so a channel-scoped count there
+	// would undercount what the link opens.
+	LoadList int
 }
 
 // FulfillmentGroup is a per-shipping-method bucket on the action views.
@@ -43,9 +46,6 @@ type FulfillmentListProps struct {
 	Counts     FulfillmentViewCounts
 	Groups     []FulfillmentGroup // populated on action views (needs_action, ready_to_ship)
 	Rows       []OrderRow         // populated on post-action views (shipped, delivered, all)
-	// LoadList is populated only on the load_list view — the delivery
-	// load-out rollup. Nil elsewhere.
-	LoadList *LoadListProps
 	TotalCount int
 	Page       int
 	PerPage    int
@@ -206,8 +206,10 @@ func (p FulfillmentListProps) tabs() []orderViewTab {
 		{Key: "delivered", Label: "Delivered", Count: p.Counts.Delivered},
 		{Key: "all", Label: "All", Count: p.Counts.All},
 		// Load list sits last: it's the pre-departure check, run once the
-		// working queues above have been packed.
-		{Key: "load_list", Label: "Load list", Count: p.Counts.LoadList},
+		// working queues above have been packed. It links out to a page of its
+		// own because it deliberately spans both channels — see LoadListPage —
+		// so its count is the combined one, not this queue's.
+		{Key: "load_list", Label: "Load list", Count: p.Counts.LoadList, Href: "/admin/fulfillment/load-list"},
 	}
 }
 
@@ -228,6 +230,15 @@ func (p FulfillmentListProps) showingEnd() int {
 
 // fulfillmentViewHref builds a URL for switching tabs. "needs_action" is the
 // canonical default and renders as a bare base path.
+// fulfillmentTabHref resolves one tab's link, honouring an explicit Href for
+// tabs that lead to their own page instead of another view of this queue.
+func fulfillmentTabHref(basePath string, tab orderViewTab) string {
+	if tab.Href != "" {
+		return tab.Href
+	}
+	return fulfillmentViewHref(basePath, tab.Key)
+}
+
 func fulfillmentViewHref(basePath, view string) string {
 	if view == "" || view == "needs_action" {
 		return basePath
@@ -287,7 +298,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 	<section class="mt-5" aria-label="Filter fulfillment queue">
 		<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Fulfillment views">
 			for _, tab := range props.tabs() {
-				<a href={ templ.SafeURL(fulfillmentViewHref(props.BasePath, tab.Key)) } class={ orderTabClass(props.View == tab.Key) }>
+				<a href={ templ.SafeURL(fulfillmentTabHref(props.BasePath, tab)) } class={ orderTabClass(props.View == tab.Key) }>
 					<span>{ tab.Label }</span>
 					<span class={ orderTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
 				</a>
@@ -295,9 +306,7 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 		</nav>
 	</section>
 	<div class="mt-4">
-		if props.View == "load_list" && props.LoadList != nil {
-			@LoadListContent(*props.LoadList)
-		} else if isFulfillmentActionView(props.View) {
+		if isFulfillmentActionView(props.View) {
 			@fulfillmentActionView(props)
 		} else {
 			@fulfillmentFlatView(props)

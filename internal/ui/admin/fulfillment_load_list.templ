@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
 // LoadListProps drives the delivery load list — the pre-departure check that
@@ -13,18 +14,48 @@ import (
 // per-product rollup; Orders is the roster those totals were computed from,
 // with Selected marking which ones are counted.
 type LoadListProps struct {
-	// BasePath is the owning fulfillment queue ("/admin/fulfillment" or
-	// "/admin/wholesale/fulfillment") so the tab strip and the totals/print
-	// endpoints stay on the right channel.
-	BasePath string
-	// Channel is the query-param form of the channel ("retail" / "wholesale"),
-	// forwarded to the totals fragment and print sheet so they scope the same
-	// way the page did.
+	// Channel is the query-param form of the scope: "retail", "wholesale", or
+	// "" for both. Empty is the default — one van makes one run, so the load
+	// list folds the channels together unless staff narrow it. Forwarded to the
+	// totals fragment and print sheet so they scope the way the page did.
 	Channel    string
 	Lines      []domain.DeliveryLoadLine
 	Orders     []LoadListOrder
 	MerchantTZ *time.Location
 	Now        time.Time
+	StaffName  string
+	StaffRole  string
+}
+
+// combined reports whether the list is showing both channels at once, which is
+// the only case where per-row channel badges earn their space — in a narrowed
+// scope every row would carry the same label.
+func (p LoadListProps) combined() bool {
+	return p.Channel == ""
+}
+
+// loadListScopeHref builds a scope link. The empty channel is the canonical
+// "both" URL and carries no param at all, so the default view has a clean
+// address staff can bookmark.
+func loadListScopeHref(channel string) string {
+	if channel == "" {
+		return "/admin/fulfillment/load-list"
+	}
+	v := url.Values{}
+	v.Set("channel", channel)
+	return "/admin/fulfillment/load-list?" + v.Encode()
+}
+
+// loadListChannelCount reports how many roster rows belong to one channel, for
+// the "11 retail · 7 wholesale" split under the heading.
+func loadListChannelCount(orders []LoadListOrder, channel domain.OrderChannel) int {
+	n := 0
+	for _, o := range orders {
+		if o.Order.Channel == channel {
+			n++
+		}
+	}
+	return n
 }
 
 // LoadListOrder is one row of the roster under the totals: an order in the
@@ -91,6 +122,9 @@ func formatLoadPounds(grams int) string {
 // when staff check or uncheck a row. The channel rides along so the fragment
 // scopes to the same queue.
 func loadListTotalsHref(channel string) string {
+	if channel == "" {
+		return "/admin/fulfillment/load-list/totals"
+	}
 	v := url.Values{}
 	v.Set("channel", channel)
 	return "/admin/fulfillment/load-list/totals?" + v.Encode()
@@ -108,6 +142,59 @@ func loadListPrintAction() string {
 // van and the stop list can never disagree about which orders are going out.
 func loadListPlanRouteAction() string {
 	return "/admin/fulfillment/route/plan"
+}
+
+// LoadListPage is the standalone load list. It lives outside the retail and
+// wholesale fulfillment queues on purpose: those are split because staff pack
+// the two channels separately, but the van doesn't care — a cafe and a house on
+// the same street are adjacent stops on one run. So this page defaults to both
+// channels and offers the scope control for the days when only one is going out.
+templ LoadListPage(props LoadListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Load list",
+		ActivePath: "/admin/fulfillment",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@LoadListPageContent(props)
+	}
+}
+
+// LoadListPageContent is the htmx-swappable body.
+templ LoadListPageContent(props LoadListProps) {
+	@loadListScopeControl(props.Channel)
+	<div>
+		<h1 class="admin-page-title">Load list</h1>
+		<p class="mt-1 text-sm text-rr-muted tabular-nums">
+			<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%d", len(props.Orders)) }</span>
+			{ " " }
+			if len(props.Orders) == 1 {
+				stop waiting
+			} else {
+				stops waiting
+			}
+			if props.combined() && len(props.Orders) > 0 {
+				<span class="mx-1 text-rr-border" aria-hidden="true">·</span>
+				<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%d", loadListChannelCount(props.Orders, domain.OrderChannelRetail)) }</span> retail
+				<span class="mx-1 text-rr-border" aria-hidden="true">·</span>
+				<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%d", loadListChannelCount(props.Orders, domain.OrderChannelWholesale)) }</span> wholesale
+			}
+		</p>
+	</div>
+	<div class="mt-5">
+		@LoadListContent(props)
+	</div>
+}
+
+// loadListScopeControl is the three-up segmented control. It reuses the channel
+// toggle's segment styling so a scope switch reads the same here as it does on
+// the orders and fulfillment queues — ink-stamped active segment, no rust.
+templ loadListScopeControl(active string) {
+	<div class="mb-6 inline-flex items-center gap-1 rounded-sm bg-rr-raised p-1 ring-1 ring-rr-border" role="tablist" aria-label="Delivery channels">
+		<a href={ templ.SafeURL(loadListScopeHref("")) } role="tab" aria-selected={ boolAttr(active == "") } class={ channelSegClass(active == "") }>All</a>
+		<a href={ templ.SafeURL(loadListScopeHref("retail")) } role="tab" aria-selected={ boolAttr(active == "retail") } class={ channelSegClass(active == "retail") }>Retail</a>
+		<a href={ templ.SafeURL(loadListScopeHref("wholesale")) } role="tab" aria-selected={ boolAttr(active == "wholesale") } class={ channelSegClass(active == "wholesale") }>Wholesale</a>
+	</div>
 }
 
 // LoadListContent is the "Load list" tab body: totals on top for the go/no-go
@@ -309,6 +396,17 @@ templ loadListRoster(props LoadListProps) {
 	</section>
 }
 
+// loadListChannelBadge marks which queue a stop came out of. Teal for
+// wholesale (matching the wholesale marker elsewhere in admin), slate for
+// retail — both neutral, since neither channel is a status worth alarming over.
+templ loadListChannelBadge(channel domain.OrderChannel) {
+	if channel == domain.OrderChannelWholesale {
+		<span class="badge badge-teal" title="Wholesale delivery">Wholesale</span>
+	} else {
+		<span class="badge badge-slate" title="Retail delivery">Retail</span>
+	}
+}
+
 templ loadListRosterRow(row LoadListOrder, props LoadListProps) {
 	{{ stale := orderIsStale(row.Order, props.Now) }}
 	<tr class={ "row-link", templ.KV("row-link-stale", stale) }>
@@ -327,7 +425,14 @@ templ loadListRosterRow(row LoadListOrder, props LoadListProps) {
 			<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) } class="row-link-target block">
 				<div class="flex items-baseline gap-2 leading-none">
 					<span class="font-bold text-rr-heading tabular-nums tracking-wide uppercase" style="font-size:0.95rem;">{ row.Order.Number }</span>
-					if row.AccountType == domain.AccountTypeWholesale {
+					<!-- On a combined run the channel is load-out information —
+					     a driver stacking the van needs to know which drops are
+					     cafes. Badge every row so the two read as a real pair;
+					     in a narrowed scope it's noise, so fall back to the
+					     wholesale-only marker the queues use. -->
+					if props.combined() {
+						@loadListChannelBadge(row.Order.Channel)
+					} else if row.AccountType == domain.AccountTypeWholesale {
 						<span class="label-font text-[#0A5E5C]" title="Wholesale customer">Wholesale</span>
 					}
 				</div>
@@ -353,9 +458,22 @@ templ loadListRosterRow(row LoadListOrder, props LoadListProps) {
 type LoadListPrintProps struct {
 	Lines      []domain.DeliveryLoadLine
 	Orders     []LoadListOrder
-	ChannelLbl string // "Retail" / "Wholesale", shown in the masthead
+	ChannelLbl string // "Retail" / "Wholesale" / "All channels", in the masthead
+	// Combined mirrors LoadListProps.combined(): on a both-channels sheet the
+	// stops table gains a channel column so the driver can read the mix off
+	// paper the same way they read it on screen.
+	Combined   bool
 	Printed    time.Time
 	MerchantTZ *time.Location
+}
+
+// loadListPrintChannel is the paper form of the channel marker — a word, since
+// a printed sheet has no colour to lean on.
+func loadListPrintChannel(channel domain.OrderChannel) string {
+	if channel == domain.OrderChannelWholesale {
+		return "Wholesale"
+	}
+	return "Retail"
 }
 
 // loadListPrintDate renders the sheet's timestamp in the merchant's timezone —
@@ -517,6 +635,9 @@ templ LoadListPrint(props LoadListPrintProps) {
 									<th style="width: 24px;"></th>
 									<th>Order</th>
 									<th>Customer</th>
+									if props.Combined {
+										<th>Channel</th>
+									}
 								</tr>
 							</thead>
 							<tbody>
@@ -525,6 +646,9 @@ templ LoadListPrint(props LoadListPrintProps) {
 										<td><span class="tick"></span></td>
 										<td>{ o.Order.Number }</td>
 										<td>{ o.CustomerName }</td>
+										if props.Combined {
+											<td>{ loadListPrintChannel(o.Order.Channel) }</td>
+										}
 									</tr>
 								}
 							</tbody>

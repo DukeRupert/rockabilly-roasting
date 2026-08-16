@@ -57,7 +57,16 @@ func (d *Deps) handleAdminRoutePlan(w http.ResponseWriter, r *http.Request) {
 		Error(w, r, err)
 		return
 	}
-	selected, _ := parseLoadListSelection(r.Form)
+	selected, explicit := parseLoadListSelection(r.Form)
+
+	// An empty OrderIDs filter means "unconstrained" at the store layer, so a
+	// submitted-but-empty selection would plan the entire delivery queue —
+	// the opposite of what unchecking every row asks for. Bounce back to the
+	// load list instead of planning a route nobody selected.
+	if explicit && len(selected) == 0 {
+		http.Redirect(w, r, "/admin/fulfillment/load-list", http.StatusSeeOther)
+		return
+	}
 
 	saved, plan, err := d.RouteService.PlanAndSaveRoute(
 		r.Context(), d.Pool, d.planRouteDate(r),

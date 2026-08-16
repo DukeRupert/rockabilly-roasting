@@ -110,11 +110,11 @@ func (d *Deps) renderFulfillmentList(w http.ResponseWriter, r *http.Request, cha
 
 	view := normalizeFulfillmentView(r.URL.Query().Get("view"))
 
-	// The load list is a different shape of page — a rollup over the delivery
-	// queue rather than a page of order rows — so it gets its own render path
-	// instead of threading an unused filter/pagination pass.
+	// The load list moved to a page of its own once it started spanning both
+	// channels. Redirect rather than 404 — staff have this URL bookmarked from
+	// when it was a tab, and both channels' versions now mean the same page.
 	if view == "load_list" {
-		d.renderFulfillmentLoadList(w, r, channel, basePath, title)
+		http.Redirect(w, r, "/admin/fulfillment/load-list", http.StatusSeeOther)
 		return
 	}
 
@@ -159,6 +159,14 @@ func (d *Deps) renderFulfillmentList(w http.ResponseWriter, r *http.Request, cha
 		if txErr != nil {
 			return txErr
 		}
+		// The Load list tab leads to a both-channels page, so its chip has to
+		// count both — a channel-scoped number would understate what the link
+		// opens. Every other tab stays scoped to this queue.
+		allChannels, txErr := d.OrderService.CountFulfillmentViews(ctx, tx, nil)
+		if txErr != nil {
+			return txErr
+		}
+		counts.LoadList = allChannels.LoadList
 
 		rows = make([]admin.OrderRow, 0, len(orders))
 		orderIDs := make([]uuid.UUID, 0, len(orders))

@@ -23,20 +23,42 @@ import (
 // any real day's route.
 const loadListRosterCap = 500
 
-// loadListChannel resolves the ?channel= param used by the totals fragment and
-// the print sheet. Anything other than "wholesale" is retail — the storefront
-// queue is the common case and an unrecognized value should land somewhere
-// sane rather than 400.
-func loadListChannel(r *http.Request) domain.OrderChannel {
-	if r.URL.Query().Get("channel") == string(domain.OrderChannelWholesale) {
-		return domain.OrderChannelWholesale
+// loadListScope resolves the ?channel= param into a channel filter. nil means
+// both channels, and it is the default: the retail and wholesale queues are
+// separate because staff pack them separately, but one van makes one run, so
+// the load list and the route planned off it fold the channels together unless
+// staff deliberately narrow the scope.
+//
+// An unrecognized value falls back to nil rather than 400 — a mangled URL
+// should show more of the run than expected, never less.
+func loadListScope(r *http.Request) *domain.OrderChannel {
+	switch r.URL.Query().Get("channel") {
+	case string(domain.OrderChannelWholesale):
+		c := domain.OrderChannelWholesale
+		return &c
+	case string(domain.OrderChannelRetail):
+		c := domain.OrderChannelRetail
+		return &c
 	}
-	return domain.OrderChannelRetail
+	return nil
+}
+
+// loadListScopeParam is the query-param form of a scope, "" for both. Threaded
+// into the templates so the totals fragment and print sheet re-scope the way
+// the page did.
+func loadListScopeParam(c *domain.OrderChannel) string {
+	if c == nil {
+		return ""
+	}
+	return string(*c)
 }
 
 // loadListChannelLabel is the human name shown on the printed masthead.
-func loadListChannelLabel(c domain.OrderChannel) string {
-	if c == domain.OrderChannelWholesale {
+func loadListChannelLabel(c *domain.OrderChannel) string {
+	if c == nil {
+		return "All channels"
+	}
+	if *c == domain.OrderChannelWholesale {
 		return "Wholesale"
 	}
 	return "Retail"
@@ -77,14 +99,14 @@ func parseLoadListSelection(q url.Values) (ids []uuid.UUID, explicit bool) {
 func (d *Deps) loadDeliveryLoadList(
 	ctx context.Context,
 	tx pgx.Tx,
-	channel domain.OrderChannel,
+	channel *domain.OrderChannel,
 	selected []uuid.UUID,
 	explicit bool,
 ) ([]admin.LoadListOrder, []domain.DeliveryLoadLine, error) {
 	localDelivery := domain.ShippingMethodLocalDelivery
 
 	rosterFilter := store.OrderFilter{
-		Channel:                  &channel,
+		Channel:                  channel,
 		ShippingMethod:           &localDelivery,
 		FulfillmentStatuses:      fulfillmentNeedsActionStatuses,
 		ExcludeUnconfirmed:       true,
@@ -134,15 +156,21 @@ func (d *Deps) loadDeliveryLoadList(
 
 	// Flag wholesale accounts past terms — same hold signal the main queue
 	// shows, so a driver doesn't load coffee for an account on stop-ship.
-	if channel == domain.OrderChannelWholesale {
-		customerIDs := make([]uuid.UUID, 0, len(roster))
-		seen := make(map[uuid.UUID]bool, len(roster))
-		for i := range roster {
-			if cid := roster[i].Order.CustomerID; cid != nil && !seen[*cid] {
-				seen[*cid] = true
-				customerIDs = append(customerIDs, *cid)
-			}
+	// Keyed off each order's own channel rather than the page scope: a combined
+	// run carries wholesale stops even though it isn't a wholesale-scoped list,
+	// and those are exactly the ones that can be on stop-ship.
+	customerIDs := make([]uuid.UUID, 0, len(roster))
+	seen := make(map[uuid.UUID]bool, len(roster))
+	for i := range roster {
+		if roster[i].Order.Channel != domain.OrderChannelWholesale {
+			continue
 		}
+		if cid := roster[i].Order.CustomerID; cid != nil && !seen[*cid] {
+			seen[*cid] = true
+			customerIDs = append(customerIDs, *cid)
+		}
+	}
+	if len(customerIDs) > 0 {
 		pastDue, pdErr := d.OrderService.PastDueCustomerFlags(ctx, tx, customerIDs)
 		if pdErr != nil {
 			return nil, nil, pdErr
@@ -167,28 +195,24 @@ func (d *Deps) loadDeliveryLoadList(
 	return roster, lines, nil
 }
 
-// renderFulfillmentLoadList renders the "Load list" tab of a fulfillment
-// queue — per-product pound totals across the delivery orders waiting to go
-// out, over a roster staff can adjust for outliers.
-func (d *Deps) renderFulfillmentLoadList(
-	w http.ResponseWriter,
-	r *http.Request,
-	channel domain.OrderChannel,
-	basePath, title string,
-) {
+// handleAdminLoadList renders the delivery load list: per-product pound totals
+// across the delivery orders waiting to go out, over a roster staff can adjust
+// for outliers. GET /admin/fulfillment/load-list.
+//
+// It is its own page rather than a tab on either fulfillment queue because it
+// defaults to both channels — the queues are split by how staff pack, the load
+// list is organised around what goes on the van. ?channel=retail|wholesale
+// narrows it for the days when only one channel is going out.
+func (d *Deps) handleAdminLoadList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	channel := loadListScope(r)
 	selected, explicit := parseLoadListSelection(r.URL.Query())
 
 	var roster []admin.LoadListOrder
 	var lines []domain.DeliveryLoadLine
-	var counts store.FulfillmentViewCounts
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		counts, txErr = d.OrderService.CountFulfillmentViews(ctx, tx, &channel)
-		if txErr != nil {
-			return txErr
-		}
 		roster, lines, txErr = d.loadDeliveryLoadList(ctx, tx, channel, selected, explicit)
 		return txErr
 	})
@@ -198,37 +222,21 @@ func (d *Deps) renderFulfillmentLoadList(
 	}
 
 	name, role := staffNameRole(r)
-	props := admin.FulfillmentListProps{
-		BasePath: basePath,
-		Title:    title,
-		View:     "load_list",
-		Counts: admin.FulfillmentViewCounts{
-			NeedsAction: counts.NeedsAction,
-			ReadyToShip: counts.ReadyToShip,
-			Shipped:     counts.Shipped,
-			Delivered:   counts.Delivered,
-			All:         counts.All,
-			LoadList:    counts.LoadList,
-		},
+	props := admin.LoadListProps{
+		Channel:    loadListScopeParam(channel),
+		Lines:      lines,
+		Orders:     roster,
 		MerchantTZ: d.MerchantTZ,
 		Now:        time.Now(),
 		StaffName:  name,
 		StaffRole:  role,
-		LoadList: &admin.LoadListProps{
-			BasePath:   basePath,
-			Channel:    string(channel),
-			Lines:      lines,
-			Orders:     roster,
-			MerchantTZ: d.MerchantTZ,
-			Now:        time.Now(),
-		},
 	}
 
 	if IsHTMX(r) {
-		admin.FulfillmentListContent(props).Render(ctx, w) //nolint:errcheck
+		admin.LoadListPageContent(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
-	admin.FulfillmentList(props).Render(ctx, w) //nolint:errcheck
+	admin.LoadListPage(props).Render(ctx, w) //nolint:errcheck
 }
 
 // handleAdminFulfillmentLoadListTotals re-renders just the totals panel after
@@ -237,7 +245,7 @@ func (d *Deps) renderFulfillmentLoadList(
 // a driver is going to trust.
 func (d *Deps) handleAdminFulfillmentLoadListTotals(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	channel := loadListChannel(r)
+	channel := loadListScope(r)
 	selected, explicit := parseLoadListSelection(r.URL.Query())
 
 	var roster []admin.LoadListOrder
@@ -253,7 +261,7 @@ func (d *Deps) handleAdminFulfillmentLoadListTotals(w http.ResponseWriter, r *ht
 	}
 
 	admin.LoadListTotals(admin.LoadListProps{ //nolint:errcheck
-		Channel:    string(channel),
+		Channel:    loadListScopeParam(channel),
 		Lines:      lines,
 		Orders:     roster,
 		MerchantTZ: d.MerchantTZ,
@@ -267,7 +275,7 @@ func (d *Deps) handleAdminFulfillmentLoadListTotals(w http.ResponseWriter, r *ht
 // window.print() on load, same as the packing slip and invoice sheets.
 func (d *Deps) handleAdminFulfillmentLoadListPrint(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	channel := loadListChannel(r)
+	channel := loadListScope(r)
 	selected, explicit := parseLoadListSelection(r.URL.Query())
 
 	var roster []admin.LoadListOrder
@@ -295,6 +303,7 @@ func (d *Deps) handleAdminFulfillmentLoadListPrint(w http.ResponseWriter, r *htt
 		Lines:      lines,
 		Orders:     counted,
 		ChannelLbl: loadListChannelLabel(channel),
+		Combined:   channel == nil,
 		Printed:    time.Now(),
 		MerchantTZ: d.MerchantTZ,
 	}).Render(ctx, w)

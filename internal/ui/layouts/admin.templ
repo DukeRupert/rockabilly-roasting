@@ -124,9 +124,15 @@ func navIconColor(active bool) string {
 // swapped its own tiny fragment over the entire main-content div, blanking the
 // page (and destroying the boost target) after the first tick.
 // Exported because web serves it as a standalone fragment at /admin/nav-badges.
+//
+// data-sidebar-badge is the hook the collapsed rail uses to drop ml-auto. An
+// auto margin absorbs all free space and outranks justify-content, so without
+// that override this wrapper — which renders even at count 0 — shoves the
+// Catalog icon to the left edge while every other icon stays centred.
 templ CatalogNavBadge(count int) {
 	<span
 		id="nav-badge-white-label"
+		data-sidebar-badge
 		hx-get="/admin/nav-badges"
 		hx-trigger="every 60s"
 		hx-target="this"
@@ -259,6 +265,22 @@ templ Admin(props AdminProps) {
 					#desktop-sidebar.is-collapsed [data-dropdown-trigger] {
 						justify-content: center;
 						gap: 0;
+					}
+					/* The Catalog row carries a badge wrapper pinned right with
+					   ml-auto. An auto margin absorbs all free space and outranks
+					   justify-content, so the rule above can't centre that row until
+					   the margin is gone. The wrapper renders at any count (htmx needs
+					   a swap target), so this is not conditional on a pending review.
+
+					   display:none rather than margin-left:0 alone: when a review IS
+					   pending the inner pill is a data-sidebar-label, and that only
+					   collapses max-width — its horizontal padding survives and still
+					   contributes ~20px, pushing the icon back off-centre. Taking the
+					   wrapper out of layout entirely is the only width-proof answer.
+					   Polling is unaffected; hx-trigger timers run on hidden elements,
+					   so the count is current the moment the rail is expanded. */
+					#desktop-sidebar.is-collapsed [data-sidebar-badge] {
+						display: none;
 					}
 
 					/* The chevron points "<" to collapse; flip it to ">" once collapsed

@@ -45,6 +45,34 @@ type SubscriptionsProps struct {
 	PriorActive   int
 }
 
+// ActiveCustomersProps backs the active-customers card: how many distinct
+// customers actually placed an order over each of the three activity windows,
+// scoped to a sales channel. All three windows render at once — "are we losing
+// people" is a comparison across horizons, not a single number — and each
+// carries the equivalent prior window so it reads as a trend, not a level.
+// Channel is "all", "retail", or "wholesale" and drives the toggle's state.
+type ActiveCustomersProps struct {
+	Channel      string
+	Week         int
+	WeekPrior    int
+	Month        int
+	MonthPrior   int
+	Quarter      int
+	QuarterPrior int
+}
+
+// channelLabel renders the selected scope in the card's title.
+func (p ActiveCustomersProps) channelLabel() string {
+	switch p.Channel {
+	case "retail":
+		return "retail"
+	case "wholesale":
+		return "wholesale"
+	default:
+		return "all customers"
+	}
+}
+
 type DashboardProps struct {
 	// Today stats
 	TodayOrderCount int
@@ -80,10 +108,11 @@ type DashboardProps struct {
 	WholesaleRows  []PipelineRow
 
 	// Charts
-	Revenue       RevenueProps
-	Subscriptions SubscriptionsProps    // active-subscriptions trend, 7/30/90-day window
-	TopProducts   []charts.LabeledValue // top 5 by selected metric, last 30 days
-	TopBy         string                // "units" (default) or "weight"
+	ActiveCustomers ActiveCustomersProps // distinct customers ordering, by window and channel
+	Revenue         RevenueProps
+	Subscriptions   SubscriptionsProps    // active-subscriptions trend, 7/30/90-day window
+	TopProducts     []charts.LabeledValue // top 5 by selected metric, last 30 days
+	TopBy           string                // "units" (default) or "weight"
 
 	// Merchant local timezone for date display.
 	MerchantTZ *time.Location
@@ -301,6 +330,9 @@ templ DashboardContent(props DashboardProps) {
 		<div class="mt-4">
 			@RevenueCard(props.Revenue)
 		</div>
+		<div class="mt-6">
+			@ActiveCustomersCard(props.ActiveCustomers)
+		</div>
 		<div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
 			@TopSellersCard(props.TopProducts, props.TopBy)
 			@SubscriptionsCard(props.Subscriptions)
@@ -457,6 +489,82 @@ templ revenueMix(cr ChannelRevenue) {
 			<span class="mx-1">·</span>
 			<span class="font-semibold text-rr-heading">{ fmt.Sprintf("%.0f%%", oneTimePct) }</span> one-time
 		</p>
+	}
+}
+
+// ActiveCustomersCard answers "how many customers are actually buying" —
+// distinct customers with at least one real order in the window. All three
+// horizons render side by side because the interesting signal is the shape
+// across them: a healthy base has week ⊂ month ⊂ quarter with the gaps holding
+// steady; week shrinking against a flat quarter means people are drifting.
+// The channel toggle rescopes all three at once. htmx swaps the whole card, so
+// #active-customers-card is the stable target.
+templ ActiveCustomersCard(props ActiveCustomersProps) {
+	<div id="active-customers-card" class="border border-rr-border bg-rr-surface px-6 py-5">
+		<div class="flex items-baseline justify-between gap-3">
+			<p class="label-font text-rr-muted">{ fmt.Sprintf("Active customers · %s", props.channelLabel()) }</p>
+			<div class="flex items-center gap-1 text-xs shrink-0">
+				@activeCustomersChannelToggle("all", "All", props.Channel)
+				@activeCustomersChannelToggle("retail", "Retail", props.Channel)
+				@activeCustomersChannelToggle("wholesale", "Wholesale", props.Channel)
+			</div>
+		</div>
+		<div class="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+			@activeCustomersWindow("Last week", props.Week, props.WeekPrior, "7d")
+			@activeCustomersWindow("Last month", props.Month, props.MonthPrior, "30d")
+			@activeCustomersWindow("Last quarter", props.Quarter, props.QuarterPrior, "90d")
+		</div>
+		<p class="mt-4 text-xs text-rr-muted">Distinct customers who placed an order. Cancelled, refunded and unpaid orders don't count.</p>
+	</div>
+}
+
+// activeCustomersWindow renders one horizon's count with its change against the
+// preceding window of the same length — last week vs the week before it, and so
+// on. Growth here is people returning, so up is good and reads teal.
+templ activeCustomersWindow(label string, count, prior int, priorLabel string) {
+	<div class="min-w-0">
+		<p class="label-font text-rr-muted">{ label }</p>
+		<div class="mt-1 flex items-baseline gap-3 flex-wrap">
+			<p class="text-xl font-bold tabular-nums text-rr-heading">{ fmt.Sprintf("%d", count) }</p>
+			@activeCustomersDelta(count, prior, priorLabel)
+		</div>
+		<p class="mt-1 text-xs text-rr-muted">{ fmt.Sprintf("customer%s ordering", pluralS(count)) }</p>
+	</div>
+}
+
+// activeCustomersDelta compares a window against the one before it. Hidden when
+// the prior window is empty — a store with no history has no percentage to show
+// (and dividing by zero would render an infinity).
+templ activeCustomersDelta(count, prior int, priorLabel string) {
+	if prior > 0 {
+		{{
+			deltaPct := float64(count-prior) / float64(prior) * 100
+		}}
+		<span class="text-xs">
+			if deltaPct >= 0.1 {
+				<span class="text-rr-teal font-bold">{ fmt.Sprintf("↑ %.1f%%", deltaPct) }</span>
+			} else if deltaPct <= -0.1 {
+				<span class="text-rr-red font-bold">{ fmt.Sprintf("↓ %.1f%%", -deltaPct) }</span>
+			} else {
+				<span class="text-rr-muted font-bold">flat</span>
+			}
+			<span class="text-rr-muted ml-1">{ fmt.Sprintf("vs prior %s", priorLabel) }</span>
+		</span>
+	}
+}
+
+templ activeCustomersChannelToggle(value, label, current string) {
+	if value == current {
+		<span class="px-2 py-1 text-xs font-semibold uppercase tracking-wide bg-rr-heading text-rr-bg rounded-sm">{ label }</span>
+	} else {
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/admin/dashboard/active-customers?channel=%s", value)) }
+			hx-get={ fmt.Sprintf("/admin/dashboard/active-customers?channel=%s", value) }
+			hx-target="#active-customers-card"
+			hx-swap="outerHTML"
+			class="px-2 py-1 border border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading font-semibold uppercase tracking-wide"
+			style="font-size:0.65rem;"
+		>{ label }</a>
 	}
 }
 

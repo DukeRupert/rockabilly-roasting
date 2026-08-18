@@ -160,6 +160,14 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// Active customers — how many distinct customers are actually ordering
+		// over the last week / month / quarter, scoped by ?channel=.
+		acChannel, acCh := activeCustomersChannel(r)
+		props.ActiveCustomers, txErr = d.buildActiveCustomersProps(ctx, tx, acChannel, acCh, todayStart)
+		if txErr != nil {
+			return txErr
+		}
+
 		// Active-subscriptions trend — same 7/30/90 window as revenue, plus a
 		// net-change / total mode from ?mode=
 		props.Subscriptions, txErr = d.buildSubscriptionsProps(ctx, tx, revenueDays(r), subscriptionsMode(r), todayStart)
@@ -360,6 +368,84 @@ func (d *Deps) handleAdminRevenue(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.RevenueCard(rp).Render(ctx, w) //nolint:errcheck
+}
+
+// activeCustomersChannel normalizes the ?channel= query param to a sales
+// channel, returning nil for "all" (both channels). Anything unrecognized falls
+// back to "all" so a hand-edited URL can't produce an empty card.
+func activeCustomersChannel(r *http.Request) (string, *domain.OrderChannel) {
+	switch r.URL.Query().Get("channel") {
+	case "retail":
+		ch := domain.OrderChannelRetail
+		return "retail", &ch
+	case "wholesale":
+		ch := domain.OrderChannelWholesale
+		return "wholesale", &ch
+	default:
+		return "all", nil
+	}
+}
+
+// buildActiveCustomersProps assembles the active-customers card: distinct
+// customers who placed an order in the last week, month, and quarter, each
+// against the equivalent preceding window.
+//
+// Windows are trailing day counts anchored on the merchant's local midnight —
+// "last week" is the 7 calendar days ending today, matching how the revenue
+// card reads its 7/30/90 selector — not calendar weeks/months, which would make
+// the number collapse and rebuild every time the calendar rolls over.
+//
+// Channel comes from orders.channel, not the customer's account_type: the
+// channel is frozen at placement, so a wholesale conversion can't retroactively
+// rewrite who counted as a retail buyer last quarter.
+func (d *Deps) buildActiveCustomersProps(ctx context.Context, tx pgx.Tx, channel string, ch *domain.OrderChannel, todayStart time.Time) (admin.ActiveCustomersProps, error) {
+	end := todayStart.AddDate(0, 0, 1) // exclusive — through end of today
+	windows := store.ActiveCustomerWindows{
+		End:               end,
+		WeekStart:         end.AddDate(0, 0, -7),
+		WeekPriorStart:    end.AddDate(0, 0, -14),
+		MonthStart:        end.AddDate(0, 0, -30),
+		MonthPriorStart:   end.AddDate(0, 0, -60),
+		QuarterStart:      end.AddDate(0, 0, -90),
+		QuarterPriorStart: end.AddDate(0, 0, -180),
+	}
+
+	counts, err := d.OrderService.CountActiveCustomers(ctx, tx, windows, ch)
+	if err != nil {
+		return admin.ActiveCustomersProps{}, err
+	}
+
+	return admin.ActiveCustomersProps{
+		Channel:      channel,
+		Week:         counts.Week,
+		WeekPrior:    counts.WeekPrior,
+		Month:        counts.Month,
+		MonthPrior:   counts.MonthPrior,
+		Quarter:      counts.Quarter,
+		QuarterPrior: counts.QuarterPrior,
+	}, nil
+}
+
+// handleAdminActiveCustomers renders just the active-customers card for an htmx
+// swap when the user switches the all/retail/wholesale scope.
+func (d *Deps) handleAdminActiveCustomers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	channel, ch := activeCustomersChannel(r)
+
+	now := time.Now().In(d.MerchantTZ)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, d.MerchantTZ)
+
+	var props admin.ActiveCustomersProps
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		props, txErr = d.buildActiveCustomersProps(ctx, tx, channel, ch, todayStart)
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	admin.ActiveCustomersCard(props).Render(ctx, w) //nolint:errcheck
 }
 
 // buildSubscriptionsProps assembles the active-subscriptions trend card: the

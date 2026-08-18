@@ -209,6 +209,17 @@ func (s *OrderService) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to tim
 	return rows, nil
 }
 
+// CountActiveCustomers returns the number of distinct customers who placed an
+// order in each of the three activity windows, plus the equivalent prior
+// windows. A non-nil channel scopes the counts to retail or wholesale.
+func (s *OrderService) CountActiveCustomers(ctx context.Context, tx pgx.Tx, w store.ActiveCustomerWindows, channel *domain.OrderChannel) (store.ActiveCustomerCounts, error) {
+	c, err := s.orders.CountActiveCustomers(ctx, tx, w, channel)
+	if err != nil {
+		return store.ActiveCustomerCounts{}, fmt.Errorf("count active customers: %w", err)
+	}
+	return c, nil
+}
+
 // TopProducts returns the top-N products in [from, to), ranked by the chosen
 // metric. Cancelled and refunded orders are excluded.
 func (s *OrderService) TopProducts(ctx context.Context, tx pgx.Tx, from, to time.Time, sort store.TopProductsSort, limit int) ([]domain.ProductSales, error) {

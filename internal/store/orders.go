@@ -857,6 +857,79 @@ func (s *OrderStore) RevenueByDay(ctx context.Context, tx pgx.Tx, from, to time.
 	return out, rows.Err()
 }
 
+// ActiveCustomerWindows carries the boundaries the active-customer counts are
+// measured over. Each window is [Start, End) with a same-length prior window
+// [PriorStart, Start) driving the period-over-period delta. The caller owns the
+// definition of "a week" so the store stays free of calendar policy — the
+// dashboard builds these off the merchant's local midnight.
+type ActiveCustomerWindows struct {
+	End               time.Time // exclusive upper bound, shared by all three windows
+	WeekStart         time.Time
+	WeekPriorStart    time.Time
+	MonthStart        time.Time
+	MonthPriorStart   time.Time
+	QuarterStart      time.Time
+	QuarterPriorStart time.Time
+}
+
+// ActiveCustomerCounts holds the number of distinct customers who placed an
+// order in each window, plus the same count over the equivalent prior window.
+type ActiveCustomerCounts struct {
+	Week         int
+	WeekPrior    int
+	Month        int
+	MonthPrior   int
+	Quarter      int
+	QuarterPrior int
+}
+
+// CountActiveCustomers counts distinct customers with at least one order in
+// each of the three activity windows, in a single pass over the widest range.
+// A non-nil channel scopes every count to that sales channel.
+//
+// Cancelled/refunded and unconfirmed (status=pending AND payment_status=awaiting)
+// orders are excluded, mirroring RevenueByDay — a customer whose only order was
+// an abandoned payment intent is not active. Orders with no customer_id (guest
+// checkouts, customers since deleted) can't be counted as a distinct customer
+// and are excluded by COUNT(DISTINCT) anyway; the explicit NULL filter keeps
+// that intent visible.
+func (s *OrderStore) CountActiveCustomers(ctx context.Context, tx pgx.Tx, w ActiveCustomerWindows, channel *domain.OrderChannel) (_ ActiveCustomerCounts, err error) {
+	defer trackQuery(s.metrics, "orders.count_active_customers", time.Now(), &err)
+	query := `
+		SELECT
+			COUNT(DISTINCT customer_id) FILTER (WHERE placed_at >= $2)                        AS week,
+			COUNT(DISTINCT customer_id) FILTER (WHERE placed_at >= $3 AND placed_at < $2)     AS week_prior,
+			COUNT(DISTINCT customer_id) FILTER (WHERE placed_at >= $4)                        AS month,
+			COUNT(DISTINCT customer_id) FILTER (WHERE placed_at >= $5 AND placed_at < $4)     AS month_prior,
+			COUNT(DISTINCT customer_id) FILTER (WHERE placed_at >= $6)                        AS quarter,
+			COUNT(DISTINCT customer_id) FILTER (WHERE placed_at >= $7 AND placed_at < $6)     AS quarter_prior
+		FROM orders
+		WHERE placed_at < $1
+		  AND placed_at >= $7
+		  AND customer_id IS NOT NULL
+		  AND status NOT IN ('cancelled', 'refunded')
+		  AND NOT (status = 'pending' AND payment_status = 'awaiting')`
+	args := []any{
+		w.End, w.WeekStart, w.WeekPriorStart,
+		w.MonthStart, w.MonthPriorStart,
+		w.QuarterStart, w.QuarterPriorStart,
+	}
+	if channel != nil {
+		query += " AND channel = $8"
+		args = append(args, string(*channel))
+	}
+
+	var c ActiveCustomerCounts
+	if err := tx.QueryRow(ctx, query, args...).Scan(
+		&c.Week, &c.WeekPrior,
+		&c.Month, &c.MonthPrior,
+		&c.Quarter, &c.QuarterPrior,
+	); err != nil {
+		return ActiveCustomerCounts{}, fmt.Errorf("count active customers: %w", err)
+	}
+	return c, nil
+}
+
 // TopProductsSort selects the metric used to rank products in TopProducts.
 type TopProductsSort string
 

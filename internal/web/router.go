@@ -384,6 +384,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("GET /admin/dashboard/top-sellers", deps.handleAdminTopSellers)
 	adminMux.HandleFunc("GET /admin/dashboard/revenue", deps.handleAdminRevenue)
 	adminMux.HandleFunc("GET /admin/dashboard/subscriptions", deps.handleAdminSubscriptionsTrend)
+	adminMux.HandleFunc("GET /admin/dashboard/active-customers", deps.handleAdminActiveCustomers)
 
 	// Admin catalog — categories
 	adminMux.HandleFunc("GET /admin/categories", deps.handleAdminCategoryList)

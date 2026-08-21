@@ -460,6 +460,8 @@ func NewRouter(deps *Deps) http.Handler {
 
 	// Admin customers
 	adminMux.HandleFunc("GET /admin/customers", deps.handleAdminCustomerList)
+	// The wholesale channel of the same list — same handler, different scope.
+	adminMux.HandleFunc("GET /admin/customers/wholesale", deps.handleAdminCustomerList)
 	adminMux.HandleFunc("GET /admin/customers/{id}", deps.handleAdminCustomerShow)
 	adminMux.HandleFunc("POST /admin/customers/{id}/groups/add", deps.handleAdminCustomerGroupAdd)
 	adminMux.HandleFunc("POST /admin/customers/{id}/groups/{groupID}/remove", deps.handleAdminCustomerGroupRemove)
@@ -561,7 +563,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.Handle("POST /admin/staff/{id}/resend-invite", deps.requirePermission(auth.PermManageStaff, http.HandlerFunc(deps.handleAdminStaffResendInvite)))
 
 	// Admin wholesale
-	adminMux.HandleFunc("GET /admin/wholesale", deps.handleAdminWholesaleList)
+	adminMux.HandleFunc("GET /admin/wholesale", deps.handleAdminWholesaleRedirect)
 	adminMux.HandleFunc("GET /admin/wholesale/reminders", deps.handleAdminWholesaleReminders)
 	// Sending mail to the whole active wholesale list is a customer-write action,
 	// not a view — gate it behind the same permission as editing an account.

@@ -1,0 +1,148 @@
+package admin
+
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+// Wholesale-only pieces of the customer list. They live beside it rather than
+// on a page of their own: the wholesale channel is the same list of customers
+// with the account-book columns and the review actions turned on.
+
+// priceListLabel resolves a customer's assigned price list to a display name,
+// falling back to "Base prices" when none is set (or a dash if the referenced
+// list is no longer in the supplied set).
+func priceListLabel(id *uuid.UUID, lists []domain.PriceList) string {
+	if id == nil {
+		return "Base prices"
+	}
+	for _, pl := range lists {
+		if pl.ID == *id {
+			return pl.Name
+		}
+	}
+	return "—"
+}
+
+// wholesalePriceListCell renders the per-applicant pricing control. Pending
+// applications get an inline auto-submitting selector so staff can assign a price
+// list before approving; other statuses show the assigned list read-only (it
+// stays editable on the customer profile). The hidden status field lets the
+// handler redirect back to the current filter view.
+templ wholesalePriceListCell(c domain.Customer, priceLists []domain.PriceList, statusFilter string) {
+	if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
+		<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/price-list", c.ID)) }>
+			<input type="hidden" name="status" value={ statusFilter }/>
+			<label class="sr-only" for={ fmt.Sprintf("pl-%s", c.ID) }>Price list</label>
+			<div class="grid grid-cols-1">
+				<select
+					id={ fmt.Sprintf("pl-%s", c.ID) }
+					name="price_list_id"
+					onchange="this.form.submit()"
+					class="col-start-1 row-start-1 w-full min-w-36 appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+				>
+					<option value="" selected?={ c.PriceListID == nil }>Base prices</option>
+					for _, pl := range priceLists {
+						<option value={ pl.ID.String() } selected?={ c.PriceListID != nil && *c.PriceListID == pl.ID }>
+							{ pl.Name }
+							if pl.Status != domain.PriceListStatusActive {
+								({ string(pl.Status) })
+							}
+						</option>
+					}
+				</select>
+				<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+					<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+				</svg>
+			</div>
+		</form>
+	} else {
+		<span class="text-rr-muted">{ priceListLabel(c.PriceListID, priceLists) }</span>
+	}
+}
+
+// wholesaleRowActions renders the per-row action controls. xl+ shows the
+// full inline button stack (Approve/Decline, Suspend, Reactivate, View);
+// below xl falls back to a kebab menu so the actions stay reachable on
+// narrow viewports where the table would otherwise clip them.
+templ wholesaleRowActions(c domain.Customer) {
+	<!-- Inline buttons: xl+ (~1280px). Hidden below to avoid horizontal overflow. -->
+	<div class="hidden xl:flex items-center justify-end gap-3">
+		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
+			<div class="inline-flex gap-2">
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)) }>
+					<button type="submit" class="btn-confirm">Approve</button>
+				</form>
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
+					<button type="submit" class="btn-danger" onclick="return confirm('Decline this application?')">Decline</button>
+				</form>
+			</div>
+		}
+		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
+				<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
+			</form>
+		}
+		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
+				<button type="submit" class="btn-confirm" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
+			</form>
+		}
+		<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
+			View
+		</a>
+	</div>
+	<!-- Kebab dropdown: visible below xl. Same actions, packed into a popover. -->
+	<div class="xl:hidden flex justify-end" x-data="{ open: false, mx: 0, my: 0, place() { const r = $refs.kebab.getBoundingClientRect(); this.mx = r.right; this.my = r.bottom + 4 } }">
+		<button
+			x-ref="kebab"
+			type="button"
+			x-on:click="open = !open; open && place()"
+			x-bind:aria-expanded="open"
+			aria-haspopup="true"
+			aria-label="Actions"
+			class="inline-flex items-center justify-center rounded-sm border border-rr-border bg-rr-surface p-1.5 text-rr-heading hover:bg-rr-raised"
+		>
+			<svg class="size-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+				<path d="M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z"></path>
+			</svg>
+		</button>
+		<div
+			x-show="open"
+			x-cloak
+			x-transition.opacity
+			x-on:click.outside="open = false"
+			x-on:keydown.escape.window="open = false"
+			x-on:scroll.window.capture="open = false"
+			x-on:resize.window="open = false"
+			x-bind:style="`top:${my}px; left:${mx}px; transform:translateX(-100%)`"
+			class="fixed z-40 w-48 rounded-sm border border-rr-border bg-rr-surface py-1 text-left shadow-lg"
+			role="menu"
+		>
+			if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", c.ID)) }>
+					<button type="submit" role="menuitem" class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised">Approve</button>
+				</form>
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
+					<button type="submit" role="menuitem" onclick="return confirm('Decline this application?')" class="block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised">Decline</button>
+				</form>
+			}
+			if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
+					<button type="submit" role="menuitem" onclick="return confirm('Suspend this wholesale account?')" class="block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised">Suspend</button>
+				</form>
+			}
+			if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
+					<button type="submit" role="menuitem" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')" class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised">Reactivate</button>
+				</form>
+			}
+			<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } role="menuitem" class="block px-3 py-2 text-sm text-rr-heading hover:bg-rr-raised">
+				View customer
+			</a>
+		</div>
+	</div>
+}

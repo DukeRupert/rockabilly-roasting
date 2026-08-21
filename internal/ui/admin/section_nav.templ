@@ -1,5 +1,7 @@
 package admin
 
+import "fmt"
+
 // Section-level navigation that lives at the top of a content area, one step
 // below the sidebar. The sidebar was flattened to seven primary destinations;
 // the pages that used to be their own sidebar rows (categories, attributes,
@@ -9,7 +11,8 @@ package admin
 //   adminSectionTabs  — underline tab bar for sibling *pages* in a section
 //                       (Catalog: Products | Categories | Attributes | Pricing).
 //   adminChannelToggle — segmented control for the *same* list scoped by sales
-//                       channel (Orders: Retail | Wholesale).
+//                       channel (Orders, Fulfillment, Customers: Retail |
+//                       Wholesale).
 //
 // Both render plain links (hx-boost on <body> upgrades them) so the active row
 // is driven by the page's own URL, not client state — a hard refresh lands in
@@ -38,7 +41,6 @@ func customersTabs() []sectionTab {
 	return []sectionTab{
 		{Label: "Customers", Href: "/admin/customers"},
 		{Label: "Groups", Href: "/admin/groups"},
-		{Label: "Wholesale", Href: "/admin/wholesale"},
 		{Label: "Reminders", Href: "/admin/wholesale/reminders"},
 	}
 }
@@ -90,6 +92,22 @@ templ adminChannelToggle(retailHref, wholesaleHref, activeHref string) {
 	<div class="mb-6 inline-flex items-center gap-1 rounded-sm bg-rr-raised p-1 ring-1 ring-rr-border" role="tablist" aria-label="Sales channel">
 		<a href={ templ.SafeURL(retailHref) } role="tab" aria-selected={ boolAttr(retailHref == activeHref) } class={ channelSegClass(retailHref == activeHref) }>Retail</a>
 		<a href={ templ.SafeURL(wholesaleHref) } role="tab" aria-selected={ boolAttr(wholesaleHref == activeHref) } class={ channelSegClass(wholesaleHref == activeHref) }>Wholesale</a>
+	</div>
+}
+
+// adminChannelToggleCount is the two-up control with a count on the wholesale
+// segment — used by the customers list, where pending applications are work
+// waiting even when the staffer is looking at the retail side. Zero renders no
+// badge: a "0" reads as a number to check rather than nothing to do.
+templ adminChannelToggleCount(retailHref, wholesaleHref, activeHref string, wholesaleCount int) {
+	<div class="mb-6 inline-flex items-center gap-1 rounded-sm bg-rr-raised p-1 ring-1 ring-rr-border" role="tablist" aria-label="Sales channel">
+		<a href={ templ.SafeURL(retailHref) } role="tab" aria-selected={ boolAttr(retailHref == activeHref) } class={ channelSegClass(retailHref == activeHref) }>Retail</a>
+		<a href={ templ.SafeURL(wholesaleHref) } role="tab" aria-selected={ boolAttr(wholesaleHref == activeHref) } class={ channelSegClass(wholesaleHref == activeHref) }>
+			Wholesale
+			if wholesaleCount > 0 {
+				<span class="badge badge-amber ml-2">{ fmt.Sprintf("%d", wholesaleCount) }</span>
+			}
+		</a>
 	</div>
 }
 

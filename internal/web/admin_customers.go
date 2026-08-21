@@ -16,8 +16,16 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
 
+// handleAdminCustomerList serves both channels of the customer list. Retail and
+// wholesale are the same query with a different account type, a different column
+// set, and — on the wholesale side — the application review actions on the row.
+// They used to be two pages (/admin/customers and /admin/wholesale) listing the
+// same rows, which left staff guessing which one carried the button they wanted.
 func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+
+	channel := customerChannel(r)
+	wholesale := channel == "wholesale"
 
 	q := r.URL.Query()
 	search := strings.TrimSpace(q.Get("q"))
@@ -27,8 +35,12 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 		page = p
 	}
 
-	typeFilter := normalizeCustomerType(q.Get("type"))
-	statusFilter := normalizeCustomerStatus(q.Get("status"))
+	// The application status only exists on wholesale rows; carrying it into the
+	// retail channel would filter every row out.
+	statusFilter := ""
+	if wholesale {
+		statusFilter = normalizeCustomerStatus(q.Get("status"))
+	}
 	verifiedFilter := normalizeCustomerVerified(q.Get("verified"))
 	sort := normalizeCustomerSort(q.Get("sort"))
 
@@ -39,10 +51,11 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 		Limit:  perPage + 1,
 		Offset: (page - 1) * perPage,
 	}
-	applyCustomerFilters(typeFilter, statusFilter, verifiedFilter, &filter)
+	applyCustomerFilters(channel, statusFilter, verifiedFilter, &filter)
 
 	var customers []domain.Customer
 	var suggestions []domain.Customer
+	var priceLists []domain.PriceList
 	var totalCount int
 	counts := map[string]int{}
 
@@ -57,16 +70,26 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
-		// Pill counts vary only the account-type dimension, so each number is
-		// exactly what clicking that pill would show. Wholesale status is left
-		// out because it's a sub-filter of the wholesale pill — clicking a type
-		// pill clears it, so counting with it applied would understate every
-		// pill (and force them all to the wholesale number).
-		for _, t := range customerTypeValues {
-			f := filter
-			f.Limit, f.Offset = 0, 0
-			applyCustomerFilters(t, "", verifiedFilter, &f)
-			counts[t], txErr = d.CustomerService.CountCustomers(ctx, tx, f)
+		// Per-status counts drive the wholesale status pills and — as "pending" —
+		// the badge on the channel toggle, which is why they are loaded on the
+		// retail channel too: waiting applications are work either way. They
+		// ignore the search term and the status pill, so each number is what
+		// clicking that pill would show.
+		base := store.CustomerFilter{AccountType: ptrTo(domain.AccountTypeWholesale)}
+		if verifiedFilter != "" {
+			applyCustomerFilters("wholesale", "", verifiedFilter, &base)
+		}
+		for _, st := range wholesaleStatusValues {
+			f := base
+			f.WholesaleStatus = ptrTo(domain.WholesaleStatus(st))
+			counts[st], txErr = d.CustomerService.CountCustomers(ctx, tx, f)
+			if txErr != nil {
+				return txErr
+			}
+		}
+
+		if wholesale {
+			priceLists, txErr = d.PriceListService.List(ctx, tx)
 			if txErr != nil {
 				return txErr
 			}
@@ -74,6 +97,8 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 
 		// Only reach for fuzzy matches when an actual search term found nothing
 		// — otherwise the operator is just paging an empty filter combination.
+		// Suggestions span both channels, so a search on the wrong side still
+		// finds the account.
 		if len(customers) == 0 && search != "" {
 			suggestions, txErr = d.CustomerService.SuggestCustomers(ctx, tx, search, 5)
 			if txErr != nil {
@@ -96,11 +121,12 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 	props := admin.CustomerListProps{
 		Customers:      customers,
 		Suggestions:    suggestions,
+		Channel:        channel,
 		Search:         search,
-		TypeFilter:     typeFilter,
 		StatusFilter:   statusFilter,
 		VerifiedFilter: verifiedFilter,
 		Sort:           string(sort),
+		PriceLists:     priceLists,
 		Counts:         counts,
 		TotalCount:     totalCount,
 		Page:           page,
@@ -118,21 +144,23 @@ func (d *Deps) handleAdminCustomerList(w http.ResponseWriter, r *http.Request) {
 	admin.CustomerList(props).Render(ctx, w) //nolint:errcheck
 }
 
-// customerTypeValues are the account-type pills on the admin customer list, in
-// display order. "" is the "All" pill.
-var customerTypeValues = []string{"", "retail", "wholesale"}
-
-// normalizeCustomerType clamps the ?type= param to the account types we know.
-// Unrecognised values fall back to "all" rather than erroring — a stale or
-// hand-edited URL should show the operator a list, not a 400.
-func normalizeCustomerType(v string) string {
-	switch v {
-	case "retail", "wholesale":
-		return v
-	default:
-		return ""
-	}
+// handleAdminWholesaleRedirect keeps the old /admin/wholesale bookmark working:
+// it is now the wholesale channel of the customer list.
+func (d *Deps) handleAdminWholesaleRedirect(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, wholesaleListURL(r.URL.Query().Get("status")), http.StatusMovedPermanently)
 }
+
+// customerChannel reads the channel from the route: /admin/customers/wholesale
+// is the wholesale side, everything else is retail.
+func customerChannel(r *http.Request) string {
+	if strings.HasPrefix(r.URL.Path, admin.CustomersWholesalePath) {
+		return "wholesale"
+	}
+	return ""
+}
+
+// wholesaleStatusValues are the application statuses, in pill display order.
+var wholesaleStatusValues = []string{"pending", "approved", "suspended", "declined"}
 
 // normalizeCustomerStatus clamps ?status= to the wholesale status values.
 func normalizeCustomerStatus(v string) string {
@@ -169,18 +197,18 @@ func normalizeCustomerSort(v string) store.CustomerSort {
 }
 
 // applyCustomerFilters translates the normalized query params onto a store
-// filter. A wholesale status implies the wholesale account type — the column is
-// NULL for retail rows, so pairing the two would always return nothing.
-func applyCustomerFilters(typeFilter, statusFilter, verifiedFilter string, f *store.CustomerFilter) {
+// filter. The channel picks the account type; a wholesale status implies it too,
+// since the column is NULL on retail rows and pairing the two returns nothing.
+func applyCustomerFilters(channel, statusFilter, verifiedFilter string, f *store.CustomerFilter) {
 	f.AccountType = nil
 	f.WholesaleStatus = nil
 	f.EmailVerified = nil
 
-	switch typeFilter {
-	case "retail":
-		f.AccountType = ptrTo(domain.AccountTypeRetail)
+	switch channel {
 	case "wholesale":
 		f.AccountType = ptrTo(domain.AccountTypeWholesale)
+	default:
+		f.AccountType = ptrTo(domain.AccountTypeRetail)
 	}
 
 	if statusFilter != "" {

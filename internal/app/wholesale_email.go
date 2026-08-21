@@ -35,7 +35,7 @@ func (s *WholesaleService) SendApplicationNotice(ctx context.Context, pool *pgxp
 		companyName = *customer.CompanyName
 	}
 
-	reviewURL := fmt.Sprintf("%s/admin/wholesale", s.email.BaseURL)
+	reviewURL := fmt.Sprintf("%s/admin/customers/wholesale?status=pending", s.email.BaseURL)
 	html, text, err := s.email.Renderer.Render("wholesale_application", emailtemplates.WholesaleApplicationData{
 		CompanyName:   companyName,
 		CustomerEmail: customer.Email,

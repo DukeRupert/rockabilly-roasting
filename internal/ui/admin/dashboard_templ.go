@@ -365,7 +365,7 @@ func DashboardContent(props DashboardProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				if props.PendingWholesale > 0 {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<a href=\"/admin/wholesale\" class=\"flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors\"><div class=\"flex items-center gap-3 min-w-0\"><span class=\"inline-block size-2 rounded-full bg-rr-amber shrink-0\"></span><div class=\"min-w-0\"><p class=\"text-sm font-medium text-rr-heading\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<a href=\"/admin/customers/wholesale?status=pending\" class=\"flex items-center justify-between gap-4 px-4 py-3 hover:bg-rr-raised transition-colors\"><div class=\"flex items-center gap-3 min-w-0\"><span class=\"inline-block size-2 rounded-full bg-rr-amber shrink-0\"></span><div class=\"min-w-0\"><p class=\"text-sm font-medium text-rr-heading\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

@@ -9,23 +9,52 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
+// Customer channel paths. Retail and wholesale are the same list scoped by
+// sales channel — the same relationship Orders and Fulfillment already model
+// with a segmented toggle, so this list uses the same control instead of a
+// separate "Wholesale" page with its own columns and its own actions.
+const (
+	CustomersRetailPath    = "/admin/customers"
+	CustomersWholesalePath = "/admin/customers/wholesale"
+)
+
 type CustomerListProps struct {
 	Customers []domain.Customer
-	// Suggestions holds fuzzy matches shown when a search returns nothing.
-	Suggestions    []domain.Customer
+	// Suggestions holds fuzzy matches shown when a search returns nothing. They
+	// ignore every filter *including the channel*, so searching the retail side
+	// for a cafe still finds it.
+	Suggestions []domain.Customer
+	// Channel is "" for retail or "wholesale". It selects the columns, the row
+	// actions, and which filters apply.
+	Channel        string
 	Search         string
-	TypeFilter     string // "", "retail", "wholesale"
-	StatusFilter   string // wholesale status, "" for any
+	StatusFilter   string // wholesale application status, "" for any
 	VerifiedFilter string // "", "yes", "no"
 	Sort           string
-	Counts         map[string]int
-	TotalCount     int
-	Page           int
-	PerPage        int
-	HasMore        bool
-	MerchantTZ     *time.Location
-	StaffName      string
-	StaffRole      string
+	// PriceLists backs the inline price-list selector on pending applications.
+	PriceLists []domain.PriceList
+	// Counts holds the per-status wholesale counts (keyed by status, plus "all")
+	// for the status pills and the channel toggle's pending badge.
+	Counts     map[string]int
+	TotalCount int
+	Page       int
+	PerPage    int
+	HasMore    bool
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
+}
+
+// IsWholesale reports whether this render is the wholesale channel.
+func (p CustomerListProps) IsWholesale() bool { return p.Channel == "wholesale" }
+
+// BasePath is the list URL for the active channel — every link on the page is
+// built from it, so a channel never leaks into the other one's URLs.
+func (p CustomerListProps) BasePath() string {
+	if p.IsWholesale() {
+		return CustomersWholesalePath
+	}
+	return CustomersRetailPath
 }
 
 func (p CustomerListProps) showingStart() int {
@@ -46,15 +75,16 @@ func (p CustomerListProps) showingEnd() int {
 // anyFilterActive reports whether anything is narrowing the list. It drives the
 // "Clear all" escape hatch — the whole point of which is that a staffer who has
 // filtered themselves into an empty page always has one click back to safety.
+// The channel is not a filter: clearing keeps you on the side you were on.
 func (p CustomerListProps) anyFilterActive() bool {
-	return p.Search != "" || p.TypeFilter != "" || p.StatusFilter != "" || p.VerifiedFilter != ""
+	return p.Search != "" || p.StatusFilter != "" || p.VerifiedFilter != ""
 }
 
 // filtersBeyondSearchActive reports whether a filter other than the search term
 // is narrowing the list. When a search comes up empty, this tells us whether to
 // blame the term alone or suggest widening the filters first.
 func (p CustomerListProps) filtersBeyondSearchActive() bool {
-	return p.TypeFilter != "" || p.StatusFilter != "" || p.VerifiedFilter != ""
+	return p.StatusFilter != "" || p.VerifiedFilter != ""
 }
 
 // noMatchMessage is built in Go rather than assembled from templ fragments so
@@ -70,16 +100,13 @@ func (p CustomerListProps) noMatchMessage() string {
 // customerListURL builds a list URL from the full filter state. Every
 // navigation on this page goes through here so no control silently drops
 // another's state — the bug that makes filter UIs feel broken.
-func customerListURL(page int, typeFilter, statusFilter, verifiedFilter, sort, search string) string {
+func customerListURL(basePath string, page int, statusFilter, verifiedFilter, sort, search string) string {
 	v := url.Values{}
 	if page > 1 {
 		v.Set("page", fmt.Sprintf("%d", page))
 	}
 	if search != "" {
 		v.Set("q", search)
-	}
-	if typeFilter != "" {
-		v.Set("type", typeFilter)
 	}
 	if statusFilter != "" {
 		v.Set("status", statusFilter)
@@ -91,38 +118,32 @@ func customerListURL(page int, typeFilter, statusFilter, verifiedFilter, sort, s
 		v.Set("sort", sort)
 	}
 	if len(v) == 0 {
-		return "/admin/customers"
+		return basePath
 	}
-	return "/admin/customers?" + v.Encode()
+	return basePath + "?" + v.Encode()
 }
 
 // customerFilterURL changes one filter and resets to page 1 — paging is only
 // meaningful relative to a result set, so it can't survive a filter change.
-// Switching account type also clears the wholesale status sub-filter.
 func customerFilterURL(p CustomerListProps, dimension, value string) string {
-	typeFilter, statusFilter, verifiedFilter := p.TypeFilter, p.StatusFilter, p.VerifiedFilter
+	statusFilter, verifiedFilter := p.StatusFilter, p.VerifiedFilter
 	switch dimension {
-	case "type":
-		typeFilter, statusFilter = value, ""
 	case "status":
 		statusFilter = value
-		if value != "" {
-			typeFilter = "wholesale"
-		}
 	case "verified":
 		verifiedFilter = value
 	}
-	return customerListURL(1, typeFilter, statusFilter, verifiedFilter, p.Sort, p.Search)
+	return customerListURL(p.BasePath(), 1, statusFilter, verifiedFilter, p.Sort, p.Search)
 }
 
 // customerSortURL builds the href for a sortable column header.
 func customerSortURL(p CustomerListProps, col string) string {
-	return customerListURL(1, p.TypeFilter, p.StatusFilter, p.VerifiedFilter, customerSortToggle(col, p.Sort), p.Search)
+	return customerListURL(p.BasePath(), 1, p.StatusFilter, p.VerifiedFilter, customerSortToggle(col, p.Sort), p.Search)
 }
 
 // customerPageHref builds a pagination href, carrying every active filter.
 func customerPageHref(p CustomerListProps, page int) string {
-	return customerListURL(page, p.TypeFilter, p.StatusFilter, p.VerifiedFilter, p.Sort, p.Search)
+	return customerListURL(p.BasePath(), page, p.StatusFilter, p.VerifiedFilter, p.Sort, p.Search)
 }
 
 // customerSortToggle returns the next sort value when a header is clicked.
@@ -186,12 +207,6 @@ type customerPill struct {
 	Label string
 }
 
-var customerTypePills = []customerPill{
-	{"", "All"},
-	{"retail", "Retail"},
-	{"wholesale", "Wholesale"},
-}
-
 var customerStatusPills = []customerPill{
 	{"", "Any status"},
 	{"pending", "Pending"},
@@ -214,17 +229,31 @@ func customerPillClasses(active bool) string {
 	return base + " border-rr-border bg-rr-surface text-rr-body hover:bg-rr-raised"
 }
 
+// customerListSubtitle says what the current channel is for. The two sides of
+// this list do genuinely different jobs — one is a roster, the other is an
+// application queue — so the header says which one you are looking at.
+func customerListSubtitle(p CustomerListProps) string {
+	if p.IsWholesale() {
+		return "Cafes, offices and shops — applications, terms, and pricing"
+	}
+	return "Everyone who buys direct from the shop"
+}
+
 templ CustomerListContent(props CustomerListProps) {
 	@adminSectionTabs(customersTabs(), "/admin/customers")
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">Customers</h1>
-			<p class="mt-1 text-sm text-rr-muted">Manage your customer accounts</p>
+			<p class="mt-1 text-sm text-rr-muted">{ customerListSubtitle(props) }</p>
 		</div>
 	</div>
+	<!-- Channel -->
+	<div class="mt-6">
+		@adminChannelToggleCount(CustomersRetailPath, CustomersWholesalePath, props.BasePath(), props.Counts["pending"])
+	</div>
 	<!-- Search + filters -->
-	<div class="mt-6 space-y-3">
+	<div class="space-y-3">
 		<div class="flex flex-wrap items-center gap-3">
 			<div class="max-w-sm flex-auto">
 				<label for="customers-search" class="sr-only">Search customers</label>
@@ -234,41 +263,25 @@ templ CustomerListContent(props CustomerListProps) {
 					name="q"
 					value={ props.Search }
 					placeholder="Search name, email, or company..."
-					hx-get="/admin/customers"
+					hx-get={ props.BasePath() }
 					hx-trigger="input changed delay:300ms, search"
 					hx-target="#main-content"
 					hx-push-url="true"
-					hx-include="[name='type'],[name='status'],[name='verified'],[name='sort']"
+					hx-include="[name='status'],[name='verified'],[name='sort']"
 					class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 				/>
 			</div>
 			<!-- Carried with the search request so typing never drops the active filters. -->
-			<input type="hidden" name="type" value={ props.TypeFilter }/>
 			<input type="hidden" name="status" value={ props.StatusFilter }/>
 			<input type="hidden" name="verified" value={ props.VerifiedFilter }/>
 			<input type="hidden" name="sort" value={ props.Sort }/>
 			if props.anyFilterActive() {
-				<a href="/admin/customers" class="text-sm font-medium text-rr-red hover:text-rr-red-lt">
+				<a href={ templ.SafeURL(props.BasePath()) } class="text-sm font-medium text-rr-red hover:text-rr-red-lt">
 					Clear all
 				</a>
 			}
 		</div>
 		<div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-			<div class="flex flex-wrap items-center gap-2">
-				<span class="label-font text-xs uppercase tracking-wide text-rr-muted">Type</span>
-				for _, f := range customerTypePills {
-					<a
-						href={ templ.SafeURL(customerFilterURL(props, "type", f.Value)) }
-						class={ customerPillClasses(props.TypeFilter == f.Value) }
-						if props.TypeFilter == f.Value {
-							aria-current="page"
-						}
-					>
-						{ f.Label }
-						<span class="text-xs font-normal tabular-nums opacity-70">{ fmt.Sprintf("%d", props.Counts[f.Value]) }</span>
-					</a>
-				}
-			</div>
 			<div class="flex flex-wrap items-center gap-2">
 				<span class="label-font text-xs uppercase tracking-wide text-rr-muted">Email</span>
 				for _, f := range customerVerifiedPills {
@@ -284,9 +297,9 @@ templ CustomerListContent(props CustomerListProps) {
 				}
 			</div>
 		</div>
-		if props.TypeFilter == "wholesale" || props.StatusFilter != "" {
+		if props.IsWholesale() {
 			<div class="flex flex-wrap items-center gap-2">
-				<span class="label-font text-xs uppercase tracking-wide text-rr-muted">Wholesale status</span>
+				<span class="label-font text-xs uppercase tracking-wide text-rr-muted">Application</span>
 				for _, f := range customerStatusPills {
 					<a
 						href={ templ.SafeURL(customerFilterURL(props, "status", f.Value)) }
@@ -296,6 +309,9 @@ templ CustomerListContent(props CustomerListProps) {
 						}
 					>
 						{ f.Label }
+						if f.Value != "" {
+							<span class="text-xs font-normal tabular-nums opacity-70">{ fmt.Sprintf("%d", props.Counts[f.Value]) }</span>
+						}
 					</a>
 				}
 			</div>
@@ -304,107 +320,22 @@ templ CustomerListContent(props CustomerListProps) {
 	<!-- Customer table -->
 	<div class="mt-6">
 		if len(props.Customers) == 0 {
-			<div class="border border-dashed border-rr-border p-12 text-center">
-				<svg class="mx-auto size-12 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"></path>
-				</svg>
-				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No customers found</h3>
-				if props.Search != "" {
-					<p class="mt-1 text-sm text-rr-muted">{ props.noMatchMessage() }</p>
-				} else if props.anyFilterActive() {
-					<p class="mt-1 text-sm text-rr-muted">No customers match the current filters.</p>
-				} else {
-					<p class="mt-1 text-sm text-rr-muted">Customers will appear here once they register or place an order.</p>
-				}
-				<!-- Closest matches, ignoring the active filters — the operator has
-				     already found nothing where they were looking. -->
-				if len(props.Suggestions) > 0 {
-					<div class="mx-auto mt-6 max-w-md border-t border-rr-border pt-6 text-left">
-						<p class="label-font text-xs uppercase tracking-wide text-rr-muted">Did you mean</p>
-						<ul class="mt-3 divide-y divide-rr-border border border-rr-border bg-rr-surface">
-							for _, c := range props.Suggestions {
-								<li>
-									<a
-										href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) }
-										class="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-rr-raised"
-									>
-										<span>
-											<span class="font-medium text-rr-heading">{ c.FirstName } { c.LastName }</span>
-											if c.CompanyName != nil && *c.CompanyName != "" {
-												<span class="text-rr-muted">&nbsp;· { *c.CompanyName }</span>
-											}
-											<span class="block text-xs text-rr-muted">{ c.Email }</span>
-										</span>
-										if c.AccountType == "wholesale" {
-											<span class="badge badge-slate shrink-0">wholesale</span>
-										}
-									</a>
-								</li>
-							}
-						</ul>
-					</div>
-				}
-				if props.anyFilterActive() {
-					<div class="mt-6">
-						<a
-							href="/admin/customers"
-							class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
-						>
-							Clear search and filters
-						</a>
-					</div>
-				}
-			</div>
+			@customerListEmpty(props)
 		} else {
-			<div class="overflow-hidden border border-rr-border bg-rr-surface">
+			<div class="overflow-x-auto border border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
-					<thead class="bg-rr-raised">
-						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">
-								@customerSortHeader(props, "name", "Name")
-							</th>
-							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">
-								@customerSortHeader(props, "email", "Email")
-							</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Status</th>
-							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">
-								@customerSortHeader(props, "created", "Joined")
-							</th>
-							<th scope="col" class="hidden relative py-3.5 pl-3 pr-4 sm:table-cell sm:pr-6">
-								<span class="sr-only">View</span>
-							</th>
-						</tr>
-					</thead>
+					if props.IsWholesale() {
+						@wholesaleCustomerHead(props)
+					} else {
+						@retailCustomerHead(props)
+					}
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, c := range props.Customers {
-							<tr class="row-link">
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
-										{ c.FirstName } { c.LastName }
-									</a>
-								</td>
-								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
-									{ c.Email }
-								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm sm:table-cell">
-									<div class="flex items-center gap-2">
-										if c.EmailVerified {
-											<span class="badge badge-green">verified</span>
-										}
-										if c.AccountType == "wholesale" {
-											<span class="badge badge-slate">wholesale</span>
-										}
-									</div>
-								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
-									{ c.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
-								</td>
-								<td class="hidden whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:table-cell sm:pr-6">
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
-										View<span class="sr-only">, { c.FirstName } { c.LastName }</span>
-									</a>
-								</td>
-							</tr>
+							if props.IsWholesale() {
+								@wholesaleCustomerRow(props, c)
+							} else {
+								@retailCustomerRow(props, c)
+							}
 						}
 					</tbody>
 				</table>
@@ -439,6 +370,189 @@ templ CustomerListContent(props CustomerListProps) {
 			</nav>
 		}
 	</div>
+}
+
+// customerListEmpty covers every way this list comes up empty: a search that
+// missed, a filter combination with nothing in it, and a channel with no
+// customers at all. Suggestions ignore the filters *and* the channel, so a
+// wholesale account found from the retail side is one click away.
+templ customerListEmpty(props CustomerListProps) {
+	<div class="border border-dashed border-rr-border p-12 text-center">
+		<svg class="mx-auto size-12 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+			<path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"></path>
+		</svg>
+		<h3 class="mt-2 text-sm font-semibold text-rr-heading">No customers found</h3>
+		if props.Search != "" {
+			<p class="mt-1 text-sm text-rr-muted">{ props.noMatchMessage() }</p>
+		} else if props.anyFilterActive() {
+			if props.IsWholesale() && props.StatusFilter == "pending" {
+				<p class="mt-1 text-sm text-rr-muted">Inbox zero. New wholesale applications land here for review.</p>
+			} else {
+				<p class="mt-1 text-sm text-rr-muted">No customers match the current filters.</p>
+			}
+		} else if props.IsWholesale() {
+			<p class="mt-1 text-sm text-rr-muted">Applications will appear here as cafes and offices apply.</p>
+		} else {
+			<p class="mt-1 text-sm text-rr-muted">Customers will appear here once they register or place an order.</p>
+		}
+		if len(props.Suggestions) > 0 {
+			<div class="mx-auto mt-6 max-w-md border-t border-rr-border pt-6 text-left">
+				<p class="label-font text-xs uppercase tracking-wide text-rr-muted">Did you mean</p>
+				<ul class="mt-3 divide-y divide-rr-border border border-rr-border bg-rr-surface">
+					for _, c := range props.Suggestions {
+						<li>
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) }
+								class="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-rr-raised"
+							>
+								<span>
+									<span class="font-medium text-rr-heading">{ c.FirstName } { c.LastName }</span>
+									if c.CompanyName != nil && *c.CompanyName != "" {
+										<span class="text-rr-muted">&nbsp;· { *c.CompanyName }</span>
+									}
+									<span class="block text-xs text-rr-muted">{ c.Email }</span>
+								</span>
+								if c.AccountType == domain.AccountTypeWholesale {
+									<span class="badge badge-slate shrink-0">wholesale</span>
+								}
+							</a>
+						</li>
+					}
+				</ul>
+			</div>
+		}
+		if props.anyFilterActive() {
+			<div class="mt-6">
+				<a
+					href={ templ.SafeURL(props.BasePath()) }
+					class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+				>
+					Clear search and filters
+				</a>
+			</div>
+		}
+	</div>
+}
+
+// --- Retail channel: a roster. Who they are, whether they can sign in. ---
+
+templ retailCustomerHead(props CustomerListProps) {
+	<thead class="bg-rr-raised">
+		<tr>
+			<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">
+				@customerSortHeader(props, "name", "Name")
+			</th>
+			<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">
+				@customerSortHeader(props, "email", "Email")
+			</th>
+			<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Status</th>
+			<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">
+				@customerSortHeader(props, "created", "Joined")
+			</th>
+			<th scope="col" class="hidden relative py-3.5 pl-3 pr-4 sm:table-cell sm:pr-6">
+				<span class="sr-only">View</span>
+			</th>
+		</tr>
+	</thead>
+}
+
+templ retailCustomerRow(props CustomerListProps, c domain.Customer) {
+	<tr class="row-link">
+		<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+			<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
+				{ c.FirstName } { c.LastName }
+			</a>
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+			{ c.Email }
+		</td>
+		<td class="hidden whitespace-nowrap px-3 py-4 text-sm sm:table-cell">
+			if c.EmailVerified {
+				<span class="badge badge-green">verified</span>
+			} else {
+				<span class="badge badge-amber">unverified</span>
+			}
+		</td>
+		<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
+			{ c.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
+		</td>
+		<td class="hidden whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:table-cell sm:pr-6">
+			<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
+				View<span class="sr-only">, { c.FirstName } { c.LastName }</span>
+			</a>
+		</td>
+	</tr>
+}
+
+// --- Wholesale channel: an account book. Terms, pricing, and the application
+// queue, with the review actions on the row rather than a page away. ---
+
+templ wholesaleCustomerHead(props CustomerListProps) {
+	<thead class="bg-rr-raised">
+		<tr>
+			<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Company</th>
+			<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">
+				@customerSortHeader(props, "name", "Contact")
+			</th>
+			<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">
+				@customerSortHeader(props, "email", "Email")
+			</th>
+			<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading xl:table-cell">Terms</th>
+			<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading 2xl:table-cell">
+				@customerSortHeader(props, "created", "Applied")
+			</th>
+			<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Price list</th>
+			if props.StatusFilter == "" {
+				<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+			}
+			<th scope="col" class="sticky right-0 z-20 border-l border-rr-border bg-rr-raised py-3.5 pl-3 pr-4 sm:pr-6">
+				<span class="sr-only">Actions</span>
+			</th>
+		</tr>
+	</thead>
+}
+
+templ wholesaleCustomerRow(props CustomerListProps, c domain.Customer) {
+	<tr>
+		<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+			<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="font-medium text-rr-heading hover:text-rr-red">
+				if c.CompanyName != nil && *c.CompanyName != "" {
+					{ *c.CompanyName }
+				} else {
+					{ c.FirstName } { c.LastName }
+				}
+			</a>
+		</td>
+		<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
+			{ c.FirstName } { c.LastName }
+		</td>
+		<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted md:table-cell">
+			{ c.Email }
+		</td>
+		<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted xl:table-cell">
+			if c.PaymentTermsDays != nil {
+				{ fmt.Sprintf("Net %d", *c.PaymentTermsDays) }
+			} else {
+				<span class="text-rr-border">&mdash;</span>
+			}
+		</td>
+		<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted 2xl:table-cell">
+			{ c.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm">
+			@wholesalePriceListCell(c, props.PriceLists, props.StatusFilter)
+		</td>
+		if props.StatusFilter == "" {
+			<td class="whitespace-nowrap px-3 py-4 text-sm">
+				if c.WholesaleStatus != nil {
+					@WholesaleStatusBadge(*c.WholesaleStatus)
+				}
+			</td>
+		}
+		<td class="sticky right-0 z-10 border-l border-rr-border bg-rr-surface whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+			@wholesaleRowActions(c)
+		</td>
+	</tr>
 }
 
 // customerSortHeader renders a clickable column header. The inactive state

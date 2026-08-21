@@ -72,50 +72,9 @@ SET visibility = $2, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
--- name: SetProductGroupVisibility :exec
-INSERT INTO product_group_visibility (product_id, customer_group_id)
-VALUES ($1, $2)
-ON CONFLICT DO NOTHING;
-
--- name: RemoveProductGroupVisibility :exec
-DELETE FROM product_group_visibility
-WHERE product_id = $1 AND customer_group_id = $2;
-
--- name: ListProductGroupVisibility :many
-SELECT customer_group_id FROM product_group_visibility
-WHERE product_id = $1;
-
 -- name: UpdateVariantWholesale :one
 UPDATE variants
 SET wholesale_min_qty = $2, wholesale_multiple = $3, updated_at = now()
 WHERE id = $1
 RETURNING *;
 
--- name: CreateCustomerGroup :one
-INSERT INTO customer_groups (id, name, metadata)
-VALUES ($1, $2, $3)
-RETURNING *;
-
--- name: GetCustomerGroupByID :one
-SELECT * FROM customer_groups WHERE id = $1;
-
--- name: ListCustomerGroups :many
-SELECT * FROM customer_groups ORDER BY name;
-
--- name: DeleteCustomerGroup :exec
-DELETE FROM customer_groups WHERE id = $1;
-
--- name: AddCustomerGroupMembership :exec
-INSERT INTO customer_group_memberships (customer_id, customer_group_id)
-VALUES ($1, $2)
-ON CONFLICT DO NOTHING;
-
--- name: RemoveCustomerGroupMembership :exec
-DELETE FROM customer_group_memberships
-WHERE customer_id = $1 AND customer_group_id = $2;
-
--- name: ListCustomerGroupsByCustomer :many
-SELECT cg.* FROM customer_groups cg
-JOIN customer_group_memberships cgm ON cgm.customer_group_id = cg.id
-WHERE cgm.customer_id = $1
-ORDER BY cg.name;

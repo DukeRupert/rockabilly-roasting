@@ -39,8 +39,6 @@ type ProductEditProps struct {
 	Taxons         []domain.Taxon
 	Variants       []VariantWithOptions
 	Options        []OptionWithValues
-	Groups         []domain.CustomerGroup
-	GroupAccessIDs []uuid.UUID // customer groups granted access to a restricted product
 	WholesaleCustomers []domain.Customer // candidates for a private (white-label) product
 	CustomerAccessIDs  []uuid.UUID       // customers granted access to a private product
 	Media          []domain.ProductMedia
@@ -273,7 +271,7 @@ templ productAttributesTab(props ProductEditProps) {
 templ productVariantsTab(props ProductEditProps) {
 	<div class="space-y-8">
 		@OptionsPanel(props.Product, props.Options)
-		@VariantsPanel(props.Product, props.Variants, props.Options, props.TaxonName, props.Groups, nil)
+		@VariantsPanel(props.Product, props.Variants, props.Options, props.TaxonName, nil)
 	</div>
 }
 
@@ -542,7 +540,7 @@ func priceToDollars(cents int) string {
 }
 
 // VariantsPanel renders the variants section as a standalone partial for htmx swaps.
-templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues, taxonName string, groups []domain.CustomerGroup, attrs templ.Attributes) {
+templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, options []OptionWithValues, taxonName string, attrs templ.Attributes) {
 	<div id="variants-panel" { attrs... } class="border border-rr-border bg-rr-surface">
 		<div class="px-4 py-5 sm:px-6">
 			<h3 class="text-base/7 font-semibold text-rr-heading">Variants</h3>
@@ -824,8 +822,8 @@ templ VariantChannelToggles(productID uuid.UUID, variant domain.Variant) {
 	</form>
 }
 
-// VisibilityPanel controls a product's storefront visibility tier and, when restricted,
-// which customer groups may access it. Tier and group grants submit together in one POST.
+// VisibilityPanel controls a product's storefront visibility tier and, when private,
+// which customers may access it. Tier and grants submit together in one POST.
 templ VisibilityPanel(props ProductEditProps) {
 	<div x-data={ "{ vis: '" + string(props.Product.Visibility) + "' }" } class="border-t border-rr-border pt-6">
 		<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/visibility", props.Product.ID)) } class="space-y-4">
@@ -839,7 +837,6 @@ templ VisibilityPanel(props ProductEditProps) {
 				>
 					<option value="public" selected?={ props.Product.Visibility == domain.ProductVisibilityPublic }>Public — everyone</option>
 					<option value="wholesale" selected?={ props.Product.Visibility == domain.ProductVisibilityWholesale }>Wholesale — all approved wholesale customers</option>
-					<option value="restricted" selected?={ props.Product.Visibility == domain.ProductVisibilityRestricted }>Restricted — only selected groups</option>
 					<option value="private" selected?={ props.Product.Visibility == domain.ProductVisibilityPrivate }>Private — only selected customers (white-label)</option>
 				</select>
 			</div>
@@ -862,27 +859,6 @@ templ VisibilityPanel(props ProductEditProps) {
 							</label>
 						}
 					</div>
-				}
-			</div>
-			<div x-show="vis === 'restricted'" x-cloak class="space-y-2">
-				<p class="text-sm font-medium text-rr-heading">Groups with access</p>
-				if len(props.Groups) == 0 {
-					<p class="text-sm text-rr-muted">
-						<a href="/admin/groups" class="text-rr-red hover:text-rr-red-lt">Create customer groups</a> to grant access.
-					</p>
-				} else {
-					for _, g := range props.Groups {
-						<label class="flex items-center gap-2 text-sm text-rr-body">
-							<input
-								type="checkbox"
-								name="group_ids"
-								value={ g.ID.String() }
-								checked?={ containsUUID(props.GroupAccessIDs, g.ID) }
-								class="rounded-sm border-rr-border text-rr-red focus:ring-rr-red"
-							/>
-							{ g.Name }
-						</label>
-					}
 				}
 			</div>
 			<button type="submit" class="rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">

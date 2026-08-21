@@ -19,7 +19,6 @@ func newWholesaleService() *app.WholesaleService {
 	return app.NewWholesaleService(
 		store.NewCustomerStore(),
 		store.NewCustomerUserStore(),
-		store.NewCustomerGroupStore(),
 		store.NewCatalogStore(),
 		store.NewOrderStore(nil),
 		store.NewCartStore(),

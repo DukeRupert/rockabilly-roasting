@@ -4,20 +4,43 @@ This guide covers the customer management screens in the admin panel.
 
 ## Customer List
 
-Navigate to **Admin > Customers** to view all customer accounts. Both retail (B2C) and wholesale (B2B) customers appear in this single list.
+Navigate to **Admin > Customers** to view customer accounts. A **Retail | Wholesale** toggle at the top switches channels — the same list of people, scoped to one side of the business, with the columns and actions that side needs. A count on the Wholesale segment shows how many applications are waiting for review.
 
-### Columns
+### Retail columns
 
 | Column | Description |
 |--------|-------------|
 | Name | First and last name, linked to the customer detail page |
 | Email | Customer's email address |
-| Status | Badges indicating email verification and account type (`verified`, `wholesale`) |
+| Status | Email verification (`verified` / `unverified`) |
 | Joined | Date the account was created |
+
+### Wholesale columns
+
+| Column | Description |
+|--------|-------------|
+| Company | Company name (falls back to the contact's name), linked to the detail page |
+| Contact | The person on the account |
+| Email | Login/contact email |
+| Terms | Payment terms (e.g. Net 7), or a dash if unset |
+| Applied | Date the application came in |
+| Price list | Assigned price list — an editable selector while the application is pending |
+| Status | Application status, when no status filter is active |
+| Actions | Approve, Decline, Suspend or Reactivate, plus View |
+
+Wholesale also gets an **Application** filter row (Pending / Approved / Suspended / Declined) with counts.
+
+The old `/admin/wholesale` page redirects here.
+
+### Filters
+
+The **Email** pills narrow to verified or unverified accounts on either channel.
 
 ### Search
 
-The search box at the top filters customers by name or email. Results update automatically as you type (with a short delay). The search term is preserved in the URL, so you can bookmark or share filtered views.
+The search box at the top filters customers by name, email, or company. Results update automatically as you type (with a short delay). The search term is preserved in the URL, so you can bookmark or share filtered views.
+
+If a search finds nothing, closest matches appear under "Did you mean" — these ignore the filters *and* the channel, so searching the retail side for a cafe still finds it.
 
 ### Pagination
 
@@ -86,28 +109,6 @@ Like payment terms, this saves immediately on change.
 
 ---
 
-## Customer Groups
-
-Groups are used to assign tiered wholesale pricing. A customer can belong to multiple groups simultaneously.
-
-### Viewing Group Memberships
-
-Current group memberships appear as badges below the "Customer Groups" heading. Each badge shows the group name with an X button to remove the customer from that group.
-
-If the customer is not in any groups, the message "Not in any groups" appears.
-
-### Adding a Customer to a Group
-
-If groups exist that the customer is not already a member of, a dropdown labeled "Add to group" appears. Select a group and click **Add**. The page reloads with the new membership.
-
-If no groups have been created yet, a link to **Create one** directs you to the Customer Groups management page (`/admin/groups`).
-
-### Removing a Customer from a Group
-
-Click the X button on any group badge. The customer is removed immediately (no confirmation dialog).
-
----
-
 ## Addresses
 
 The Addresses section shows all shipping/billing addresses on file for the customer, displayed as cards in a two-column grid.
@@ -127,5 +128,5 @@ Addresses are managed by the customer through their account. The admin view is r
 
 ## Related Pages
 
-- [Wholesale Management](wholesale.md) -- application review, groups, and pricing
+- [Wholesale Management](wholesale.md) -- application review and account management
 - [Invoices](invoices.md) -- B2B invoice lifecycle and payment recording

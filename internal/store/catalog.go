@@ -151,37 +151,6 @@ func (s *CatalogStore) UpdateProductVisibility(ctx context.Context, tx pgx.Tx, i
 	return productFromRow(row), nil
 }
 
-// SetProductGroupVisibility adds a customer group to a product's restricted visibility list.
-func (s *CatalogStore) SetProductGroupVisibility(ctx context.Context, tx pgx.Tx, productID, groupID uuid.UUID) error {
-	if err := sqlcgen.New(tx).SetProductGroupVisibility(ctx, sqlcgen.SetProductGroupVisibilityParams{
-		ProductID:       productID,
-		CustomerGroupID: groupID,
-	}); err != nil {
-		return fmt.Errorf("set product group visibility: %w", err)
-	}
-	return nil
-}
-
-// RemoveProductGroupVisibility removes a customer group from a product's restricted visibility list.
-func (s *CatalogStore) RemoveProductGroupVisibility(ctx context.Context, tx pgx.Tx, productID, groupID uuid.UUID) error {
-	if err := sqlcgen.New(tx).RemoveProductGroupVisibility(ctx, sqlcgen.RemoveProductGroupVisibilityParams{
-		ProductID:       productID,
-		CustomerGroupID: groupID,
-	}); err != nil {
-		return fmt.Errorf("remove product group visibility: %w", err)
-	}
-	return nil
-}
-
-// ListProductGroupVisibility returns the group IDs assigned to a restricted product.
-func (s *CatalogStore) ListProductGroupVisibility(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]uuid.UUID, error) {
-	ids, err := sqlcgen.New(tx).ListProductGroupVisibility(ctx, productID)
-	if err != nil {
-		return nil, fmt.Errorf("list product group visibility: %w", err)
-	}
-	return ids, nil
-}
-
 // SetProductCustomerVisibility grants a customer access to a private product.
 func (s *CatalogStore) SetProductCustomerVisibility(ctx context.Context, tx pgx.Tx, productID, customerID uuid.UUID) error {
 	if err := sqlcgen.New(tx).SetProductCustomerVisibility(ctx, sqlcgen.SetProductCustomerVisibilityParams{
@@ -259,7 +228,6 @@ func (s *CatalogStore) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUI
 // is visible only to the customers explicitly granted access.
 type VisibilityContext struct {
 	IsWholesale bool
-	GroupIDs    []uuid.UUID
 	CustomerID  *uuid.UUID
 }
 
@@ -297,10 +265,10 @@ type ProductFilter struct {
 // The fragment references the products table by name (products.visibility, products.id),
 // so any query embedding it MUST expose the products table unaliased.
 //
-// The predicate is the OR of: public always; wholesale (+ group-gated restricted) when
-// the viewer is wholesale; and group of private products granted to the viewer's
-// CustomerID. Positional params are allocated starting at argStart in the order they are
-// appended to the returned args slice.
+// The predicate is the OR of: public always; wholesale when the viewer is wholesale;
+// and private products granted to the viewer's CustomerID. Positional params are
+// allocated starting at argStart in the order they are appended to the returned args
+// slice.
 func visibilityClause(vc *VisibilityContext, argStart int) (string, []any) {
 	if vc == nil {
 		return "", nil
@@ -311,18 +279,8 @@ func visibilityClause(vc *VisibilityContext, argStart int) (string, []any) {
 	argN := argStart
 
 	if vc.IsWholesale {
+		// The wholesale tier is open to every approved wholesale customer.
 		preds = append(preds, "products.visibility = 'wholesale'")
-		if len(vc.GroupIDs) > 0 {
-			// 'restricted' is group-gated; wholesale tier itself is open to every
-			// authenticated wholesale customer.
-			preds = append(preds, fmt.Sprintf(`(products.visibility = 'restricted' AND EXISTS (
-			SELECT 1 FROM product_group_visibility pgv
-			WHERE pgv.product_id = products.id
-			AND pgv.customer_group_id = ANY($%d)
-		))`, argN))
-			args = append(args, vc.GroupIDs)
-			argN++
-		}
 	}
 
 	if vc.CustomerID != nil {

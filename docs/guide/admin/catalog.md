@@ -61,7 +61,7 @@ Define product options and their purchasable combinations. See the [Options](#pr
 
 ### Pricing Tab
 
-Set base prices and customer-group-specific prices for each variant. See the [Pricing](#variant-pricing) section below.
+Set the base price and every price-list override for each variant, in one grid. See the [Pricing](#variant-pricing) section below.
 
 On mobile, the tabs appear as a dropdown selector instead of a tab bar.
 
@@ -142,26 +142,20 @@ The variants table shows:
 
 ## Variant Pricing
 
-The **Pricing** tab provides inline price editing for all variants.
-
-### Base Prices
-
-Each variant has a base price in USD. To set or change it:
+The **Pricing** tab shows every price this product carries: one row per variant, a **Base** column, and one column per price list.
 
 1. Go to the **Pricing** tab.
-2. In the "Base Prices" card, enter the dollar amount in the input next to each SKU.
-3. The price saves automatically when you change the value (no submit button needed).
+2. Type dollar amounts into any cells you want to change (e.g. `14.99` — stored internally in cents).
+3. Click **Save changes**. Everything you edited is written in one go.
 
-Prices are entered in dollars (e.g., `14.99`) and stored internally in cents.
+Rules:
 
-### Group Prices
+- **Base** is what retail pays. It cannot be left empty once set — every other price falls back to it.
+- A **price list** cell overrides base for the customers on that list. Leave it empty (it shows "base") and that list charges the base price.
+- Clearing a list cell that had a price removes the override.
+- **Breaks** in a list's column header opens that list's volume breaks for this product.
 
-If customer groups exist (e.g., Wholesale), additional pricing cards appear below the base prices. Each card shows the group name and lets you set per-variant prices for that group.
-
-- Enter a price to set a group-specific price for that variant.
-- Clear the price field to remove the group price (the customer will see the base price instead).
-
-If no customer groups exist, a link to create them is shown.
+To work through a whole list instead of a single coffee, open it under **Catalog > Pricing**. To compare every product against every list at once, use **Compare all lists** there.
 
 ---
 
@@ -296,7 +290,7 @@ Click "Delete" next to a category. You will be prompted to confirm. Products in 
 3. **Create a product** -- Add title, description, and assign a category at `/admin/catalog/new`.
 4. **Add options** -- On the Variants tab, create options like "Size" (with values "12 oz", "2 lb", "5 lb") and "Grind" (with values "Whole Bean", "Drip", "Espresso", "French Press").
 5. **Add variants** -- Create a variant for each purchasable combination (e.g., 12oz Whole Bean, 12oz Drip, 2lb Whole Bean).
-6. **Set prices** -- On the Pricing tab, enter the base price for each variant. Add group prices for wholesale customers if applicable.
+6. **Set prices** -- On the Pricing tab, enter the base price for each variant, plus any price-list overrides for wholesale customers.
 7. **Upload images** -- On the Media tab, upload product photos. The first image becomes the primary.
 8. **Add attributes** -- On the Attributes tab, assign the "Coffee Profile" set and fill in origin, roast level, tasting notes.
 9. **Activate** -- On the Details tab, toggle the Active switch to make the product visible on the storefront.

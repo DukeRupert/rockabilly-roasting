@@ -20,16 +20,15 @@ import (
 
 // WholesaleService contains business logic for wholesale customer management and ordering.
 type WholesaleService struct {
-	customers      *store.CustomerStore
-	customerUsers  *store.CustomerUserStore
-	customerGroups *store.CustomerGroupStore
-	catalog        *store.CatalogStore
-	orders         *store.OrderStore
-	carts          *store.CartStore
-	audit          *audit.AuditWriter
-	metrics        *metrics.Registry
-	auth           *AuthService // populated via WithEmail; used to mint setup tokens for SendApprovalEmail
-	email          EmailEnv     // populated via WithEmail; required for Send* methods
+	customers     *store.CustomerStore
+	customerUsers *store.CustomerUserStore
+	catalog       *store.CatalogStore
+	orders        *store.OrderStore
+	carts         *store.CartStore
+	audit         *audit.AuditWriter
+	metrics       *metrics.Registry
+	auth          *AuthService // populated via WithEmail; used to mint setup tokens for SendApprovalEmail
+	email         EmailEnv     // populated via WithEmail; required for Send* methods
 	// unsubscribe signs the opt-out links in the weekly reminder. Never nil —
 	// an unconfigured signer reports Enabled() false and the link is omitted.
 	unsubscribe *auth.UnsubscribeSigner
@@ -53,7 +52,6 @@ func (s *WholesaleService) WithDeliverySchedule(shipping *store.ShippingStore, l
 func NewWholesaleService(
 	customers *store.CustomerStore,
 	customerUsers *store.CustomerUserStore,
-	customerGroups *store.CustomerGroupStore,
 	catalog *store.CatalogStore,
 	orders *store.OrderStore,
 	carts *store.CartStore,
@@ -61,15 +59,14 @@ func NewWholesaleService(
 	metrics *metrics.Registry,
 ) *WholesaleService {
 	return &WholesaleService{
-		unsubscribe:    auth.NewUnsubscribeSigner(""),
-		customers:      customers,
-		customerUsers:  customerUsers,
-		customerGroups: customerGroups,
-		catalog:        catalog,
-		orders:         orders,
-		carts:          carts,
-		audit:          audit,
-		metrics:        metrics,
+		unsubscribe:   auth.NewUnsubscribeSigner(""),
+		customers:     customers,
+		customerUsers: customerUsers,
+		catalog:       catalog,
+		orders:        orders,
+		carts:         carts,
+		audit:         audit,
+		metrics:       metrics,
 	}
 }
 
@@ -335,12 +332,11 @@ type QuickOrderProduct struct {
 
 // QuickOrderCatalog returns products grouped with their variants, options, and prices
 // for the wholesale quick order page. Pricing reflects the customer's assigned price
-// list; visibility is filtered to the wholesale tier and any restricted products
-// granted to one of the customer's groups.
+// list; visibility is the wholesale tier plus any private (white-label) products
+// granted to this customer.
 func (s *WholesaleService) QuickOrderCatalog(
 	ctx context.Context,
 	tx pgx.Tx,
-	groupIDs []uuid.UUID,
 	customerID uuid.UUID,
 	pricing *PricingService,
 	currencyCode string,
@@ -349,7 +345,6 @@ func (s *WholesaleService) QuickOrderCatalog(
 		Status: ptrTo(domain.ProductStatusActive),
 		Visibility: &store.VisibilityContext{
 			IsWholesale: true,
-			GroupIDs:    groupIDs,
 			// Include 'private' white-label products granted to this customer.
 			CustomerID: &customerID,
 		},

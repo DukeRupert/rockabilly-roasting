@@ -28,7 +28,7 @@ func TestQuickOrderCatalog_HidesWholesaleUnavailableVariant(t *testing.T) {
 	testutil.SetBasePriceForVariant(t, tx, retailOnly.ID, 1000, "USD")
 	testutil.SetBasePriceForVariant(t, tx, both.ID, 2500, "USD")
 
-	products, err := svc.QuickOrderCatalog(ctx, tx, nil, customer.ID, pricing, "USD")
+	products, err := svc.QuickOrderCatalog(ctx, tx, customer.ID, pricing, "USD")
 	require.NoError(t, err)
 
 	var skus []string
@@ -56,7 +56,7 @@ func TestQuickOrderCatalog_DropsProductWithNoWholesaleVariants(t *testing.T) {
 	v := testutil.CreateVariant(t, tx, product.ID, testutil.WithChannelAvailability(true, false))
 	testutil.SetBasePriceForVariant(t, tx, v.ID, 1000, "USD")
 
-	products, err := svc.QuickOrderCatalog(ctx, tx, nil, customer.ID, pricing, "USD")
+	products, err := svc.QuickOrderCatalog(ctx, tx, customer.ID, pricing, "USD")
 	require.NoError(t, err)
 	for _, p := range products {
 		assert.NotEqual(t, product.ID, p.ID,
@@ -81,7 +81,7 @@ func TestQuickOrderCatalog_PrivateProductVisibleToGrantedCustomer(t *testing.T) 
 	testutil.AddProductCustomerVisibility(t, tx, product.ID, granted.ID)
 
 	// Granted customer sees it.
-	products, err := svc.QuickOrderCatalog(ctx, tx, nil, granted.ID, pricing, "USD")
+	products, err := svc.QuickOrderCatalog(ctx, tx, granted.ID, pricing, "USD")
 	require.NoError(t, err)
 	found := false
 	for _, p := range products {
@@ -92,7 +92,7 @@ func TestQuickOrderCatalog_PrivateProductVisibleToGrantedCustomer(t *testing.T) 
 	assert.True(t, found, "granted customer should see the private product")
 
 	// A different customer does not.
-	products, err = svc.QuickOrderCatalog(ctx, tx, nil, other.ID, pricing, "USD")
+	products, err = svc.QuickOrderCatalog(ctx, tx, other.ID, pricing, "USD")
 	require.NoError(t, err)
 	for _, p := range products {
 		assert.NotEqual(t, product.ID, p.ID,

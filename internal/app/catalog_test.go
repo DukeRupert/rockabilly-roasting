@@ -19,7 +19,7 @@ import (
 )
 
 func newCatalogService() *app.CatalogService {
-	return app.NewCatalogService(store.NewCatalogStore(), store.NewCustomerStore(), store.NewCustomerGroupStore(), audit.NewAuditWriter(), metrics.NewRegistry())
+	return app.NewCatalogService(store.NewCatalogStore(), store.NewCustomerStore(), audit.NewAuditWriter(), metrics.NewRegistry())
 }
 
 func TestCatalogService_CreateProduct(t *testing.T) {

@@ -252,13 +252,8 @@ func (d *Deps) handleWholesaleQuickOrder(w http.ResponseWriter, r *http.Request)
 	cartQty := map[uuid.UUID]int{}
 	var lastOrder *domain.Order
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		// Access identity comes from the membership join (the source of truth), not the
-		// deprecated customer.customer_group_id column.
-		viewer, txErr := d.CatalogService.ResolveViewer(ctx, tx, customer.ID)
-		if txErr != nil {
-			return txErr
-		}
-		products, txErr = d.WholesaleService.QuickOrderCatalog(ctx, tx, viewer.GroupIDs, customer.ID, d.PricingService, "USD")
+		var txErr error
+		products, txErr = d.WholesaleService.QuickOrderCatalog(ctx, tx, customer.ID, d.PricingService, "USD")
 		if txErr != nil {
 			return txErr
 		}

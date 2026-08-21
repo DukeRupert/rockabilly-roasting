@@ -5,8 +5,8 @@ import "fmt"
 // Section-level navigation that lives at the top of a content area, one step
 // below the sidebar. The sidebar was flattened to seven primary destinations;
 // the pages that used to be their own sidebar rows (categories, attributes,
-// groups, price lists, plans, wholesale orders/fulfillment) are now reached
-// through these in-page strips. Two flavours:
+// price lists, plans, wholesale orders/fulfillment) are now reached through
+// these in-page strips. Two flavours:
 //
 //   adminSectionTabs  — underline tab bar for sibling *pages* in a section
 //                       (Catalog: Products | Categories | Attributes | Pricing).
@@ -40,7 +40,6 @@ func catalogTabs() []sectionTab {
 func customersTabs() []sectionTab {
 	return []sectionTab{
 		{Label: "Customers", Href: "/admin/customers"},
-		{Label: "Groups", Href: "/admin/groups"},
 		{Label: "Reminders", Href: "/admin/wholesale/reminders"},
 	}
 }

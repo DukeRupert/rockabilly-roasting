@@ -80,7 +80,9 @@ const (
 	AuditCustomerUserNotificationsEnabled  = "customer_user.notifications_enabled"
 	AuditCustomerUserNotificationsDisabled = "customer_user.notifications_disabled"
 
-	// Customer group actions
+	// Customer group actions. Customer groups have been retired — nothing writes
+	// these any more, but historical audit rows carry them, so the constants stay
+	// for the reader that renders those rows.
 	AuditCustomerGroupCreated       = "customer_group.created"
 	AuditCustomerGroupDeleted       = "customer_group.deleted"
 	AuditCustomerGroupMemberAdded   = "customer_group.member_added"
@@ -142,7 +144,8 @@ const (
 	AuditWhiteLabelSubmitted  = "white_label.submitted"
 
 	// Product visibility actions
-	AuditProductVisibilityUpdated     = "product.visibility_updated"
+	AuditProductVisibilityUpdated = "product.visibility_updated"
+	// Retired with customer groups; kept for historical rows.
 	AuditProductGroupAccessUpdated    = "product.group_access_updated"
 	AuditProductCustomerAccessUpdated = "product.customer_access_updated"
 

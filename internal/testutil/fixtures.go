@@ -11,9 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"testing"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store/sqlcgen"
-	"github.com/dukerupert/hiri/internal/app"
 )
 
 // --- Customer ---
@@ -83,27 +83,6 @@ func CreateCustomer(t *testing.T, tx pgx.Tx, opts ...CustomerOption) *domain.Cus
 		PriceListID:   in.priceListID,
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,
-	}
-}
-
-// --- Customer group ---
-
-func CreateCustomerGroup(t *testing.T, tx pgx.Tx, name string) *domain.CustomerGroup {
-	t.Helper()
-	if name == "" {
-		name = fmt.Sprintf("group-%s", uuid.New().String()[:8])
-	}
-	row, err := sqlcgen.New(tx).CreateCustomerGroup(context.Background(), sqlcgen.CreateCustomerGroupParams{
-		ID:       uuid.New(),
-		Name:     name,
-		Metadata: json.RawMessage(`{}`),
-	})
-	if err != nil {
-		t.Fatalf("create customer group fixture: %v", err)
-	}
-	return &domain.CustomerGroup{
-		ID:   row.ID,
-		Name: row.Name,
 	}
 }
 
@@ -360,17 +339,6 @@ func CreateProduct(t *testing.T, tx pgx.Tx, opts ...ProductOption) *domain.Produ
 	}
 }
 
-// AddProductGroupVisibility grants a customer group access to a restricted product.
-func AddProductGroupVisibility(t *testing.T, tx pgx.Tx, productID, customerGroupID uuid.UUID) {
-	t.Helper()
-	if err := sqlcgen.New(tx).SetProductGroupVisibility(context.Background(), sqlcgen.SetProductGroupVisibilityParams{
-		ProductID:       productID,
-		CustomerGroupID: customerGroupID,
-	}); err != nil {
-		t.Fatalf("add product group visibility fixture: %v", err)
-	}
-}
-
 // --- Variant ---
 
 type VariantOption func(*sqlcgen.CreateVariantParams)
@@ -423,7 +391,7 @@ func CreateVariant(t *testing.T, tx pgx.Tx, productID uuid.UUID, opts ...Variant
 }
 
 // AddProductCustomerVisibility grants a customer access to a private (white-label)
-// product — the per-customer equivalent of AddProductGroupVisibility.
+// product.
 func AddProductCustomerVisibility(t *testing.T, tx pgx.Tx, productID, customerID uuid.UUID) {
 	t.Helper()
 	if err := sqlcgen.New(tx).SetProductCustomerVisibility(context.Background(), sqlcgen.SetProductCustomerVisibilityParams{

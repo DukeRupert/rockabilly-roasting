@@ -1,39 +1,31 @@
 # Wholesale Management
 
-This guide covers the wholesale application review, account management, customer groups, and group pricing features in the admin panel.
+This guide covers wholesale application review and account management in the admin panel.
 
 ## Wholesale Applications List
 
-Navigate to **Admin > Wholesale** to view wholesale applications and accounts. The page defaults to showing pending applications.
+Navigate to **Admin > Customers** and switch the channel toggle to **Wholesale**. (The old `/admin/wholesale` URL redirects here.) A count on the Wholesale segment shows how many applications are waiting, so the queue is visible from the retail side too.
 
-### Status Filters
+### Application filters
 
-Three filter buttons at the top let you switch between views:
+The **Application** pills narrow the list by status, each with a count:
 
 - **Pending** -- new applications awaiting review
 - **Approved** -- active wholesale accounts
 - **Suspended** -- accounts that have been temporarily deactivated
+- **Declined** -- rejected applications
 
-The active filter is highlighted. Each filter shows its own paginated list.
+With no status pill active, every wholesale account is listed and a Status column shows where each one stands.
 
 ### Columns
 
-| Column | Description |
-|--------|-------------|
-| Company | The applicant's company name |
-| Contact | First and last name |
-| Email | Contact email address |
-| Terms | Payment terms if set (e.g., "Net 30"), or a dash |
-| Applied | Date the application was submitted |
-| Status | Badge showing pending, approved, or suspended |
-
-### Actions Column
-
-The rightmost column shows context-sensitive action buttons and a View link to the customer detail page:
+See [Customers > Wholesale columns](customers.md#wholesale-columns) for the full list. The rightmost column carries the context-sensitive actions plus a View link to the customer detail page:
 
 - **Pending applications** -- Approve and Decline buttons
 - **Approved accounts** -- Suspend button
 - **Suspended accounts** -- Reactivate button
+
+On narrower screens the actions collapse into a kebab menu.
 
 ---
 
@@ -48,7 +40,7 @@ Click the **Approve** button next to a pending application (available on both th
 3. Sends a welcome/setup email to the customer so they can create their account password
 4. If QuickBooks is connected, creates a corresponding QB customer record
 
-The customer can then log in, access the wholesale portal, and place orders at group pricing.
+The customer can then log in, access the wholesale portal, and place orders at their price list.
 
 ### Declining an Application
 
@@ -81,79 +73,21 @@ From the wholesale list (Suspended tab), click **Reactivate**. A confirmation di
 
 ---
 
-## Customer Groups
+## Wholesale Pricing
 
-Navigate to **Admin > Customer Groups** (or click "Manage groups" from the Group Pricing page). Groups represent wholesale pricing tiers -- for example, "Wholesale Tier 1", "Wholesale Tier 2", or "Restaurant Partners".
+Wholesale pricing is set with **price lists**, under **Catalog > Pricing**. A price list is a named set of per-variant overrides on the base price; a customer assigned to one pays those prices, and anything the list does not override falls back to base.
 
-### Creating a Group
+- Assign a customer's list from the Price list column here (while their application is pending) or from **Billing Settings** on their detail page.
+- Edit a list's prices by opening it under **Catalog > Pricing**, or edit one coffee's prices across every list on that product's **Pricing** tab.
+- Volume breaks (e.g. 24+ at a lower price) are set per product, per list, via the **Breaks** link in a list's column.
 
-Enter a name in the "New group" field and click **Create group**. The group appears in the table immediately. Group names should be descriptive of the pricing tier or customer segment.
+See the [Catalog guide](catalog.md#variant-pricing) for the pricing grid itself.
 
-### Deleting a Group
-
-Click **Delete** next to any group in the table. A confirmation dialog warns that customers will be removed from the group. Deleting a group also removes all group-specific pricing overrides associated with it.
-
-### Group Table
-
-The table shows:
-
-- **Name** -- the display name for the group
-- **ID** -- the internal UUID (useful for API integrations or debugging)
-
-### Assigning Customers to Groups
-
-Customers are assigned to groups from the individual customer detail page. See the [Customer Groups section](customers.md#customer-groups) in the Customers guide.
-
----
-
-## Group Pricing Matrix
-
-Navigate to **Admin > Customer Groups > Manage prices** (or directly to `/admin/groups/prices`). This page shows a pricing matrix for every product variant in the catalog.
-
-### How the Page is Organized
-
-The page lists each product by name. Under each product, pricing is split into stacked cards:
-
-1. **Base Prices** -- the standard retail price for each variant (applies to all customers not in a group)
-2. **[Group Name] Prices** -- one card per customer group, showing the override price for that group
-
-Each card is a table with two columns:
-
-| Column | Description |
-|--------|-------------|
-| SKU | The variant's SKU code, with a "Default" badge on the default variant |
-| Unit Price | An editable dollar input with a Save button |
-
-### Setting Base Prices
-
-In the "Base Prices" card, enter a dollar amount (e.g., `14.99`) next to a variant's SKU and click **Save**. This is the price all non-grouped customers see.
-
-### Setting Group Prices
-
-In any group's pricing card (displayed in teal text), enter a dollar amount and click **Save**. This price overrides the base price for customers in that group.
-
-To remove a group price override (reverting to the base price), clear the input field and click **Save**.
-
-### How Wholesale Pricing Works
-
-When a wholesale customer browses the catalog or places an order, the system resolves pricing in this order:
-
-1. Check if the customer belongs to any customer group
-2. If yes, look for a group-specific price for the variant
-3. If a group price exists, use it; otherwise, fall back to the base price
-4. If no base price exists, the variant cannot be purchased
-
-This means you can set discounted prices for specific wholesale tiers without affecting retail pricing. A customer in "Wholesale Tier 1" might pay $10.00 for a bag that retails at $14.99.
-
-### Navigating Between Groups and Prices
-
-- From the Groups page, click **Manage prices** to go to the pricing matrix
-- From the Pricing page, click **Manage groups** to return to group management
-- From any product's pricing card, click **Edit product** to go to the catalog editor for that product
+Customer groups have been removed. They had not been a pricing mechanism since v1.54.0, and nothing used them for product access — the wholesale visibility tier covers the channel, and `private` visibility covers per-customer white-labelling.
 
 ---
 
 ## Related Pages
 
-- [Customers](customers.md) -- customer detail, group assignment, billing settings
+- [Customers](customers.md) -- customer detail and billing settings
 - [Invoices](invoices.md) -- B2B invoice lifecycle and payment recording

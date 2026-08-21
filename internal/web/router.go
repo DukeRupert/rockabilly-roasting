@@ -59,7 +59,6 @@ type Deps struct {
 	WhiteLabelService      *app.WhiteLabelService
 	AttributeService       *app.AttributeService
 	InvoiceService         *app.InvoiceService
-	CustomerGroupService   *app.CustomerGroupService
 	PriceListService       *app.PriceListService
 	AuditQueryService      *app.AuditQueryService
 	WebhookService         *app.WebhookService
@@ -463,8 +462,6 @@ func NewRouter(deps *Deps) http.Handler {
 	// The wholesale channel of the same list — same handler, different scope.
 	adminMux.HandleFunc("GET /admin/customers/wholesale", deps.handleAdminCustomerList)
 	adminMux.HandleFunc("GET /admin/customers/{id}", deps.handleAdminCustomerShow)
-	adminMux.HandleFunc("POST /admin/customers/{id}/groups/add", deps.handleAdminCustomerGroupAdd)
-	adminMux.HandleFunc("POST /admin/customers/{id}/groups/{groupID}/remove", deps.handleAdminCustomerGroupRemove)
 	// Changing a customer's sign-in address is the front half of an account
 	// takeover, so unlike its neighbours it is gated on customers:write rather
 	// than plain staff-session access.
@@ -477,11 +474,6 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/customers/{id}/send-verification", deps.handleAdminCustomerSendVerification)
 	adminMux.HandleFunc("POST /admin/customers/{id}/send-white-label-invite", deps.handleAdminCustomerSendWhiteLabelInvite)
 	adminMux.Handle("POST /admin/customers/{id}/order-reminders", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminCustomerOrderReminders)))
-
-	// Admin customer groups (access control for restricted products; not pricing)
-	adminMux.HandleFunc("GET /admin/groups", deps.handleAdminGroupList)
-	adminMux.HandleFunc("POST /admin/groups", deps.handleAdminGroupCreate)
-	adminMux.HandleFunc("POST /admin/groups/{id}/delete", deps.handleAdminGroupDelete)
 
 	// Admin price lists
 	adminMux.HandleFunc("GET /admin/price-lists", deps.handleAdminPriceListList)

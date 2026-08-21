@@ -235,8 +235,6 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 
 	var customer *domain.Customer
 	var addresses []domain.Address
-	var memberGroups []domain.CustomerGroup
-	var allGroups []domain.CustomerGroup
 	var priceLists []domain.PriceList
 	var recentOrders []domain.Order
 	var activity []domain.AuditEntry
@@ -248,14 +246,6 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		addresses, txErr = d.CustomerService.ListAddresses(ctx, tx, id)
-		if txErr != nil {
-			return txErr
-		}
-		memberGroups, txErr = d.CustomerGroupService.ListByCustomer(ctx, tx, id)
-		if txErr != nil {
-			return txErr
-		}
-		allGroups, txErr = d.CustomerGroupService.List(ctx, tx)
 		if txErr != nil {
 			return txErr
 		}
@@ -282,8 +272,6 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	props := admin.CustomerShowProps{
 		Customer:     customer,
 		Addresses:    addresses,
-		MemberGroups: memberGroups,
-		AllGroups:    allGroups,
 		PriceLists:   priceLists,
 		RecentOrders: recentOrders,
 		Activity:     activity,

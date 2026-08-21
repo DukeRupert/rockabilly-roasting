@@ -11,7 +11,6 @@ import (
 )
 
 type Querier interface {
-	AddCustomerGroupMembership(ctx context.Context, arg AddCustomerGroupMembershipParams) error
 	AdjustStockQuantity(ctx context.Context, arg AdjustStockQuantityParams) (StockLevel, error)
 	ApproveWholesaleCustomer(ctx context.Context, arg ApproveWholesaleCustomerParams) (Customer, error)
 	ArchiveVariant(ctx context.Context, id uuid.UUID) (Variant, error)
@@ -34,7 +33,6 @@ type Querier interface {
 	CreateCartForSession(ctx context.Context, arg CreateCartForSessionParams) (Cart, error)
 	CreateCouponCode(ctx context.Context, arg CreateCouponCodeParams) (CouponCode, error)
 	CreateCustomer(ctx context.Context, arg CreateCustomerParams) (Customer, error)
-	CreateCustomerGroup(ctx context.Context, arg CreateCustomerGroupParams) (CustomerGroup, error)
 	CreateCustomerUser(ctx context.Context, arg CreateCustomerUserParams) (CustomerUser, error)
 	CreateCustomerUserInviteToken(ctx context.Context, arg CreateCustomerUserInviteTokenParams) (CustomerUserInviteToken, error)
 	CreateDiscount(ctx context.Context, arg CreateDiscountParams) (Discount, error)
@@ -80,7 +78,6 @@ type Querier interface {
 	DeleteCartItemByCartAndVariant(ctx context.Context, arg DeleteCartItemByCartAndVariantParams) error
 	DeleteCouponCode(ctx context.Context, id uuid.UUID) error
 	DeleteCustomer(ctx context.Context, id uuid.UUID) error
-	DeleteCustomerGroup(ctx context.Context, id uuid.UUID) error
 	// DeleteCustomerUser is scoped by customer_id as well as id so a caller cannot
 	// revoke a member of an account it does not own — the same ownership-by-query
 	// discipline the customer-scoped store methods use.
@@ -121,7 +118,6 @@ type Querier interface {
 	GetCustomerByEmail(ctx context.Context, email string) (Customer, error)
 	GetCustomerByID(ctx context.Context, id uuid.UUID) (Customer, error)
 	GetCustomerByStripeCustomerID(ctx context.Context, stripeCustomerID *string) (Customer, error)
-	GetCustomerGroupByID(ctx context.Context, id uuid.UUID) (CustomerGroup, error)
 	GetCustomerUserByEmail(ctx context.Context, email string) (CustomerUser, error)
 	GetCustomerUserByID(ctx context.Context, id uuid.UUID) (CustomerUser, error)
 	// GetCustomerUserForCustomer is the ownership-scoped fetch: a caller holding an
@@ -198,8 +194,6 @@ type Querier interface {
 	ListBoxPresetsByMaxWeightAsc(ctx context.Context) ([]BoxPreset, error)
 	ListCartItems(ctx context.Context, cartID uuid.UUID) ([]CartItem, error)
 	ListCouponCodesByDiscount(ctx context.Context, discountID uuid.UUID) ([]CouponCode, error)
-	ListCustomerGroups(ctx context.Context) ([]CustomerGroup, error)
-	ListCustomerGroupsByCustomer(ctx context.Context, customerID uuid.UUID) ([]CustomerGroup, error)
 	ListCustomerUsersByCustomer(ctx context.Context, customerID uuid.UUID) ([]CustomerUser, error)
 	ListCustomers(ctx context.Context) ([]Customer, error)
 	ListFulfillmentItemsByFulfillment(ctx context.Context, fulfillmentID uuid.UUID) ([]FulfillmentItem, error)
@@ -220,7 +214,6 @@ type Querier interface {
 	ListPriceLists(ctx context.Context) ([]PriceList, error)
 	ListProductAttributeSets(ctx context.Context, productID uuid.UUID) ([]AttributeSet, error)
 	ListProductCustomerVisibility(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
-	ListProductGroupVisibility(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error)
 	ListProductMediaByProduct(ctx context.Context, productID uuid.UUID) ([]ProductMedium, error)
 	ListProductOptionValuesByOption(ctx context.Context, productOptionID uuid.UUID) ([]ProductOptionValue, error)
 	ListProductOptionsByProduct(ctx context.Context, productID uuid.UUID) ([]ProductOption, error)
@@ -264,9 +257,7 @@ type Querier interface {
 	ReleaseCouponCodeByOrderID(ctx context.Context, redeemedByOrderID *uuid.UUID) error
 	ReleaseReservation(ctx context.Context, arg ReleaseReservationParams) (StockLevel, error)
 	RemoveAttributeSetFromProduct(ctx context.Context, arg RemoveAttributeSetFromProductParams) error
-	RemoveCustomerGroupMembership(ctx context.Context, arg RemoveCustomerGroupMembershipParams) error
 	RemoveProductCustomerVisibility(ctx context.Context, arg RemoveProductCustomerVisibilityParams) error
-	RemoveProductGroupVisibility(ctx context.Context, arg RemoveProductGroupVisibilityParams) error
 	ReserveStock(ctx context.Context, arg ReserveStockParams) (StockLevel, error)
 	RevokeAllSessionsForActor(ctx context.Context, arg RevokeAllSessionsForActorParams) error
 	RevokeSession(ctx context.Context, id uuid.UUID) error
@@ -274,7 +265,6 @@ type Querier interface {
 	SetCartItemQuantity(ctx context.Context, arg SetCartItemQuantityParams) (CartItem, error)
 	SetDefaultAddress(ctx context.Context, arg SetDefaultAddressParams) error
 	SetProductCustomerVisibility(ctx context.Context, arg SetProductCustomerVisibilityParams) error
-	SetProductGroupVisibility(ctx context.Context, arg SetProductGroupVisibilityParams) error
 	SumInvoicePayments(ctx context.Context, invoiceID uuid.UUID) (int32, error)
 	SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error)
 	// Moves a local-delivery order to pickup and drops the delivery promise in one

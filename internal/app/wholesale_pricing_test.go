@@ -30,49 +30,7 @@ func approveWholesaleCustomer(t *testing.T, tx pgx.Tx, customerID uuid.UUID) {
 	require.NoError(t, err)
 }
 
-func TestQuickOrderCatalog_FiltersByGroup_RestrictedHidden(t *testing.T) {
-	tx := testutil.NewTestTx(t, testPool)
-	svc := newWholesaleService()
-	pricing := newPricingService()
-	ctx := context.Background()
-
-	customer := testutil.CreateCustomer(t, tx)
-	restricted := testutil.CreateProduct(t, tx, testutil.WithProductVisibility(domain.ProductVisibilityRestricted))
-	v := testutil.CreateVariant(t, tx, restricted.ID)
-	testutil.SetBasePriceForVariant(t, tx, v.ID, 1000, "USD")
-
-	products, err := svc.QuickOrderCatalog(ctx, tx, nil, customer.ID, pricing, "USD")
-	require.NoError(t, err)
-	for _, p := range products {
-		assert.NotEqual(t, restricted.ID, p.ID, "restricted product should be hidden")
-	}
-}
-
-func TestQuickOrderCatalog_FiltersByGroup_RestrictedShownToMember(t *testing.T) {
-	tx := testutil.NewTestTx(t, testPool)
-	svc := newWholesaleService()
-	pricing := newPricingService()
-	ctx := context.Background()
-
-	group := testutil.CreateCustomerGroup(t, tx, "")
-	customer := testutil.CreateCustomer(t, tx)
-	restricted := testutil.CreateProduct(t, tx, testutil.WithProductVisibility(domain.ProductVisibilityRestricted))
-	v := testutil.CreateVariant(t, tx, restricted.ID)
-	testutil.SetBasePriceForVariant(t, tx, v.ID, 1000, "USD")
-	testutil.AddProductGroupVisibility(t, tx, restricted.ID, group.ID)
-
-	products, err := svc.QuickOrderCatalog(ctx, tx, []uuid.UUID{group.ID}, customer.ID, pricing, "USD")
-	require.NoError(t, err)
-	found := false
-	for _, p := range products {
-		if p.ID == restricted.ID {
-			found = true
-		}
-	}
-	assert.True(t, found, "restricted product should be visible to a member of its assigned group")
-}
-
-func TestQuickOrderCatalog_NoGroupShowsPublicAndWholesale(t *testing.T) {
+func TestQuickOrderCatalog_ShowsPublicAndWholesale(t *testing.T) {
 	tx := testutil.NewTestTx(t, testPool)
 	svc := newWholesaleService()
 	pricing := newPricingService()
@@ -81,13 +39,13 @@ func TestQuickOrderCatalog_NoGroupShowsPublicAndWholesale(t *testing.T) {
 	customer := testutil.CreateCustomer(t, tx)
 	public := testutil.CreateProduct(t, tx, testutil.WithProductVisibility(domain.ProductVisibilityPublic))
 	wholesale := testutil.CreateProduct(t, tx, testutil.WithProductVisibility(domain.ProductVisibilityWholesale))
-	restricted := testutil.CreateProduct(t, tx, testutil.WithProductVisibility(domain.ProductVisibilityRestricted))
-	for _, p := range []*domain.Product{public, wholesale, restricted} {
+	private := testutil.CreateProduct(t, tx, testutil.WithProductVisibility(domain.ProductVisibilityPrivate))
+	for _, p := range []*domain.Product{public, wholesale, private} {
 		v := testutil.CreateVariant(t, tx, p.ID)
 		testutil.SetBasePriceForVariant(t, tx, v.ID, 1000, "USD")
 	}
 
-	products, err := svc.QuickOrderCatalog(ctx, tx, nil, customer.ID, pricing, "USD")
+	products, err := svc.QuickOrderCatalog(ctx, tx, customer.ID, pricing, "USD")
 	require.NoError(t, err)
 
 	seen := make(map[uuid.UUID]bool, len(products))
@@ -96,7 +54,7 @@ func TestQuickOrderCatalog_NoGroupShowsPublicAndWholesale(t *testing.T) {
 	}
 	assert.True(t, seen[public.ID], "public product should be visible")
 	assert.True(t, seen[wholesale.ID], "wholesale product should be visible")
-	assert.False(t, seen[restricted.ID], "restricted product should be hidden when no group")
+	assert.False(t, seen[private.ID], "private product should be hidden without a grant")
 }
 
 func TestQuickOrderCatalog_PricesUsePriceList(t *testing.T) {
@@ -112,7 +70,7 @@ func TestQuickOrderCatalog_PricesUsePriceList(t *testing.T) {
 	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
 	testutil.CreatePriceListPrice(t, tx, priceList.ID, variant.ID, 1100, "USD")
 
-	products, err := svc.QuickOrderCatalog(ctx, tx, nil, customer.ID, pricing, "USD")
+	products, err := svc.QuickOrderCatalog(ctx, tx, customer.ID, pricing, "USD")
 	require.NoError(t, err)
 	require.Len(t, products, 1)
 	require.Len(t, products[0].Variants, 1)
@@ -130,7 +88,7 @@ func TestQuickOrderCatalog_PricesFallBackToBase(t *testing.T) {
 	variant := testutil.CreateVariant(t, tx, product.ID)
 	testutil.SetBasePriceForVariant(t, tx, variant.ID, 1500, "USD")
 
-	products, err := svc.QuickOrderCatalog(ctx, tx, nil, customer.ID, pricing, "USD")
+	products, err := svc.QuickOrderCatalog(ctx, tx, customer.ID, pricing, "USD")
 	require.NoError(t, err)
 	require.Len(t, products, 1)
 	require.Len(t, products[0].Variants, 1)

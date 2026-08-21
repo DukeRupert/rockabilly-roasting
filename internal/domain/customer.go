@@ -40,15 +40,15 @@ const DefaultPaymentTermsDays = 7
 
 // Customer represents a registered or guest customer.
 type Customer struct {
-	ID              uuid.UUID
-	Email           string
-	EmailVerified   bool
-	PasswordHash    *string
-	FirstName       string
-	LastName        string
-	Phone           *string
-	TaxExempt       bool
-	TaxExemptReason *string
+	ID               uuid.UUID
+	Email            string
+	EmailVerified    bool
+	PasswordHash     *string
+	FirstName        string
+	LastName         string
+	Phone            *string
+	TaxExempt        bool
+	TaxExemptReason  *string
 	StripeCustomerID *string
 	AccountType      AccountType
 	WholesaleStatus  *WholesaleStatus
@@ -72,9 +72,9 @@ type Customer struct {
 	// OrderRemindersEnabled controls whether this account receives the weekly
 	// wholesale order reminder. Staff can clear it per customer; defaults true.
 	OrderRemindersEnabled bool
-	Metadata         map[string]any
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	Metadata              map[string]any
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 // IsApprovedWholesale reports whether the customer is a wholesale account in good
@@ -124,20 +124,6 @@ type Address struct {
 	PostalCode  string
 	CountryCode string
 	IsDefault   bool
-}
-
-// CustomerGroup represents a pricing group (e.g., Retail, Wholesale, VIP).
-type CustomerGroup struct {
-	ID       uuid.UUID
-	Name     string
-	Metadata map[string]any
-}
-
-// CustomerGroupMembership links a customer to a customer group.
-type CustomerGroupMembership struct {
-	CustomerID      uuid.UUID
-	CustomerGroupID uuid.UUID
-	AssignedAt      time.Time
 }
 
 // NormalizeEmail canonicalizes an email address for storage and lookup.

@@ -193,7 +193,7 @@ func TestSubmitWhiteLabel_VisibilityScoping(t *testing.T) {
 	require.NoError(t, err)
 
 	inCatalog := func(customerID uuid.UUID) bool {
-		products, err := wsvc.QuickOrderCatalog(ctx, tx, nil, customerID, pricing, "USD")
+		products, err := wsvc.QuickOrderCatalog(ctx, tx, customerID, pricing, "USD")
 		require.NoError(t, err)
 		for _, p := range products {
 			if p.ID == product.ID {

@@ -355,7 +355,6 @@ func run() error {
 	attributeStore := store.NewAttributeStore()
 	auditStore := store.NewAuditStore()
 	staffStore := store.NewStaffStore()
-	customerGroupStore := store.NewCustomerGroupStore()
 	priceListStore := store.NewPriceListStore()
 	invoiceStore := store.NewInvoiceStore()
 	magicLinkStore := store.NewMagicLinkStore()
@@ -376,7 +375,7 @@ func run() error {
 	}
 
 	// Services. Those that send email have email-capable variants attached via WithEmail.
-	catalogSvc := app.NewCatalogService(catalogStore, customerStore, customerGroupStore, auditWriter, metricsReg)
+	catalogSvc := app.NewCatalogService(catalogStore, customerStore, auditWriter, metricsReg)
 	orderSvc := app.NewOrderService(orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, customerUserStore, catalogStore, subscriptionStore).
 		WithShipments(shippingStore).
@@ -406,7 +405,7 @@ func run() error {
 		WithTaxCalc(settingsStore, catalogStore).
 		WithRenewalAnchor(merchantTZ, renewalAnchorHour).
 		WithMerchantTZ(merchantTZ)
-	wholesaleSvc := app.NewWholesaleService(customerStore, customerUserStore, customerGroupStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
+	wholesaleSvc := app.NewWholesaleService(customerStore, customerUserStore, catalogStore, orderStore, cartStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc).
 		WithUnsubscribeSigner(unsubscribeSigner).
 		WithDeliverySchedule(shippingStore, merchantTZ)
@@ -415,7 +414,6 @@ func run() error {
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
 	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore)
-	customerGroupSvc := app.NewCustomerGroupService(customerGroupStore, auditWriter, metricsReg)
 	priceListSvc := app.NewPriceListService(priceListStore, auditWriter, metricsReg).
 		WithSettings(settingsStore)
 	// Delivery route planning. Both externals degrade to a clear error rather
@@ -678,7 +676,6 @@ func run() error {
 		WhiteLabelService:      whiteLabelSvc,
 		AttributeService:       attributeSvc,
 		InvoiceService:         invoiceSvc,
-		CustomerGroupService:   customerGroupSvc,
 		PriceListService:       priceListSvc,
 		AuditQueryService:      auditQuerySvc,
 		WebhookService:         webhookSvc,

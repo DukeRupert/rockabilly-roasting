@@ -280,8 +280,6 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var taxons []domain.Taxon
 	var variants []admin.VariantWithOptions
 	var options []admin.OptionWithValues
-	var groups []domain.CustomerGroup
-	var groupAccessIDs []uuid.UUID
 	var wholesaleCustomers []domain.Customer
 	var customerAccessIDs []uuid.UUID
 	var mediaList []domain.ProductMedia
@@ -305,15 +303,6 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		switch tab {
 		case "details":
 			taxons, txErr = d.CatalogService.ListRootTaxons(ctx, tx)
-			if txErr != nil {
-				return txErr
-			}
-			// Groups + current grants drive the restricted-visibility panel.
-			groups, txErr = d.CustomerGroupService.List(ctx, tx)
-			if txErr != nil {
-				return txErr
-			}
-			groupAccessIDs, txErr = d.CatalogService.ListProductGroupAccess(ctx, tx, id)
 			if txErr != nil {
 				return txErr
 			}
@@ -361,7 +350,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 			if txErr != nil {
 				return txErr
 			}
-			variants, groups, txErr = d.loadVariantsWithPrices(ctx, tx, id, options)
+			variants, txErr = d.loadVariantsWithPrices(ctx, tx, id, options)
 			return txErr
 
 		case "pricing":
@@ -395,8 +384,6 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		Taxons:             taxons,
 		Variants:           variants,
 		Options:            options,
-		Groups:             groups,
-		GroupAccessIDs:     groupAccessIDs,
 		WholesaleCustomers: wholesaleCustomers,
 		CustomerAccessIDs:  customerAccessIDs,
 		Media:              mediaList,
@@ -551,20 +538,20 @@ func lessVariantKey(a, b []int) bool {
 	return len(a) < len(b)
 }
 
-func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID uuid.UUID, options []admin.OptionWithValues) ([]admin.VariantWithOptions, []domain.CustomerGroup, error) {
+func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID uuid.UUID, options []admin.OptionWithValues) ([]admin.VariantWithOptions, error) {
 	rawVariants, err := d.CatalogService.ListVariants(ctx, tx, productID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	priceMap, err := d.PricingService.ListBasePricesByProduct(ctx, tx, productID, "USD")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	ordering, err := d.loadProductOptionOrdering(ctx, tx, productID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var variants []admin.VariantWithOptions
@@ -572,7 +559,7 @@ func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID 
 	for _, v := range rawVariants {
 		vov, vErr := d.CatalogService.ListVariantOptionValues(ctx, tx, v.ID)
 		if vErr != nil {
-			return nil, nil, vErr
+			return nil, vErr
 		}
 		keys[v.ID] = ordering.sortKey(vov)
 		vwo := admin.VariantWithOptions{
@@ -590,12 +577,7 @@ func (d *Deps) loadVariantsWithPrices(ctx context.Context, tx pgx.Tx, productID 
 		return v.Variant.ID, v.Variant.SKU
 	})
 
-	groups, err := d.CustomerGroupService.List(ctx, tx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return variants, groups, nil
+	return variants, nil
 }
 
 // sortVariantsByKey stably orders any slice of variant wrappers by their
@@ -717,8 +699,8 @@ func (d *Deps) handleAdminProductStatusUpdate(w http.ResponseWriter, r *http.Req
 }
 
 // handleAdminProductVisibilityUpdate sets a product's visibility tier and, when the tier
-// is restricted, the set of customer groups granted access. Both writes happen in one
-// transaction; switching away from restricted clears any existing grants.
+// is private, the set of customers granted access. Both writes happen in one
+// transaction; switching away from private clears any existing grants.
 func (d *Deps) handleAdminProductVisibilityUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -735,23 +717,11 @@ func (d *Deps) handleAdminProductVisibilityUpdate(w http.ResponseWriter, r *http
 
 	visibility := domain.ProductVisibility(r.FormValue("visibility"))
 	switch visibility {
-	case domain.ProductVisibilityPublic, domain.ProductVisibilityWholesale, domain.ProductVisibilityRestricted, domain.ProductVisibilityPrivate:
+	case domain.ProductVisibilityPublic, domain.ProductVisibilityWholesale, domain.ProductVisibilityPrivate:
 		// valid
 	default:
 		http.Error(w, "invalid visibility", http.StatusBadRequest)
 		return
-	}
-
-	// Group grants only apply to restricted products; any other tier clears them.
-	var groupIDs []uuid.UUID
-	if visibility == domain.ProductVisibilityRestricted {
-		for _, raw := range r.Form["group_ids"] {
-			gid, parseErr := uuid.Parse(raw)
-			if parseErr != nil {
-				continue
-			}
-			groupIDs = append(groupIDs, gid)
-		}
 	}
 
 	// Customer grants only apply to private products; any other tier clears them.
@@ -768,9 +738,6 @@ func (d *Deps) handleAdminProductVisibilityUpdate(w http.ResponseWriter, r *http
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		if _, txErr := d.CatalogService.UpdateProductVisibility(ctx, tx, id, visibility, staffActor(r)); txErr != nil {
-			return txErr
-		}
-		if txErr := d.CatalogService.SetProductGroupAccess(ctx, tx, id, groupIDs, staffActor(r)); txErr != nil {
 			return txErr
 		}
 		return d.CatalogService.SetProductCustomerAccess(ctx, tx, id, customerIDs, staffActor(r))
@@ -949,7 +916,6 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 	var product *domain.Product
 	var options []admin.OptionWithValues
 	var variants []admin.VariantWithOptions
-	var groups []domain.CustomerGroup
 	var taxonName string
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -1008,8 +974,6 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 			variants = append(variants, vwo)
 		}
 
-		// Load customer groups
-		groups, txErr = d.CustomerGroupService.List(ctx, tx)
 		return txErr
 	})
 	if err != nil {
@@ -1020,7 +984,7 @@ func (d *Deps) renderOptionsPanel(w http.ResponseWriter, r *http.Request, produc
 	// Render options panel (primary swap target)
 	admin.OptionsPanel(product, options).Render(ctx, w) //nolint:errcheck
 	// Render variants panel as OOB swap so its option dropdowns stay in sync
-	admin.VariantsPanel(product, variants, options, taxonName, groups, templ.Attributes{"hx-swap-oob": "outerHTML"}).Render(ctx, w) //nolint:errcheck
+	admin.VariantsPanel(product, variants, options, taxonName, templ.Attributes{"hx-swap-oob": "outerHTML"}).Render(ctx, w) //nolint:errcheck
 }
 
 // renderVariantsPanel re-fetches variants for a product and renders the partial.
@@ -1029,7 +993,6 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 	var product *domain.Product
 	var variants []admin.VariantWithOptions
 	var options []admin.OptionWithValues
-	var groups []domain.CustomerGroup
 	var taxonName string
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -1088,8 +1051,6 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 			variants = append(variants, vwo)
 		}
 
-		// Load customer groups
-		groups, txErr = d.CustomerGroupService.List(ctx, tx)
 		return txErr
 	})
 	if err != nil {
@@ -1106,7 +1067,7 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 		admin.ProductPricingPanel(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
-	admin.VariantsPanel(product, variants, options, taxonName, groups, nil).Render(ctx, w) //nolint:errcheck
+	admin.VariantsPanel(product, variants, options, taxonName, nil).Render(ctx, w) //nolint:errcheck
 }
 
 // --- Variants ---

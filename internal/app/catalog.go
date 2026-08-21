@@ -27,37 +27,28 @@ type catalogCustomerReader interface {
 	GetByID(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.Customer, error)
 }
 
-// catalogGroupReader lists the groups a customer belongs to — the access source of
-// truth (customer_group_memberships). *store.CustomerGroupStore satisfies it.
-type catalogGroupReader interface {
-	ListByCustomer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) ([]domain.CustomerGroup, error)
-}
-
 // CatalogService contains business logic for products, variants, and taxonomy.
 type CatalogService struct {
 	catalog   *store.CatalogStore
 	customers catalogCustomerReader
-	groups    catalogGroupReader
 	audit     *audit.AuditWriter
 	metrics   *metrics.Registry
 }
 
 // NewCatalogService creates a new CatalogService.
-func NewCatalogService(catalog *store.CatalogStore, customers catalogCustomerReader, groups catalogGroupReader, audit *audit.AuditWriter, metrics *metrics.Registry) *CatalogService {
+func NewCatalogService(catalog *store.CatalogStore, customers catalogCustomerReader, audit *audit.AuditWriter, metrics *metrics.Registry) *CatalogService {
 	return &CatalogService{
 		catalog:   catalog,
 		customers: customers,
-		groups:    groups,
 		audit:     audit,
 		metrics:   metrics,
 	}
 }
 
-// --- Product access (visibility + group grants) ---
+// --- Product access (visibility + per-customer grants) ---
 
-// ResolveViewer builds the access identity for a customer from the
-// customer_group_memberships join table (the source of truth) — never from the
-// deprecated customer.customer_group_id column.
+// ResolveViewer builds the access identity for a customer: whether they are an
+// approved wholesale account, and who they are (which gates private products).
 func (s *CatalogService) ResolveViewer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (domain.ProductViewer, error) {
 	customer, err := s.customers.GetByID(ctx, tx, customerID)
 	if err != nil {
@@ -67,19 +58,8 @@ func (s *CatalogService) ResolveViewer(ctx context.Context, tx pgx.Tx, customerI
 		return domain.ProductViewer{}, fmt.Errorf("resolve viewer customer: %w", err)
 	}
 
-	groups, err := s.groups.ListByCustomer(ctx, tx, customerID)
-	if err != nil {
-		return domain.ProductViewer{}, fmt.Errorf("resolve viewer groups: %w", err)
-	}
-
-	groupIDs := make([]uuid.UUID, len(groups))
-	for i, g := range groups {
-		groupIDs[i] = g.ID
-	}
-
 	return domain.ProductViewer{
 		IsWholesale: customer.IsApprovedWholesale(),
-		GroupIDs:    groupIDs,
 		CustomerID:  &customer.ID,
 	}, nil
 }
@@ -87,7 +67,7 @@ func (s *CatalogService) ResolveViewer(ctx context.Context, tx pgx.Tx, customerI
 // AccessibleFilter maps a viewer to the store visibility filter used for list reads.
 // The retail/anonymous zero-value viewer yields a public-only filter.
 func (s *CatalogService) AccessibleFilter(v domain.ProductViewer) store.VisibilityContext {
-	return store.VisibilityContext{IsWholesale: v.IsWholesale, GroupIDs: v.GroupIDs, CustomerID: v.CustomerID}
+	return store.VisibilityContext{IsWholesale: v.IsWholesale, CustomerID: v.CustomerID}
 }
 
 // CanAccessProduct reports whether the viewer may see/purchase the product. It uses the
@@ -135,70 +115,10 @@ func (s *CatalogService) UpdateProductVisibility(ctx context.Context, tx pgx.Tx,
 	return product, nil
 }
 
-// SetProductGroupAccess replaces the product's entire group-access set with groupIDs
-// (declarative — the caller submits desired state, not deltas). Passing an empty slice
-// clears all grants. Records one audit entry capturing the new set, with the previous
-// set in metadata.
-func (s *CatalogService) SetProductGroupAccess(ctx context.Context, tx pgx.Tx, productID uuid.UUID, groupIDs []uuid.UUID, actor Actor) error {
-	current, err := s.catalog.ListProductGroupVisibility(ctx, tx, productID)
-	if err != nil {
-		return fmt.Errorf("list current group access: %w", err)
-	}
-
-	desired := make(map[uuid.UUID]bool, len(groupIDs))
-	for _, id := range groupIDs {
-		desired[id] = true
-	}
-	existing := make(map[uuid.UUID]bool, len(current))
-	for _, id := range current {
-		existing[id] = true
-	}
-
-	for id := range desired {
-		if !existing[id] {
-			if err := s.catalog.SetProductGroupVisibility(ctx, tx, productID, id); err != nil {
-				return fmt.Errorf("grant group access: %w", err)
-			}
-		}
-	}
-	for id := range existing {
-		if !desired[id] {
-			if err := s.catalog.RemoveProductGroupVisibility(ctx, tx, productID, id); err != nil {
-				return fmt.Errorf("revoke group access: %w", err)
-			}
-		}
-	}
-
-	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
-		ActorType:    actor.Type,
-		ActorID:      actor.ID,
-		ActorName:    actor.Name,
-		Action:       audit.AuditProductGroupAccessUpdated,
-		ResourceType: "product",
-		ResourceID:   productID,
-		After:        groupIDs,
-		Metadata:     map[string]any{"previous_group_ids": current},
-	}); err != nil {
-		return fmt.Errorf("audit group access: %w", err)
-	}
-
-	return nil
-}
-
-// ListProductGroupAccess returns the group IDs granted access to a restricted product.
-func (s *CatalogService) ListProductGroupAccess(ctx context.Context, tx pgx.Tx, productID uuid.UUID) ([]uuid.UUID, error) {
-	ids, err := s.catalog.ListProductGroupVisibility(ctx, tx, productID)
-	if err != nil {
-		return nil, fmt.Errorf("list product group access: %w", err)
-	}
-	return ids, nil
-}
-
 // SetProductCustomerAccess replaces the product's entire per-customer access set with
 // customerIDs (declarative — desired state, not deltas). This is the grant set for a
 // 'private' white-labelled product; passing an empty slice clears all grants. Records
-// one audit entry capturing the new set, with the previous set in metadata. Mirrors
-// SetProductGroupAccess.
+// one audit entry capturing the new set, with the previous set in metadata.
 func (s *CatalogService) SetProductCustomerAccess(ctx context.Context, tx pgx.Tx, productID uuid.UUID, customerIDs []uuid.UUID, actor Actor) error {
 	current, err := s.catalog.ListProductCustomerVisibility(ctx, tx, productID)
 	if err != nil {

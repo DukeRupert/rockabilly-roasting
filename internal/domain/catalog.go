@@ -10,9 +10,8 @@ import (
 type ProductVisibility string
 
 const (
-	ProductVisibilityPublic     ProductVisibility = "public"
-	ProductVisibilityWholesale  ProductVisibility = "wholesale"
-	ProductVisibilityRestricted ProductVisibility = "restricted"
+	ProductVisibilityPublic    ProductVisibility = "public"
+	ProductVisibilityWholesale ProductVisibility = "wholesale"
 	// ProductVisibilityPrivate is a white-labelled product visible/orderable only by
 	// the specific customers granted access (product_customer_visibility).
 	ProductVisibilityPrivate ProductVisibility = "private"
@@ -58,21 +57,19 @@ func ChannelFor(v ProductViewer) SalesChannel {
 	return ChannelRetail
 }
 
-// ProductViewer is the resolved access identity of whoever is asking — the wholesale
-// flag plus the customer groups they belong to. It carries no pricing or currency.
+// ProductViewer is the resolved access identity of whoever is asking. It carries no
+// pricing or currency.
 //
-// The zero value (ProductViewer{}) is the retail/anonymous viewer: not wholesale, no
-// groups, and therefore restricted to public products by construction. Callers with no
-// authenticated customer use the zero value directly; for an authenticated wholesale
-// customer, obtain the viewer from CatalogService.ResolveViewer — never hand-assemble
-// GroupIDs in a handler.
+// The zero value (ProductViewer{}) is the retail/anonymous viewer: not wholesale and
+// no customer, and therefore limited to public products by construction. Callers with
+// no authenticated customer use the zero value directly; for an authenticated
+// customer, obtain the viewer from CatalogService.ResolveViewer.
 //
 // CustomerID is the authenticated customer's ID (nil for the anonymous/retail-browse
 // viewer). It gates 'private' products: only customers explicitly granted a private
 // product may see or order it. A nil CustomerID never sees private products.
 type ProductViewer struct {
 	IsWholesale bool
-	GroupIDs    []uuid.UUID
 	CustomerID  *uuid.UUID
 }
 

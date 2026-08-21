@@ -7,46 +7,10 @@ package sqlcgen
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
-
-const addCustomerGroupMembership = `-- name: AddCustomerGroupMembership :exec
-INSERT INTO customer_group_memberships (customer_id, customer_group_id)
-VALUES ($1, $2)
-ON CONFLICT DO NOTHING
-`
-
-type AddCustomerGroupMembershipParams struct {
-	CustomerID      uuid.UUID `json:"customer_id"`
-	CustomerGroupID uuid.UUID `json:"customer_group_id"`
-}
-
-func (q *Queries) AddCustomerGroupMembership(ctx context.Context, arg AddCustomerGroupMembershipParams) error {
-	_, err := q.db.Exec(ctx, addCustomerGroupMembership, arg.CustomerID, arg.CustomerGroupID)
-	return err
-}
-
-const createCustomerGroup = `-- name: CreateCustomerGroup :one
-INSERT INTO customer_groups (id, name, metadata)
-VALUES ($1, $2, $3)
-RETURNING id, name, metadata
-`
-
-type CreateCustomerGroupParams struct {
-	ID       uuid.UUID       `json:"id"`
-	Name     string          `json:"name"`
-	Metadata json.RawMessage `json:"metadata"`
-}
-
-func (q *Queries) CreateCustomerGroup(ctx context.Context, arg CreateCustomerGroupParams) (CustomerGroup, error) {
-	row := q.db.QueryRow(ctx, createCustomerGroup, arg.ID, arg.Name, arg.Metadata)
-	var i CustomerGroup
-	err := row.Scan(&i.ID, &i.Name, &i.Metadata)
-	return i, err
-}
 
 const createInvoice = `-- name: CreateInvoice :one
 INSERT INTO invoices (id, order_id, number, status, subtotal, shipping, tax_total, total,
@@ -189,26 +153,6 @@ func (q *Queries) CreateInvoicePayment(ctx context.Context, arg CreateInvoicePay
 	return i, err
 }
 
-const deleteCustomerGroup = `-- name: DeleteCustomerGroup :exec
-DELETE FROM customer_groups WHERE id = $1
-`
-
-func (q *Queries) DeleteCustomerGroup(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteCustomerGroup, id)
-	return err
-}
-
-const getCustomerGroupByID = `-- name: GetCustomerGroupByID :one
-SELECT id, name, metadata FROM customer_groups WHERE id = $1
-`
-
-func (q *Queries) GetCustomerGroupByID(ctx context.Context, id uuid.UUID) (CustomerGroup, error) {
-	row := q.db.QueryRow(ctx, getCustomerGroupByID, id)
-	var i CustomerGroup
-	err := row.Scan(&i.ID, &i.Name, &i.Metadata)
-	return i, err
-}
-
 const getInvoiceByID = `-- name: GetInvoiceByID :one
 SELECT id, order_id, number, status, subtotal, shipping, tax_total, total, amount_paid, amount_due, due_date, notes, internal_note, sent_at, paid_at, voided_at, created_by, created_at, updated_at FROM invoices WHERE id = $1
 `
@@ -238,57 +182,6 @@ func (q *Queries) GetInvoiceByID(ctx context.Context, id uuid.UUID) (Invoice, er
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const listCustomerGroups = `-- name: ListCustomerGroups :many
-SELECT id, name, metadata FROM customer_groups ORDER BY name
-`
-
-func (q *Queries) ListCustomerGroups(ctx context.Context) ([]CustomerGroup, error) {
-	rows, err := q.db.Query(ctx, listCustomerGroups)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CustomerGroup{}
-	for rows.Next() {
-		var i CustomerGroup
-		if err := rows.Scan(&i.ID, &i.Name, &i.Metadata); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listCustomerGroupsByCustomer = `-- name: ListCustomerGroupsByCustomer :many
-SELECT cg.id, cg.name, cg.metadata FROM customer_groups cg
-JOIN customer_group_memberships cgm ON cgm.customer_group_id = cg.id
-WHERE cgm.customer_id = $1
-ORDER BY cg.name
-`
-
-func (q *Queries) ListCustomerGroupsByCustomer(ctx context.Context, customerID uuid.UUID) ([]CustomerGroup, error) {
-	rows, err := q.db.Query(ctx, listCustomerGroupsByCustomer, customerID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []CustomerGroup{}
-	for rows.Next() {
-		var i CustomerGroup
-		if err := rows.Scan(&i.ID, &i.Name, &i.Metadata); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listInvoiceLinesByInvoice = `-- name: ListInvoiceLinesByInvoice :many
@@ -400,31 +293,6 @@ func (q *Queries) ListInvoicesByOrder(ctx context.Context, orderID uuid.UUID) ([
 	return items, nil
 }
 
-const listProductGroupVisibility = `-- name: ListProductGroupVisibility :many
-SELECT customer_group_id FROM product_group_visibility
-WHERE product_id = $1
-`
-
-func (q *Queries) ListProductGroupVisibility(ctx context.Context, productID uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := q.db.Query(ctx, listProductGroupVisibility, productID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []uuid.UUID{}
-	for rows.Next() {
-		var customer_group_id uuid.UUID
-		if err := rows.Scan(&customer_group_id); err != nil {
-			return nil, err
-		}
-		items = append(items, customer_group_id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const nextInvoiceNumber = `-- name: NextInvoiceNumber :one
 SELECT COALESCE(MAX(CAST(SUBSTRING(number FROM 5) AS integer)), 0) + 1 AS next_num
 FROM invoices
@@ -436,52 +304,6 @@ func (q *Queries) NextInvoiceNumber(ctx context.Context) (int32, error) {
 	var next_num int32
 	err := row.Scan(&next_num)
 	return next_num, err
-}
-
-const removeCustomerGroupMembership = `-- name: RemoveCustomerGroupMembership :exec
-DELETE FROM customer_group_memberships
-WHERE customer_id = $1 AND customer_group_id = $2
-`
-
-type RemoveCustomerGroupMembershipParams struct {
-	CustomerID      uuid.UUID `json:"customer_id"`
-	CustomerGroupID uuid.UUID `json:"customer_group_id"`
-}
-
-func (q *Queries) RemoveCustomerGroupMembership(ctx context.Context, arg RemoveCustomerGroupMembershipParams) error {
-	_, err := q.db.Exec(ctx, removeCustomerGroupMembership, arg.CustomerID, arg.CustomerGroupID)
-	return err
-}
-
-const removeProductGroupVisibility = `-- name: RemoveProductGroupVisibility :exec
-DELETE FROM product_group_visibility
-WHERE product_id = $1 AND customer_group_id = $2
-`
-
-type RemoveProductGroupVisibilityParams struct {
-	ProductID       uuid.UUID `json:"product_id"`
-	CustomerGroupID uuid.UUID `json:"customer_group_id"`
-}
-
-func (q *Queries) RemoveProductGroupVisibility(ctx context.Context, arg RemoveProductGroupVisibilityParams) error {
-	_, err := q.db.Exec(ctx, removeProductGroupVisibility, arg.ProductID, arg.CustomerGroupID)
-	return err
-}
-
-const setProductGroupVisibility = `-- name: SetProductGroupVisibility :exec
-INSERT INTO product_group_visibility (product_id, customer_group_id)
-VALUES ($1, $2)
-ON CONFLICT DO NOTHING
-`
-
-type SetProductGroupVisibilityParams struct {
-	ProductID       uuid.UUID `json:"product_id"`
-	CustomerGroupID uuid.UUID `json:"customer_group_id"`
-}
-
-func (q *Queries) SetProductGroupVisibility(ctx context.Context, arg SetProductGroupVisibilityParams) error {
-	_, err := q.db.Exec(ctx, setProductGroupVisibility, arg.ProductID, arg.CustomerGroupID)
-	return err
 }
 
 const sumInvoicePayments = `-- name: SumInvoicePayments :one

@@ -198,18 +198,6 @@ type Customer struct {
 	OrderRemindersEnabled     bool               `json:"order_reminders_enabled"`
 }
 
-type CustomerGroup struct {
-	ID       uuid.UUID       `json:"id"`
-	Name     string          `json:"name"`
-	Metadata json.RawMessage `json:"metadata"`
-}
-
-type CustomerGroupMembership struct {
-	CustomerID      uuid.UUID `json:"customer_id"`
-	CustomerGroupID uuid.UUID `json:"customer_group_id"`
-	AssignedAt      time.Time `json:"assigned_at"`
-}
-
 type CustomerUser struct {
 	ID                    uuid.UUID          `json:"id"`
 	CustomerID            uuid.UUID          `json:"customer_id"`
@@ -231,6 +219,25 @@ type CustomerUserInviteToken struct {
 	ExpiresAt      time.Time          `json:"expires_at"`
 	UsedAt         pgtype.Timestamptz `json:"used_at"`
 	CreatedAt      time.Time          `json:"created_at"`
+}
+
+type DeliveryRoute struct {
+	ID             uuid.UUID          `json:"id"`
+	RouteDate      pgtype.Date        `json:"route_date"`
+	Status         string             `json:"status"`
+	OriginLat      float64            `json:"origin_lat"`
+	OriginLng      float64            `json:"origin_lng"`
+	OriginAddress  string             `json:"origin_address"`
+	TotalDistanceM int32              `json:"total_distance_m"`
+	TotalDurationS int32              `json:"total_duration_s"`
+	Roundtrip      bool               `json:"roundtrip"`
+	ShareToken     *string            `json:"share_token"`
+	CreatedAt      time.Time          `json:"created_at"`
+	ActivatedAt    pgtype.Timestamptz `json:"activated_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	EndAddress     string             `json:"end_address"`
+	EndLat         *float64           `json:"end_lat"`
+	EndLng         *float64           `json:"end_lng"`
 }
 
 type Discount struct {
@@ -274,6 +281,17 @@ type FulfillmentItem struct {
 	FulfillmentID uuid.UUID `json:"fulfillment_id"`
 	LineItemID    uuid.UUID `json:"line_item_id"`
 	Quantity      int32     `json:"quantity"`
+}
+
+type GeocodedAddress struct {
+	ID                uuid.UUID `json:"id"`
+	NormalizedAddress string    `json:"normalized_address"`
+	RawAddress        string    `json:"raw_address"`
+	Lat               float64   `json:"lat"`
+	Lng               float64   `json:"lng"`
+	Provider          string    `json:"provider"`
+	Confidence        string    `json:"confidence"`
+	GeocodedAt        time.Time `json:"geocoded_at"`
 }
 
 type InventoryItem struct {
@@ -450,11 +468,6 @@ type ProductCustomerVisibility struct {
 	CustomerID uuid.UUID `json:"customer_id"`
 }
 
-type ProductGroupVisibility struct {
-	ProductID       uuid.UUID `json:"product_id"`
-	CustomerGroupID uuid.UUID `json:"customer_group_id"`
-}
-
 type ProductMedium struct {
 	ID        uuid.UUID  `json:"id"`
 	ProductID uuid.UUID  `json:"product_id"`
@@ -499,6 +512,22 @@ type ResetToken struct {
 	ExpiresAt time.Time          `json:"expires_at"`
 	UsedAt    pgtype.Timestamptz `json:"used_at"`
 	CreatedAt time.Time          `json:"created_at"`
+}
+
+type RouteStop struct {
+	ID           uuid.UUID          `json:"id"`
+	RouteID      uuid.UUID          `json:"route_id"`
+	OrderID      uuid.UUID          `json:"order_id"`
+	Position     int32              `json:"position"`
+	Address      string             `json:"address"`
+	Lat          float64            `json:"lat"`
+	Lng          float64            `json:"lng"`
+	CustomerName string             `json:"customer_name"`
+	Channel      string             `json:"channel"`
+	Status       string             `json:"status"`
+	SkipReason   string             `json:"skip_reason"`
+	Notes        string             `json:"notes"`
+	DeliveredAt  pgtype.Timestamptz `json:"delivered_at"`
 }
 
 type Session struct {

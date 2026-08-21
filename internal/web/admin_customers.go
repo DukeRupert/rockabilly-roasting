@@ -6,6 +6,7 @@ import (
 	"net/mail"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -237,7 +238,9 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	var addresses []domain.Address
 	var priceLists []domain.PriceList
 	var recentOrders []domain.Order
+	var subscriptions []domain.Subscription
 	var activity []domain.AuditEntry
+	var orderCount, lifetimeSpend int
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -260,6 +263,27 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
+		// Count and spend exclude abandoned intents and cancelled/refunded
+		// orders, so the header numbers mean the same thing the revenue
+		// dashboards mean. Recent orders above stay unfiltered — staff need to
+		// see the cancelled one they are being asked about.
+		lifetime := store.OrderFilter{
+			CustomerID:               &id,
+			ExcludeUnconfirmed:       true,
+			ExcludeCancelledRefunded: true,
+		}
+		orderCount, txErr = d.OrderService.CountOrders(ctx, tx, lifetime)
+		if txErr != nil {
+			return txErr
+		}
+		lifetimeSpend, txErr = d.OrderService.SumOrderRevenue(ctx, tx, lifetime)
+		if txErr != nil {
+			return txErr
+		}
+		subscriptions, txErr = d.SubscriptionService.ListSubscriptionsByCustomer(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
 		activity, txErr = d.AuditQueryService.ListForCustomer(ctx, tx, id, 25)
 		return txErr
 	})
@@ -268,17 +292,28 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ListOrders is newest-first, so the first row is the last order placed.
+	var lastOrderAt *time.Time
+	if len(recentOrders) > 0 {
+		placed := recentOrders[0].PlacedAt
+		lastOrderAt = &placed
+	}
+
 	name, role := staffNameRole(r)
 	props := admin.CustomerShowProps{
-		Customer:     customer,
-		Addresses:    addresses,
-		PriceLists:   priceLists,
-		RecentOrders: recentOrders,
-		Activity:     activity,
-		MerchantTZ:   d.MerchantTZ,
-		StaffName:    name,
-		StaffRole:    role,
-		CanEditEmail: staffCan(r, auth.PermEditCustomers),
+		Customer:      customer,
+		Addresses:     addresses,
+		PriceLists:    priceLists,
+		RecentOrders:  recentOrders,
+		Subscriptions: subscriptions,
+		Activity:      activity,
+		OrderCount:    orderCount,
+		LifetimeSpend: lifetimeSpend,
+		LastOrderAt:   lastOrderAt,
+		MerchantTZ:    d.MerchantTZ,
+		StaffName:     name,
+		StaffRole:     role,
+		CanEditEmail:  staffCan(r, auth.PermEditCustomers),
 	}
 
 	if IsHTMX(r) {

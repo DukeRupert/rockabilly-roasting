@@ -8,19 +8,34 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
+// CustomerShowProps backs one customer's page. The page is two-column: the main
+// column is what they have done (orders, subscriptions, activity), the rail is
+// what they are (contact details, account settings, addresses). Before that split
+// it was nine full-width slabs, with the email address — the most-used field on
+// the page — buried more than halfway down.
 type CustomerShowProps struct {
-	Customer     *domain.Customer
-	Addresses    []domain.Address
-	PriceLists   []domain.PriceList
-	RecentOrders []domain.Order
-	Activity     []domain.AuditEntry
-	MerchantTZ   *time.Location
-	StaffName    string
-	StaffRole    string
+	Customer      *domain.Customer
+	Addresses     []domain.Address
+	PriceLists    []domain.PriceList
+	RecentOrders  []domain.Order
+	Subscriptions []domain.Subscription
+	Activity      []domain.AuditEntry
+	// OrderCount and LifetimeSpend count confirmed, non-cancelled orders — the
+	// same definition the revenue dashboards use.
+	OrderCount    int
+	LifetimeSpend int
+	LastOrderAt   *time.Time
+	MerchantTZ    *time.Location
+	StaffName     string
+	StaffRole     string
 	// CanEditEmail gates the inline email editor. The route is gated
 	// independently on customers:write; this only keeps the form from showing
 	// to staff whose submit would bounce.
 	CanEditEmail bool
+}
+
+func (p CustomerShowProps) IsWholesale() bool {
+	return p.Customer.AccountType == domain.AccountTypeWholesale
 }
 
 // boolToggleValue returns the value a toggle form should post: the opposite of
@@ -32,112 +47,124 @@ func boolToggleValue(current bool) string {
 	return "true"
 }
 
+func customerLastOrderLabel(p CustomerShowProps) string {
+	if p.LastOrderAt == nil {
+		return "Never"
+	}
+	return p.LastOrderAt.In(p.MerchantTZ).Format("Jan 2, 2006")
+}
+
+// customerBackPath returns to the channel the customer belongs to, so the back
+// link lands on the list the staffer was actually looking at.
+func customerBackPath(p CustomerShowProps) string {
+	if p.IsWholesale() {
+		return CustomersWholesalePath
+	}
+	return CustomersRetailPath
+}
+
 templ CustomerShowContent(props CustomerShowProps) {
 	<!-- Header -->
-	<div class="sm:flex sm:items-center sm:justify-between">
+	<div class="sm:flex sm:items-start sm:justify-between">
 		<div>
-			<div class="flex items-center gap-3">
-				<h1 class="admin-page-title">{ props.Customer.FirstName } { props.Customer.LastName }</h1>
-				if props.Customer.AccountType == domain.AccountTypeWholesale {
+			<div class="flex flex-wrap items-center gap-3">
+				<h1 class="admin-page-title">
+					if props.Customer.CompanyName != nil && *props.Customer.CompanyName != "" {
+						{ *props.Customer.CompanyName }
+					} else {
+						{ props.Customer.FirstName } { props.Customer.LastName }
+					}
+				</h1>
+				if props.IsWholesale() {
 					<span class="badge badge-indigo">B2B</span>
 				} else {
 					<span class="badge badge-neutral">B2C</span>
 				}
+				if !props.Customer.EmailVerified {
+					<span class="badge badge-amber">unverified email</span>
+				}
 			</div>
-			<p class="mt-1 text-sm text-rr-muted">{ props.Customer.Email }</p>
-			if props.Customer.CompanyName != nil && *props.Customer.CompanyName != "" {
-				<p class="text-sm text-rr-muted">{ *props.Customer.CompanyName }</p>
-			}
+			<p class="mt-1 text-sm text-rr-muted">
+				if props.Customer.CompanyName != nil && *props.Customer.CompanyName != "" {
+					{ props.Customer.FirstName } { props.Customer.LastName } &middot;
+				}
+				{ props.Customer.Email }
+			</p>
 		</div>
 		<div class="mt-4 sm:mt-0">
-			<a href="/admin/customers" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">&larr; Back to customers</a>
+			<a href={ templ.SafeURL(customerBackPath(props)) } class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">&larr; Back to customers</a>
 		</div>
 	</div>
-	<!-- Wholesale status banner -->
-	if props.Customer.AccountType == domain.AccountTypeWholesale && props.Customer.WholesaleStatus != nil {
-		<div class="mt-4 border border-rr-border bg-rr-surface p-4">
-			<div class="sm:flex sm:items-center sm:justify-between">
-				<div class="flex items-center gap-3">
-					<h3 class="text-sm font-medium text-rr-heading">Wholesale application</h3>
-					@WholesaleStatusBadge(*props.Customer.WholesaleStatus)
-				</div>
-				<div class="mt-3 sm:mt-0">
-					if *props.Customer.WholesaleStatus == domain.WholesaleStatusPending {
-						<div class="flex gap-2">
-							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", props.Customer.ID)) }>
-								<button type="submit" class="btn-confirm">Approve</button>
-							</form>
-							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", props.Customer.ID)) }>
-								<button type="submit" class="btn-danger" onclick="return confirm('Decline this application?')">Decline</button>
-							</form>
-						</div>
-					}
-					if *props.Customer.WholesaleStatus == domain.WholesaleStatusApproved {
-						<div class="flex gap-2">
-							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-white-label-invite", props.Customer.ID)) }>
-								<button type="submit" class="btn-confirm" onclick="return confirm('Email this customer a white-label onboarding invite link?')">Send white-label invite</button>
-							</form>
-							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", props.Customer.ID)) }>
-								<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
-							</form>
-						</div>
-					}
-				</div>
-			</div>
-		</div>
+	<!-- Wholesale application: the one thing here that is an action, not a setting -->
+	if props.IsWholesale() && props.Customer.WholesaleStatus != nil {
+		@customerWholesaleBanner(props)
 	}
-	<!-- Info cards -->
-	<div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+	<!-- What this customer is worth, in three numbers -->
+	<dl class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
 		<div class="border border-rr-border bg-rr-surface p-4">
-			<dt class="text-sm font-medium text-rr-muted">Email verified</dt>
-			<dd class="mt-1 flex flex-wrap items-center justify-between gap-2">
-				if props.Customer.EmailVerified {
-					<span class="badge badge-green">yes</span>
-				} else {
-					<span class="badge badge-amber">no</span>
+			<dt class="text-sm font-medium text-rr-muted">Orders</dt>
+			<dd class="mt-1 text-lg font-semibold text-rr-heading tabular-nums">{ fmt.Sprintf("%d", props.OrderCount) }</dd>
+		</div>
+		<div class="border border-rr-border bg-rr-surface p-4">
+			<dt class="text-sm font-medium text-rr-muted">Lifetime spend</dt>
+			<dd class="mt-1 text-lg font-semibold text-rr-heading tabular-nums">{ formatCents(props.LifetimeSpend) }</dd>
+		</div>
+		<div class="border border-rr-border bg-rr-surface p-4">
+			<dt class="text-sm font-medium text-rr-muted">Last order</dt>
+			<dd class="mt-1 text-lg font-semibold text-rr-heading">{ customerLastOrderLabel(props) }</dd>
+		</div>
+	</dl>
+	<div class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-3">
+		<!-- Main column: what this customer has done -->
+		<div class="space-y-8 lg:col-span-2">
+			@customerOrdersSection(props)
+			@customerSubscriptionsSection(props)
+			@CustomerActivity(props.Activity, props.MerchantTZ)
+		</div>
+		<!-- Rail: who they are, and how the account is configured -->
+		<div class="space-y-6 lg:sticky lg:top-6 lg:self-start">
+			@customerContactCard(props)
+			@customerSettingsCard(props)
+			@customerAddressesCard(props)
+		</div>
+	</div>
+}
+
+templ customerWholesaleBanner(props CustomerShowProps) {
+	<div class="mt-4 border border-rr-border bg-rr-surface p-4">
+		<div class="sm:flex sm:items-center sm:justify-between">
+			<div class="flex items-center gap-3">
+				<h2 class="text-sm font-medium text-rr-heading">Wholesale application</h2>
+				@WholesaleStatusBadge(*props.Customer.WholesaleStatus)
+			</div>
+			<div class="mt-3 sm:mt-0">
+				if *props.Customer.WholesaleStatus == domain.WholesaleStatusPending {
+					<div class="flex gap-2">
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", props.Customer.ID)) }>
+							<button type="submit" class="btn-confirm">Approve</button>
+						</form>
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", props.Customer.ID)) }>
+							<button type="submit" class="btn-danger" onclick="return confirm('Decline this application?')">Decline</button>
+						</form>
+					</div>
 				}
-				if !props.Customer.EmailVerified {
-					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-verification", props.Customer.ID)) }>
-						<button type="submit" class="btn-confirm" style="padding:0.35rem 0.75rem;font-size:0.7rem;" onclick="return confirm('Email this customer a link to confirm this address? Following it signs them in — no password change.')">
-							Send verification link
-						</button>
+				if *props.Customer.WholesaleStatus == domain.WholesaleStatusApproved {
+					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", props.Customer.ID)) }>
+						<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
 					</form>
 				}
-				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-password-setup", props.Customer.ID)) }>
-					if props.Customer.PasswordHash == nil {
-						<button type="submit" class="btn-confirm" style="padding:0.35rem 0.75rem;font-size:0.7rem;" onclick="return confirm('Email this customer a password setup link?')">
-							Send setup link
-						</button>
-					} else {
-						<button type="submit" class="btn-confirm" style="padding:0.35rem 0.75rem;font-size:0.7rem;" onclick="return confirm('Email this customer a password reset link? Their current password will keep working until they use the link.')">
-							Send reset link
-						</button>
-					}
-				</form>
-			</dd>
-		</div>
-		<div class="border border-rr-border bg-rr-surface p-4">
-			<dt class="text-sm font-medium text-rr-muted">Account type</dt>
-			<dd class="mt-1 text-sm text-rr-heading capitalize">
-				{ string(props.Customer.AccountType) }
-			</dd>
-		</div>
-		<div class="border border-rr-border bg-rr-surface p-4">
-			<dt class="text-sm font-medium text-rr-muted">Tax exempt</dt>
-			<dd class="mt-1 text-sm text-rr-heading">
-				if props.Customer.TaxExempt {
-					Yes
-					if props.Customer.TaxExemptReason != nil {
-						<span class="text-rr-muted"> — { *props.Customer.TaxExemptReason }</span>
-					}
-				} else {
-					No
+				if *props.Customer.WholesaleStatus == domain.WholesaleStatusSuspended {
+					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", props.Customer.ID)) }>
+						<button type="submit" class="btn-confirm" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
+					</form>
 				}
-			</dd>
+			</div>
 		</div>
 	</div>
-	<!-- Recent Orders -->
-	<div class="mt-8">
+}
+
+templ customerOrdersSection(props CustomerShowProps) {
+	<div>
 		<div class="sm:flex sm:items-center sm:justify-between">
 			<h2 class="text-sm font-semibold text-rr-heading">Recent orders</h2>
 			if len(props.RecentOrders) > 0 {
@@ -164,11 +191,11 @@ templ CustomerShowContent(props CustomerShowProps) {
 					</thead>
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, o := range props.RecentOrders {
-							<tr>
+							<tr class="row-link">
 								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
 									<a
 										href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID.String())) }
-										class="font-medium text-rr-red hover:text-rr-red-lt"
+										class="row-link-target font-medium text-rr-red hover:text-rr-red-lt"
 									>
 										if o.Number != "" {
 											{ o.Number }
@@ -195,248 +222,363 @@ templ CustomerShowContent(props CustomerShowProps) {
 			</div>
 		}
 	</div>
-	<!-- Activity -->
-	@CustomerActivity(props.Activity, props.MerchantTZ)
-	<!-- Details -->
-	<div class="mt-8 border border-rr-border bg-rr-surface">
-		<div class="px-4 py-5 sm:px-6">
-			<h2 class="text-sm font-semibold text-rr-heading">Details</h2>
-		</div>
-		<div class="border-t border-rr-border">
-			<dl class="divide-y divide-rr-border">
-				<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-					<dt class="text-sm font-medium text-rr-muted">Email</dt>
-					<dd class="mt-1 sm:col-span-2 sm:mt-0">
-						if props.CanEditEmail {
-							<form
-								method="post"
-								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/email", props.Customer.ID)) }
-								class="flex flex-wrap items-center gap-2"
-								onsubmit="return confirm('Change this customer’s sign-in address? They will use the new address to log in. Send them a verification link afterwards to confirm it works.')"
-							>
-								<input
-									type="email"
-									name="email"
-									value={ props.Customer.Email }
-									required
-									maxlength="255"
-									autocomplete="off"
-									class="w-full max-w-sm rounded-sm bg-rr-surface py-1.5 px-3 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-								/>
-								<button type="submit" class="btn-confirm">Save</button>
-							</form>
-							<p class="mt-1 text-xs text-rr-muted">
-								Orders, subscriptions, and history stay with the customer. The address is marked unverified until they follow a verification link &mdash; send one from the Email verified card above.
-							</p>
-						} else {
-							<span class="text-sm text-rr-heading">{ props.Customer.Email }</span>
-						}
-					</dd>
-				</div>
-				if props.Customer.Phone != nil {
-					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-rr-muted">Phone</dt>
-						<dd class="mt-1 text-sm text-rr-heading sm:col-span-2 sm:mt-0">{ *props.Customer.Phone }</dd>
-					</div>
-				}
-				<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-					<dt class="text-sm font-medium text-rr-muted">Customer since</dt>
-					<dd class="mt-1 text-sm text-rr-heading sm:col-span-2 sm:mt-0">{ props.Customer.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }</dd>
-				</div>
-			</dl>
-		</div>
-	</div>
-	<!-- Fulfillment preferences -->
-	<div class="mt-8 border border-rr-border bg-rr-surface">
-		<div class="px-4 py-5 sm:px-6">
-			<h2 class="text-sm font-semibold text-rr-heading">Fulfillment preferences</h2>
-		</div>
-		<div class="border-t border-rr-border">
-			<dl class="divide-y divide-rr-border">
-				<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-					<dt class="text-sm font-medium text-rr-muted">Local fulfillment</dt>
-					<dd class="mt-1 sm:col-span-2 sm:mt-0">
-						<form
-							method="post"
-							action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/local-fulfillment", props.Customer.ID)) }
-							class="flex items-center gap-2"
-						>
-							<div class="grid grid-cols-1">
-								<select
-									name="local_fulfillment"
-									onchange="this.form.submit()"
-									class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-								>
-									<option value="" selected?={ props.Customer.PreferredLocalFulfillment == nil }>Ask each time</option>
-									<option value="local_delivery" selected?={ props.Customer.PreferredLocalFulfillment != nil && *props.Customer.PreferredLocalFulfillment == domain.ShippingMethodLocalDelivery }>Local delivery</option>
-									<option value="pickup" selected?={ props.Customer.PreferredLocalFulfillment != nil && *props.Customer.PreferredLocalFulfillment == domain.ShippingMethodPickup }>Pickup at the shop</option>
-								</select>
-								<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
-									<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
-								</svg>
-							</div>
-						</form>
-					</dd>
-				</div>
-			</dl>
-		</div>
-	</div>
-	<!-- Wholesale billing settings -->
-	if props.Customer.AccountType == domain.AccountTypeWholesale {
-		<div class="mt-8 border border-rr-border bg-rr-surface">
-			<div class="px-4 py-5 sm:px-6">
-				<h2 class="text-sm font-semibold text-rr-heading">Billing Settings</h2>
-			</div>
-			<div class="border-t border-rr-border">
-				<dl class="divide-y divide-rr-border">
-					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-rr-muted">Payment terms</dt>
-						<dd class="mt-1 sm:col-span-2 sm:mt-0">
-							<form
-								method="post"
-								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/payment-terms", props.Customer.ID)) }
-								class="flex items-center gap-2"
-							>
-								<div class="grid grid-cols-1">
-									<select
-										name="payment_terms_days"
-										onchange="this.form.submit()"
-										class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-									>
-										<option value="" selected?={ props.Customer.PaymentTermsDays == nil }>Not set</option>
-										<option value="7" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 7 }>Net 7</option>
-										<option value="15" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 15 }>Net 15</option>
-										<option value="21" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 21 }>Net 21</option>
-										<option value="30" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 30 }>Net 30</option>
-									</select>
-									<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
-										<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
-									</svg>
-								</div>
-							</form>
-						</dd>
-					</div>
-					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-rr-muted">Price list</dt>
-						<dd class="mt-1 sm:col-span-2 sm:mt-0">
-							<form
-								method="post"
-								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/price-list", props.Customer.ID)) }
-								class="flex items-center gap-2"
-							>
-								<div class="grid grid-cols-1">
-									<select
-										name="price_list_id"
-										onchange="this.form.submit()"
-										class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-									>
-										<option value="" selected?={ props.Customer.PriceListID == nil }>Base prices</option>
-										for _, pl := range props.PriceLists {
-											<option value={ pl.ID.String() } selected?={ props.Customer.PriceListID != nil && *props.Customer.PriceListID == pl.ID }>
-												{ pl.Name }
-												if pl.Status != domain.PriceListStatusActive {
-													({ string(pl.Status) })
-												}
-											</option>
-										}
-									</select>
-									<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
-										<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
-									</svg>
-								</div>
-								<!-- The assignment is set here; what the list actually charges lives
-								     in the catalog, one click away. -->
-								if props.Customer.PriceListID != nil {
-									<a href={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s", *props.Customer.PriceListID)) } class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">
-										View prices
-									</a>
-								}
-							</form>
-						</dd>
-					</div>
-					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-rr-muted">Billing method</dt>
-						<dd class="mt-1 sm:col-span-2 sm:mt-0">
-							<form
-								method="post"
-								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/billing-method", props.Customer.ID)) }
-								class="flex items-center gap-2"
-							>
-								<div class="grid grid-cols-1">
-									<select
-										name="billing_method"
-										onchange="this.form.submit()"
-										class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-									>
-										<option value="manual" selected?={ props.Customer.BillingMethod == domain.BillingMethodManual }>Manual</option>
-										<option value="ach" selected?={ props.Customer.BillingMethod == domain.BillingMethodACH }>ACH</option>
-										<option value="credit_card" selected?={ props.Customer.BillingMethod == domain.BillingMethodCreditCard }>Credit Card</option>
-									</select>
-									<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
-										<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
-									</svg>
-								</div>
-							</form>
-						</dd>
-					</div>
-					<div class="px-4 py-4 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-						<dt class="text-sm font-medium text-rr-muted">Weekly order reminder</dt>
-						<dd class="mt-1 sm:col-span-2 sm:mt-0">
-							<form
-								method="post"
-								action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/order-reminders", props.Customer.ID)) }
-								class="flex items-center gap-2"
-							>
-								<input type="hidden" name="enabled" value={ boolToggleValue(props.Customer.OrderRemindersEnabled) }/>
-								if props.Customer.OrderRemindersEnabled {
-									<span class="badge badge-green">On</span>
-									<button type="submit" class="btn btn-secondary">Turn off</button>
-								} else {
-									<span class="badge badge-grey">Off</span>
-									<button type="submit" class="btn btn-secondary">Turn on</button>
-								}
-								<span class="text-xs text-rr-muted">Sent Fridays to accounts that ordered in the last 3 weeks.</span>
-							</form>
-						</dd>
-					</div>
-				</dl>
-			</div>
-		</div>
-	}
-	<!-- Addresses -->
-	<div class="mt-8">
-		<h2 class="text-sm font-semibold text-rr-heading">Addresses</h2>
-		if len(props.Addresses) == 0 {
-			<p class="mt-2 text-sm text-rr-muted">No addresses on file.</p>
+}
+
+// customerSubscriptionsSection answers "is this person on a standing order?" —
+// a question the page could not answer at all before, short of searching the
+// subscriptions list by hand.
+templ customerSubscriptionsSection(props CustomerShowProps) {
+	<div>
+		<h2 class="text-sm font-semibold text-rr-heading">Subscriptions</h2>
+		if len(props.Subscriptions) == 0 {
+			<p class="mt-2 text-sm text-rr-muted">No subscriptions.</p>
 		} else {
-			<div class="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-				for _, addr := range props.Addresses {
-					<div class="border border-rr-border bg-rr-surface p-4">
-						<p class="text-sm font-medium text-rr-heading">{ addr.FirstName } { addr.LastName }</p>
-						if addr.Company != nil {
-							<p class="text-sm text-rr-muted">{ *addr.Company }</p>
+			<div class="mt-2 overflow-hidden border border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Subscription</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Next order</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, sub := range props.Subscriptions {
+							<tr class="row-link">
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", sub.ID)) } class="row-link-target font-medium text-rr-red hover:text-rr-red-lt">
+										{ sub.ID.String()[:8] }
+									</a>
+									<span class="text-rr-muted">&nbsp;&times;{ fmt.Sprintf("%d", sub.Quantity) }</span>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									@SubscriptionStatusBadge(sub.Status)
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+									{ sub.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
+								</td>
+							</tr>
 						}
-						<p class="text-sm text-rr-muted">{ addr.Line1 }</p>
-						if addr.Line2 != nil {
-							<p class="text-sm text-rr-muted">{ *addr.Line2 }</p>
-						}
-						<p class="text-sm text-rr-muted">{ addr.City }, { addr.State } { addr.PostalCode }</p>
-						<p class="text-sm text-rr-muted">{ addr.CountryCode }</p>
-						if addr.IsDefault {
-							<p class="mt-2">
-								<span class="badge badge-blue">default</span>
-							</p>
-						}
-					</div>
-				}
+					</tbody>
+				</table>
 			</div>
 		}
 	</div>
 }
 
+// customerContactCard holds identity: the sign-in address, the phone, and every
+// "send them a link" action, gathered behind one Send menu rather than scattered
+// as three buttons inside a card nominally about verification status.
+templ customerContactCard(props CustomerShowProps) {
+	<div class="border border-rr-border bg-rr-surface">
+		<div class="flex items-center justify-between border-b border-rr-border px-4 py-3">
+			<h2 class="text-sm font-semibold text-rr-heading">Contact</h2>
+			@customerSendMenu(props)
+		</div>
+		<dl class="divide-y divide-rr-border">
+			<div class="px-4 py-3">
+				<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Email</dt>
+				<dd class="mt-1">
+					if props.CanEditEmail {
+						<form
+							method="post"
+							action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/email", props.Customer.ID)) }
+							class="flex flex-wrap items-center gap-2"
+							onsubmit="return confirm('Change this customer’s sign-in address? They will use the new address to log in. Send them a verification link afterwards to confirm it works.')"
+						>
+							<input
+								type="email"
+								name="email"
+								value={ props.Customer.Email }
+								required
+								maxlength="255"
+								autocomplete="off"
+								class="w-full min-w-0 flex-1 rounded-sm bg-rr-surface py-1.5 px-3 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+							/>
+							<button type="submit" class="btn-confirm">Save</button>
+						</form>
+						<p class="mt-1 text-xs text-rr-muted">
+							Orders, subscriptions and history stay with the customer. The address is marked unverified until they follow a verification link.
+						</p>
+					} else {
+						<span class="text-sm text-rr-heading">{ props.Customer.Email }</span>
+					}
+				</dd>
+			</div>
+			<div class="px-4 py-3">
+				<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Verified</dt>
+				<dd class="mt-1">
+					if props.Customer.EmailVerified {
+						<span class="badge badge-green">yes</span>
+					} else {
+						<span class="badge badge-amber">no</span>
+					}
+					if props.Customer.PasswordHash == nil {
+						<span class="badge badge-grey ml-1.5">no password set</span>
+					}
+				</dd>
+			</div>
+			if props.Customer.Phone != nil && *props.Customer.Phone != "" {
+				<div class="px-4 py-3">
+					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Phone</dt>
+					<dd class="mt-1 text-sm text-rr-heading">{ *props.Customer.Phone }</dd>
+				</div>
+			}
+			<div class="px-4 py-3">
+				<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Customer since</dt>
+				<dd class="mt-1 text-sm text-rr-heading">{ props.Customer.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }</dd>
+			</div>
+		</dl>
+	</div>
+}
+
+// customerSendMenu gathers the outbound-email actions. They are all "send this
+// person a link", they are all occasional, and each one used to occupy a button
+// in a card that was supposed to be reporting verification status.
+templ customerSendMenu(props CustomerShowProps) {
+	<div x-data="{ open: false }" class="relative">
+		<button
+			type="button"
+			x-on:click="open = !open"
+			x-bind:aria-expanded="open"
+			aria-haspopup="true"
+			class="inline-flex items-center gap-1 rounded-sm border border-rr-border bg-rr-surface px-2.5 py-1 text-xs font-semibold text-rr-heading hover:bg-rr-raised"
+		>
+			Send
+			<svg class="size-3.5" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+				<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+			</svg>
+		</button>
+		<div
+			x-show="open"
+			x-cloak
+			x-transition.opacity
+			x-on:click.outside="open = false"
+			x-on:keydown.escape.window="open = false"
+			class="absolute right-0 z-30 mt-1 w-64 rounded-sm border border-rr-border bg-rr-surface py-1 text-left shadow-lg"
+			role="menu"
+		>
+			if !props.Customer.EmailVerified {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-verification", props.Customer.ID)) }>
+					<button
+						type="submit"
+						role="menuitem"
+						class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised"
+						onclick="return confirm('Email this customer a link to confirm this address? Following it signs them in — no password change.')"
+					>
+						Verification link
+					</button>
+				</form>
+			}
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-password-setup", props.Customer.ID)) }>
+				if props.Customer.PasswordHash == nil {
+					<button
+						type="submit"
+						role="menuitem"
+						class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised"
+						onclick="return confirm('Email this customer a password setup link?')"
+					>
+						Password setup link
+					</button>
+				} else {
+					<button
+						type="submit"
+						role="menuitem"
+						class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised"
+						onclick="return confirm('Email this customer a password reset link? Their current password will keep working until they use the link.')"
+					>
+						Password reset link
+					</button>
+				}
+			</form>
+			if props.IsWholesale() && props.Customer.WholesaleStatus != nil && *props.Customer.WholesaleStatus == domain.WholesaleStatusApproved {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/send-white-label-invite", props.Customer.ID)) }>
+					<button
+						type="submit"
+						role="menuitem"
+						class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised"
+						onclick="return confirm('Email this customer a white-label onboarding invite link?')"
+					>
+						White-label invite
+					</button>
+				</form>
+			}
+		</div>
+	</div>
+}
+
+// customerSettingsCard is every switch on the account in one place. Retail
+// accounts see the two that apply to them; wholesale accounts get the billing
+// block here as well, rather than in its own slab further down the page.
+templ customerSettingsCard(props CustomerShowProps) {
+	<div class="border border-rr-border bg-rr-surface">
+		<div class="border-b border-rr-border px-4 py-3">
+			<h2 class="text-sm font-semibold text-rr-heading">Account settings</h2>
+		</div>
+		<dl class="divide-y divide-rr-border">
+			<div class="px-4 py-3">
+				<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Tax exempt</dt>
+				<dd class="mt-1 text-sm text-rr-heading">
+					if props.Customer.TaxExempt {
+						Yes
+						if props.Customer.TaxExemptReason != nil {
+							<span class="text-rr-muted"> — { *props.Customer.TaxExemptReason }</span>
+						}
+					} else {
+						No
+					}
+				</dd>
+			</div>
+			<div class="px-4 py-3">
+				<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Local fulfillment</dt>
+				<dd class="mt-1">
+					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/local-fulfillment", props.Customer.ID)) }>
+						@customerSelect("local_fulfillment") {
+							<option value="" selected?={ props.Customer.PreferredLocalFulfillment == nil }>Ask each time</option>
+							<option value="local_delivery" selected?={ props.Customer.PreferredLocalFulfillment != nil && *props.Customer.PreferredLocalFulfillment == domain.ShippingMethodLocalDelivery }>Local delivery</option>
+							<option value="pickup" selected?={ props.Customer.PreferredLocalFulfillment != nil && *props.Customer.PreferredLocalFulfillment == domain.ShippingMethodPickup }>Pickup at the shop</option>
+						}
+					</form>
+				</dd>
+			</div>
+			if props.IsWholesale() {
+				<div class="px-4 py-3">
+					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Payment terms</dt>
+					<dd class="mt-1">
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/payment-terms", props.Customer.ID)) }>
+							@customerSelect("payment_terms_days") {
+								<option value="" selected?={ props.Customer.PaymentTermsDays == nil }>Not set</option>
+								<option value="7" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 7 }>Net 7</option>
+								<option value="15" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 15 }>Net 15</option>
+								<option value="21" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 21 }>Net 21</option>
+								<option value="30" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 30 }>Net 30</option>
+							}
+						</form>
+					</dd>
+				</div>
+				<div class="px-4 py-3">
+					<dt class="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-rr-muted">
+						Price list
+						if props.Customer.PriceListID != nil {
+							<a href={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s", *props.Customer.PriceListID)) } class="font-semibold normal-case tracking-normal text-rr-red hover:text-rr-red-lt">
+								View prices
+							</a>
+						}
+					</dt>
+					<dd class="mt-1">
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/price-list", props.Customer.ID)) }>
+							@customerSelect("price_list_id") {
+								<option value="" selected?={ props.Customer.PriceListID == nil }>Base prices</option>
+								for _, pl := range props.PriceLists {
+									<option value={ pl.ID.String() } selected?={ props.Customer.PriceListID != nil && *props.Customer.PriceListID == pl.ID }>
+										{ pl.Name }
+										if pl.Status != domain.PriceListStatusActive {
+											({ string(pl.Status) })
+										}
+									</option>
+								}
+							}
+						</form>
+					</dd>
+				</div>
+				<div class="px-4 py-3">
+					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Billing method</dt>
+					<dd class="mt-1">
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/billing-method", props.Customer.ID)) }>
+							@customerSelect("billing_method") {
+								<option value="manual" selected?={ props.Customer.BillingMethod == domain.BillingMethodManual }>Manual</option>
+								<option value="ach" selected?={ props.Customer.BillingMethod == domain.BillingMethodACH }>ACH</option>
+								<option value="credit_card" selected?={ props.Customer.BillingMethod == domain.BillingMethodCreditCard }>Credit Card</option>
+							}
+						</form>
+					</dd>
+				</div>
+				<div class="px-4 py-3">
+					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Weekly order reminder</dt>
+					<dd class="mt-1">
+						<form
+							method="post"
+							action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/order-reminders", props.Customer.ID)) }
+							class="flex items-center gap-2"
+						>
+							<input type="hidden" name="enabled" value={ boolToggleValue(props.Customer.OrderRemindersEnabled) }/>
+							if props.Customer.OrderRemindersEnabled {
+								<span class="badge badge-green">On</span>
+								<button type="submit" class="btn btn-secondary">Turn off</button>
+							} else {
+								<span class="badge badge-grey">Off</span>
+								<button type="submit" class="btn btn-secondary">Turn on</button>
+							}
+						</form>
+						<p class="mt-1 text-xs text-rr-muted">Sent Fridays to accounts that ordered in the last 3 weeks.</p>
+					</dd>
+				</div>
+			}
+		</dl>
+	</div>
+}
+
+// customerSelect is the auto-submitting select these settings all share: change
+// the value, the form posts, the page comes back with it applied.
+templ customerSelect(name string) {
+	<div class="grid grid-cols-1">
+		<select
+			name={ name }
+			onchange="this.form.submit()"
+			class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+		>
+			{ children... }
+		</select>
+		<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+			<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+		</svg>
+	</div>
+}
+
+templ customerAddressesCard(props CustomerShowProps) {
+	<div class="border border-rr-border bg-rr-surface">
+		<div class="border-b border-rr-border px-4 py-3">
+			<h2 class="text-sm font-semibold text-rr-heading">Addresses</h2>
+		</div>
+		if len(props.Addresses) == 0 {
+			<p class="px-4 py-3 text-sm text-rr-muted">No addresses on file.</p>
+		} else {
+			<ul class="divide-y divide-rr-border">
+				for _, addr := range props.Addresses {
+					<li class="px-4 py-3">
+						<p class="text-sm font-medium text-rr-heading">
+							{ addr.FirstName } { addr.LastName }
+							if addr.IsDefault {
+								<span class="badge badge-blue ml-1.5">default</span>
+							}
+						</p>
+						if addr.Company != nil && *addr.Company != "" {
+							<p class="text-sm text-rr-muted">{ *addr.Company }</p>
+						}
+						<p class="text-sm text-rr-muted">{ addr.Line1 }</p>
+						if addr.Line2 != nil && *addr.Line2 != "" {
+							<p class="text-sm text-rr-muted">{ *addr.Line2 }</p>
+						}
+						<p class="text-sm text-rr-muted">{ addr.City }, { addr.State } { addr.PostalCode }</p>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+}
+
+// customerPageTitle matches the h1: a wholesale account is known by its company
+// name, a retail customer by their own.
+func customerPageTitle(c *domain.Customer) string {
+	if c.CompanyName != nil && *c.CompanyName != "" {
+		return *c.CompanyName
+	}
+	return fmt.Sprintf("%s %s", c.FirstName, c.LastName)
+}
+
 templ CustomerShow(props CustomerShowProps) {
 	@layouts.Admin(layouts.AdminProps{
-		Title:      fmt.Sprintf("%s %s", props.Customer.FirstName, props.Customer.LastName),
+		Title:      customerPageTitle(props.Customer),
 		ActivePath: "/admin/customers",
 		StaffName:  props.StaffName,
 		StaffRole:  props.StaffRole,

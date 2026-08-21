@@ -774,6 +774,13 @@ func (s *OrderStore) SumOrderRevenue(ctx context.Context, tx pgx.Tx, f OrderFilt
 	args := []any{}
 	argN := 1
 
+	// One customer's lifetime spend uses the same sum as the dashboards, so the
+	// two can never disagree about what counts as revenue.
+	if f.CustomerID != nil {
+		query += fmt.Sprintf(" AND customer_id = $%d", argN)
+		args = append(args, *f.CustomerID)
+		argN++
+	}
 	if f.Status != nil {
 		query += fmt.Sprintf(" AND status = $%d", argN)
 		args = append(args, string(*f.Status))

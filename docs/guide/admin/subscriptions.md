@@ -81,7 +81,7 @@ If the subscription has been cancelled, the cancellation timestamp is shown. If 
 
 ### Skipping Shipments
 
-Active subscriptions have a **Skip shipments** panel on the detail page, for when a customer calls in rather than doing it themselves.
+Active subscriptions get a **Skip shipments** row in the Actions panel, for when a customer calls in rather than doing it themselves.
 
 - **Skip the next N shipments** -- pick a count (up to 6) and click **Skip**. The schedule advances by that many whole billing cycles.
 - **Or restart on a date** -- pick a day and click **Set date**. The next order lands on that day and the normal cadence resumes from there. The picker runs from the day after the order already scheduled through the 60-day ceiling; if the next order is already past that ceiling the date option is hidden and only the shipment count applies.
@@ -92,7 +92,7 @@ Skipping never charges the customer and never creates an order for the skipped w
 
 **Undoing notifies the customer.** An undo moves the charge date *earlier* than the last message told them, so a staff-initiated undo emails them the old and new dates. A customer who undoes it themselves gets nothing extra -- they saw it confirmed on screen.
 
-**Undoing.** While a skip can still be cleanly reversed, an **Undo skip** bar appears in the panel showing the date it would restore. Undo puts back the exact schedule the skip replaced. It disappears once that original date has passed or the schedule moves for another reason (renewal, resume, plan change, or a second skip) -- at that point there is no single skip left to reverse, and the dates have to be set by hand.
+**Undoing.** While a skip can still be cleanly reversed, an **Undo skip** bar appears in that row showing the date it would restore. Undo puts back the exact schedule the skip replaced. It disappears once that original date has passed or the schedule moves for another reason (renewal, resume, plan change, or a second skip) -- at that point there is no single skip left to reverse, and the dates have to be set by hand.
 
 ### Renewal Orders
 
@@ -127,7 +127,9 @@ past_due --> cancelled
 
 ## Staff Actions
 
-The subscription detail page shows action buttons based on the current status.
+Everything you can *do* to a subscription lives in one **Actions** panel near the top of the detail page. The reversible lifecycle buttons — Pause, Resume, Retry payment, Cancel — sit in its header, with Cancel ruled off to the right because it's the one that can't be taken back. The settings that need a sentence of explanation (**Skip shipments**, **Renewal shipping**) are rows underneath. What's offered depends on the current status; a cancelled subscription shows no panel at all.
+
+Changing the **plan** and changing the **size/grind** are not in this panel — they sit next to the values they change, on the plan card and the product line.
 
 ### Pause
 

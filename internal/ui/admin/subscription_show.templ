@@ -169,146 +169,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			</p>
 		</div>
 	}
-	<!-- Actions -->
-	if canPause(props.Subscription.Status) || canResume(props.Subscription.Status) || canCancel(props.Subscription.Status) {
-		<div class="mt-6 flex flex-wrap gap-3">
-			if canPause(props.Subscription.Status) {
-				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/pause", props.Subscription.ID.String())) }>
-					<button type="submit" class="btn-secondary">Pause</button>
-				</form>
-			}
-			if canResume(props.Subscription.Status) {
-				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/resume", props.Subscription.ID.String())) }>
-					<button type="submit" class="btn-confirm">Resume</button>
-				</form>
-			}
-			if props.Subscription.Status == domain.SubscriptionStatusPastDue {
-				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/retry", props.Subscription.ID.String())) }>
-					<button type="submit" class="btn-confirm">Retry payment now</button>
-				</form>
-			}
-			if canCancel(props.Subscription.Status) {
-				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/cancel", props.Subscription.ID.String())) }>
-					<button
-						type="submit"
-						class="btn-danger"
-						onclick="return confirm('Cancel this subscription? This cannot be undone.')"
-					>
-						Cancel Subscription
-					</button>
-				</form>
-			}
-		</div>
-	}
-	<!-- Skip upcoming shipments -->
-	if props.Subscription.Status == domain.SubscriptionStatusActive {
-		{{ minDate, maxDate, canPickRestart := skipDateBounds(props.Subscription, props.MerchantTZ) }}
-		<div class="mt-6 border border-rr-border bg-rr-surface p-4">
-			<p class="text-sm font-semibold text-rr-heading">Skip shipments</p>
-			<p class="mt-0.5 text-sm text-rr-muted">
-				Pushes the next order out without pausing or cancelling. Nothing is charged for the skipped window, and the cadence picks back up from the new date.
-			</p>
-			{{ restoreTo, canUndo := skipUndoOffer(props.Subscription) }}
-			if canUndo {
-				<form
-					method="post"
-					action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/undo-skip", props.Subscription.ID.String())) }
-					class="mt-3 flex flex-wrap items-center justify-between gap-3 border border-rr-border bg-rr-raised p-3"
-				>
-					<p class="text-sm text-rr-heading">
-						Skipped to { props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006") }.
-						<span class="text-rr-muted">Undo puts the next order back to { restoreTo.In(props.MerchantTZ).Format("Jan 2, 2006") }.</span>
-					</p>
-					<button type="submit" class="btn-secondary">Undo skip</button>
-				</form>
-			}
-			<!-- Two separate forms, not one with two submit buttons: pressing
-			     Enter in the date field would otherwise submit the first button
-			     in the form and skip a shipment count nobody chose. -->
-			<div class="mt-3 flex flex-wrap items-end gap-x-6 gap-y-3">
-				<form
-					method="post"
-					action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/skip", props.Subscription.ID.String())) }
-					class="flex items-end gap-2"
-				>
-					<input type="hidden" name="skip_mode" value="intervals"/>
-					<div>
-						<label for="skip-intervals" class="block text-xs font-medium uppercase tracking-wide text-rr-muted">Skip the next</label>
-						<select
-							id="skip-intervals"
-							name="intervals"
-							class="mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
-						>
-							for _, n := range skipCounts() {
-								<option value={ fmt.Sprintf("%d", n) }>{ skipCountLabel(n) }</option>
-							}
-						</select>
-					</div>
-					<button type="submit" class="btn-secondary">Skip</button>
-				</form>
-				if canPickRestart {
-					<form
-						method="post"
-						action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/skip", props.Subscription.ID.String())) }
-						class="flex items-end gap-2"
-					>
-						<input type="hidden" name="skip_mode" value="date"/>
-						<div>
-							<label for="skip-resume-on" class="block text-xs font-medium uppercase tracking-wide text-rr-muted">Or restart on</label>
-							<input
-								id="skip-resume-on"
-								type="date"
-								name="resume_on"
-								required
-								min={ minDate }
-								max={ maxDate }
-								class="mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
-							/>
-						</div>
-						<button type="submit" class="btn-secondary">Set date</button>
-					</form>
-					<p class="text-xs text-rr-muted">
-						Restart dates run from { minDate } to { maxDate } — after the order already scheduled, and no more than { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out.
-					</p>
-				} else {
-					<p class="text-xs text-rr-muted">
-						The next order is already more than { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out, so there's no restart date to pick — skip by shipment count instead.
-					</p>
-				}
-			</div>
-		</div>
-	}
-	<!-- Renewal shipping exception (grandfather toggle) -->
-	if canCancel(props.Subscription.Status) {
-		{{ grandfathered := props.Subscription.ShippingGrandfathered() }}
-		<div class="mt-6 border border-rr-border bg-rr-surface p-4">
-			<div class="flex flex-wrap items-center justify-between gap-3">
-				<div>
-					<p class="text-sm font-semibold text-rr-heading">Renewal shipping</p>
-					if grandfathered {
-						<p class="mt-0.5 text-sm text-rr-muted">Exempt — renewals ship free for this subscription.</p>
-					} else {
-						<p class="mt-0.5 text-sm text-rr-muted">Charged on renewal like a retail order (free over the threshold or for local zips).</p>
-					}
-				</div>
-				<div class="flex items-center gap-3">
-					if grandfathered {
-						<span class="badge-green">Free shipping</span>
-						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/grandfather-shipping", props.Subscription.ID.String())) }>
-							<input type="hidden" name="enabled" value="false"/>
-							<button type="submit" class="btn-secondary">Remove exception</button>
-						</form>
-					} else {
-						<span class="badge-slate">Standard</span>
-						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/grandfather-shipping", props.Subscription.ID.String())) }>
-							<input type="hidden" name="enabled" value="true"/>
-							<button type="submit" class="btn-secondary">Grant free shipping</button>
-						</form>
-					}
-				</div>
-			</div>
-		</div>
-	}
+	@subscriptionActions(props)
 	<!-- Product line -->
 	if props.Product != nil && props.Variant != nil {
 		<div class="mt-6 border border-rr-border bg-rr-surface p-4">
@@ -522,6 +383,200 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 		}
 	</div>
 	@SubscriptionTimeline(props.Activity, props.MerchantTZ)
+}
+
+// subscriptionActions is everything staff can *do* to a subscription, in one
+// panel.
+//
+// These used to be three separate things stacked down the page — a bare button
+// row, then a skip card, then a shipping toggle — which read as unrelated
+// widgets that happened to be adjacent. They are all the same job: change the
+// state of this subscription. The panel makes that one decision point, with the
+// lifecycle buttons in the header and the settings that need explaining as rows
+// underneath.
+//
+// What is deliberately NOT here: changing the plan and changing the size/grind.
+// Those are edits to a displayed value, and they live next to the value they
+// edit so the select and the thing it changes are never separated.
+templ subscriptionActions(props SubscriptionShowProps) {
+	{{ status := props.Subscription.Status }}
+	if canPause(status) || canResume(status) || canCancel(status) {
+		<section class="mt-6 border border-rr-border bg-rr-surface">
+			<header class="flex flex-wrap items-center justify-between gap-3 border-b border-rr-border bg-rr-raised px-4 py-2">
+				<h2 class="text-xs uppercase tracking-wide text-rr-muted label-font">Actions</h2>
+				<div class="flex flex-wrap items-center gap-2">
+					if canResume(status) {
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/resume", props.Subscription.ID.String())) }>
+							<button type="submit" class="btn-confirm">Resume</button>
+						</form>
+					}
+					if canPause(status) {
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/pause", props.Subscription.ID.String())) }>
+							<button type="submit" class="btn-secondary">Pause</button>
+						</form>
+					}
+					if status == domain.SubscriptionStatusPastDue {
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/retry", props.Subscription.ID.String())) }>
+							<button type="submit" class="btn-confirm">Retry payment now</button>
+						</form>
+					}
+					if canCancel(status) {
+						<!-- Ruled off from the reversible actions: cancelling is the
+						     one button here that cannot be taken back, and it should
+						     not sit flush against Pause in a row staff click quickly. -->
+						<form
+							method="post"
+							action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/cancel", props.Subscription.ID.String())) }
+							class="ml-1 border-l border-rr-border pl-3"
+						>
+							<button
+								type="submit"
+								class="btn-danger"
+								onclick="return confirm('Cancel this subscription? This cannot be undone.')"
+							>
+								Cancel Subscription
+							</button>
+						</form>
+					}
+				</div>
+			</header>
+			<div class="divide-y divide-rr-border">
+				if status == domain.SubscriptionStatusActive {
+					@subscriptionSkipRow(props)
+				}
+				if canCancel(status) {
+					@subscriptionShippingRow(props)
+				}
+			</div>
+		</section>
+	}
+}
+
+// subscriptionActionRow is the shared shape of every row in the panel: what it
+// does on the left, the controls on the right. One rhythm, so skipping a
+// shipment and granting free shipping read as the same kind of thing.
+templ subscriptionActionRow(title, description string) {
+	<div class="px-4 py-3">
+		<div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+			<div class="min-w-0 max-w-prose">
+				<p class="text-sm font-semibold text-rr-heading">{ title }</p>
+				<p class="mt-0.5 text-sm text-rr-muted">{ description }</p>
+			</div>
+			<!-- items-center, not items-end: these controls are buttons and
+			     badges rather than labelled fields, and bottom-aligning a badge
+			     against a button leaves it sitting low. -->
+			<div class="flex flex-wrap items-center gap-x-3 gap-y-3">
+				{ children... }
+			</div>
+		</div>
+	</div>
+}
+
+templ subscriptionSkipRow(props SubscriptionShowProps) {
+	{{ minDate, maxDate, canPickRestart := skipDateBounds(props.Subscription, props.MerchantTZ) }}
+	{{ restoreTo, canUndo := skipUndoOffer(props.Subscription) }}
+	<div class="px-4 py-3">
+		<div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+			<div class="min-w-0 max-w-prose">
+				<p class="text-sm font-semibold text-rr-heading">Skip shipments</p>
+				<p class="mt-0.5 text-sm text-rr-muted">
+					Pushes the next order out without pausing or cancelling. Nothing is charged for the skipped window, and the cadence picks back up from the new date.
+				</p>
+			</div>
+			<!-- Two separate forms, not one with two submit buttons: pressing
+			     Enter in the date field would otherwise submit the first button
+			     in the form and skip a shipment count nobody chose. -->
+			<div class="flex flex-wrap items-end gap-x-4 gap-y-3">
+				<form
+					method="post"
+					action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/skip", props.Subscription.ID.String())) }
+					class="flex items-end gap-2"
+				>
+					<input type="hidden" name="skip_mode" value="intervals"/>
+					<div>
+						<label for="skip-intervals" class="block text-xs font-medium uppercase tracking-wide text-rr-muted">Skip the next</label>
+						<select
+							id="skip-intervals"
+							name="intervals"
+							class="mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+						>
+							for _, n := range skipCounts() {
+								<option value={ fmt.Sprintf("%d", n) }>{ skipCountLabel(n) }</option>
+							}
+						</select>
+					</div>
+					<button type="submit" class="btn-secondary">Skip</button>
+				</form>
+				if canPickRestart {
+					<form
+						method="post"
+						action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/skip", props.Subscription.ID.String())) }
+						class="flex items-end gap-2"
+					>
+						<input type="hidden" name="skip_mode" value="date"/>
+						<div>
+							<label for="skip-resume-on" class="block text-xs font-medium uppercase tracking-wide text-rr-muted">Or restart on</label>
+							<input
+								id="skip-resume-on"
+								type="date"
+								name="resume_on"
+								required
+								min={ minDate }
+								max={ maxDate }
+								class="mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+							/>
+						</div>
+						<button type="submit" class="btn-secondary">Set date</button>
+					</form>
+				}
+			</div>
+		</div>
+		<!-- Bounds sit under the controls rather than beside them: the row keeps
+		     its two-column rhythm, and the sentence is as wide as it needs to be. -->
+		if canPickRestart {
+			<p class="mt-2 text-xs text-rr-muted">
+				Restart dates run from { minDate } to { maxDate } — after the order already scheduled, and no more than { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out.
+			</p>
+		} else {
+			<p class="mt-2 text-xs text-rr-muted">
+				The next order is already more than { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out, so there's no restart date to pick — skip by shipment count instead.
+			</p>
+		}
+		if canUndo {
+			<form
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/undo-skip", props.Subscription.ID.String())) }
+				class="mt-3 flex flex-wrap items-center justify-between gap-3 border border-rr-border bg-rr-raised p-3"
+			>
+				<p class="text-sm text-rr-heading">
+					Skipped to { props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006") }.
+					<span class="text-rr-muted">Undo puts the next order back to { restoreTo.In(props.MerchantTZ).Format("Jan 2, 2006") }.</span>
+				</p>
+				<button type="submit" class="btn-secondary">Undo skip</button>
+			</form>
+		}
+	</div>
+}
+
+templ subscriptionShippingRow(props SubscriptionShowProps) {
+	{{ grandfathered := props.Subscription.ShippingGrandfathered() }}
+	if grandfathered {
+		@subscriptionActionRow("Renewal shipping", "Exempt — renewals ship free for this subscription.") {
+			<span class="badge badge-green">Free shipping</span>
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/grandfather-shipping", props.Subscription.ID.String())) }>
+				<input type="hidden" name="enabled" value="false"/>
+				<button type="submit" class="btn-secondary">Remove exception</button>
+			</form>
+		}
+	} else {
+		@subscriptionActionRow("Renewal shipping", "Charged on renewal like a retail order (free over the threshold or for local zips).") {
+			<span class="badge badge-slate">Standard</span>
+			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/grandfather-shipping", props.Subscription.ID.String())) }>
+				<input type="hidden" name="enabled" value="true"/>
+				<button type="submit" class="btn-secondary">Grant free shipping</button>
+			</form>
+		}
+	}
 }
 
 templ SubscriptionShow(props SubscriptionShowProps) {

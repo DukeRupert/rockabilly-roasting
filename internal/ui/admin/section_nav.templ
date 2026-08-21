@@ -40,7 +40,8 @@ func catalogTabs() []sectionTab {
 func customersTabs() []sectionTab {
 	return []sectionTab{
 		{Label: "Customers", Href: "/admin/customers"},
-		{Label: "Reminders", Href: "/admin/wholesale/reminders"},
+		// A send console, not a customer view — the label says which reminders.
+		{Label: "Order reminders", Href: "/admin/wholesale/reminders"},
 	}
 }
 

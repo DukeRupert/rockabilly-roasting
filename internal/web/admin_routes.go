@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -70,7 +71,12 @@ func (d *Deps) handleAdminRoutePlan(w http.ResponseWriter, r *http.Request) {
 
 	saved, plan, err := d.RouteService.PlanAndSaveRoute(
 		r.Context(), d.Pool, d.planRouteDate(r),
-		app.PlanRouteOptions{OrderIDs: selected, Roundtrip: true},
+		app.PlanRouteOptions{
+			OrderIDs:  selected,
+			Roundtrip: true,
+			// Blank is the Monday case and means "come back to the shop".
+			EndAddress: strings.TrimSpace(r.FormValue("end_address")),
+		},
 		staffActor(r),
 	)
 	if err != nil {
@@ -203,12 +209,16 @@ func (d *Deps) handleAdminRouteStopRemove(w http.ResponseWriter, r *http.Request
 
 	var keep []uuid.UUID
 	var routeDate time.Time
+	var endAddress string
 	err = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
 		saved, txErr := d.RouteService.GetRoute(r.Context(), tx, routeID)
 		if txErr != nil {
 			return txErr
 		}
 		routeDate = saved.Route.RouteDate
+		// Carried forward, not re-asked: dropping one stop should not quietly
+		// turn a run that finishes at the driver's house back into a roundtrip.
+		endAddress = saved.Route.EndAddress
 		for _, st := range saved.Stops {
 			if st.ID != stopID {
 				keep = append(keep, st.OrderID)
@@ -230,7 +240,7 @@ func (d *Deps) handleAdminRouteStopRemove(w http.ResponseWriter, r *http.Request
 
 	saved, _, err := d.RouteService.PlanAndSaveRoute(
 		r.Context(), d.Pool, routeDate,
-		app.PlanRouteOptions{OrderIDs: keep, Roundtrip: true},
+		app.PlanRouteOptions{OrderIDs: keep, Roundtrip: true, EndAddress: endAddress},
 		staffActor(r),
 	)
 	if err != nil {

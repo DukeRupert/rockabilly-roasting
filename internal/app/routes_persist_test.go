@@ -78,6 +78,54 @@ func TestPlanAndSaveRoute_PersistsOrderedStops(t *testing.T) {
 	assert.Equal(t, audit.AuditRoutePlanned, entry.Action)
 }
 
+// Where the run finishes has to survive the database: the route page states it,
+// and a re-plan reads it back off the saved route rather than asking again.
+func TestPlanAndSaveRoute_PersistsCustomEnd(t *testing.T) {
+	ctx := context.Background()
+	seedDeliveryOrders(t, []string{"100 First St", "200 Second St"})
+
+	const home = "915 S Olympia St, Kennewick, WA 99336"
+	g := routeTestGeocoder()
+	g.results[home] = geocode.Result{Lat: 46.19, Lng: -119.11, Confidence: "ROOFTOP"}
+	svc := newPersistingRouteService(t, g, stubPinnedEndRouter(t))
+
+	saved, _, err := svc.PlanAndSaveRoute(ctx, testPool, routeDate,
+		app.PlanRouteOptions{Roundtrip: true, EndAddress: home}, testutil.TestActor())
+	require.NoError(t, err)
+
+	assert.True(t, saved.Route.EndsElsewhere())
+	assert.Equal(t, home, saved.Route.EndAddress)
+	require.NotNil(t, saved.Route.EndLat)
+	assert.InDelta(t, 46.19, *saved.Route.EndLat, 0.0001)
+	assert.False(t, saved.Route.Roundtrip)
+
+	// Read back through the store, not just the value the write returned.
+	tx := testutil.NewTestTx(t, testPool)
+	reloaded, err := svc.GetRoute(ctx, tx, saved.Route.ID)
+	require.NoError(t, err)
+	assert.Equal(t, home, reloaded.Route.EndAddress)
+	require.NotNil(t, reloaded.Route.EndLng)
+	assert.InDelta(t, -119.11, *reloaded.Route.EndLng, 0.0001)
+}
+
+// The default is unchanged: no ending given means the van comes home, and the
+// coordinates stay NULL rather than landing on 0,0 in the Gulf of Guinea.
+func TestPlanAndSaveRoute_DefaultEndsAtRoastery(t *testing.T) {
+	ctx := context.Background()
+	seedDeliveryOrders(t, []string{"100 First St", "200 Second St"})
+	svc := newPersistingRouteService(t, routeTestGeocoder(), stubSortingRouter(t))
+
+	saved, _, err := svc.PlanAndSaveRoute(ctx, testPool, routeDate,
+		app.PlanRouteOptions{Roundtrip: true}, testutil.TestActor())
+	require.NoError(t, err)
+
+	assert.False(t, saved.Route.EndsElsewhere())
+	assert.Empty(t, saved.Route.EndAddress)
+	assert.Nil(t, saved.Route.EndLat)
+	assert.Nil(t, saved.Route.EndLng)
+	assert.True(t, saved.Route.Roundtrip)
+}
+
 // Re-planning is the normal loop — staff adjust the selection and go again —
 // so it must replace rather than accumulate.
 func TestPlanAndSaveRoute_ReplacesExistingDraft(t *testing.T) {

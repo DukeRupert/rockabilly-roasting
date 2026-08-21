@@ -108,6 +108,9 @@ func (s *RouteService) PlanAndSaveRoute(
 			OriginLat:           plan.OriginLat,
 			OriginLng:           plan.OriginLng,
 			OriginAddress:       plan.OriginAddress,
+			EndAddress:          plan.EndAddress,
+			EndLat:              plan.EndLat,
+			EndLng:              plan.EndLng,
 			TotalDistanceMeters: int(plan.TotalDistanceMeters),
 			TotalDurationSecs:   int(plan.TotalDurationSeconds),
 			Roundtrip:           plan.Roundtrip,
@@ -139,6 +142,7 @@ func (s *RouteService) PlanAndSaveRoute(
 			"unroutable":       len(plan.Unroutable),
 			"replanned":        existing != nil,
 			"geocode_lookups":  plan.GeocodeLookups,
+			"ends_at":          endAuditValue(plan),
 			"duration_seconds": plan.TotalDurationSeconds,
 		}); err != nil {
 			return err
@@ -164,6 +168,16 @@ func (s *RouteService) PlanAndSaveRoute(
 	}
 
 	return saved, plan, nil
+}
+
+// endAuditValue names where the run finishes, for the audit trail. "roastery"
+// rather than an empty string: a reader six months later should not have to
+// know that blank meant "came back to the shop".
+func endAuditValue(plan *RoutePlan) string {
+	if plan.EndAddress == "" {
+		return "roastery"
+	}
+	return plan.EndAddress
 }
 
 // GetRoute loads a route and its stops by id. Staff-facing.

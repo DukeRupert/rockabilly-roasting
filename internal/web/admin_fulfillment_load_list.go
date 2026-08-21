@@ -210,10 +210,18 @@ func (d *Deps) handleAdminLoadList(w http.ResponseWriter, r *http.Request) {
 
 	var roster []admin.LoadListOrder
 	var lines []domain.DeliveryLoadLine
+	var originAddress string
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		roster, lines, txErr = d.loadDeliveryLoadList(ctx, tx, channel, selected, explicit)
+		if txErr != nil {
+			return txErr
+		}
+		// Only to label the "End of run" field's default. A missing origin is
+		// a settings problem for PlanRoute to report at plan time, not a reason
+		// to fail rendering the load list.
+		originAddress, txErr = d.RouteService.OriginAddress(ctx, tx)
 		return txErr
 	})
 	if err != nil {
@@ -223,13 +231,14 @@ func (d *Deps) handleAdminLoadList(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.LoadListProps{
-		Channel:    loadListScopeParam(channel),
-		Lines:      lines,
-		Orders:     roster,
-		MerchantTZ: d.MerchantTZ,
-		Now:        time.Now(),
-		StaffName:  name,
-		StaffRole:  role,
+		Channel:       loadListScopeParam(channel),
+		Lines:         lines,
+		Orders:        roster,
+		OriginAddress: originAddress,
+		MerchantTZ:    d.MerchantTZ,
+		Now:           time.Now(),
+		StaffName:     name,
+		StaffRole:     role,
 	}
 
 	if IsHTMX(r) {

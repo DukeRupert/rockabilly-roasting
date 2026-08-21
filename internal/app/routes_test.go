@@ -220,6 +220,112 @@ func newRouteService(t *testing.T, g geocode.Geocoder, router *routing.Client) *
 	)
 }
 
+// stubPinnedEndRouter is a fake OSRM that honours destination=last: the final
+// coordinate is visited last, the origin first, and everything between them is
+// ordered north to south. It fails the request if the planner forgot to ask for
+// a pinned destination, which is the whole point of appending the coordinate.
+func stubPinnedEndRouter(t *testing.T) *routing.Client {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("destination") != "last" {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"code":"InvalidQuery","message":"expected destination=last"}`))
+			return
+		}
+		raw := strings.Split(strings.TrimPrefix(r.URL.Path, "/trip/v1/driving/"), ";")
+
+		type pt struct {
+			idx int
+			lat float64
+		}
+		middle := make([]pt, 0, len(raw))
+		for i, c := range raw {
+			if i == 0 || i == len(raw)-1 {
+				continue // both ends are pinned
+			}
+			lat, err := strconv.ParseFloat(strings.Split(c, ",")[1], 64)
+			require.NoError(t, err)
+			middle = append(middle, pt{idx: i, lat: lat})
+		}
+		sort.Slice(middle, func(a, b int) bool { return middle[a].lat > middle[b].lat })
+
+		position := make([]int, len(raw))
+		for pos, m := range middle {
+			position[m.idx] = pos + 1
+		}
+		position[len(raw)-1] = len(raw) - 1
+
+		var sb strings.Builder
+		sb.WriteString(`{"code":"Ok","trips":[{"duration":2400,"distance":31000}],"waypoints":[`)
+		for i := range raw {
+			if i > 0 {
+				sb.WriteByte(',')
+			}
+			fmt.Fprintf(&sb, `{"waypoint_index":%d}`, position[i])
+		}
+		sb.WriteString(`]}`)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(sb.String()))
+	}))
+	t.Cleanup(srv.Close)
+	return routing.NewClient(srv.URL)
+}
+
+// Thursday: the driver takes the van home, so the run finishes at their house
+// rather than the roastery. The house is a routing anchor, never a stop.
+func TestPlanRoute_CustomEndIsAnchorNotStop(t *testing.T) {
+	ctx := context.Background()
+	seedDeliveryOrders(t, []string{"100 First St", "200 Second St", "300 Third St"})
+
+	const home = "915 S Olympia St, Kennewick, WA 99336"
+	svc := newRouteService(t, geocoderFor(map[string]geocode.Result{
+		"1234 W 4th Ave, Kennewick, WA 99336": {Lat: 46.2087, Lng: -119.1372, Confidence: "ROOFTOP"},
+		"100 First St, Portland, OR 97201":    {Lat: 46.21, Lng: -119.14, Confidence: "ROOFTOP"},
+		"200 Second St, Portland, OR 97201":   {Lat: 46.22, Lng: -119.15, Confidence: "ROOFTOP"},
+		"300 Third St, Portland, OR 97201":    {Lat: 46.23, Lng: -119.16, Confidence: "ROOFTOP"},
+		home:                                  {Lat: 46.19, Lng: -119.11, Confidence: "ROOFTOP"},
+	}), stubPinnedEndRouter(t))
+
+	plan, err := svc.PlanRoute(ctx, testPool,
+		app.PlanRouteOptions{Roundtrip: true, EndAddress: "  " + home + "  "})
+	require.NoError(t, err)
+
+	// Three deliveries, contiguous positions — the house is not among them.
+	require.Len(t, plan.Stops, 3)
+	for i, st := range plan.Stops {
+		assert.Equal(t, i+1, st.Position)
+		assert.NotEqual(t, home, st.Address)
+	}
+	assert.Equal(t, "300 Third St, Portland, OR 97201", plan.Stops[0].Address)
+	assert.Equal(t, "100 First St, Portland, OR 97201", plan.Stops[2].Address)
+
+	// The ending is recorded, trimmed, and the run is no longer a loop.
+	assert.Equal(t, home, plan.EndAddress)
+	require.NotNil(t, plan.EndLat)
+	require.NotNil(t, plan.EndLng)
+	assert.InDelta(t, 46.19, *plan.EndLat, 0.0001)
+	assert.InDelta(t, -119.11, *plan.EndLng, 0.0001)
+	assert.False(t, plan.Roundtrip, "a run that ends at the driver's house does not loop back")
+}
+
+// Falling back to the roastery would hand the driver a route optimized to end
+// on the wrong side of town, so a bad ending stops planning instead.
+func TestPlanRoute_UngeocodableEndAddressFails(t *testing.T) {
+	ctx := context.Background()
+	seedDeliveryOrders(t, []string{"100 First St"})
+
+	svc := newRouteService(t, geocoderFor(map[string]geocode.Result{
+		"1234 W 4th Ave, Kennewick, WA 99336": {Lat: 46.2087, Lng: -119.1372, Confidence: "ROOFTOP"},
+		"100 First St, Portland, OR 97201":    {Lat: 46.21, Lng: -119.14, Confidence: "ROOFTOP"},
+		// The driver's house deliberately absent -> ErrNotFound from the stub.
+	}), stubPinnedEndRouter(t))
+
+	_, err := svc.PlanRoute(ctx, testPool,
+		app.PlanRouteOptions{Roundtrip: true, EndAddress: "Nowhere At All"})
+	require.Error(t, err)
+	assert.ErrorIs(t, err, app.ErrEndNotGeocodable)
+}
+
 func TestPlanRoute_OrdersStopsByRouterAnswer(t *testing.T) {
 	ctx := context.Background()
 	seedDeliveryOrders(t, []string{"100 First St", "200 Second St", "300 Third St"})

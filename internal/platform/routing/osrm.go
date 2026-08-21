@@ -104,9 +104,19 @@ func (c *Client) Enabled() bool {
 
 // TripOptions controls how the trip is solved.
 type TripOptions struct {
-	// Roundtrip returns the driver to the first coordinate. Set for v1: the
-	// van goes back to the roastery at the end of the run.
+	// Roundtrip returns the driver to the first coordinate — the van goes back
+	// to the roastery at the end of the run. Ignored when PinDestination is
+	// set: a run that finishes at the driver's house does not also loop home.
 	Roundtrip bool
+	// PinDestination fixes the LAST coordinate as the end of the trip, the way
+	// the first is always fixed as the origin. Set it when the caller appended
+	// a finishing point that is not a delivery — the driver's house on a run
+	// where the van doesn't come back to the shop.
+	//
+	// Without it OSRM is free to end wherever the solver likes, which for a
+	// route that has to finish somewhere specific means an order that looks
+	// optimal and isn't.
+	PinDestination bool
 }
 
 // maxTripCoordinates mirrors --max-table-size on the deployed router. Exceeding
@@ -131,7 +141,8 @@ type osrmTripResponse struct {
 
 // Trip returns the optimal visiting order for coords. The first coordinate is
 // pinned as the origin (source=first) — the route starts at the roastery, not
-// wherever the solver finds convenient.
+// wherever the solver finds convenient. With TripOptions.PinDestination the
+// last coordinate is fixed as the end in the same way.
 //
 // Must not be called inside a database transaction: it is a network call, and
 // holding a pgx transaction across it is the pattern CLAUDE.md forbids.
@@ -150,8 +161,14 @@ func (c *Client) Trip(ctx context.Context, coords []Coordinate, opts TripOptions
 	if profile == "" {
 		profile = "driving"
 	}
+	// destination=last only means anything with roundtrip=false — OSRM rejects
+	// the combination otherwise, and a pinned end is by definition not a loop.
+	roundtrip := opts.Roundtrip && !opts.PinDestination
 	url := fmt.Sprintf("%s/trip/v1/%s/%s?source=first&roundtrip=%t",
-		c.BaseURL, profile, coordinatePath(coords), opts.Roundtrip)
+		c.BaseURL, profile, coordinatePath(coords), roundtrip)
+	if opts.PinDestination {
+		url += "&destination=last"
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

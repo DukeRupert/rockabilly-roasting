@@ -21,6 +21,11 @@ type LoadListProps struct {
 	Channel    string
 	Lines      []domain.DeliveryLoadLine
 	Orders     []LoadListOrder
+	// OriginAddress is the roastery address, shown as the default ending for a
+	// planned route. Empty when shipping settings have no usable origin — in
+	// which case planning will refuse anyway, and the field just says
+	// "the roastery" instead of naming it.
+	OriginAddress string
 	MerchantTZ *time.Location
 	Now        time.Time
 	StaffName  string
@@ -222,9 +227,50 @@ templ LoadListContent(props LoadListProps) {
 		     is indistinguishable from "form never submitted", and unchecking
 		     the last row would silently show the full load again. -->
 		<input type="hidden" name="scope" value="selection"/>
+		@loadListEndOfRun(props.OriginAddress)
 		@LoadListTotals(props)
 		@loadListRoster(props)
 	</form>
+}
+
+// loadListEndOfRun is where the driver finishes. Blank means the roastery,
+// which is Monday's answer; on Thursday the van goes home with the driver and
+// the optimizer should end the run next to their house instead of the shop's.
+//
+// Deliberately OUTSIDE #load-list-totals even though the Plan route button sits
+// inside it: the totals panel re-fetches itself on every checkbox change, and
+// an address typed into a swapped-away panel would vanish the moment staff
+// adjusted the selection.
+templ loadListEndOfRun(originAddress string) {
+	<div class="mb-3 border border-rr-border bg-rr-surface px-3 py-2">
+		<label for="end_address" class="block text-xs uppercase tracking-wide text-rr-muted label-font">
+			End of run
+		</label>
+		<div class="mt-1 sm:max-w-lg">
+			<input
+				type="text"
+				id="end_address"
+				name="end_address"
+				autocomplete="off"
+				placeholder={ loadListEndPlaceholder(originAddress) }
+				class={ inputClasses(false) }
+			/>
+		</div>
+		<p class="mt-1 text-xs text-rr-muted">
+			Leave blank to finish back at the roastery. On the runs where the driver takes
+			the van home, put their address here — the route then ends at the stop nearest
+			to it instead of doubling back. Nothing is delivered to this address.
+		</p>
+	</div>
+}
+
+// loadListEndPlaceholder names the default ending in the field itself, so the
+// blank state reads as a choice rather than an empty box.
+func loadListEndPlaceholder(originAddress string) string {
+	if originAddress == "" {
+		return "The roastery"
+	}
+	return originAddress
 }
 
 // LoadListTotals is the per-product rollup, swapped in place over htmx when
@@ -458,6 +504,11 @@ templ loadListRosterRow(row LoadListOrder, props LoadListProps) {
 type LoadListPrintProps struct {
 	Lines      []domain.DeliveryLoadLine
 	Orders     []LoadListOrder
+	// OriginAddress is the roastery address, shown as the default ending for a
+	// planned route. Empty when shipping settings have no usable origin — in
+	// which case planning will refuse anyway, and the field just says
+	// "the roastery" instead of naming it.
+	OriginAddress string
 	ChannelLbl string // "Retail" / "Wholesale" / "All channels", in the masthead
 	// Combined mirrors LoadListProps.combined(): on a both-channels sheet the
 	// stops table gains a channel column so the driver can read the mix off

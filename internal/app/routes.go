@@ -83,13 +83,35 @@ func NewRouteService(
 	}
 }
 
+// OriginAddress is the roastery address route planning starts from, formatted
+// the way the geocoder wants it. Exposed for the admin UI, which shows it as
+// the default ending for a run; returns "" when shipping settings have no
+// usable origin, the same condition PlanRoute rejects with
+// ErrOriginNotConfigured.
+func (s *RouteService) OriginAddress(ctx context.Context, tx pgx.Tx) (string, error) {
+	cfg, err := s.shipping.GetConfig(ctx, tx)
+	if err != nil {
+		return "", fmt.Errorf("load shipping config: %w", err)
+	}
+	return formatOriginAddress(cfg), nil
+}
+
 // PlanRouteOptions narrows what goes on the route.
 type PlanRouteOptions struct {
 	// OrderIDs restricts the route to an explicit set of orders — the load
 	// list's checkbox selection. Empty means the whole delivery queue.
 	OrderIDs []uuid.UUID
 	// Roundtrip returns the driver to the roastery at the end of the run.
+	// Ignored when EndAddress is set.
 	Roundtrip bool
+	// EndAddress finishes the run somewhere other than the roastery — the
+	// driver's house on the days the van doesn't come back. Empty is the
+	// common case and means "end where you started".
+	//
+	// It is a free-text address rather than a stop: nothing is delivered
+	// there, it never appears on the driver's list, and it exists only so the
+	// optimizer finishes the run next to the right building.
+	EndAddress string
 }
 
 // PlannedStop is one delivery on an optimized route.
@@ -128,6 +150,12 @@ type RoutePlan struct {
 	OriginLat     float64
 	OriginLng     float64
 	Roundtrip     bool
+
+	// EndAddress and its coordinates are set only when the run finishes away
+	// from the roastery. EndAddress == "" means it ends where it started.
+	EndAddress string
+	EndLat     *float64
+	EndLng     *float64
 
 	Stops      []PlannedStop
 	Unroutable []UnroutableStop
@@ -178,6 +206,16 @@ func (s *RouteService) PlanRoute(ctx context.Context, pool *pgxpool.Pool, opts P
 	var originAddress string
 	var candidates []routeCandidate
 
+	// A custom finishing point costs one coordinate out of the router's budget,
+	// and turns the run into a one-way trip: there is no return leg to the shop
+	// to plan or to count in the totals.
+	endAddress := strings.TrimSpace(opts.EndAddress)
+	roundtrip := opts.Roundtrip && endAddress == ""
+	stopBudget := maxRouteStops
+	if endAddress != "" {
+		stopBudget--
+	}
+
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		cfg, err := s.shipping.GetConfig(ctx, tx)
 		if err != nil {
@@ -194,7 +232,7 @@ func (s *RouteService) PlanRoute(ctx context.Context, pool *pgxpool.Pool, opts P
 			ExcludeUnconfirmed:       true,
 			ExcludeCancelledRefunded: true,
 			OrderIDs:                 opts.OrderIDs,
-			Limit:                    maxRouteStops + 1, // +1 so an over-cap queue is detectable
+			Limit:                    stopBudget + 1, // +1 so an over-cap queue is detectable
 		}
 		orders, err := s.orders.ListOrders(ctx, tx, filter)
 		if err != nil {
@@ -237,9 +275,9 @@ func (s *RouteService) PlanRoute(ctx context.Context, pool *pgxpool.Pool, opts P
 	if len(candidates) == 0 {
 		return nil, ErrNoDeliveryStops
 	}
-	if len(candidates) > maxRouteStops {
+	if len(candidates) > stopBudget {
 		return nil, fmt.Errorf("%w: %d orders in the delivery queue, limit %d per route",
-			routing.ErrTooManyStops, len(candidates), maxRouteStops)
+			routing.ErrTooManyStops, len(candidates), stopBudget)
 	}
 
 	// --- Phase 2: geocode (no transaction open) ---
@@ -249,6 +287,9 @@ func (s *RouteService) PlanRoute(ctx context.Context, pool *pgxpool.Pool, opts P
 		if c.address != "" {
 			addresses = append(addresses, c.address)
 		}
+	}
+	if endAddress != "" {
+		addresses = append(addresses, endAddress)
 	}
 	resolved, err := s.geocoding.ResolveMany(ctx, pool, addresses)
 	if err != nil {
@@ -264,13 +305,30 @@ func (s *RouteService) PlanRoute(ctx context.Context, pool *pgxpool.Pool, opts P
 		return nil, fmt.Errorf("%w: %s: %v", ErrOriginNotGeocodable, originAddress, reason)
 	}
 
+	// Same treatment as the origin, and for the same reason: a finishing point
+	// staff typed but that cannot be placed on the map is a settings-shaped
+	// mistake to fix, not a stop to quietly drop. Planning around the roastery
+	// instead would hand the driver a route optimized for the wrong ending.
+	var endLat, endLng *float64
+	if endAddress != "" {
+		end, endOK := resolved.Resolved[endAddress]
+		if !endOK {
+			return nil, fmt.Errorf("%w: %s: %v", ErrEndNotGeocodable, endAddress, resolved.Failed[endAddress])
+		}
+		endLat, endLng = &end.Lat, &end.Lng
+	}
+
 	plan := &RoutePlan{
 		OriginAddress:    originAddress,
 		OriginLat:        origin.Lat,
 		OriginLng:        origin.Lng,
-		Roundtrip:        opts.Roundtrip,
+		Roundtrip:        roundtrip,
 		GeocodeCacheHits: resolved.CacheHits,
 		GeocodeLookups:   resolved.Lookups,
+	}
+	if endAddress != "" {
+		plan.EndAddress = endAddress
+		plan.EndLat, plan.EndLng = endLat, endLng
 	}
 
 	// Origin is always coordinate 0; source=first pins it as the start.
@@ -308,7 +366,18 @@ func (s *RouteService) PlanRoute(ctx context.Context, pool *pgxpool.Pool, opts P
 	}
 
 	// --- Phase 3: order the stops (no transaction open) ---
-	trip, err := s.router.Trip(ctx, coords, routing.TripOptions{Roundtrip: opts.Roundtrip})
+	// The finishing point rides last so destination=last pins it, mirroring the
+	// origin at index 0. endIdx is where it lands; nothing else may occupy it.
+	endIdx := -1
+	if endAddress != "" {
+		coords = append(coords, routing.Coordinate{Lat: *endLat, Lng: *endLng})
+		endIdx = len(coords) - 1
+	}
+
+	trip, err := s.router.Trip(ctx, coords, routing.TripOptions{
+		Roundtrip:      roundtrip,
+		PinDestination: endAddress != "",
+	})
 	if err != nil {
 		return nil, fmt.Errorf("plan trip: %w", err)
 	}
@@ -319,8 +388,8 @@ func (s *RouteService) PlanRoute(ctx context.Context, pool *pgxpool.Pool, opts P
 	plan.Stops = make([]PlannedStop, 0, len(routable))
 	position := 0
 	for _, coordIdx := range trip.Order {
-		if coordIdx == 0 {
-			continue // the roastery is not a delivery
+		if coordIdx == 0 || coordIdx == endIdx {
+			continue // neither the roastery nor the driver's house is a delivery
 		}
 		c := routable[coordIdx-1]
 		g := resolved.Resolved[c.address]

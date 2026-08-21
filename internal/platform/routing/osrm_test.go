@@ -92,6 +92,34 @@ func TestTripRoundtripFalse(t *testing.T) {
 	assert.Contains(t, *gotPath, "roundtrip=false")
 }
 
+// A run that has to finish at the driver's house pins both ends. OSRM rejects
+// destination=last together with roundtrip=true, so the client has to drop the
+// loop rather than pass both through and 400.
+func TestTripPinnedDestination(t *testing.T) {
+	c, gotPath := newStubRouter(t, http.StatusOK, prodTripResponse)
+
+	_, err := c.Trip(context.Background(),
+		[]routing.Coordinate{roastery, pasco, richland, middle},
+		routing.TripOptions{Roundtrip: true, PinDestination: true})
+	require.NoError(t, err)
+
+	assert.Contains(t, *gotPath, "source=first")
+	assert.Contains(t, *gotPath, "destination=last")
+	assert.Contains(t, *gotPath, "roundtrip=false")
+}
+
+// Without PinDestination the query must stay exactly as it was — every route
+// that comes back to the roastery still goes through this path.
+func TestTripWithoutPinnedDestinationSendsNoDestinationParam(t *testing.T) {
+	c, gotPath := newStubRouter(t, http.StatusOK, prodTripResponse)
+
+	_, err := c.Trip(context.Background(),
+		[]routing.Coordinate{roastery, pasco, richland, middle},
+		routing.TripOptions{Roundtrip: true})
+	require.NoError(t, err)
+	assert.NotContains(t, *gotPath, "destination=")
+}
+
 // A malformed permutation would silently drop a stop from the route — a missed
 // delivery nobody notices until the customer calls.
 func TestTripRejectsMalformedWaypointOrder(t *testing.T) {

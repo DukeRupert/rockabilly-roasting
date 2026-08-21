@@ -106,6 +106,17 @@ templ RouteShowContent(props RouteShowProps) {
 					<span class="mx-2 text-rr-border">|</span>
 					<span class={ routeStatusBadge(props.Route.Status) }>{ string(props.Route.Status) }</span>
 				</p>
+				<!-- Where the run finishes changes the stop order, so it is
+				     stated on the page rather than left implicit: a route
+				     planned to end at the driver's house looks wrong to anyone
+				     who assumes it comes back to the shop. -->
+				<p class="mt-1 text-xs text-rr-muted">
+					if props.Route.EndsElsewhere() {
+						Ends at <span class="text-rr-body">{ props.Route.EndAddress }</span> — the van does not return to the roastery.
+					} else {
+						Ends back at the roastery.
+					}
+				</p>
 			</div>
 			<div class="flex items-center gap-2">
 				if props.Route.Status == domain.RouteStatusDraft {

@@ -23,6 +23,7 @@ func NewRouteStore(metrics QueryRecorder) *RouteStore {
 }
 
 const routeColumns = `id, route_date, status, origin_lat, origin_lng, origin_address,
+	end_address, end_lat, end_lng,
 	total_distance_m, total_duration_s, roundtrip, share_token,
 	created_at, activated_at, completed_at`
 
@@ -30,6 +31,7 @@ func scanRoute(row pgx.Row) (*domain.DeliveryRoute, error) {
 	var r domain.DeliveryRoute
 	var status string
 	if err := row.Scan(&r.ID, &r.RouteDate, &status, &r.OriginLat, &r.OriginLng, &r.OriginAddress,
+		&r.EndAddress, &r.EndLat, &r.EndLng,
 		&r.TotalDistanceMeters, &r.TotalDurationSecs, &r.Roundtrip, &r.ShareToken,
 		&r.CreatedAt, &r.ActivatedAt, &r.CompletedAt); err != nil {
 		return nil, err
@@ -55,10 +57,15 @@ func scanRouteStop(row pgx.Row) (*domain.RouteStop, error) {
 
 // CreateRouteParams holds the fields needed to save a planned route.
 type CreateRouteParams struct {
-	RouteDate           time.Time
-	OriginLat           float64
-	OriginLng           float64
-	OriginAddress       string
+	RouteDate     time.Time
+	OriginLat     float64
+	OriginLng     float64
+	OriginAddress string
+	// EndAddress is where the run finishes when that is not the roastery.
+	// Empty (with nil coordinates) means it ends where it started.
+	EndAddress          string
+	EndLat              *float64
+	EndLng              *float64
 	TotalDistanceMeters int
 	TotalDurationSecs   int
 	Roundtrip           bool
@@ -71,10 +78,12 @@ func (s *RouteStore) CreateRoute(ctx context.Context, tx pgx.Tx, p CreateRoutePa
 	row := tx.QueryRow(ctx,
 		`INSERT INTO delivery_routes
 		   (id, route_date, status, origin_lat, origin_lng, origin_address,
+		    end_address, end_lat, end_lng,
 		    total_distance_m, total_duration_s, roundtrip)
-		 VALUES ($1, $2, 'draft', $3, $4, $5, $6, $7, $8)
+		 VALUES ($1, $2, 'draft', $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		 RETURNING `+routeColumns,
 		uuid.New(), p.RouteDate, p.OriginLat, p.OriginLng, p.OriginAddress,
+		p.EndAddress, p.EndLat, p.EndLng,
 		p.TotalDistanceMeters, p.TotalDurationSecs, p.Roundtrip,
 	)
 	r, err := scanRoute(row)

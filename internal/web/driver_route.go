@@ -149,12 +149,13 @@ func driverRouteProps(token string, saved *app.SavedRoute) storefront.DriverRout
 		Token: token,
 		// Computed from the domain stops rather than the view models: the chunk
 		// math is tested against the real type, and the page just renders it.
-		NavChunks: domain.GoogleMapsNavChunks(saved.Stops),
-		Stops:     stops,
-		Progress:  saved.Progress(),
-		Completed: saved.Route.Status == domain.RouteStatusCompleted,
-		OriginLat: saved.Route.OriginLat,
-		OriginLng: saved.Route.OriginLng,
-		Roundtrip: saved.Route.Roundtrip,
+		NavChunks:  domain.GoogleMapsNavChunks(saved.Stops),
+		Stops:      stops,
+		Progress:   saved.Progress(),
+		Completed:  saved.Route.Status == domain.RouteStatusCompleted,
+		OriginLat:  saved.Route.OriginLat,
+		OriginLng:  saved.Route.OriginLng,
+		Roundtrip:  saved.Route.Roundtrip,
+		EndAddress: saved.Route.EndAddress,
 	}
 }

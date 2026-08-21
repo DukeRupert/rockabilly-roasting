@@ -236,7 +236,12 @@ var (
 	// ErrOriginNotGeocodable means the configured origin exists but cannot be
 	// placed on the map — every route starts there, so planning cannot proceed.
 	ErrOriginNotGeocodable = errors.New("roastery origin address could not be geocoded")
-	ErrRouteNotFound       = errors.New("delivery route not found")
+	// ErrEndNotGeocodable means staff asked the run to finish at an address
+	// that could not be placed on the map. Planning stops rather than falling
+	// back to the roastery: silently ignoring the requested ending would give
+	// the driver a route optimized to end at the wrong side of town.
+	ErrEndNotGeocodable = errors.New("the end-of-run address could not be geocoded")
+	ErrRouteNotFound    = errors.New("delivery route not found")
 	// ErrRouteAlreadyActive guards a driver mid-run: re-planning a date whose
 	// route is already out with a driver would swap the stop list under them.
 	ErrRouteAlreadyActive = errors.New("a route for this date is already active; complete it before re-planning")

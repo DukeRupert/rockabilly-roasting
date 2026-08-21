@@ -46,6 +46,14 @@ type DeliveryRoute struct {
 	OriginLng     float64
 	OriginAddress string
 
+	// EndAddress is where the run finishes when that is not the roastery —
+	// the driver taking the van home after a Thursday run. Empty means the
+	// route ends where it started, which is what Roundtrip describes.
+	// EndLat/EndLng are nil in that case: there is no second pin to remember.
+	EndAddress string
+	EndLat     *float64
+	EndLng     *float64
+
 	TotalDistanceMeters int
 	TotalDurationSecs   int
 	Roundtrip           bool
@@ -56,6 +64,13 @@ type DeliveryRoute struct {
 	CreatedAt   time.Time
 	ActivatedAt *time.Time
 	CompletedAt *time.Time
+}
+
+// EndsElsewhere reports whether the run finishes somewhere other than the
+// roastery. The address is the flag, not the coordinates: a route with a custom
+// end always has one, and 0,0 is a real place in the Gulf of Guinea.
+func (r DeliveryRoute) EndsElsewhere() bool {
+	return r.EndAddress != ""
 }
 
 // RouteStop is one delivery on a route.

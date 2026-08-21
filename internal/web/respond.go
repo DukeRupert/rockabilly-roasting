@@ -82,6 +82,8 @@ func mapError(err error) (int, string) {
 		return http.StatusConflict, "set the roastery address in shipping settings before planning a route"
 	case errors.Is(err, app.ErrOriginNotGeocodable):
 		return http.StatusConflict, "the roastery address could not be placed on the map — check it in shipping settings"
+	case errors.Is(err, app.ErrEndNotGeocodable):
+		return http.StatusConflict, "the end-of-run address could not be placed on the map — check the spelling, or leave it blank to finish at the roastery"
 	case errors.Is(err, app.ErrGeocoderNotConfigured):
 		return http.StatusServiceUnavailable, "address lookup is not configured, so routes cannot be planned"
 	case errors.Is(err, app.ErrGeocoderUnavailable):

@@ -24,6 +24,10 @@ type DriverRouteProps struct {
 	OriginLat float64
 	OriginLng float64
 	Roundtrip bool
+	// EndAddress is where the run finishes when that is not the roastery.
+	// Shown, never navigated to: the driver knows the way to their own house,
+	// but seeing it here confirms the stop order was planned around it.
+	EndAddress string
 	// NavChunks are "navigate the next N stops" links. A Google Maps URL holds
 	// ten stops, so a longer run becomes several sequential links rather than
 	// one that the maps app silently truncates.
@@ -109,6 +113,11 @@ templ DriverRouteBody(props DriverRouteProps) {
 					style={ fmt.Sprintf("width: %d%%", progressPercent(props.Progress)) }
 				></div>
 			</div>
+			if props.EndAddress != "" {
+				<p class="mt-2 font-oswald text-xs text-ink-soft">
+					Ends at { props.EndAddress } — no need to come back to the shop.
+				</p>
+			}
 			if props.Progress.Skipped > 0 {
 				<p class="mt-2 font-oswald text-xs text-ink-soft">
 					{ fmt.Sprintf("%d skipped — those orders stay on the list for the next run.", props.Progress.Skipped) }

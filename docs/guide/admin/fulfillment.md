@@ -208,12 +208,26 @@ This replaces exporting addresses into a third-party routing app by hand. The st
 ### Planning
 
 1. On the **Load list** page, check the orders going out — the same checkboxes that drive the pound totals.
-2. Click **Plan route**. It takes a few seconds: each address is placed on the map, then the driving order is worked out.
-3. You land on the route's review page.
+2. Set **End of run** if the van isn't coming back to the shop (see below). Leave it blank most days.
+3. Click **Plan route**. It takes a few seconds: each address is placed on the map, then the driving order is worked out.
+4. You land on the route's review page.
 
 The route covers exactly what the load list is showing. Left on **All**, that means **both retail and wholesale** together — one van makes one run, so a cafe and a house on the same street end up next to each other rather than on two routes that cross. Narrow the scope first if only one channel is going out.
 
 If you uncheck every order and click **Plan route**, nothing is planned and you land back on the load list.
+
+### Where the run ends
+
+By default a route is a loop: out from the roastery, round the stops, back to the roastery. That's the Monday shape.
+
+On the runs where the driver takes the van home afterwards, type their address into **End of run** above the totals before planning. The route is then worked out to finish at the stop nearest that address instead of doubling back across town, and the drive time and distance shown are for the one-way run — no return leg nobody drives.
+
+A few things worth knowing:
+
+- **Nothing is delivered there.** The address is a finishing point for the optimizer, not a stop. It never appears on the stop list and the driver is never asked to mark it.
+- **The route page says which it is** — "Ends back at the roastery" or "Ends at *address*" — so nobody has to guess why the stop order looks unusual.
+- **Remove & re-plan keeps it.** Dropping a stop won't quietly turn a home run back into a loop.
+- **A bad address stops the plan** rather than falling back to the roastery, because a route optimized to end on the wrong side of town is worse than no route. Check the spelling, or clear the field.
 
 ### Reviewing
 
@@ -254,6 +268,7 @@ Once every stop is delivered or skipped, the route completes on its own and the 
 | "A route for this delivery day is already out with a driver" | The route is active. End it before planning a new one — this stops a driver's stop list being swapped mid-run. |
 | "No local delivery orders are waiting to be routed" | Nothing is checked, or the queue is empty. |
 | "Set the roastery address in shipping settings" | The route starts from the shop. Fill in the origin address under [Settings](settings.md). |
+| "The end-of-run address could not be placed on the map" | The **End of run** address wasn't recognised. Check the spelling, or leave it blank to finish at the roastery. |
 | "Address lookup is temporarily unavailable" | The address service is having a moment. Try again shortly; nothing was lost. |
 
 ---
@@ -273,3 +288,4 @@ Once every stop is delivered or skipped, the route completes on its own and the 
 | Print packing slip | Packing Slip button | Opens printable page in new tab |
 | Check the delivery load | Fulfillment → **Load list** | Pounds of each coffee needed for the run; uncheck orders that aren't going today |
 | Carry the load list | **Print load sheet** | Printable totals + stop list, with tick boxes |
+| Finish somewhere else | **End of run** field, then Plan route | Route ends at that address instead of the roastery; no return leg |

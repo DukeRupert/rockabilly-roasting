@@ -289,6 +289,8 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var allSets []domain.AttributeSet
 	var attrValues []domain.ProductAttributeValue
 	var taxonName string
+	var priceLists []domain.PriceList
+	var pricing admin.ProductPriceListPricing
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -363,11 +365,14 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 			return txErr
 
 		case "pricing":
-			options, txErr = d.loadProductOptions(ctx, tx, id)
+			// The pricing tab shows base and every price list side by side, so it
+			// loads the same shape the all-products matrix does rather than the
+			// base-price-only variant list.
+			priceLists, txErr = d.PriceListService.List(ctx, tx)
 			if txErr != nil {
 				return txErr
 			}
-			variants, groups, txErr = d.loadVariantsWithPrices(ctx, tx, id, options)
+			pricing, txErr = d.buildPriceListProduct(ctx, tx, *product)
 			return txErr
 		}
 		return nil
@@ -404,6 +409,8 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		AllSets:            allSets,
 		AttributeValues:    attrValues,
 		ActiveTab:          tab,
+		PriceLists:         priceLists,
+		Pricing:            pricing,
 	}
 
 	// htmx request (sidebar nav or tab click via hx-boost): return page content
@@ -1091,7 +1098,12 @@ func (d *Deps) renderVariantsPanel(w http.ResponseWriter, r *http.Request, produ
 	}
 	// Check which panel the htmx request targets
 	if IsHTMX(r) && r.Header.Get("HX-Target") == "pricing-panel" {
-		admin.PricingPanel(product, variants).Render(ctx, w) //nolint:errcheck
+		props, pErr := d.buildProductPricingProps(ctx, *product)
+		if pErr != nil {
+			Error(w, r, pErr)
+			return
+		}
+		admin.ProductPricingPanel(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
 	admin.VariantsPanel(product, variants, options, taxonName, groups, nil).Render(ctx, w) //nolint:errcheck

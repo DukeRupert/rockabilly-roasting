@@ -416,6 +416,9 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/unarchive", deps.handleAdminVariantUnarchive)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/delete", deps.handleAdminVariantDelete)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/price", deps.handleAdminVariantPriceUpdate)
+	// Whole-grid save from the product Pricing tab: base prices and every price
+	// list override in one transaction.
+	adminMux.HandleFunc("POST /admin/catalog/{id}/pricing", deps.handleAdminProductPricingUpdate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/options", deps.handleAdminOptionCreate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/delete", deps.handleAdminOptionDelete)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/options/{optionID}/values", deps.handleAdminOptionValueCreate)

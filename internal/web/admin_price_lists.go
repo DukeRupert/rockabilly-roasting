@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -588,4 +589,184 @@ func parseTierForm(r *http.Request) (map[uuid.UUID][]domain.PriceTier, error) {
 		out[variantID] = append(out[variantID], domain.PriceTier{MinQuantity: qty, Amount: cents})
 	}
 	return out, nil
+}
+
+// --- Product pricing grid (base + every list, on the product page) ---
+
+// errBasePriceRequired is returned when a save would clear a base price. Every
+// other price falls back to base, so base is the one cell that cannot be empty
+// once it has been set — there is nothing behind it.
+var errBasePriceRequired = errors.New("base price required")
+
+// buildProductPricingProps assembles the Pricing tab's props for one product.
+// Used by the bulk-save handler and by the variants panel's pricing swap, which
+// both need the grid rebuilt outside the main edit handler.
+func (d *Deps) buildProductPricingProps(ctx context.Context, product domain.Product) (admin.ProductEditProps, error) {
+	var lists []domain.PriceList
+	var pricing admin.ProductPriceListPricing
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		lists, txErr = d.PriceListService.List(ctx, tx)
+		if txErr != nil {
+			return txErr
+		}
+		pricing, txErr = d.buildPriceListProduct(ctx, tx, product)
+		return txErr
+	})
+	if err != nil {
+		return admin.ProductEditProps{}, err
+	}
+
+	p := product
+	return admin.ProductEditProps{Product: &p, PriceLists: lists, Pricing: pricing}, nil
+}
+
+// handleAdminProductPricingUpdate saves one product's whole price grid — base
+// prices and every list override — in a single transaction. Each cell carries a
+// hidden "previous value", so only changed cells are written and a cleared list
+// cell deletes that override.
+func (d *Deps) handleAdminProductPricingUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	productID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	ops, err := parseProductPricingForm(r)
+	if err != nil {
+		// Never re-render on a bad value — that would discard the number the
+		// staffer is in the middle of fixing.
+		msg := "Please enter a valid price"
+		if errors.Is(err, errBasePriceRequired) {
+			msg = "Base price can't be empty — every other price falls back to it"
+		}
+		if IsHTMX(r) {
+			w.Header().Set("HX-Reswap", "none")
+			toast.Toast(toast.VariantError, msg).Render(ctx, w) //nolint:errcheck
+			return
+		}
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
+
+	if len(ops) == 0 {
+		if IsHTMX(r) {
+			w.Header().Set("HX-Reswap", "none")
+			toast.Toast(toast.VariantWarning, "No changes to save").Render(ctx, w) //nolint:errcheck
+			return
+		}
+		http.Redirect(w, r, productPricingURL(productID, ""), http.StatusSeeOther)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		for _, op := range ops {
+			var txErr error
+			switch op.kind {
+			case opBaseSet:
+				_, txErr = d.PricingService.SetBasePrice(ctx, tx, op.variantID, op.cents, "USD")
+			case opGroupDelete:
+				txErr = d.PricingService.DeletePriceListPrice(ctx, tx, op.variantID, op.groupID, "USD")
+			default:
+				_, txErr = d.PricingService.SetPriceListPrice(ctx, tx, op.variantID, op.groupID, op.cents, "USD")
+			}
+			if txErr != nil {
+				return txErr
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		if IsHTMX(r) {
+			w.Header().Set("HX-Reswap", "none")
+			_, msg := mapError(err)
+			toast.Toast(toast.VariantError, msg).Render(ctx, w) //nolint:errcheck
+			return
+		}
+		Error(w, r, err)
+		return
+	}
+
+	if IsHTMX(r) {
+		// Same contract as the all-products matrix: leave the table alone so
+		// scroll and focus survive, confirm with a toast, and OOB-correct each
+		// saved cell's "previous value" for the next save's change detection.
+		w.Header().Set("HX-Reswap", "none")
+		toast.Toast(toast.VariantSuccess, savedPricesMessage(len(ops))).Render(ctx, w) //nolint:errcheck
+		for _, op := range ops {
+			if op.kind == opBaseSet {
+				admin.BasePrevOOB(op.variantID, fmt.Sprintf("%.2f", float64(op.cents)/100)).Render(ctx, w) //nolint:errcheck
+				continue
+			}
+			newPrev := ""
+			if op.kind != opGroupDelete {
+				newPrev = fmt.Sprintf("%.2f", float64(op.cents)/100)
+			}
+			admin.PriceListPrevOOB(op.groupID, op.variantID, newPrev).Render(ctx, w) //nolint:errcheck
+		}
+		return
+	}
+	http.Redirect(w, r, productPricingURL(productID, "Prices updated"), http.StatusSeeOther)
+}
+
+// productPricingURL builds the no-JS return URL for the pricing tab.
+func productPricingURL(productID uuid.UUID, flash string) string {
+	if flash == "" {
+		return fmt.Sprintf("/admin/catalog/%s?tab=pricing", productID)
+	}
+	return fmt.Sprintf("/admin/catalog/%s?tab=pricing&flash=%s", productID, url.QueryEscape(flash))
+}
+
+// parseProductPricingForm collects the changed cells from the product pricing
+// grid: base prices plus list overrides, which reuse the matrix's form keys so
+// both editors write through the same parser.
+func parseProductPricingForm(r *http.Request) ([]priceOp, error) {
+	ops, err := parseBasePriceForm(r)
+	if err != nil {
+		return nil, err
+	}
+	listOps, err := parsePriceListForm(r)
+	if err != nil {
+		return nil, err
+	}
+	return append(ops, listOps...), nil
+}
+
+// parseBasePriceForm turns the grid's base-price cells into ops, skipping
+// unchanged ones. Clearing a base price that was set is rejected rather than
+// silently ignored — see errBasePriceRequired.
+func parseBasePriceForm(r *http.Request) ([]priceOp, error) {
+	var ops []priceOp
+
+	for key := range r.PostForm {
+		if !strings.HasPrefix(key, "base:") {
+			continue
+		}
+		variantID, parseErr := uuid.Parse(strings.TrimPrefix(key, "base:"))
+		if parseErr != nil {
+			continue
+		}
+		cur, err := parseDollarCents(r.PostForm.Get(key))
+		if err != nil {
+			return nil, err
+		}
+		prev, _ := parseDollarCents(r.PostForm.Get("base_prev:" + variantID.String()))
+		if centsEqual(cur, prev) {
+			continue
+		}
+		if cur == nil {
+			return nil, errBasePriceRequired
+		}
+		ops = append(ops, priceOp{kind: opBaseSet, variantID: variantID, cents: *cur})
+	}
+
+	return ops, nil
 }

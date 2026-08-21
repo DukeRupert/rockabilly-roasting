@@ -87,12 +87,14 @@ func (d *Deps) handleAdminGroupDelete(w http.ResponseWriter, r *http.Request) {
 
 // priceOpKind enumerates the mutations a bulk price save can apply to one cell.
 // Shared with the price-list bulk editor (see admin_price_lists.go), where
-// opGroupSet/opGroupDelete mean set/clear a price-list price.
+// opGroupSet/opGroupDelete mean set/clear a price-list price and opBaseSet means
+// set the variant's base price — the product pricing grid edits both in one save.
 type priceOpKind int
 
 const (
 	opGroupSet priceOpKind = iota
 	opGroupDelete
+	opBaseSet
 )
 
 type priceOp struct {

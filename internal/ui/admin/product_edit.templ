@@ -54,6 +54,12 @@ type ProductEditProps struct {
 	AllSets        []domain.AttributeSet
 	AttributeValues []domain.ProductAttributeValue
 	ActiveTab      string // "details", "attributes", "media", "variants", "pricing"
+	// PriceLists and Pricing back the Pricing tab, which shows this product's
+	// base price and every price-list override side by side. Prices are catalog
+	// data, so they are edited here — on the product — rather than only in the
+	// all-products matrix under Price lists.
+	PriceLists []domain.PriceList
+	Pricing    ProductPriceListPricing
 }
 
 func tabClasses(active bool) string {
@@ -274,90 +280,155 @@ templ productVariantsTab(props ProductEditProps) {
 // --- Pricing Tab ---
 
 templ productPricingTab(props ProductEditProps) {
-	<div id="pricing-panel" class="space-y-4">
-		<p class="text-sm text-rr-muted">
-			Set base prices for this product's variants. Wholesale pricing is managed under
-			<a href="/admin/price-lists" class="text-rr-red hover:text-rr-red-lt">Price lists</a>.
-		</p>
-		if len(props.Variants) == 0 {
-			<div class="border border-dashed border-rr-border p-12 text-center">
-				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No variants</h3>
-				<p class="mt-1 text-sm text-rr-muted">Add variants on the Variants tab first.</p>
-			</div>
-		} else {
-			@productPricingCard(props)
-		}
-	</div>
+	@ProductPricingPanel(props)
 }
 
-// PricingPanel renders the pricing tab content as a standalone partial for htmx swaps.
-templ PricingPanel(product *domain.Product, variants []VariantWithOptions) {
+// ProductPricingPanel renders every price this product carries — the base price
+// and one column per price list — as a single editable grid. Pricing lives on
+// the product because that is where staff are standing when they decide what a
+// coffee costs; the all-products matrix under Price lists remains for comparing
+// a whole list at once. Both write through the same form keys, so the two views
+// stay interchangeable.
+//
+// It is also the htmx swap target after variant changes (renderVariantsPanel),
+// hence the stable #pricing-panel id on the wrapper rather than on the form.
+templ ProductPricingPanel(props ProductEditProps) {
 	<div id="pricing-panel" class="space-y-4">
-		<p class="text-sm text-rr-muted">
-			Set base prices for this product's variants. Wholesale pricing is managed under
-			<a href="/admin/price-lists" class="text-rr-red hover:text-rr-red-lt">Price lists</a>.
-		</p>
-		if len(variants) == 0 {
+		if len(props.Pricing.Variants) == 0 {
 			<div class="border border-dashed border-rr-border p-12 text-center">
 				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No variants</h3>
 				<p class="mt-1 text-sm text-rr-muted">Add variants on the Variants tab first.</p>
 			</div>
 		} else {
-			@productPricingCard(ProductEditProps{Product: product, Variants: variants})
+			<form
+				id="product-pricing-form"
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/pricing", props.Product.ID)) }
+				hx-post={ fmt.Sprintf("/admin/catalog/%s/pricing", props.Product.ID) }
+				hx-target="#pricing-panel"
+				hx-swap="innerHTML"
+				class="space-y-4"
+			>
+				<div class="sm:flex sm:items-start sm:justify-between sm:gap-6">
+					<p class="max-w-2xl text-sm text-rr-muted">
+						Base is what retail pays. Each list column overrides it for the customers on that list &mdash; leave a cell empty and that list falls back to base.
+						if len(props.PriceLists) == 0 {
+							<a href="/admin/price-lists" class="text-rr-red hover:text-rr-red-lt">Create a price list</a> to set wholesale prices.
+						} else {
+							<a href="/admin/price-lists" class="text-rr-red hover:text-rr-red-lt">Manage lists</a>
+						}
+					</p>
+					<div class="mt-4 shrink-0 sm:mt-0">
+						<button
+							type="submit"
+							class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt"
+						>
+							Save changes
+						</button>
+					</div>
+				</div>
+				@productPricingCard(props)
+			</form>
 		}
 	</div>
 }
 
 templ productPricingCard(props ProductEditProps) {
-	<div class="overflow-hidden border border-rr-border bg-rr-surface">
-		<div class="border-b border-rr-border bg-rr-raised px-4 py-2.5 sm:px-6">
-			<h3 class="text-sm font-medium text-rr-body">Base Prices</h3>
-		</div>
+	<div class="overflow-x-auto border border-rr-border bg-rr-surface">
 		<table class="min-w-full divide-y divide-rr-border">
 			<thead class="bg-rr-raised">
 				<tr>
-					<th scope="col" class="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-rr-heading sm:pl-6">SKU</th>
-					<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-rr-heading">Unit Price</th>
+					<th scope="col" class="sticky left-0 z-10 bg-rr-raised py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-rr-heading sm:pl-6">SKU</th>
+					<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-rr-heading">Base</th>
+					for _, list := range props.PriceLists {
+						<th scope="col" class="whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold text-rr-teal">
+							{ list.Name }
+							if list.Status != domain.PriceListStatusActive {
+								<span class="ml-1 font-normal text-rr-muted">({ string(list.Status) })</span>
+							}
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s/products/%s/tiers", list.ID, props.Product.ID)) }
+								class="ml-2 font-normal text-rr-red hover:text-rr-red-lt"
+							>Breaks</a>
+						</th>
+					}
 				</tr>
 			</thead>
 			<tbody class="divide-y divide-rr-border bg-rr-surface">
-				for _, vwo := range props.Variants {
+				for _, vp := range props.Pricing.Variants {
 					<tr>
-						<td class="whitespace-nowrap py-2.5 pl-4 pr-3 text-sm sm:pl-6">
-							<span class="font-mono font-medium text-rr-heading">{ vwo.Variant.SKU }</span>
-							if vwo.Variant.IsDefault {
+						<td class="sticky left-0 z-10 whitespace-nowrap bg-rr-surface py-2.5 pl-4 pr-3 text-sm sm:pl-6">
+							<span class="font-mono font-medium text-rr-heading">{ vp.Variant.SKU }</span>
+							if vp.Variant.IsDefault {
 								<span class="badge badge-green ml-1.5">Default</span>
 							}
 						</td>
+						<!-- Base price — editable here, same as the Variants tab -->
 						<td class="whitespace-nowrap px-3 py-2.5 text-sm">
-							<form
-								method="post"
-								action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID)) }
-								hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/price", props.Product.ID, vwo.Variant.ID) }
-								hx-target="#pricing-panel"
-								hx-swap="outerHTML"
-								hx-trigger="change from:find input"
-								class="flex items-center gap-1"
-							>
+							<div class="flex items-center gap-1">
 								<span class="text-rr-muted">$</span>
 								<input
 									type="number"
-									name="price"
+									name={ "base:" + vp.Variant.ID.String() }
 									step="0.01"
 									min="0"
 									placeholder="0.00"
-									if vwo.PriceCents != nil {
-										value={ priceToDollars(*vwo.PriceCents) }
+									if vp.PriceCents != nil {
+										value={ priceToDollars(*vp.PriceCents) }
 									}
 									class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
 								/>
-							</form>
+								<input type="hidden" id={ "bprev-" + vp.Variant.ID.String() } name={ "base_prev:" + vp.Variant.ID.String() } value={ basePriceDollars(vp.PriceCents) }/>
+							</div>
 						</td>
+						<!-- One editable override per price list -->
+						for _, list := range props.PriceLists {
+							<td class="whitespace-nowrap px-3 py-2.5 text-sm">
+								<div class="flex items-center gap-1">
+									<span class="text-rr-muted">$</span>
+									<input
+										type="number"
+										name={ "list:" + list.ID.String() + ":" + vp.Variant.ID.String() }
+										step="0.01"
+										min="0"
+										placeholder="base"
+										if cents, ok := vp.ListPrices[list.ID]; ok {
+											value={ priceToDollars(cents) }
+										}
+										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
+									/>
+									<input type="hidden" id={ "plprev-" + list.ID.String() + "-" + vp.Variant.ID.String() } name={ "list_prev:" + list.ID.String() + ":" + vp.Variant.ID.String() } value={ priceListDollars(vp.ListPrices, list.ID) }/>
+									@TierSummary(vp.ListBreaks[list.ID])
+								</div>
+							</td>
+						}
 					</tr>
 				}
 			</tbody>
 		</table>
 	</div>
+}
+
+// basePriceDollars renders a base price for the hidden "previous value" input,
+// or "" when the variant has no base price yet.
+func basePriceDollars(cents *int) string {
+	if cents == nil {
+		return ""
+	}
+	return priceToDollars(*cents)
+}
+
+// BasePrevOOB updates one base-price cell's hidden "previous value" after a
+// successful save, mirroring PriceListPrevOOB — the table is left as the user
+// typed it, so change detection has to be corrected in place.
+templ BasePrevOOB(variantID uuid.UUID, value string) {
+	<input
+		type="hidden"
+		id={ "bprev-" + variantID.String() }
+		name={ "base_prev:" + variantID.String() }
+		value={ value }
+		hx-swap-oob="true"
+	/>
 }
 
 // OptionsPanel renders the options section as a standalone partial for htmx swaps.

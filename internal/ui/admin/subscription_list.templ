@@ -9,19 +9,114 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
-func subscriptionListURL(page int, status, q, sort string) string {
+// EnrichedSubscription bundles a subscription with the display fields the list
+// renders at a glance: who it belongs to, which coffee, and which plan. Built
+// in the handler from per-row lookups (bounded by page size).
+type EnrichedSubscription struct {
+	domain.Subscription
+	CustomerName  string
+	CustomerEmail string
+	PlanName      string
+	ProductTitle  string
+}
+
+// SubscriptionProductOption is one coffee in the filter dropdown, with how
+// many subscriptions point at it. Mirrors store.SubscribedProduct so the ui
+// package stays free of store imports.
+type SubscriptionProductOption struct {
+	ID    string
+	Title string
+	Count int
+}
+
+type SubscriptionListProps struct {
+	Subscriptions []EnrichedSubscription
+	// Suggestions holds fuzzy customer matches shown when a search finds no
+	// subscriptions — the near-miss is almost always a half-remembered name.
+	Suggestions []domain.Customer
+	Plans       []domain.SubscriptionPlan
+	Products    []SubscriptionProductOption
+
+	SearchQuery   string
+	StatusFilter  string // one of: active | paused | past_due | cancelled | expired, "" for all
+	PlanFilter    string // plan UUID, "" for any
+	ProductFilter string // product UUID, "" for any
+	Due           string // next-order preset key, "" for any, "custom" for From/To
+	From          string // yyyy-mm-dd, only when Due == "custom"
+	To            string // yyyy-mm-dd, only when Due == "custom"
+	Sort          string
+
+	// Counts holds the per-status totals under the other active filters, keyed
+	// by status string; "" is the All total.
+	Counts     map[string]int
+	TotalCount int
+
+	Page       int
+	PerPage    int
+	HasMore    bool
+	MerchantTZ *time.Location
+	Now        time.Time // injected so the overdue accent is deterministic in tests
+	StaffName  string
+	StaffRole  string
+}
+
+// subFilterState is the full filter state of the subscriptions list as plain
+// strings. Every link on the page is built by copying this, changing one
+// field, and rendering it — which is what keeps sorting from dropping the
+// filters and paging from dropping the search.
+type subFilterState struct {
+	Page                                 int
+	Status, Plan, Product, Due, From, To string
+	Sort, Q                              string
+}
+
+func (p SubscriptionListProps) state() subFilterState {
+	return subFilterState{
+		Page:    p.Page,
+		Status:  p.StatusFilter,
+		Plan:    p.PlanFilter,
+		Product: p.ProductFilter,
+		Due:     p.Due,
+		From:    p.From,
+		To:      p.To,
+		Sort:    p.Sort,
+		Q:       p.SearchQuery,
+	}
+}
+
+// subscriptionListURL renders a filter state as a URL. Defaults (page 1, the
+// default sort, an unset dimension) are left out so the common case stays a
+// bare /admin/subscriptions and the address bar reads as what's on screen.
+func subscriptionListURL(st subFilterState) string {
 	v := url.Values{}
-	if page > 1 {
-		v.Set("page", fmt.Sprintf("%d", page))
+	if st.Page > 1 {
+		v.Set("page", fmt.Sprintf("%d", st.Page))
 	}
-	if status != "" {
-		v.Set("status", status)
+	if st.Status != "" {
+		v.Set("status", st.Status)
 	}
-	if q != "" {
-		v.Set("q", q)
+	if st.Plan != "" {
+		v.Set("plan", st.Plan)
 	}
-	if sort != "" && sort != "created_desc" {
-		v.Set("sort", sort)
+	if st.Product != "" {
+		v.Set("product", st.Product)
+	}
+	if st.Due != "" {
+		v.Set("due", st.Due)
+		if st.Due == "custom" {
+			if st.From != "" {
+				v.Set("from", st.From)
+			}
+			if st.To != "" {
+				v.Set("to", st.To)
+			}
+		}
+	}
+	if st.Sort != "" && st.Sort != "created_desc" {
+		v.Set("sort", st.Sort)
+	}
+	if st.Q != "" {
+		v.Set("q", st.Q)
 	}
 	if len(v) == 0 {
 		return "/admin/subscriptions"
@@ -29,13 +124,60 @@ func subscriptionListURL(page int, status, q, sort string) string {
 	return "/admin/subscriptions?" + v.Encode()
 }
 
+// subscriptionFilterURL changes one filter dimension and resets to page 1 —
+// paging is only meaningful relative to a result set.
+func subscriptionFilterURL(p SubscriptionListProps, dimension, value string) string {
+	st := p.state()
+	st.Page = 1
+	switch dimension {
+	case "status":
+		st.Status = value
+	case "plan":
+		st.Plan = value
+	case "product":
+		st.Product = value
+	case "due":
+		st.Due = value
+		if value != "custom" {
+			st.From, st.To = "", ""
+		}
+	}
+	return subscriptionListURL(st)
+}
+
+// subscriptionPageHref builds a pagination href, carrying every active filter.
+func subscriptionPageHref(p SubscriptionListProps, page int) string {
+	st := p.state()
+	st.Page = page
+	return subscriptionListURL(st)
+}
+
+// subscriptionSortURL builds the href for a sortable column header.
+func subscriptionSortURL(p SubscriptionListProps, col string) string {
+	st := p.state()
+	st.Page = 1
+	st.Sort = subscriptionSortToggle(col, p.Sort)
+	return subscriptionListURL(st)
+}
+
+// subscriptionSearchURL is the list scoped to one search term with everything
+// else cleared — where a "did you mean" suggestion points.
+func subscriptionSearchURL(q string) string {
+	return subscriptionListURL(subFilterState{Page: 1, Q: q})
+}
+
 // subscriptionSortToggle returns the next sort value when a user clicks the
-// header for `col` (one of "next_order", "created"). Clicking the active
-// column flips direction; clicking an inactive column picks the most useful
-// default (ASC for next_order so soonest is on top, DESC for created so
-// newest is on top).
+// header for `col` (one of "customer", "next_order", "created"). Clicking the
+// active column flips direction; clicking an inactive column picks the most
+// useful default (A–Z for customer, ASC for next_order so soonest is on top,
+// DESC for created so newest is on top).
 func subscriptionSortToggle(col, current string) string {
 	switch col {
+	case "customer":
+		if current == "customer_asc" {
+			return "customer_desc"
+		}
+		return "customer_asc"
 	case "next_order":
 		if current == "next_order_asc" {
 			return "next_order_desc"
@@ -52,6 +194,13 @@ func subscriptionSortToggle(col, current string) string {
 
 func subscriptionSortIndicator(col, current string) string {
 	switch col {
+	case "customer":
+		if current == "customer_asc" {
+			return "↑"
+		}
+		if current == "customer_desc" {
+			return "↓"
+		}
 	case "next_order":
 		if current == "next_order_asc" {
 			return "↑"
@@ -70,117 +219,353 @@ func subscriptionSortIndicator(col, current string) string {
 	return ""
 }
 
-type EnrichedSubscription struct {
-	domain.Subscription
-	CustomerName  string
-	CustomerEmail string
-	PlanName      string
+var subscriptionStatusTabs = []adminListPill{
+	{"", "All"},
+	{"active", "Active"},
+	{"past_due", "Past due"},
+	{"paused", "Paused"},
+	{"cancelled", "Cancelled"},
+	{"expired", "Expired"},
 }
 
-type SubscriptionListProps struct {
-	Subscriptions []EnrichedSubscription
-	StatusFilter  string
-	SearchQuery   string
-	Sort          string
-	Page          int
-	PerPage       int
-	HasMore       bool
-	MerchantTZ    *time.Location
-	StaffName     string
-	StaffRole     string
+var subscriptionDuePills = []adminListPill{
+	{"", "Any time"},
+	{"overdue", "Overdue"},
+	{"today", "Today"},
+	{"7d", "7 days"},
+	{"30d", "30 days"},
+	{"custom", "Custom"},
+}
+
+// subscriptionPlanLabel marks a deactivated plan on its filter pill. Retired
+// plans still have live subscriptions on them, so they have to stay filterable
+// — but staff shouldn't have to remember which of two similar names is the one
+// no longer on offer.
+func subscriptionPlanLabel(p domain.SubscriptionPlan) string {
+	if p.IsActive {
+		return p.Name
+	}
+	return p.Name + " (retired)"
+}
+
+// anySubscriptionFilterActive reports whether anything is narrowing the list —
+// drives the "Clear all" escape hatch.
+func anySubscriptionFilterActive(p SubscriptionListProps) bool {
+	return p.SearchQuery != "" || subscriptionFiltersBeyondSearchActive(p) ||
+		(p.Sort != "" && p.Sort != "created_desc")
+}
+
+// subscriptionFiltersBeyondSearchActive reports whether a filter other than the
+// search term is narrowing the list, so the empty state can say which is to
+// blame.
+func subscriptionFiltersBeyondSearchActive(p SubscriptionListProps) bool {
+	return p.StatusFilter != "" || p.PlanFilter != "" || p.ProductFilter != "" || p.Due != ""
+}
+
+// subscriptionNoMatchMessage is built in Go so punctuation lands tight against
+// the closing quote — templ inserts whitespace between adjacent expressions.
+func subscriptionNoMatchMessage(p SubscriptionListProps) string {
+	if subscriptionFiltersBeyondSearchActive(p) {
+		return fmt.Sprintf("Nothing for %q with the current filters.", p.SearchQuery)
+	}
+	return fmt.Sprintf("Nothing for %q. Try a different angle — name, email, or company.", p.SearchQuery)
+}
+
+func (p SubscriptionListProps) showingStart() int {
+	if p.TotalCount == 0 {
+		return 0
+	}
+	return (p.Page-1)*p.PerPage + 1
+}
+
+func (p SubscriptionListProps) showingEnd() int {
+	end := p.Page * p.PerPage
+	if end > p.TotalCount {
+		return p.TotalCount
+	}
+	return end
+}
+
+// subscriptionNextOrderClass rusts the next-order date once it's in the past.
+// A renewal that should already have run is the one date on this page that
+// needs to catch the eye.
+func subscriptionNextOrderClass(sub EnrichedSubscription, now time.Time) string {
+	if sub.Status == domain.SubscriptionStatusActive && sub.NextOrderAt.Before(now) {
+		return "hidden whitespace-nowrap px-3 py-4 text-sm font-semibold text-rr-red sm:table-cell"
+	}
+	return "hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell"
+}
+
+// subscriptionSortHeader renders a clickable column header. Inactive columns
+// keep a dimmed ↕ so they read as sortable before you hover them.
+templ subscriptionSortHeader(props SubscriptionListProps, col, label string) {
+	<a
+		href={ templ.SafeURL(subscriptionSortURL(props, col)) }
+		class="inline-flex items-center gap-1 hover:text-rr-red"
+		if subscriptionSortIndicator(col, props.Sort) != "" {
+			aria-current="true"
+		}
+	>
+		{ label }
+		if ind := subscriptionSortIndicator(col, props.Sort); ind != "" {
+			<span class="text-rr-red">{ ind }</span>
+		} else {
+			<span class="text-rr-border" aria-hidden="true">↕</span>
+		}
+	</a>
+}
+
+// subscriptionHiddenState emits hidden inputs for the filter state a GET form
+// must preserve. `except` names the fields that form owns as real inputs —
+// emitting them twice would send both values and the stale one could win.
+templ subscriptionHiddenState(props SubscriptionListProps, except ...string) {
+	for _, f := range subscriptionStateFields(props, except...) {
+		<input type="hidden" name={ f.Value } value={ f.Label }/>
+	}
+}
+
+// subscriptionStateFields lists the current filter state as name/value pairs,
+// minus the excluded names. Reuses adminListPill purely as a string pair.
+func subscriptionStateFields(props SubscriptionListProps, except ...string) []adminListPill {
+	st := props.state()
+	all := []adminListPill{
+		{"q", st.Q},
+		{"status", st.Status},
+		{"plan", st.Plan},
+		{"product", st.Product},
+		{"due", st.Due},
+		{"from", st.From},
+		{"to", st.To},
+		{"sort", st.Sort},
+	}
+	out := make([]adminListPill, 0, len(all))
+	for _, f := range all {
+		if f.Label == "" {
+			continue
+		}
+		skip := false
+		for _, e := range except {
+			if f.Value == e {
+				skip = true
+				break
+			}
+		}
+		if !skip {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 templ SubscriptionListContent(props SubscriptionListProps) {
 	@adminSectionTabs(subscriptionsTabs(), "/admin/subscriptions")
 	<!-- Page header -->
-	<div class="sm:flex sm:items-center">
-		<div class="sm:flex-auto">
+	<div class="sm:flex sm:items-end sm:justify-between">
+		<div>
 			<h1 class="admin-page-title">Subscriptions</h1>
-			<p class="mt-1 text-sm text-rr-muted">Manage recurring delivery subscriptions</p>
+			<p class="mt-1 text-sm text-rr-muted">Every recurring delivery — search, narrow, and open one to act on it.</p>
 		</div>
 	</div>
-	<!-- Filters -->
-	<form method="get" action="/admin/subscriptions" class="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-		if props.Sort != "" && props.Sort != "created_desc" {
-			<input type="hidden" name="sort" value={ props.Sort }/>
-		}
-		<div class="relative flex-1 sm:max-w-sm">
-			<input
-				type="search"
-				name="q"
-				value={ props.SearchQuery }
-				placeholder="Search by name, email, or company"
-				class="w-full rounded-sm bg-rr-surface py-1.5 pl-9 pr-3 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-			/>
-			<svg class="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-rr-muted" viewBox="0 0 20 20" fill="currentColor">
-				<path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 3.4 9.8l3.65 3.65a.75.75 0 1 0 1.06-1.06l-3.65-3.65A5.5 5.5 0 0 0 9 3.5ZM5 9a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z" clip-rule="evenodd"></path>
-			</svg>
-		</div>
-		<div class="grid grid-cols-1 sm:w-48">
-			<select
-				name="status"
-				onchange="this.form.submit()"
-				class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
-			>
-				<option value="">All statuses</option>
-				<option value="active" selected?={ props.StatusFilter == "active" }>Active</option>
-				<option value="paused" selected?={ props.StatusFilter == "paused" }>Paused</option>
-				<option value="past_due" selected?={ props.StatusFilter == "past_due" }>Past Due</option>
-				<option value="cancelled" selected?={ props.StatusFilter == "cancelled" }>Cancelled</option>
-				<option value="expired" selected?={ props.StatusFilter == "expired" }>Expired</option>
-			</select>
-			<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
-				<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
-			</svg>
-		</div>
-		<button type="submit" class="btn-secondary sm:w-auto">Search</button>
-		if props.SearchQuery != "" || props.StatusFilter != "" {
-			<a href="/admin/subscriptions" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">Clear</a>
-		}
-	</form>
-	<!-- Subscription table -->
-	<div class="mt-6">
-		if len(props.Subscriptions) == 0 {
-			<div class="border border-dashed border-rr-border p-12 text-center">
-				<svg class="mx-auto size-12 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"></path>
-				</svg>
-				<h3 class="mt-2 text-sm font-semibold text-rr-heading">No subscriptions</h3>
-				<p class="mt-1 text-sm text-rr-muted">Subscriptions will appear here once customers subscribe to plans.</p>
+	<!-- Filter masthead — status tabs + search. Sits under the page header as a
+	     lighter control strip (no border rules) so it doesn't compete with the
+	     H1 band. On desktop tabs live left, search right; on mobile they stack
+	     with tabs on top (col-reverse). -->
+	<section class="mt-4" aria-label="Filter subscriptions">
+		<div class="flex flex-col-reverse items-stretch gap-3 md:flex-row md:items-center md:justify-between md:gap-6">
+			<!-- Status tabs — the primary split, with live counts under whatever
+			     else is filtered. Active tab is stamped so it's unmissable. -->
+			<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Subscription statuses">
+				for _, tab := range subscriptionStatusTabs {
+					<a
+						href={ templ.SafeURL(subscriptionFilterURL(props, "status", tab.Value)) }
+						class={ adminTabClass(props.StatusFilter == tab.Value) }
+						if props.StatusFilter == tab.Value {
+							aria-current="page"
+						}
+					>
+						<span>{ tab.Label }</span>
+						<span class={ adminTabCountClass(props.StatusFilter == tab.Value) }>{ fmt.Sprintf("%d", props.Counts[tab.Value]) }</span>
+					</a>
+				}
+			</nav>
+			<!-- Search — submits via htmx on type so the table refreshes inline. -->
+			<div class="md:w-72 md:shrink-0">
+				<label for="subscriptions-search" class="sr-only">Search subscriptions</label>
+				<input
+					id="subscriptions-search"
+					type="search"
+					name="q"
+					value={ props.SearchQuery }
+					placeholder="Search names, emails, companies"
+					hx-get="/admin/subscriptions"
+					hx-trigger="input changed delay:300ms, search"
+					hx-target="#main-content"
+					hx-push-url="true"
+					hx-include="#subscriptions-filter-state input"
+					class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+				/>
+				<!-- Carried with the search request so typing never drops the
+				     active filters. Scoped by id rather than by name so the
+				     coffee form's own copy of this state isn't included twice. -->
+				<div id="subscriptions-filter-state">
+					<input type="hidden" name="status" value={ props.StatusFilter }/>
+					<input type="hidden" name="plan" value={ props.PlanFilter }/>
+					<input type="hidden" name="product" value={ props.ProductFilter }/>
+					<input type="hidden" name="due" value={ props.Due }/>
+					<input type="hidden" name="from" value={ props.From }/>
+					<input type="hidden" name="to" value={ props.To }/>
+					<input type="hidden" name="sort" value={ props.Sort }/>
+				</div>
 			</div>
+		</div>
+		<!-- Secondary filter rows. Quieter than the status tabs: those are the
+		     primary split, these narrow within it. -->
+		<div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+			<div class="flex flex-wrap items-center gap-2">
+				<span class="label-font text-xs uppercase tracking-wide text-rr-muted">Next order</span>
+				for _, f := range subscriptionDuePills {
+					<a
+						href={ templ.SafeURL(subscriptionFilterURL(props, "due", f.Value)) }
+						class={ adminPillClasses(props.Due == f.Value) }
+						if props.Due == f.Value {
+							aria-current="page"
+						}
+					>
+						{ f.Label }
+					</a>
+				}
+			</div>
+			if len(props.Plans) > 1 {
+				<div class="flex flex-wrap items-center gap-2">
+					<span class="label-font text-xs uppercase tracking-wide text-rr-muted">Plan</span>
+					<a href={ templ.SafeURL(subscriptionFilterURL(props, "plan", "")) } class={ adminPillClasses(props.PlanFilter == "") }>Any</a>
+					for _, plan := range props.Plans {
+						<a
+							href={ templ.SafeURL(subscriptionFilterURL(props, "plan", plan.ID.String())) }
+							class={ adminPillClasses(props.PlanFilter == plan.ID.String()) }
+							if props.PlanFilter == plan.ID.String() {
+								aria-current="page"
+							}
+						>
+							{ subscriptionPlanLabel(plan) }
+						</a>
+					}
+				</div>
+			}
+		</div>
+		<!-- Coffee picker and the custom date window. A select, not pills: the
+		     catalog is long enough that a pill row would wrap into a wall. -->
+		<form method="get" action="/admin/subscriptions" class="mt-3 flex flex-wrap items-end gap-3">
+			@subscriptionHiddenState(props, "product", "from", "to")
+			<div>
+				<label for="subscriptions-product" class="label-font block text-xs uppercase tracking-wide text-rr-muted">Coffee</label>
+				<select
+					id="subscriptions-product"
+					name="product"
+					onchange="this.form.submit()"
+					class="mt-1 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+				>
+					<option value="">Any coffee</option>
+					for _, prod := range props.Products {
+						<option value={ prod.ID } selected?={ props.ProductFilter == prod.ID }>{ fmt.Sprintf("%s (%d)", prod.Title, prod.Count) }</option>
+					}
+				</select>
+			</div>
+			if props.Due == "custom" {
+				<div>
+					<label for="subscriptions-from" class="label-font block text-xs uppercase tracking-wide text-rr-muted">From</label>
+					<input id="subscriptions-from" type="date" name="from" value={ props.From } class="mt-1 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+				</div>
+				<div>
+					<label for="subscriptions-to" class="label-font block text-xs uppercase tracking-wide text-rr-muted">To</label>
+					<input id="subscriptions-to" type="date" name="to" value={ props.To } class="mt-1 rounded-sm bg-rr-surface px-2 py-1 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"/>
+				</div>
+			}
+			<button type="submit" class="btn-secondary">Apply</button>
+			if anySubscriptionFilterActive(props) {
+				<a href="/admin/subscriptions" class="pb-1 text-sm font-medium text-rr-red hover:text-rr-red-lt">Clear all</a>
+			}
+		</form>
+	</section>
+	<!-- Subscription table -->
+	<div class="mt-4">
+		if len(props.Subscriptions) == 0 {
+			if props.SearchQuery != "" {
+				<!-- Empty: search returned no matches -->
+				<div class="border border-rr-border bg-rr-surface px-6 py-14 text-center">
+					<h2 class="admin-page-title text-2xl">No match.</h2>
+					<p class="mt-3 text-sm text-rr-body">{ subscriptionNoMatchMessage(props) }</p>
+					<!-- Closest customers, ignoring the active filters — the operator
+					     has already found nothing where they were looking. -->
+					if len(props.Suggestions) > 0 {
+						<div class="mx-auto mt-8 max-w-md border-t border-rr-border pt-6 text-left">
+							<p class="label-font text-xs uppercase tracking-wide text-rr-muted">Did you mean</p>
+							<ul class="mt-3 divide-y divide-rr-border border border-rr-border">
+								for _, c := range props.Suggestions {
+									<li>
+										<a
+											href={ templ.SafeURL(subscriptionSearchURL(c.Email)) }
+											class="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-rr-raised"
+										>
+											<span>
+												<span class="font-medium text-rr-heading">{ c.FirstName } { c.LastName }</span>
+												if c.CompanyName != nil && *c.CompanyName != "" {
+													<span class="text-rr-muted">&nbsp;&middot; { *c.CompanyName }</span>
+												}
+												<span class="block text-xs text-rr-muted">{ c.Email }</span>
+											</span>
+											<span class="shrink-0 text-xs font-semibold text-rr-red">Subscriptions &rarr;</span>
+										</a>
+									</li>
+								}
+							</ul>
+						</div>
+					}
+					if anySubscriptionFilterActive(props) {
+						<div class="mt-6">
+							<a href="/admin/subscriptions" class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised">
+								Clear search and filters
+							</a>
+						</div>
+					}
+				</div>
+			} else if subscriptionFiltersBeyondSearchActive(props) {
+				<!-- Empty: no search term, but the filters excluded everything. -->
+				<div class="border border-rr-border bg-rr-surface px-6 py-14 text-center">
+					<h2 class="admin-page-title text-2xl">Nothing matches.</h2>
+					<p class="mt-3 text-sm text-rr-body">No subscriptions match the current filters.</p>
+					<div class="mt-6">
+						<a href="/admin/subscriptions" class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised">
+							Clear all filters
+						</a>
+					</div>
+				</div>
+			} else {
+				<!-- Empty: nobody subscribes yet -->
+				<div class="border border-dashed border-rr-border p-12 text-center">
+					<svg class="mx-auto size-12 text-rr-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 0 0-3.7-3.7 48.678 48.678 0 0 0-7.324 0 4.006 4.006 0 0 0-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 0 0 3.7 3.7 48.656 48.656 0 0 0 7.324 0 4.006 4.006 0 0 0 3.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3-3 3"></path>
+					</svg>
+					<h3 class="mt-2 text-sm font-semibold text-rr-heading">No subscriptions</h3>
+					<p class="mt-1 text-sm text-rr-muted">Subscriptions will appear here once customers subscribe to plans.</p>
+				</div>
+			}
 		} else {
 			<div class="overflow-hidden border border-rr-border bg-rr-surface">
 				<table class="min-w-full divide-y divide-rr-border">
 					<thead class="bg-rr-raised">
 						<tr>
-							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Customer</th>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">
+								@subscriptionSortHeader(props, "customer", "Customer")
+							</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Coffee</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading md:table-cell">Plan</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">
-								<a
-									href={ templ.SafeURL(subscriptionListURL(1, props.StatusFilter, props.SearchQuery, subscriptionSortToggle("next_order", props.Sort))) }
-									class="inline-flex items-center gap-1 hover:text-rr-red"
-								>
-									Next Order
-									if ind := subscriptionSortIndicator("next_order", props.Sort); ind != "" {
-										<span class="text-rr-red">{ ind }</span>
-									} else {
-										<span class="text-rr-border">↕</span>
-									}
-								</a>
+								@subscriptionSortHeader(props, "next_order", "Next order")
 							</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">
-								<a
-									href={ templ.SafeURL(subscriptionListURL(1, props.StatusFilter, props.SearchQuery, subscriptionSortToggle("created", props.Sort))) }
-									class="inline-flex items-center gap-1 hover:text-rr-red"
-								>
-									Created
-									if ind := subscriptionSortIndicator("created", props.Sort); ind != "" {
-										<span class="text-rr-red">{ ind }</span>
-									} else {
-										<span class="text-rr-border">↕</span>
-									}
-								</a>
+								@subscriptionSortHeader(props, "created", "Created")
 							</th>
 						</tr>
 					</thead>
@@ -199,6 +584,7 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 										<div class="text-xs text-rr-muted">{ sub.CustomerEmail }</div>
 									}
 								</td>
+								<td class="hidden px-3 py-4 text-sm text-rr-heading lg:table-cell">{ sub.ProductTitle }</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-heading md:table-cell">
 									{ sub.PlanName }
 									if sub.Quantity > 1 {
@@ -208,7 +594,7 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									@SubscriptionStatusBadge(sub.Status)
 								</td>
-								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
+								<td class={ subscriptionNextOrderClass(sub, props.Now) }>
 									{ sub.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
 								</td>
 								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
@@ -221,20 +607,25 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 			</div>
 			<!-- Pagination -->
 			<nav class="flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
-				<div class="-mt-px flex w-0 flex-1">
+				<div class="hidden sm:block">
+					<p class="text-sm text-rr-muted">
+						Showing <span class="font-medium tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.showingStart()) }</span>
+						&ndash; <span class="font-medium tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.showingEnd()) }</span>
+						of <span class="font-medium tabular-nums text-rr-heading">{ fmt.Sprintf("%d", props.TotalCount) }</span>
+					</p>
+				</div>
+				<div class="flex flex-1 justify-between gap-2 sm:flex-none sm:justify-end">
 					if props.Page > 1 {
 						<a
-							href={ templ.SafeURL(subscriptionListURL(props.Page-1, props.StatusFilter, props.SearchQuery, props.Sort)) }
+							href={ templ.SafeURL(subscriptionPageHref(props, props.Page-1)) }
 							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 						>
 							Previous
 						</a>
 					}
-				</div>
-				<div class="-mt-px flex w-0 flex-1 justify-end">
 					if props.HasMore {
 						<a
-							href={ templ.SafeURL(subscriptionListURL(props.Page+1, props.StatusFilter, props.SearchQuery, props.Sort)) }
+							href={ templ.SafeURL(subscriptionPageHref(props, props.Page+1)) }
 							class="inline-flex items-center rounded-sm px-3 py-2 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
 						>
 							Next

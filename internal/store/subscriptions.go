@@ -579,16 +579,126 @@ const (
 	SubscriptionSortCreatedAsc    SubscriptionSort = "created_asc"
 	SubscriptionSortNextOrderAsc  SubscriptionSort = "next_order_asc"
 	SubscriptionSortNextOrderDesc SubscriptionSort = "next_order_desc"
+	SubscriptionSortCustomerAsc   SubscriptionSort = "customer_asc"
+	SubscriptionSortCustomerDesc  SubscriptionSort = "customer_desc"
 )
 
 // SubscriptionFilter holds optional filters for listing subscriptions.
 type SubscriptionFilter struct {
-	Status                     *domain.SubscriptionStatus
-	CustomerQuery              string // free-text match on customer name / email / company
-	ExcludeDunningAcknowledged bool   // drop past-due rows already acknowledged on the dashboard
+	Status        *domain.SubscriptionStatus
+	PlanID        *uuid.UUID
+	ProductID     *uuid.UUID // the coffee behind the subscribed variant
+	NextOrderFrom *time.Time // inclusive lower bound on next_order_at
+	NextOrderTo   *time.Time // inclusive upper bound on next_order_at
+	CustomerQuery string     // free-text match on customer name / email / company
+	// ExcludeDunningAcknowledged drops past-due rows already acknowledged on
+	// the dashboard.
+	ExcludeDunningAcknowledged bool
 	Sort                       SubscriptionSort
 	Limit                      int
 	Offset                     int
+}
+
+// subscriptionCustomerNameExpr orders by the same string the list renders:
+// the person's name, falling back to company then email when the name is
+// blank. Sorting on first_name alone would strand every company-only account
+// at the top under an empty string.
+const subscriptionCustomerNameExpr = `lower(coalesce(nullif(trim(c.first_name || ' ' || c.last_name), ''), nullif(c.company_name, ''), c.email))`
+
+// needsCustomerJoin reports whether the query has to reach into customers —
+// either to search them or to order by the displayed name.
+func (f SubscriptionFilter) needsCustomerJoin() bool {
+	return f.CustomerQuery != "" ||
+		f.Sort == SubscriptionSortCustomerAsc ||
+		f.Sort == SubscriptionSortCustomerDesc
+}
+
+// subscriptionFrom builds the FROM clause and only the joins the filter earns.
+// Every selected column is s.-qualified, so adding a join can't collide with a
+// same-named column on customers or variants.
+func (f SubscriptionFilter) subscriptionFrom() string {
+	q := " FROM subscriptions s"
+	if f.needsCustomerJoin() {
+		q += " JOIN customers c ON c.id = s.customer_id"
+	}
+	if f.ProductID != nil {
+		q += " JOIN variants v ON v.id = s.variant_id"
+	}
+	return q
+}
+
+// subscriptionWhere builds the WHERE clause shared by List, Count, and
+// CountsByStatus, appending placeholders from argN onward. One builder, not
+// three copies: a filter added to the list and missed in the count is how the
+// "of N" total starts contradicting the rows on screen, and how the status
+// pill counts drift from the list beneath them.
+//
+// skipStatus omits the status predicate — CountsByStatus varies that dimension
+// itself, so each pill's number is exactly what clicking it would show.
+func subscriptionWhere(f SubscriptionFilter, argN int, skipStatus bool) (string, []any, int) {
+	clause := " WHERE true"
+	args := []any{}
+
+	if f.Status != nil && !skipStatus {
+		clause += fmt.Sprintf(" AND s.status = $%d", argN)
+		args = append(args, string(*f.Status))
+		argN++
+	}
+
+	if f.PlanID != nil {
+		clause += fmt.Sprintf(" AND s.plan_id = $%d", argN)
+		args = append(args, *f.PlanID)
+		argN++
+	}
+
+	if f.ProductID != nil {
+		clause += fmt.Sprintf(" AND v.product_id = $%d", argN)
+		args = append(args, *f.ProductID)
+		argN++
+	}
+
+	if f.NextOrderFrom != nil {
+		clause += fmt.Sprintf(" AND s.next_order_at >= $%d", argN)
+		args = append(args, *f.NextOrderFrom)
+		argN++
+	}
+
+	if f.NextOrderTo != nil {
+		clause += fmt.Sprintf(" AND s.next_order_at <= $%d", argN)
+		args = append(args, *f.NextOrderTo)
+		argN++
+	}
+
+	if f.CustomerQuery != "" {
+		clause += fmt.Sprintf(" AND (c.email ILIKE $%d OR c.first_name ILIKE $%d OR c.last_name ILIKE $%d OR (c.first_name || ' ' || c.last_name) ILIKE $%d OR c.company_name ILIKE $%d)", argN, argN, argN, argN, argN)
+		args = append(args, "%"+f.CustomerQuery+"%")
+		argN++
+	}
+
+	if f.ExcludeDunningAcknowledged {
+		clause += " AND (s.metadata->>'dunning_acknowledged_at') IS NULL"
+	}
+
+	return clause, args, argN
+}
+
+// subscriptionOrderBy maps the closed sort enum onto an ORDER BY. Callers pass
+// the enum, never a raw identifier, so no query param can reach the clause.
+func subscriptionOrderBy(sort SubscriptionSort) string {
+	switch sort {
+	case SubscriptionSortCreatedAsc:
+		return " ORDER BY s.created_at ASC"
+	case SubscriptionSortNextOrderAsc:
+		return " ORDER BY s.next_order_at ASC"
+	case SubscriptionSortNextOrderDesc:
+		return " ORDER BY s.next_order_at DESC"
+	case SubscriptionSortCustomerAsc:
+		return " ORDER BY " + subscriptionCustomerNameExpr + " ASC, s.created_at DESC"
+	case SubscriptionSortCustomerDesc:
+		return " ORDER BY " + subscriptionCustomerNameExpr + " DESC, s.created_at DESC"
+	default:
+		return " ORDER BY s.created_at DESC"
+	}
 }
 
 // List returns subscriptions matching the given filter (hand-written for dynamic WHERE).
@@ -597,42 +707,12 @@ func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionF
 	query := `SELECT s.id, s.customer_id, s.plan_id, s.variant_id, s.quantity, s.status, s.shipping_address_id,
 	                 s.stripe_payment_method_id,
 	                 s.current_period_start, s.current_period_end, s.next_order_at,
-	                 s.ends_at, s.cancelled_at, s.pause_until, s.metadata, s.created_at, s.updated_at
-	          FROM subscriptions s`
-	args := []any{}
-	argN := 1
+	                 s.ends_at, s.cancelled_at, s.pause_until, s.metadata, s.created_at, s.updated_at`
+	query += f.subscriptionFrom()
 
-	if f.CustomerQuery != "" {
-		query += " JOIN customers c ON c.id = s.customer_id"
-	}
-	query += " WHERE true"
-
-	if f.Status != nil {
-		query += fmt.Sprintf(" AND s.status = $%d", argN)
-		args = append(args, string(*f.Status))
-		argN++
-	}
-
-	if f.CustomerQuery != "" {
-		query += fmt.Sprintf(" AND (c.email ILIKE $%d OR c.first_name ILIKE $%d OR c.last_name ILIKE $%d OR (c.first_name || ' ' || c.last_name) ILIKE $%d OR c.company_name ILIKE $%d)", argN, argN, argN, argN, argN)
-		args = append(args, "%"+f.CustomerQuery+"%")
-		argN++
-	}
-
-	if f.ExcludeDunningAcknowledged {
-		query += " AND (s.metadata->>'dunning_acknowledged_at') IS NULL"
-	}
-
-	switch f.Sort {
-	case SubscriptionSortCreatedAsc:
-		query += " ORDER BY s.created_at ASC"
-	case SubscriptionSortNextOrderAsc:
-		query += " ORDER BY s.next_order_at ASC"
-	case SubscriptionSortNextOrderDesc:
-		query += " ORDER BY s.next_order_at DESC"
-	default:
-		query += " ORDER BY s.created_at DESC"
-	}
+	where, args, argN := subscriptionWhere(f, 1, false)
+	query += where
+	query += subscriptionOrderBy(f.Sort)
 
 	limit := f.Limit
 	if limit <= 0 {
@@ -675,6 +755,88 @@ func (s *SubscriptionStore) List(ctx context.Context, tx pgx.Tx, f SubscriptionF
 		subs = append(subs, sub)
 	}
 	return subs, rows.Err()
+}
+
+// Count returns how many subscriptions match the filter, ignoring Limit and
+// Offset. Shares List's WHERE builder so the "of N" total can't disagree with
+// the rows.
+func (s *SubscriptionStore) Count(ctx context.Context, tx pgx.Tx, f SubscriptionFilter) (_ int, err error) {
+	defer trackQuery(s.metrics, "subscriptions.count", time.Now(), &err)
+	query := "SELECT COUNT(*)" + f.subscriptionFrom()
+	where, args, _ := subscriptionWhere(f, 1, false)
+	query += where
+
+	var count int
+	if err = tx.QueryRow(ctx, query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count subscriptions: %w", err)
+	}
+	return count, nil
+}
+
+// CountsByStatus returns the number of subscriptions per status under every
+// filter dimension except status itself — the numbers behind the status pills.
+// One grouped query rather than one count per pill: six round trips on every
+// page load, all reading the same rows, would be the same answer for more work.
+func (s *SubscriptionStore) CountsByStatus(ctx context.Context, tx pgx.Tx, f SubscriptionFilter) (_ map[domain.SubscriptionStatus]int, err error) {
+	defer trackQuery(s.metrics, "subscriptions.counts_by_status", time.Now(), &err)
+	query := "SELECT s.status, COUNT(*)" + f.subscriptionFrom()
+	where, args, _ := subscriptionWhere(f, 1, true)
+	query += where + " GROUP BY s.status"
+
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("count subscriptions by status: %w", err)
+	}
+	defer rows.Close()
+
+	counts := map[domain.SubscriptionStatus]int{}
+	for rows.Next() {
+		var status string
+		var n int
+		if err := rows.Scan(&status, &n); err != nil {
+			return nil, fmt.Errorf("scan subscription status count: %w", err)
+		}
+		counts[domain.SubscriptionStatus(status)] = n
+	}
+	return counts, rows.Err()
+}
+
+// SubscribedProduct is one coffee that at least one subscription points at,
+// with how many subscriptions that is.
+type SubscribedProduct struct {
+	ID    uuid.UUID
+	Title string
+	Count int
+}
+
+// ListSubscribedProducts returns the products behind existing subscriptions,
+// most-subscribed first. This is the option list for the admin coffee filter:
+// derived from what customers actually subscribe to rather than from the
+// subscribable catalog, so a coffee that has since been marked unsubscribable
+// stays filterable, and a subscribable coffee nobody has taken up doesn't
+// offer staff an option that can only return nothing.
+func (s *SubscriptionStore) ListSubscribedProducts(ctx context.Context, tx pgx.Tx) (_ []SubscribedProduct, err error) {
+	defer trackQuery(s.metrics, "subscriptions.list_subscribed_products", time.Now(), &err)
+	rows, err := tx.Query(ctx, `SELECT p.id, p.title, COUNT(*)
+	          FROM subscriptions s
+	          JOIN variants v ON v.id = s.variant_id
+	          JOIN products p ON p.id = v.product_id
+	          GROUP BY p.id, p.title
+	          ORDER BY COUNT(*) DESC, p.title ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("list subscribed products: %w", err)
+	}
+	defer rows.Close()
+
+	var out []SubscribedProduct
+	for rows.Next() {
+		var p SubscribedProduct
+		if err := rows.Scan(&p.ID, &p.Title, &p.Count); err != nil {
+			return nil, fmt.Errorf("scan subscribed product: %w", err)
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
 }
 
 // --- Subscription Orders ---

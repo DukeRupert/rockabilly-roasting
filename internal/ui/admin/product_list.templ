@@ -161,11 +161,11 @@ templ ProductListContent(props ProductListProps) {
 			</form>
 			<!-- Status tabs -->
 			<nav class="flex gap-0 border-b border-rr-border -mb-px">
-				<a href={ templ.SafeURL(productTabHref("", props.TaxonFilter, props.Search)) } class={ orderTabClass(!props.WhiteLabel && props.StatusFilter == "") }>All</a>
-				<a href={ templ.SafeURL(productTabHref("draft", props.TaxonFilter, props.Search)) } class={ orderTabClass(!props.WhiteLabel && props.StatusFilter == "draft") }>Draft</a>
-				<a href={ templ.SafeURL(productTabHref("active", props.TaxonFilter, props.Search)) } class={ orderTabClass(!props.WhiteLabel && props.StatusFilter == "active") }>Active</a>
-				<a href={ templ.SafeURL(productTabHref("archived", props.TaxonFilter, props.Search)) } class={ orderTabClass(!props.WhiteLabel && props.StatusFilter == "archived") }>Archived</a>
-				<a href={ templ.SafeURL(whiteLabelQueueHref(props.TaxonFilter, props.Search)) } class={ orderTabClass(props.WhiteLabel) }>
+				<a href={ templ.SafeURL(productTabHref("", props.TaxonFilter, props.Search)) } class={ adminTabClass(!props.WhiteLabel && props.StatusFilter == "") }>All</a>
+				<a href={ templ.SafeURL(productTabHref("draft", props.TaxonFilter, props.Search)) } class={ adminTabClass(!props.WhiteLabel && props.StatusFilter == "draft") }>Draft</a>
+				<a href={ templ.SafeURL(productTabHref("active", props.TaxonFilter, props.Search)) } class={ adminTabClass(!props.WhiteLabel && props.StatusFilter == "active") }>Active</a>
+				<a href={ templ.SafeURL(productTabHref("archived", props.TaxonFilter, props.Search)) } class={ adminTabClass(!props.WhiteLabel && props.StatusFilter == "archived") }>Archived</a>
+				<a href={ templ.SafeURL(whiteLabelQueueHref(props.TaxonFilter, props.Search)) } class={ adminTabClass(props.WhiteLabel) }>
 					White-label review
 					if props.WhiteLabelPending > 0 {
 						<span class="badge badge-indigo ml-1.5">{ fmt.Sprintf("%d", props.WhiteLabelPending) }</span>

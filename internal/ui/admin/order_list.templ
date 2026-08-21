@@ -224,13 +224,13 @@ templ orderSortHeader(props OrderListProps, col, label string) {
 }
 
 // orderPillRow renders one labelled row of filter pills.
-templ orderPillRow(props OrderListProps, label, dimension, active string, pills []orderPill) {
+templ orderPillRow(props OrderListProps, label, dimension, active string, pills []adminListPill) {
 	<div class="flex flex-wrap items-center gap-2">
 		<span class="label-font text-xs uppercase tracking-wide text-rr-muted">{ label }</span>
 		for _, f := range pills {
 			<a
 				href={ templ.SafeURL(orderFilterURL(props, dimension, f.Value)) }
-				class={ orderPillClasses(active == f.Value) }
+				class={ adminPillClasses(active == f.Value) }
 				if active == f.Value {
 					aria-current="page"
 				}
@@ -251,9 +251,9 @@ templ orderHiddenState(props OrderListProps, except ...string) {
 }
 
 // orderStateFields lists the current filter state as name/value pairs, minus
-// the excluded names. Reuses orderPill purely as a string pair.
-func orderStateFields(props OrderListProps, except ...string) []orderPill {
-	all := []orderPill{
+// the excluded names. Reuses adminListPill purely as a string pair.
+func orderStateFields(props OrderListProps, except ...string) []adminListPill {
+	all := []adminListPill{
 		{"view", props.View},
 		{"q", props.Search},
 		{"sort", props.Sort},
@@ -265,7 +265,7 @@ func orderStateFields(props OrderListProps, except ...string) []orderPill {
 		{"min", props.Min},
 		{"max", props.Max},
 	}
-	out := make([]orderPill, 0, len(all))
+	out := make([]adminListPill, 0, len(all))
 	for _, f := range all {
 		if f.Label == "" {
 			continue
@@ -284,16 +284,6 @@ func orderStateFields(props OrderListProps, except ...string) []orderPill {
 	return out
 }
 
-// orderTabClass returns the class for an order-view tab. The active tab gets
-// the paper-and-ink stamp treatment: ink border, hard offset shadow, cream
-// surface — visually pasted on top of the row of inactive labels.
-func orderTabClass(active bool) string {
-	if active {
-		return "relative shrink-0 whitespace-nowrap inline-flex items-center gap-2 border border-rr-border bg-rr-surface px-3.5 py-2 font-semibold text-rr-heading shadow-sm z-10"
-	}
-	return "shrink-0 whitespace-nowrap inline-flex items-center gap-2 border border-transparent px-3.5 py-2 text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
-}
-
 // orderEmptyBucketCopy returns the body copy shown when a tab has 0 rows
 // but other buckets have orders. Per-view phrasing reads more naturally
 // than a generic "no orders" line.
@@ -309,16 +299,6 @@ func orderEmptyBucketCopy(view string) string {
 		return "Archive's empty — no cancelled or refunded orders."
 	}
 	return "No orders match this view."
-}
-
-// orderTabCountClass returns the chip class beside each tab label. The active
-// tab's count chip pops in rust to draw the eye to "you have N here";
-// inactive chips sit quiet on raised paper.
-func orderTabCountClass(active bool) string {
-	if active {
-		return "inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-px bg-rr-red text-white text-[0.65rem] font-bold tabular-nums tracking-wider"
-	}
-	return "inline-flex items-center justify-center min-w-[1.25rem] px-1.5 py-px bg-rr-raised text-rr-body text-[0.65rem] font-bold tabular-nums tracking-wider"
 }
 
 templ OrderListContent(props OrderListProps) {
@@ -343,9 +323,9 @@ templ OrderListContent(props OrderListProps) {
 			     (ink border + hard offset shadow) so the current bucket is unmissable. -->
 			<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Order views">
 				for _, tab := range props.tabs() {
-					<a href={ templ.SafeURL(orderListURL(props, 1, tab.Key, props.Sort, props.Payment, props.Fulfillment, props.Range, props.From, props.To, props.Min, props.Max, props.Search)) } class={ orderTabClass(props.View == tab.Key) }>
+					<a href={ templ.SafeURL(orderListURL(props, 1, tab.Key, props.Sort, props.Payment, props.Fulfillment, props.Range, props.From, props.To, props.Min, props.Max, props.Search)) } class={ adminTabClass(props.View == tab.Key) }>
 						<span>{ tab.Label }</span>
-						<span class={ orderTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
+						<span class={ adminTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
 					</a>
 				}
 			</nav>
@@ -843,12 +823,7 @@ func orderNoMatchMessage(p OrderListProps) string {
 	return fmt.Sprintf("Nothing for %q. Try a different angle — name, email, company, or order number.", p.Search)
 }
 
-type orderPill struct {
-	Value string
-	Label string
-}
-
-var orderPaymentPills = []orderPill{
+var orderPaymentPills = []adminListPill{
 	{"", "Any"},
 	{"captured", "Captured"},
 	{"awaiting", "Awaiting"},
@@ -857,14 +832,14 @@ var orderPaymentPills = []orderPill{
 	{"failed", "Failed"},
 }
 
-var orderFulfillmentPills = []orderPill{
+var orderFulfillmentPills = []adminListPill{
 	{"", "Any"},
 	{"unfulfilled", "Unfulfilled"},
 	{"fulfilled", "Fulfilled"},
 	{"delivered", "Delivered"},
 }
 
-var orderRangePills = []orderPill{
+var orderRangePills = []adminListPill{
 	{"", "All time"},
 	{"today", "Today"},
 	{"7d", "7 days"},
@@ -873,10 +848,3 @@ var orderRangePills = []orderPill{
 	{"custom", "Custom"},
 }
 
-func orderPillClasses(active bool) string {
-	base := "inline-flex items-center rounded-sm border px-2.5 py-1 text-sm font-medium"
-	if active {
-		return base + " border-rr-heading bg-rr-heading text-rr-bg"
-	}
-	return base + " border-rr-border bg-rr-surface text-rr-body hover:bg-rr-raised"
-}

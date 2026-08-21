@@ -235,7 +235,7 @@ func ProductListContent(props ProductListProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var6 = []any{orderTabClass(!props.WhiteLabel && props.StatusFilter == "")}
+		var templ_7745c5c3_Var6 = []any{adminTabClass(!props.WhiteLabel && props.StatusFilter == "")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -270,7 +270,7 @@ func ProductListContent(props ProductListProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var9 = []any{orderTabClass(!props.WhiteLabel && props.StatusFilter == "draft")}
+		var templ_7745c5c3_Var9 = []any{adminTabClass(!props.WhiteLabel && props.StatusFilter == "draft")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var9...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -305,7 +305,7 @@ func ProductListContent(props ProductListProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var12 = []any{orderTabClass(!props.WhiteLabel && props.StatusFilter == "active")}
+		var templ_7745c5c3_Var12 = []any{adminTabClass(!props.WhiteLabel && props.StatusFilter == "active")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var12...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -340,7 +340,7 @@ func ProductListContent(props ProductListProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 = []any{orderTabClass(!props.WhiteLabel && props.StatusFilter == "archived")}
+		var templ_7745c5c3_Var15 = []any{adminTabClass(!props.WhiteLabel && props.StatusFilter == "archived")}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var15...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -375,7 +375,7 @@ func ProductListContent(props ProductListProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var18 = []any{orderTabClass(props.WhiteLabel)}
+		var templ_7745c5c3_Var18 = []any{adminTabClass(props.WhiteLabel)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var18...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

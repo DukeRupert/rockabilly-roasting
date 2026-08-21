@@ -371,7 +371,7 @@ func FulfillmentListContent(props FulfillmentListProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		for _, tab := range props.tabs() {
-			var templ_7745c5c3_Var6 = []any{orderTabClass(props.View == tab.Key)}
+			var templ_7745c5c3_Var6 = []any{adminTabClass(props.View == tab.Key)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -419,7 +419,7 @@ func FulfillmentListContent(props FulfillmentListProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var10 = []any{orderTabCountClass(props.View == tab.Key)}
+			var templ_7745c5c3_Var10 = []any{adminTabCountClass(props.View == tab.Key)}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var10...)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

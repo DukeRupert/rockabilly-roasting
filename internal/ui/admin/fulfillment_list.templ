@@ -298,9 +298,9 @@ templ FulfillmentListContent(props FulfillmentListProps) {
 	<section class="mt-5" aria-label="Filter fulfillment queue">
 		<nav class="flex flex-wrap items-center gap-2 label-font" aria-label="Fulfillment views">
 			for _, tab := range props.tabs() {
-				<a href={ templ.SafeURL(fulfillmentTabHref(props.BasePath, tab)) } class={ orderTabClass(props.View == tab.Key) }>
+				<a href={ templ.SafeURL(fulfillmentTabHref(props.BasePath, tab)) } class={ adminTabClass(props.View == tab.Key) }>
 					<span>{ tab.Label }</span>
-					<span class={ orderTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
+					<span class={ adminTabCountClass(props.View == tab.Key) }>{ fmt.Sprintf("%d", tab.Count) }</span>
 				</a>
 			}
 		</nav>

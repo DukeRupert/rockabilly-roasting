@@ -133,6 +133,36 @@ func (s *SubscriptionService) ListSubscriptions(ctx context.Context, tx pgx.Tx, 
 	return subs, nil
 }
 
+// CountSubscriptions returns how many subscriptions match the filter, ignoring
+// its Limit and Offset — the "of N" behind the paged list.
+func (s *SubscriptionService) CountSubscriptions(ctx context.Context, tx pgx.Tx, f store.SubscriptionFilter) (int, error) {
+	count, err := s.subscriptions.Count(ctx, tx, f)
+	if err != nil {
+		return 0, fmt.Errorf("count subscriptions: %w", err)
+	}
+	return count, nil
+}
+
+// SubscriptionStatusCounts returns the per-status totals under every filter
+// dimension except status — what each status pill on the admin list shows.
+func (s *SubscriptionService) SubscriptionStatusCounts(ctx context.Context, tx pgx.Tx, f store.SubscriptionFilter) (map[domain.SubscriptionStatus]int, error) {
+	counts, err := s.subscriptions.CountsByStatus(ctx, tx, f)
+	if err != nil {
+		return nil, fmt.Errorf("subscription status counts: %w", err)
+	}
+	return counts, nil
+}
+
+// ListSubscribedProducts returns the coffees behind existing subscriptions,
+// most-subscribed first — the option list for the admin coffee filter.
+func (s *SubscriptionService) ListSubscribedProducts(ctx context.Context, tx pgx.Tx) ([]store.SubscribedProduct, error) {
+	products, err := s.subscriptions.ListSubscribedProducts(ctx, tx)
+	if err != nil {
+		return nil, fmt.Errorf("list subscribed products: %w", err)
+	}
+	return products, nil
+}
+
 // CountSubscriptionsByStatus returns the number of subscriptions with the given status.
 func (s *SubscriptionService) CountSubscriptionsByStatus(ctx context.Context, tx pgx.Tx, status domain.SubscriptionStatus) (int, error) {
 	count, err := s.subscriptions.CountByStatus(ctx, tx, status)

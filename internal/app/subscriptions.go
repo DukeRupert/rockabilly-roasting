@@ -11,6 +11,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -21,12 +22,13 @@ type SubscriptionService struct {
 	orders        *store.OrderStore
 	audit         *audit.AuditWriter
 	metrics       *metrics.Registry
-	customers     *store.CustomerStore // populated via WithEmail; required for SendConfirmationEmail
-	catalog       *store.CatalogStore  // populated via WithEmail/WithCatalog; required for SendConfirmationEmail and ChangeVariant
-	pricing       *store.PricingStore  // populated via WithCatalog; required for ChangeVariant same-price guard
-	email         EmailEnv             // populated via WithEmail; required for SendConfirmationEmail
-	renewalLoc    *time.Location       // populated via WithRenewalAnchor; nil disables renewal-time anchoring
-	renewalHour   int                  // hour-of-day (0–23) in renewalLoc that renewals fire at
+	customers     *store.CustomerStore    // populated via WithEmail; required for SendConfirmationEmail
+	catalog       *store.CatalogStore     // populated via WithEmail/WithCatalog; required for SendConfirmationEmail and ChangeVariant
+	pricing       *store.PricingStore     // populated via WithCatalog; required for ChangeVariant same-price guard
+	email         EmailEnv                // populated via WithEmail; required for SendConfirmationEmail
+	renewalLoc    *time.Location          // populated via WithRenewalAnchor; nil disables renewal-time anchoring
+	renewalHour   int                     // hour-of-day (0–23) in renewalLoc that renewals fire at
+	orderActions  *auth.OrderActionSigner // populated via WithOrderActionSigner; nil omits the one-click undo link
 }
 
 // NewSubscriptionService creates a new SubscriptionService.
@@ -58,6 +60,14 @@ func (s *SubscriptionService) WithEmail(env EmailEnv, customers *store.CustomerS
 func (s *SubscriptionService) WithCatalog(catalog *store.CatalogStore, pricing *store.PricingStore) *SubscriptionService {
 	s.catalog = catalog
 	s.pricing = pricing
+	return s
+}
+
+// WithOrderActionSigner wires the signer behind the one-click undo link in the
+// skip notification. Without it the email still sends — it just points at the
+// account page rather than printing a link nothing could verify.
+func (s *SubscriptionService) WithOrderActionSigner(signer *auth.OrderActionSigner) *SubscriptionService {
+	s.orderActions = signer
 	return s
 }
 
@@ -1025,4 +1035,219 @@ func nextPeriodEnd(start time.Time, interval domain.SubscriptionInterval, count 
 	default:
 		return start.AddDate(0, 0, 30*count)
 	}
+}
+
+// --- Skipping shipments ---
+
+// SkipSubscriptionParams describes a skip request. Exactly one of the two forms
+// must be set: Intervals skips that many upcoming shipments at the subscription's
+// own cadence; ResumeOn names the day the customer wants shipments to start
+// again. Both empty (or both set) is a bad request.
+type SkipSubscriptionParams struct {
+	Intervals int
+	ResumeOn  *time.Time
+}
+
+func canSkipSubscription(status domain.SubscriptionStatus) bool {
+	return status == domain.SubscriptionStatusActive
+}
+
+// SkipSubscription pushes a subscription's next shipment into the future
+// without generating an order for the skipped window. It is the light-touch
+// alternative to pausing: the subscription stays active, keeps its plan,
+// variant and cadence, and simply resumes on its own.
+//
+// Mechanically the current period is stretched — current_period_start is left
+// alone and current_period_end (with next_order_at anchored off it) moves out
+// to the resume instant. The renewal path starts the next period at
+// current_period_end, so once the skip elapses the subscription picks the
+// cadence back up from the resume date rather than snapping back to the old
+// calendar. No charge is made and no order is created for the skipped span:
+// subscriptions bill per shipment, so a skipped shipment is simply not billed.
+//
+// Only active subscriptions can be skipped. A paused subscription already has
+// no upcoming shipments, and a past-due one has an unpaid charge that must be
+// resolved before its schedule means anything.
+func (s *SubscriptionService) SkipSubscription(ctx context.Context, tx pgx.Tx, id uuid.UUID, p SkipSubscriptionParams, actor Actor) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for skip: %w", err)
+	}
+	if !canSkipSubscription(sub.Status) {
+		return nil, ErrSubscriptionNotSkippable
+	}
+
+	plan, err := s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
+	if err != nil {
+		return nil, fmt.Errorf("get plan for skip: %w", err)
+	}
+
+	now := time.Now()
+	resumeAt, err := resolveSkipResume(sub, plan, p, now)
+	if err != nil {
+		return nil, err
+	}
+
+	nextOrder := s.anchorRenewal(resumeAt)
+	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, sub.CurrentPeriodStart, resumeAt, nextOrder); err != nil {
+		return nil, fmt.Errorf("skip subscription period: %w", err)
+	}
+
+	// Snapshot what the skip replaced, so a mistaken skip (the email offers a
+	// one-click way out) is restored exactly rather than re-derived.
+	undo := domain.SkipUndo{
+		PeriodEnd:          sub.CurrentPeriodEnd,
+		NextOrderAt:        sub.NextOrderAt,
+		AppliedNextOrderAt: nextOrder,
+	}
+	if err := s.subscriptions.SetSkipUndo(ctx, tx, id, &undo); err != nil {
+		return nil, fmt.Errorf("record skip undo: %w", err)
+	}
+
+	previousNextOrder := sub.NextOrderAt
+	sub.CurrentPeriodEnd = resumeAt
+	sub.NextOrderAt = nextOrder
+	if sub.Metadata == nil {
+		sub.Metadata = map[string]any{}
+	}
+	sub.Metadata[domain.SubscriptionMetaSkipUndo] = undo.Metadata()
+
+	meta := map[string]any{
+		"previous_next_order_at": previousNextOrder,
+		"next_order_at":          nextOrder,
+	}
+	if p.Intervals > 0 {
+		meta["skipped_shipments"] = p.Intervals
+	} else {
+		meta["resume_on"] = resumeAt
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditSubscriptionSkipped,
+		ResourceType: "subscription",
+		ResourceID:   id,
+		After:        sub,
+		Metadata:     meta,
+	}); err != nil {
+		return nil, fmt.Errorf("audit subscription skipped: %w", err)
+	}
+
+	return sub, nil
+}
+
+// resolveSkipResume validates a skip request and returns the instant the
+// subscription should ship again. Kept separate from SkipSubscription so the
+// date arithmetic is unit-testable without a database.
+func resolveSkipResume(sub *domain.Subscription, plan *domain.SubscriptionPlan, p SkipSubscriptionParams, now time.Time) (time.Time, error) {
+	switch {
+	case p.Intervals > 0 && p.ResumeOn != nil:
+		return time.Time{}, ErrInvalidSkipRequest
+	case p.Intervals > 0:
+		if p.Intervals > domain.SubscriptionMaxSkipIntervals {
+			return time.Time{}, ErrSkipIntervalsOutOfRange
+		}
+		// Walk the cadence forward from the shipment being skipped, so each
+		// skipped period is a real period rather than a flat multiple — plans
+		// with a multi-unit interval count stay honest.
+		resume := sub.CurrentPeriodEnd
+		for i := 0; i < p.Intervals; i++ {
+			resume = nextPeriodEnd(resume, plan.Interval, plan.IntervalCount)
+		}
+		// A subscription whose period end is already in the past (its renewals
+		// are backlogged, or a worker has been failing) would otherwise land a
+		// "skip" on a date that has already passed — and the next renewal sweep
+		// would immediately bill the shipment the customer just asked to skip.
+		// Re-walk from now in that case: N shipments skipped means N cadences
+		// from today.
+		if !resume.After(now) {
+			resume = now
+			for i := 0; i < p.Intervals; i++ {
+				resume = nextPeriodEnd(resume, plan.Interval, plan.IntervalCount)
+			}
+		}
+		return resume, nil
+	case p.ResumeOn != nil:
+		resume := *p.ResumeOn
+		if !resume.After(now) || resume.After(now.AddDate(0, 0, domain.SubscriptionMaxSkipDays)) {
+			return time.Time{}, ErrSkipDateOutOfRange
+		}
+		// A "skip" that pulls the next shipment forward isn't a skip — it would
+		// bill the customer earlier than they agreed to. Rescheduling earlier is
+		// a plan change, not a skip. Reported separately from the window check:
+		// the date is perfectly reasonable, it just isn't later than the
+		// shipment already booked, and the customer needs to be told which.
+		if !resume.After(sub.NextOrderAt) {
+			return time.Time{}, ErrSkipDateBeforeNextOrder
+		}
+		return resume, nil
+	default:
+		return time.Time{}, ErrInvalidSkipRequest
+	}
+}
+
+// UndoSkip puts a skipped subscription back on the schedule it had before the
+// skip — the "that wasn't meant to happen" path, reachable from the skip
+// confirmation email, the customer's account page, and the admin detail page.
+//
+// It restores the exact snapshot the skip took rather than recomputing a date,
+// and only while the subscription is still sitting on the date that skip set:
+// if anything has moved the schedule since (a renewal, a resume, a plan change,
+// a second skip), there is no longer a single skip to reverse and the undo is
+// refused rather than guessing. A restored date that has already passed is
+// refused too — undoing must never queue an immediate surprise charge.
+func (s *SubscriptionService) UndoSkip(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) (*domain.Subscription, error) {
+	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSubscriptionNotFound
+		}
+		return nil, fmt.Errorf("get subscription for skip undo: %w", err)
+	}
+	if !canSkipSubscription(sub.Status) {
+		return nil, ErrSubscriptionNotSkippable
+	}
+
+	undo, ok := sub.SkipUndo()
+	if !ok || !undo.AppliedNextOrderAt.Equal(sub.NextOrderAt) {
+		return nil, ErrNoSkipToUndo
+	}
+	if !undo.NextOrderAt.After(time.Now()) {
+		return nil, ErrSkipUndoTooLate
+	}
+
+	if err := s.subscriptions.UpdatePeriod(ctx, tx, id, sub.CurrentPeriodStart, undo.PeriodEnd, undo.NextOrderAt); err != nil {
+		return nil, fmt.Errorf("restore skipped period: %w", err)
+	}
+	if err := s.subscriptions.SetSkipUndo(ctx, tx, id, nil); err != nil {
+		return nil, fmt.Errorf("clear skip undo: %w", err)
+	}
+
+	skippedTo := sub.NextOrderAt
+	sub.CurrentPeriodEnd = undo.PeriodEnd
+	sub.NextOrderAt = undo.NextOrderAt
+	delete(sub.Metadata, domain.SubscriptionMetaSkipUndo)
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditSubscriptionSkipUndone,
+		ResourceType: "subscription",
+		ResourceID:   id,
+		After:        sub,
+		Metadata: map[string]any{
+			"skipped_to":    skippedTo,
+			"next_order_at": undo.NextOrderAt,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit subscription skip undone: %w", err)
+	}
+
+	return sub, nil
 }

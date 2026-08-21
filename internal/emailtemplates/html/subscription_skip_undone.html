@@ -1,0 +1,42 @@
+{{define "subscription_skip_undone.html"}}<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:0;background-color:#F5F0E6;font-family:Arial,Helvetica,sans-serif;color:#1A1612;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F0E6;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background-color:#1A1612;padding:24px;text-align:center;">
+    <span style="color:#F5F0E6;font-size:20px;font-weight:bold;">{{.StoreName}}</span>
+  </td></tr>
+  <tr><td style="padding:32px 24px;">
+    <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Your Skip Was Undone</h1>
+    <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
+    <p style="margin:0 0 16px;">We've put your <strong>{{.ProductName}}</strong> subscription ({{.PlanName}}) back on its original schedule &mdash; so the shipment you'd skipped is on again.</p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E5DFD0;margin:0 0 24px;">
+      {{if not .SkippedTo.IsZero}}<tr>
+        <td style="padding:8px 12px;font-weight:bold;">Was skipped to</td>
+        <td style="padding:8px 12px;">{{date .SkippedTo}}</td>
+      </tr>{{end}}
+      <tr style="background-color:#F5F0E6;">
+        <td style="padding:8px 12px;font-weight:bold;">Now bills</td>
+        <td style="padding:8px 12px;"><strong>{{date .NextChargeOn}}</strong></td>
+      </tr>
+    </table>
+
+    <p style="margin:0 0 24px;">That date is sooner than the skipped one, so we wanted you to know before your card is charged.</p>
+
+    <p style="margin:0 0 24px;text-align:center;">
+      <a href="{{.AccountURL}}" style="display:inline-block;background-color:#C0271D;color:#ffffff;text-decoration:none;padding:12px 24px;font-weight:bold;border-radius:4px;">Manage your subscription</a>
+    </p>
+
+    <p style="margin:0;font-size:13px;color:#666;">Wanted it skipped after all? Skip it again from your account, or reply to this email and we'll sort it.</p>
+  </td></tr>
+  <tr><td style="background-color:#F5F0E6;padding:16px 24px;text-align:center;font-size:12px;color:#666;">
+    {{.StoreName}} &middot; <a href="{{.StoreURL}}" style="color:#C0271D;">{{.StoreURL}}</a>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>{{end}}

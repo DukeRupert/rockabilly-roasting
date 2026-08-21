@@ -499,9 +499,63 @@ type AccountSubscriptionRow struct {
 }
 
 type AccountSubscriptionsProps struct {
-	Customer  *domain.Customer
-	Rows      []AccountSubscriptionRow
-	CartCount int
+	Customer   *domain.Customer
+	Rows       []AccountSubscriptionRow
+	CartCount  int
+	MerchantTZ *time.Location
+}
+
+// skipUndoOffer reports whether this subscription can still be put back on the
+// schedule a skip moved it off, and the date that would restore. Mirrors the
+// service's guards (still sitting on the skipped date, and that date still in
+// the future) so the button only appears when pressing it would work.
+func skipUndoOffer(sub domain.Subscription) (time.Time, bool) {
+	undo, ok := sub.SkipUndo()
+	if !ok || !undo.AppliedNextOrderAt.Equal(sub.NextOrderAt) || !undo.NextOrderAt.After(time.Now()) {
+		return time.Time{}, false
+	}
+	return undo.NextOrderAt, true
+}
+
+// skipShipmentOptions lists the shipment counts a customer can skip in one go,
+// with the labels the select shows.
+func skipShipmentOptions() []int {
+	counts := make([]int, 0, domain.SubscriptionMaxSkipIntervals)
+	for n := 1; n <= domain.SubscriptionMaxSkipIntervals; n++ {
+		counts = append(counts, n)
+	}
+	return counts
+}
+
+func skipShipmentLabel(n int) string {
+	if n == 1 {
+		return "1 shipment"
+	}
+	return fmt.Sprintf("%d shipments", n)
+}
+
+// skipRestartBounds returns the first and last day a customer may pick as their
+// restart date, formatted for a date input's min/max. The window is bounded on
+// both sides by what the service will actually accept: it opens the day after
+// the shipment already scheduled (an earlier date would pull the charge
+// forward, not push it back) and closes at the 60-day ceiling. ok is false when
+// the next shipment is already further out than that ceiling — there is no
+// valid day to offer, and the caller hides the date form rather than showing a
+// picker where every choice bounces.
+func skipRestartBounds(sub domain.Subscription, tz *time.Location) (string, string, bool) {
+	if tz == nil {
+		tz = time.Local
+	}
+	now := time.Now().In(tz)
+	earliest := now.AddDate(0, 0, 1)
+	if afterNext := sub.NextOrderAt.In(tz).AddDate(0, 0, 1); afterNext.After(earliest) {
+		earliest = afterNext
+	}
+	latest := now.AddDate(0, 0, domain.SubscriptionMaxSkipDays)
+	if earliest.After(latest) {
+		return "", "", false
+	}
+	return earliest.Format("2006-01-02"), latest.Format("2006-01-02"), true
 }
 
 func subscriptionStatusLabel(status domain.SubscriptionStatus) string {
@@ -591,14 +645,14 @@ templ AccountSubscriptionsContent(props AccountSubscriptionsProps) {
 			}
 			<div class="space-y-4">
 				for _, row := range props.Rows {
-					@accountSubscriptionCard(row)
+					@accountSubscriptionCard(row, props.MerchantTZ)
 				}
 			</div>
 		}
 	}
 }
 
-templ accountSubscriptionCard(row AccountSubscriptionRow) {
+templ accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) {
 	{{ sub := row.Subscription }}
 	<div class="border-2 border-ink bg-cream-hi shadow-stamp p-5 sm:p-6">
 		<div class="flex items-start gap-5 mb-5">
@@ -690,6 +744,22 @@ templ accountSubscriptionCard(row AccountSubscriptionRow) {
 					</form>
 					<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Nope</button>
 				</div>
+				{{ restoreTo, canUndo := skipUndoOffer(sub) }}
+				if canUndo {
+					<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/undo-skip") } class="w-full border-2 border-ink bg-paper p-3 mb-1 flex flex-wrap items-center justify-between gap-3">
+						<p class="font-oswald text-ink-soft text-sm" style="letter-spacing:0.04em;">
+							Skipped &mdash; didn't mean to? Put it back to <strong class="text-ink font-special">{ formatDate(restoreTo) }</strong>.
+						</p>
+						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-cream-hi text-ink px-4 py-2" style="letter-spacing:0.16em; text-transform:uppercase;">
+							Undo skip
+						</button>
+					</form>
+				}
+				<button x-show="confirming !== 'skip'" x-on:click="confirming = 'skip'"
+					class="font-oswald font-bold text-[11px] border-2 border-ink bg-paper text-ink px-4 py-2 hover:bg-paper-warm transition-colors"
+					style="letter-spacing:0.16em; text-transform:uppercase;">
+					Skip a shipment
+				</button>
 				<button x-show="confirming !== 'cancel'" x-on:click="confirming = 'cancel'"
 					class="font-oswald font-bold text-[11px] border-2 border-rust bg-paper text-rust px-4 py-2 hover:bg-rust hover:text-paper transition-colors"
 					style="letter-spacing:0.16em; text-transform:uppercase;">
@@ -701,6 +771,59 @@ templ accountSubscriptionCard(row AccountSubscriptionRow) {
 						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-rust text-paper px-3 py-1.5" style="letter-spacing:0.16em; text-transform:uppercase;">Yes, cancel</button>
 					</form>
 					<button x-on:click="confirming = ''" class="font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
+				</div>
+				{{ minDate, maxDate, canPickRestart := skipRestartBounds(sub, tz) }}
+				<div x-show="confirming === 'skip'" x-cloak class="w-full border-2 border-ink bg-paper p-4 mt-1">
+					<p class="font-oswald font-bold text-ink text-[11px]" style="letter-spacing:0.24em; text-transform:uppercase;">Skip a shipment</p>
+					<p class="font-oswald text-ink-soft text-sm mt-1" style="letter-spacing:0.04em;">
+						Still got beans? Push the next one out. Nothing is charged for the skipped window, and your usual rhythm picks back up from the new date.
+					</p>
+					<!-- Two separate forms, not one with two submit buttons: pressing
+					     Enter in the date field would otherwise submit the first
+					     button in the form and silently skip a shipment count the
+					     customer never chose. -->
+					<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/skip") } class="mt-4 flex flex-wrap items-end gap-2">
+						<input type="hidden" name="skip_mode" value="intervals"/>
+						<div>
+							<label for={ "skip-count-" + sub.ID.String() } class="block font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">Skip the next</label>
+							<select
+								id={ "skip-count-" + sub.ID.String() }
+								name="intervals"
+								class="mt-1 border-2 border-ink bg-cream-hi text-ink font-oswald text-sm px-3 py-2"
+							>
+								for _, n := range skipShipmentOptions() {
+									<option value={ fmt.Sprintf("%d", n) }>{ skipShipmentLabel(n) }</option>
+								}
+							</select>
+						</div>
+						<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-candle text-ink px-4 py-2" style="letter-spacing:0.16em; text-transform:uppercase;">Skip</button>
+					</form>
+					if canPickRestart {
+						<form method="POST" action={ templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/skip") } class="mt-4 flex flex-wrap items-end gap-2">
+							<input type="hidden" name="skip_mode" value="date"/>
+							<div>
+								<label for={ "skip-date-" + sub.ID.String() } class="block font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">Or start me up again on</label>
+								<input
+									id={ "skip-date-" + sub.ID.String() }
+									type="date"
+									name="resume_on"
+									required
+									min={ minDate }
+									max={ maxDate }
+									class="mt-1 border-2 border-ink bg-cream-hi text-ink font-oswald text-sm px-3 py-2"
+								/>
+							</div>
+							<button type="submit" class="btn-stamp font-oswald font-bold text-[11px] border-2 border-ink bg-paper text-ink px-4 py-2" style="letter-spacing:0.16em; text-transform:uppercase;">Set date</button>
+						</form>
+						<p class="font-special text-chrome-deep text-xs mt-3">
+							Any day after { formatDate(sub.NextOrderAt) } &mdash; the shipment already booked &mdash; up to { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out. Need longer? Pause instead.
+						</p>
+					} else {
+						<p class="font-special text-chrome-deep text-xs mt-3">
+							Need a specific date instead? Your next shipment is already more than { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out &mdash; drop us a line and we'll set it by hand.
+						</p>
+					}
+					<button x-on:click="confirming = ''" class="mt-3 font-oswald font-bold text-[11px] text-chrome-deep hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">Never mind</button>
 				</div>
 			</div>
 		}

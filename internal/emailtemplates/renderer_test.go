@@ -481,3 +481,86 @@ func TestRender_QBTokenAlert(t *testing.T) {
 	assert.Contains(t, expired, "stalled")
 	assert.Contains(t, text, "stalled")
 }
+
+func TestRender_SubscriptionSkipped(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	data := SubscriptionSkippedData{
+		CustomerName:    "Jane",
+		ProductName:     "Switchblade Espresso",
+		PlanName:        "Monthly",
+		SkippedCount:    2,
+		PreviousOrderOn: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
+		NextChargeOn:    time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC),
+		UndoURL:         "https://rockabillyroasting.com/subscriptions/undo-skip?t=abc.def",
+		StoreName:       "Rockabilly Roasting",
+		StoreURL:        "https://rockabillyroasting.com",
+		AccountURL:      "https://rockabillyroasting.com/account/subscriptions",
+	}
+
+	html, text, err := r.Render("subscription_skipped", data)
+	require.NoError(t, err)
+
+	for _, body := range []string{html, text} {
+		// Both dates, so the customer can see what moved and where it landed.
+		assert.Contains(t, body, "September 1, 2026")
+		assert.Contains(t, body, "November 1, 2026")
+		assert.Contains(t, body, "2 shipments")
+		assert.Contains(t, body, data.UndoURL)
+	}
+	// The undo CTA replaces the "reply to us" fallback when a link is present.
+	assert.NotContains(t, text, "Reply to this email")
+}
+
+// Without a signing secret the link is empty; the mail must still make sense
+// and must not print a bare or broken href.
+func TestRender_SubscriptionSkipped_NoUndoLink(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	html, text, err := r.Render("subscription_skipped", SubscriptionSkippedData{
+		CustomerName: "Jane",
+		ProductName:  "Switchblade Espresso",
+		PlanName:     "Monthly",
+		SkippedCount: 1,
+		NextChargeOn: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC),
+		StoreName:    "Rockabilly Roasting",
+		StoreURL:     "https://rockabillyroasting.com",
+		AccountURL:   "https://rockabillyroasting.com/account/subscriptions",
+	})
+	require.NoError(t, err)
+
+	assert.NotContains(t, html, "undo-skip")
+	// One skipped shipment reads as "the next shipment", not "the next 1 shipments".
+	assert.Contains(t, html, "the next shipment")
+	// A zero previous date must not print as year 0001 — the row drops out.
+	assert.NotContains(t, html, "0001")
+	assert.NotContains(t, html, "Was billing")
+	assert.Contains(t, text, "Reply to this email")
+	assert.NotContains(t, strings.ToLower(text), "href")
+}
+
+func TestRender_SubscriptionSkipUndone(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	html, text, err := r.Render("subscription_skip_undone", SubscriptionSkipUndoneData{
+		CustomerName: "Jane",
+		ProductName:  "Switchblade Espresso",
+		PlanName:     "Monthly",
+		SkippedTo:    time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC),
+		NextChargeOn: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
+		StoreName:    "Rockabilly Roasting",
+		StoreURL:     "https://rockabillyroasting.com",
+		AccountURL:   "https://rockabillyroasting.com/account/subscriptions",
+	})
+	require.NoError(t, err)
+
+	for _, body := range []string{html, text} {
+		// The whole point of this mail is that the charge moved earlier, so both
+		// dates have to be on the page.
+		assert.Contains(t, body, "November 1, 2026")
+		assert.Contains(t, body, "September 1, 2026")
+	}
+}

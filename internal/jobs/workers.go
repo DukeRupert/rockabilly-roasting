@@ -393,6 +393,30 @@ type SubscriptionCancelledArgs struct {
 // Kind returns the job kind identifier.
 func (SubscriptionCancelledArgs) Kind() string { return "email:subscription_cancelled" }
 
+// SubscriptionSkippedArgs tells the customer their next shipment was skipped,
+// when the following one bills, and how to undo it. SkippedCount is the number
+// of shipments skipped, or 0 when the customer named a restart date instead.
+type SubscriptionSkippedArgs struct {
+	SubscriptionID uuid.UUID `json:"subscription_id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+	SkippedCount   int       `json:"skipped_count"`
+}
+
+// Kind returns the job kind identifier.
+func (SubscriptionSkippedArgs) Kind() string { return "email:subscription_skipped" }
+
+// SubscriptionSkipUndoneArgs tells the customer a staff member reversed a skip,
+// so their next shipment bills sooner than the last message told them.
+// SkippedTo is carried in the args because undoing clears the record of it.
+type SubscriptionSkipUndoneArgs struct {
+	SubscriptionID uuid.UUID `json:"subscription_id"`
+	CustomerID     uuid.UUID `json:"customer_id"`
+	SkippedTo      time.Time `json:"skipped_to"`
+}
+
+// Kind returns the job kind identifier.
+func (SubscriptionSkipUndoneArgs) Kind() string { return "email:subscription_skip_undone" }
+
 // SubscriptionDunningEndedArgs sends the "subscription ended" notice after
 // dunning retries are exhausted and the subscription is expired.
 type SubscriptionDunningEndedArgs struct {

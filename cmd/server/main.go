@@ -258,21 +258,22 @@ func run() error {
 		logger.Warn("UNSUBSCRIBE_SECRET is not set; reminder emails will omit the one-click opt-out link and ask customers to reply instead")
 	}
 
-	// Signs the "switch to pickup" links in order confirmations. Falls back to
+	// Signs the one-click links in transactional email — "switch to pickup" in
+	// order confirmations, "undo this skip" in subscription skip notices. Falls back to
 	// UNSUBSCRIBE_SECRET so this feature works on existing deployments without a
 	// new variable — the token's purpose is inside the signed payload, so
 	// sharing a key cannot let one link stand in for the other. Set
 	// ORDER_ACTION_SECRET to rotate the two independently.
 	//
-	// Unset, orders still place normally; the confirmation email just omits the
-	// pickup offer and tells the customer to reply instead.
+	// Unset, orders and skips still work normally; the emails just omit the
+	// one-click link and tell the customer to reply instead.
 	orderActionSecret := os.Getenv("ORDER_ACTION_SECRET")
 	if strings.TrimSpace(orderActionSecret) == "" {
 		orderActionSecret = os.Getenv("UNSUBSCRIBE_SECRET")
 	}
 	orderActionSigner := auth.NewOrderActionSigner(orderActionSecret)
 	if !orderActionSigner.Enabled() {
-		logger.Warn("neither ORDER_ACTION_SECRET nor UNSUBSCRIBE_SECRET is set; order confirmations will omit the switch-to-pickup link and ask customers to reply instead")
+		logger.Warn("neither ORDER_ACTION_SECRET nor UNSUBSCRIBE_SECRET is set; order confirmations will omit the switch-to-pickup link and subscription skip notices the undo link, asking customers to reply instead")
 	}
 
 	reminderScheduleNote := fmt.Sprintf("Sends automatically every %s at %s %s.",
@@ -386,7 +387,8 @@ func run() error {
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore).
 		WithCatalog(catalogStore, pricingStore).
-		WithRenewalAnchor(merchantTZ, renewalAnchorHour)
+		WithRenewalAnchor(merchantTZ, renewalAnchorHour).
+		WithOrderActionSigner(orderActionSigner)
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg).
@@ -455,6 +457,8 @@ func run() error {
 	river.AddWorker(workers, jobs.NewSubscriptionRenewalReceiptWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionPastDueWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionCancelledWorker(subscriptionSvc, pool))
+	river.AddWorker(workers, jobs.NewSubscriptionSkippedWorker(subscriptionSvc, pool))
+	river.AddWorker(workers, jobs.NewSubscriptionSkipUndoneWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewSubscriptionDunningEndedWorker(subscriptionSvc, pool))
 	river.AddWorker(workers, jobs.NewRefundConfirmationWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderShippedEmailWorker(orderSvc, pool))

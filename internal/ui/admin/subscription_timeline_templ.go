@@ -27,6 +27,14 @@ func subscriptionEventLabel(action string) string {
 		return "Paused"
 	case audit.AuditSubscriptionResumed:
 		return "Resumed"
+	case audit.AuditSubscriptionSkipped:
+		return "Shipments skipped"
+	case audit.AuditSubscriptionSkipUndone:
+		return "Skip undone"
+	case audit.AuditEmailSubscriptionSkipped:
+		return "Skip notification sent"
+	case audit.AuditEmailSubscriptionSkipUndone:
+		return "Skip-undone notification sent"
 	case audit.AuditSubscriptionCancelled:
 		return "Cancelled"
 	case audit.AuditSubscriptionRenewed:
@@ -52,11 +60,11 @@ func subscriptionEventLabel(action string) string {
 // rust for cancelled/failed, paper-warm for paused.
 func subscriptionEventMarker(action string) string {
 	switch action {
-	case audit.AuditSubscriptionCreated, audit.AuditSubscriptionRenewed, audit.AuditSubscriptionResumed:
+	case audit.AuditSubscriptionCreated, audit.AuditSubscriptionRenewed, audit.AuditSubscriptionResumed, audit.AuditSubscriptionSkipUndone:
 		return "bg-rr-amber"
 	case audit.AuditSubscriptionCancelled, audit.AuditSubscriptionFailed:
 		return "bg-rr-red"
-	case audit.AuditSubscriptionPaused:
+	case audit.AuditSubscriptionPaused, audit.AuditSubscriptionSkipped:
 		return "bg-rr-raised"
 	default:
 		return "bg-rr-surface"

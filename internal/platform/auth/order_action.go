@@ -33,6 +33,13 @@ type OrderActionPurpose string
 // OrderActionSwitchToPickup authorizes moving a local-delivery order to pickup.
 const OrderActionSwitchToPickup OrderActionPurpose = "pickup"
 
+// OrderActionUndoSkip authorizes putting a skipped subscription back on its
+// previous schedule. The signed payload is a resource UUID and the purpose is
+// what says which kind of resource it names — this one carries a subscription
+// ID rather than an order ID, and a token minted for one purpose can never be
+// replayed against the other.
+const OrderActionUndoSkip OrderActionPurpose = "undo_skip"
+
 // OrderActionSigner mints and verifies the tokens behind one-click order links
 // in transactional email.
 //
@@ -72,19 +79,20 @@ func NewOrderActionSigner(secret string) *OrderActionSigner {
 // Enabled reports whether a secret is configured.
 func (s *OrderActionSigner) Enabled() bool { return s != nil && len(s.secret) > 0 }
 
-// Sign returns an opaque token authorizing purpose on orderID, expiring
-// DefaultOrderActionTTL after issuedAt. Returns "" when the signer is disabled.
-func (s *OrderActionSigner) Sign(purpose OrderActionPurpose, orderID uuid.UUID, issuedAt time.Time) string {
+// Sign returns an opaque token authorizing purpose on resourceID (the order or
+// subscription the purpose names), expiring DefaultOrderActionTTL after
+// issuedAt. Returns "" when the signer is disabled.
+func (s *OrderActionSigner) Sign(purpose OrderActionPurpose, resourceID uuid.UUID, issuedAt time.Time) string {
 	if !s.Enabled() {
 		return ""
 	}
 	expiry := issuedAt.Add(s.ttl).Unix()
-	payload := string(purpose) + ":" + orderID.String() + ":" + strconv.FormatInt(expiry, 10)
+	payload := string(purpose) + ":" + resourceID.String() + ":" + strconv.FormatInt(expiry, 10)
 	return payload + "." + s.mac(payload)
 }
 
-// Verify checks a token's signature, purpose, and expiry, returning the order it
-// authorizes. now is passed in so expiry is testable and so a single request
+// Verify checks a token's signature, purpose, and expiry, returning the resource
+// it authorizes. now is passed in so expiry is testable and so a single request
 // judges every token against one clock.
 func (s *OrderActionSigner) Verify(token string, purpose OrderActionPurpose, now time.Time) (uuid.UUID, error) {
 	if !s.Enabled() {
@@ -111,7 +119,7 @@ func (s *OrderActionSigner) Verify(token string, purpose OrderActionPurpose, now
 	if OrderActionPurpose(fields[0]) != purpose {
 		return uuid.Nil, ErrInvalidOrderActionToken
 	}
-	orderID, err := uuid.Parse(fields[1])
+	resourceID, err := uuid.Parse(fields[1])
 	if err != nil {
 		return uuid.Nil, ErrInvalidOrderActionToken
 	}
@@ -122,7 +130,7 @@ func (s *OrderActionSigner) Verify(token string, purpose OrderActionPurpose, now
 	if now.After(time.Unix(expiry, 0)) {
 		return uuid.Nil, ErrOrderActionTokenExpired
 	}
-	return orderID, nil
+	return resourceID, nil
 }
 
 func (s *OrderActionSigner) mac(payload string) string {

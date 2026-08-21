@@ -1,0 +1,18 @@
+{{define "subscription_skip_undone.txt"}}Your Skip Was Undone
+
+Hi {{.CustomerName}},
+
+We've put your {{.ProductName}} subscription ({{.PlanName}}) back on its original schedule -- so the shipment you'd skipped is on again.
+
+{{if not .SkippedTo.IsZero}}Was skipped to: {{date .SkippedTo}}
+{{end}}Now bills:      {{date .NextChargeOn}}
+
+That date is sooner than the skipped one, so we wanted you to know before your card is charged.
+
+Manage your subscription: {{.AccountURL}}
+
+Wanted it skipped after all? Skip it again from your account, or reply to this email and we'll sort it.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

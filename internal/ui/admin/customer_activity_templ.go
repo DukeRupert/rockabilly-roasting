@@ -61,6 +61,10 @@ func customerEventLabel(action string) string {
 		return "Subscription paused"
 	case audit.AuditSubscriptionResumed:
 		return "Subscription resumed"
+	case audit.AuditSubscriptionSkipped:
+		return "Subscription shipments skipped"
+	case audit.AuditSubscriptionSkipUndone:
+		return "Subscription skip undone"
 	case audit.AuditSubscriptionCancelled:
 		return "Subscription cancelled"
 	}
@@ -90,9 +94,10 @@ func customerEventMarker(action string) string {
 		audit.AuditWholesaleAccountReactivated,
 		audit.AuditCustomerTaxExemptionGranted,
 		audit.AuditSubscriptionCreated,
-		audit.AuditSubscriptionResumed:
+		audit.AuditSubscriptionResumed,
+		audit.AuditSubscriptionSkipUndone:
 		return "bg-rr-amber"
-	case audit.AuditSubscriptionPaused:
+	case audit.AuditSubscriptionPaused, audit.AuditSubscriptionSkipped:
 		return "bg-rr-raised"
 	default:
 		return "bg-rr-surface"

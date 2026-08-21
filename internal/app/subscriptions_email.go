@@ -3,6 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -11,6 +14,7 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/emailtemplates"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/platform/email"
 	"github.com/dukerupert/hiri/internal/store"
 )
@@ -159,6 +163,199 @@ func (s *SubscriptionService) SendDunningEndedEmail(ctx context.Context, pool *p
 			}
 		},
 	})
+}
+
+// SendSkipEmail tells the customer their next shipment has been skipped, when
+// the following one bills, and how to put it back if the skip was a mistake.
+// Sent for staff-initiated skips too — the customer should hear about a change
+// to their schedule regardless of who made it. Read → send → audit.
+//
+// The undo link is the same shape as the switch-to-pickup link: a signed,
+// expiring token that authorizes exactly one narrow, reversible change and
+// nothing else. Without a signing secret the link is omitted and the template
+// points at the account page instead of printing something unverifiable.
+func (s *SubscriptionService) SendSkipEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID, skippedCount int) error {
+	var (
+		sub         *domain.Subscription
+		customer    *domain.Customer
+		plan        *domain.SubscriptionPlan
+		productName = "your subscription"
+	)
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		var err error
+		sub, err = s.subscriptions.GetByIDAsStaff(ctx, tx, subscriptionID)
+		if err != nil {
+			return fmt.Errorf("get subscription %s: %w", subscriptionID, err)
+		}
+		customer, err = s.customers.GetByID(ctx, tx, customerID)
+		if err != nil {
+			return fmt.Errorf("get customer %s: %w", customerID, err)
+		}
+		plan, err = s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
+		if err != nil {
+			return fmt.Errorf("get plan %s: %w", sub.PlanID, err)
+		}
+		if variant, err := s.catalog.GetVariantByID(ctx, tx, sub.VariantID); err == nil {
+			if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
+				productName = product.Title
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	// The date the skip moved away from. Read from the undo snapshot so the
+	// email states what actually changed; if the snapshot has already been
+	// retired (a renewal or another change landed first) the mail still goes
+	// out, just without the "was billing" comparison or the undo link.
+	var previousOrderOn time.Time
+	undoURL := ""
+	if undo, ok := sub.SkipUndo(); ok && undo.AppliedNextOrderAt.Equal(sub.NextOrderAt) {
+		previousOrderOn = undo.NextOrderAt
+		undoURL = s.undoSkipURL(sub.ID)
+	}
+
+	html, text, err := s.email.Renderer.Render("subscription_skipped", emailtemplates.SubscriptionSkippedData{
+		CustomerName:    customer.FirstName,
+		ProductName:     productName,
+		PlanName:        plan.Name,
+		SkippedCount:    skippedCount,
+		PreviousOrderOn: previousOrderOn,
+		NextChargeOn:    sub.NextOrderAt,
+		UndoURL:         undoURL,
+		StoreName:       s.email.StoreName,
+		StoreURL:        s.email.BaseURL,
+		AccountURL:      s.email.BaseURL + "/account/subscriptions",
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("subscription_skipped", "failed").Inc()
+		return fmt.Errorf("render subscription skipped template: %w", err)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      customer.Email,
+		Subject: "Your next shipment is skipped",
+		HTML:    html,
+		Text:    text,
+		Tag:     "subscription-skipped",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("subscription_skipped", "failed").Inc()
+		return fmt.Errorf("send subscription skipped email: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "subscription_skipped_worker",
+			Action:       audit.AuditEmailSubscriptionSkipped,
+			ResourceType: "subscription",
+			ResourceID:   sub.ID,
+		})
+	}); err != nil {
+		return fmt.Errorf("audit subscription skipped email sent: %w", err)
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("subscription_skipped", "sent").Inc()
+	return nil
+}
+
+// SendSkipUndoneEmail tells the customer a skip has been reversed and their
+// next shipment now bills sooner. Sent only for staff-initiated undos: a
+// customer who undid it themselves — from the emailed link or their account —
+// has already seen it confirmed on screen, and a second notice would be noise.
+// skippedTo is passed in rather than read back, because undoing clears the
+// snapshot that held it. Read → send → audit.
+func (s *SubscriptionService) SendSkipUndoneEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID, skippedTo time.Time) error {
+	var (
+		sub         *domain.Subscription
+		customer    *domain.Customer
+		plan        *domain.SubscriptionPlan
+		productName = "your subscription"
+	)
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		var err error
+		sub, err = s.subscriptions.GetByIDAsStaff(ctx, tx, subscriptionID)
+		if err != nil {
+			return fmt.Errorf("get subscription %s: %w", subscriptionID, err)
+		}
+		customer, err = s.customers.GetByID(ctx, tx, customerID)
+		if err != nil {
+			return fmt.Errorf("get customer %s: %w", customerID, err)
+		}
+		plan, err = s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
+		if err != nil {
+			return fmt.Errorf("get plan %s: %w", sub.PlanID, err)
+		}
+		if variant, err := s.catalog.GetVariantByID(ctx, tx, sub.VariantID); err == nil {
+			if product, err := s.catalog.GetProductByID(ctx, tx, variant.ProductID); err == nil {
+				productName = product.Title
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	html, text, err := s.email.Renderer.Render("subscription_skip_undone", emailtemplates.SubscriptionSkipUndoneData{
+		CustomerName: customer.FirstName,
+		ProductName:  productName,
+		PlanName:     plan.Name,
+		SkippedTo:    skippedTo,
+		NextChargeOn: sub.NextOrderAt,
+		StoreName:    s.email.StoreName,
+		StoreURL:     s.email.BaseURL,
+		AccountURL:   s.email.BaseURL + "/account/subscriptions",
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("subscription_skip_undone", "failed").Inc()
+		return fmt.Errorf("render subscription skip undone template: %w", err)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      customer.Email,
+		Subject: "Your skipped shipment is back on",
+		HTML:    html,
+		Text:    text,
+		Tag:     "subscription-skip-undone",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("subscription_skip_undone", "failed").Inc()
+		return fmt.Errorf("send subscription skip undone email: %w", err)
+	}
+
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "subscription_skip_undone_worker",
+			Action:       audit.AuditEmailSubscriptionSkipUndone,
+			ResourceType: "subscription",
+			ResourceID:   sub.ID,
+		})
+	}); err != nil {
+		return fmt.Errorf("audit subscription skip undone email sent: %w", err)
+	}
+
+	s.metrics.EmailsSent.WithLabelValues("subscription_skip_undone", "sent").Inc()
+	return nil
+}
+
+// undoSkipURL mints the one-click undo link. Empty when no signer is wired or
+// the secret is unset — callers omit the link rather than emailing one that
+// could never be verified.
+func (s *SubscriptionService) undoSkipURL(subscriptionID uuid.UUID) string {
+	if s.orderActions == nil || !s.orderActions.Enabled() {
+		return ""
+	}
+	token := s.orderActions.Sign(auth.OrderActionUndoSkip, subscriptionID, time.Now())
+	if token == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/subscriptions/undo-skip?t=%s",
+		strings.TrimRight(s.email.BaseURL, "/"), url.QueryEscape(token))
 }
 
 // lifecycleEmailSpec captures the per-template specifics for past-due and

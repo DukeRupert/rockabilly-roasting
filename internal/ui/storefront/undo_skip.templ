@@ -1,0 +1,186 @@
+package storefront
+
+import (
+	"github.com/google/uuid"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// UndoSkipReason names why the undo could not be offered, so the page can say
+// something useful instead of a generic failure.
+type UndoSkipReason string
+
+const (
+	// UndoSkipReasonInvalid covers a link we cannot verify — malformed,
+	// tampered with, or signed under a rotated secret. Deliberately vague.
+	UndoSkipReasonInvalid UndoSkipReason = "invalid"
+	// UndoSkipReasonExpired is a genuine link that has aged out.
+	UndoSkipReasonExpired UndoSkipReason = "expired"
+	// UndoSkipReasonNothingToUndo is a subscription whose schedule has moved
+	// on since the skip — it renewed, resumed, changed plan, or was skipped
+	// again — so there is no longer one skip to reverse.
+	UndoSkipReasonNothingToUndo UndoSkipReason = "nothing_to_undo"
+	// UndoSkipReasonTooLate is a skip whose original shipment date has already
+	// passed, or a subscription no longer active. Restoring it would queue an
+	// immediate charge, so we ask rather than act.
+	UndoSkipReasonTooLate UndoSkipReason = "too_late"
+)
+
+type UndoSkipProps struct {
+	// Token is echoed back so the confirm button can POST it. The page never
+	// acts on GET — see web/undo_skip.go for why.
+	Token          string
+	SubscriptionID uuid.UUID
+	ProductName    string
+	PlanName       string
+	// SkippedTo is the date the skip moved the next shipment to; RestoredTo is
+	// the date undoing puts it back to.
+	SkippedTo  string
+	RestoredTo string
+	Reason     UndoSkipReason
+}
+
+// undoSkipShell wraps every outcome in one paper card so the flow reads as a
+// single conversation. Mirrors switchToPickupShell — both are one-off pages a
+// customer reaches from an email.
+templ undoSkipShell(eyebrow, heading, script string) {
+	<section class="-mx-4 sm:-mx-6 lg:-mx-8 relative bg-paper min-h-[calc(100vh-4rem)] flex items-center">
+		<div class="absolute inset-0 opacity-[0.05] pointer-events-none" style="background-image: radial-gradient(circle, rgba(14,13,12,0.6) 1px, transparent 1px); background-size: 3px 3px;"></div>
+		<div class="relative mx-auto max-w-md lg:max-w-xl w-full px-6 sm:px-10 lg:px-14 py-14 sm:py-20">
+			<div class="text-center mb-8">
+				<p class="font-oswald text-chrome-deep text-xs font-semibold" style="letter-spacing:0.24em; text-transform:uppercase;">
+					{ eyebrow }
+				</p>
+				<h1 class="font-slab text-ink uppercase leading-[0.92] mt-2" style="font-size: clamp(1.75rem, 4.5vw, 2.75rem); letter-spacing:-0.005em;">
+					{ heading }
+					<span class="font-script text-rust normal-case inline-block align-baseline" style="font-size:1.1em; letter-spacing:0;">{ script }</span>
+				</h1>
+			</div>
+			<div class="border-2 border-ink bg-cream-hi shadow-stamp p-6 sm:p-8 text-center">
+				{ children... }
+			</div>
+		</div>
+	</section>
+}
+
+templ UndoSkipConfirmContent(props UndoSkipProps) {
+	@undoSkipShell("Skipped shipment", "Put it", "back?") {
+		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+			Your <strong class="text-ink">{ props.ProductName }</strong> subscription
+			if props.PlanName != "" {
+				({ props.PlanName })
+			}
+			is skipped ahead to <strong class="text-ink">{ props.SkippedTo }</strong>.
+		</p>
+		<div class="mt-5 border-2 border-ink bg-paper p-4">
+			<p class="font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.2em; text-transform:uppercase;">Undo puts it back to</p>
+			<p class="font-special text-ink text-lg mt-1">{ props.RestoredTo }</p>
+		</div>
+		<p class="font-oswald text-ink-soft text-sm mt-4 leading-relaxed">
+			That's the day we'd roast, bill, and ship it — same coffee, same price, same cadence after that.
+		</p>
+		<form method="post" action="/subscriptions/undo-skip" class="mt-6">
+			<input type="hidden" name="t" value={ props.Token }/>
+			<button type="submit" class="btn-stamp w-full border-2 border-ink bg-rust text-paper px-5 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
+				Undo the skip
+			</button>
+		</form>
+		<a href="/" class="inline-block mt-4 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+			No thanks &mdash; keep it skipped
+		</a>
+	}
+}
+
+templ UndoSkipDoneContent(props UndoSkipProps) {
+	@undoSkipShell("Skipped shipment", "Back on", "the schedule.") {
+		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+			Your <strong class="text-ink">{ props.ProductName }</strong> subscription is back where it was. The next shipment bills on
+			<strong class="text-ink">{ props.RestoredTo }</strong>.
+		</p>
+		<p class="font-oswald text-ink-soft text-sm mt-4 leading-relaxed">
+			Want it moved after all? Skip it again from your account any time.
+		</p>
+		<a href="/account/subscriptions" class="btn-stamp inline-block mt-6 border-2 border-ink bg-rust text-paper px-5 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
+			Your subscriptions
+		</a>
+	}
+}
+
+templ UndoSkipProblemContent(props UndoSkipProps) {
+	switch props.Reason {
+		case UndoSkipReasonExpired:
+			@undoSkipShell("Undo skip", "Link", "expired.") {
+				<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+					That link has aged out. Your subscription is still running on its skipped schedule.
+				</p>
+				<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+					Sign in to your account to sort the dates, or reply to the email and we'll do it by hand.
+				</p>
+				<a href="/account/subscriptions" class="inline-block mt-5 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+					Your subscriptions
+				</a>
+			}
+		case UndoSkipReasonNothingToUndo:
+			@undoSkipShell("Undo skip", "Nothing", "to undo.") {
+				<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+					This subscription's schedule has already moved on since that skip &mdash; it renewed, resumed, or was changed again.
+				</p>
+				<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+					Check the dates in your account, and reply to the email if they're not what you want.
+				</p>
+				<a href="/account/subscriptions" class="inline-block mt-5 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+					Your subscriptions
+				</a>
+			}
+		case UndoSkipReasonTooLate:
+			@undoSkipShell("Undo skip", "That date's", "passed.") {
+				<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+					The shipment you skipped was due before today, so putting it back would bill you right now. We'd rather ask first.
+				</p>
+				<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+					Reply to the email and we'll get you a bag on the next run.
+				</p>
+				<a href="/account/subscriptions" class="inline-block mt-5 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+					Your subscriptions
+				</a>
+			}
+		default:
+			@undoSkipShell("Undo skip", "Link", "not recognized.") {
+				<p class="font-oswald text-ink-soft text-sm leading-relaxed">
+					We couldn't read that link. Email clients sometimes break them in transit.
+				</p>
+				<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
+					Sign in to your account to fix the dates, or reply to the email and we'll handle it.
+				</p>
+				<a href="/account/subscriptions" class="inline-block mt-5 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+					Your subscriptions
+				</a>
+			}
+	}
+}
+
+templ UndoSkipConfirmPage(props UndoSkipProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Undo Skip",
+		Description: "Put your skipped Rockabilly Roasting Co. shipment back on its original schedule.",
+	}) {
+		@UndoSkipConfirmContent(props)
+	}
+}
+
+templ UndoSkipDonePage(props UndoSkipProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Skip Undone",
+		Description: "Your Rockabilly Roasting Co. subscription is back on its original schedule.",
+	}) {
+		@UndoSkipDoneContent(props)
+	}
+}
+
+templ UndoSkipProblemPage(props UndoSkipProps) {
+	@layouts.Storefront(layouts.StorefrontProps{
+		Title:       "Undo Skip",
+		Description: "We couldn't undo this skip.",
+	}) {
+		@UndoSkipProblemContent(props)
+	}
+}

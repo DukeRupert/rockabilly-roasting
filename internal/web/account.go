@@ -362,9 +362,10 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 	}
 
 	props := storefront.AccountSubscriptionsProps{
-		Customer:  customer,
-		Rows:      rows,
-		CartCount: d.cartItemCountFromCookie(r),
+		Customer:   customer,
+		Rows:       rows,
+		CartCount:  d.cartItemCountFromCookie(r),
+		MerchantTZ: d.MerchantTZ,
 	}
 
 	if IsHTMX(r) {

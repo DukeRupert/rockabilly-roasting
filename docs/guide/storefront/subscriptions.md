@@ -105,6 +105,24 @@ Each subscription shows:
 - The current status (Active, Paused, or Cancelled)
 - Your next order date (for active subscriptions)
 
+### Skipping a Shipment
+
+Still have beans on the shelf, or heading out of town for a couple of weeks? Skip ahead instead of pausing -- the subscription stays active and picks its rhythm back up on its own.
+
+1. Go to **Account > Subscriptions**.
+2. Find the subscription and click **Skip a shipment**.
+3. Either pick how many upcoming shipments to skip (up to 6) and click **Skip**, or pick the day you want deliveries to start again and click **Set date**. Restart dates run from the day after your next scheduled shipment up to 60 days out -- a date before that shipment would move your charge earlier, not later. If your next shipment is already more than 60 days away there is nothing to push back, so only the shipment-count option is offered.
+
+Nothing is charged for a skipped shipment -- you only pay for coffee we actually send. Your next order date updates right away, and the normal cadence continues from there. Need a longer break than 60 days? Pause instead.
+
+We email you as soon as a skip goes through -- whether you did it yourself or asked the shop to -- confirming what was skipped and when the next shipment bills.
+
+### Undoing a Skip
+
+Skipped by mistake? The confirmation email has an **Undo this skip** link. It opens a page showing the date the skip moved you to and the date undoing puts you back to; nothing changes until you press the button. The same **Undo skip** button appears on the subscription card in **Account > Subscriptions**.
+
+Undo restores the exact schedule you had before, and is available until either that original shipment date passes or the schedule moves for another reason (a renewal, a resume, a plan change, or a second skip). After that, reply to the email and we will sort the dates out with you.
+
 ### Pausing a Subscription
 
 If you need a break -- maybe you are going on vacation or you have extra coffee stacked up -- you can pause your subscription.

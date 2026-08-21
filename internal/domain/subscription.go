@@ -62,6 +62,71 @@ type Subscription struct {
 	UpdatedAt          time.Time
 }
 
+// SubscriptionMaxSkipIntervals caps how many upcoming shipments a subscriber
+// (or staff on their behalf) can skip in one request. Six keeps a weekly
+// subscriber inside a month and a half and a monthly subscriber inside half a
+// year — long enough for a trip or a full pantry, short enough that a forgotten
+// subscription resurfaces rather than quietly going dormant. Anything longer is
+// a pause, not a skip.
+const SubscriptionMaxSkipIntervals = 6
+
+// SubscriptionMaxSkipDays caps the date form of a skip: any restart day up to
+// 60 days out. Beyond that the customer wants a pause — an open-ended gap is a
+// different intent, and we'd rather they tell us so.
+const SubscriptionMaxSkipDays = 60
+
+// SubscriptionMetaSkipUndo is the metadata key holding the schedule a skip
+// replaced, so a mistaken skip can be put back exactly as it was rather than
+// re-derived from a cadence that may since have changed.
+const SubscriptionMetaSkipUndo = "skip_undo"
+
+// SkipUndo is the schedule snapshot taken when a subscription was skipped.
+// AppliedNextOrderAt records what the skip set next_order_at to: an undo is
+// only offered while the subscription still sits on that date, so any later
+// change (a renewal, a resume, a plan swap, a second skip) retires the undo on
+// its own without anyone having to remember to clear it.
+type SkipUndo struct {
+	PeriodEnd          time.Time
+	NextOrderAt        time.Time
+	AppliedNextOrderAt time.Time
+}
+
+// Metadata renders the snapshot for the jsonb column. Times are RFC3339 so they
+// survive the round-trip through jsonb as strings.
+func (u SkipUndo) Metadata() map[string]any {
+	return map[string]any{
+		"period_end":            u.PeriodEnd.Format(time.RFC3339Nano),
+		"next_order_at":         u.NextOrderAt.Format(time.RFC3339Nano),
+		"applied_next_order_at": u.AppliedNextOrderAt.Format(time.RFC3339Nano),
+	}
+}
+
+// SkipUndo reads back the snapshot written by the last skip. ok is false when
+// there is none, or when the stored shape is not what we wrote (an old row, or
+// hand-edited metadata) — an unreadable snapshot must read as "nothing to
+// undo", never as a partially-restored schedule.
+func (s *Subscription) SkipUndo() (SkipUndo, bool) {
+	if s.Metadata == nil {
+		return SkipUndo{}, false
+	}
+	raw, _ := s.Metadata[SubscriptionMetaSkipUndo].(map[string]any)
+	if raw == nil {
+		return SkipUndo{}, false
+	}
+	parse := func(key string) (time.Time, bool) {
+		str, _ := raw[key].(string)
+		t, err := time.Parse(time.RFC3339Nano, str)
+		return t, err == nil
+	}
+	periodEnd, okEnd := parse("period_end")
+	nextOrder, okNext := parse("next_order_at")
+	applied, okApplied := parse("applied_next_order_at")
+	if !okEnd || !okNext || !okApplied {
+		return SkipUndo{}, false
+	}
+	return SkipUndo{PeriodEnd: periodEnd, NextOrderAt: nextOrder, AppliedNextOrderAt: applied}, true
+}
+
 // SubscriptionMetaShippingGrandfathered is the metadata key marking a
 // subscription whose renewals keep free shipping (it predates, or was manually
 // exempted from, the shipping-on-renewal policy). Migration 054 seeds it on

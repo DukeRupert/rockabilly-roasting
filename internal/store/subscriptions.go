@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -340,6 +341,39 @@ func (s *SubscriptionStore) SetShippingGrandfathered(ctx context.Context, tx pgx
 	}
 	if err != nil {
 		return fmt.Errorf("set shipping grandfathered: %w", err)
+	}
+	return nil
+}
+
+// SetSkipUndo stores (or clears, when undo is nil) the schedule snapshot a skip
+// replaced. Written in the same transaction as the skip itself so a subscription
+// is never left showing a skipped date with no way back.
+func (s *SubscriptionStore) SetSkipUndo(ctx context.Context, tx pgx.Tx, id uuid.UUID, undo *domain.SkipUndo) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.set_skip_undo", time.Now(), &err)
+	if undo == nil {
+		_, err = tx.Exec(ctx,
+			`UPDATE subscriptions
+			 SET metadata = metadata - $2, updated_at = now()
+			 WHERE id = $1`,
+			id, domain.SubscriptionMetaSkipUndo,
+		)
+	} else {
+		// Marshalled here rather than handed over as a map: the parameter has
+		// no declared type on the wire, and jsonb_set needs actual JSON.
+		payload, mErr := json.Marshal(undo.Metadata())
+		if mErr != nil {
+			return fmt.Errorf("marshal skip undo: %w", mErr)
+		}
+		_, err = tx.Exec(ctx,
+			`UPDATE subscriptions
+			 SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), $2, $3::jsonb),
+			     updated_at = now()
+			 WHERE id = $1`,
+			id, []string{domain.SubscriptionMetaSkipUndo}, payload,
+		)
+	}
+	if err != nil {
+		return fmt.Errorf("set skip undo: %w", err)
 	}
 	return nil
 }

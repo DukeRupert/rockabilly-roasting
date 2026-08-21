@@ -56,6 +56,13 @@ var (
 	ErrSubscriptionNotCancellable = errors.New("subscription cannot be cancelled")
 	ErrSubscriptionNotEditable    = errors.New("subscription cannot be edited in its current state")
 	ErrSubscriptionNotPastDue     = errors.New("subscription is not past due")
+	ErrSubscriptionNotSkippable   = errors.New("subscription cannot be skipped")
+	ErrInvalidSkipRequest         = errors.New("choose a number of shipments to skip or a restart date, not both")
+	ErrSkipIntervalsOutOfRange    = errors.New("skip count is out of range")
+	ErrSkipDateOutOfRange         = errors.New("pick a restart date within the next 60 days")
+	ErrSkipDateBeforeNextOrder    = errors.New("pick a restart date after the shipment already scheduled")
+	ErrNoSkipToUndo               = errors.New("no skip to undo")
+	ErrSkipUndoTooLate            = errors.New("the skipped shipment date has already passed")
 	// ErrRenewalPaymentDeclined signals that a renewal charge was declined and
 	// the dunning state has already been advanced (past_due retry scheduled, or
 	// expired at the cap). The job worker treats it as terminal — the renewal

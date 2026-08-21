@@ -57,6 +57,56 @@ func canCancel(status domain.SubscriptionStatus) bool {
 		status == domain.SubscriptionStatusPastDue
 }
 
+// skipDateBounds returns the first and last day (yyyy-mm-dd, merchant time) a
+// staff member may pick as a subscription's restart date. Bounded on both sides
+// by what the service accepts: it opens the day after the shipment already
+// scheduled (an earlier date would pull the charge forward rather than push it
+// back) and closes at the 60-day ceiling. ok is false when the next shipment is
+// already beyond that ceiling — no day would be accepted, so the caller hides
+// the date form instead of offering a picker that always bounces.
+func skipDateBounds(sub *domain.Subscription, tz *time.Location) (string, string, bool) {
+	if tz == nil {
+		tz = time.Local
+	}
+	now := time.Now().In(tz)
+	earliest := now.AddDate(0, 0, 1)
+	if afterNext := sub.NextOrderAt.In(tz).AddDate(0, 0, 1); afterNext.After(earliest) {
+		earliest = afterNext
+	}
+	latest := now.AddDate(0, 0, domain.SubscriptionMaxSkipDays)
+	if earliest.After(latest) {
+		return "", "", false
+	}
+	return earliest.Format("2006-01-02"), latest.Format("2006-01-02"), true
+}
+
+// skipUndoOffer reports whether a skip on this subscription can still be taken
+// back, and the date doing so restores. Mirrors the service's guards so the
+// button only shows when pressing it would work.
+func skipUndoOffer(sub *domain.Subscription) (time.Time, bool) {
+	undo, ok := sub.SkipUndo()
+	if !ok || !undo.AppliedNextOrderAt.Equal(sub.NextOrderAt) || !undo.NextOrderAt.After(time.Now()) {
+		return time.Time{}, false
+	}
+	return undo.NextOrderAt, true
+}
+
+// skipCounts lists the selectable shipment counts for the skip form.
+func skipCounts() []int {
+	counts := make([]int, 0, domain.SubscriptionMaxSkipIntervals)
+	for n := 1; n <= domain.SubscriptionMaxSkipIntervals; n++ {
+		counts = append(counts, n)
+	}
+	return counts
+}
+
+func skipCountLabel(n int) string {
+	if n == 1 {
+		return "1 shipment"
+	}
+	return fmt.Sprintf("%d shipments", n)
+}
+
 func planCadence(p *domain.SubscriptionPlan) string {
 	if p == nil {
 		return ""
@@ -148,6 +198,84 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 					</button>
 				</form>
 			}
+		</div>
+	}
+	<!-- Skip upcoming shipments -->
+	if props.Subscription.Status == domain.SubscriptionStatusActive {
+		{{ minDate, maxDate, canPickRestart := skipDateBounds(props.Subscription, props.MerchantTZ) }}
+		<div class="mt-6 border border-rr-border bg-rr-surface p-4">
+			<p class="text-sm font-semibold text-rr-heading">Skip shipments</p>
+			<p class="mt-0.5 text-sm text-rr-muted">
+				Pushes the next order out without pausing or cancelling. Nothing is charged for the skipped window, and the cadence picks back up from the new date.
+			</p>
+			{{ restoreTo, canUndo := skipUndoOffer(props.Subscription) }}
+			if canUndo {
+				<form
+					method="post"
+					action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/undo-skip", props.Subscription.ID.String())) }
+					class="mt-3 flex flex-wrap items-center justify-between gap-3 border border-rr-border bg-rr-raised p-3"
+				>
+					<p class="text-sm text-rr-heading">
+						Skipped to { props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006") }.
+						<span class="text-rr-muted">Undo puts the next order back to { restoreTo.In(props.MerchantTZ).Format("Jan 2, 2006") }.</span>
+					</p>
+					<button type="submit" class="btn-secondary">Undo skip</button>
+				</form>
+			}
+			<!-- Two separate forms, not one with two submit buttons: pressing
+			     Enter in the date field would otherwise submit the first button
+			     in the form and skip a shipment count nobody chose. -->
+			<div class="mt-3 flex flex-wrap items-end gap-x-6 gap-y-3">
+				<form
+					method="post"
+					action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/skip", props.Subscription.ID.String())) }
+					class="flex items-end gap-2"
+				>
+					<input type="hidden" name="skip_mode" value="intervals"/>
+					<div>
+						<label for="skip-intervals" class="block text-xs font-medium uppercase tracking-wide text-rr-muted">Skip the next</label>
+						<select
+							id="skip-intervals"
+							name="intervals"
+							class="mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+						>
+							for _, n := range skipCounts() {
+								<option value={ fmt.Sprintf("%d", n) }>{ skipCountLabel(n) }</option>
+							}
+						</select>
+					</div>
+					<button type="submit" class="btn-secondary">Skip</button>
+				</form>
+				if canPickRestart {
+					<form
+						method="post"
+						action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/skip", props.Subscription.ID.String())) }
+						class="flex items-end gap-2"
+					>
+						<input type="hidden" name="skip_mode" value="date"/>
+						<div>
+							<label for="skip-resume-on" class="block text-xs font-medium uppercase tracking-wide text-rr-muted">Or restart on</label>
+							<input
+								id="skip-resume-on"
+								type="date"
+								name="resume_on"
+								required
+								min={ minDate }
+								max={ maxDate }
+								class="mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+							/>
+						</div>
+						<button type="submit" class="btn-secondary">Set date</button>
+					</form>
+					<p class="text-xs text-rr-muted">
+						Restart dates run from { minDate } to { maxDate } — after the order already scheduled, and no more than { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out.
+					</p>
+				} else {
+					<p class="text-xs text-rr-muted">
+						The next order is already more than { fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays) } days out, so there's no restart date to pick — skip by shipment count instead.
+					</p>
+				}
+			</div>
 		</div>
 	}
 	<!-- Renewal shipping exception (grandfather toggle) -->

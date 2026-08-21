@@ -1,0 +1,22 @@
+{{define "subscription_skipped.txt"}}Your Next Shipment Is Skipped
+
+Hi {{.CustomerName}},
+
+{{if .SkippedCount}}We've skipped the next {{if eq .SkippedCount 1}}shipment{{else}}{{.SkippedCount}} shipments{{end}} on your {{.ProductName}} subscription ({{.PlanName}}).{{else}}We've pushed out the next shipment on your {{.ProductName}} subscription ({{.PlanName}}).{{end}} Nothing is charged for a skipped shipment -- you only pay for coffee we actually send.
+
+{{if not .PreviousOrderOn.IsZero}}Was billing: {{date .PreviousOrderOn}}
+{{end}}Now bills:   {{date .NextChargeOn}}
+
+Your subscription stays active and picks its usual rhythm back up from that date -- there's nothing else you need to do.
+
+{{if .UndoURL}}Didn't mean to skip? Put it back where it was:
+{{.UndoURL}}
+
+You can also change things any time at {{.AccountURL}}
+{{else}}Manage your subscription: {{.AccountURL}}
+
+Didn't mean to skip? Reply to this email and we'll put it back.
+{{end}}
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

@@ -360,6 +360,40 @@ type SubscriptionCancelledData struct {
 	AccountURL   string
 }
 
+// SubscriptionSkippedData holds data for the "we've skipped your next
+// shipment" notice, sent whether the customer skipped it themselves or asked
+// staff to. UndoURL is a signed one-click link back to the previous schedule;
+// it is empty when no signing secret is configured, and the template then falls
+// back to pointing at the account page.
+type SubscriptionSkippedData struct {
+	CustomerName    string
+	ProductName     string
+	PlanName        string
+	SkippedCount    int       // shipments skipped; 0 when the customer named a restart date instead
+	PreviousOrderOn time.Time // when the next shipment would have been billed
+	NextChargeOn    time.Time // when it will be billed now
+	UndoURL         string
+	StoreName       string
+	StoreURL        string
+	AccountURL      string
+}
+
+// SubscriptionSkipUndoneData holds data for the notice sent when staff put a
+// skipped subscription back on its original schedule. Undoing moves the charge
+// date *earlier*, so the customer is told before their card is billed on a day
+// they were last told was cancelled. Customer-driven undos send nothing — they
+// just saw the confirmation page.
+type SubscriptionSkipUndoneData struct {
+	CustomerName string
+	ProductName  string
+	PlanName     string
+	SkippedTo    time.Time // the date the skip had moved them to
+	NextChargeOn time.Time // the restored date
+	StoreName    string
+	StoreURL     string
+	AccountURL   string
+}
+
 // SubscriptionDunningEndedData holds data for the "we couldn't renew, your
 // subscription has ended" notice sent when dunning retries are exhausted.
 type SubscriptionDunningEndedData struct {

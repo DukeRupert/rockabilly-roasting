@@ -572,3 +572,23 @@ templ flashToast(message string) {
 		</div>
 	</div>
 }
+
+func priceListStatusBadgeClasses(status domain.PriceListStatus) string {
+	switch status {
+	case domain.PriceListStatusActive:
+		return "badge badge-dot badge-green"
+	case domain.PriceListStatusDraft:
+		return "badge badge-dot badge-amber"
+	default:
+		return "badge badge-dot badge-grey"
+	}
+}
+
+// PriceListStatusBadge marks whether a list is charging anyone. Draft and
+// expired lists still show their prices in the editors — staff need to see what
+// a list would charge before they switch it on.
+templ PriceListStatusBadge(status domain.PriceListStatus) {
+	<span class={ priceListStatusBadgeClasses(status) }>
+		{ string(status) }
+	</span>
+}

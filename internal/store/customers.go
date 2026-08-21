@@ -85,6 +85,9 @@ type CustomerFilter struct {
 	AccountType     *domain.AccountType
 	WholesaleStatus *domain.WholesaleStatus
 	EmailVerified   *bool
+	// PriceListID scopes the list to the customers assigned to one price list —
+	// the "who is on this list" question the price list detail page asks.
+	PriceListID     *uuid.UUID
 	Search          string // ILIKE on name, email, or company name
 	Sort            CustomerSort
 	Limit           int
@@ -123,6 +126,11 @@ func customerWhere(query string, f CustomerFilter) (string, []any, int) {
 	if f.EmailVerified != nil {
 		query += fmt.Sprintf(" AND email_verified = $%d", argN)
 		args = append(args, *f.EmailVerified)
+		argN++
+	}
+	if f.PriceListID != nil {
+		query += fmt.Sprintf(" AND price_list_id = $%d", argN)
+		args = append(args, *f.PriceListID)
 		argN++
 	}
 	if f.Search != "" {

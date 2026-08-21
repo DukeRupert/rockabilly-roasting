@@ -62,6 +62,87 @@ func (d *Deps) handleAdminPriceListList(w http.ResponseWriter, r *http.Request) 
 	admin.PriceListList(props).Render(ctx, w) //nolint:errcheck
 }
 
+// handleAdminPriceListShow renders one price list: its prices, and who is on it.
+// The list index used to be the whole feature — a name, a status dropdown and a
+// UUID — which meant "what does Wholesale 2025 charge?" had no answer short of
+// reading one column out of the all-products matrix.
+func (d *Deps) handleAdminPriceListShow(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	var props admin.PriceListShowProps
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		list, txErr := d.PriceListService.Get(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		props.List = *list
+
+		props.Customers, txErr = d.CustomerService.ListCustomers(ctx, tx, store.CustomerFilter{
+			PriceListID: &id,
+			Sort:        store.CustomerSortNameAsc,
+			Limit:       500,
+		})
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	products, err := d.listPriceListProducts(ctx)
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	props.Products = products
+	props.StaffName, props.StaffRole = staffNameRole(r)
+
+	if IsHTMX(r) {
+		admin.PriceListShowContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.PriceListShow(props).Render(ctx, w) //nolint:errcheck
+}
+
+// listPriceListProducts assembles every product's variants and prices for the
+// pricing editors. Each product is read in its own transaction, matching the
+// matrix handler — these are long reads over the whole catalog, not a snapshot
+// anything depends on being consistent.
+func (d *Deps) listPriceListProducts(ctx context.Context) ([]admin.ProductPriceListPricing, error) {
+	var products []domain.Product
+	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		products, txErr = d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{})
+		return txErr
+	}); err != nil {
+		return nil, err
+	}
+
+	out := make([]admin.ProductPriceListPricing, 0, len(products))
+	for _, p := range products {
+		var pp admin.ProductPriceListPricing
+		if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			var txErr error
+			pp, txErr = d.buildPriceListProduct(ctx, tx, p)
+			return txErr
+		}); err != nil {
+			return nil, err
+		}
+		if len(pp.Variants) == 0 {
+			continue
+		}
+		out = append(out, pp)
+	}
+	return out, nil
+}
+
 func (d *Deps) handleAdminPriceListCreate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -142,15 +223,10 @@ func (d *Deps) handleAdminPriceListPrices(w http.ResponseWriter, r *http.Request
 	ctx := r.Context()
 
 	var lists []domain.PriceList
-	var products []domain.Product
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		lists, txErr = d.PriceListService.List(ctx, tx)
-		if txErr != nil {
-			return txErr
-		}
-		products, txErr = d.CatalogService.ListProducts(ctx, tx, store.ProductFilter{})
 		return txErr
 	})
 	if err != nil {
@@ -158,22 +234,10 @@ func (d *Deps) handleAdminPriceListPrices(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	pgs := make([]admin.ProductPriceListPricing, 0, len(products))
-	for _, p := range products {
-		var pp admin.ProductPriceListPricing
-		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-			var txErr error
-			pp, txErr = d.buildPriceListProduct(ctx, tx, p)
-			return txErr
-		})
-		if err != nil {
-			Error(w, r, err)
-			return
-		}
-		if len(pp.Variants) == 0 {
-			continue
-		}
-		pgs = append(pgs, pp)
+	pgs, err := d.listPriceListProducts(ctx)
+	if err != nil {
+		Error(w, r, err)
+		return
 	}
 
 	name, role := staffNameRole(r)
@@ -222,7 +286,7 @@ func (d *Deps) handleAdminPriceListPriceBulkUpdate(w http.ResponseWriter, r *htt
 			toast.Toast(toast.VariantWarning, "No changes to save").Render(ctx, w) //nolint:errcheck
 			return
 		}
-		http.Redirect(w, r, "/admin/price-lists/prices", http.StatusSeeOther)
+		http.Redirect(w, r, priceReturnTo(r), http.StatusSeeOther)
 		return
 	}
 
@@ -267,7 +331,19 @@ func (d *Deps) handleAdminPriceListPriceBulkUpdate(w http.ResponseWriter, r *htt
 		}
 		return
 	}
-	http.Redirect(w, r, "/admin/price-lists/prices", http.StatusSeeOther)
+	http.Redirect(w, r, priceReturnTo(r), http.StatusSeeOther)
+}
+
+// priceReturnTo picks the page a no-JS bulk save returns to. The same endpoint
+// serves the all-lists matrix and a single list's page, so the form says where
+// it came from. Only same-site admin paths are honoured — the value is user
+// input, and an open redirect out of the admin is not worth the convenience.
+func priceReturnTo(r *http.Request) string {
+	to := r.PostForm.Get("return_to")
+	if strings.HasPrefix(to, "/admin/") && !strings.HasPrefix(to, "//") {
+		return to
+	}
+	return "/admin/price-lists/prices"
 }
 
 // savedPricesMessage builds the success-toast text for a bulk price save.

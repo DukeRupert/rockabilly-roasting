@@ -39,6 +39,7 @@ func priceListDollars(prices map[uuid.UUID]int, listID uuid.UUID) string {
 }
 
 templ PriceListPricingContent(props PriceListPricingProps) {
+	@adminSectionTabs(catalogTabs(), "/admin/price-lists")
 	<!-- One page-wide form: a single Save button writes every product's changed cells in one transaction.
 	     The id lives on the form (not a wrapper div) so it's present whether this is rendered as the
 	     htmx content partial or inside the full page — otherwise hx-target can't resolve after a boosted
@@ -55,9 +56,9 @@ templ PriceListPricingContent(props PriceListPricingProps) {
 		<!-- Page header -->
 		<div class="sm:flex sm:items-center">
 			<div class="sm:flex-auto">
-				<h1 class="admin-page-title">Price List Pricing</h1>
+				<h1 class="admin-page-title">Compare all lists</h1>
 				<p class="mt-1 text-sm text-rr-muted">
-					Set per-list overrides for any variant. Empty cells fall back to the base price.
+					Every product against every list, for the times one price has to be read against another. To price a single coffee, open it in the catalog; to work through one list, open the list. Empty cells fall back to the base price.
 					if len(props.Lists) == 0 {
 						<a href="/admin/price-lists" class="text-rr-red hover:text-rr-red-lt">Create a price list</a> to enable list pricing.
 					}
@@ -192,7 +193,7 @@ templ priceListProductBlock(lists []domain.PriceList, pp ProductPriceListPricing
 
 templ PriceListPricing(props PriceListPricingProps) {
 	@layouts.Admin(layouts.AdminProps{
-		Title:      "Price List Pricing",
+		Title:      "Compare all lists",
 		ActivePath: "/admin/price-lists",
 		StaffName:  props.StaffName,
 		StaffRole:  props.StaffRole,

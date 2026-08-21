@@ -7,7 +7,7 @@ package admin
 // through these in-page strips. Two flavours:
 //
 //   adminSectionTabs  — underline tab bar for sibling *pages* in a section
-//                       (Catalog: Products | Categories | Attributes).
+//                       (Catalog: Products | Categories | Attributes | Pricing).
 //   adminChannelToggle — segmented control for the *same* list scoped by sales
 //                       channel (Orders: Retail | Wholesale).
 //
@@ -27,6 +27,10 @@ func catalogTabs() []sectionTab {
 		{Label: "Products", Href: "/admin/catalog"},
 		{Label: "Categories", Href: "/admin/categories"},
 		{Label: "Attributes", Href: "/admin/attributes"},
+		// Prices are catalog data. Price lists sat under Customers because they
+		// are *assigned* to customers, but that is the rare action — staff edit
+		// prices constantly and assign a list once, at onboarding.
+		{Label: "Pricing", Href: "/admin/price-lists"},
 	}
 }
 
@@ -34,7 +38,6 @@ func customersTabs() []sectionTab {
 	return []sectionTab{
 		{Label: "Customers", Href: "/admin/customers"},
 		{Label: "Groups", Href: "/admin/groups"},
-		{Label: "Price Lists", Href: "/admin/price-lists"},
 		{Label: "Wholesale", Href: "/admin/wholesale"},
 		{Label: "Reminders", Href: "/admin/wholesale/reminders"},
 	}

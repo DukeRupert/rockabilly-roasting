@@ -65,11 +65,11 @@ func resolveActiveNav(path string) string {
 		return "/admin/fulfillment"
 	case strings.HasPrefix(path, "/admin/catalog") ||
 		strings.HasPrefix(path, "/admin/categories") ||
-		strings.HasPrefix(path, "/admin/attributes"):
+		strings.HasPrefix(path, "/admin/attributes") ||
+		strings.HasPrefix(path, "/admin/price-lists"):
 		return "/admin/catalog"
 	case strings.HasPrefix(path, "/admin/customers") ||
 		strings.HasPrefix(path, "/admin/groups") ||
-		strings.HasPrefix(path, "/admin/price-lists") ||
 		strings.HasPrefix(path, "/admin/wholesale"):
 		return "/admin/customers"
 	case strings.HasPrefix(path, "/admin/subscriptions") ||
@@ -619,9 +619,9 @@ templ Admin(props AdminProps) {
 					if (path === '/admin/fulfillment' || path.indexOf('/admin/fulfillment/') === 0 ||
 						path.indexOf('/admin/wholesale/fulfillment') === 0) return '/admin/fulfillment';
 					if (path.indexOf('/admin/catalog') === 0 || path.indexOf('/admin/categories') === 0 ||
-						path.indexOf('/admin/attributes') === 0) return '/admin/catalog';
+						path.indexOf('/admin/attributes') === 0 || path.indexOf('/admin/price-lists') === 0) return '/admin/catalog';
 					if (path.indexOf('/admin/customers') === 0 || path.indexOf('/admin/groups') === 0 ||
-						path.indexOf('/admin/price-lists') === 0 || path.indexOf('/admin/wholesale') === 0) return '/admin/customers';
+						path.indexOf('/admin/wholesale') === 0) return '/admin/customers';
 					if (path.indexOf('/admin/subscriptions') === 0 || path.indexOf('/admin/plans') === 0) return '/admin/subscriptions';
 					if (path.indexOf('/admin/discounts') === 0) return '/admin/discounts';
 					return path;

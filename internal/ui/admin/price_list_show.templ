@@ -1,0 +1,237 @@
+package admin
+
+import (
+	"fmt"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// PriceListShowProps backs one price list's own page — the view that answers
+// "what does this list charge, and who is on it?". Before this existed a list
+// was only ever visible as one column of the all-products matrix, so neither
+// question had an answer anywhere in the admin.
+type PriceListShowProps struct {
+	List      domain.PriceList
+	Products  []ProductPriceListPricing
+	Customers []domain.Customer
+	StaffName string
+	StaffRole string
+}
+
+templ PriceListShowContent(props PriceListShowProps) {
+	@adminSectionTabs(catalogTabs(), "/admin/price-lists")
+	<!-- Page header -->
+	<div class="sm:flex sm:items-center sm:justify-between">
+		<div>
+			<div class="flex items-center gap-3">
+				<h1 class="admin-page-title">{ props.List.Name }</h1>
+				@PriceListStatusBadge(props.List.Status)
+			</div>
+			<p class="mt-1 text-sm text-rr-muted">
+				{ priceListCustomerCountLabel(len(props.Customers)) } on this list. Variants with no entry below charge the base price.
+			</p>
+		</div>
+		<div class="mt-4 sm:mt-0">
+			<a href="/admin/price-lists" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">&larr; All price lists</a>
+		</div>
+	</div>
+	<!-- Name + status -->
+	<div class="mt-6 border border-rr-border bg-rr-surface p-4">
+		<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s", props.List.ID)) } class="flex flex-wrap items-end gap-3">
+			<div>
+				<label for="name" class="block text-sm font-medium text-rr-heading">Name</label>
+				<input
+					type="text"
+					name="name"
+					id="name"
+					value={ props.List.Name }
+					required
+					class="mt-2 block w-64 rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+				/>
+			</div>
+			<div>
+				<label for="status" class="block text-sm font-medium text-rr-heading">Status</label>
+				<select
+					name="status"
+					id="status"
+					class="mt-2 block rounded-sm bg-rr-surface px-3 py-1.5 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+				>
+					<option value="active" selected?={ props.List.Status == domain.PriceListStatusActive }>Active</option>
+					<option value="draft" selected?={ props.List.Status == domain.PriceListStatusDraft }>Draft</option>
+					<option value="expired" selected?={ props.List.Status == domain.PriceListStatusExpired }>Expired</option>
+				</select>
+			</div>
+			<button type="submit" class="rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">Save</button>
+		</form>
+	</div>
+	<!-- Prices on this list -->
+	<div class="mt-8">
+		<form
+			id="price-list-show-prices"
+			method="post"
+			action="/admin/price-lists/prices/bulk"
+			hx-post="/admin/price-lists/prices/bulk"
+			hx-target="#price-list-show-prices"
+			hx-swap="innerHTML"
+		>
+			<!-- The bulk endpoint is shared with the all-lists matrix; without JS it
+			     needs to know which page submitted so the redirect lands back here. -->
+			<input type="hidden" name="return_to" value={ fmt.Sprintf("/admin/price-lists/%s", props.List.ID) }/>
+			<div class="sm:flex sm:items-center sm:justify-between">
+				<h2 class="text-sm font-semibold text-rr-heading">Prices</h2>
+				if len(props.Products) > 0 {
+					<button type="submit" class="mt-3 rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt sm:mt-0">Save changes</button>
+				}
+			</div>
+			if len(props.Products) == 0 {
+				<div class="mt-3 border border-dashed border-rr-border p-12 text-center">
+					<h3 class="text-sm font-semibold text-rr-heading">No products with variants</h3>
+					<p class="mt-1 text-sm text-rr-muted">Add variants to a product before setting list prices.</p>
+				</div>
+			} else {
+				<div class="mt-3 space-y-8">
+					for _, pp := range props.Products {
+						@priceListShowProductBlock(props.List, pp)
+					}
+				</div>
+			}
+		</form>
+	</div>
+	<!-- Customers on this list -->
+	<div class="mt-8">
+		<h2 class="text-sm font-semibold text-rr-heading">Customers on this list</h2>
+		if len(props.Customers) == 0 {
+			<p class="mt-2 text-sm text-rr-muted">Nobody is assigned to this list yet. Assign one from a customer's Billing settings.</p>
+		} else {
+			<div class="mt-3 overflow-hidden border border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Name</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Company</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Email</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, c := range props.Customers {
+							<tr class="row-link">
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
+										{ c.FirstName } { c.LastName }
+									</a>
+								</td>
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell">
+									if c.CompanyName != nil {
+										{ *c.CompanyName }
+									}
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">{ c.Email }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+	<!-- Delete -->
+	<div class="mt-8 border-t border-rr-border pt-6">
+		<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s/delete", props.List.ID)) }>
+			<button
+				type="submit"
+				class="text-sm font-semibold text-rr-red hover:text-rr-red-lt"
+				onclick="return confirm('Delete this price list? Customers assigned to it will fall back to base prices.')"
+			>
+				Delete this price list
+			</button>
+		</form>
+	</div>
+}
+
+// priceListShowProductBlock renders one product's prices on this list only:
+// base for reference, then the editable override. It reuses the matrix's field
+// names, so the same bulk-save handler applies the changes.
+templ priceListShowProductBlock(list domain.PriceList, pp ProductPriceListPricing) {
+	<div>
+		<div class="mb-3 flex items-center justify-between">
+			<h3 class="text-sm font-semibold text-rr-heading">{ pp.Product.Title }</h3>
+			<div class="flex items-center gap-3">
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/admin/price-lists/%s/products/%s/tiers", list.ID, pp.Product.ID)) }
+					class="text-xs text-rr-red hover:text-rr-red-lt"
+				>Volume breaks</a>
+				<a
+					href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s?tab=pricing", pp.Product.ID)) }
+					class="text-xs text-rr-red hover:text-rr-red-lt"
+				>All prices for this coffee</a>
+			</div>
+		</div>
+		<div class="overflow-hidden border border-rr-border bg-rr-surface">
+			<table class="min-w-full divide-y divide-rr-border">
+				<thead class="bg-rr-raised">
+					<tr>
+						<th scope="col" class="py-2.5 pl-4 pr-3 text-left text-xs font-semibold text-rr-heading sm:pl-6">SKU</th>
+						<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-rr-heading">Base</th>
+						<th scope="col" class="px-3 py-2.5 text-left text-xs font-semibold text-rr-teal">{ list.Name }</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-rr-border bg-rr-surface">
+					for _, vp := range pp.Variants {
+						<tr>
+							<td class="whitespace-nowrap py-2.5 pl-4 pr-3 text-sm sm:pl-6">
+								<span class="font-mono font-medium text-rr-heading">{ vp.Variant.SKU }</span>
+								if vp.Variant.IsDefault {
+									<span class="badge badge-green ml-1.5">Default</span>
+								}
+							</td>
+							<td class="whitespace-nowrap px-3 py-2.5 text-sm text-rr-muted">
+								if vp.PriceCents != nil {
+									<span class="font-mono">${ priceToDollars(*vp.PriceCents) }</span>
+								} else {
+									<span class="italic">&mdash;</span>
+								}
+							</td>
+							<td class="whitespace-nowrap px-3 py-2.5 text-sm">
+								<div class="flex items-center gap-1">
+									<span class="text-rr-muted">$</span>
+									<input
+										type="number"
+										name={ "list:" + list.ID.String() + ":" + vp.Variant.ID.String() }
+										step="0.01"
+										min="0"
+										placeholder="base"
+										if cents, ok := vp.ListPrices[list.ID]; ok {
+											value={ priceToDollars(cents) }
+										}
+										class="w-24 rounded-sm border-0 py-1 px-2 text-sm text-rr-heading border border-rr-border placeholder:text-rr-muted focus:ring-2 focus:ring-inset focus:ring-rr-red"
+									/>
+									<input type="hidden" id={ "plprev-" + list.ID.String() + "-" + vp.Variant.ID.String() } name={ "list_prev:" + list.ID.String() + ":" + vp.Variant.ID.String() } value={ priceListDollars(vp.ListPrices, list.ID) }/>
+									@TierSummary(vp.ListBreaks[list.ID])
+								</div>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	</div>
+}
+
+// priceListCustomerCountLabel keeps the singular/plural out of the markup.
+func priceListCustomerCountLabel(n int) string {
+	if n == 1 {
+		return "1 customer"
+	}
+	return fmt.Sprintf("%d customers", n)
+}
+
+templ PriceListShow(props PriceListShowProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      props.List.Name,
+		ActivePath: "/admin/price-lists",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@PriceListShowContent(props)
+	}
+}

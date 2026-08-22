@@ -35,6 +35,17 @@ func discountTypeLabel(t domain.DiscountType) string {
 	}
 }
 
+// discountMinimumLabel is the order threshold a discount needs to apply,
+// shown under its value. MinimumOrderCents was settable on the create form and
+// enforced in checkout (see app/checkout.go) but rendered nowhere, so once set
+// it could never be read back — and discounts have no edit page to check it on.
+func discountMinimumLabel(d domain.Discount) string {
+	if d.MinimumOrderCents == nil || *d.MinimumOrderCents <= 0 {
+		return ""
+	}
+	return "min " + formatCents(*d.MinimumOrderCents)
+}
+
 func discountValueDisplay(d domain.Discount) string {
 	switch d.Type {
 	case domain.DiscountTypePercentage:
@@ -213,6 +224,9 @@ templ DiscountListContent(props DiscountListProps) {
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-heading tabular-nums">
 									{ discountValueDisplay(d) }
+									if discountMinimumLabel(d) != "" {
+										<span class="block text-xs font-normal text-rr-muted">{ discountMinimumLabel(d) }</span>
+									}
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									@DiscountActiveBadge(d.Active)

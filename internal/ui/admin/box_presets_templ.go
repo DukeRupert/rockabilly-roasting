@@ -50,6 +50,10 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = ConfirmDialogHost().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Box presets</h1><p class=\"mt-1 text-sm text-rr-muted\">Named cartons used when buying shipping labels. The smallest preset whose max weight covers an order's total physical weight (line items + tare) is selected automatically.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/settings\" class=\"block rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Back to settings</a></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -62,7 +66,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Flash)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 42, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 43, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -95,7 +99,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				var templ_7745c5c3_Var3 templ.SafeURL
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/settings/box-presets/%s", p.ID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 98, Col: 104}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 99, Col: 104}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -108,7 +112,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 101, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 102, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 				if templ_7745c5c3_Err != nil {
@@ -121,7 +125,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatInches(p.LengthIn))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 105, Col: 113}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 106, Col: 113}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 				if templ_7745c5c3_Err != nil {
@@ -134,7 +138,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatInches(p.WidthIn))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 108, Col: 111}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 109, Col: 111}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 				if templ_7745c5c3_Err != nil {
@@ -147,7 +151,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatInches(p.HeightIn))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 111, Col: 113}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 112, Col: 113}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -160,7 +164,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatOz(p.MaxWeightOz))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 114, Col: 114}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 115, Col: 114}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
@@ -173,7 +177,7 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", p.SortOrder))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 117, Col: 97}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 118, Col: 97}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 				if templ_7745c5c3_Err != nil {
@@ -186,23 +190,40 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				var templ_7745c5c3_Var10 templ.SafeURL
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/settings/box-presets/%s/delete", p.ID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 123, Col: 111}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 124, Col: 111}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" class=\"mt-1 text-right\"><button type=\"submit\" class=\"text-xs text-rr-red hover:text-rr-red-lt\" onclick=\"return confirm('Delete this preset?')\">Delete</button></form></td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" class=\"mt-1 text-right\"><button type=\"submit\" class=\"text-xs text-rr-red hover:text-rr-red-lt\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, ConfirmAttrs(ActionConfirm{
+					Title: "Delete this box preset?",
+					Lead:  "Removes the preset from the list staff pick from when buying a label.",
+					Points: []string{
+						"Labels already bought with it are unaffected.",
+						"This cannot be undone — you would have to re-enter the dimensions.",
+					},
+					Confirm: "Delete preset",
+					Danger:  true,
+				}))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, ">Delete</button></form></td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</tbody></table></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</tbody></table></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

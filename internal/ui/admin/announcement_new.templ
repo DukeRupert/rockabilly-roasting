@@ -47,6 +47,7 @@ templ AnnouncementTestResult(message string, ok bool) {
 }
 
 templ AnnouncementNewContent(props AnnouncementNewProps) {
+	@ConfirmDialogHost()
 	@adminSectionTabs(customersTabs(), "/admin/announcements")
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
@@ -140,7 +141,16 @@ templ AnnouncementNewContent(props AnnouncementNewProps) {
 				<button
 					type="submit"
 					class="rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
-					onclick="return confirm('Send this to the selected audience? This cannot be undone once it starts sending.')"
+					{ ConfirmAttrs(ActionConfirm{
+						Title: "Schedule this announcement?",
+						Lead:  "Queues the notice for the audience and time you picked above.",
+						Points: []string{
+							"Once sending starts it cannot be stopped or taken back.",
+							"Check the audience and the wording — this goes to real customers.",
+							"You can cancel it from the announcement page while it is still waiting to send.",
+						},
+						Confirm: "Schedule announcement",
+					})... }
 				>
 					Schedule announcement
 				</button>

@@ -6,6 +6,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/components/icon"
+	"github.com/dukerupert/hiri/internal/ui/utils"
 )
 
 // pluralSuffix returns "s" for any count but one. Local to layouts — admin has its
@@ -186,12 +187,17 @@ templ Admin(props AdminProps) {
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 			<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Inter:wght@400;500;600;700&family=Special+Elite&display=swap" rel="stylesheet"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
-			<script defer src="/static/js/image-uploader.js"></script>
+			<!-- First-party admin scripts go through ScriptURL so a deploy busts
+			     the browser cache. /static is served with max-age=3600 and these
+			     filenames are not content-hashed, so without the ?v= stamp a JS
+			     change can take an hour to reach staff — and admin-confirm.js is
+			     what makes the confirmation dialogs work. -->
+			<script defer src={ utils.ScriptURL("/static/js/image-uploader.js") }></script>
 			<script defer src="/static/js/chart.min.js"></script>
-			<script defer src="/static/js/admin-charts.js"></script>
+			<script defer src={ utils.ScriptURL("/static/js/admin-charts.js") }></script>
 			<!-- Registers Alpine.data('adminConfirm'); must load BEFORE alpine.min.js
 			     so its alpine:init listener is attached in time. -->
-			<script defer src="/static/js/admin-confirm.js"></script>
+			<script defer src={ utils.ScriptURL("/static/js/admin-confirm.js") }></script>
 			<script defer src="/static/js/alpine.min.js"></script>
 			<script src="/static/js/htmx.min.js"></script>
 			<style>[x-cloak] { display: none !important; }</style>

@@ -2,12 +2,12 @@ package admin
 
 import (
 	"fmt"
-	"math"
-	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/media"
-	"github.com/dukerupert/hiri/internal/ui/layouts"
 	switchcomp "github.com/dukerupert/hiri/internal/ui/components/switch"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/google/uuid"
+	"math"
 )
 
 // gramsToOz converts grams to ounces for display.
@@ -35,23 +35,23 @@ type OptionWithValues struct {
 }
 
 type ProductEditProps struct {
-	Product        *domain.Product
-	Taxons         []domain.Taxon
-	Variants       []VariantWithOptions
-	Options        []OptionWithValues
+	Product            *domain.Product
+	Taxons             []domain.Taxon
+	Variants           []VariantWithOptions
+	Options            []OptionWithValues
 	WholesaleCustomers []domain.Customer // candidates for a private (white-label) product
 	CustomerAccessIDs  []uuid.UUID       // customers granted access to a private product
-	Media          []domain.ProductMedia
-	MediaConfig    *media.Config
-	TaxonName      string
-	Errors         map[string]string
-	Flash          string
-	StaffName      string
-	StaffRole      string
-	AssignedSets   []domain.AttributeSet
-	AllSets        []domain.AttributeSet
-	AttributeValues []domain.ProductAttributeValue
-	ActiveTab      string // "details", "attributes", "media", "variants", "pricing"
+	Media              []domain.ProductMedia
+	MediaConfig        *media.Config
+	TaxonName          string
+	Errors             map[string]string
+	Flash              string
+	StaffName          string
+	StaffRole          string
+	AssignedSets       []domain.AttributeSet
+	AllSets            []domain.AttributeSet
+	AttributeValues    []domain.ProductAttributeValue
+	ActiveTab          string // "details", "attributes", "media", "variants", "pricing"
 	// PriceLists and Pricing back the Pricing tab, which shows this product's
 	// base price and every price-list override side by side. Prices are catalog
 	// data, so they are edited here — on the product — rather than only in the
@@ -68,6 +68,7 @@ func tabClasses(active bool) string {
 }
 
 templ ProductEditContent(props ProductEditProps) {
+	@ConfirmDialogHost()
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
@@ -179,7 +180,6 @@ templ ProductEditContent(props ProductEditProps) {
 }
 
 // --- Details Tab ---
-
 templ productDetailsTab(props ProductEditProps) {
 	<div class="space-y-8">
 		@ProductForm(ProductFormProps{
@@ -233,10 +233,26 @@ templ productDetailsTab(props ProductEditProps) {
 								</button>
 							</form>
 						}
-						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/delete", props.Product.ID)) } onsubmit="return confirm('Are you sure you want to delete this product?')">
-							<button type="submit" class="btn-danger">
-								Delete
-							</button>
+						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/delete", props.Product.ID)) }>
+							@ActionWrap("hint-product-delete", "Removes the product outright. Archive it instead to keep the history and hide it from the shop.") {
+								<button
+									type="submit"
+									class="btn-danger"
+									aria-describedby="hint-product-delete"
+									{ ConfirmAttrs(ActionConfirm{
+										Title: "Delete this product?",
+										Lead:  "Removes the product and its variants from the catalog.",
+										Points: []string{
+											"This cannot be undone.",
+											"If you only want it off the storefront, Archive keeps the product and its order history intact.",
+										},
+										Confirm: "Delete product",
+										Danger:  true,
+									})... }
+								>
+									Delete
+								</button>
+							}
 						</form>
 					</div>
 				</div>
@@ -246,7 +262,6 @@ templ productDetailsTab(props ProductEditProps) {
 }
 
 // --- Media Tab ---
-
 templ productMediaTab(props ProductEditProps) {
 	@MediaGallery(MediaGalleryProps{
 		ProductID:   props.Product.ID,
@@ -256,7 +271,6 @@ templ productMediaTab(props ProductEditProps) {
 }
 
 // --- Attributes Tab ---
-
 templ productAttributesTab(props ProductEditProps) {
 	@AttributesPanel(AttributesPanelProps{
 		Product:      props.Product,
@@ -267,7 +281,6 @@ templ productAttributesTab(props ProductEditProps) {
 }
 
 // --- Variants Tab ---
-
 templ productVariantsTab(props ProductEditProps) {
 	<div class="space-y-8">
 		@OptionsPanel(props.Product, props.Options)
@@ -276,7 +289,6 @@ templ productVariantsTab(props ProductEditProps) {
 }
 
 // --- Pricing Tab ---
-
 templ productPricingTab(props ProductEditProps) {
 	@ProductPricingPanel(props)
 }
@@ -450,6 +462,16 @@ templ OptionsPanel(product *domain.Product, options []OptionWithValues) {
 									hx-target="#options-panel"
 									hx-swap="outerHTML"
 									hx-confirm="Delete this option and all its values?"
+									{ ConfirmDataAttrs(ActionConfirm{
+										Title: "Delete this option and all its values?",
+										Lead:  "Removes the option from the product along with every value defined under it.",
+										Points: []string{
+											"Variants built from this option are affected — check the variant list afterwards.",
+											"This cannot be undone.",
+										},
+										Confirm: "Delete option",
+										Danger:  true,
+									})... }
 									class="inline"
 								>
 									<button type="submit" class="text-sm text-rr-red hover:text-rr-red-lt">Delete option</button>
@@ -636,7 +658,17 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 											hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/archive", product.ID, vwo.Variant.ID) }
 											hx-target="#variants-panel"
 											hx-swap="outerHTML"
-											hx-confirm="Archive this variant? It will be hidden from the storefront and refused at checkout. Existing subscriptions on this variant will continue to renew."
+											hx-confirm="Archive this variant?"
+											{ ConfirmDataAttrs(ActionConfirm{
+												Title: "Archive this variant?",
+												Lead:  "Takes the variant off the storefront without deleting it.",
+												Points: []string{
+													"It is hidden from the shop and refused at checkout.",
+													"Existing subscriptions on this variant keep renewing — move those to another variant first if you want them off it.",
+													"You can unarchive it again at any time.",
+												},
+												Confirm: "Archive variant",
+											})... }
 											class="inline"
 										>
 											<button type="submit" class="text-rr-red hover:text-rr-red-lt">Archive</button>

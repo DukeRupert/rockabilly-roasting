@@ -76,8 +76,42 @@ func ConfirmAttrs(c ActionConfirm) templ.Attributes {
 	}
 }
 
+// ConfirmJSAttrs is ConfirmAttrs for actions whose copy is only known in the
+// browser — the fulfillment page's bulk buttons, where the count comes from
+// the Alpine selection. copyExpr is a JavaScript expression evaluated in the
+// button's Alpine scope that must produce the same shape as ActionConfirm:
+//
+//	ConfirmJSAttrs(`{ title: 'Buy ' + selected.length + ' labels?', danger: true }`)
+//
+// Prefer ConfirmAttrs wherever the copy is static — it keeps the words in Go
+// where they can be read and reviewed alongside the action.
+func ConfirmJSAttrs(copyExpr string) templ.Attributes {
+	return templ.Attributes{
+		"@click.prevent": "$dispatch('admin-confirm', { form: $el.form, copy: " + copyExpr + " })",
+	}
+}
+
+// ConfirmDataAttrs spreads onto an element that already carries hx-confirm,
+// giving that confirmation the full title/lead/points treatment:
+//
+//	<form hx-post="…" hx-confirm="Delete this option?" { ConfirmDataAttrs(c)... }>
+//
+// htmx-driven actions do not go through a form submit, so ConfirmAttrs's click
+// hook does not apply — admin-confirm.js intercepts htmx:confirm instead and
+// reads this attribute. hx-confirm must stay: it is what makes htmx raise the
+// event at all. Its text becomes the fallback if this JSON ever fails to parse.
+func ConfirmDataAttrs(c ActionConfirm) templ.Attributes {
+	payload, err := json.Marshal(c)
+	if err != nil {
+		return templ.Attributes{}
+	}
+	return templ.Attributes{"data-confirm": string(payload)}
+}
+
 // ConfirmDialogHost renders the single dialog every ConfirmAttrs button on the
-// page shares. Include it once per page that uses ConfirmAttrs.
+// page shares. Include it once per page that uses ConfirmAttrs, ConfirmJSAttrs,
+// or hx-confirm — hx-confirm is routed through the same dialog by
+// admin-confirm.js rather than the browser's own prompt.
 templ ConfirmDialogHost() {
 	<div
 		x-data="adminConfirm"

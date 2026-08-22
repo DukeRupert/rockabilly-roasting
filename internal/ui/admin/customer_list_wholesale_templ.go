@@ -276,13 +276,21 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Decline this application?')\">Decline</button></form></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\"><button type=\"submit\" class=\"btn-danger\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, ConfirmAttrs(declineWholesaleConfirm()))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, ">Decline</button></form></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -295,13 +303,21 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\"><button type=\"submit\" class=\"btn-danger\" onclick=\"return confirm('Suspend this wholesale account?')\">Suspend</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\"><button type=\"submit\" class=\"btn-danger\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, ConfirmAttrs(suspendWholesaleConfirm()))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, ">Suspend</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -314,12 +330,20 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\"><button type=\"submit\" class=\"btn-confirm\" onclick=\"return confirm('Reactivate this wholesale account? A new setup email will be sent.')\">Reactivate</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\"><button type=\"submit\" class=\"btn-confirm\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, ConfirmAttrs(reactivateWholesaleConfirm()))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, ">Reactivate</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -332,12 +356,12 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" class=\"text-rr-red hover:text-rr-red-lt\">View</a></div><!-- Kebab dropdown: visible below xl. Same actions, packed into a popover. --><div class=\"xl:hidden flex justify-end\" x-data=\"{ open: false, mx: 0, my: 0, place() { const r = $refs.kebab.getBoundingClientRect(); this.mx = r.right; this.my = r.bottom + 4 } }\"><button x-ref=\"kebab\" type=\"button\" x-on:click=\"open = !open; open && place()\" x-bind:aria-expanded=\"open\" aria-haspopup=\"true\" aria-label=\"Actions\" class=\"inline-flex items-center justify-center rounded-sm border border-rr-border bg-rr-surface p-1.5 text-rr-heading hover:bg-rr-raised\"><svg class=\"size-5\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z\"></path></svg></button><div x-show=\"open\" x-cloak x-transition.opacity x-on:click.outside=\"open = false\" x-on:keydown.escape.window=\"open = false\" x-on:scroll.window.capture=\"open = false\" x-on:resize.window=\"open = false\" x-bind:style=\"`top:${my}px; left:${mx}px; transform:translateX(-100%)`\" class=\"fixed z-40 w-48 rounded-sm border border-rr-border bg-rr-surface py-1 text-left shadow-lg\" role=\"menu\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\" class=\"text-rr-red hover:text-rr-red-lt\">View</a></div><!-- Kebab dropdown: visible below xl. Same actions, packed into a popover. --><div class=\"xl:hidden flex justify-end\" x-data=\"{ open: false, mx: 0, my: 0, place() { const r = $refs.kebab.getBoundingClientRect(); this.mx = r.right; this.my = r.bottom + 4 } }\"><button x-ref=\"kebab\" type=\"button\" x-on:click=\"open = !open; open && place()\" x-bind:aria-expanded=\"open\" aria-haspopup=\"true\" aria-label=\"Actions\" class=\"inline-flex items-center justify-center rounded-sm border border-rr-border bg-rr-surface p-1.5 text-rr-heading hover:bg-rr-raised\"><svg class=\"size-5\" viewBox=\"0 0 20 20\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M10 3a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm0 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Z\"></path></svg></button><div x-show=\"open\" x-cloak x-transition.opacity x-on:click.outside=\"open = false\" x-on:keydown.escape.window=\"open = false\" x-on:scroll.window.capture=\"open = false\" x-on:resize.window=\"open = false\" x-bind:style=\"`top:${my}px; left:${mx}px; transform:translateX(-100%)`\" class=\"fixed z-40 w-48 rounded-sm border border-rr-border bg-rr-surface py-1 text-left shadow-lg\" role=\"menu\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusPending {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -350,7 +374,7 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\"><button type=\"submit\" role=\"menuitem\" class=\"block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised\">Approve</button></form><form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\"><button type=\"submit\" role=\"menuitem\" class=\"block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised\">Approve</button></form><form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -363,13 +387,21 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "\"><button type=\"submit\" role=\"menuitem\" onclick=\"return confirm('Decline this application?')\" class=\"block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised\">Decline</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\"><button type=\"submit\" role=\"menuitem\" class=\"block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, ConfirmAttrs(declineWholesaleConfirm()))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, ">Decline</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -382,13 +414,21 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\"><button type=\"submit\" role=\"menuitem\" onclick=\"return confirm('Suspend this wholesale account?')\" class=\"block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised\">Suspend</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\"><button type=\"submit\" role=\"menuitem\" class=\"block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, ConfirmAttrs(suspendWholesaleConfirm()))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, ">Suspend</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -401,12 +441,20 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\"><button type=\"submit\" role=\"menuitem\" onclick=\"return confirm('Reactivate this wholesale account? A new setup email will be sent.')\" class=\"block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised\">Reactivate</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\"><button type=\"submit\" role=\"menuitem\" class=\"block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, ConfirmAttrs(reactivateWholesaleConfirm()))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, ">Reactivate</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -419,7 +467,7 @@ func wholesaleRowActions(c domain.Customer) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" role=\"menuitem\" class=\"block px-3 py-2 text-sm text-rr-heading hover:bg-rr-raised\">View customer</a></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "\" role=\"menuitem\" class=\"block px-3 py-2 text-sm text-rr-heading hover:bg-rr-raised\">View customer</a></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

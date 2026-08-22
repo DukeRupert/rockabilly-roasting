@@ -268,6 +268,10 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = ConfirmDialogHost().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Err = adminSectionTabs(customersTabs(), "/admin/customers").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -279,7 +283,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(customerListSubtitle(props))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 248, Col: 70}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 249, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -300,7 +304,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Search)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 264, Col: 25}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 265, Col: 25}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -313,7 +317,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.BasePath())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 266, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 267, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -326,7 +330,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.StatusFilter)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 275, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 276, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
@@ -339,7 +343,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.VerifiedFilter)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 276, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 277, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -352,7 +356,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Sort)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 277, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 278, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
@@ -370,7 +374,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 			var templ_7745c5c3_Var8 templ.SafeURL
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(props.BasePath()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 279, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 280, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -398,7 +402,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 			var templ_7745c5c3_Var10 templ.SafeURL
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(customerFilterURL(props, "verified", f.Value)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 289, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 290, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -434,7 +438,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(f.Label)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 295, Col: 15}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 296, Col: 15}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -467,7 +471,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var14 templ.SafeURL
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(customerFilterURL(props, "status", f.Value)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 305, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 306, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -503,7 +507,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(f.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 311, Col: 15}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 312, Col: 15}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -521,7 +525,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 					var templ_7745c5c3_Var17 string
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.Counts[f.Value]))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 313, Col: 107}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 314, Col: 107}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -596,7 +600,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var18 templ.SafeURL
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(customerPageHref(props, props.Page-1)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 348, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 349, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -619,7 +623,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.showingStart()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 357, Col: 89}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 358, Col: 89}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -632,7 +636,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.showingEnd()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 357, Col: 182}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 358, Col: 182}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -645,7 +649,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.TotalCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 357, Col: 274}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 358, Col: 274}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -668,7 +672,7 @@ func CustomerListContent(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var22 templ.SafeURL
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(customerPageHref(props, props.Page+1)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 363, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 364, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
@@ -729,7 +733,7 @@ func customerListEmpty(props CustomerListProps) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(props.noMatchMessage())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 386, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 387, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -775,7 +779,7 @@ func customerListEmpty(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var25 templ.SafeURL
 				templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 405, Col: 70}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 406, Col: 70}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 				if templ_7745c5c3_Err != nil {
@@ -788,7 +792,7 @@ func customerListEmpty(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var26 string
 				templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(c.FirstName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 409, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 410, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 				if templ_7745c5c3_Err != nil {
@@ -801,7 +805,7 @@ func customerListEmpty(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var27 string
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(c.LastName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 409, Col: 79}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 410, Col: 79}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
@@ -819,7 +823,7 @@ func customerListEmpty(props CustomerListProps) templ.Component {
 					var templ_7745c5c3_Var28 string
 					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(*c.CompanyName)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 411, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 412, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 					if templ_7745c5c3_Err != nil {
@@ -837,7 +841,7 @@ func customerListEmpty(props CustomerListProps) templ.Component {
 				var templ_7745c5c3_Var29 string
 				templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(c.Email)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 413, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 414, Col: 60}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 				if templ_7745c5c3_Err != nil {
@@ -871,7 +875,7 @@ func customerListEmpty(props CustomerListProps) templ.Component {
 			var templ_7745c5c3_Var30 templ.SafeURL
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(props.BasePath()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 427, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 428, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -1185,7 +1189,7 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 		var templ_7745c5c3_Var43 templ.SafeURL
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 518, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 517, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
@@ -1199,7 +1203,7 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 			var templ_7745c5c3_Var44 string
 			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(*c.CompanyName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 520, Col: 21}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 519, Col: 21}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 			if templ_7745c5c3_Err != nil {
@@ -1209,7 +1213,7 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 			var templ_7745c5c3_Var45 string
 			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(c.FirstName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 522, Col: 18}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 521, Col: 18}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 			if templ_7745c5c3_Err != nil {
@@ -1222,7 +1226,7 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 			var templ_7745c5c3_Var46 string
 			templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(c.LastName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 522, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 521, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 			if templ_7745c5c3_Err != nil {
@@ -1236,7 +1240,7 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 		var templ_7745c5c3_Var47 string
 		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(c.FirstName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 527, Col: 16}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 526, Col: 16}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {
@@ -1249,7 +1253,7 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(c.LastName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 527, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 526, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
@@ -1262,7 +1266,7 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 		var templ_7745c5c3_Var49 string
 		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(c.Email)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 530, Col: 12}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 529, Col: 12}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 		if templ_7745c5c3_Err != nil {
@@ -1276,7 +1280,7 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 			var templ_7745c5c3_Var50 string
 			templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Net %d", *c.PaymentTermsDays))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 534, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 533, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 			if templ_7745c5c3_Err != nil {
@@ -1295,7 +1299,7 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 		var templ_7745c5c3_Var51 string
 		templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(c.CreatedAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 540, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 539, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 		if templ_7745c5c3_Err != nil {
@@ -1375,7 +1379,7 @@ func customerSortHeader(props CustomerListProps, col, label string) templ.Compon
 		var templ_7745c5c3_Var53 templ.SafeURL
 		templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(customerSortURL(props, col)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 562, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 561, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 		if templ_7745c5c3_Err != nil {
@@ -1398,7 +1402,7 @@ func customerSortHeader(props CustomerListProps, col, label string) templ.Compon
 		var templ_7745c5c3_Var54 string
 		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 568, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 567, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 		if templ_7745c5c3_Err != nil {
@@ -1416,7 +1420,7 @@ func customerSortHeader(props CustomerListProps, col, label string) templ.Compon
 			var templ_7745c5c3_Var55 string
 			templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(ind)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 570, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 569, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 			if templ_7745c5c3_Err != nil {

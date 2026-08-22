@@ -14,6 +14,7 @@ type AttributeSetListProps struct {
 }
 
 templ AttributeSetListContent(props AttributeSetListProps) {
+	@ConfirmDialogHost()
 	@adminSectionTabs(catalogTabs(), "/admin/attributes")
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
@@ -59,10 +60,22 @@ templ AttributeSetListContent(props AttributeSetListProps) {
 							<form
 								method="post"
 								action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/delete", set.ID)) }
-								onsubmit="return confirm('Delete this attribute set and all its keys?')"
 								class="inline"
 							>
-								<button type="submit" class="text-sm text-rr-red hover:text-rr-red-lt">Delete</button>
+								<button
+									type="submit"
+									class="text-sm text-rr-red hover:text-rr-red-lt"
+									{ ConfirmAttrs(ActionConfirm{
+										Title: "Delete this attribute set?",
+										Lead:  "Removes the set and every key defined under it.",
+										Points: []string{
+											"Product values using those keys are lost.",
+											"This cannot be undone.",
+										},
+										Confirm: "Delete set",
+										Danger:  true,
+									})... }
+								>Delete</button>
 							</form>
 						</div>
 					</div>

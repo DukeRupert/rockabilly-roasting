@@ -240,6 +240,7 @@ func customerListSubtitle(p CustomerListProps) string {
 }
 
 templ CustomerListContent(props CustomerListProps) {
+	@ConfirmDialogHost()
 	@adminSectionTabs(customersTabs(), "/admin/customers")
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
@@ -435,7 +436,6 @@ templ customerListEmpty(props CustomerListProps) {
 }
 
 // --- Retail channel: a roster. Who they are, whether they can sign in. ---
-
 templ retailCustomerHead(props CustomerListProps) {
 	<thead class="bg-rr-raised">
 		<tr>
@@ -486,7 +486,6 @@ templ retailCustomerRow(props CustomerListProps, c domain.Customer) {
 
 // --- Wholesale channel: an account book. Terms, pricing, and the application
 // queue, with the review actions on the row rather than a page away. ---
-
 templ wholesaleCustomerHead(props CustomerListProps) {
 	<thead class="bg-rr-raised">
 		<tr>

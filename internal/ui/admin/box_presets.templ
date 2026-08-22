@@ -22,6 +22,7 @@ func formatOz(oz float64) string {
 }
 
 templ BoxPresetsContent(props BoxPresetsProps) {
+	@ConfirmDialogHost()
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">Box presets</h1>
@@ -121,7 +122,20 @@ templ BoxPresetsContent(props BoxPresetsProps) {
 										</div>
 									</form>
 									<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/settings/box-presets/%s/delete", p.ID)) } class="mt-1 text-right">
-										<button type="submit" class="text-xs text-rr-red hover:text-rr-red-lt" onclick="return confirm('Delete this preset?')">Delete</button>
+										<button
+											type="submit"
+											class="text-xs text-rr-red hover:text-rr-red-lt"
+											{ ConfirmAttrs(ActionConfirm{
+												Title: "Delete this box preset?",
+												Lead:  "Removes the preset from the list staff pick from when buying a label.",
+												Points: []string{
+													"Labels already bought with it are unaffected.",
+													"This cannot be undone — you would have to re-enter the dimensions.",
+												},
+												Confirm: "Delete preset",
+												Danger:  true,
+											})... }
+										>Delete</button>
 									</form>
 								</td>
 							</tr>

@@ -129,6 +129,10 @@ func AnnouncementNewContent(props AnnouncementNewProps) templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = ConfirmDialogHost().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Err = adminSectionTabs(customersTabs(), "/admin/announcements").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -150,7 +154,7 @@ func AnnouncementNewContent(props AnnouncementNewProps) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(audienceCount(props.Counts, domain.AnnouncementAudienceAll))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 67, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 68, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -173,7 +177,7 @@ func AnnouncementNewContent(props AnnouncementNewProps) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(audienceCount(props.Counts, domain.AnnouncementAudienceRetail))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 74, Col: 104}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 75, Col: 104}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -196,7 +200,7 @@ func AnnouncementNewContent(props AnnouncementNewProps) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(audienceCount(props.Counts, domain.AnnouncementAudienceWholesale))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 81, Col: 107}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 82, Col: 107}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -209,7 +213,7 @@ func AnnouncementNewContent(props AnnouncementNewProps) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.DefaultSendAt)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 130, Col: 33}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 131, Col: 33}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -222,36 +226,53 @@ func AnnouncementNewContent(props AnnouncementNewProps) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.TZAbbrev)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 133, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 134, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, " (shop time)</span></label></div><p class=\"mt-2 text-xs text-rr-muted\">A scheduled announcement can be cancelled any time before it starts sending.</p></div><div class=\"border-t border-rr-border pt-6\"><div class=\"flex flex-wrap items-center gap-3\"><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\" onclick=\"return confirm('Send this to the selected audience? This cannot be undone once it starts sending.')\">Schedule announcement</button><!--\n\t\t\t\t\tPosts the draft to a preview endpoint and swaps only the\n\t\t\t\t\tresult line, so everything typed above survives. hx-include\n\t\t\t\t\tpulls the subject and body out of the form this button sits\n\t\t\t\t\tin without submitting it.\n\t\t\t\t--><button type=\"button\" hx-post=\"/admin/announcements/test\" hx-include=\"closest form\" hx-target=\"#test-result\" hx-swap=\"innerHTML\" class=\"rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm/6 font-semibold text-rr-heading hover:bg-rr-raised\">Send me a test first</button> <a href=\"/admin/announcements\" class=\"text-sm/6 font-semibold text-rr-muted hover:text-rr-heading\">Cancel</a></div><div id=\"test-result\" class=\"mt-3\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, " (shop time)</span></label></div><p class=\"mt-2 text-xs text-rr-muted\">A scheduled announcement can be cancelled any time before it starts sending.</p></div><div class=\"border-t border-rr-border pt-6\"><div class=\"flex flex-wrap items-center gap-3\"><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, ConfirmAttrs(ActionConfirm{
+			Title: "Schedule this announcement?",
+			Lead:  "Queues the notice for the audience and time you picked above.",
+			Points: []string{
+				"Once sending starts it cannot be stopped or taken back.",
+				"Check the audience and the wording — this goes to real customers.",
+				"You can cancel it from the announcement page while it is still waiting to send.",
+			},
+			Confirm: "Schedule announcement",
+		}))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, ">Schedule announcement</button><!--\n\t\t\t\t\tPosts the draft to a preview endpoint and swaps only the\n\t\t\t\t\tresult line, so everything typed above survives. hx-include\n\t\t\t\t\tpulls the subject and body out of the form this button sits\n\t\t\t\t\tin without submitting it.\n\t\t\t\t--><button type=\"button\" hx-post=\"/admin/announcements/test\" hx-include=\"closest form\" hx-target=\"#test-result\" hx-swap=\"innerHTML\" class=\"rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm/6 font-semibold text-rr-heading hover:bg-rr-raised\">Send me a test first</button> <a href=\"/admin/announcements\" class=\"text-sm/6 font-semibold text-rr-muted hover:text-rr-heading\">Cancel</a></div><div id=\"test-result\" class=\"mt-3\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.TestAddress != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<p class=\"text-sm text-rr-muted\">The test goes to ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<p class=\"text-sm text-rr-muted\">The test goes to ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(props.TestAddress)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 167, Col: 74}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/announcement_new.templ`, Line: 177, Col: 74}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, ".</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, ".</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div></div></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div></div></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

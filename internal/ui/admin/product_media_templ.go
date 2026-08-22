@@ -164,17 +164,34 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" hx-target=\"#media-gallery\" hx-swap=\"outerHTML\" hx-confirm=\"Delete this image?\"><button type=\"submit\" class=\"rounded-full bg-red-600 p-1 text-white shadow-sm hover:bg-red-500\" title=\"Delete\"><svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18 18 6M6 6l12 12\"></path></svg></button></form></div></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" hx-target=\"#media-gallery\" hx-swap=\"outerHTML\" hx-confirm=\"Delete this image?\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, ConfirmDataAttrs(ActionConfirm{
+					Title: "Delete this image?",
+					Lead:  "Removes the image from this product.",
+					Points: []string{
+						"This cannot be undone — you would have to upload the file again.",
+						"If it is the primary image, the next one takes its place on the storefront.",
+					},
+					Confirm: "Delete image",
+					Danger:  true,
+				}))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "><button type=\"submit\" class=\"rounded-full bg-red-600 p-1 text-white shadow-sm hover:bg-red-500\" title=\"Delete\"><svg class=\"size-4\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2\" stroke=\"currentColor\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M6 18 18 6M6 6l12 12\"></path></svg></button></form></div></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<!-- Upload drop zone -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<!-- Upload drop zone -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -183,20 +200,20 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div x-data=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<div x-data=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("imageUploader('%s')", props.ProductID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/product_media.templ`, Line: 101, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/product_media.templ`, Line: 111, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -209,7 +226,7 @@ func MediaGallery(props MediaGalleryProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\"><div @click=\"$refs.fileInput.click()\" @dragover.prevent=\"dragging = true\" @dragleave.prevent=\"dragging = false\" @drop.prevent=\"dragging = false; handleDrop($event)\" :class=\"dragging ? 'border-rr-red bg-rr-red/5' : 'border-rr-border'\" class=\"flex cursor-pointer justify-center rounded-sm border border-dashed px-6 py-10 transition-colors\"><div class=\"text-center\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\" class=\"mx-auto size-12 text-rr-border\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M1.5 6a2.25 2.25 0 0 1 2.25-2.25h16.5A2.25 2.25 0 0 1 22.5 6v12a2.25 2.25 0 0 1-2.25 2.25H3.75A2.25 2.25 0 0 1 1.5 18V6ZM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0 0 21 18v-1.94l-2.69-2.689a1.5 1.5 0 0 0-2.12 0l-.88.879.97.97a.75.75 0 1 1-1.06 1.06l-5.16-5.159a1.5 1.5 0 0 0-2.12 0L3 16.061Zm10.125-7.81a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Z\"></path></svg><div class=\"mt-4 flex text-sm/6 text-rr-muted\"><span class=\"font-semibold text-rr-red hover:text-rr-red-lt\" x-show=\"!uploading\">Upload a file</span> <span class=\"font-semibold text-rr-muted\" x-show=\"uploading\" x-cloak>Uploading <span x-text=\"progress\"></span>...</span><p class=\"pl-1\" x-show=\"!uploading\">or drag and drop</p></div><p class=\"text-xs/5 text-rr-muted\">PNG, JPG, GIF up to 10MB</p><!-- Error display --><template x-if=\"error\"><p class=\"mt-2 text-sm text-red-600\" x-text=\"error\"></p></template></div></div><input type=\"file\" accept=\"image/png,image/jpeg,image/gif\" multiple x-ref=\"fileInput\" @change=\"handleFiles($event)\" class=\"sr-only\"></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\"><div @click=\"$refs.fileInput.click()\" @dragover.prevent=\"dragging = true\" @dragleave.prevent=\"dragging = false\" @drop.prevent=\"dragging = false; handleDrop($event)\" :class=\"dragging ? 'border-rr-red bg-rr-red/5' : 'border-rr-border'\" class=\"flex cursor-pointer justify-center rounded-sm border border-dashed px-6 py-10 transition-colors\"><div class=\"text-center\"><svg viewBox=\"0 0 24 24\" fill=\"currentColor\" aria-hidden=\"true\" class=\"mx-auto size-12 text-rr-border\"><path fill-rule=\"evenodd\" clip-rule=\"evenodd\" d=\"M1.5 6a2.25 2.25 0 0 1 2.25-2.25h16.5A2.25 2.25 0 0 1 22.5 6v12a2.25 2.25 0 0 1-2.25 2.25H3.75A2.25 2.25 0 0 1 1.5 18V6ZM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0 0 21 18v-1.94l-2.69-2.689a1.5 1.5 0 0 0-2.12 0l-.88.879.97.97a.75.75 0 1 1-1.06 1.06l-5.16-5.159a1.5 1.5 0 0 0-2.12 0L3 16.061Zm10.125-7.81a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Z\"></path></svg><div class=\"mt-4 flex text-sm/6 text-rr-muted\"><span class=\"font-semibold text-rr-red hover:text-rr-red-lt\" x-show=\"!uploading\">Upload a file</span> <span class=\"font-semibold text-rr-muted\" x-show=\"uploading\" x-cloak>Uploading <span x-text=\"progress\"></span>...</span><p class=\"pl-1\" x-show=\"!uploading\">or drag and drop</p></div><p class=\"text-xs/5 text-rr-muted\">PNG, JPG, GIF up to 10MB</p><!-- Error display --><template x-if=\"error\"><p class=\"mt-2 text-sm text-red-600\" x-text=\"error\"></p></template></div></div><input type=\"file\" accept=\"image/png,image/jpeg,image/gif\" multiple x-ref=\"fileInput\" @change=\"handleFiles($event)\" class=\"sr-only\"></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

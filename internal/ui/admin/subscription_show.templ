@@ -163,6 +163,16 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			</p>
 		</div>
 	}
+	<!-- An expired subscription said so in its badge but never said when it
+	     ran out. EndsAt is set by the expiry sweep and was displayed nowhere. -->
+	if props.Subscription.EndsAt != nil {
+		<div class="mt-6 border border-rr-border bg-rr-raised p-4">
+			<p class="text-sm text-rr-heading">
+				<span class="font-semibold">Ended</span>
+				<span class="text-rr-muted">on { props.Subscription.EndsAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM") }</span>
+			</p>
+		</div>
+	}
 	if props.Subscription.PauseUntil != nil {
 		<div class="mt-6 badge-amber rounded-sm p-4">
 			<p class="text-sm">

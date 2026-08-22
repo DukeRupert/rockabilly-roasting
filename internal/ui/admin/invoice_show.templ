@@ -30,6 +30,7 @@ func canVoidInvoice(inv *domain.Invoice) bool {
 }
 
 templ InvoiceShowContent(props InvoiceShowProps) {
+	@ConfirmDialogHost()
 	<!-- Header -->
 	<div class="sm:flex sm:items-center sm:justify-between">
 		<div>
@@ -40,7 +41,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 			<p class="mt-1 text-sm text-rr-muted">
 				Created { props.Invoice.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }
 				if props.Invoice.DueDate != nil {
-					 — Due { props.Invoice.DueDate.In(props.MerchantTZ).Format("January 2, 2006") }
+					— Due { props.Invoice.DueDate.In(props.MerchantTZ).Format("January 2, 2006") }
 				}
 			</p>
 		</div>
@@ -70,7 +71,16 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 				<button
 					type="submit"
 					class="btn-danger"
-					onclick="return confirm('Void this invoice? This cannot be undone.')"
+					{ ConfirmAttrs(ActionConfirm{
+						Title: "Void this invoice?",
+						Lead:  "Cancels the invoice in QuickBooks and here.",
+						Points: []string{
+							"This cannot be undone — a voided invoice cannot be reissued, only replaced with a new one.",
+							"No money moves. If the customer already paid, refund them separately.",
+						},
+						Confirm: "Void invoice",
+						Danger:  true,
+					})... }
 				>
 					Void Invoice
 				</button>

@@ -16,6 +16,7 @@ type AttributeKeyEditProps struct {
 }
 
 templ AttributeKeyEditContent(props AttributeKeyEditProps) {
+	@ConfirmDialogHost()
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
@@ -190,9 +191,21 @@ templ AttributeKeyEditContent(props AttributeKeyEditProps) {
 			<form
 				method="post"
 				action={ templ.SafeURL(fmt.Sprintf("/admin/attributes/%s/keys/%s/delete", props.Set.ID, props.Key.ID)) }
-				onsubmit="return confirm('Are you sure you want to delete this attribute key?')"
 			>
-				<button type="submit" class="btn-danger">
+				<button
+					type="submit"
+					class="btn-danger"
+					{ ConfirmAttrs(ActionConfirm{
+						Title: "Delete this attribute key?",
+						Lead:  "Removes the key from this set.",
+						Points: []string{
+							"Any product values recorded under this key are lost.",
+							"This cannot be undone.",
+						},
+						Confirm: "Delete key",
+						Danger:  true,
+					})... }
+				>
 					Delete key
 				</button>
 			</form>

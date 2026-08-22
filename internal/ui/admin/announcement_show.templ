@@ -47,6 +47,7 @@ func announcementSentSummary(a domain.Announcement, loc *time.Location) string {
 }
 
 templ AnnouncementShowContent(props AnnouncementShowProps) {
+	@ConfirmDialogHost()
 	@adminSectionTabs(customersTabs(), "/admin/announcements")
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
@@ -62,7 +63,16 @@ templ AnnouncementShowContent(props AnnouncementShowProps) {
 					<button
 						type="submit"
 						class="rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm/6 font-semibold text-rr-heading hover:bg-rr-raised"
-						onclick="return confirm('Cancel this announcement? It will not send.')"
+						{ ConfirmAttrs(ActionConfirm{
+							Title: "Cancel this announcement?",
+							Lead:  "Stops the notice going out. Nothing is sent.",
+							Points: []string{
+								"Anyone already emailed in a send that started keeps their copy.",
+								"The announcement stays here as a record — you can write a new one from it.",
+							},
+							Confirm: "Cancel send",
+							Danger:  true,
+						})... }
 					>
 						Cancel this send
 					</button>

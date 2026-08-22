@@ -6,6 +6,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/components/icon"
+	"github.com/dukerupert/hiri/internal/ui/utils"
 )
 
 // pluralSuffix returns "s" for any count but one. Local to layouts — admin has its
@@ -186,9 +187,17 @@ templ Admin(props AdminProps) {
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 			<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Inter:wght@400;500;600;700&family=Special+Elite&display=swap" rel="stylesheet"/>
 			<link rel="stylesheet" href="/static/css/output.css"/>
-			<script defer src="/static/js/image-uploader.js"></script>
+			<!-- First-party admin scripts go through ScriptURL so a deploy busts
+			     the browser cache. /static is served with max-age=3600 and these
+			     filenames are not content-hashed, so without the ?v= stamp a JS
+			     change can take an hour to reach staff — and admin-confirm.js is
+			     what makes the confirmation dialogs work. -->
+			<script defer src={ utils.ScriptURL("/static/js/image-uploader.js") }></script>
 			<script defer src="/static/js/chart.min.js"></script>
-			<script defer src="/static/js/admin-charts.js"></script>
+			<script defer src={ utils.ScriptURL("/static/js/admin-charts.js") }></script>
+			<!-- Registers Alpine.data('adminConfirm'); must load BEFORE alpine.min.js
+			     so its alpine:init listener is attached in time. -->
+			<script defer src={ utils.ScriptURL("/static/js/admin-confirm.js") }></script>
 			<script defer src="/static/js/alpine.min.js"></script>
 			<script src="/static/js/htmx.min.js"></script>
 			<style>[x-cloak] { display: none !important; }</style>
@@ -444,6 +453,53 @@ templ Admin(props AdminProps) {
 				.row-link a:not(.row-link-target),
 				.row-link button,
 				.row-link form { position: relative; z-index: 1; }
+
+				/* ── Action hints ──
+				   A one-line explanation of what a button does, shown before the
+				   click rather than after it. Hover AND focus-within, so keyboard
+				   users get the same affordance; the button carries
+				   aria-describedby pointing at the hint, so it is announced too.
+				   CSS-only — nothing here needs JS to be correct. */
+				.action-wrap {
+					position: relative;
+					display: inline-flex;
+				}
+				.action-hint {
+					position: absolute;
+					bottom: calc(100% + 6px);
+					left: 0;
+					z-index: 30;
+					width: max-content;
+					max-width: 18rem;
+					padding: 0.35rem 0.55rem;
+					border-radius: 2px;
+					background: var(--color-rr-heading);
+					color: var(--color-rr-bg);
+					font-size: 0.75rem;
+					line-height: 1.45;
+					font-weight: 400;
+					text-align: left;
+					white-space: normal;
+					pointer-events: none;
+					/* Toggled with display, not an opacity fade. A fade from a
+					   visibility:hidden element does not reliably advance in Chrome
+					   when the reveal comes from :focus-within rather than the
+					   pointer, and admin motion is utility anyway — see
+					   docs/admin-ui.md. */
+					display: none;
+				}
+				/* Actions sit in a wrapping flex row, so a left-anchored hint on a
+				   right-hand button would overflow the viewport. The trailing
+				   actions in an .action-row (Cancel / Refund and friends) anchor
+				   to their right edge instead. */
+				.action-row > *:nth-last-child(-n+2) .action-hint {
+					left: auto;
+					right: 0;
+				}
+				.action-wrap:hover > .action-hint,
+				.action-wrap:focus-within > .action-hint {
+					display: block;
+				}
 			</style>
 		</head>
 		<body class="h-full overflow-x-hidden" hx-boost="true" hx-target="#main-content" hx-swap="innerHTML show:window:top">

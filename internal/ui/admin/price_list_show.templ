@@ -20,6 +20,7 @@ type PriceListShowProps struct {
 }
 
 templ PriceListShowContent(props PriceListShowProps) {
+	@ConfirmDialogHost()
 	@adminSectionTabs(catalogTabs(), "/admin/price-lists")
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center sm:justify-between">
@@ -140,7 +141,16 @@ templ PriceListShowContent(props PriceListShowProps) {
 			<button
 				type="submit"
 				class="text-sm font-semibold text-rr-red hover:text-rr-red-lt"
-				onclick="return confirm('Delete this price list? Customers assigned to it will fall back to base prices.')"
+				{ ConfirmAttrs(ActionConfirm{
+					Title: "Delete this price list?",
+					Lead:  "Removes the list and every price on it.",
+					Points: []string{
+						"Customers assigned to it fall back to base prices — check who is on it before deleting.",
+						"This cannot be undone.",
+					},
+					Confirm: "Delete price list",
+					Danger:  true,
+				})... }
 			>
 				Delete this price list
 			</button>

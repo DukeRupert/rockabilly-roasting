@@ -2,9 +2,9 @@ package admin
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/media"
+	"github.com/google/uuid"
 )
 
 type MediaGalleryProps struct {
@@ -80,6 +80,16 @@ templ MediaGallery(props MediaGalleryProps) {
 									hx-target="#media-gallery"
 									hx-swap="outerHTML"
 									hx-confirm="Delete this image?"
+									{ ConfirmDataAttrs(ActionConfirm{
+										Title: "Delete this image?",
+										Lead:  "Removes the image from this product.",
+										Points: []string{
+											"This cannot be undone — you would have to upload the file again.",
+											"If it is the primary image, the next one takes its place on the storefront.",
+										},
+										Confirm: "Delete image",
+										Danger:  true,
+									})... }
 								>
 									<button
 										type="submit"
@@ -143,4 +153,3 @@ templ MediaGallery(props MediaGalleryProps) {
 		</div>
 	</div>
 }
-

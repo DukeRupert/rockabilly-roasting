@@ -276,6 +276,7 @@ func fulfillmentEmptyBucketCopy(view string) string {
 }
 
 templ FulfillmentListContent(props FulfillmentListProps) {
+	@ConfirmDialogHost()
 	@adminChannelToggle("/admin/fulfillment", "/admin/wholesale/fulfillment", props.BasePath)
 	if props.BatchResult != nil {
 		@batchActionResultBanner(*props.BatchResult)
@@ -379,12 +380,7 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 					>
 						Print invoices
 					</button>
-					<form
-						method="post"
-						action="/admin/orders/labels"
-						@submit="if (!confirm('Buy a label for ' + selected.length + ' order(s)? This will charge your Shippo account.')) { $event.preventDefault(); }"
-						class="contents"
-					>
+					<form method="post" action="/admin/orders/labels" class="contents">
 						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
 						<label for={ "bulk-label-service-" + fulfillmentGroupAnchor(group.Method) } class="sr-only">Shipping service</label>
 						<select
@@ -401,56 +397,78 @@ templ fulfillmentGroupSection(group FulfillmentGroup, props FulfillmentListProps
 							type="submit"
 							title="Buy a Shippo label for each selected order. Charges your Shippo account."
 							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+							{ ConfirmJSAttrs(`{
+								title: 'Buy ' + selected.length + ' shipping label' + (selected.length === 1 ? '' : 's') + '?',
+								lead: 'Buys one label per selected order from Shippo, using the service picked to the left.',
+								points: [
+									'Your Shippo account is charged for every label bought.',
+									'Refunding a label afterwards is a request to the carrier, and only unused labels qualify.',
+									'The customer is not emailed — that happens when you mark the order shipped.',
+								],
+								confirm: 'Buy ' + selected.length + ' label' + (selected.length === 1 ? '' : 's'),
+								danger: true,
+							}`)... }
 						>
 							Buy labels
 						</button>
 					</form>
 				} else if group.Method != nil && *group.Method == domain.ShippingMethodPickup {
-					<form
-						method="post"
-						action="/admin/orders/batch/ready-for-pickup"
-						@submit="if (!confirm('Mark ' + selected.length + ' order(s) ready for pickup and email each customer?')) { $event.preventDefault(); }"
-						class="contents"
-					>
+					<form method="post" action="/admin/orders/batch/ready-for-pickup" class="contents">
 						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
 						<input type="hidden" name="return_to" value={ props.BasePath }/>
 						<button
 							type="submit"
 							title="Mark each selected order ready for pickup and email the customer."
 							class="inline-flex items-center rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+							{ ConfirmJSAttrs(`{
+								title: 'Mark ' + selected.length + ' order' + (selected.length === 1 ? '' : 's') + ' ready for pickup?',
+								lead: 'Tells each customer their order is waiting at the shop.',
+								points: [
+									'Every selected customer is emailed straight away.',
+									'There is no undo on the email — only mark orders that are actually on the shelf.',
+								],
+								confirm: 'Mark ready and email',
+							}`)... }
 						>
 							Mark ready for pickup
 						</button>
 					</form>
-					<form
-						method="post"
-						action="/admin/orders/batch/picked-up"
-						@submit="if (!confirm('Mark ' + selected.length + ' order(s) as picked up?')) { $event.preventDefault(); }"
-						class="contents"
-					>
+					<form method="post" action="/admin/orders/batch/picked-up" class="contents">
 						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
 						<input type="hidden" name="return_to" value={ props.BasePath }/>
 						<button
 							type="submit"
 							title="Mark each selected order as picked up by the customer."
 							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+							{ ConfirmJSAttrs(`{
+								title: 'Mark ' + selected.length + ' order' + (selected.length === 1 ? '' : 's') + ' picked up?',
+								lead: 'Closes each selected order as collected.',
+								points: [
+									'No email is sent to the customer.',
+								],
+								confirm: 'Mark picked up',
+							}`)... }
 						>
 							Mark picked up
 						</button>
 					</form>
 				} else if group.Method != nil && *group.Method == domain.ShippingMethodLocalDelivery {
-					<form
-						method="post"
-						action="/admin/orders/batch/out-for-delivery"
-						@submit="if (!confirm('Send delivery notification to ' + selected.length + ' customer(s) and mark out for delivery?')) { $event.preventDefault(); }"
-						class="contents"
-					>
+					<form method="post" action="/admin/orders/batch/out-for-delivery" class="contents">
 						<input type="hidden" name="order_ids" :value="selected.join(',')"/>
 						<input type="hidden" name="return_to" value={ props.BasePath }/>
 						<button
 							type="submit"
 							title="Email a delivery notification to each customer and mark the orders out for delivery."
 							class="inline-flex items-center rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white hover:bg-rr-red/90"
+							{ ConfirmJSAttrs(`{
+								title: 'Send ' + selected.length + ' delivery notification' + (selected.length === 1 ? '' : 's') + '?',
+								lead: 'Emails each customer that their order is on the van, and marks the orders out for delivery.',
+								points: [
+									'Every selected customer is emailed straight away.',
+									'Send these as the van leaves, not while you are still loading it.',
+								],
+								confirm: 'Notify and mark out',
+							}`)... }
 						>
 							Out for delivery
 						</button>
@@ -639,7 +657,7 @@ templ batchActionResultBanner(r BatchActionResult) {
 				}
 				<span class="text-sm">
 					<span class="font-semibold text-rr-red tabular-nums">{ fmt.Sprintf("%d", len(r.Failures)) }</span>
-					<span class="text-rr-body"> skipped</span>
+					<span class="text-rr-body">skipped</span>
 				</span>
 			}
 		</div>
@@ -650,7 +668,7 @@ templ batchActionResultBanner(r BatchActionResult) {
 						<a href={ templ.SafeURL("/admin/orders/" + f.OrderID.String()) } class="font-semibold text-rr-heading tabular-nums hover:text-rr-red">
 							{ f.OrderID.String()[:8] }
 						</a>
-						<span class="text-rr-muted"> — { f.Reason }</span>
+						<span class="text-rr-muted">— { f.Reason }</span>
 					</li>
 				}
 				if r.Truncated {

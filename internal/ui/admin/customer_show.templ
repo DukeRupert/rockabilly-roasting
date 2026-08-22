@@ -27,11 +27,11 @@ type CustomerShowProps struct {
 	// domain.Customer.
 	AnnouncementsEnabled bool
 	OrderCount           int
-	LifetimeSpend int
-	LastOrderAt   *time.Time
-	MerchantTZ    *time.Location
-	StaffName     string
-	StaffRole     string
+	LifetimeSpend        int
+	LastOrderAt          *time.Time
+	MerchantTZ           *time.Location
+	StaffName            string
+	StaffRole            string
 	// CanEditEmail gates the inline email editor. The route is gated
 	// independently on customers:write; this only keeps the form from showing
 	// to staff whose submit would bounce.
@@ -67,7 +67,51 @@ func customerBackPath(p CustomerShowProps) string {
 	return CustomersRetailPath
 }
 
+// Wholesale status changes appear in three places — this page, and both the
+// inline and kebab layouts of the wholesale customer list. Sharing the copy
+// keeps them from drifting apart.
+
+func declineWholesaleConfirm() ActionConfirm {
+	return ActionConfirm{
+		Title: "Decline this wholesale application?",
+		Lead:  "Turns down the application. The person keeps their retail account and can still order at retail prices.",
+		Points: []string{
+			"They are not emailed a rejection — tell them yourself if they are expecting an answer.",
+			"You can approve them later if they reapply or you change your mind.",
+		},
+		Confirm: "Decline application",
+		Danger:  true,
+	}
+}
+
+func suspendWholesaleConfirm() ActionConfirm {
+	return ActionConfirm{
+		Title: "Suspend this wholesale account?",
+		Lead:  "Stops the account ordering at wholesale prices until you reactivate it.",
+		Points: []string{
+			"They lose access to the wholesale portal immediately.",
+			"Open orders and invoices are untouched — chase or cancel those separately.",
+			"They are not emailed about the suspension.",
+		},
+		Confirm: "Suspend account",
+		Danger:  true,
+	}
+}
+
+func reactivateWholesaleConfirm() ActionConfirm {
+	return ActionConfirm{
+		Title: "Reactivate this wholesale account?",
+		Lead:  "Restores wholesale pricing and portal access.",
+		Points: []string{
+			"The customer is emailed a new setup link straight away.",
+			"They go back on the price list they were on before.",
+		},
+		Confirm: "Reactivate and email",
+	}
+}
+
 templ CustomerShowContent(props CustomerShowProps) {
+	@ConfirmDialogHost()
 	<!-- Header -->
 	<div class="sm:flex sm:items-start sm:justify-between">
 		<div>
@@ -148,18 +192,39 @@ templ customerWholesaleBanner(props CustomerShowProps) {
 							<button type="submit" class="btn-confirm">Approve</button>
 						</form>
 						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", props.Customer.ID)) }>
-							<button type="submit" class="btn-danger" onclick="return confirm('Decline this application?')">Decline</button>
+							@ActionWrap("hint-wholesale-decline", "Turns down the wholesale application. The account stays as a retail customer.") {
+								<button
+									type="submit"
+									class="btn-danger"
+									aria-describedby="hint-wholesale-decline"
+									{ ConfirmAttrs(declineWholesaleConfirm())... }
+								>Decline</button>
+							}
 						</form>
 					</div>
 				}
 				if *props.Customer.WholesaleStatus == domain.WholesaleStatusApproved {
 					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", props.Customer.ID)) }>
-						<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
+						@ActionWrap("hint-wholesale-suspend", "Cuts off wholesale pricing and portal access until you reactivate the account.") {
+							<button
+								type="submit"
+								class="btn-danger"
+								aria-describedby="hint-wholesale-suspend"
+								{ ConfirmAttrs(suspendWholesaleConfirm())... }
+							>Suspend</button>
+						}
 					</form>
 				}
 				if *props.Customer.WholesaleStatus == domain.WholesaleStatusSuspended {
 					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", props.Customer.ID)) }>
-						<button type="submit" class="btn-confirm" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
+						@ActionWrap("hint-wholesale-reactivate", "Restores wholesale access and emails the customer a fresh setup link.") {
+							<button
+								type="submit"
+								class="btn-confirm"
+								aria-describedby="hint-wholesale-reactivate"
+								{ ConfirmAttrs(reactivateWholesaleConfirm())... }
+							>Reactivate</button>
+						}
 					</form>
 				}
 			</div>
@@ -288,7 +353,6 @@ templ customerContactCard(props CustomerShowProps) {
 							method="post"
 							action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/email", props.Customer.ID)) }
 							class="flex flex-wrap items-center gap-2"
-							onsubmit="return confirm('Change this customer’s sign-in address? They will use the new address to log in. Send them a verification link afterwards to confirm it works.')"
 						>
 							<input
 								type="email"
@@ -299,7 +363,23 @@ templ customerContactCard(props CustomerShowProps) {
 								autocomplete="off"
 								class="w-full min-w-0 flex-1 rounded-sm bg-rr-surface py-1.5 px-3 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
 							/>
-							<button type="submit" class="btn-confirm">Save</button>
+							@ActionWrap("hint-change-email", "Changes the address this customer signs in with. Send them a verification link afterwards.") {
+								<button
+									type="submit"
+									class="btn-confirm"
+									aria-describedby="hint-change-email"
+									{ ConfirmAttrs(ActionConfirm{
+										Title: "Change this customer's sign-in address?",
+										Lead:  "They will use the new address to log in from now on.",
+										Points: []string{
+											"Orders, subscriptions and history stay with the customer.",
+											"The new address is marked unverified — send a verification link afterwards to confirm it reaches them.",
+											"They are not told about the change automatically.",
+										},
+										Confirm: "Change address",
+									})... }
+								>Save</button>
+							}
 						</form>
 						<p class="mt-1 text-xs text-rr-muted">
 							Orders, subscriptions and history stay with the customer. The address is marked unverified until they follow a verification link.
@@ -368,7 +448,15 @@ templ customerSendMenu(props CustomerShowProps) {
 						type="submit"
 						role="menuitem"
 						class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised"
-						onclick="return confirm('Email this customer a link to confirm this address? Following it signs them in — no password change.')"
+						{ ConfirmAttrs(ActionConfirm{
+							Title: "Email a verification link?",
+							Lead:  "Sends the customer a link that confirms this is really their address.",
+							Points: []string{
+								"Following the link signs them in. It does not change their password.",
+								"The link goes to the address shown above — check it is right before sending.",
+							},
+							Confirm: "Send verification link",
+						})... }
 					>
 						Verification link
 					</button>
@@ -380,7 +468,14 @@ templ customerSendMenu(props CustomerShowProps) {
 						type="submit"
 						role="menuitem"
 						class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised"
-						onclick="return confirm('Email this customer a password setup link?')"
+						{ ConfirmAttrs(ActionConfirm{
+							Title: "Email a password setup link?",
+							Lead:  "This customer has no password yet. The link lets them choose one.",
+							Points: []string{
+								"The link goes to the address shown above.",
+							},
+							Confirm: "Send setup link",
+						})... }
 					>
 						Password setup link
 					</button>
@@ -389,7 +484,15 @@ templ customerSendMenu(props CustomerShowProps) {
 						type="submit"
 						role="menuitem"
 						class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised"
-						onclick="return confirm('Email this customer a password reset link? Their current password will keep working until they use the link.')"
+						{ ConfirmAttrs(ActionConfirm{
+							Title: "Email a password reset link?",
+							Lead:  "Sends the customer a link to set a new password.",
+							Points: []string{
+								"Their current password keeps working until they actually use the link.",
+								"The link goes to the address shown above.",
+							},
+							Confirm: "Send reset link",
+						})... }
 					>
 						Password reset link
 					</button>
@@ -401,7 +504,15 @@ templ customerSendMenu(props CustomerShowProps) {
 						type="submit"
 						role="menuitem"
 						class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised"
-						onclick="return confirm('Email this customer a white-label onboarding invite link?')"
+						{ ConfirmAttrs(ActionConfirm{
+							Title: "Email a white-label onboarding invite?",
+							Lead:  "Invites this wholesale account to set up their own private labels.",
+							Points: []string{
+								"The link goes to the address shown above.",
+								"Only send this to accounts you have agreed white-label terms with.",
+							},
+							Confirm: "Send invite",
+						})... }
 					>
 						White-label invite
 					</button>
@@ -426,7 +537,7 @@ templ customerSettingsCard(props CustomerShowProps) {
 					if props.Customer.TaxExempt {
 						Yes
 						if props.Customer.TaxExemptReason != nil {
-							<span class="text-rr-muted"> — { *props.Customer.TaxExemptReason }</span>
+							<span class="text-rr-muted">— { *props.Customer.TaxExemptReason }</span>
 						}
 					} else {
 						No

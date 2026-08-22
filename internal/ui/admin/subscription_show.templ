@@ -127,6 +127,7 @@ func planOptionLabel(p domain.SubscriptionPlan) string {
 }
 
 templ SubscriptionShowContent(props SubscriptionShowProps) {
+	@ConfirmDialogHost()
 	if props.Flash != "" {
 		@flashToast(props.Flash)
 	}
@@ -158,7 +159,7 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 		<div class="mt-6 border border-rr-border bg-rr-raised p-4">
 			<p class="text-sm text-rr-heading">
 				<span class="font-semibold">Cancelled</span>
-				<span class="text-rr-muted"> on { props.Subscription.CancelledAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM") }</span>
+				<span class="text-rr-muted">on { props.Subscription.CancelledAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM") }</span>
 			</p>
 		</div>
 	}
@@ -217,11 +218,23 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 										}
 									}
 								</select>
-								<button
-									type="submit"
-									class="border border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
-									onclick="return confirm('Change the size/grind on this subscription? If the new variant is a different price, the per-period charge will change — future renewals use the new variant and its current price. The current pending order (if any) is not updated by this action.')"
-								>Save</button>
+								@ActionWrap("hint-sub-variant", "Swaps what this subscription ships from the next renewal on. A different-priced variant changes what the customer pays.") {
+									<button
+										type="submit"
+										class="border border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
+										aria-describedby="hint-sub-variant"
+										{ ConfirmAttrs(ActionConfirm{
+											Title: "Change the size and grind on this subscription?",
+											Lead:  "Future renewals ship the new variant at its current price.",
+											Points: []string{
+												"If the new variant costs a different amount, the per-period charge changes with it.",
+												"The pending order, if there is one, is not updated — edit that order directly.",
+												"The customer is not emailed about the change.",
+											},
+											Confirm: "Change variant",
+										})... }
+									>Save</button>
+								}
 								<span class="text-xs text-rr-muted">Applies to future renewals only.</span>
 							</form>
 						} else {
@@ -264,11 +277,22 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 							}
 						}
 					</select>
-					<button
-						type="submit"
-						class="border border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
-						onclick="return confirm('Change this subscription to the selected plan? The current period and next order date will be recalculated to match the new cadence.')"
-					>Save</button>
+					@ActionWrap("hint-sub-plan", "Moves the subscription onto a different cadence. The next order date is recalculated to match.") {
+						<button
+							type="submit"
+							class="border border-rr-border bg-rr-raised px-2 py-1 text-xs font-medium text-rr-heading hover:bg-rr-border"
+							aria-describedby="hint-sub-plan"
+							{ ConfirmAttrs(ActionConfirm{
+								Title: "Move this subscription to the selected plan?",
+								Lead:  "Changes how often the customer is charged and shipped.",
+								Points: []string{
+									"The current period and the next order date are recalculated to match the new cadence — the next order may land sooner or later than it does now.",
+									"The customer is not emailed about the change.",
+								},
+								Confirm: "Change plan",
+							})... }
+						>Save</button>
+					}
 				</form>
 			}
 		</div>
@@ -429,13 +453,26 @@ templ subscriptionActions(props SubscriptionShowProps) {
 							action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/cancel", props.Subscription.ID.String())) }
 							class="ml-1 border-l border-rr-border pl-3"
 						>
-							<button
-								type="submit"
-								class="btn-danger"
-								onclick="return confirm('Cancel this subscription? This cannot be undone.')"
-							>
-								Cancel Subscription
-							</button>
+							@ActionWrap("hint-sub-cancel", "Ends the subscription for good. Pause it instead if the customer only wants a break.") {
+								<button
+									type="submit"
+									class="btn-danger"
+									aria-describedby="hint-sub-cancel"
+									{ ConfirmAttrs(ActionConfirm{
+										Title: "Cancel this subscription?",
+										Lead:  "Ends the subscription. No further orders are created and no further charges are taken.",
+										Points: []string{
+											"This cannot be undone — the customer has to resubscribe.",
+											"If they only want a break, use Pause instead.",
+											"Any order already placed is unaffected. Cancel or refund that separately.",
+										},
+										Confirm: "Cancel subscription",
+										Danger:  true,
+									})... }
+								>
+									Cancel Subscription
+								</button>
+							}
 						</form>
 					}
 				</div>

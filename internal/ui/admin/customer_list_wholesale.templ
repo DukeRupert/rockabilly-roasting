@@ -77,18 +77,18 @@ templ wholesaleRowActions(c domain.Customer) {
 					<button type="submit" class="btn-confirm">Approve</button>
 				</form>
 				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
-					<button type="submit" class="btn-danger" onclick="return confirm('Decline this application?')">Decline</button>
+					<button type="submit" class="btn-danger" { ConfirmAttrs(declineWholesaleConfirm())... }>Decline</button>
 				</form>
 			</div>
 		}
 		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
-				<button type="submit" class="btn-danger" onclick="return confirm('Suspend this wholesale account?')">Suspend</button>
+				<button type="submit" class="btn-danger" { ConfirmAttrs(suspendWholesaleConfirm())... }>Suspend</button>
 			</form>
 		}
 		if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
-				<button type="submit" class="btn-confirm" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')">Reactivate</button>
+				<button type="submit" class="btn-confirm" { ConfirmAttrs(reactivateWholesaleConfirm())... }>Reactivate</button>
 			</form>
 		}
 		<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } class="text-rr-red hover:text-rr-red-lt">
@@ -127,17 +127,17 @@ templ wholesaleRowActions(c domain.Customer) {
 					<button type="submit" role="menuitem" class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised">Approve</button>
 				</form>
 				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", c.ID)) }>
-					<button type="submit" role="menuitem" onclick="return confirm('Decline this application?')" class="block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised">Decline</button>
+					<button type="submit" role="menuitem" class="block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised" { ConfirmAttrs(declineWholesaleConfirm())... }>Decline</button>
 				</form>
 			}
 			if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusApproved {
 				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", c.ID)) }>
-					<button type="submit" role="menuitem" onclick="return confirm('Suspend this wholesale account?')" class="block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised">Suspend</button>
+					<button type="submit" role="menuitem" class="block w-full px-3 py-2 text-left text-sm text-rr-red hover:bg-rr-raised" { ConfirmAttrs(suspendWholesaleConfirm())... }>Suspend</button>
 				</form>
 			}
 			if c.WholesaleStatus != nil && *c.WholesaleStatus == domain.WholesaleStatusSuspended {
 				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", c.ID)) }>
-					<button type="submit" role="menuitem" onclick="return confirm('Reactivate this wholesale account? A new setup email will be sent.')" class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised">Reactivate</button>
+					<button type="submit" role="menuitem" class="block w-full px-3 py-2 text-left text-sm text-rr-heading hover:bg-rr-raised" { ConfirmAttrs(reactivateWholesaleConfirm())... }>Reactivate</button>
 				</form>
 			}
 			<a href={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s", c.ID)) } role="menuitem" class="block px-3 py-2 text-sm text-rr-heading hover:bg-rr-raised">

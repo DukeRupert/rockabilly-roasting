@@ -2,12 +2,12 @@ package admin
 
 import (
 	"fmt"
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+	"github.com/google/uuid"
 	"strconv"
 	"strings"
 	"time"
-	"github.com/google/uuid"
-	"github.com/dukerupert/hiri/internal/domain"
-	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
 // QBConnectionStatus holds the QuickBooks connection state for the settings page.
@@ -36,15 +36,15 @@ type ShippingSettings struct {
 	LocalDeliveryWeekdays []time.Weekday
 	LocalDeliveryCutoff   string
 	OriginName            string
-	OriginStreet1           string
-	OriginStreet2           string
-	OriginCity              string
-	OriginState             string
-	OriginZip               string
-	OriginCountry           string
-	OriginEmail             string
-	OriginPhone             string
-	TareWeightOz            float64
+	OriginStreet1         string
+	OriginStreet2         string
+	OriginCity            string
+	OriginState           string
+	OriginZip             string
+	OriginCountry         string
+	OriginEmail           string
+	OriginPhone           string
+	TareWeightOz          float64
 }
 
 // formatTareOz renders the tare weight as a number input value. Trailing
@@ -151,6 +151,7 @@ func refreshTokenUrgencyClasses(days int) string {
 }
 
 templ SettingsContent(props SettingsProps) {
+	@ConfirmDialogHost()
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">Settings</h1>
@@ -577,7 +578,17 @@ templ SettingsContent(props SettingsProps) {
 								<button
 									type="submit"
 									class="btn-danger"
-									onclick="return confirm('Disconnect QuickBooks? This will stop all automated B2B invoicing until you reconnect.')"
+									{ ConfirmAttrs(ActionConfirm{
+										Title: "Disconnect QuickBooks?",
+										Lead:  "Drops the connection between Hiri and your QuickBooks company.",
+										Points: []string{
+											"All automated B2B invoicing stops until you reconnect.",
+											"Invoices already in QuickBooks stay there — nothing is deleted on their side.",
+											"Reconnecting means going through the QuickBooks authorisation again.",
+										},
+										Confirm: "Disconnect",
+										Danger:  true,
+									})... }
 								>
 									Disconnect
 								</button>

@@ -32,18 +32,18 @@ type SiblingVariant struct {
 }
 
 type OrderShowProps struct {
-	Order               *domain.Order
-	LineItems           []EnrichedLineItem
-	Adjustments         []domain.Adjustment
-	Customer            *domain.Customer
-	ShippingAddress     *domain.Address
-	Shipments           []domain.Shipment
-	LatestLabelAttempt  *domain.LabelAttempt
-	Flash               string
-	MerchantTZ          *time.Location
-	StaffName           string
-	StaffRole           string
-	CanEditLineItems    bool
+	Order              *domain.Order
+	LineItems          []EnrichedLineItem
+	Adjustments        []domain.Adjustment
+	Customer           *domain.Customer
+	ShippingAddress    *domain.Address
+	Shipments          []domain.Shipment
+	LatestLabelAttempt *domain.LabelAttempt
+	Flash              string
+	MerchantTZ         *time.Location
+	StaffName          string
+	StaffRole          string
+	CanEditLineItems   bool
 	// AccountPastDue flags a customer with invoices past terms — staff hold
 	// new fulfillment for the account until the balance clears.
 	AccountPastDue bool
@@ -352,15 +352,31 @@ templ shippingMethodSwap(orderID uuid.UUID, current domain.ShippingMethod) {
 }
 
 // convertToShippedForm flips a local order onto the carrier "shipped" channel
-// so staff can buy a label. One-way and comped — the confirm spells that out.
+// so staff can buy a label. One-way and comped — the dialog spells that out.
 templ convertToShippedForm(orderID uuid.UUID) {
-	<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/shipping-method", orderID.String())) } class="inline">
+	<form
+		method="post"
+		action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/shipping-method", orderID.String())) }
+		class="inline"
+	>
 		<input type="hidden" name="method" value="shipped"/>
-		<button
-			type="submit"
-			class="btn-secondary text-xs"
-			onclick="return confirm('Convert this order to a mail-out? Shipping is comped (no extra charge), and you can then buy a shipping label. The customer is not notified.')"
-		>Convert to mail-out</button>
+		@ActionWrap("hint-convert-mailout", "Moves this order onto the carrier channel so you can buy a label. Shipping stays comped and the customer is not notified.") {
+			<button
+				type="submit"
+				class="btn-secondary text-xs"
+				aria-describedby="hint-convert-mailout"
+				{ ConfirmAttrs(ActionConfirm{
+					Title: "Convert this order to a mail-out?",
+					Lead:  "Moves the order off local delivery or pickup and onto the carrier channel so you can buy a shipping label.",
+					Points: []string{
+						"Shipping stays comped — the customer is not charged extra.",
+						"The customer is not notified of the change.",
+						"Switch it back from the shipping method controls if you change your mind.",
+					},
+					Confirm: "Convert to mail-out",
+				})... }
+			>Convert to mail-out</button>
+		}
 	</form>
 }
 
@@ -552,44 +568,53 @@ templ OrderShowContent(props OrderShowProps) {
 			aria-hidden="true"
 		></div>
 	}
-	<!-- Guided actions -->
-	<div class="mt-6 flex flex-wrap gap-3">
+	<!-- Guided actions. Every button carries an action hint explaining what it
+	     does before it is clicked; the consequential ones route their submit
+	     through ConfirmDialogHost instead of window.confirm(). -->
+	@ConfirmDialogHost()
+	<div class="action-row mt-6 flex flex-wrap gap-3">
 		if canFulfillOrder(props.Order) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/fulfill", props.Order.ID.String())) }>
-				<button
-					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
-				>
-					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"></path>
-					</svg>
-					Fulfill Order
-				</button>
+				@ActionWrap("hint-fulfill", "Records the order as picked and packed and moves it to processing. No email is sent to the customer.") {
+					<button
+						type="submit"
+						aria-describedby="hint-fulfill"
+						class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+					>
+						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z"></path>
+						</svg>
+						Fulfill Order
+					</button>
+				}
 			</form>
 		}
 		if canBuyLabel(props.Order, props.Shipments, props.LatestLabelAttempt) {
 			<div class="w-full">
-				<button
-					type="button"
-					hx-get={ fmt.Sprintf("/admin/orders/%s/rates", props.Order.ID.String()) }
-					hx-target="#label-rates-panel"
-					hx-swap="innerHTML"
-					hx-disabled-elt="this"
-					class="async-btn inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt disabled:opacity-70 disabled:cursor-wait"
-				>
-					<svg class="async-btn-icon size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z"></path>
-					</svg>
-					<svg class="async-btn-spinner size-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-						<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
-						<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-					</svg>
-					if props.LatestLabelAttempt != nil && props.LatestLabelAttempt.Status == domain.LabelAttemptStatusFailed {
-						Get shipping rates (retry)
-					} else {
-						Get shipping rates
-					}
-				</button>
+				@ActionWrap("hint-rates", "Asks Shippo for live rates for this order's box and address. Nothing is bought until you pick a rate.") {
+					<button
+						type="button"
+						aria-describedby="hint-rates"
+						hx-get={ fmt.Sprintf("/admin/orders/%s/rates", props.Order.ID.String()) }
+						hx-target="#label-rates-panel"
+						hx-swap="innerHTML"
+						hx-disabled-elt="this"
+						class="async-btn inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt disabled:opacity-70 disabled:cursor-wait"
+					>
+						<svg class="async-btn-icon size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z"></path>
+						</svg>
+						<svg class="async-btn-spinner size-4" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+							<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+						</svg>
+						if props.LatestLabelAttempt != nil && props.LatestLabelAttempt.Status == domain.LabelAttemptStatusFailed {
+							Get shipping rates (retry)
+						} else {
+							Get shipping rates
+						}
+					</button>
+				}
 				<div id="label-rates-panel"></div>
 			</div>
 		}
@@ -605,28 +630,46 @@ templ OrderShowContent(props OrderShowProps) {
 						}
 					</div>
 					<div class="flex flex-wrap items-center gap-2">
-						<a
-							href={ templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/label", sh.ID.String())) }
-							target="_blank"
-							class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
-						>
-							<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
-							</svg>
-							Download label
-						</a>
+						@ActionWrap("hint-download-label", "Opens the purchased label PDF in a new tab for printing.") {
+							<a
+								href={ templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/label", sh.ID.String())) }
+								target="_blank"
+								aria-describedby="hint-download-label"
+								class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
+							>
+								<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+									<path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
+								</svg>
+								Download label
+							</a>
+						}
 						if sh.CanRequestRefund() {
-							<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/refund", sh.ID.String())) }>
-								<button
-									type="submit"
-									class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
-									onclick="return confirm('Request a carrier refund for this label? Only unused labels are eligible — a used or scanned label will be rejected.')"
-								>
-									<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-										<path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"></path>
-									</svg>
-									Request refund
-								</button>
+							<form
+								method="post"
+								action={ templ.SafeURL(fmt.Sprintf("/admin/shipments/%s/refund", sh.ID.String())) }
+							>
+								@ActionWrap("hint-label-refund", "Asks the carrier to refund the postage for this label. Unused labels only — it does not refund the customer's order.") {
+									<button
+										{ ConfirmAttrs(ActionConfirm{
+										Title: "Request a carrier refund for this label?",
+										Lead:  "Asks the carrier to refund what you paid for this label. This refunds the postage only — it does not refund the customer's order.",
+										Points: []string{
+											"Only unused labels are eligible. A label that has been used or scanned will be rejected.",
+											"The carrier decides, and can take several days to answer.",
+											"The shipment stays on the order either way.",
+										},
+										Confirm: "Request refund",
+									})... }
+										type="submit"
+										aria-describedby="hint-label-refund"
+										class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
+									>
+										<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+											<path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"></path>
+										</svg>
+										Request refund
+									</button>
+								}
 							</form>
 						}
 					</div>
@@ -645,113 +688,204 @@ templ OrderShowContent(props OrderShowProps) {
 		}
 		if canShipOrder(props.Order) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/ship", props.Order.ID.String())) }>
-				<button
-					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
-				>
-					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"></path>
-					</svg>
-					Mark Shipped
-				</button>
+				@ActionWrap("hint-ship", "Marks the order shipped and closes it as complete. Hiri sends no shipped email — the customer is not given tracking.") {
+					<button
+						type="submit"
+						aria-describedby="hint-ship"
+						class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+					>
+						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"></path>
+						</svg>
+						Mark Shipped
+					</button>
+				}
 			</form>
 		}
 		if canMarkReadyForPickup(props.Order) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/ready-for-pickup", props.Order.ID.String())) }>
-				<button
-					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
-				>
-					Mark Ready for Pickup
-				</button>
+				@ActionWrap("hint-ready-pickup", "Emails the customer that their order is ready to collect at the shop.") {
+					<button
+						type="submit"
+						aria-describedby="hint-ready-pickup"
+						class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+					>
+						Mark Ready for Pickup
+					</button>
+				}
 			</form>
 		}
 		if canMarkPickedUp(props.Order) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/picked-up", props.Order.ID.String())) }>
-				<button
-					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
-				>
-					Mark Picked Up
-				</button>
+				@ActionWrap("hint-picked-up", "Closes the order as collected. No email is sent to the customer.") {
+					<button
+						type="submit"
+						aria-describedby="hint-picked-up"
+						class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+					>
+						Mark Picked Up
+					</button>
+				}
 			</form>
 		}
 		if canMarkOutForDelivery(props.Order) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/out-for-delivery", props.Order.ID.String())) }>
-				<button
-					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
-				>
-					Out for Local Delivery
-				</button>
+				@ActionWrap("hint-out-for-delivery", "Emails the customer that their order is on the van today.") {
+					<button
+						type="submit"
+						aria-describedby="hint-out-for-delivery"
+						class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+					>
+						Out for Local Delivery
+					</button>
+				}
 			</form>
 		}
 		if canRevertFulfillment(props.Order) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-fulfillment", props.Order.ID.String())) }>
-				<button
-					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
-					onclick="return confirm('Revert this order back to unfulfilled? Use only if it was marked fulfilled by mistake.')"
-				>
-					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"></path>
-					</svg>
-					Revert Fulfillment
-				</button>
+			<form
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-fulfillment", props.Order.ID.String())) }
+			>
+				@ActionWrap("hint-revert-fulfillment", "Puts the order back in the fulfillment queue. Use only if it was marked fulfilled by mistake.") {
+					<button
+						{ ConfirmAttrs(ActionConfirm{
+						Title: "Revert this order to unfulfilled?",
+						Lead:  "Puts the order back in the fulfillment queue. Use this only if it was marked fulfilled by mistake.",
+						Points: []string{
+							"The order moves from processing back to confirmed.",
+							"Payment status is left untouched.",
+							"The customer is not emailed.",
+						},
+						Confirm: "Revert fulfillment",
+					})... }
+						type="submit"
+						aria-describedby="hint-revert-fulfillment"
+						class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
+					>
+						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"></path>
+						</svg>
+						Revert Fulfillment
+					</button>
+				}
 			</form>
 		}
 		if canRevertShipment(props.Order) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-shipment", props.Order.ID.String())) }>
-				<button
-					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
-					onclick="return confirm('Revert shipped status back to fulfilled? The shipping label and customer email will NOT be undone — handle that manually.')"
-				>
-					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"></path>
-					</svg>
-					Revert Shipment
-				</button>
+			<form
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/revert-shipment", props.Order.ID.String())) }
+			>
+				@ActionWrap("hint-revert-shipment", "Moves the order back to fulfilled. Any label already bought stays bought — handle that separately.") {
+					<button
+						{ ConfirmAttrs(ActionConfirm{
+						Title: "Revert shipped status back to fulfilled?",
+						Lead:  "Moves the order out of shipped and back into fulfilled.",
+						Points: []string{
+							"Any shipping label already bought stays bought — void or refund it separately from the shipment above.",
+							"The customer is not emailed, either now or when the order was marked shipped.",
+						},
+						Confirm: "Revert shipment",
+					})... }
+						type="submit"
+						aria-describedby="hint-revert-shipment"
+						class="inline-flex items-center gap-1.5 rounded-sm bg-rr-surface px-4 py-2.5 text-sm font-semibold text-rr-heading border border-rr-border hover:bg-rr-raised"
+					>
+						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"></path>
+						</svg>
+						Revert Shipment
+					</button>
+				}
 			</form>
 		}
 		if canMarkOrderPaid(props.Order) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/mark-paid", props.Order.ID.String())) } class="inline-flex items-center gap-3">
-				<label class="inline-flex items-center gap-1.5 text-sm text-rr-body">
-					<input type="checkbox" name="send_email" class="size-4 rounded-sm border-rr-border text-rr-red focus:ring-rr-red"/>
-					Email the customer a payment confirmation
-				</label>
-				<button
-					type="submit"
-					class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
-					onclick="return confirm('Mark this order as paid? Only do this after confirming the wholesale payment cleared.')"
-				>
-					<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-						<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
-					</svg>
-					Mark as Paid
-				</button>
+			<form
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/mark-paid", props.Order.ID.String())) }
+				class="inline-flex items-center gap-3"
+			>
+				@ActionWrap("hint-mark-paid-email", "Leave unticked to record the payment quietly, without mailing the customer.") {
+					<label class="inline-flex items-center gap-1.5 text-sm text-rr-body" aria-describedby="hint-mark-paid-email">
+						<input type="checkbox" name="send_email" class="size-4 rounded-sm border-rr-border text-rr-red focus:ring-rr-red"/>
+						Email the customer a payment confirmation
+					</label>
+				}
+				@ActionWrap("hint-mark-paid", "Records payment received outside Stripe. No money moves — do this only after the payment has cleared.") {
+					<button
+						{ ConfirmAttrs(ActionConfirm{
+						Title: "Mark this order as paid?",
+						Lead:  fmt.Sprintf("Records %s as received. Do this only after you have confirmed the payment actually cleared.", formatCents(props.Order.Total)),
+						Points: []string{
+							"No money moves — this records a payment taken outside Stripe.",
+							"The customer is emailed a confirmation only if you ticked the box.",
+						},
+						Confirm: "Mark as paid",
+					})... }
+						type="submit"
+						aria-describedby="hint-mark-paid"
+						class="inline-flex items-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+					>
+						<svg class="size-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+						</svg>
+						Mark as Paid
+					</button>
+				}
 			</form>
 		}
 		if canCancelOrder(props.Order.Status) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/cancel", props.Order.ID.String())) }>
-				<button
-					type="submit"
-					class="btn-danger"
-					onclick="return confirm('Are you sure you want to cancel this order?')"
-				>
-					Cancel Order
-				</button>
+			<form
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/cancel", props.Order.ID.String())) }
+			>
+				@ActionWrap("hint-cancel", "Closes the order as cancelled. It does not refund any payment and does not email the customer.") {
+					<button
+						type="submit"
+						class="btn-danger"
+						aria-describedby="hint-cancel"
+						{ ConfirmAttrs(ActionConfirm{
+						Title: "Cancel this order?",
+						Lead:  "Closes the order as cancelled so it drops out of the fulfillment queue.",
+						Points: []string{
+							"No money is refunded. If the order was paid, refund it separately.",
+							"The customer is not emailed.",
+							"Any coupon used on the order is released so the code can be used again.",
+						},
+						Confirm: "Cancel order",
+						Danger:  true,
+					})... }
+					>
+						Cancel Order
+					</button>
+				}
 			</form>
 		}
 		if canRefundOrder(props.Order.Status, props.Order.PaymentStatus) {
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/refund", props.Order.ID.String())) }>
-				<button
-					type="submit"
-					class="btn-danger"
-					onclick="return confirm('Are you sure you want to refund this order?')"
-				>
-					Refund Order
-				</button>
+			<form
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/refund", props.Order.ID.String())) }
+			>
+				@ActionWrap("hint-refund", fmt.Sprintf("Refunds the full %s to the customer's card through Stripe. Cannot be undone from Hiri.", formatCents(props.Order.Total))) {
+					<button
+						type="submit"
+						class="btn-danger"
+						aria-describedby="hint-refund"
+						{ ConfirmAttrs(ActionConfirm{
+						Title: fmt.Sprintf("Refund %s to the customer?", formatCents(props.Order.Total)),
+						Lead:  fmt.Sprintf("Sends the full %s back to the card through Stripe, then marks the order refunded.", formatCents(props.Order.Total)),
+						Points: []string{
+							"The whole order total is refunded. There is no partial refund here — issue those in Stripe.",
+							"This cannot be undone from Hiri.",
+							"Stripe may email the customer its own receipt; Hiri does not.",
+							"Refunding does not cancel the order or stop fulfillment — cancel it separately if the coffee has not gone out.",
+						},
+						Confirm: fmt.Sprintf("Refund %s", formatCents(props.Order.Total)),
+						Danger:  true,
+					})... }
+					>
+						Refund Order
+					</button>
+				}
 			</form>
 		}
 	</div>

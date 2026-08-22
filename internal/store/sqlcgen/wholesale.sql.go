@@ -15,7 +15,7 @@ const approveWholesaleCustomer = `-- name: ApproveWholesaleCustomer :one
 UPDATE customers
 SET wholesale_status = 'approved', approved_at = now(), approved_by = $2, updated_at = now()
 WHERE id = $1 AND account_type = 'wholesale'
-RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method, qb_customer_id, qb_synced_at, payment_terms_days, billing_method, preferred_local_fulfillment, price_list_id, order_reminders_enabled
+RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method, qb_customer_id, qb_synced_at, payment_terms_days, billing_method, preferred_local_fulfillment, price_list_id, order_reminders_enabled, announcements_enabled
 `
 
 type ApproveWholesaleCustomerParams struct {
@@ -56,6 +56,7 @@ func (q *Queries) ApproveWholesaleCustomer(ctx context.Context, arg ApproveWhole
 		&i.PreferredLocalFulfillment,
 		&i.PriceListID,
 		&i.OrderRemindersEnabled,
+		&i.AnnouncementsEnabled,
 	)
 	return i, err
 }
@@ -76,7 +77,7 @@ const createWholesaleCustomer = `-- name: CreateWholesaleCustomer :one
 INSERT INTO customers (id, email, password_hash, first_name, last_name, phone,
                        account_type, wholesale_status, company_name, website)
 VALUES ($1, $2, $3, $4, $5, $6, 'wholesale', 'pending', $7, $8)
-RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method, qb_customer_id, qb_synced_at, payment_terms_days, billing_method, preferred_local_fulfillment, price_list_id, order_reminders_enabled
+RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method, qb_customer_id, qb_synced_at, payment_terms_days, billing_method, preferred_local_fulfillment, price_list_id, order_reminders_enabled, announcements_enabled
 `
 
 type CreateWholesaleCustomerParams struct {
@@ -132,12 +133,13 @@ func (q *Queries) CreateWholesaleCustomer(ctx context.Context, arg CreateWholesa
 		&i.PreferredLocalFulfillment,
 		&i.PriceListID,
 		&i.OrderRemindersEnabled,
+		&i.AnnouncementsEnabled,
 	)
 	return i, err
 }
 
 const listWholesaleByStatus = `-- name: ListWholesaleByStatus :many
-SELECT id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method, qb_customer_id, qb_synced_at, payment_terms_days, billing_method, preferred_local_fulfillment, price_list_id, order_reminders_enabled FROM customers
+SELECT id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method, qb_customer_id, qb_synced_at, payment_terms_days, billing_method, preferred_local_fulfillment, price_list_id, order_reminders_enabled, announcements_enabled FROM customers
 WHERE account_type = 'wholesale' AND wholesale_status = $1
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -188,6 +190,7 @@ func (q *Queries) ListWholesaleByStatus(ctx context.Context, arg ListWholesaleBy
 			&i.PreferredLocalFulfillment,
 			&i.PriceListID,
 			&i.OrderRemindersEnabled,
+			&i.AnnouncementsEnabled,
 		); err != nil {
 			return nil, err
 		}
@@ -203,7 +206,7 @@ const suspendWholesaleCustomer = `-- name: SuspendWholesaleCustomer :one
 UPDATE customers
 SET wholesale_status = 'suspended', updated_at = now()
 WHERE id = $1 AND account_type = 'wholesale'
-RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method, qb_customer_id, qb_synced_at, payment_terms_days, billing_method, preferred_local_fulfillment, price_list_id, order_reminders_enabled
+RETURNING id, email, email_verified, password_hash, first_name, last_name, phone, tax_exempt, tax_exempt_reason, metadata, created_at, updated_at, stripe_customer_id, account_type, wholesale_status, company_name, website, wholesale_notes, approved_at, approved_by, two_fa_enabled, two_fa_method, qb_customer_id, qb_synced_at, payment_terms_days, billing_method, preferred_local_fulfillment, price_list_id, order_reminders_enabled, announcements_enabled
 `
 
 func (q *Queries) SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (Customer, error) {
@@ -239,6 +242,7 @@ func (q *Queries) SuspendWholesaleCustomer(ctx context.Context, id uuid.UUID) (C
 		&i.PreferredLocalFulfillment,
 		&i.PriceListID,
 		&i.OrderRemindersEnabled,
+		&i.AnnouncementsEnabled,
 	)
 	return i, err
 }

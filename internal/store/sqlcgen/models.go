@@ -84,6 +84,21 @@ type Adjustment struct {
 	SourceID   uuid.UUID  `json:"source_id"`
 }
 
+type Announcement struct {
+	ID             uuid.UUID          `json:"id"`
+	Subject        string             `json:"subject"`
+	Body           string             `json:"body"`
+	Audience       string             `json:"audience"`
+	Status         string             `json:"status"`
+	ScheduledAt    time.Time          `json:"scheduled_at"`
+	SentAt         pgtype.Timestamptz `json:"sent_at"`
+	RecipientCount *int32             `json:"recipient_count"`
+	CreatedBy      *uuid.UUID         `json:"created_by"`
+	CreatedByName  string             `json:"created_by_name"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+}
+
 type AttributeKey struct {
 	ID             uuid.UUID          `json:"id"`
 	AttributeSetID uuid.UUID          `json:"attribute_set_id"`
@@ -196,6 +211,7 @@ type Customer struct {
 	PreferredLocalFulfillment *string            `json:"preferred_local_fulfillment"`
 	PriceListID               *uuid.UUID         `json:"price_list_id"`
 	OrderRemindersEnabled     bool               `json:"order_reminders_enabled"`
+	AnnouncementsEnabled      bool               `json:"announcements_enabled"`
 }
 
 type CustomerUser struct {
@@ -210,6 +226,7 @@ type CustomerUser struct {
 	LastLoginAt           pgtype.Timestamptz `json:"last_login_at"`
 	CreatedAt             time.Time          `json:"created_at"`
 	UpdatedAt             time.Time          `json:"updated_at"`
+	AnnouncementsEnabled  bool               `json:"announcements_enabled"`
 }
 
 type CustomerUserInviteToken struct {

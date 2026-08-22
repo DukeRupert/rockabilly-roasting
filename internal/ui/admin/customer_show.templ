@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -32,6 +33,10 @@ type CustomerShowProps struct {
 	MerchantTZ           *time.Location
 	StaffName            string
 	StaffRole            string
+	// ApprovedByName is the staff member who approved the wholesale
+	// application, resolved from Customer.ApprovedBy. Empty when the account
+	// was never approved, or when that staff record no longer exists.
+	ApprovedByName string
 	// CanEditEmail gates the inline email editor. The route is gated
 	// independently on customers:write; this only keeps the form from showing
 	// to staff whose submit would bounce.
@@ -178,32 +183,65 @@ templ CustomerShowContent(props CustomerShowProps) {
 	</div>
 }
 
+// safeWebsiteURL turns the free-text website from a wholesale application into
+// a link target, or returns "" when it cannot be made safe.
+//
+// This value is typed by the public applicant and reaches templ.SafeURL, which
+// bypasses templ's own sanitizer — so the scheme allow-list here is the only
+// thing standing between an applicant and a javascript: or data: URL on a
+// staff page. Anything without a scheme is assumed https, which is what people
+// mean when they type "example.com".
+func safeWebsiteURL(raw string) string {
+	v := strings.TrimSpace(raw)
+	if v == "" {
+		return ""
+	}
+	if strings.Contains(v, "://") {
+		lower := strings.ToLower(v)
+		if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") {
+			return v
+		}
+		return ""
+	}
+	// A bare "javascript:alert(1)" has a colon but no "://".
+	if i := strings.IndexByte(v, ':'); i >= 0 && !strings.Contains(v[:i], ".") {
+		return ""
+	}
+	return "https://" + v
+}
+
+// wholesaleApplicationRow is one label/value line in the application block.
+templ wholesaleApplicationRow(label string) {
+	<div>
+		<dt class="text-xs text-rr-muted">{ label }</dt>
+		<dd class="mt-0.5 text-sm text-rr-heading">{ children... }</dd>
+	</div>
+}
+
+// customerWholesaleBanner is the wholesale application: what they told us, who
+// ruled on it, and the buttons to rule on it.
+//
+// It used to show the status badge and the Approve/Decline buttons and nothing
+// else — staff were asked to approve an account with none of the application
+// in front of them. Website was collected on the public form and displayed
+// nowhere; approved_at/approved_by were recorded and displayed nowhere; and
+// wholesale_notes (the decline reason) had a complete backend with no UI at
+// either end, so it was always written empty and never read back.
 templ customerWholesaleBanner(props CustomerShowProps) {
+	{{ status := *props.Customer.WholesaleStatus }}
 	<div class="mt-4 border border-rr-border bg-rr-surface p-4">
 		<div class="sm:flex sm:items-center sm:justify-between">
 			<div class="flex items-center gap-3">
 				<h2 class="text-sm font-medium text-rr-heading">Wholesale application</h2>
-				@WholesaleStatusBadge(*props.Customer.WholesaleStatus)
+				@WholesaleStatusBadge(status)
 			</div>
 			<div class="mt-3 sm:mt-0">
-				if *props.Customer.WholesaleStatus == domain.WholesaleStatusPending {
-					<div class="flex gap-2">
-						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", props.Customer.ID)) }>
-							<button type="submit" class="btn-confirm">Approve</button>
-						</form>
-						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", props.Customer.ID)) }>
-							@ActionWrap("hint-wholesale-decline", "Turns down the wholesale application. The account stays as a retail customer.") {
-								<button
-									type="submit"
-									class="btn-danger"
-									aria-describedby="hint-wholesale-decline"
-									{ ConfirmAttrs(declineWholesaleConfirm())... }
-								>Decline</button>
-							}
-						</form>
-					</div>
+				if status == domain.WholesaleStatusPending {
+					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/approve", props.Customer.ID)) }>
+						<button type="submit" class="btn-confirm">Approve</button>
+					</form>
 				}
-				if *props.Customer.WholesaleStatus == domain.WholesaleStatusApproved {
+				if status == domain.WholesaleStatusApproved {
 					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/suspend", props.Customer.ID)) }>
 						@ActionWrap("hint-wholesale-suspend", "Cuts off wholesale pricing and portal access until you reactivate the account.") {
 							<button
@@ -215,7 +253,7 @@ templ customerWholesaleBanner(props CustomerShowProps) {
 						}
 					</form>
 				}
-				if *props.Customer.WholesaleStatus == domain.WholesaleStatusSuspended {
+				if status == domain.WholesaleStatusSuspended {
 					<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/reactivate", props.Customer.ID)) }>
 						@ActionWrap("hint-wholesale-reactivate", "Restores wholesale access and emails the customer a fresh setup link.") {
 							<button
@@ -229,6 +267,82 @@ templ customerWholesaleBanner(props CustomerShowProps) {
 				}
 			</div>
 		</div>
+		<!-- What they actually told us on the application form. -->
+		<dl class="mt-4 grid grid-cols-2 gap-4 border-t border-rr-border pt-3 sm:grid-cols-4">
+			if props.Customer.CompanyName != nil && *props.Customer.CompanyName != "" {
+				@wholesaleApplicationRow("Company") {
+					{ *props.Customer.CompanyName }
+				}
+			}
+			if props.Customer.Website != nil && *props.Customer.Website != "" {
+				@wholesaleApplicationRow("Website") {
+					if href := safeWebsiteURL(*props.Customer.Website); href != "" {
+						<a
+							href={ templ.SafeURL(href) }
+							target="_blank"
+							rel="noopener noreferrer"
+							class="break-all text-rr-red hover:text-rr-red-lt"
+						>{ *props.Customer.Website }</a>
+					} else {
+						<span class="break-all">{ *props.Customer.Website }</span>
+					}
+				}
+			}
+			if props.Customer.Phone != nil && *props.Customer.Phone != "" {
+				@wholesaleApplicationRow("Phone") {
+					<a href={ templ.SafeURL("tel:" + *props.Customer.Phone) } class="hover:text-rr-red">{ *props.Customer.Phone }</a>
+				}
+			}
+			@wholesaleApplicationRow("Applied") {
+				{ props.Customer.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }
+			}
+			if status == domain.WholesaleStatusApproved && props.Customer.ApprovedAt != nil {
+				@wholesaleApplicationRow("Approved") {
+					{ props.Customer.ApprovedAt.In(props.MerchantTZ).Format("January 2, 2006") }
+					if props.ApprovedByName != "" {
+						<span class="text-rr-muted">by { props.ApprovedByName }</span>
+					}
+				}
+			}
+		</dl>
+		<!-- The decline reason: captured here, read back below. The service has
+		     always written it; nothing ever sent it or showed it. -->
+		if status == domain.WholesaleStatusDeclined {
+			<div class="mt-3 border-t border-rr-border pt-3">
+				<p class="text-xs text-rr-muted">Decline reason</p>
+				if props.Customer.WholesaleNotes != nil && *props.Customer.WholesaleNotes != "" {
+					<p class="mt-0.5 whitespace-pre-line text-sm text-rr-heading">{ *props.Customer.WholesaleNotes }</p>
+				} else {
+					<p class="mt-0.5 text-sm text-rr-muted">None recorded.</p>
+				}
+			</div>
+		}
+		if status == domain.WholesaleStatusPending {
+			<form
+				method="post"
+				action={ templ.SafeURL(fmt.Sprintf("/admin/wholesale/%s/decline", props.Customer.ID)) }
+				class="mt-3 flex flex-col gap-2 border-t border-rr-border pt-3"
+			>
+				<label for="wholesale-decline-notes" class="text-xs text-rr-muted">
+					Decline reason &mdash; recorded on the account, not emailed to the applicant
+				</label>
+				<textarea
+					id="wholesale-decline-notes"
+					name="notes"
+					rows="2"
+					class="w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none sm:max-w-lg"
+					placeholder="Why this application was turned down."
+				></textarea>
+				@ActionWrap("hint-wholesale-decline", "Turns down the wholesale application. The account stays as a retail customer, and your reason is saved here.") {
+					<button
+						type="submit"
+						class="btn-danger self-start"
+						aria-describedby="hint-wholesale-decline"
+						{ ConfirmAttrs(declineWholesaleConfirm())... }
+					>Decline</button>
+				}
+			</form>
+		}
 	</div>
 }
 

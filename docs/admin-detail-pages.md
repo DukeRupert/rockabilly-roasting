@@ -167,13 +167,25 @@ Every hit is a judgement call, not automatically a bug — some fields are genui
 bookkeeping (`Order.OverdueReminderStage` is a dedup ledger and belongs nowhere). But as of
 this writing the scan finds:
 
-- **`Customer.Website`** — collected on the wholesale application form, stored, and shown to
-  staff *nowhere*, including on the screen where they approve or decline the application.
-- **`Customer.WholesaleNotes`** — same.
-- **`Customer.ApprovedAt` / `ApprovedBy`** — who approved this account and when, invisible.
 - **`Customer.TwoFAEnabled`** — support cannot see whether 2FA is on when someone is locked out.
 - **`Subscription.EndsAt`** — when a subscription is scheduled to end.
 - **`Invoice.VoidedAt`**.
+
+The scan also caught the wholesale application fields — `Website`, `WholesaleNotes`,
+`ApprovedAt`/`ApprovedBy` — which have since been fixed. That case is worth keeping as the
+worked example, because the three fields had failed in three *different* ways and only one
+of them matched the `InternalNote` shape:
+
+| Field | What was actually wrong |
+| --- | --- |
+| `Website` | Collected on the public form, stored, rendered nowhere. The `InternalNote` shape. |
+| `ApprovedAt` / `ApprovedBy` | Written correctly on approval, rendered nowhere. |
+| `WholesaleNotes` | The decline *reason*. Store method, service, handler and audit all complete — but no form ever submitted a `notes` field and no page ever read it back. Written empty every time, for years. |
+
+The last one is the instructive one: a grep for the field name finds plenty of hits and the
+feature looks finished. **A write path with no form feeding it is as invisible as no write
+path at all.** When the scan flags a field, trace it to a *form input* and to a *rendered
+element*, not merely to a function that mentions it.
 
 ---
 

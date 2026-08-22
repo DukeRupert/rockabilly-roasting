@@ -1,0 +1,47 @@
+package admin
+
+import (
+	"strings"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/audit"
+)
+
+// announcementEventLabel turns an announcement.* audit action into staff-facing
+// copy. "Sent to recipients" rather than "Dispatched" — the question this page
+// answers is whether the notice actually went out, and to how many.
+func announcementEventLabel(action string) string {
+	switch action {
+	case audit.AuditAnnouncementScheduled:
+		return "Scheduled"
+	case audit.AuditAnnouncementCancelled:
+		return "Cancelled before sending"
+	case audit.AuditAnnouncementDispatched:
+		return "Sent to recipients"
+	}
+	parts := strings.SplitN(action, ".", 2)
+	if len(parts) == 2 {
+		verb := strings.ReplaceAll(parts[1], "_", " ")
+		return strings.ToUpper(verb[:1]) + verb[1:]
+	}
+	return action
+}
+
+func announcementEventMarker(action string) string {
+	switch action {
+	case audit.AuditAnnouncementCancelled:
+		return "bg-rr-red"
+	case audit.AuditAnnouncementDispatched:
+		return "bg-rr-amber"
+	default:
+		return "bg-rr-surface"
+	}
+}
+
+// AnnouncementActivity is the notice's history. A broadcast is the one admin
+// action that cannot be taken back once it leaves, so who scheduled it and who
+// pulled it before it went is worth keeping in front of staff.
+templ AnnouncementActivity(entries []domain.AuditEntry, loc *time.Location) {
+	@ActivityTimeline(entries, announcementEventLabel, announcementEventMarker, loc)
+}

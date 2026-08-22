@@ -12,6 +12,8 @@ import (
 
 type AnnouncementShowProps struct {
 	Announcement domain.Announcement
+	// Activity is the notice's audit history, newest first.
+	Activity     []domain.AuditEntry
 	MerchantTZ   *time.Location
 	StaffName    string
 	StaffRole    string
@@ -117,6 +119,7 @@ templ AnnouncementShowContent(props AnnouncementShowProps) {
 			</dl>
 		</div>
 	</div>
+	@AnnouncementActivity(props.Activity, props.MerchantTZ)
 }
 
 templ AnnouncementShow(props AnnouncementShowProps) {

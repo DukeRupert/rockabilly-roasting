@@ -137,8 +137,8 @@ Coverage today:
 | `subscription_show` | yes |
 | `invoice_show` | yes |
 | `route_show` | yes (route + its stops' orders, merged) |
-| `price_list_show` | **no** |
-| `announcement_show` | **no** |
+| `price_list_show` | yes |
+| `announcement_show` | yes |
 
 All of them go through one shared `ActivityTimeline(entries, label, marker, loc)` in
 `timeline.templ`. A page contributes only the two functions and a thin named wrapper
@@ -178,23 +178,16 @@ PYEOF
 Every hit is a judgement call, not automatically a bug. Triage each one into three buckets,
 because they need different responses:
 
-**Real gaps** — written and/or enforced, invisible in admin. Open as of this writing:
-
-- **`Discount.MinimumOrderCents`** — *write-only*. Settable on the create form, enforced at
-  checkout, and displayed nowhere; discounts have no detail or edit page, so staff can never
-  verify or change what they set.
-- **`DeliveryRoute.ActivatedAt` / `CompletedAt`** — written by the activate/complete paths,
-  shown nowhere, and `route_show` has no timeline either.
-- **`Subscription.EndsAt`** — set when a subscription expires; an expired one does not say when.
-- **`Invoice.VoidedAt`** — same shape.
-- **`PriceList.EndsAt`**, **`CustomerUser.LastLoginAt`**.
+**Real gaps** — written and/or enforced, invisible in admin. All the ones this scan first
+turned up have since been closed; the bucket is kept because the next run will refill it.
 
 **Dead scaffolding** — a field nothing writes. Not a display gap; there is nothing to show.
 Deleting it, or finishing the feature, is the fix — rendering it is not.
 
 - **`Customer.TwoFAEnabled` / `TwoFAMethod`** — read out of the database into the struct and
   never set by anything. There is no 2FA feature.
-- **`CustomerUser.InvitedAt`** — no writer.
+- **`PriceList.StartsAt` / `EndsAt`** — were the same: neither CreatePriceList nor
+  UpdatePriceList ever set them. Removed from the type rather than rendered.
 
 **Deliberate** — leave alone.
 
@@ -206,6 +199,8 @@ Two traps in the scan itself, both of which bit:
 
 - It matches `.FieldName` as a Go expression, so a field whose form input is a **string
   literal** (`name="minimum_order"`) looks unrendered when it is merely un-*read*-back.
+- A `written in Go` heuristic also misses **database defaults**. `CustomerUser.InvitedAt` was
+  reported dead; the column is `invited_at timestamptz NOT NULL DEFAULT now()`.
 - A `written in Go` heuristic that looks for `Field =` misses raw SQL. `DeliveryRoute.ActivatedAt`
   was reported "never written" when `SET activated_at = now()` writes it. Always confirm
   against `internal/store/*.go` and `db/queries/*.sql` before concluding a column is dead.

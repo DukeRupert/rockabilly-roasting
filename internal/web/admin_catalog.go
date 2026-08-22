@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -259,7 +260,7 @@ func (d *Deps) handleAdminProductCreate(w http.ResponseWriter, r *http.Request) 
 // productTab returns the validated tab name from the query string.
 func productTab(r *http.Request) string {
 	switch r.URL.Query().Get("tab") {
-	case "details", "attributes", "media", "variants", "pricing":
+	case "details", "attributes", "media", "variants", "pricing", "activity":
 		return r.URL.Query().Get("tab")
 	default:
 		return "details"
@@ -290,6 +291,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var taxonName string
 	var priceLists []domain.PriceList
 	var pricing admin.ProductPriceListPricing
+	var activity []domain.AuditEntry
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -364,6 +366,37 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 			}
 			pricing, txErr = d.buildPriceListProduct(ctx, tx, *product)
 			return txErr
+
+		case "activity":
+			// The product's own entries, merged with those recorded against its
+			// variants — variant.* is keyed to the variant, so a price change or
+			// an archived SKU never shows up under the product's resource_id.
+			// Archived variants are included on purpose: pulling a SKU is exactly
+			// the change someone comes here to attribute.
+			activity, txErr = d.AuditQueryService.ListByResource(ctx, tx, "product", id)
+			if txErr != nil {
+				return txErr
+			}
+			variantRows, vErr := d.CatalogService.ListVariants(ctx, tx, id)
+			if vErr != nil {
+				return vErr
+			}
+			variantIDs := make([]uuid.UUID, len(variantRows))
+			for i, v := range variantRows {
+				variantIDs[i] = v.ID
+			}
+			if len(variantIDs) > 0 {
+				variantEntries, aErr := d.AuditQueryService.ListByRelatedResource(ctx, tx, "variant", variantIDs, "variant.")
+				if aErr != nil {
+					return aErr
+				}
+				activity = append(activity, variantEntries...)
+			}
+			// Each query is ordered only within itself.
+			slices.SortStableFunc(activity, func(a, b domain.AuditEntry) int {
+				return b.CreatedAt.Compare(a.CreatedAt)
+			})
+			return nil
 		}
 		return nil
 	})
@@ -399,6 +432,8 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		ActiveTab:          tab,
 		PriceLists:         priceLists,
 		Pricing:            pricing,
+		Activity:           activity,
+		MerchantTZ:         d.MerchantTZ,
 	}
 
 	// htmx request (sidebar nav or tab click via hx-boost): return page content

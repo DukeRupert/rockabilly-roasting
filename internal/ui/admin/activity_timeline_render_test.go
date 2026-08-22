@@ -95,19 +95,31 @@ func TestActivityTimeline_EmptyState(t *testing.T) {
 
 // The shared component must be what each page's wrapper renders — if a wrapper
 // ever grows its own markup again the feeds drift apart.
+//
+// Every wrapper is listed here, not a sample: the drift this pins is exactly
+// the kind that shows up in the one page nobody checked.
 func TestActivityWrappers_ShareOneShape(t *testing.T) {
 	now := time.Now().UTC()
 	e := []domain.AuditEntry{entry(audit.AuditRoutePlanned, "Logan", now)}
 
-	route := renderTimeline(t, RouteActivity(e, time.UTC))
-	invoice := renderTimeline(t, InvoiceActivity(e, time.UTC))
+	wrappers := map[string]templ.Component{
+		"announcement": AnnouncementActivity(e, time.UTC),
+		"customer":     CustomerActivity(e, time.UTC),
+		"discount":     DiscountActivity(e, time.UTC),
+		"invoice":      InvoiceActivity(e, time.UTC),
+		"order":        OrderActivity(e, time.UTC),
+		"price_list":   PriceListActivity(e, time.UTC),
+		"product":      ProductActivity(e, time.UTC),
+		"route":        RouteActivity(e, time.UTC),
+		"subscription": SubscriptionTimeline(e, time.UTC),
+	}
 
 	// Same wrapper, same heading, same row scaffolding; only the label differs.
-	for _, shared := range []string{`<h2 class="text-sm font-semibold text-rr-heading">Activity</h2>`, `<ol role="list"`} {
-		assert.Contains(t, route, shared)
-		assert.Contains(t, invoice, shared)
+	for name, component := range wrappers {
+		html := renderTimeline(t, component)
+		for _, shared := range []string{`<h2 class="text-sm font-semibold text-rr-heading">Activity</h2>`, `<ol role="list"`} {
+			assert.Contains(t, html, shared, name)
+		}
+		assert.Equal(t, 1, strings.Count(html, `<li class=`), name)
 	}
-	assert.Equal(t,
-		strings.Count(route, `<li class=`),
-		strings.Count(invoice, `<li class=`))
 }

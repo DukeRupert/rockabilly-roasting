@@ -8,6 +8,7 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 	"github.com/google/uuid"
 	"math"
+	"time"
 )
 
 // gramsToOz converts grams to ounces for display.
@@ -51,7 +52,11 @@ type ProductEditProps struct {
 	AssignedSets       []domain.AttributeSet
 	AllSets            []domain.AttributeSet
 	AttributeValues    []domain.ProductAttributeValue
-	ActiveTab          string // "details", "attributes", "media", "variants", "pricing"
+	ActiveTab          string // "details", "attributes", "media", "variants", "pricing", "activity"
+	// Activity is the product's audit history merged with its variants', newest
+	// first. Only loaded for the Activity tab.
+	Activity   []domain.AuditEntry
+	MerchantTZ *time.Location
 	// PriceLists and Pricing back the Pricing tab, which shows this product's
 	// base price and every price-list override side by side. Prices are catalog
 	// data, so they are edited here — on the product — rather than only in the
@@ -135,6 +140,7 @@ templ ProductEditContent(props ProductEditProps) {
 				<option value="media" selected?={ props.ActiveTab == "media" }>Media</option>
 				<option value="variants" selected?={ props.ActiveTab == "variants" }>Variants</option>
 				<option value="pricing" selected?={ props.ActiveTab == "pricing" }>Pricing</option>
+				<option value="activity" selected?={ props.ActiveTab == "activity" }>Activity</option>
 			</select>
 			<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end fill-rr-muted">
 				<path d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" fill-rule="evenodd"></path>
@@ -150,6 +156,7 @@ templ ProductEditContent(props ProductEditProps) {
 						{"media", "Media"},
 						{"variants", "Variants"},
 						{"pricing", "Pricing"},
+						{"activity", "Activity"},
 					} {
 						<a
 							href={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s?tab=%s", props.Product.ID, tab.Name)) }
@@ -173,10 +180,22 @@ templ ProductEditContent(props ProductEditProps) {
 				@productVariantsTab(props)
 			case "pricing":
 				@productPricingTab(props)
+			case "activity":
+				@productActivityTab(props)
 			default:
 				@productDetailsTab(props)
 		}
 	</div>
+}
+
+// --- Activity Tab ---
+
+// productActivityTab is the catalog page's answer to "who changed this, and
+// when". It is a tab rather than a section at the foot of Details so the audit
+// query only runs when someone asks for it — the other four tabs are hit far
+// more often.
+templ productActivityTab(props ProductEditProps) {
+	@ProductActivity(props.Activity, props.MerchantTZ)
 }
 
 // --- Details Tab ---

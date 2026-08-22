@@ -466,9 +466,15 @@ templ Admin(props AdminProps) {
 				}
 				.action-hint {
 					position: absolute;
-					bottom: calc(100% + 6px);
+					/* Below the trigger, not above it. Action rows sit near the top
+					   of the content, #main-content-wrapper is a scroll container
+					   (overflow-x:hidden computes overflow-y to auto, which clips),
+					   and the mobile top bar is z-40 — so anything opening upward
+					   got cut off or painted over. There is always room below. */
+					top: calc(100% + 6px);
 					left: 0;
-					z-index: 30;
+					/* Above the sticky mobile top bar (z-40). */
+					z-index: 50;
 					width: max-content;
 					max-width: 18rem;
 					padding: 0.35rem 0.55rem;
@@ -488,11 +494,12 @@ templ Admin(props AdminProps) {
 					   docs/admin-ui.md. */
 					display: none;
 				}
-				/* Actions sit in a wrapping flex row, so a left-anchored hint on a
-				   right-hand button would overflow the viewport. The trailing
-				   actions in an .action-row (Cancel / Refund and friends) anchor
-				   to their right edge instead. */
-				.action-row > *:nth-last-child(-n+2) .action-hint {
+				/* A left-anchored hint on a button that hugs the right edge would
+				   run off the viewport, so the trailing group anchors its hints to
+				   the right instead. Marked explicitly rather than counted by
+				   position: an nth-last-child rule also caught left-hand buttons
+				   whenever the row happened to be short. */
+				.action-row-end .action-hint {
 					left: auto;
 					right: 0;
 				}

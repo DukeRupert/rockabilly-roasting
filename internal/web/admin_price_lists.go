@@ -89,6 +89,10 @@ func (d *Deps) handleAdminPriceListShow(w http.ResponseWriter, r *http.Request) 
 			Sort:        store.CustomerSortNameAsc,
 			Limit:       500,
 		})
+		if txErr != nil {
+			return txErr
+		}
+		props.Activity, txErr = d.AuditQueryService.ListByResource(ctx, tx, "price_list", id)
 		return txErr
 	})
 	if err != nil {
@@ -102,6 +106,7 @@ func (d *Deps) handleAdminPriceListShow(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	props.Products = products
+	props.MerchantTZ = d.MerchantTZ
 	props.StaffName, props.StaffRole = staffNameRole(r)
 
 	if IsHTMX(r) {

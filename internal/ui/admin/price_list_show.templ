@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
@@ -15,8 +16,11 @@ type PriceListShowProps struct {
 	List      domain.PriceList
 	Products  []ProductPriceListPricing
 	Customers []domain.Customer
-	StaffName string
-	StaffRole string
+	// Activity is the list's audit history, newest first.
+	Activity   []domain.AuditEntry
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
 }
 
 templ PriceListShowContent(props PriceListShowProps) {
@@ -156,6 +160,7 @@ templ PriceListShowContent(props PriceListShowProps) {
 			</button>
 		</form>
 	</div>
+	@PriceListActivity(props.Activity, props.MerchantTZ)
 }
 
 // priceListShowProductBlock renders one product's prices on this list only:

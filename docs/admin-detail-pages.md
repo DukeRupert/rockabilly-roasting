@@ -135,10 +135,22 @@ Coverage today:
 | `customer_show` | yes (`ListForCustomer` — actor *or* resource) |
 | `order_show` | yes (order + shipments merged) |
 | `subscription_show` | yes |
-| `invoice_show` | **no** |
-| `route_show` | **no** |
+| `invoice_show` | yes |
+| `route_show` | yes (route + its stops' orders, merged) |
 | `price_list_show` | **no** |
 | `announcement_show` | **no** |
+
+All of them go through one shared `ActivityTimeline(entries, label, marker, loc)` in
+`timeline.templ`. A page contributes only the two functions and a thin named wrapper
+(`RouteActivity`, `InvoiceActivity`, …) so call sites read well. Do not hand-roll the heading
+and `<ol>` again — there is a render test asserting the wrappers still share one shape.
+
+**Check where an event is actually keyed before assuming `ListByResource` is enough.** The
+route page is the cautionary case: `delivery_route.stop_skipped` is recorded against the
+**order**, not the route, so the obvious lookup silently omitted the one event a delivery
+route page most needs to show. `AuditQueryService.ListByRelatedResource` exists for this —
+it takes the related ids plus an action prefix, so a route gets its stops'
+`delivery_route.*` events without dragging in each order's entire history.
 
 ### 6. Audit the model for fields you render nowhere
 

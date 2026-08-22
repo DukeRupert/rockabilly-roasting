@@ -21,6 +21,9 @@ type RouteShowProps struct {
 	// on the map. They are not stops, so the page has to say so explicitly or
 	// the route silently looks shorter than staff expected.
 	Unroutable int
+	// Activity is the run's audit history — planned, started, stops removed
+	// or skipped, completed. Newest first.
+	Activity   []domain.AuditEntry
 	MerchantTZ *time.Location
 	StaffName  string
 	StaffRole  string
@@ -106,6 +109,21 @@ templ RouteShowContent(props RouteShowProps) {
 					<span class="mx-2 text-rr-border">|</span>
 					<span class={ routeStatusBadge(props.Route.Status) }>{ string(props.Route.Status) }</span>
 				</p>
+				<!-- When the run actually started and finished. Both columns were
+				     written from the day routes shipped and shown nowhere. -->
+				if props.Route.ActivatedAt != nil || props.Route.CompletedAt != nil {
+					<p class="mt-1 text-xs text-rr-muted">
+						if props.Route.ActivatedAt != nil {
+							Started { props.Route.ActivatedAt.In(props.MerchantTZ).Format("Jan 2, 3:04 PM") }
+						}
+						if props.Route.ActivatedAt != nil && props.Route.CompletedAt != nil {
+							<span class="mx-1.5 text-rr-border">&middot;</span>
+						}
+						if props.Route.CompletedAt != nil {
+							Finished { props.Route.CompletedAt.In(props.MerchantTZ).Format("Jan 2, 3:04 PM") }
+						}
+					</p>
+				}
 				<!-- Where the run finishes changes the stop order, so it is
 				     stated on the page rather than left implicit: a route
 				     planned to end at the driver's house looks wrong to anyone
@@ -190,6 +208,7 @@ templ RouteShowContent(props RouteShowProps) {
 			</div>
 		}
 		@routeStopsTable(props)
+		@RouteActivity(props.Activity, props.MerchantTZ)
 	</div>
 }
 

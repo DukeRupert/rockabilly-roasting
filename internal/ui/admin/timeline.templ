@@ -41,7 +41,7 @@ func timelineRelative(t time.Time) string {
 }
 
 // timelineRow renders a single timeline entry — marker + connecting rail +
-// event card. Used by SubscriptionTimeline and CustomerActivity.
+// event card. Used by every page's activity feed, through ActivityTimeline.
 templ timelineRow(e domain.AuditEntry, label, markerClass string, isLast bool, loc *time.Location) {
 	<li class={ "relative flex gap-x-4", templ.KV("pb-6", !isLast) }>
 		if !isLast {
@@ -72,4 +72,24 @@ templ timelineRow(e domain.AuditEntry, label, markerClass string, isLast bool, l
 			</p>
 		</div>
 	</li>
+}
+
+// ActivityTimeline renders a resource's audit history, newest first.
+//
+// The two functions are the only per-resource part: label turns an audit action
+// into staff-facing copy, marker picks the dot colour. Every detail page's feed
+// goes through here — see docs/admin-detail-pages.md, rule 5.
+templ ActivityTimeline(entries []domain.AuditEntry, label func(string) string, marker func(string) string, loc *time.Location) {
+	<div class="mt-8">
+		<h2 class="text-sm font-semibold text-rr-heading">Activity</h2>
+		if len(entries) == 0 {
+			<p class="mt-2 text-sm text-rr-muted">No activity recorded yet.</p>
+		} else {
+			<ol role="list" class="mt-4">
+				for i, e := range entries {
+					@timelineRow(e, label(e.Action), marker(e.Action), i == len(entries)-1, loc)
+				}
+			</ol>
+		}
+	</div>
 }

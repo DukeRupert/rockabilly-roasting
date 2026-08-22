@@ -206,6 +206,61 @@ func (s *AuditStore) List(ctx context.Context, tx pgx.Tx, f AuditFilter) ([]doma
 	return entries, nil
 }
 
+// ListByResourceIDsWithActionPrefix returns audit entries for any of the given
+// resource ids whose action starts with the prefix, newest first.
+//
+// It exists because some events are recorded against a *related* resource
+// rather than the one whose page you are looking at: a skipped delivery stop is
+// audited against the order, not the route, so a route's own resource_id lookup
+// would miss it. The prefix keeps the join narrow — a route page wants the
+// stop's "delivery_route.*" events, not the order's entire history.
+func (s *AuditStore) ListByResourceIDsWithActionPrefix(
+	ctx context.Context,
+	tx pgx.Tx,
+	resourceType string,
+	ids []uuid.UUID,
+	actionPrefix string,
+) ([]domain.AuditEntry, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	rows, err := tx.Query(ctx,
+		`SELECT id, actor_type, actor_id, actor_name, action, resource_type, resource_id,
+		        after_snapshot, request_id, ip_address, reason, metadata, created_at
+		   FROM audit_log
+		  WHERE resource_type = $1 AND resource_id = ANY($2) AND action LIKE $3 || '%'
+		  ORDER BY created_at DESC`,
+		resourceType, ids, actionPrefix,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list audit by resource ids: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []domain.AuditEntry
+	for rows.Next() {
+		var e domain.AuditEntry
+		var actorType string
+		var metadataJSON json.RawMessage
+		if err := rows.Scan(
+			&e.ID, &actorType, &e.ActorID, &e.ActorName,
+			&e.Action, &e.ResourceType, &e.ResourceID,
+			&e.AfterSnapshot, &e.RequestID, &e.IPAddress,
+			&e.Reason, &metadataJSON, &e.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan audit entry: %w", err)
+		}
+		e.ActorType = domain.AuditActorType(actorType)
+		e.Metadata = metadataFromJSON(metadataJSON)
+		entries = append(entries, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate audit entries: %w", err)
+	}
+	return entries, nil
+}
+
 // --- Row converters ---
 
 func auditEntryFromRow(r sqlcgen.AuditLog) *domain.AuditEntry {

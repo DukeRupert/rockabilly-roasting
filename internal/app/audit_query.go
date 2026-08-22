@@ -42,6 +42,17 @@ func (s *AuditQueryService) ListByResource(ctx context.Context, tx pgx.Tx, resou
 	return entries, nil
 }
 
+// ListByRelatedResource returns entries recorded against related resources —
+// see AuditStore.ListByResourceIDsWithActionPrefix for why a page sometimes has
+// to look somewhere other than its own resource_id.
+func (s *AuditQueryService) ListByRelatedResource(ctx context.Context, tx pgx.Tx, resourceType string, ids []uuid.UUID, actionPrefix string) ([]domain.AuditEntry, error) {
+	entries, err := s.entries.ListByResourceIDsWithActionPrefix(ctx, tx, resourceType, ids, actionPrefix)
+	if err != nil {
+		return nil, fmt.Errorf("list audit by related resource: %w", err)
+	}
+	return entries, nil
+}
+
 // ListForCustomer returns audit entries that relate to a single customer —
 // either as actor (self-service actions, login, logout) or as resource (staff
 // actions on the customer, wholesale events). Newest first, capped at limit.

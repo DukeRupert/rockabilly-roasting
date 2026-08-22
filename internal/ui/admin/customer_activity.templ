@@ -100,16 +100,5 @@ func customerEventMarker(action string) string {
 // from audit_log entries where the customer was either the actor or the
 // resource. Newest first.
 templ CustomerActivity(entries []domain.AuditEntry, loc *time.Location) {
-	<div class="mt-8">
-		<h2 class="text-sm font-semibold text-rr-heading">Activity</h2>
-		if len(entries) == 0 {
-			<p class="mt-2 text-sm text-rr-muted">No activity recorded yet.</p>
-		} else {
-			<ol role="list" class="mt-4">
-				for i, e := range entries {
-					@timelineRow(e, customerEventLabel(e.Action), customerEventMarker(e.Action), i == len(entries)-1, loc)
-				}
-			</ol>
-		}
-	</div>
+	@ActivityTimeline(entries, customerEventLabel, customerEventMarker, loc)
 }

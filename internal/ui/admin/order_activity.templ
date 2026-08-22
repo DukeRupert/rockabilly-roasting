@@ -130,16 +130,5 @@ func orderEventMarker(action string) string {
 // Before this existed the audit log could only be filtered by resource *type*,
 // so "who cancelled this order, and when" was unanswerable from the admin.
 templ OrderActivity(entries []domain.AuditEntry, loc *time.Location) {
-	<div>
-		<h2 class="text-sm font-semibold text-rr-heading">Activity</h2>
-		if len(entries) == 0 {
-			<p class="mt-2 text-sm text-rr-muted">No activity recorded yet.</p>
-		} else {
-			<ol role="list" class="mt-4 border border-rr-border bg-rr-surface p-4">
-				for i, e := range entries {
-					@timelineRow(e, orderEventLabel(e.Action), orderEventMarker(e.Action), i == len(entries)-1, loc)
-				}
-			</ol>
-		}
-	</div>
+	@ActivityTimeline(entries, orderEventLabel, orderEventMarker, loc)
 }

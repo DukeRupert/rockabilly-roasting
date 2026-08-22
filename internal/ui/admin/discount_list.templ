@@ -201,8 +201,8 @@ templ DiscountListContent(props DiscountListProps) {
 					<tbody class="divide-y divide-rr-border bg-rr-surface">
 						for _, d := range props.Discounts {
 							<tr>
-								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-rr-heading sm:pl-6">
-									{ d.Name }
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium sm:pl-6">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s", d.ID.String())) } class="text-rr-red hover:text-rr-red-lt">{ d.Name }</a>
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									for i, code := range props.Codes[d.ID] {

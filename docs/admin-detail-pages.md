@@ -139,6 +139,7 @@ Coverage today:
 | `route_show` | yes (route + its stops' orders, merged) |
 | `price_list_show` | yes |
 | `announcement_show` | yes |
+| `discount_show` | yes |
 
 All of them go through one shared `ActivityTimeline(entries, label, marker, loc)` in
 `timeline.templ`. A page contributes only the two functions and a thin named wrapper

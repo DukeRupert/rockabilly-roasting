@@ -1,0 +1,312 @@
+package admin
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// DiscountShowProps backs one discount's page — the view that answers "what
+// does this code actually do, and has anyone used it?".
+//
+// Discounts had no detail page at all: they could be created and switched on or
+// off from the list, and never inspected or corrected. A wrong minimum order
+// meant deactivating the discount and issuing a new code.
+type DiscountShowProps struct {
+	Discount domain.Discount
+	Codes    []domain.CouponCode
+	// Activity is the discount's audit history, newest first.
+	Activity   []domain.AuditEntry
+	Error      string
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
+}
+
+// discountValueInput is the edit form's value field, pre-filled in whatever
+// unit the discount's type is expressed in — whole percent, or dollars.
+func discountValueInput(d domain.Discount) string {
+	if d.Type == domain.DiscountTypeFixedAmount {
+		return fmt.Sprintf("%.2f", float64(d.Value)/100)
+	}
+	return fmt.Sprintf("%d", d.Value)
+}
+
+func discountDollarsInput(cents *int) string {
+	if cents == nil || *cents <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%.2f", float64(*cents)/100)
+}
+
+// discountDateInput formats a stored instant for a <input type="date">.
+//
+// ExpiresAt is stored as the start of the day *after* the last valid one (the
+// code works through the end of the chosen day), so it is stepped back a day
+// on the way into the field or the form would show tomorrow.
+func discountDateInput(t *time.Time, loc *time.Location, isExclusiveEnd bool) string {
+	if t == nil {
+		return ""
+	}
+	v := t.In(loc)
+	if isExclusiveEnd {
+		v = v.AddDate(0, 0, -1)
+	}
+	return v.Format("2006-01-02")
+}
+
+// discountRedemptionSummary is the headline staff want: has this been used.
+func discountRedemptionSummary(codes []domain.CouponCode) string {
+	if len(codes) == 0 {
+		return "No codes issued."
+	}
+	redeemed := 0
+	for _, c := range codes {
+		if c.RedeemedAt != nil {
+			redeemed++
+		}
+	}
+	switch {
+	case redeemed == 0 && len(codes) == 1:
+		return "Not yet redeemed."
+	case redeemed == 0:
+		return fmt.Sprintf("%d codes, none redeemed yet.", len(codes))
+	case redeemed == len(codes):
+		return fmt.Sprintf("All %d redeemed.", len(codes))
+	default:
+		return fmt.Sprintf("%d of %d redeemed.", redeemed, len(codes))
+	}
+}
+
+templ DiscountShowContent(props DiscountShowProps) {
+	@ConfirmDialogHost()
+	<!-- Header -->
+	<div class="sm:flex sm:items-start sm:justify-between sm:gap-6">
+		<div class="min-w-0">
+			<div class="flex flex-wrap items-center gap-3">
+				<h1 class="admin-page-title">{ props.Discount.Name }</h1>
+				@DiscountActiveBadge(props.Discount.Active)
+			</div>
+			<p class="mt-2 text-sm text-rr-muted">
+				{ discountTypeLabel(props.Discount.Type) }
+				<span class="mx-1.5 text-rr-border">&middot;</span>
+				<span class="text-rr-heading">{ discountValueDisplay(props.Discount) }</span>
+				if discountMinimumLabel(props.Discount) != "" {
+					<span class="mx-1.5 text-rr-border">&middot;</span>
+					{ discountMinimumLabel(props.Discount) }
+				}
+				<span class="mx-1.5 text-rr-border">&middot;</span>
+				Created { props.Discount.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }
+			</p>
+		</div>
+		<div class="mt-4 shrink-0 sm:mt-0">
+			<a href="/admin/discounts" class="text-sm font-semibold text-rr-red hover:text-rr-red-lt">&larr; Back to discounts</a>
+		</div>
+	</div>
+	if props.Error != "" {
+		<div class="mt-6 border border-rr-border bg-rr-surface px-4 py-3">
+			<p class="text-sm font-semibold text-rr-red">{ props.Error }</p>
+		</div>
+	}
+	<div class="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+		<div class="flex min-w-0 flex-col gap-6">
+			@discountCodesTable(props)
+			@DiscountActivity(props.Activity, props.MerchantTZ)
+		</div>
+		<aside class="flex flex-col gap-4 xl:sticky xl:top-6 xl:self-start">
+			@discountEditCard(props)
+			@discountStatusCard(props)
+		</aside>
+	</div>
+}
+
+templ discountCodesTable(props DiscountShowProps) {
+	<div>
+		<h2 class="text-sm font-semibold text-rr-heading">Coupon codes</h2>
+		<p class="mt-1 text-sm text-rr-muted">{ discountRedemptionSummary(props.Codes) }</p>
+		if len(props.Codes) > 0 {
+			<div class="mt-2 overflow-x-auto border border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Code</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Redeemed</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Order</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, c := range props.Codes {
+							<tr>
+								<td class="whitespace-nowrap py-4 pl-4 pr-3 font-mono text-sm text-rr-heading sm:pl-6">{ c.Code }</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									if c.RedeemedAt != nil {
+										<span class="badge badge-grey">redeemed</span>
+									} else {
+										<span class="badge badge-green">available</span>
+									}
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+									if c.RedeemedAt != nil {
+										{ c.RedeemedAt.In(props.MerchantTZ).Format("Jan 2, 2006") }
+									} else {
+										<span class="text-rr-border">&mdash;</span>
+									}
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									if c.RedeemedByOrderID != nil {
+										<a href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", c.RedeemedByOrderID.String())) } class="font-semibold text-rr-red hover:text-rr-red-lt">View order &rarr;</a>
+									} else {
+										<span class="text-rr-border">&mdash;</span>
+									}
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+// discountEditCard is the whole point of this page: every rule on a discount
+// was write-once until now.
+//
+// The coupon code is not here. A code is the thing customers have already been
+// handed, so changing it would silently break every link and card carrying it —
+// a different code means a different discount.
+templ discountEditCard(props DiscountShowProps) {
+	@railCard("Edit") {
+		<form
+			method="post"
+			action={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s", props.Discount.ID.String())) }
+			class="flex flex-col gap-3"
+		>
+			<div>
+				<label for="d-name" class="block text-xs text-rr-muted">Name</label>
+				<input
+					id="d-name"
+					name="name"
+					type="text"
+					value={ props.Discount.Name }
+					required
+					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+				/>
+			</div>
+			<div>
+				<label for="d-type" class="block text-xs text-rr-muted">Type</label>
+				<select
+					id="d-type"
+					name="type"
+					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+				>
+					<option value="percentage" selected?={ props.Discount.Type == domain.DiscountTypePercentage }>Percentage</option>
+					<option value="fixed_amount" selected?={ props.Discount.Type == domain.DiscountTypeFixedAmount }>Fixed amount</option>
+				</select>
+			</div>
+			<div>
+				<label for="d-value" class="block text-xs text-rr-muted">Value &mdash; whole percent, or dollars</label>
+				<input
+					id="d-value"
+					name="value"
+					type="text"
+					inputmode="decimal"
+					value={ discountValueInput(props.Discount) }
+					required
+					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+				/>
+			</div>
+			<div>
+				<label for="d-min" class="block text-xs text-rr-muted">Minimum order &mdash; blank for none</label>
+				<input
+					id="d-min"
+					name="minimum_order"
+					type="text"
+					inputmode="decimal"
+					value={ discountDollarsInput(props.Discount.MinimumOrderCents) }
+					placeholder="No minimum"
+					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+				/>
+			</div>
+			<div>
+				<label for="d-starts" class="block text-xs text-rr-muted">Starts</label>
+				<input
+					id="d-starts"
+					name="starts_at"
+					type="date"
+					value={ discountDateInput(props.Discount.StartsAt, props.MerchantTZ, false) }
+					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+				/>
+			</div>
+			<div>
+				<label for="d-expires" class="block text-xs text-rr-muted">Last valid day</label>
+				<input
+					id="d-expires"
+					name="expires_at"
+					type="date"
+					value={ discountDateInput(props.Discount.ExpiresAt, props.MerchantTZ, true) }
+					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+				/>
+			</div>
+			@ActionWrap("hint-discount-save", "Changes what future customers get. Orders already placed keep the discount they were given.") {
+				<button
+					type="submit"
+					aria-describedby="hint-discount-save"
+					class="inline-flex w-full items-center justify-center gap-1.5 rounded-sm bg-rr-red px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-rr-red-lt"
+				>
+					Save changes
+				</button>
+			}
+		</form>
+	}
+}
+
+templ discountStatusCard(props DiscountShowProps) {
+	@railCard("Status") {
+		<div class="flex flex-col gap-2">
+			if props.Discount.Active {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/deactivate", props.Discount.ID.String())) }>
+					<input type="hidden" name="return_to" value="detail"/>
+					@ActionWrap("hint-discount-deactivate", "Stops new customers applying any of this discount's codes. Codes already redeemed are unaffected.") {
+						<button
+							type="submit"
+							aria-describedby="hint-discount-deactivate"
+							class="btn-danger w-full justify-center"
+							{ ConfirmAttrs(ActionConfirm{
+							Title: "Deactivate this discount?",
+							Lead:  "Stops new customers applying any of its coupon codes.",
+							Points: []string{
+								"Carts already holding the code lose the discount at payment.",
+								"Orders already placed keep what they were given.",
+								"You can reactivate it again from here.",
+							},
+							Confirm: "Deactivate",
+							Danger:  true,
+						})... }
+						>Deactivate</button>
+					}
+				</form>
+			} else {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/discounts/%s/activate", props.Discount.ID.String())) }>
+					<input type="hidden" name="return_to" value="detail"/>
+					@ActionWrap("hint-discount-activate", "Lets customers apply this discount's codes again.") {
+						<button type="submit" aria-describedby="hint-discount-activate" class="btn-confirm w-full justify-center">Activate</button>
+					}
+				</form>
+			}
+		</div>
+	}
+}
+
+templ DiscountShow(props DiscountShowProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      props.Discount.Name,
+		ActivePath: "/admin/discounts",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@DiscountShowContent(props)
+	}
+}

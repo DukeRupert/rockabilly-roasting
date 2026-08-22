@@ -1,0 +1,44 @@
+package admin
+
+import (
+	"strings"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/audit"
+)
+
+func discountEventLabel(action string) string {
+	switch action {
+	case audit.AuditDiscountCreated:
+		return "Discount created"
+	case audit.AuditDiscountUpdated:
+		return "Discount edited"
+	case audit.AuditDiscountDeactivated:
+		return "Deactivated"
+	}
+	parts := strings.SplitN(action, ".", 2)
+	if len(parts) == 2 {
+		verb := strings.ReplaceAll(parts[1], "_", " ")
+		return strings.ToUpper(verb[:1]) + verb[1:]
+	}
+	return action
+}
+
+func discountEventMarker(action string) string {
+	switch action {
+	case audit.AuditDiscountDeactivated:
+		return "bg-rr-red"
+	case audit.AuditDiscountCreated:
+		return "bg-rr-amber"
+	default:
+		return "bg-rr-surface"
+	}
+}
+
+// DiscountActivity is the discount's history. Edits are the reason it matters:
+// changing a percentage or a minimum changes what every future customer gets,
+// and until the edit form existed there was nothing to attribute.
+templ DiscountActivity(entries []domain.AuditEntry, loc *time.Location) {
+	@ActivityTimeline(entries, discountEventLabel, discountEventMarker, loc)
+}

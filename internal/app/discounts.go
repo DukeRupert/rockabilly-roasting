@@ -97,19 +97,8 @@ func (s *DiscountService) CreateWithCode(ctx context.Context, tx pgx.Tx, p Creat
 	if p.Name == "" || p.Code == "" {
 		return nil, ErrDiscountInvalid
 	}
-	switch p.Type {
-	case domain.DiscountTypePercentage:
-		if p.Value < 1 || p.Value > 100 {
-			return nil, ErrDiscountInvalid
-		}
-	case domain.DiscountTypeFixedAmount:
-		if p.Value < 1 {
-			return nil, ErrDiscountInvalid
-		}
-	default:
-		// free_shipping exists in the schema but checkout doesn't honor it
-		// yet — refuse to create discounts the buy path can't apply.
-		return nil, ErrDiscountInvalid
+	if err := validateDiscountShape(p.Type, p.Value); err != nil {
+		return nil, err
 	}
 
 	if _, err := s.discounts.GetCouponCodeByCode(ctx, tx, p.Code); err == nil {
@@ -150,6 +139,99 @@ func (s *DiscountService) CreateWithCode(ctx context.Context, tx pgx.Tx, p Creat
 		Metadata:     map[string]any{"coupon_code": code.Code},
 	}); err != nil {
 		return nil, fmt.Errorf("audit discount created: %w", err)
+	}
+
+	return discount, nil
+}
+
+// validateDiscountShape checks a discount's type/value pair. Shared by create
+// and edit so an edit cannot put a discount into a state create would refuse.
+//
+// free_shipping exists in the schema but checkout does not honor it, so it is
+// rejected here rather than allowed to sit in the catalog looking functional.
+func validateDiscountShape(t domain.DiscountType, value int) error {
+	switch t {
+	case domain.DiscountTypePercentage:
+		if value < 1 || value > 100 {
+			return ErrDiscountInvalid
+		}
+	case domain.DiscountTypeFixedAmount:
+		if value < 1 {
+			return ErrDiscountInvalid
+		}
+	default:
+		return ErrDiscountInvalid
+	}
+	return nil
+}
+
+// EditDiscountParams holds the editable fields of an existing discount.
+//
+// Active is deliberately absent: activation stays on SetActive so the list's
+// Activate/Deactivate buttons remain the single way it changes, and saving the
+// edit form cannot flip a live discount off by accident.
+type EditDiscountParams struct {
+	Name              string
+	Description       *string
+	Type              domain.DiscountType
+	Value             int
+	MinimumOrderCents *int
+	StartsAt          *time.Time
+	ExpiresAt         *time.Time
+}
+
+// Update edits an existing discount.
+//
+// Nothing here rewrites history: an order's discount is frozen as an
+// adjustment row at checkout, so changing the rule changes what future
+// customers get and leaves past orders alone. Coupon codes are not editable —
+// a code is the thing customers have already been given, so a new code means a
+// new discount.
+func (s *DiscountService) Update(ctx context.Context, tx pgx.Tx, id uuid.UUID, p EditDiscountParams, actor Actor) (*domain.Discount, error) {
+	p.Name = strings.TrimSpace(p.Name)
+	if p.Name == "" {
+		return nil, ErrDiscountInvalid
+	}
+	if err := validateDiscountShape(p.Type, p.Value); err != nil {
+		return nil, err
+	}
+	if p.StartsAt != nil && p.ExpiresAt != nil && !p.ExpiresAt.After(*p.StartsAt) {
+		return nil, fmt.Errorf("expiry must fall after the start date: %w", ErrDiscountInvalid)
+	}
+
+	existing, err := s.discounts.GetByID(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrDiscountNotFound
+		}
+		return nil, fmt.Errorf("get discount for update: %w", err)
+	}
+
+	discount, err := s.discounts.Update(ctx, tx, store.UpdateDiscountParams{
+		ID:                id,
+		Name:              p.Name,
+		Description:       p.Description,
+		Type:              p.Type,
+		Value:             p.Value,
+		MinimumOrderCents: p.MinimumOrderCents,
+		StartsAt:          p.StartsAt,
+		ExpiresAt:         p.ExpiresAt,
+		Active:            existing.Active,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update discount: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditDiscountUpdated,
+		ResourceType: "discount",
+		ResourceID:   id,
+		After:        discount,
+	}); err != nil {
+		return nil, fmt.Errorf("audit discount updated: %w", err)
 	}
 
 	return discount, nil

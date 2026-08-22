@@ -88,19 +88,10 @@ func (s *PriceListStore) CountCustomers(ctx context.Context, tx pgx.Tx, id uuid.
 }
 
 func priceListFromRow(r sqlcgen.PriceList) *domain.PriceList {
-	pl := &domain.PriceList{
+	return &domain.PriceList{
 		ID:     r.ID,
 		Name:   r.Name,
 		Type:   domain.PriceListType(r.Type),
 		Status: domain.PriceListStatus(r.Status),
 	}
-	if r.StartsAt.Valid {
-		t := r.StartsAt.Time
-		pl.StartsAt = &t
-	}
-	if r.EndsAt.Valid {
-		t := r.EndsAt.Time
-		pl.EndsAt = &t
-	}
-	return pl
 }

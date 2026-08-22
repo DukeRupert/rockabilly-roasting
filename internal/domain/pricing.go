@@ -52,13 +52,18 @@ type Price struct {
 }
 
 // PriceList groups promotional or override prices.
+// PriceList is a named set of prices a customer can be put on.
+//
+// It deliberately has no scheduling fields. The price_lists table carries
+// starts_at / ends_at columns, but nothing has ever written them — neither
+// CreatePriceList nor UpdatePriceList sets either one — so surfacing them on
+// the type only advertised a feature that does not exist. Scheduling lives on
+// individual prices (domain.Price), which really are date-bounded.
 type PriceList struct {
-	ID       uuid.UUID
-	Name     string
-	Type     PriceListType
-	Status   PriceListStatus
-	StartsAt *time.Time
-	EndsAt   *time.Time
+	ID     uuid.UUID
+	Name   string
+	Type   PriceListType
+	Status PriceListStatus
 }
 
 // ListLadder is a variant's ladder on one named price list. Used where a

@@ -34,6 +34,16 @@ func discountValueInput(d domain.Discount) string {
 	return fmt.Sprintf("%d", d.Value)
 }
 
+// discountDescriptionValue is the edit form's description contents, blank for
+// nil. Kept as a Go expression on one line: templ would indent an if-block
+// inside the element, and a textarea renders its leading whitespace verbatim.
+func discountDescriptionValue(d domain.Discount) string {
+	if d.Description == nil {
+		return ""
+	}
+	return *d.Description
+}
+
 func discountDollarsInput(cents *int) string {
 	if cents == nil || *cents <= 0 {
 		return ""
@@ -194,6 +204,16 @@ templ discountEditCard(props DiscountShowProps) {
 					required
 					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
 				/>
+			</div>
+			<div>
+				<label for="d-description" class="block text-xs text-rr-muted">Description &mdash; staff note, not shown to customers</label>
+				<textarea
+					id="d-description"
+					name="description"
+					rows="2"
+					placeholder="What this discount is for."
+					class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+				>{ discountDescriptionValue(props.Discount) }</textarea>
 			</div>
 			<div>
 				<label for="d-type" class="block text-xs text-rr-muted">Type</label>

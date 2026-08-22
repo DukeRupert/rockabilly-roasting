@@ -363,6 +363,7 @@ func (d *Deps) handleAdminDiscountUpdate(w http.ResponseWriter, r *http.Request)
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		_, txErr := d.DiscountService.Update(ctx, tx, id, app.EditDiscountParams{
 			Name:              r.FormValue("name"),
+			Description:       optionalText(r.FormValue("description")),
 			Type:              discountType,
 			Value:             value,
 			MinimumOrderCents: minimumOrderCents,
@@ -384,6 +385,16 @@ func (d *Deps) handleAdminDiscountUpdate(w http.ResponseWriter, r *http.Request)
 	}
 
 	http.Redirect(w, r, "/admin/discounts/"+id.String(), http.StatusSeeOther)
+}
+
+// optionalText reads a free-text form field where blank means "unset". Update
+// writes description unconditionally, so an omitted field would clear it.
+func optionalText(raw string) *string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
 }
 
 // parseMerchantDay reads a yyyy-mm-dd form field in merchant time. Blank yields

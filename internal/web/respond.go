@@ -33,6 +33,13 @@ func Error(w http.ResponseWriter, r *http.Request, err error) {
 		logger.Error("internal error", "error", err)
 	}
 	if IsHTMX(r) {
+		// The toast is a single root element carrying hx-swap-oob, and htmx
+		// lifts every top-level OOB element out of the response before the
+		// normal swap runs. What is left is an empty fragment — so a form that
+		// targets itself with hx-swap="outerHTML" would delete itself off the
+		// page on any rejection, taking the operator's typed values with it.
+		// HX-Reswap: none cancels only the main swap; OOB toasts still land.
+		w.Header().Set("HX-Reswap", "none")
 		w.WriteHeader(http.StatusOK)
 		toast.Toast(toast.VariantError, msg).Render(r.Context(), w) //nolint:errcheck
 		return
@@ -151,6 +158,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrPaymentFailed),
 		errors.Is(err, app.ErrInvalidPrice),
 		errors.Is(err, app.ErrInvalidQuantity),
+		errors.Is(err, app.ErrInvalidWholesaleMOQ),
 		errors.Is(err, app.ErrWholesaleNotApproved),
 		errors.Is(err, app.ErrWholesaleNotPending),
 		errors.Is(err, app.ErrMOQViolation),

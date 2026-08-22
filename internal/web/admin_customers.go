@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/mail"
@@ -11,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/store"
@@ -242,6 +244,8 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	var activity []domain.AuditEntry
 	var orderCount, lifetimeSpend int
 	var announcementsEnabled bool
+	var approvedByName string
+	var teamMembers []domain.CustomerUser
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -290,7 +294,29 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		activity, txErr = d.AuditQueryService.ListForCustomer(ctx, tx, id, 25)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+
+		// Additional logins on the account. Retail customers never have any, so
+		// this is empty for them and the rail card does not render.
+		teamMembers, txErr = d.CustomerUserService.List(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+
+		// Who approved the wholesale application. A staff record that has since
+		// been removed leaves the name blank rather than failing the page — the
+		// approval date is still worth showing on its own.
+		if customer.ApprovedBy != nil {
+			approver, sErr := d.StaffService.Get(ctx, tx, *customer.ApprovedBy)
+			if sErr == nil && approver != nil {
+				approvedByName = approver.Name
+			} else if sErr != nil && !errors.Is(sErr, app.ErrStaffNotFound) {
+				return sErr
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -320,6 +346,8 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		StaffName:            name,
 		StaffRole:            role,
 		CanEditEmail:         staffCan(r, auth.PermEditCustomers),
+		ApprovedByName:       approvedByName,
+		TeamMembers:          teamMembers,
 	}
 
 	if IsHTMX(r) {

@@ -119,9 +119,14 @@ func (d *Deps) handleAdminAnnouncementShow(w http.ResponseWriter, r *http.Reques
 	}
 
 	var announcement *domain.Announcement
+	var activity []domain.AuditEntry
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		announcement, txErr = d.AnnouncementService.GetAnnouncement(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		activity, txErr = d.AuditQueryService.ListByResource(ctx, tx, "announcement", id)
 		return txErr
 	}); err != nil {
 		Error(w, r, err)
@@ -130,6 +135,7 @@ func (d *Deps) handleAdminAnnouncementShow(w http.ResponseWriter, r *http.Reques
 
 	props := admin.AnnouncementShowProps{
 		Announcement: *announcement,
+		Activity:     activity,
 		MerchantTZ:   d.MerchantTZ,
 		StaffName:    name,
 		StaffRole:    role,

@@ -25,6 +25,7 @@ func (d *Deps) handleAdminInvoiceShow(w http.ResponseWriter, r *http.Request) {
 	var invoice *domain.Invoice
 	var lines []domain.InvoiceLine
 	var payments []domain.InvoicePayment
+	var activity []domain.AuditEntry
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -37,6 +38,10 @@ func (d *Deps) handleAdminInvoiceShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 		payments, txErr = d.InvoiceService.ListInvoicePayments(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		activity, txErr = d.AuditQueryService.ListByResource(ctx, tx, "invoice", id)
 		return txErr
 	})
 	if err != nil {
@@ -49,6 +54,7 @@ func (d *Deps) handleAdminInvoiceShow(w http.ResponseWriter, r *http.Request) {
 		Invoice:    invoice,
 		Lines:      lines,
 		Payments:   payments,
+		Activity:   activity,
 		MerchantTZ: d.MerchantTZ,
 		StaffName:  name,
 		StaffRole:  role,

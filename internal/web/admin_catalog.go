@@ -6,6 +6,7 @@ import (
 	"math"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/a-h/templ"
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
@@ -258,7 +260,7 @@ func (d *Deps) handleAdminProductCreate(w http.ResponseWriter, r *http.Request) 
 // productTab returns the validated tab name from the query string.
 func productTab(r *http.Request) string {
 	switch r.URL.Query().Get("tab") {
-	case "details", "attributes", "media", "variants", "pricing":
+	case "details", "attributes", "media", "variants", "pricing", "activity":
 		return r.URL.Query().Get("tab")
 	default:
 		return "details"
@@ -289,6 +291,7 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var taxonName string
 	var priceLists []domain.PriceList
 	var pricing admin.ProductPriceListPricing
+	var activity []domain.AuditEntry
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -363,6 +366,37 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 			}
 			pricing, txErr = d.buildPriceListProduct(ctx, tx, *product)
 			return txErr
+
+		case "activity":
+			// The product's own entries, merged with those recorded against its
+			// variants — variant.* is keyed to the variant, so a price change or
+			// an archived SKU never shows up under the product's resource_id.
+			// Archived variants are included on purpose: pulling a SKU is exactly
+			// the change someone comes here to attribute.
+			activity, txErr = d.AuditQueryService.ListByResource(ctx, tx, "product", id)
+			if txErr != nil {
+				return txErr
+			}
+			variantRows, vErr := d.CatalogService.ListVariants(ctx, tx, id)
+			if vErr != nil {
+				return vErr
+			}
+			variantIDs := make([]uuid.UUID, len(variantRows))
+			for i, v := range variantRows {
+				variantIDs[i] = v.ID
+			}
+			if len(variantIDs) > 0 {
+				variantEntries, aErr := d.AuditQueryService.ListByRelatedResource(ctx, tx, "variant", variantIDs, "variant.")
+				if aErr != nil {
+					return aErr
+				}
+				activity = append(activity, variantEntries...)
+			}
+			// Each query is ordered only within itself.
+			slices.SortStableFunc(activity, func(a, b domain.AuditEntry) int {
+				return b.CreatedAt.Compare(a.CreatedAt)
+			})
+			return nil
 		}
 		return nil
 	})
@@ -398,6 +432,8 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		ActiveTab:          tab,
 		PriceLists:         priceLists,
 		Pricing:            pricing,
+		Activity:           activity,
+		MerchantTZ:         d.MerchantTZ,
 	}
 
 	// htmx request (sidebar nav or tab click via hx-boost): return page content
@@ -1306,6 +1342,80 @@ func (d *Deps) handleAdminVariantChannels(w http.ResponseWriter, r *http.Request
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Variant+updated", productID), http.StatusSeeOther)
+}
+
+// handleAdminVariantWholesaleMOQ saves a variant's wholesale minimum order
+// quantity and order multiple. A blank field clears that constraint.
+func (d *Deps) handleAdminVariantWholesaleMOQ(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	productID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	variantID, err := uuid.Parse(r.PathValue("variantID"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	minQty, err := optionalPositiveInt("minimum order quantity", r.FormValue("wholesale_min_qty"))
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	multiple, err := optionalPositiveInt("order multiple", r.FormValue("wholesale_multiple"))
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	var variant *domain.Variant
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		variant, txErr = d.CatalogService.UpdateVariantWholesaleMOQ(ctx, tx, variantID, minQty, multiple, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	// Re-render just this variant's MOQ fields, like the channel toggles do, so
+	// the rest of the variant table does not reflow under the operator.
+	if IsHTMX(r) {
+		admin.VariantMOQFields(productID, *variant).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Order+rules+updated", productID), http.StatusSeeOther)
+}
+
+// optionalPositiveInt parses a form field that may be left blank. Blank means
+// "no constraint" and yields nil; anything non-numeric or below 1 is an error
+// rather than a silent nil, so a typo cannot quietly remove a live MOQ rule.
+//
+// The field name is threaded through so the error toast names the box the
+// operator got wrong — there are two of them side by side.
+func optionalPositiveInt(field, raw string) (*int, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, nil
+	}
+	n, err := strconv.Atoi(trimmed)
+	if err != nil {
+		return nil, fmt.Errorf("%s must be a whole number: %w", field, app.ErrInvalidWholesaleMOQ)
+	}
+	if n < 1 {
+		return nil, fmt.Errorf("%s must be at least 1: %w", field, app.ErrInvalidWholesaleMOQ)
+	}
+	return &n, nil
 }
 
 func (d *Deps) handleAdminVariantUnarchive(w http.ResponseWriter, r *http.Request) {

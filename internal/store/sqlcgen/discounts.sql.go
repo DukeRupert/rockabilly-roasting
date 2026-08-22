@@ -153,6 +153,27 @@ func (q *Queries) GetCouponCodeByID(ctx context.Context, id uuid.UUID) (CouponCo
 	return i, err
 }
 
+const getCouponCodeByOrderID = `-- name: GetCouponCodeByOrderID :one
+SELECT id, discount_id, code, customer_id, redeemed_at, redeemed_by, created_at, redeemed_by_order_id FROM coupon_codes
+WHERE redeemed_by_order_id = $1
+`
+
+func (q *Queries) GetCouponCodeByOrderID(ctx context.Context, redeemedByOrderID *uuid.UUID) (CouponCode, error) {
+	row := q.db.QueryRow(ctx, getCouponCodeByOrderID, redeemedByOrderID)
+	var i CouponCode
+	err := row.Scan(
+		&i.ID,
+		&i.DiscountID,
+		&i.Code,
+		&i.CustomerID,
+		&i.RedeemedAt,
+		&i.RedeemedBy,
+		&i.CreatedAt,
+		&i.RedeemedByOrderID,
+	)
+	return i, err
+}
+
 const getDiscountByID = `-- name: GetDiscountByID :one
 SELECT id, name, description, type, value, minimum_order_cents, starts_at, expires_at, active, created_at, updated_at FROM discounts WHERE id = $1
 `

@@ -177,6 +177,11 @@ var (
 	// ErrInvalidTierQuantity is returned for a volume break below 2. Quantity 1
 	// is the list price itself, which is set through SetPriceListPrice.
 	ErrInvalidTierQuantity = errors.New("volume break must start at 2 or more")
+	// ErrInvalidWholesaleMOQ covers the three ways a variant's wholesale
+	// minimum/multiple can be self-contradictory. See
+	// CatalogService.UpdateVariantWholesaleMOQ for why a minimum that is not a
+	// multiple of the multiple is rejected rather than silently rounded up.
+	ErrInvalidWholesaleMOQ = errors.New("invalid wholesale order quantity rule")
 	ErrPriceListNotFound   = errors.New("price list not found")
 
 	// Cart errors (item-level)

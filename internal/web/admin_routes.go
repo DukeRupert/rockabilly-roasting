@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -104,10 +105,34 @@ func (d *Deps) handleAdminRouteShow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var saved *app.SavedRoute
+	var activity []domain.AuditEntry
 	err = store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		saved, txErr = d.RouteService.GetRoute(r.Context(), tx, id)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+		activity, txErr = d.AuditQueryService.ListByResource(r.Context(), tx, "delivery_route", id)
+		if txErr != nil {
+			return txErr
+		}
+
+		// A skipped stop is audited against the *order*, not the route, so the
+		// route's own resource_id lookup misses the events that matter most
+		// here — a skipped stop is a customer who did not get their coffee.
+		orderIDs := make([]uuid.UUID, 0, len(saved.Stops))
+		for _, stop := range saved.Stops {
+			orderIDs = append(orderIDs, stop.OrderID)
+		}
+		stopEvents, seErr := d.AuditQueryService.ListByRelatedResource(r.Context(), tx, "order", orderIDs, "delivery_route.")
+		if seErr != nil {
+			return seErr
+		}
+		activity = append(activity, stopEvents...)
+		slices.SortStableFunc(activity, func(a, b domain.AuditEntry) int {
+			return b.CreatedAt.Compare(a.CreatedAt)
+		})
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)
@@ -121,6 +146,7 @@ func (d *Deps) handleAdminRouteShow(w http.ResponseWriter, r *http.Request) {
 		Progress:   saved.Progress(),
 		DriverURL:  saved.DriverURL(d.BaseURL),
 		Unroutable: parseUnroutableCount(r),
+		Activity:   activity,
 		MerchantTZ: d.MerchantTZ,
 		StaffName:  name,
 		StaffRole:  role,

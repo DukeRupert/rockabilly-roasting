@@ -162,6 +162,9 @@ func (d *Deps) handleAdminPlanUpdateDiscount(w http.ResponseWriter, r *http.Requ
 
 func renderPlanError(w http.ResponseWriter, r *http.Request, msg string) {
 	if IsHTMX(r) {
+		// Toast only — nothing else is rendered, so the main swap must be
+		// cancelled or the empty remainder would blank the swap target.
+		w.Header().Set("HX-Reswap", "none")
 		w.WriteHeader(http.StatusOK)
 		toast.Toast(toast.VariantError, msg).Render(r.Context(), w) //nolint:errcheck
 		return

@@ -12,6 +12,9 @@ type InvoiceShowProps struct {
 	Invoice    *domain.Invoice
 	Lines      []domain.InvoiceLine
 	Payments   []domain.InvoicePayment
+	// Activity is the invoice's audit history — created, emailed, part-paid,
+	// voided. Newest first.
+	Activity   []domain.AuditEntry
 	MerchantTZ *time.Location
 	StaffName  string
 	StaffRole  string
@@ -42,6 +45,10 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 				Created { props.Invoice.CreatedAt.In(props.MerchantTZ).Format("January 2, 2006") }
 				if props.Invoice.DueDate != nil {
 					— Due { props.Invoice.DueDate.In(props.MerchantTZ).Format("January 2, 2006") }
+				}
+				<!-- A voided invoice said so in its badge but never said when. -->
+				if props.Invoice.VoidedAt != nil {
+					— Voided { props.Invoice.VoidedAt.In(props.MerchantTZ).Format("January 2, 2006") }
 				}
 			</p>
 		</div>
@@ -236,6 +243,7 @@ templ InvoiceShowContent(props InvoiceShowProps) {
 			</div>
 		}
 	</div>
+	@InvoiceActivity(props.Activity, props.MerchantTZ)
 }
 
 templ InvoiceShow(props InvoiceShowProps) {

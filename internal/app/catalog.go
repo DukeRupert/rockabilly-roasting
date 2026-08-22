@@ -673,6 +673,75 @@ func (s *CatalogService) UpdateVariantChannels(ctx context.Context, tx pgx.Tx, i
 	return variant, nil
 }
 
+// validateWholesaleMOQ rejects the three ways a variant's wholesale minimum and
+// order multiple can contradict each other. Pure so it can be tested without a
+// database — the rule about divisibility is the non-obvious one.
+func validateWholesaleMOQ(minQty, multiple *int) error {
+	if minQty != nil && *minQty < 1 {
+		return fmt.Errorf("minimum order quantity must be at least 1: %w", ErrInvalidWholesaleMOQ)
+	}
+	if multiple != nil && *multiple < 1 {
+		return fmt.Errorf("order multiple must be at least 1: %w", ErrInvalidWholesaleMOQ)
+	}
+	if minQty != nil && multiple != nil && *minQty%*multiple != 0 {
+		return fmt.Errorf("minimum %d is not a multiple of %d: %w", *minQty, *multiple, ErrInvalidWholesaleMOQ)
+	}
+	return nil
+}
+
+// UpdateVariantWholesaleMOQ sets a variant's wholesale minimum order quantity
+// and order multiple. Nil clears a constraint.
+//
+// These are enforced at wholesale checkout by domain.ValidateWholesaleCart, and
+// until now had no admin UI at all — the only writer was the white-label
+// variant copier, so the values could only ever have come from the importer or
+// hand-written SQL.
+//
+// A multiple that does not divide the minimum is rejected: the two constraints
+// are applied in sequence, so e.g. min 10 with multiple 4 makes 10 itself an
+// invalid quantity and the smallest orderable amount is silently 12. Staff
+// should say what they mean rather than discover that at a customer's checkout.
+func (s *CatalogService) UpdateVariantWholesaleMOQ(ctx context.Context, tx pgx.Tx, id uuid.UUID, minQty, multiple *int, actor Actor) (*domain.Variant, error) {
+	if err := validateWholesaleMOQ(minQty, multiple); err != nil {
+		return nil, err
+	}
+
+	variant, err := s.catalog.UpdateVariantWholesale(ctx, tx, id, minQty, multiple)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrVariantNotFound
+		}
+		return nil, fmt.Errorf("update variant wholesale moq: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditVariantUpdated,
+		ResourceType: "variant",
+		ResourceID:   id,
+		After:        variant,
+		Metadata: map[string]any{
+			"wholesale_min_qty":  intPtrOrNil(minQty),
+			"wholesale_multiple": intPtrOrNil(multiple),
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit variant wholesale moq: %w", err)
+	}
+
+	return variant, nil
+}
+
+// intPtrOrNil unwraps an *int for audit metadata so the JSON records a number
+// or null rather than a pointer address.
+func intPtrOrNil(v *int) any {
+	if v == nil {
+		return nil
+	}
+	return *v
+}
+
 // DeleteVariant hard-deletes a variant by ID and records an audit entry.
 // Returns ErrVariantInUse if a foreign key constraint blocks the delete
 // (line_items, subscriptions, etc.) — callers should offer ArchiveVariant

@@ -7,6 +7,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -433,6 +434,10 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 	var latestLabelAttempt *domain.LabelAttempt
 	var enrichedItems []admin.EnrichedLineItem
 	var accountPastDue bool
+	var billingAddress *domain.Address
+	var customerOrderCount int
+	var couponCode string
+	var activity []domain.AuditEntry
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -479,6 +484,54 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		shippingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
 		if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
 			return txErr
+		}
+
+		// Billing address. Usually the same row as shipping; the rail renders it
+		// separately only when it differs.
+		if order.BillingAddressID != order.ShippingAddressID {
+			billingAddress, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.BillingAddressID)
+			if txErr != nil && !errors.Is(txErr, app.ErrAddressNotFound) {
+				return txErr
+			}
+		} else {
+			billingAddress = shippingAddress
+		}
+
+		// Lifetime order count, so the rail can say "first order" vs "regular".
+		if order.CustomerID != nil {
+			customerOrderCount, txErr = d.OrderService.CountCustomerOrders(ctx, tx, *order.CustomerID)
+			if txErr != nil {
+				return txErr
+			}
+		}
+
+		// Activity feed: the order's own audit entries merged with those recorded
+		// against its shipments (label bought, carrier refund, shipped email).
+		// Newest first — the merge below re-sorts because each query is only
+		// ordered within its own resource.
+		activity, txErr = d.AuditQueryService.ListByResource(ctx, tx, "order", id)
+		if txErr != nil {
+			return txErr
+		}
+		for _, sh := range shipments {
+			shipEntries, aErr := d.AuditQueryService.ListByResource(ctx, tx, "shipment", sh.ID)
+			if aErr != nil {
+				return aErr
+			}
+			activity = append(activity, shipEntries...)
+		}
+		slices.SortStableFunc(activity, func(a, b domain.AuditEntry) int {
+			return b.CreatedAt.Compare(a.CreatedAt)
+		})
+
+		// The coupon the customer actually typed. The adjustments table shows the
+		// discount's name, which is not what support gets asked about.
+		coupon, cErr := d.DiscountService.GetCouponCodeForOrder(ctx, tx, id)
+		if cErr != nil {
+			return cErr
+		}
+		if coupon != nil {
+			couponCode = coupon.Code
 		}
 
 		// Resolve variant + product names + sibling variants for each line item.
@@ -611,6 +664,11 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		CanEditLineItems:   canEditOrderLineItemsView(order),
 		AccountPastDue:     accountPastDue,
 		PollCount:          pollCount,
+		BillingAddress:     billingAddress,
+		CustomerOrderCount: customerOrderCount,
+		CouponCode:         couponCode,
+		PaymentDueAt:       orderPaymentDueAt(order, customer),
+		Activity:           activity,
 	}
 
 	if IsHTMX(r) {
@@ -618,6 +676,23 @@ func (d *Deps) handleAdminOrderShow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.OrderShow(props).Render(ctx, w) //nolint:errcheck
+}
+
+// orderPaymentDueAt is when a terms-billed order is due: placement plus the
+// customer's NET terms. Card-paid retail orders settle at checkout and have no
+// due date, so they get nil.
+func orderPaymentDueAt(order *domain.Order, customer *domain.Customer) *time.Time {
+	if order.Channel != domain.OrderChannelWholesale || customer == nil {
+		return nil
+	}
+	switch order.PaymentStatus {
+	case domain.PaymentStatusPendingInvoice, domain.PaymentStatusInvoiced,
+		domain.PaymentStatusOverdue, domain.PaymentStatusPartiallyPaid:
+		due := order.PlacedAt.AddDate(0, 0, app.EffectivePaymentTermsDays(customer))
+		return &due
+	default:
+		return nil
+	}
 }
 
 func (d *Deps) handleAdminOrderCancel(w http.ResponseWriter, r *http.Request) {
@@ -949,6 +1024,38 @@ func (d *Deps) handleAdminOrderShippingMethod(w http.ResponseWriter, r *http.Req
 		flash = "Converted+to+mail-out.+Get+shipping+rates+to+print+a+label."
 	default:
 		flash = "Shipping+method+updated"
+	}
+	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash="+flash, http.StatusSeeOther)
+}
+
+// handleAdminOrderInternalNote saves the staff-only note on an order. Blank
+// input clears it. Ungated like its sibling order actions — every staff role
+// that can open the order can annotate it.
+func (d *Deps) handleAdminOrderInternalNote(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	note := r.FormValue("internal_note")
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.OrderService.SetOrderInternalNote(ctx, tx, id, note, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	flash := "Internal+note+saved"
+	if strings.TrimSpace(note) == "" {
+		flash = "Internal+note+cleared"
 	}
 	http.Redirect(w, r, "/admin/orders/"+id.String()+"?flash="+flash, http.StatusSeeOther)
 }

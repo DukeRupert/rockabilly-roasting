@@ -259,6 +259,16 @@ func (s *OrderService) ListAdjustments(ctx context.Context, tx pgx.Tx, orderID u
 	return adjs, nil
 }
 
+// CountCustomerOrders returns how many non-cancelled orders a customer has
+// placed. Staff-only context — no customer scoping needed.
+func (s *OrderService) CountCustomerOrders(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (int, error) {
+	n, err := s.orders.CountOrdersByCustomer(ctx, tx, customerID)
+	if err != nil {
+		return 0, fmt.Errorf("count customer orders: %w", err)
+	}
+	return n, nil
+}
+
 // GetOrderByStripePaymentIntentIDAsStaff returns an order by its Stripe PaymentIntent ID.
 func (s *OrderService) GetOrderByStripePaymentIntentIDAsStaff(ctx context.Context, tx pgx.Tx, intentID string) (*domain.Order, error) {
 	o, err := s.orders.GetOrderByStripePaymentIntentIDAsStaff(ctx, tx, intentID)
@@ -1342,6 +1352,50 @@ func (s *OrderService) SwapLocalShippingMethod(ctx context.Context, tx pgx.Tx, i
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("audit shipping-method swap: %w", err)
+	}
+
+	return order, nil
+}
+
+// SetOrderInternalNote replaces the staff-only note on an order. Blank input
+// clears it. This is the note staff write for each other — Order.Notes is the
+// customer's note from checkout and is never touched here.
+//
+// Allowed in any order state: an internal note is annotation, not workflow, and
+// a cancelled or refunded order is exactly when someone needs to record why.
+func (s *OrderService) SetOrderInternalNote(ctx context.Context, tx pgx.Tx, id uuid.UUID, note string, actor Actor) (*domain.Order, error) {
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrOrderNotFound
+		}
+		return nil, fmt.Errorf("get order for internal note: %w", err)
+	}
+
+	trimmed := strings.TrimSpace(note)
+	var next *string
+	if trimmed != "" {
+		next = &trimmed
+	}
+
+	order, err = s.orders.UpdateOrderInternalNote(ctx, tx, id, next)
+	if err != nil {
+		return nil, fmt.Errorf("set internal note: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditOrderInternalNoteUpdated,
+		ResourceType: "order",
+		ResourceID:   id,
+		After:        order,
+		Metadata: map[string]any{
+			"cleared": next == nil,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit internal note update: %w", err)
 	}
 
 	return order, nil

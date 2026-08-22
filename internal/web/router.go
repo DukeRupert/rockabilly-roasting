@@ -420,6 +420,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants", deps.handleAdminVariantCreate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}", deps.handleAdminVariantUpdate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/channels", deps.handleAdminVariantChannels)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/wholesale-moq", deps.handleAdminVariantWholesaleMOQ)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/archive", deps.handleAdminVariantArchive)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/unarchive", deps.handleAdminVariantUnarchive)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/delete", deps.handleAdminVariantDelete)
@@ -462,6 +463,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/orders/{id}/picked-up", deps.handleAdminOrderPickedUp)
 	adminMux.HandleFunc("POST /admin/orders/{id}/out-for-delivery", deps.handleAdminOrderOutForDelivery)
 	adminMux.HandleFunc("POST /admin/orders/{id}/shipping-method", deps.handleAdminOrderShippingMethod)
+	adminMux.HandleFunc("POST /admin/orders/{id}/internal-note", deps.handleAdminOrderInternalNote)
 	adminMux.HandleFunc("GET /admin/orders/{id}/packing-slip", deps.handleAdminOrderPackingSlip)
 	adminMux.HandleFunc("GET /admin/orders/{id}/invoice", deps.handleAdminOrderInvoice)
 	adminMux.HandleFunc("POST /admin/orders/{id}/line-items/{lineItemID}/variant", deps.handleAdminOrderLineItemVariantUpdate)
@@ -550,6 +552,8 @@ func NewRouter(deps *Deps) http.Handler {
 	// Admin discounts
 	adminMux.HandleFunc("GET /admin/discounts", deps.handleAdminDiscountList)
 	adminMux.HandleFunc("POST /admin/discounts", deps.handleAdminDiscountCreate)
+	adminMux.HandleFunc("GET /admin/discounts/{id}", deps.handleAdminDiscountShow)
+	adminMux.HandleFunc("POST /admin/discounts/{id}", deps.handleAdminDiscountUpdate)
 	adminMux.HandleFunc("POST /admin/discounts/{id}/deactivate", deps.handleAdminDiscountDeactivate)
 	adminMux.HandleFunc("POST /admin/discounts/{id}/activate", deps.handleAdminDiscountActivate)
 

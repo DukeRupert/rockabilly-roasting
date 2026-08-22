@@ -172,6 +172,7 @@ mage testVerbose                             # verbose output
 
 Live docs in `docs/`:
 - `CLAUDE-backend.md` — backend conventions (the authoritative reference) + a "Design rationale" appendix capturing non-obvious decisions
+- `admin-ui.md` / `admin-detail-pages.md` — admin visual conventions (lint-enforced) and detail-page structure
 - `operations.md` — one-shot tools (`cmd/support-reply`, `cmd/seed`, `cmd/sentrycheck`) and runbook index
 - `backup-restore-runbook.md` — daily backup procedure and full restore steps
 - `stripe-setup.md` — Stripe wiring (keys, webhooks, tax)
@@ -228,7 +229,7 @@ The admin is a working tool for staff, not a brand showcase. It shares the store
 - **Active nav.** Ink text + raised paper background; the active row is resolved from the page's `ActivePath` via `resolveActiveNav` (sub-pages light their parent). The sidebar is a flat seven-item list — Dashboard → Orders → Fulfillment → Catalog → Customers → Subscriptions → Discounts — with no group labels. Second-level pages (Categories/Attributes, Groups/Price Lists/Wholesale, Plans, and the retail/wholesale channels of Orders & Fulfillment) are reached through in-page **section tabs** / a **channel toggle** at the top of each parent (`section_nav.templ`), not their own sidebar row. Settings, Audit log, and Help live in the user menu. Mobile drawer and desktop rail share one `adminNav` component.
 - **Motion is utility, not theatre.** Sidebar collapse, dropdown toggles, toast slide-in (`translateX(100%) → 0`, 200ms). No stamp lift-and-press in admin. The storefront delights; the admin gets out of the way.
 - **Internal name.** The admin still says "Hiri" in nav/topbar — that's the platform codename and it's never customer-facing. Don't rename it without checking. Storefront and emails always say "Rockabilly Roasting Co."
-- **Enforced.** `docs/admin-ui.md` is the authoritative reference — the allowed `rr-*` token list, the banned storefront classes (paper-and-ink colors, brand fonts, stamp shadows, heavy borders), and the rationale for each. `mage checkAdminUI` (wired into `mage check`) fails the build if any admin templ reaches for a banned class. **Read `docs/admin-ui.md` before adding new admin UI.**
+- **Enforced.** `docs/admin-ui.md` is the authoritative reference — the allowed `rr-*` token list, the banned storefront classes (paper-and-ink colors, brand fonts, stamp shadows, heavy borders), and the rationale for each. `mage checkAdminUI` (wired into `mage check`) fails the build if any admin templ reaches for a banned class. **Read `docs/admin-ui.md` before adding new admin UI.** For the structure of a detail (`/admin/<thing>/{id}`) page specifically — main column vs rail, where each class of action belongs, activity timelines — read `docs/admin-detail-pages.md`.
 
 ### Design Principles
 1. **Paper, not white. Ink, not black.** Every surface is warm; every stroke is weighted. Pure `#fff`/`#000` is a bug.

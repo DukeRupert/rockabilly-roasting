@@ -1,0 +1,48 @@
+package admin
+
+import (
+	"strings"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/audit"
+)
+
+// invoiceEventLabel turns an invoice.* audit action into staff-facing copy.
+// "Emailed to customer" rather than "Sent" — on an invoice, sent is ambiguous
+// between issued and delivered, and staff are asking about the latter.
+func invoiceEventLabel(action string) string {
+	switch action {
+	case audit.AuditInvoiceCreated:
+		return "Invoice created"
+	case audit.AuditInvoiceSent:
+		return "Emailed to customer"
+	case audit.AuditInvoiceVoided:
+		return "Invoice voided"
+	case audit.AuditInvoicePaymentRecorded:
+		return "Payment recorded"
+	}
+	parts := strings.SplitN(action, ".", 2)
+	if len(parts) == 2 {
+		verb := strings.ReplaceAll(parts[1], "_", " ")
+		return strings.ToUpper(verb[:1]) + verb[1:]
+	}
+	return action
+}
+
+func invoiceEventMarker(action string) string {
+	switch action {
+	case audit.AuditInvoiceVoided:
+		return "bg-rr-red"
+	case audit.AuditInvoiceCreated, audit.AuditInvoicePaymentRecorded:
+		return "bg-rr-amber"
+	default:
+		return "bg-rr-surface"
+	}
+}
+
+// InvoiceActivity is the invoice's history — created, emailed, part-paid,
+// voided. The payments table below shows the money; this shows who did what.
+templ InvoiceActivity(entries []domain.AuditEntry, loc *time.Location) {
+	@ActivityTimeline(entries, invoiceEventLabel, invoiceEventMarker, loc)
+}

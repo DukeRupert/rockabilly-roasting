@@ -15,7 +15,7 @@ import (
 const createCustomerUser = `-- name: CreateCustomerUser :one
 INSERT INTO customer_users (id, customer_id, email, name, role, receives_notifications)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at
+RETURNING id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at, announcements_enabled
 `
 
 type CreateCustomerUserParams struct {
@@ -49,6 +49,7 @@ func (q *Queries) CreateCustomerUser(ctx context.Context, arg CreateCustomerUser
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AnnouncementsEnabled,
 	)
 	return i, err
 }
@@ -117,7 +118,7 @@ func (q *Queries) DeleteExpiredCustomerUserInviteTokens(ctx context.Context) err
 }
 
 const getCustomerUserByEmail = `-- name: GetCustomerUserByEmail :one
-SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at FROM customer_users
+SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at, announcements_enabled FROM customer_users
 WHERE email = $1
 `
 
@@ -136,12 +137,13 @@ func (q *Queries) GetCustomerUserByEmail(ctx context.Context, email string) (Cus
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AnnouncementsEnabled,
 	)
 	return i, err
 }
 
 const getCustomerUserByID = `-- name: GetCustomerUserByID :one
-SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at FROM customer_users
+SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at, announcements_enabled FROM customer_users
 WHERE id = $1
 `
 
@@ -160,12 +162,13 @@ func (q *Queries) GetCustomerUserByID(ctx context.Context, id uuid.UUID) (Custom
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AnnouncementsEnabled,
 	)
 	return i, err
 }
 
 const getCustomerUserForCustomer = `-- name: GetCustomerUserForCustomer :one
-SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at FROM customer_users
+SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at, announcements_enabled FROM customer_users
 WHERE id = $1 AND customer_id = $2
 `
 
@@ -191,6 +194,7 @@ func (q *Queries) GetCustomerUserForCustomer(ctx context.Context, arg GetCustome
 		&i.LastLoginAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AnnouncementsEnabled,
 	)
 	return i, err
 }
@@ -217,7 +221,7 @@ func (q *Queries) GetValidCustomerUserInviteToken(ctx context.Context, tokenHash
 }
 
 const listCustomerUsersByCustomer = `-- name: ListCustomerUsersByCustomer :many
-SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at FROM customer_users
+SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at, announcements_enabled FROM customer_users
 WHERE customer_id = $1
 ORDER BY created_at
 `
@@ -243,6 +247,7 @@ func (q *Queries) ListCustomerUsersByCustomer(ctx context.Context, customerID uu
 			&i.LastLoginAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AnnouncementsEnabled,
 		); err != nil {
 			return nil, err
 		}
@@ -255,7 +260,7 @@ func (q *Queries) ListCustomerUsersByCustomer(ctx context.Context, customerID uu
 }
 
 const listNotifiedCustomerUsers = `-- name: ListNotifiedCustomerUsers :many
-SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at FROM customer_users
+SELECT id, customer_id, email, password_hash, name, role, receives_notifications, invited_at, last_login_at, created_at, updated_at, announcements_enabled FROM customer_users
 WHERE customer_id = $1
   AND receives_notifications = true
 ORDER BY created_at
@@ -285,6 +290,7 @@ func (q *Queries) ListNotifiedCustomerUsers(ctx context.Context, customerID uuid
 			&i.LastLoginAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AnnouncementsEnabled,
 		); err != nil {
 			return nil, err
 		}

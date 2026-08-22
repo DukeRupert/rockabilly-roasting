@@ -4,6 +4,8 @@ The admin panel (Hiri) is a working tool for staff, not a brand showcase. It sha
 
 This doc is the **enforceable** companion to that brief: what classes to reach for, what classes to never reach for, and how the lint catches violations.
 
+For how a `/admin/<thing>/{id}` page is *structured* — main column vs rail, where each class of action lives, activity timelines, and the traps that bite when one of these pages grows — see `docs/admin-detail-pages.md`.
+
 > **Scope.** This applies to every templ file under `internal/ui/admin/` *except* `staff_login.templ`, which is a standalone branded splash page using its own layout and font import — it's intentionally paper-and-ink. The lint skips it.
 
 ---

@@ -600,7 +600,48 @@ func (s *OrderService) ShipOrder(ctx context.Context, tx pgx.Tx, id uuid.UUID, a
 		return nil, fmt.Errorf("audit order shipped: %w", err)
 	}
 
+	// Notify the customer with their tracking number. This used to be enqueued
+	// by the Pirate Ship CSV tracking import; when that was removed in favour
+	// of Shippo (6ba17ee) nothing took over, and no shipped email went out at
+	// all. Marking shipped is the moment the customer's parcel leaves, so it
+	// is the right hook — and re-running is safe because ShipOrder only
+	// accepts an order still in "fulfilled".
+	//
+	// Skipped for guest orders (no account to mail) and for orders shipped
+	// without a label: the email is built entirely around carrier, service and
+	// tracking number, so with no shipment there is nothing to tell them.
+	// canShipOrder deliberately allows that case, so it is not an error.
+	if s.enqueuer != nil && s.shipments != nil && order.CustomerID != nil {
+		shipment, err := s.latestTrackedShipment(ctx, tx, id)
+		if err != nil {
+			return nil, err
+		}
+		if shipment != nil {
+			if err := s.enqueuer.EnqueueOrderShipped(ctx, tx, order.ID, *order.CustomerID, shipment.ID); err != nil {
+				return nil, fmt.Errorf("enqueue order shipped email: %w", err)
+			}
+		}
+	}
+
 	return order, nil
+}
+
+// latestTrackedShipment returns the most recent shipment on an order that has
+// a tracking number, or nil when the order has none. Shipments come back
+// oldest-first, so the last match wins — a re-bought label supersedes the one
+// it replaced.
+func (s *OrderService) latestTrackedShipment(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (*domain.Shipment, error) {
+	shipments, err := s.shipments.ListShipmentsByOrder(ctx, tx, orderID)
+	if err != nil {
+		return nil, fmt.Errorf("list shipments for shipped email: %w", err)
+	}
+	var latest *domain.Shipment
+	for i := range shipments {
+		if shipments[i].TrackingNumber != "" {
+			latest = &shipments[i]
+		}
+	}
+	return latest, nil
 }
 
 // RevertFulfillment moves an order from fulfilled back to unfulfilled when

@@ -253,6 +253,34 @@ func canMarkPickedUp(order *domain.Order) bool {
 		order.Status != domain.OrderStatusRefunded
 }
 
+// markShippedHint spells out whether the customer actually hears about it.
+// ShipOrder emails their tracking number, but only when a label was bought —
+// canShipOrder deliberately allows marking an order shipped without one, and
+// the shipped email is built entirely around carrier and tracking.
+func markShippedHint(shipments []domain.Shipment) string {
+	for _, sh := range shipments {
+		if sh.TrackingNumber != "" {
+			return "Marks the order shipped and closes it as complete, and emails the customer their tracking number."
+		}
+	}
+	return "Marks the order shipped and closes it as complete. No email goes out — there is no label on this order, so there is no tracking to send."
+}
+
+// revertShipmentPoints tells staff what reverting cannot take back. Marking
+// shipped emails the customer their tracking when a label exists, and that
+// mail is already gone by the time anyone reaches for this button.
+func revertShipmentPoints(shipments []domain.Shipment) []string {
+	points := []string{
+		"Any shipping label already bought stays bought — void or refund it separately from the shipment above.",
+	}
+	for _, sh := range shipments {
+		if sh.TrackingNumber != "" {
+			return append(points, "The customer has already been emailed their tracking number. That cannot be undone — tell them yourself if the parcel is not on its way.")
+		}
+	}
+	return append(points, "No shipped email went out, so there is nothing to correct with the customer.")
+}
+
 func canRevertFulfillment(order *domain.Order) bool {
 	return order.FulfillmentStatus == domain.FulfillmentStatusFulfilled &&
 		order.Status != domain.OrderStatusCancelled &&
@@ -688,7 +716,7 @@ templ OrderShowContent(props OrderShowProps) {
 		}
 		if canShipOrder(props.Order) {
 			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/ship", props.Order.ID.String())) }>
-				@ActionWrap("hint-ship", "Marks the order shipped and closes it as complete. Hiri sends no shipped email — the customer is not given tracking.") {
+				@ActionWrap("hint-ship", markShippedHint(props.Shipments)) {
 					<button
 						type="submit"
 						aria-describedby="hint-ship"
@@ -780,10 +808,7 @@ templ OrderShowContent(props OrderShowProps) {
 						{ ConfirmAttrs(ActionConfirm{
 						Title: "Revert shipped status back to fulfilled?",
 						Lead:  "Moves the order out of shipped and back into fulfilled.",
-						Points: []string{
-							"Any shipping label already bought stays bought — void or refund it separately from the shipment above.",
-							"The customer is not emailed, either now or when the order was marked shipped.",
-						},
+						Points: revertShipmentPoints(props.Shipments),
 						Confirm: "Revert shipment",
 					})... }
 						type="submit"

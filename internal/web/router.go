@@ -420,6 +420,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants", deps.handleAdminVariantCreate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}", deps.handleAdminVariantUpdate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/channels", deps.handleAdminVariantChannels)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/wholesale-moq", deps.handleAdminVariantWholesaleMOQ)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/archive", deps.handleAdminVariantArchive)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/unarchive", deps.handleAdminVariantUnarchive)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants/{variantID}/delete", deps.handleAdminVariantDelete)

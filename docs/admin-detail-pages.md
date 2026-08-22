@@ -163,13 +163,45 @@ for line in m.group(1).split('\n'):
 PYEOF
 ```
 
-Every hit is a judgement call, not automatically a bug — some fields are genuine internal
-bookkeeping (`Order.OverdueReminderStage` is a dedup ledger and belongs nowhere). But as of
-this writing the scan finds:
+Every hit is a judgement call, not automatically a bug. Triage each one into three buckets,
+because they need different responses:
 
-- **`Customer.TwoFAEnabled`** — support cannot see whether 2FA is on when someone is locked out.
-- **`Subscription.EndsAt`** — when a subscription is scheduled to end.
-- **`Invoice.VoidedAt`**.
+**Real gaps** — written and/or enforced, invisible in admin. Open as of this writing:
+
+- **`Discount.MinimumOrderCents`** — *write-only*. Settable on the create form, enforced at
+  checkout, and displayed nowhere; discounts have no detail or edit page, so staff can never
+  verify or change what they set.
+- **`DeliveryRoute.ActivatedAt` / `CompletedAt`** — written by the activate/complete paths,
+  shown nowhere, and `route_show` has no timeline either.
+- **`Subscription.EndsAt`** — set when a subscription expires; an expired one does not say when.
+- **`Invoice.VoidedAt`** — same shape.
+- **`PriceList.EndsAt`**, **`CustomerUser.LastLoginAt`**.
+
+**Dead scaffolding** — a field nothing writes. Not a display gap; there is nothing to show.
+Deleting it, or finishing the feature, is the fix — rendering it is not.
+
+- **`Customer.TwoFAEnabled` / `TwoFAMethod`** — read out of the database into the struct and
+  never set by anything. There is no 2FA feature.
+- **`CustomerUser.InvitedAt`** — no writer.
+
+**Deliberate** — leave alone.
+
+- `DeliveryRoute.ShareToken` is the QR link secret. `Order.OverdueReminderStage` is a reminder
+  dedup ledger. `DeliveryRoute.OriginLat/Lng`, `EndLat/Lng` are routing inputs that belong in
+  shipping settings, not on a route record.
+
+Two traps in the scan itself, both of which bit:
+
+- It matches `.FieldName` as a Go expression, so a field whose form input is a **string
+  literal** (`name="minimum_order"`) looks unrendered when it is merely un-*read*-back.
+- A `written in Go` heuristic that looks for `Field =` misses raw SQL. `DeliveryRoute.ActivatedAt`
+  was reported "never written" when `SET activated_at = now()` writes it. Always confirm
+  against `internal/store/*.go` and `db/queries/*.sql` before concluding a column is dead.
+
+`Variant.WholesaleMinQty` / `WholesaleMultiple` were on this list and are now fixed — they were
+the worst kind, an ordering rule *enforced at wholesale checkout* whose only writer was the
+white-label variant copier, so the values could only ever have come from the importer or
+hand-written SQL. Live data existed in the wild that no one could see or change.
 
 The scan also caught the wholesale application fields — `Website`, `WholesaleNotes`,
 `ApprovedAt`/`ApprovedBy` — which have since been fixed. That case is worth keeping as the

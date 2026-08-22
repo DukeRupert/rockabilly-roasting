@@ -577,6 +577,10 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Base Price</th>
 							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Weight (oz)</th>
 							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Channels</th>
+							<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">
+								Wholesale order rules
+								<span class="block text-xs font-normal text-rr-muted">Min / multiple</span>
+							</th>
 							<th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
 								<span class="sr-only">Actions</span>
 							</th>
@@ -629,6 +633,9 @@ templ VariantsPanel(product *domain.Product, variants []VariantWithOptions, opti
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
 									@VariantChannelToggles(product.ID, vwo.Variant)
+								</td>
+								<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted lg:table-cell">
+									@VariantMOQFields(product.ID, vwo.Variant)
 								</td>
 								<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 space-x-3">
 									if !vwo.Variant.IsDefault && vwo.Variant.ArchivedAt == nil {
@@ -851,6 +858,75 @@ templ VariantChannelToggles(productID uuid.UUID, variant domain.Variant) {
 			})
 			<span class="text-xs text-rr-muted">Wholesale</span>
 		</div>
+	</form>
+}
+
+// moqFieldValue renders an *int as a form value, blank for nil. Kept as a Go
+// expression so the input's value attribute has no stray whitespace.
+func moqFieldValue(v *int) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%d", *v)
+}
+
+// moqSummary is the plain-English version of a variant's order rules, shown
+// under the inputs so staff can see the effect without doing the arithmetic.
+func moqSummary(v domain.Variant) string {
+	switch {
+	case v.WholesaleMinQty == nil && v.WholesaleMultiple == nil:
+		return "Any quantity"
+	case v.WholesaleMultiple == nil:
+		return fmt.Sprintf("At least %d", *v.WholesaleMinQty)
+	case v.WholesaleMinQty == nil:
+		return fmt.Sprintf("In multiples of %d", *v.WholesaleMultiple)
+	default:
+		return fmt.Sprintf("At least %d, in multiples of %d", *v.WholesaleMinQty, *v.WholesaleMultiple)
+	}
+}
+
+// VariantMOQFields edits the wholesale minimum order quantity and order
+// multiple enforced by domain.ValidateWholesaleCart at wholesale checkout.
+//
+// Submits on change like the channel toggles, and swaps itself so the summary
+// line updates without reflowing the variant table. Blank clears a constraint.
+templ VariantMOQFields(productID uuid.UUID, variant domain.Variant) {
+	<form
+		id={ "variant-moq-" + variant.ID.String() }
+		method="post"
+		action={ templ.SafeURL(fmt.Sprintf("/admin/catalog/%s/variants/%s/wholesale-moq", productID, variant.ID)) }
+		hx-post={ fmt.Sprintf("/admin/catalog/%s/variants/%s/wholesale-moq", productID, variant.ID) }
+		hx-trigger="change"
+		hx-target="this"
+		hx-swap="outerHTML"
+		class="flex flex-col gap-1"
+	>
+		<div class="flex items-center gap-1.5">
+			<label for={ "moq-min-" + variant.ID.String() } class="sr-only">Minimum order quantity</label>
+			<input
+				id={ "moq-min-" + variant.ID.String() }
+				name="wholesale_min_qty"
+				type="number"
+				min="1"
+				inputmode="numeric"
+				value={ moqFieldValue(variant.WholesaleMinQty) }
+				placeholder="—"
+				class="w-16 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+			/>
+			<span class="text-xs text-rr-muted">/</span>
+			<label for={ "moq-mult-" + variant.ID.String() } class="sr-only">Order multiple</label>
+			<input
+				id={ "moq-mult-" + variant.ID.String() }
+				name="wholesale_multiple"
+				type="number"
+				min="1"
+				inputmode="numeric"
+				value={ moqFieldValue(variant.WholesaleMultiple) }
+				placeholder="—"
+				class="w-16 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading focus:border-rr-red focus:outline-none"
+			/>
+		</div>
+		<span class="text-xs text-rr-muted">{ moqSummary(variant) }</span>
 	</form>
 }
 

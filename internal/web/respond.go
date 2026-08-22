@@ -151,6 +151,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrPaymentFailed),
 		errors.Is(err, app.ErrInvalidPrice),
 		errors.Is(err, app.ErrInvalidQuantity),
+		errors.Is(err, app.ErrInvalidWholesaleMOQ),
 		errors.Is(err, app.ErrWholesaleNotApproved),
 		errors.Is(err, app.ErrWholesaleNotPending),
 		errors.Is(err, app.ErrMOQViolation),

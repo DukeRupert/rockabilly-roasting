@@ -245,6 +245,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	var orderCount, lifetimeSpend int
 	var announcementsEnabled bool
 	var approvedByName string
+	var teamMembers []domain.CustomerUser
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -297,6 +298,13 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// Additional logins on the account. Retail customers never have any, so
+		// this is empty for them and the rail card does not render.
+		teamMembers, txErr = d.CustomerUserService.List(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+
 		// Who approved the wholesale application. A staff record that has since
 		// been removed leaves the name blank rather than failing the page — the
 		// approval date is still worth showing on its own.
@@ -339,6 +347,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		StaffRole:            role,
 		CanEditEmail:         staffCan(r, auth.PermEditCustomers),
 		ApprovedByName:       approvedByName,
+		TeamMembers:          teamMembers,
 	}
 
 	if IsHTMX(r) {

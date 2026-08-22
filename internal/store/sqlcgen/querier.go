@@ -22,6 +22,7 @@ type Querier interface {
 	CountActiveStaffByRole(ctx context.Context, role string) (int64, error)
 	CountAddresses(ctx context.Context, customerID *uuid.UUID) (int64, error)
 	CountCustomersByPriceList(ctx context.Context, priceListID *uuid.UUID) (int64, error)
+	CountOrdersByCustomer(ctx context.Context, customerID *uuid.UUID) (int64, error)
 	CountWholesaleByStatus(ctx context.Context, wholesaleStatus *string) (int64, error)
 	CreateAddress(ctx context.Context, arg CreateAddressParams) (Address, error)
 	CreateAdjustment(ctx context.Context, arg CreateAdjustmentParams) (Adjustment, error)
@@ -115,6 +116,7 @@ type Querier interface {
 	// or hand-inserted rows may differ and customers type in any case.
 	GetCouponCodeByCode(ctx context.Context, upper interface{}) (CouponCode, error)
 	GetCouponCodeByID(ctx context.Context, id uuid.UUID) (CouponCode, error)
+	GetCouponCodeByOrderID(ctx context.Context, redeemedByOrderID *uuid.UUID) (CouponCode, error)
 	GetCustomerByEmail(ctx context.Context, email string) (Customer, error)
 	GetCustomerByID(ctx context.Context, id uuid.UUID) (Customer, error)
 	GetCustomerByStripeCustomerID(ctx context.Context, stripeCustomerID *string) (Customer, error)
@@ -307,6 +309,7 @@ type Querier interface {
 	UpdateInvoiceVoided(ctx context.Context, id uuid.UUID) (Invoice, error)
 	UpdateLineItemVariant(ctx context.Context, arg UpdateLineItemVariantParams) (LineItem, error)
 	UpdateOrderFulfillmentStatus(ctx context.Context, arg UpdateOrderFulfillmentStatusParams) (Order, error)
+	UpdateOrderInternalNote(ctx context.Context, arg UpdateOrderInternalNoteParams) (Order, error)
 	UpdateOrderPaymentStatus(ctx context.Context, arg UpdateOrderPaymentStatusParams) (Order, error)
 	UpdateOrderRequestedDeliveryDate(ctx context.Context, arg UpdateOrderRequestedDeliveryDateParams) (Order, error)
 	UpdateOrderShippingMethod(ctx context.Context, arg UpdateOrderShippingMethodParams) (Order, error)

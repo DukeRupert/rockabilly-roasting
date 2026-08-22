@@ -14,6 +14,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countOrdersByCustomer = `-- name: CountOrdersByCustomer :one
+SELECT count(*) FROM orders
+WHERE customer_id = $1
+  AND status <> 'cancelled'
+`
+
+func (q *Queries) CountOrdersByCustomer(ctx context.Context, customerID *uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOrdersByCustomer, customerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAdjustment = `-- name: CreateAdjustment :one
 INSERT INTO adjustments (id, order_id, line_item_id, label, amount, source_type, source_id)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -877,6 +890,61 @@ type UpdateOrderFulfillmentStatusParams struct {
 
 func (q *Queries) UpdateOrderFulfillmentStatus(ctx context.Context, arg UpdateOrderFulfillmentStatusParams) (Order, error) {
 	row := q.db.QueryRow(ctx, updateOrderFulfillmentStatus, arg.ID, arg.FulfillmentStatus)
+	var i Order
+	err := row.Scan(
+		&i.ID,
+		&i.Number,
+		&i.CustomerID,
+		&i.Status,
+		&i.PaymentStatus,
+		&i.FulfillmentStatus,
+		&i.CurrencyCode,
+		&i.Subtotal,
+		&i.DiscountTotal,
+		&i.ShippingTotal,
+		&i.TaxTotal,
+		&i.Total,
+		&i.ShippingAddressID,
+		&i.BillingAddressID,
+		&i.SubscriptionID,
+		&i.DraftByUserID,
+		&i.TaxExempt,
+		&i.TaxExemptReason,
+		&i.StripeTaxID,
+		&i.Notes,
+		&i.Metadata,
+		&i.PlacedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.StripePaymentIntentID,
+		&i.CustomerPoNumber,
+		&i.InternalNote,
+		&i.QbInvoiceID,
+		&i.QbInvoiceNo,
+		&i.QbSyncedAt,
+		&i.ShippingMethod,
+		&i.RequestedDeliveryDate,
+		&i.OverdueReminderStage,
+		&i.Channel,
+		&i.ScheduledDeliveryDate,
+	)
+	return i, err
+}
+
+const updateOrderInternalNote = `-- name: UpdateOrderInternalNote :one
+UPDATE orders
+SET internal_note = $2, updated_at = now()
+WHERE id = $1
+RETURNING id, number, customer_id, status, payment_status, fulfillment_status, currency_code, subtotal, discount_total, shipping_total, tax_total, total, shipping_address_id, billing_address_id, subscription_id, draft_by_user_id, tax_exempt, tax_exempt_reason, stripe_tax_id, notes, metadata, placed_at, created_at, updated_at, stripe_payment_intent_id, customer_po_number, internal_note, qb_invoice_id, qb_invoice_no, qb_synced_at, shipping_method, requested_delivery_date, overdue_reminder_stage, channel, scheduled_delivery_date
+`
+
+type UpdateOrderInternalNoteParams struct {
+	ID           uuid.UUID `json:"id"`
+	InternalNote *string   `json:"internal_note"`
+}
+
+func (q *Queries) UpdateOrderInternalNote(ctx context.Context, arg UpdateOrderInternalNoteParams) (Order, error) {
+	row := q.db.QueryRow(ctx, updateOrderInternalNote, arg.ID, arg.InternalNote)
 	var i Order
 	err := row.Scan(
 		&i.ID,

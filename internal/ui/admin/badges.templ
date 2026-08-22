@@ -592,3 +592,24 @@ templ PriceListStatusBadge(status domain.PriceListStatus) {
 		{ string(status) }
 	</span>
 }
+
+// orderChannelBadgeClasses distinguishes wholesale from retail at a glance.
+// The order detail page serves both channels from the same URL and gates
+// several actions on the channel, so it has to say which one you're looking at.
+func orderChannelBadgeClasses(channel domain.OrderChannel) string {
+	if channel == domain.OrderChannelWholesale {
+		return "badge badge-indigo"
+	}
+	return "badge badge-neutral"
+}
+
+func OrderChannelLabel(channel domain.OrderChannel) string {
+	if channel == domain.OrderChannelWholesale {
+		return "Wholesale"
+	}
+	return "Retail"
+}
+
+templ OrderChannelBadge(channel domain.OrderChannel) {
+	<span class={ orderChannelBadgeClasses(channel) }>{ OrderChannelLabel(channel) }</span>
+}

@@ -53,6 +53,20 @@ func (s *DiscountService) ListDiscounts(ctx context.Context, tx pgx.Tx, f store.
 	return discounts, nil
 }
 
+// GetCouponCodeForOrder returns the coupon code redeemed against an order.
+// Returns nil, nil when the order carried no coupon — callers display the code
+// when there is one and say nothing when there isn't.
+func (s *DiscountService) GetCouponCodeForOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (*domain.CouponCode, error) {
+	code, err := s.discounts.GetCouponCodeByOrderID(ctx, tx, orderID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get coupon code for order: %w", err)
+	}
+	return code, nil
+}
+
 // ListCouponCodes returns all coupon codes for a discount.
 func (s *DiscountService) ListCouponCodes(ctx context.Context, tx pgx.Tx, discountID uuid.UUID) ([]domain.CouponCode, error) {
 	codes, err := s.discounts.ListCouponCodesByDiscount(ctx, tx, discountID)

@@ -153,3 +153,14 @@ ORDER BY id;
 
 -- name: DeleteAdjustment :exec
 DELETE FROM adjustments WHERE id = $1;
+
+-- name: CountOrdersByCustomer :one
+SELECT count(*) FROM orders
+WHERE customer_id = $1
+  AND status <> 'cancelled';
+
+-- name: UpdateOrderInternalNote :one
+UPDATE orders
+SET internal_note = $2, updated_at = now()
+WHERE id = $1
+RETURNING *;

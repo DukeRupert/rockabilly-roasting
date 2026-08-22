@@ -256,6 +256,17 @@ func (s *DiscountStore) DeleteCouponCode(ctx context.Context, tx pgx.Tx, id uuid
 	return nil
 }
 
+// GetCouponCodeByOrderID returns the coupon code redeemed against an order, if
+// any. Returns pgx.ErrNoRows when the order carried no coupon — the order page
+// treats that as "no code", not an error.
+func (s *DiscountStore) GetCouponCodeByOrderID(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (*domain.CouponCode, error) {
+	row, err := sqlcgen.New(tx).GetCouponCodeByOrderID(ctx, &orderID)
+	if err != nil {
+		return nil, fmt.Errorf("get coupon code by order: %w", err)
+	}
+	return couponCodeFromRow(row), nil
+}
+
 // ReleaseCouponCodeByOrderID reverses a coupon redemption tied to a specific
 // order. Used when an order is cancelled (admin action or abandoned-checkout
 // cleanup) so the code can be redeemed again. No-op if the coupon was never

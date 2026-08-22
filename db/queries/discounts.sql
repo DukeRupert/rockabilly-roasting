@@ -62,3 +62,7 @@ SET redeemed_at = NULL,
     redeemed_by = NULL,
     redeemed_by_order_id = NULL
 WHERE redeemed_by_order_id = $1;
+
+-- name: GetCouponCodeByOrderID :one
+SELECT * FROM coupon_codes
+WHERE redeemed_by_order_id = $1;

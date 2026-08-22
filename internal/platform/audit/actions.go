@@ -18,6 +18,7 @@ const (
 	AuditOrderLineItemVariantChanged = "order.line_item_variant_changed"
 	AuditOrderShippingMethodChanged  = "order.shipping_method_changed"
 	AuditOrderSwitchedToPickup       = "order.switched_to_pickup"
+	AuditOrderInternalNoteUpdated    = "order.internal_note_updated"
 
 	// Product/pricing actions
 	AuditProductCreated      = "product.created"

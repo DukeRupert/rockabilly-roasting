@@ -178,6 +178,21 @@ func (s *OrderStore) UpdateOrderFulfillmentStatus(ctx context.Context, tx pgx.Tx
 	return orderFromRow(row), nil
 }
 
+// UpdateOrderInternalNote replaces the staff-only note on an order. Pass nil
+// to clear it. The note is never shown to the customer — Order.Notes is the
+// customer-facing one.
+func (s *OrderStore) UpdateOrderInternalNote(ctx context.Context, tx pgx.Tx, id uuid.UUID, note *string) (_ *domain.Order, err error) {
+	defer trackQuery(s.metrics, "orders.update_internal_note", time.Now(), &err)
+	row, err := sqlcgen.New(tx).UpdateOrderInternalNote(ctx, sqlcgen.UpdateOrderInternalNoteParams{
+		ID:           id,
+		InternalNote: note,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("update order internal note: %w", err)
+	}
+	return orderFromRow(row), nil
+}
+
 // UpdateOrderShippingMethod sets the shipping method on an order and returns it.
 func (s *OrderStore) UpdateOrderShippingMethod(ctx context.Context, tx pgx.Tx, id uuid.UUID, method domain.ShippingMethod) (_ *domain.Order, err error) {
 	defer trackQuery(s.metrics, "orders.update_shipping_method", time.Now(), &err)
@@ -1550,6 +1565,18 @@ func (s *OrderStore) ListAdjustmentsByOrder(ctx context.Context, tx pgx.Tx, orde
 		adjs[i] = *adjustmentFromRow(r)
 	}
 	return adjs, nil
+}
+
+// CountOrdersByCustomer returns how many non-cancelled orders a customer has
+// placed, all time. Shown on the order page so staff can tell a first-time
+// buyer from a regular without opening the customer record.
+func (s *OrderStore) CountOrdersByCustomer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (_ int, err error) {
+	defer trackQuery(s.metrics, "orders.count_by_customer", time.Now(), &err)
+	n, err := sqlcgen.New(tx).CountOrdersByCustomer(ctx, &customerID)
+	if err != nil {
+		return 0, fmt.Errorf("count orders by customer: %w", err)
+	}
+	return int(n), nil
 }
 
 // ListAdjustmentsByLineItem returns all adjustments for a line item.

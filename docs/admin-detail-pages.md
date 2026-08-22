@@ -242,7 +242,7 @@ its `ActivePath`:
 <a href={ templ.SafeURL(orderShowActivePath(props.Order)) }>&larr; Back to orders</a>
 ```
 
-Still hardcoded today: `subscription_show.templ:154`, `price_list_show.templ:37`. Both are
+Still hardcoded today: `subscription_show.templ:154`, `price_list_show.templ:41`. Both are
 currently correct — neither list is split — but they will break silently on the day one is.
 
 **Element ids inside `for` loops must be scoped.** `@ActionWrap("hint-download-label", …)`
@@ -252,6 +252,19 @@ inside a shipments loop produces duplicate ids on any order with two labels, and
 ```go
 func shipmentHintID(prefix string, id uuid.UUID) string { return prefix + "-" + id.String() }
 ```
+
+**An error response that is only a toast must cancel the swap.** `toast.Toast` is a single
+root element carrying `hx-swap-oob`, and htmx lifts every top-level OOB element out of the
+response before the normal swap runs — what is left is an empty fragment. A form that targets
+itself (`hx-target="this" hx-swap="outerHTML"`) therefore *deletes itself* on any rejection,
+and a boosted form blanks the page body. `web.Error` and the `render*Error` helpers now send:
+
+```go
+w.Header().Set("HX-Reswap", "none")
+```
+
+which cancels only the main swap; OOB toasts still land. A handler that re-renders a real
+panel alongside the toast does not need it — its fragment is not empty.
 
 **`<textarea>` renders its leading whitespace.** A templ `if` block inside a textarea gets
 indented by the generator and that indentation becomes part of the value. Use a Go

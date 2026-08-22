@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dukerupert/hiri/internal/platform/auth"
 	"github.com/dukerupert/hiri/internal/testutil"
 )
 
@@ -81,4 +83,47 @@ func TestSetOrderRemindersFromEmailLink_AuditsCustomerAsActor(t *testing.T) {
 	require.Equal(t, "customer", actorType)
 	require.NotNil(t, actorID)
 	require.Equal(t, id.String(), *actorID)
+}
+
+// An announcement opt-out link must silence announcements and nothing else.
+// Reminders and announcements are separate subscriptions; a recipient who
+// clicks one has said nothing about the other, and collapsing them is the
+// mistake the separate flag exists to prevent.
+func TestSetAnnouncementsFromEmailLink_LeavesRemindersAlone(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	svc, _ := newAnnouncementService()
+	wholesale := newWholesaleService()
+	ctx := context.Background()
+
+	id := wholesaleOrderer(t, tx, dueDaysAgo)
+
+	require.NoError(t, svc.SetAnnouncementsFromEmailLink(ctx, tx, auth.UnsubscribeTarget{
+		Audience: auth.UnsubscribeAudienceAnnouncementCustomer,
+		ID:       id,
+	}, false))
+
+	enabled, err := svc.GetAnnouncementsEnabled(ctx, tx, id)
+	require.NoError(t, err)
+	require.False(t, enabled, "announcement opt-out should stick")
+
+	recipients, err := wholesale.ListOrderReminderRecipients(ctx, tx, time.Now())
+	require.NoError(t, err)
+	require.True(t, containsCustomer(recipients, id), "the weekly reminder must be unaffected")
+}
+
+// The signer must round-trip the announcement audiences, so a token minted for
+// one topic can never be read back as another.
+func TestUnsubscribeSigner_RoundTripsAnnouncementAudiences(t *testing.T) {
+	signer := auth.NewUnsubscribeSigner("test-secret")
+
+	for _, audience := range []auth.UnsubscribeAudience{
+		auth.UnsubscribeAudienceAnnouncementCustomer,
+		auth.UnsubscribeAudienceAnnouncementCustomerUser,
+	} {
+		id := uuid.New()
+		target, err := signer.Verify(signer.Sign(auth.UnsubscribeTarget{Audience: audience, ID: id}))
+		require.NoError(t, err)
+		require.Equal(t, audience, target.Audience)
+		require.Equal(t, id, target.ID)
+	}
 }

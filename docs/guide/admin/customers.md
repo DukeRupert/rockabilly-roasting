@@ -126,6 +126,43 @@ Addresses are managed by the customer through their account. The admin view is r
 
 ---
 
+## Announcements
+
+**Admin > Customers > Announcements** sends a one-off notice to a whole audience — a holiday that moves a delivery, an unplanned closure, a change to the schedule. It is not a newsletter: the retail marketing list lives in Broadwave.
+
+### Writing one
+
+Click **Write an announcement**. You pick:
+
+| Field | Notes |
+|-------|-------|
+| Who gets it | **All customers**, **Retail customers**, or **Wholesale accounts**. Each option shows a live headcount. |
+| Subject | Also used as the heading inside the email. |
+| Message | Plain text. Blank lines start a new paragraph; a URL pasted in full becomes a link. Don't paste HTML — it will be shown as literal text. |
+| When | Send immediately, or pick a date and time in shop time. |
+
+**Send me a test first** mails the draft to your own staff address without saving anything, so you can read it the way a customer will. The draft stays on screen.
+
+### Who is actually on each list
+
+- **Retail** means retail customers who have bought something — at least one order that wasn't cancelled or refunded, or a live subscription. People who registered and never ordered are left out on purpose.
+- **Wholesale** means approved accounts only, plus any teammates invited onto those accounts. Pending applicants and suspended accounts are excluded.
+- Anyone who has switched **Shop announcements** off is excluded from both.
+
+The headcount on the compose screen is what would send *right now*. The real list is worked out at send time, so anyone who unsubscribes or gets suspended in between is dropped automatically.
+
+### Scheduling and cancelling
+
+A scheduled announcement sits on the list with an amber **scheduled** badge. Open it and click **Cancel this send** any time before it starts going out. Once it flips to **sending**, mail is already leaving and there is nothing to cancel.
+
+### Opt-outs
+
+Every announcement carries an unsubscribe link. It only silences announcements — order confirmations, shipping updates, invoices and the weekly wholesale order reminder all keep working. You can also flip it by hand from the customer detail page (**Shop announcements**), for when someone asks over the phone.
+
+Every send is recorded in the audit log, one entry per account.
+
+---
+
 ## Related Pages
 
 - [Wholesale Management](wholesale.md) -- application review and account management

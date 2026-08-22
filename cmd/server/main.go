@@ -360,6 +360,7 @@ func run() error {
 	magicLinkStore := store.NewMagicLinkStore()
 	staffInviteTokenStore := store.NewStaffInviteTokenStore()
 	customerUserStore := store.NewCustomerUserStore()
+	announcementStore := store.NewAnnouncementStore()
 	customerUserInviteTokenStore := store.NewCustomerUserInviteTokenStore()
 	geocodeStore := store.NewGeocodeStore(metricsReg)
 	routeStore := store.NewRouteStore(metricsReg)
@@ -409,6 +410,9 @@ func run() error {
 		WithEmail(emailEnv, authSvc).
 		WithUnsubscribeSigner(unsubscribeSigner).
 		WithDeliverySchedule(shippingStore, merchantTZ)
+	announcementSvc := app.NewAnnouncementService(announcementStore, customerStore, customerUserStore, auditWriter, metricsReg).
+		WithEmail(emailEnv).
+		WithUnsubscribeSigner(unsubscribeSigner)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -472,6 +476,8 @@ func run() error {
 	river.AddWorker(workers, jobs.NewShippedOrderAutoDeliverWorker(orderSvc, pool))
 	river.AddWorker(workers, jobs.NewOrderReminderWorker(wholesaleSvc, pool))
 	river.AddWorker(workers, jobs.NewWholesaleNoticeWorker(wholesaleSvc, pool))
+	river.AddWorker(workers, jobs.NewAnnouncementDispatchWorker(announcementSvc, pool))
+	river.AddWorker(workers, jobs.NewAnnouncementSendWorker(announcementSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)
 	// See below after riverClient creation.
@@ -602,6 +608,7 @@ func run() error {
 	renewalSvc.WithJobEnqueuer(enqueuer)
 	checkoutSvc.WithCheckoutConfirmDeps(cartStore, enqueuer)
 	orderSvc.WithEnqueuer(enqueuer)
+	announcementSvc.WithJobEnqueuer(enqueuer)
 
 	// Register scheduler worker (needs the client for transactional inserts)
 	river.AddWorker(workers, jobs.NewRenewalSchedulerWorker(subscriptionSvc, pool, riverClient, metricsReg))
@@ -682,6 +689,7 @@ func run() error {
 		AuditWriter:            auditWriter,
 		PaymentProvider:        paymentProvider,
 		RiverClient:            riverClient,
+		AnnouncementService:    announcementSvc,
 		Enqueuer:               enqueuer,
 		R2Client:               r2Client,
 		MediaConfig:            mediaConfig,

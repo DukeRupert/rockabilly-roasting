@@ -56,6 +56,7 @@ type Deps struct {
 	PricingService         *app.PricingService
 	CartService            *app.CartService
 	WholesaleService       *app.WholesaleService
+	AnnouncementService    *app.AnnouncementService
 	WhiteLabelService      *app.WhiteLabelService
 	AttributeService       *app.AttributeService
 	InvoiceService         *app.InvoiceService
@@ -166,7 +167,15 @@ func NewRouter(deps *Deps) http.Handler {
 	// also serves RFC 8058 one-click from Gmail/Apple. See web/unsubscribe.go.
 	mux.HandleFunc("GET /wholesale/unsubscribe", deps.handleUnsubscribePage)
 	mux.HandleFunc("POST /wholesale/unsubscribe", deps.handleUnsubscribe)
+	// Same handlers on a channel-neutral path. Announcements reach retail
+	// customers, who have no wholesale account and should not be sent to a
+	// /wholesale/ URL to opt out. The old path stays live forever — unsubscribe
+	// links sit in inboxes indefinitely, and the token itself says which
+	// subscription it governs, so both paths can serve either.
+	mux.HandleFunc("GET /unsubscribe", deps.handleUnsubscribePage)
+	mux.HandleFunc("POST /unsubscribe", deps.handleUnsubscribe)
 	mux.HandleFunc("POST /wholesale/resubscribe", deps.handleResubscribe)
+	mux.HandleFunc("POST /resubscribe", deps.handleResubscribe)
 	// Switch a local-delivery order to shop pickup from the confirmation email.
 	// Public and token-authenticated for the same reason as the opt-out above —
 	// it has to work straight from an inbox, with no session. GET only renders
@@ -559,7 +568,17 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("GET /admin/wholesale/reminders", deps.handleAdminWholesaleReminders)
 	// Sending mail to the whole active wholesale list is a customer-write action,
 	// not a view — gate it behind the same permission as editing an account.
-	adminMux.Handle("POST /admin/wholesale/reminders/notice", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminWholesaleNotice)))
+
+	// Announcements — staff-composed notices to a whole customer audience.
+	// Viewing is gated on customers:view like the rest of the section; every
+	// path that puts mail in flight needs customers:write.
+	adminMux.Handle("GET /admin/announcements", deps.requirePermission(auth.PermViewCustomers, http.HandlerFunc(deps.handleAdminAnnouncements)))
+	adminMux.Handle("GET /admin/announcements/new", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminAnnouncementNew)))
+	adminMux.Handle("GET /admin/announcements/{id}", deps.requirePermission(auth.PermViewCustomers, http.HandlerFunc(deps.handleAdminAnnouncementShow)))
+	adminMux.Handle("POST /admin/announcements", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminAnnouncementCreate)))
+	adminMux.Handle("POST /admin/announcements/test", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminAnnouncementTest)))
+	adminMux.Handle("POST /admin/announcements/{id}/cancel", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminAnnouncementCancel)))
+	adminMux.Handle("POST /admin/customers/{id}/announcements", deps.requirePermission(auth.PermEditCustomers, http.HandlerFunc(deps.handleAdminCustomerAnnouncements)))
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/price-list", deps.handleAdminWholesalePriceList)
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/approve", deps.handleAdminWholesaleApprove)
 	adminMux.HandleFunc("POST /admin/wholesale/{id}/decline", deps.handleAdminWholesaleDecline)

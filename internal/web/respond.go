@@ -58,10 +58,21 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrPriceNotFound),
 		errors.Is(err, app.ErrLineItemNotFound),
 		errors.Is(err, app.ErrInvoiceNotFound),
+		errors.Is(err, app.ErrAnnouncementNotFound),
 		// Access denial is surfaced as 404 so we never confirm a restricted
 		// product/SKU exists to a viewer who may not see it.
 		errors.Is(err, app.ErrProductNotAccessible):
 		return http.StatusNotFound, "not found"
+
+	// Announcement composition failures name what to fix — the message is shown
+	// to the staff member who typed it, and "bad request" tells them nothing.
+	case errors.Is(err, app.ErrEmptyAnnouncement),
+		errors.Is(err, app.ErrInvalidAudience),
+		errors.Is(err, app.ErrScheduleInPast):
+		return http.StatusBadRequest, err.Error()
+
+	case errors.Is(err, app.ErrAnnouncementNotCancellable):
+		return http.StatusConflict, err.Error()
 
 	case errors.Is(err, app.ErrRouteNotFound):
 		return http.StatusNotFound, "that delivery route no longer exists"

@@ -40,7 +40,11 @@ func catalogTabs() []sectionTab {
 func customersTabs() []sectionTab {
 	return []sectionTab{
 		{Label: "Customers", Href: "/admin/customers"},
-		// A send console, not a customer view — the label says which reminders.
+		// Two send consoles, not customer views. Reminders is the recurring
+		// weekly wholesale nudge; Announcements is the one-off notice to any
+		// audience. The labels say which is which because the difference is
+		// what staff pick between.
+		{Label: "Announcements", Href: "/admin/announcements"},
 		{Label: "Order reminders", Href: "/admin/wholesale/reminders"},
 	}
 }

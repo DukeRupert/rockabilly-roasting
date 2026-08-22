@@ -7,6 +7,65 @@ type UnsubscribeProps struct {
 	// done page) can POST it. The page itself never acts on GET.
 	Token string
 	Email string
+	// Topic is which subscription this link governs. The page has to say so
+	// out loud: a recipient who clicks "unsubscribe" on a shop notice must not
+	// be shown a page about weekly order reminders, and a retail customer has
+	// no wholesale portal to be sent back to.
+	Topic UnsubscribeTopic
+}
+
+// UnsubscribeTopic carries the per-subscription wording and paths for the
+// opt-out flow. Two values exist (see ReminderTopic and AnnouncementTopic);
+// the handler picks one from the token's audience.
+type UnsubscribeTopic struct {
+	// Script is the second half of the page heading, set in brush script.
+	Script string
+	// Noun names the mailing in a sentence: "the weekly order reminder".
+	Noun string
+	// Unaffected lists what keeps arriving regardless, so opting out of one
+	// thing never reads as opting out of everything.
+	Unaffected string
+	// KeepLabel is the "no, don't unsubscribe me" link text.
+	KeepLabel string
+	// RestoreLabel is the undo button on the done page.
+	RestoreLabel string
+	// UnsubscribePath and ResubscribePath are the form targets. Both flows are
+	// served on a /wholesale/ path and a channel-neutral one; the topic picks
+	// whichever matches the audience so the URL never contradicts the page.
+	UnsubscribePath string
+	ResubscribePath string
+	// BackURL is where "keep them coming" goes — the portal for a wholesale
+	// account, the storefront for a retail customer.
+	BackURL string
+}
+
+// ReminderTopic is the weekly wholesale order reminder.
+func ReminderTopic() UnsubscribeTopic {
+	return UnsubscribeTopic{
+		Script:          "reminders.",
+		Noun:            "the weekly order reminder",
+		Unaffected:      "Order confirmations, shipping updates and invoices are unaffected — you'll still get those.",
+		KeepLabel:       "Keep them coming",
+		RestoreLabel:    "Turn reminders back on",
+		UnsubscribePath: "/wholesale/unsubscribe",
+		ResubscribePath: "/wholesale/resubscribe",
+		BackURL:         "/wholesale/portal",
+	}
+}
+
+// AnnouncementTopic is staff announcements — shop notices about closures,
+// holiday schedules and the like, which reach retail customers too.
+func AnnouncementTopic() UnsubscribeTopic {
+	return UnsubscribeTopic{
+		Script:          "notices.",
+		Noun:            "shop notices",
+		Unaffected:      "Order confirmations, shipping updates and invoices are unaffected — you'll still get those.",
+		KeepLabel:       "Keep them coming",
+		RestoreLabel:    "Turn notices back on",
+		UnsubscribePath: "/unsubscribe",
+		ResubscribePath: "/resubscribe",
+		BackURL:         "/",
+	}
 }
 
 // unsubscribeShell wraps the three opt-out outcomes in one paper card, so they
@@ -32,22 +91,22 @@ templ unsubscribeShell(eyebrow, heading, script string) {
 }
 
 templ UnsubscribeConfirmContent(props UnsubscribeProps) {
-	@unsubscribeShell("Email preferences", "Order", "reminders.") {
+	@unsubscribeShell("Email preferences", "Stop", props.Topic.Script) {
 		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
-			Stop sending the weekly order reminder to
+			Stop sending { props.Topic.Noun } to
 			<strong class="text-ink">{ props.Email }</strong>?
 		</p>
 		<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">
-			Order confirmations, shipping updates and invoices are unaffected &mdash; you'll still get those.
+			{ props.Topic.Unaffected }
 		</p>
-		<form method="post" action="/wholesale/unsubscribe" class="mt-6">
+		<form method="post" action={ templ.SafeURL(props.Topic.UnsubscribePath) } class="mt-6">
 			<input type="hidden" name="t" value={ props.Token }/>
 			<button type="submit" class="btn-stamp w-full border-2 border-ink bg-rust text-paper px-5 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
 				Unsubscribe me
 			</button>
 		</form>
-		<a href="/wholesale/portal" class="inline-block mt-4 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
-			Keep them coming
+		<a href={ templ.SafeURL(props.Topic.BackURL) } class="inline-block mt-4 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+			{ props.Topic.KeepLabel }
 		</a>
 	}
 }
@@ -55,27 +114,27 @@ templ UnsubscribeConfirmContent(props UnsubscribeProps) {
 templ UnsubscribeDoneContent(props UnsubscribeProps) {
 	@unsubscribeShell("Email preferences", "You're", "unsubscribed.") {
 		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
-			No more weekly order reminders to
+			No more { props.Topic.Noun } to
 			<strong class="text-ink">{ props.Email }</strong>.
 			Order confirmations and invoices keep coming.
 		</p>
 		<p class="font-oswald text-ink-soft text-sm mt-3 leading-relaxed">Clicked this by mistake?</p>
-		<form method="post" action="/wholesale/resubscribe" class="mt-4">
+		<form method="post" action={ templ.SafeURL(props.Topic.ResubscribePath) } class="mt-4">
 			<input type="hidden" name="t" value={ props.Token }/>
 			<button type="submit" class="btn-stamp w-full border-2 border-ink bg-paper text-ink px-5 py-3 font-oswald font-bold text-sm hover:bg-ink hover:text-paper transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">
-				Turn reminders back on
+				{ props.Topic.RestoreLabel }
 			</button>
 		</form>
 	}
 }
 
 templ ResubscribeDoneContent(props UnsubscribeProps) {
-	@unsubscribeShell("Email preferences", "Reminders", "back on.") {
+	@unsubscribeShell("Email preferences", "Back", "on.") {
 		<p class="font-oswald text-ink-soft text-sm leading-relaxed">
-			We'll keep sending the weekly order reminder to
+			We'll keep sending { props.Topic.Noun } to
 			<strong class="text-ink">{ props.Email }</strong>.
 		</p>
-		<a href="/wholesale/portal" class="inline-block mt-5 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
+		<a href={ templ.SafeURL(props.Topic.BackURL) } class="inline-block mt-5 font-oswald font-bold text-rust text-xs underline" style="letter-spacing:0.14em; text-transform:uppercase;">
 			Go to your account
 		</a>
 	}

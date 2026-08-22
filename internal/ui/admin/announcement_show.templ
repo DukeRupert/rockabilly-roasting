@@ -1,0 +1,121 @@
+package admin
+
+import (
+	"fmt"
+	"strconv"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/emailtemplates"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type AnnouncementShowProps struct {
+	Announcement domain.Announcement
+	MerchantTZ   *time.Location
+	StaffName    string
+	StaffRole    string
+}
+
+// announcementBodyParagraphs re-runs the same parser the email uses, so what
+// staff read back here is split exactly the way recipients will see it.
+func announcementBodyParagraphs(body string) []emailtemplates.AnnouncementParagraph {
+	return emailtemplates.ParseAnnouncementBody(body)
+}
+
+// announcementSentSummary describes the outcome in a sentence.
+func announcementSentSummary(a domain.Announcement, loc *time.Location) string {
+	switch a.Status {
+	case domain.AnnouncementStatusScheduled:
+		return "Waiting to send. Nothing has gone out yet."
+	case domain.AnnouncementStatusSending:
+		return "Sending now."
+	case domain.AnnouncementStatusCancelled:
+		return "Cancelled before it sent. Nothing went out."
+	case domain.AnnouncementStatusSent:
+		count := "an unknown number of"
+		if a.RecipientCount != nil {
+			count = strconv.Itoa(*a.RecipientCount)
+		}
+		when := ""
+		if a.SentAt != nil {
+			when = " on " + announcementTime(*a.SentAt, loc)
+		}
+		return fmt.Sprintf("Queued to %s accounts%s. Per-recipient results are in the audit log.", count, when)
+	}
+	return ""
+}
+
+templ AnnouncementShowContent(props AnnouncementShowProps) {
+	@adminSectionTabs(customersTabs(), "/admin/announcements")
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<div class="flex items-center gap-3">
+				<h1 class="admin-page-title">{ props.Announcement.Subject }</h1>
+				<span class={ announcementStatusBadge(props.Announcement.Status) }>{ string(props.Announcement.Status) }</span>
+			</div>
+			<p class="mt-1 text-sm text-rr-muted">{ announcementSentSummary(props.Announcement, props.MerchantTZ) }</p>
+		</div>
+		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+			if props.Announcement.Cancellable() {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/announcements/%s/cancel", props.Announcement.ID)) }>
+					<button
+						type="submit"
+						class="rounded-sm border border-rr-border bg-rr-surface px-3 py-1.5 text-sm/6 font-semibold text-rr-heading hover:bg-rr-raised"
+						onclick="return confirm('Cancel this announcement? It will not send.')"
+					>
+						Cancel this send
+					</button>
+				</form>
+			}
+		</div>
+	</div>
+	<div class="mt-8 grid gap-6 lg:grid-cols-3">
+		<div class="lg:col-span-2">
+			<h2 class="text-sm font-semibold text-rr-heading">Message</h2>
+			<div class="mt-3 border border-rr-border bg-rr-surface p-6">
+				<h3 class="text-base font-semibold text-rr-heading">{ props.Announcement.Subject }</h3>
+				for _, p := range announcementBodyParagraphs(props.Announcement.Body) {
+					<p class="mt-4 text-sm leading-relaxed text-rr-body">{ p.Text }</p>
+				}
+			</div>
+			<p class="mt-2 text-xs text-rr-muted">Shown as recipients see it, minus the shop's header, footer and unsubscribe link.</p>
+		</div>
+		<div>
+			<h2 class="text-sm font-semibold text-rr-heading">Details</h2>
+			<dl class="mt-3 divide-y divide-rr-border border border-rr-border bg-rr-surface">
+				<div class="px-4 py-3">
+					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Audience</dt>
+					<dd class="mt-1 text-sm text-rr-heading">{ props.Announcement.Audience.Label() }</dd>
+				</div>
+				<div class="px-4 py-3">
+					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Send time</dt>
+					<dd class="mt-1 text-sm text-rr-heading">{ announcementTime(props.Announcement.ScheduledAt, props.MerchantTZ) }</dd>
+				</div>
+				<div class="px-4 py-3">
+					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Recipients</dt>
+					<dd class="mt-1 text-sm text-rr-heading">{ announcementRecipientLabel(props.Announcement) }</dd>
+				</div>
+				<div class="px-4 py-3">
+					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Written by</dt>
+					<dd class="mt-1 text-sm text-rr-heading">{ props.Announcement.CreatedByName }</dd>
+				</div>
+				<div class="px-4 py-3">
+					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Created</dt>
+					<dd class="mt-1 text-sm text-rr-heading">{ announcementTime(props.Announcement.CreatedAt, props.MerchantTZ) }</dd>
+				</div>
+			</dl>
+		</div>
+	</div>
+}
+
+templ AnnouncementShow(props AnnouncementShowProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Announcement",
+		ActivePath: "/admin/customers",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@AnnouncementShowContent(props)
+	}
+}

@@ -886,3 +886,31 @@ func addressFromRow(r sqlcgen.Address) *domain.Address {
 		IsDefault:   r.IsDefault,
 	}
 }
+
+// GetAnnouncementsEnabled reports whether the customer's account contact
+// receives staff announcements.
+//
+// Read on its own rather than carried on domain.Customer: the flag is needed on
+// exactly one screen (the customer detail toggle) and in the audience query,
+// and threading it through the generated customer row would touch every read
+// path in the codebase to serve those two.
+func (s *CustomerStore) GetAnnouncementsEnabled(ctx context.Context, tx pgx.Tx, id uuid.UUID) (bool, error) {
+	var enabled bool
+	if err := tx.QueryRow(ctx,
+		`SELECT announcements_enabled FROM customers WHERE id = $1`, id).Scan(&enabled); err != nil {
+		return false, fmt.Errorf("get announcements enabled: %w", err)
+	}
+	return enabled, nil
+}
+
+// UpdateAnnouncementsEnabled sets whether the customer receives staff
+// announcements. Separate from UpdateOrderRemindersEnabled on purpose — see
+// migration 071 for why the two subscriptions do not share a flag.
+func (s *CustomerStore) UpdateAnnouncementsEnabled(ctx context.Context, tx pgx.Tx, id uuid.UUID, enabled bool) error {
+	if _, err := tx.Exec(ctx,
+		`UPDATE customers SET announcements_enabled = $2, updated_at = now() WHERE id = $1`,
+		id, enabled); err != nil {
+		return fmt.Errorf("update announcements enabled: %w", err)
+	}
+	return nil
+}

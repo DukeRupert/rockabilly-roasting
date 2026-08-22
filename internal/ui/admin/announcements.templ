@@ -1,0 +1,124 @@
+package admin
+
+import (
+	"fmt"
+	"strconv"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+type AnnouncementsProps struct {
+	Announcements []domain.Announcement
+	// MerchantTZ renders every timestamp in shop time. Staff schedule sends in
+	// their own timezone, so reading them back in UTC would mean doing the
+	// conversion in their head to check they got it right.
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
+}
+
+// announcementStatusBadge maps a status to the admin's semantic badge palette.
+// Scheduled is amber (pending, still stoppable), sent green, cancelled grey.
+func announcementStatusBadge(s domain.AnnouncementStatus) string {
+	switch s {
+	case domain.AnnouncementStatusScheduled:
+		return "badge badge-amber"
+	case domain.AnnouncementStatusSending:
+		return "badge badge-teal"
+	case domain.AnnouncementStatusSent:
+		return "badge badge-green"
+	case domain.AnnouncementStatusCancelled:
+		return "badge badge-grey"
+	}
+	return "badge badge-neutral"
+}
+
+// announcementTime formats a timestamp in shop time.
+func announcementTime(t time.Time, loc *time.Location) string {
+	if loc == nil {
+		loc = time.UTC
+	}
+	return t.In(loc).Format("Jan 2, 2006 3:04pm MST")
+}
+
+// announcementRecipientLabel prints the resolved headcount, or a dash while the
+// notice is still waiting — the count does not exist until dispatch resolves
+// the audience, and printing the compose-time estimate here would be a number
+// that quietly stops being true.
+func announcementRecipientLabel(a domain.Announcement) string {
+	if a.RecipientCount == nil {
+		return "—"
+	}
+	return strconv.Itoa(*a.RecipientCount)
+}
+
+templ AnnouncementsContent(props AnnouncementsProps) {
+	@adminSectionTabs(customersTabs(), "/admin/announcements")
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Announcements</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				One-off notices to a whole audience &mdash; a holiday that moves a delivery, a closure, a change to the schedule. Send now or pick a time. Every recipient gets an unsubscribe link, and every send is recorded in the audit log.
+			</p>
+		</div>
+		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
+			<a href="/admin/announcements/new" class="rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red">
+				Write an announcement
+			</a>
+		</div>
+	</div>
+	<div class="mt-8">
+		if len(props.Announcements) == 0 {
+			<div class="border border-dashed border-rr-border p-12 text-center">
+				<h3 class="text-sm font-semibold text-rr-heading">No announcements yet</h3>
+				<p class="mt-1 text-sm text-rr-muted">Nothing has been sent or scheduled.</p>
+			</div>
+		} else {
+			<div class="overflow-hidden border border-rr-border bg-rr-surface">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead class="bg-rr-raised">
+						<tr>
+							<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Subject</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Audience</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Send time</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Recipients</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Status</th>
+							<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Written by</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border bg-rr-surface">
+						for _, a := range props.Announcements {
+							<tr class="row-link">
+								<td class="py-4 pl-4 pr-3 text-sm sm:pl-6">
+									<a href={ templ.SafeURL(fmt.Sprintf("/admin/announcements/%s", a.ID)) } class="row-link-target font-medium text-rr-heading hover:text-rr-red">
+										{ a.Subject }
+									</a>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">{ a.Audience.Label() }</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">{ announcementTime(a.ScheduledAt, props.MerchantTZ) }</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">{ announcementRecipientLabel(a) }</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm">
+									<span class={ announcementStatusBadge(a.Status) }>{ string(a.Status) }</span>
+								</td>
+								<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">{ a.CreatedByName }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+templ Announcements(props AnnouncementsProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Announcements",
+		ActivePath: "/admin/customers",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@AnnouncementsContent(props)
+	}
+}

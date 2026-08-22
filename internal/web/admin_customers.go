@@ -241,6 +241,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	var subscriptions []domain.Subscription
 	var activity []domain.AuditEntry
 	var orderCount, lifetimeSpend int
+	var announcementsEnabled bool
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -284,6 +285,10 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
+		announcementsEnabled, txErr = d.AnnouncementService.GetAnnouncementsEnabled(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
 		activity, txErr = d.AuditQueryService.ListForCustomer(ctx, tx, id, 25)
 		return txErr
 	})
@@ -301,19 +306,20 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.CustomerShowProps{
-		Customer:      customer,
-		Addresses:     addresses,
-		PriceLists:    priceLists,
-		RecentOrders:  recentOrders,
-		Subscriptions: subscriptions,
-		Activity:      activity,
-		OrderCount:    orderCount,
-		LifetimeSpend: lifetimeSpend,
-		LastOrderAt:   lastOrderAt,
-		MerchantTZ:    d.MerchantTZ,
-		StaffName:     name,
-		StaffRole:     role,
-		CanEditEmail:  staffCan(r, auth.PermEditCustomers),
+		Customer:             customer,
+		Addresses:            addresses,
+		PriceLists:           priceLists,
+		RecentOrders:         recentOrders,
+		Subscriptions:        subscriptions,
+		Activity:             activity,
+		AnnouncementsEnabled: announcementsEnabled,
+		OrderCount:           orderCount,
+		LifetimeSpend:        lifetimeSpend,
+		LastOrderAt:          lastOrderAt,
+		MerchantTZ:           d.MerchantTZ,
+		StaffName:            name,
+		StaffRole:            role,
+		CanEditEmail:         staffCan(r, auth.PermEditCustomers),
 	}
 
 	if IsHTMX(r) {

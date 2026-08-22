@@ -45,6 +45,18 @@ const (
 	// UnsubscribeAudienceCustomerUser targets one invited teammate, stored as
 	// customer_users.receives_notifications.
 	UnsubscribeAudienceCustomerUser UnsubscribeAudience = "u"
+	// UnsubscribeAudienceAnnouncementCustomer targets the account contact's
+	// staff-announcement subscription, stored as
+	// customers.announcements_enabled.
+	//
+	// Announcements are a separate topic from the weekly reminder, so they need
+	// their own code: a token minted for one must never silence the other. A
+	// wholesale buyer who mutes the weekly nudge still needs to hear that the
+	// holiday moved their delivery.
+	UnsubscribeAudienceAnnouncementCustomer UnsubscribeAudience = "ac"
+	// UnsubscribeAudienceAnnouncementCustomerUser targets one invited
+	// teammate's announcement subscription.
+	UnsubscribeAudienceAnnouncementCustomerUser UnsubscribeAudience = "au"
 )
 
 // UnsubscribeTarget is the single recipient a token authorizes an opt-out for.
@@ -106,7 +118,8 @@ func (s *UnsubscribeSigner) Verify(token string) (UnsubscribeTarget, error) {
 	rawID := payload
 	if prefix, rest, found := strings.Cut(payload, ":"); found {
 		switch UnsubscribeAudience(prefix) {
-		case UnsubscribeAudienceCustomer, UnsubscribeAudienceCustomerUser:
+		case UnsubscribeAudienceCustomer, UnsubscribeAudienceCustomerUser,
+			UnsubscribeAudienceAnnouncementCustomer, UnsubscribeAudienceAnnouncementCustomerUser:
 			audience = UnsubscribeAudience(prefix)
 		default:
 			return UnsubscribeTarget{}, ErrInvalidUnsubscribeToken

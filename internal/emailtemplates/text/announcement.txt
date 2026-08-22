@@ -1,0 +1,15 @@
+{{define "announcement.txt"}}{{.Heading}}
+{{if .Greeting}}
+Hi {{.Greeting}},
+{{end}}{{range .Paragraphs}}
+{{.Text}}
+{{end}}
+Questions? Just hit reply -- we're always happy to help.
+
+{{.StoreName}}
+{{.StoreURL}}
+
+{{if .UnsubscribeURL}}Don't want shop notices like this one? Unsubscribe here:
+{{.UnsubscribeURL}}
+Order confirmations, shipping updates and invoices keep coming either way.{{else}}Don't want shop notices like this one? Reply and we'll take you off the list.{{end}}
+{{end}}

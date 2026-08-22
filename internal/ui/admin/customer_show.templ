@@ -22,7 +22,11 @@ type CustomerShowProps struct {
 	Activity      []domain.AuditEntry
 	// OrderCount and LifetimeSpend count confirmed, non-cancelled orders — the
 	// same definition the revenue dashboards use.
-	OrderCount    int
+	// AnnouncementsEnabled is read separately from the customer row — see
+	// CustomerStore.GetAnnouncementsEnabled for why it is not a field on
+	// domain.Customer.
+	AnnouncementsEnabled bool
+	OrderCount           int
 	LifetimeSpend int
 	LastOrderAt   *time.Time
 	MerchantTZ    *time.Location
@@ -514,6 +518,26 @@ templ customerSettingsCard(props CustomerShowProps) {
 					</dd>
 				</div>
 			}
+			<div class="px-4 py-3">
+				<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Shop announcements</dt>
+				<dd class="mt-1">
+					<form
+						method="post"
+						action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/announcements", props.Customer.ID)) }
+						class="flex items-center gap-2"
+					>
+						<input type="hidden" name="enabled" value={ boolToggleValue(props.AnnouncementsEnabled) }/>
+						if props.AnnouncementsEnabled {
+							<span class="badge badge-green">On</span>
+							<button type="submit" class="btn btn-secondary">Turn off</button>
+						} else {
+							<span class="badge badge-grey">Off</span>
+							<button type="submit" class="btn btn-secondary">Turn on</button>
+						}
+					</form>
+					<p class="mt-1 text-xs text-rr-muted">One-off notices &mdash; holiday schedules, closures. Separate from the weekly reminder.</p>
+				</dd>
+			</div>
 		</dl>
 	</div>
 }

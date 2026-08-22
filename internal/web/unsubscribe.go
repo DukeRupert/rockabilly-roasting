@@ -42,6 +42,7 @@ func (d *Deps) handleUnsubscribePage(w http.ResponseWriter, r *http.Request) {
 	storefront.UnsubscribeConfirmPage(storefront.UnsubscribeProps{
 		Token: token,
 		Email: email,
+		Topic: unsubscribeTopic(target),
 	}).Render(r.Context(), w) //nolint:errcheck
 }
 
@@ -75,6 +76,7 @@ func (d *Deps) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	storefront.UnsubscribeDonePage(storefront.UnsubscribeProps{
 		Token: token,
 		Email: email,
+		Topic: unsubscribeTopic(target),
 	}).Render(r.Context(), w) //nolint:errcheck
 }
 
@@ -93,22 +95,47 @@ func (d *Deps) handleResubscribe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	email, _ := d.unsubscribeRecipientEmail(r, target)
-	storefront.ResubscribeDonePage(storefront.UnsubscribeProps{Email: email}).Render(r.Context(), w) //nolint:errcheck
+	storefront.ResubscribeDonePage(storefront.UnsubscribeProps{
+		Email: email,
+		Topic: unsubscribeTopic(target),
+	}).Render(r.Context(), w) //nolint:errcheck
 }
 
 // applyUnsubscribe flips the preference for exactly the recipient the token
 // names. A teammate's opt-out must never reach into the account-wide flag —
 // several people share one mailing, and silencing all of them because one
 // clicked is the failure this indirection exists to prevent.
+//
+// The audience also names the *topic*: announcement tokens write a different
+// flag from reminder tokens. Muting shop notices must not silence the weekly
+// order reminder, or the reverse — they are separate subscriptions, and a
+// recipient who clicks one link has said nothing about the other.
 func (d *Deps) applyUnsubscribe(r *http.Request, target auth.UnsubscribeTarget, enabled bool) error {
 	return store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
 		switch target.Audience {
+		case auth.UnsubscribeAudienceAnnouncementCustomer,
+			auth.UnsubscribeAudienceAnnouncementCustomerUser:
+			return d.AnnouncementService.SetAnnouncementsFromEmailLink(r.Context(), tx, target, enabled)
 		case auth.UnsubscribeAudienceCustomerUser:
 			return d.CustomerUserService.SetNotificationsFromEmailLink(r.Context(), tx, target.ID, enabled)
 		default:
 			return d.WholesaleService.SetOrderRemindersFromEmailLink(r.Context(), tx, target.ID, enabled)
 		}
 	})
+}
+
+// unsubscribeTopic maps a token's audience to the wording and paths the page
+// should use. The token is the only thing that says which subscription the
+// reader clicked on, so the page must be driven by it and never by which URL
+// happened to serve the request — both paths accept both kinds of token.
+func unsubscribeTopic(target auth.UnsubscribeTarget) storefront.UnsubscribeTopic {
+	switch target.Audience {
+	case auth.UnsubscribeAudienceAnnouncementCustomer,
+		auth.UnsubscribeAudienceAnnouncementCustomerUser:
+		return storefront.AnnouncementTopic()
+	default:
+		return storefront.ReminderTopic()
+	}
 }
 
 // isOneClickUnsubscribe detects the RFC 8058 POST, which carries exactly
@@ -123,7 +150,8 @@ func isOneClickUnsubscribe(r *http.Request) bool {
 func (d *Deps) unsubscribeRecipientEmail(r *http.Request, target auth.UnsubscribeTarget) (string, error) {
 	var email string
 	err := store.Tx(r.Context(), d.Pool, func(tx pgx.Tx) error {
-		if target.Audience == auth.UnsubscribeAudienceCustomerUser {
+		if target.Audience == auth.UnsubscribeAudienceCustomerUser ||
+			target.Audience == auth.UnsubscribeAudienceAnnouncementCustomerUser {
 			u, txErr := d.CustomerUserService.GetForEmailLink(r.Context(), tx, target.ID)
 			if txErr != nil {
 				return txErr

@@ -18,10 +18,8 @@ type WholesaleRemindersProps struct {
 	SuppressDays int
 	CutoffLabel  string
 	ScheduleNote string
-	// Sent is set after a notice send, so staff get confirmation of the count.
-	Sent      int
-	StaffName string
-	StaffRole string
+	StaffName    string
+	StaffRole    string
 }
 
 templ WholesaleRemindersContent(props WholesaleRemindersProps) {
@@ -34,11 +32,6 @@ templ WholesaleRemindersContent(props WholesaleRemindersProps) {
 			</p>
 		</div>
 	</div>
-	if props.Sent > 0 {
-		<div class="mt-6 border border-rr-border bg-rr-raised p-4">
-			<p class="text-sm text-rr-heading">Queued { strconv.Itoa(props.Sent) } messages. They send in the background — check the audit log for per-recipient results.</p>
-		</div>
-	}
 	<!-- Preview: who is on this week's list -->
 	<div class="mt-8">
 		<h2 class="text-sm font-semibold text-rr-heading">
@@ -79,47 +72,14 @@ templ WholesaleRemindersContent(props WholesaleRemindersProps) {
 			}
 		</div>
 	</div>
-	<!-- One-off notice to the same audience -->
+	<!-- One-off notices moved to Announcements -->
 	<div class="mt-10 border-t border-rr-border pt-8">
-		<h2 class="text-sm font-semibold text-rr-heading">Send a one-off notice</h2>
+		<h2 class="text-sm font-semibold text-rr-heading">Need to tell them something?</h2>
 		<p class="mt-1 text-sm text-rr-muted">
-			Goes to every approved wholesale account listed above &mdash; use it for a corrected cutoff or a holiday schedule, not marketing. Plain text only; blank lines start a new paragraph. Every send is recorded in the audit log.
+			One-off notices &mdash; a corrected cutoff, a holiday schedule &mdash; are written on the
+			<a href="/admin/announcements/new?audience=wholesale" class="font-medium text-rr-red hover:underline">Announcements</a>
+			page, where you can pick the audience, schedule the send, and preview it first. This page is only the weekly reminder.
 		</p>
-		<form method="post" action="/admin/wholesale/reminders/notice" class="mt-4 max-w-2xl space-y-4">
-			<div>
-				<label for="subject" class="block text-sm/6 font-medium text-rr-heading">Subject</label>
-				<div class="mt-2">
-					<input
-						type="text"
-						name="subject"
-						id="subject"
-						required
-						maxlength="120"
-						placeholder="e.g. Holiday cutoff: order by Wednesday this week"
-						class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6"
-					/>
-				</div>
-			</div>
-			<div>
-				<label for="body" class="block text-sm/6 font-medium text-rr-heading">Message</label>
-				<div class="mt-2">
-					<textarea
-						name="body"
-						id="body"
-						rows="8"
-						required
-						class="block w-full rounded-sm bg-rr-surface px-3 py-1.5 text-base text-rr-heading outline-1 -outline-offset-1 outline-rr-border placeholder:text-rr-muted focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red sm:text-sm/6"
-					></textarea>
-				</div>
-			</div>
-			<button
-				type="submit"
-				class="rounded-sm bg-rr-red px-3 py-1.5 text-sm/6 font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
-				onclick="return confirm('Send this notice to every wholesale account listed above? This cannot be undone.')"
-			>
-				Send to { strconv.Itoa(len(props.Recipients)) } accounts
-			</button>
-		</form>
 	</div>
 }
 

@@ -10,9 +10,13 @@ import (
 	"github.com/dukerupert/hiri/internal/app"
 )
 
-// WholesaleNoticeArgs sends one staff-composed notice to one customer. Staff
-// compose once in the admin and the handler enqueues one job per recipient, so
-// a bad address retries on its own instead of aborting the whole send.
+// WholesaleNoticeArgs sends one staff-composed notice to one customer.
+//
+// Superseded by AnnouncementSendArgs: the composer behind this moved to
+// Announcements, which reaches retail too and can schedule the send. Nothing
+// enqueues this any more. The worker stays registered so any job queued before
+// that switch still drains on deploy rather than dying on an unknown kind —
+// safe to delete once no wholesale_notice rows remain in river_job.
 type WholesaleNoticeArgs struct {
 	CustomerID uuid.UUID `json:"customer_id"`
 	Subject    string    `json:"subject"`

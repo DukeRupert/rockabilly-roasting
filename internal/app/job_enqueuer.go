@@ -23,4 +23,8 @@ type JobEnqueuer interface {
 	EnqueueOrderOutForDelivery(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error
 	EnqueueInvoicePaid(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID) error
 	EnqueueInvoicePastDue(ctx context.Context, tx pgx.Tx, orderID, customerID uuid.UUID, stage int, dueDate time.Time) error
+	// EnqueueAnnouncementDispatch schedules an announcement's audience fan-out.
+	// A zero sendAt means immediately.
+	EnqueueAnnouncementDispatch(ctx context.Context, tx pgx.Tx, announcementID uuid.UUID, sendAt time.Time) error
+	EnqueueAnnouncementSend(ctx context.Context, tx pgx.Tx, announcementID, customerID uuid.UUID) error
 }

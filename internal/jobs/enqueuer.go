@@ -156,3 +156,28 @@ func (e *Enqueuer) EnqueueInvoicePastDue(ctx context.Context, tx pgx.Tx, orderID
 	})
 	return err
 }
+
+// EnqueueAnnouncementDispatch schedules an announcement's fan-out for sendAt.
+//
+// Quiet hours deliberately do not apply: staff picked this time on purpose, and
+// silently shifting a "we open at 8am tomorrow" notice would defeat the point
+// of letting them schedule it at all.
+func (e *Enqueuer) EnqueueAnnouncementDispatch(ctx context.Context, tx pgx.Tx, announcementID uuid.UUID, sendAt time.Time) error {
+	var opts *river.InsertOpts
+	if !sendAt.IsZero() {
+		opts = &river.InsertOpts{ScheduledAt: sendAt}
+	}
+	_, err := e.client.InsertTx(ctx, tx, AnnouncementDispatchArgs{
+		AnnouncementID: announcementID,
+	}, opts)
+	return err
+}
+
+// EnqueueAnnouncementSend enqueues one announcement email to one account.
+func (e *Enqueuer) EnqueueAnnouncementSend(ctx context.Context, tx pgx.Tx, announcementID, customerID uuid.UUID) error {
+	_, err := e.client.InsertTx(ctx, tx, AnnouncementSendArgs{
+		AnnouncementID: announcementID,
+		CustomerID:     customerID,
+	}, nil)
+	return err
+}

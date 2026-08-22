@@ -67,6 +67,8 @@ const (
 	AuditCustomerEmailUpdated            = "customer.email_updated"
 	AuditCustomerOrderRemindersEnabled   = "customer.order_reminders_enabled"
 	AuditCustomerOrderRemindersDisabled  = "customer.order_reminders_disabled"
+	AuditCustomerAnnouncementsEnabled    = "customer.announcements_enabled"
+	AuditCustomerAnnouncementsDisabled   = "customer.announcements_disabled"
 
 	// Customer user actions (additional logins on a wholesale account).
 	// These record against the ACCOUNT (resource_type "customer",
@@ -205,6 +207,16 @@ const (
 	AuditEmailStaffInvite                  = "email.staff_invite"
 	AuditEmailOrderReminderSent            = "email.order_reminder_sent"
 	AuditEmailWholesaleNoticeSent          = "email.wholesale_notice_sent"
+	AuditEmailAnnouncementSent             = "email.announcement_sent"
+	AuditEmailAnnouncementTestSent         = "email.announcement_test_sent"
+
+	// Announcement actions — the notice itself, recorded against the
+	// announcement row. The per-recipient sends are the email.* actions above,
+	// recorded against each customer, so "what did we send this account" and
+	// "who did this notice reach" are both answerable.
+	AuditAnnouncementScheduled  = "announcement.scheduled"
+	AuditAnnouncementCancelled  = "announcement.cancelled"
+	AuditAnnouncementDispatched = "announcement.dispatched"
 
 	// Attribute actions
 	AuditAttributeSetCreated      = "attribute_set.created"

@@ -70,20 +70,25 @@ widen to hours) is skipped silently rather than mailed.
 
 ## Staff controls
 
-**Preview + one-off notice — `/admin/wholesale/reminders`**
-(Customers → Reminders)
+**Preview — `/admin/wholesale/reminders`**
+(Customers → Order reminders)
 
 - Lists exactly who the next scheduled send would email, with each account's
   last order date. It runs the *same query* the scheduler uses, so it is a true
   dry run rather than an approximation.
-- "Send a one-off notice" mails a staff-composed subject and body to that same
-  audience — for a corrected cutoff or a holiday schedule. Requires
-  `customers:write`. Body is **plain text**; blank lines start new paragraphs,
-  and it renders into the branded shell (staff cannot inject HTML). Every send
-  is recorded in the audit log per recipient.
-  - A notice deliberately **ignores** the weekly-reminder opt-out — it is
-    operational, not promotional — but still never goes to an account that is
-    no longer approved wholesale.
+
+The one-off notice composer that used to live on this page moved to
+**Announcements** (`/admin/announcements`, see
+[`guide/admin/customers.md`](guide/admin/customers.md#announcements)). It does
+the same job with a wider reach: retail as well as wholesale, a scheduled send
+time, a cancel window, and a test send. Two composers for the same job was one
+too many, so this page is now only the weekly reminder.
+
+Announcements are a **separate subscription** from the weekly reminder
+(`customers.announcements_enabled`, migration 071). That is deliberate: a buyer
+who mutes the weekly "time to order" nudge still needs to hear that a holiday
+moved their delivery, and a retail customer has no reminder to opt out of but
+must still get a working unsubscribe link.
 
 ## Customer opt-out
 

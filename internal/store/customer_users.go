@@ -175,3 +175,40 @@ func customerUserFromRow(r sqlcgen.CustomerUser) *domain.CustomerUser {
 	}
 	return u
 }
+
+// UpdateAnnouncementsEnabled sets whether one invited teammate receives staff
+// announcements. Acts on this row alone: several colleagues share an account's
+// mailing, and an opt-out must silence only the address that clicked it.
+func (s *CustomerUserStore) UpdateAnnouncementsEnabled(ctx context.Context, tx pgx.Tx, id uuid.UUID, enabled bool) error {
+	if _, err := tx.Exec(ctx,
+		`UPDATE customer_users SET announcements_enabled = $2, updated_at = now() WHERE id = $1`,
+		id, enabled); err != nil {
+		return fmt.Errorf("update customer user announcements enabled: %w", err)
+	}
+	return nil
+}
+
+// ListAnnouncementRecipients returns the invited teammates on an account who
+// receive staff announcements. Distinct from ListNotified, which governs
+// transactional mail: a teammate may want order confirmations but not notices,
+// and vice versa.
+func (s *CustomerUserStore) ListAnnouncementRecipients(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) ([]domain.CustomerUser, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT id, email, name FROM customer_users
+		 WHERE customer_id = $1 AND announcements_enabled
+		 ORDER BY email`, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("list announcement customer users: %w", err)
+	}
+	defer rows.Close()
+
+	out := []domain.CustomerUser{}
+	for rows.Next() {
+		var u domain.CustomerUser
+		if err := rows.Scan(&u.ID, &u.Email, &u.Name); err != nil {
+			return nil, fmt.Errorf("scan announcement customer user: %w", err)
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}

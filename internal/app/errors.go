@@ -259,6 +259,21 @@ var (
 	// mean un-completing the order behind it, which is a staff action in admin,
 	// not something to do from a phone in a van.
 	ErrStopAlreadyDelivered = errors.New("this stop is already marked delivered")
+
+	// --- Announcements ---
+
+	ErrAnnouncementNotFound = errors.New("announcement not found")
+	// ErrEmptyAnnouncement guards the blank blast: a notice with no subject or
+	// no body reaching every customer is never what anyone intended.
+	ErrEmptyAnnouncement = errors.New("announcement subject and message are both required")
+	ErrInvalidAudience   = errors.New("choose a valid audience")
+	// ErrAnnouncementNotCancellable is returned once dispatch has started —
+	// mail is already leaving and there is nothing honest left to undo.
+	ErrAnnouncementNotCancellable = errors.New("this announcement has already started sending")
+	// ErrScheduleInPast rejects a send time that has already gone by. River
+	// would fire it instantly, which is a surprising way to learn you typed the
+	// wrong date into a mailing that reaches every customer.
+	ErrScheduleInPast = errors.New("pick a send time in the future")
 )
 
 // MOQViolationError carries the per-line minimum/multiple violations so

@@ -288,9 +288,11 @@ type NoticeParams struct {
 	Body    string // plain text; blank lines separate paragraphs
 }
 
-// SendWholesaleNotice emails one customer a staff-composed notice. This is the
-// audited replacement for the old service's unauthenticated /send-adhoc
-// endpoint — same purpose (corrections, changed cutoffs, holiday schedules),
+// SendWholesaleNotice emails one customer a staff-composed notice.
+//
+// Superseded by AnnouncementService — see jobs/wholesale_notice.go. Retained
+// only to drain jobs queued before the switch. It was the audited replacement
+// for the old rr service's unauthenticated /send-adhoc endpoint — same purpose (corrections, changed cutoffs, holiday schedules),
 // but staff-authenticated, recorded per recipient, and rendered into the
 // branded shell rather than accepting raw HTML from the request body.
 func (s *WholesaleService) SendWholesaleNotice(ctx context.Context, pool *pgxpool.Pool, customerID uuid.UUID, p NoticeParams) error {

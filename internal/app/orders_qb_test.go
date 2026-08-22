@@ -62,6 +62,16 @@ func (f *fakeEnqueuer) EnqueueInvoicePastDue(_ context.Context, _ pgx.Tx, orderI
 	return nil
 }
 
+
+// Announcements are not part of the QB reconcile path; these satisfy the
+// interface so the fake keeps compiling as JobEnqueuer grows.
+func (f *fakeEnqueuer) EnqueueAnnouncementDispatch(context.Context, pgx.Tx, uuid.UUID, time.Time) error {
+	return nil
+}
+func (f *fakeEnqueuer) EnqueueAnnouncementSend(context.Context, pgx.Tx, uuid.UUID, uuid.UUID) error {
+	return nil
+}
+
 func newReconcileService(enq app.JobEnqueuer) (*app.OrderService, *store.OrderStore) {
 	orderStore := store.NewOrderStore(nil)
 	svc := app.NewOrderService(orderStore, audit.NewAuditWriter(), metrics.NewRegistry()).WithEnqueuer(enq)

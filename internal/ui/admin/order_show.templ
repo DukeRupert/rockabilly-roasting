@@ -366,46 +366,6 @@ func swapShippingTarget(current domain.ShippingMethod) (domain.ShippingMethod, s
 	return domain.ShippingMethodLocalDelivery, "Switch to local delivery"
 }
 
-// orderPipelineStep returns 0-3 for the progress bar position.
-// cancelled/refunded orders get a special -1 value.
-func orderPipelineStep(order *domain.Order) int {
-	if order.Status == domain.OrderStatusCancelled || order.Status == domain.OrderStatusRefunded {
-		return -1
-	}
-	if order.FulfillmentStatus == domain.FulfillmentStatusShipped ||
-		order.FulfillmentStatus == domain.FulfillmentStatusDelivered {
-		return 3
-	}
-	if order.FulfillmentStatus == domain.FulfillmentStatusFulfilled {
-		return 2
-	}
-	if order.PaymentStatus == domain.PaymentStatusCaptured {
-		return 1
-	}
-	return 0
-}
-
-func stepClasses(current int, step int) string {
-	if current >= step {
-		return "flex items-center justify-center size-8 rounded-full bg-rr-red text-white"
-	}
-	return "flex items-center justify-center size-8 rounded-full bg-rr-raised text-rr-muted"
-}
-
-func connectorClasses(current int, step int) string {
-	if current >= step {
-		return "h-0.5 flex-1 bg-rr-red"
-	}
-	return "h-0.5 flex-1 bg-rr-raised"
-}
-
-func stepLabelClasses(current int, step int) string {
-	if current >= step {
-		return "text-xs font-medium text-rr-red"
-	}
-	return "text-xs text-rr-border"
-}
-
 templ shippingMethodSwap(orderID uuid.UUID, current domain.ShippingMethod) {
 	{{ target, label := swapShippingTarget(current) }}
 	<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s/shipping-method", orderID.String())) } class="inline">
@@ -957,21 +917,25 @@ templ orderLineItemsTable(props OrderShowProps) {
 					</tbody>
 					<tfoot class="border-t border-rr-border bg-rr-raised">
 						<tr>
-							<td colspan="5" class="py-2 pl-4 pr-3 text-right text-sm text-rr-muted sm:pl-6">Subtotal</td>
+							@totalsSpacerCell()
+							<td colspan="4" class="py-2 pr-3 text-right text-sm text-rr-muted">Subtotal</td>
 							<td class="whitespace-nowrap px-3 py-2 text-right text-sm text-rr-heading tabular-nums">{ formatCents(props.Order.Subtotal) }</td>
 						</tr>
 						if props.Order.DiscountTotal > 0 {
 							<tr>
-								<td colspan="5" class="py-2 pl-4 pr-3 text-right text-sm text-rr-muted sm:pl-6">Discounts</td>
+								@totalsSpacerCell()
+								<td colspan="4" class="py-2 pr-3 text-right text-sm text-rr-muted">Discounts</td>
 								<td class="whitespace-nowrap px-3 py-2 text-right text-sm text-rr-heading tabular-nums">-{ formatCents(props.Order.DiscountTotal) }</td>
 							</tr>
 						}
 						<tr>
-							<td colspan="5" class="py-2 pl-4 pr-3 text-right text-sm text-rr-muted sm:pl-6">Shipping</td>
+							@totalsSpacerCell()
+							<td colspan="4" class="py-2 pr-3 text-right text-sm text-rr-muted">Shipping</td>
 							<td class="whitespace-nowrap px-3 py-2 text-right text-sm text-rr-heading tabular-nums">{ formatCents(props.Order.ShippingTotal) }</td>
 						</tr>
 						<tr>
-							<td colspan="5" class="py-2 pl-4 pr-3 text-right text-sm text-rr-muted sm:pl-6">
+							@totalsSpacerCell()
+							<td colspan="4" class="py-2 pr-3 text-right text-sm text-rr-muted">
 								Tax
 								if props.Order.TaxExempt {
 									<span class="badge badge-slate ml-1.5">Exempt</span>
@@ -980,7 +944,8 @@ templ orderLineItemsTable(props OrderShowProps) {
 							<td class="whitespace-nowrap px-3 py-2 text-right text-sm text-rr-heading tabular-nums">{ formatCents(props.Order.TaxTotal) }</td>
 						</tr>
 						<tr class="border-t border-rr-border">
-							<td colspan="5" class="py-3 pl-4 pr-3 text-right text-sm font-semibold text-rr-heading sm:pl-6">Total</td>
+							@totalsSpacerCell()
+							<td colspan="4" class="py-3 pr-3 text-right text-sm font-semibold text-rr-heading">Total</td>
 							<td class="whitespace-nowrap px-3 py-3 text-right text-sm font-semibold text-rr-heading tabular-nums">{ formatCents(props.Order.Total) }</td>
 						</tr>
 					</tfoot>
@@ -991,6 +956,16 @@ templ orderLineItemsTable(props OrderShowProps) {
 			}
 		}
 	</div>
+}
+
+// totalsSpacerCell keeps the totals footer's column count matching the rows
+// above it. The SKU column is hidden below sm:, so the body has five cells
+// there and six at wider widths; a fixed colspan on the label would span a
+// phantom column at one width or the other and shove the amounts out of line
+// with the Total column. The label spans four, and this cell disappears with
+// the column it stands in for.
+templ totalsSpacerCell() {
+	<td class="hidden sm:table-cell"></td>
 }
 
 templ orderAdjustmentsTable(props OrderShowProps) {

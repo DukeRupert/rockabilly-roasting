@@ -160,7 +160,9 @@ func TestSettingsIntegrations_OAuthLinksAreNotBoosted(t *testing.T) {
 		}),
 		"connect": renderIntegrations(t, SettingsIntegrationsProps{QBEnabled: true}),
 	} {
-		for _, anchor := range anchorsTo(html, "/admin/settings/integrations/quickbooks/connect") {
+		anchors := anchorsTo(html, "/admin/settings/integrations/quickbooks/connect")
+		require.NotEmpty(t, anchors, "%s state should offer a link to the connect route", name)
+		for _, anchor := range anchors {
 			assert.Contains(t, anchor, `hx-boost="false"`, "%s link must not be boosted: %s", name, anchor)
 		}
 	}

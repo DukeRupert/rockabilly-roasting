@@ -48,10 +48,13 @@ func (s settingsSection) nav(role string) admin.SettingsNav {
 	}
 }
 
-// loadSettingsSection reads the section-wide state in one transaction. Three
-// small reads on a page staff open a handful of times a week — cheap enough to
-// pay on every settings page so a broken setting cannot hide behind a tab
-// nobody clicked.
+// loadSettingsSection reads the section-wide state: a few small reads on pages
+// staff open a handful of times a week, cheap enough to pay on every one of
+// them so a broken setting cannot hide behind a tab nobody clicked.
+//
+// Two transactions, not one, and deliberately — the QuickBooks status is read
+// on its own so a failure there stays a failure there. See the comment at that
+// read.
 func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error) {
 	out := settingsSection{QBEnabled: d.QBOAuthManager != nil}
 

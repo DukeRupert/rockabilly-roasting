@@ -42,6 +42,7 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 	if len(job.Args.SubscriptionIDs) == 0 {
 		metrics.TrackJob(w.metrics, "batch_renewal", start, nil)
 		slog.ErrorContext(ctx, "background job batch_renewal received an empty batch",
+			"job_kind", "batch_renewal",
 			"job_id", job.ID,
 		)
 		return river.JobCancel(fmt.Errorf("empty subscription batch"))
@@ -58,6 +59,7 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 		// business, not an outage.
 		if errors.Is(err, app.ErrSubscriptionNotActive) || errors.Is(err, app.ErrSubscriptionNotFound) {
 			slog.WarnContext(ctx, "background job batch_renewal cancelled: subscription no longer renewable",
+				"job_kind", "batch_renewal",
 				"job_id", job.ID,
 				"subscription_ids", job.Args.SubscriptionIDs,
 				"error", err.Error(),
@@ -68,6 +70,7 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 		// batch. The scheduler owns retries, so don't let River retry the job.
 		if errors.Is(err, app.ErrRenewalPaymentDeclined) {
 			slog.WarnContext(ctx, "background job batch_renewal cancelled: payment declined, dunning advanced",
+				"job_kind", "batch_renewal",
 				"job_id", job.ID,
 				"subscription_ids", job.Args.SubscriptionIDs,
 				"error", err.Error(),

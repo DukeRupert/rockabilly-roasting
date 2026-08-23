@@ -69,6 +69,15 @@ Use the existing semantic palette in `admin.templ`'s style block — admin needs
 | `row-link-stale` | Persistent rust flag on a row that's waiting/stale |
 | `row-link-target` | The `<a>` inside that owns the full-row click area |
 
+### Section navigation
+
+| Component | Use for |
+| --- | --- |
+| `adminSectionTabs` | Sibling pages inside one section (Catalog, Settings). Renders above the page `<h1>`. A tab with a non-zero `Count` gets an amber badge; zero renders nothing, because a "0" reads as a number to check rather than as nothing to do. |
+| `adminChannelToggle` / `adminChannelToggleCount` | The same list scoped by sales channel (Retail / Wholesale). |
+
+Settings adds a second piece on top of the strip: a **Needs attention** list (`settingsAttention`) that renders on every page in the section, so a misconfiguration cannot hide behind a tab nobody clicked. Rows use `row-link` + `row-link-stale` — the same rust flag the order lists use for stuck work. It renders nothing when there is nothing wrong; an always-present "all clear" panel trains staff to skip the spot where the real warning will appear.
+
 ### Shadows
 
 Use 1px hairlines on cards (`border border-rr-border`) and `shadow-sm` if you need slight elevation. Never use the storefront stamp shadows (`shadow-stamp*`).

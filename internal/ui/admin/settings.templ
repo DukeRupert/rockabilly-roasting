@@ -2,13 +2,18 @@ package admin
 
 import (
 	"fmt"
-	"github.com/dukerupert/hiri/internal/domain"
-	"github.com/dukerupert/hiri/internal/ui/layouts"
-	"github.com/google/uuid"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
+
+// The Settings section, one page per concern — see settings_nav.templ for the
+// tab strip and the attention list that tie them together.
 
 // QBConnectionStatus holds the QuickBooks connection state for the settings page.
 type QBConnectionStatus struct {
@@ -45,6 +50,37 @@ type ShippingSettings struct {
 	OriginEmail           string
 	OriginPhone           string
 	TareWeightOz          float64
+	// TareWeightInput and FlatRate/Threshold inputs are the raw strings the
+	// staffer typed. They are set only when a save was rejected, so the form
+	// can hand back exactly what was submitted rather than silently reverting
+	// to the stored value — losing twenty other edited fields because one
+	// number was mistyped is the worst thing a settings form can do.
+	FlatRateInput  string
+	ThresholdInput string
+	TareInput      string
+}
+
+// flatRateValue and friends prefer the rejected input over the stored value, so
+// a re-rendered form shows what the staffer typed.
+func (s ShippingSettings) flatRateValue() string {
+	if s.FlatRateInput != "" {
+		return s.FlatRateInput
+	}
+	return centsToDollars(s.FlatRateCents)
+}
+
+func (s ShippingSettings) thresholdValue() string {
+	if s.ThresholdInput != "" {
+		return s.ThresholdInput
+	}
+	return centsPtrToDollars(s.FreeShippingThreshold)
+}
+
+func (s ShippingSettings) tareValue() string {
+	if s.TareInput != "" {
+		return s.TareInput
+	}
+	return formatTareOz(s.TareWeightOz)
 }
 
 // formatTareOz renders the tare weight as a number input value. Trailing
@@ -93,16 +129,58 @@ func deliveryScheduleSummary(s ShippingSettings) string {
 	return "Out for delivery on " + label + ", order by " + s.LocalDeliveryCutoff + "."
 }
 
+// shippingRuleSummary states the saved rate rule as a customer meets it at
+// checkout. Two numbers in two boxes do not add up to a policy in anyone's
+// head; the sentence they combine into does, and reading it back is how a
+// staffer catches a threshold typed in cents.
+func shippingRuleSummary(s ShippingSettings) string {
+	rate := centsToDollars(s.FlatRateCents)
+	var out string
+	if s.FreeShippingThreshold != nil {
+		free := centsToDollars(*s.FreeShippingThreshold)
+		out = fmt.Sprintf("Orders under $%s pay $%s shipping; $%s and over ship free.", free, rate, free)
+	} else {
+		out = fmt.Sprintf("Every non-local order pays $%s shipping — no free-shipping threshold is set.", rate)
+	}
+	if n := len(s.LocalZipCodes); n > 0 {
+		out += fmt.Sprintf(" Orders to the %d local zip%s ship free either way.", n, pluralS(n))
+	}
+	return out
+}
+
+// SettingsProps backs the Shipping tab — the section's landing page.
 type SettingsProps struct {
-	QB                 QBConnectionStatus
-	QBEnabled          bool // true if QB_CLIENT_ID is configured
-	Shipping           ShippingSettings
+	Nav      SettingsNav
+	Shipping ShippingSettings
+	// FieldErrors maps a form field name to what is wrong with it. Populated
+	// only on a rejected save; the page re-renders with the submitted values
+	// rather than redirecting, so nothing typed is thrown away.
+	FieldErrors map[string]string
+	Flash       Flash
+	MerchantTZ  *time.Location
+	StaffName   string
+	StaffRole   string
+}
+
+// SettingsWholesaleProps backs the Wholesale tab.
+type SettingsWholesaleProps struct {
+	Nav                SettingsNav
 	PriceLists         []domain.PriceList // all price lists, for the default-wholesale selector
 	DefaultPriceListID *uuid.UUID         // current store-wide default wholesale list, nil = base prices
-	Flash              string
-	MerchantTZ         *time.Location
+	Flash              Flash
 	StaffName          string
 	StaffRole          string
+}
+
+// SettingsIntegrationsProps backs the Integrations tab.
+type SettingsIntegrationsProps struct {
+	Nav        SettingsNav
+	QB         QBConnectionStatus
+	QBEnabled  bool // true if QB_CLIENT_ID is configured
+	Flash      Flash
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
 }
 
 // centsToDollars formats integer cents as a dollar string with no symbol, e.g.
@@ -126,6 +204,16 @@ func zipCodesLine(zips []string) string {
 	return strings.Join(zips, ", ")
 }
 
+// fieldInput builds an input's class list, outlining it in rust when that field
+// is the one that was rejected. extra carries per-field additions ("font-mono").
+func fieldInput(errs map[string]string, name, extra string) string {
+	border := "border-rr-border"
+	if _, bad := errs[name]; bad {
+		border = "border-rr-red"
+	}
+	return strings.TrimSpace("w-full rounded-sm border " + border + " bg-rr-surface px-3 py-2 text-sm " + extra)
+}
+
 func qbConnectionBadgeClasses(connected bool) string {
 	if connected {
 		return "badge badge-green"
@@ -142,43 +230,50 @@ func refreshTokenDaysRemaining(expiresAt *time.Time) int {
 
 func refreshTokenUrgencyClasses(days int) string {
 	if days <= 14 {
-		return "text-red-600 font-semibold"
+		return "text-rr-red font-semibold"
 	}
 	if days <= 30 {
-		return "text-amber-600 font-medium"
+		return "text-rr-amber-dark font-medium"
 	}
 	return "text-rr-muted"
 }
 
+// fieldNote renders the field's error if it has one, otherwise its help text.
+// One line under the input either way: the error replaces the hint rather than
+// pushing it down the page, so the layout does not jump on a rejected save.
+templ fieldNote(errs map[string]string, name, help string) {
+	if msg, bad := errs[name]; bad {
+		<p class="mt-1 text-xs font-medium text-rr-red">{ msg }</p>
+	} else if help != "" {
+		<p class="mt-1 text-xs text-rr-muted">{ help }</p>
+	}
+}
+
 templ SettingsContent(props SettingsProps) {
 	@ConfirmDialogHost()
+	@settingsSection(props.Nav, settingsTabShipping)
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
-			<h1 class="admin-page-title">Settings</h1>
-			<p class="mt-1 text-sm text-rr-muted">Manage integrations and platform configuration</p>
+			<h1 class="admin-page-title">Shipping</h1>
+			<p class="mt-1 text-sm text-rr-muted">What customers are charged, where the van goes, and the address labels are bought against.</p>
 		</div>
 	</div>
-	if props.Flash != "" {
-		<div class="mt-4 rounded-sm badge-green p-4">
-			<div class="flex">
-				<div class="flex-shrink-0">
-					<svg class="size-5" viewBox="0 0 20 20" fill="currentColor">
-						<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd"></path>
-					</svg>
-				</div>
-				<div class="ml-3">
-					<p class="text-sm font-medium">{ props.Flash }</p>
-				</div>
-			</div>
-		</div>
-	}
-	<!-- Shipping section -->
-	<div class="mt-8">
-		<h2 class="text-sm font-semibold text-rr-heading">Shipping</h2>
-		<p class="mt-1 text-sm text-rr-muted">Flat rate, free-shipping threshold, and local delivery zip codes.</p>
-		<div class="mt-4 overflow-hidden border border-rr-border bg-rr-surface">
-			<form method="post" action="/admin/settings/shipping" class="divide-y divide-rr-border">
-				<div class="px-4 py-5 sm:px-6 grid gap-5 sm:grid-cols-2">
+	@adminFlash(props.Flash)
+	@settingsAttention(props.Nav.Issues)
+	<!-- No overflow-hidden on this card: it would make itself the scroll
+	     container for the sticky save bar below and quietly unstick it. -->
+	<div class="mt-6 border border-rr-border bg-rr-surface">
+		<form
+			method="post"
+			action="/admin/settings/shipping"
+			class="divide-y divide-rr-border"
+			x-data="{ dirty: false }"
+			@input="dirty = true"
+			@change="dirty = true"
+		>
+			<div class="px-4 py-5 sm:px-6">
+				<h2 class="text-sm font-semibold text-rr-heading">Rates</h2>
+				<div class="mt-3 grid gap-5 sm:grid-cols-2">
 					<div>
 						<label for="shipping-flat-rate" class="block text-sm font-medium text-rr-heading">
 							Flat rate (USD)
@@ -191,12 +286,12 @@ templ SettingsContent(props SettingsProps) {
 								name="flat_rate"
 								step="0.01"
 								min="0"
-								value={ centsToDollars(props.Shipping.FlatRateCents) }
+								value={ props.Shipping.flatRateValue() }
 								required
-								class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+								class={ fieldInput(props.FieldErrors, "flat_rate", "font-mono") }
 							/>
 						</div>
-						<p class="mt-1 text-xs text-rr-muted">Charged on non-local orders that don't meet the free-shipping threshold.</p>
+						@fieldNote(props.FieldErrors, "flat_rate", "Charged on non-local orders that don't meet the free-shipping threshold.")
 					</div>
 					<div>
 						<label for="shipping-threshold" class="block text-sm font-medium text-rr-heading">
@@ -210,414 +305,453 @@ templ SettingsContent(props SettingsProps) {
 								name="free_threshold"
 								step="0.01"
 								min="0"
-								value={ centsPtrToDollars(props.Shipping.FreeShippingThreshold) }
+								value={ props.Shipping.thresholdValue() }
 								placeholder="leave blank to disable"
-								class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+								class={ fieldInput(props.FieldErrors, "free_threshold", "font-mono") }
 							/>
 						</div>
-						<p class="mt-1 text-xs text-rr-muted">Orders at or above this subtotal ship free. Blank = no threshold.</p>
+						@fieldNote(props.FieldErrors, "free_threshold", "Orders at or above this subtotal ship free. Blank = no threshold.")
 					</div>
 				</div>
-				<div class="px-4 py-5 sm:px-6">
-					<label for="shipping-zips" class="block text-sm font-medium text-rr-heading">
-						Local zip codes
+				<!-- The saved rule, in the words a customer meets it in. -->
+				<p class="mt-4 border-l border-rr-border pl-3 text-xs text-rr-body">
+					Customers currently see: <span class="font-medium text-rr-heading">{ shippingRuleSummary(props.Shipping) }</span>
+				</p>
+			</div>
+			<div class="px-4 py-5 sm:px-6">
+				<label for="shipping-zips" class="block text-sm font-medium text-rr-heading">
+					Local zip codes
+				</label>
+				<textarea
+					id="shipping-zips"
+					name="local_zip_codes"
+					rows="3"
+					class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+					placeholder="99336, 99337, 99338, …"
+				>{ zipCodesLine(props.Shipping.LocalZipCodes) }</textarea>
+				<p class="mt-1 text-xs text-rr-muted">
+					Comma- or whitespace-separated 5-digit zips. Orders shipping to any of these zips ship free regardless of subtotal.
+				</p>
+			</div>
+			<div id="local-fulfillment" class="px-4 py-5 sm:px-6 scroll-mt-6">
+				<h2 class="text-sm font-semibold text-rr-heading">Local fulfillment options</h2>
+				<p class="mt-1 text-xs text-rr-muted">
+					Channels offered to customers shipping to a local zip. Disable both to fall back to the standard shipped flow even for local zips.
+				</p>
+				<div class="mt-3 space-y-4">
+					<label class="flex items-start gap-3">
+						<input
+							type="checkbox"
+							name="local_delivery_enabled"
+							value="1"
+							checked?={ props.Shipping.LocalDeliveryEnabled }
+							class="mt-1 size-4 rounded-sm border border-rr-border"
+						/>
+						<span>
+							<span class="block text-sm font-medium text-rr-heading">Free local delivery</span>
+							<span class="block text-xs text-rr-muted">Customer's order is hand-delivered on the configured days.</span>
+						</span>
 					</label>
-					<textarea
-						id="shipping-zips"
-						name="local_zip_codes"
-						rows="3"
-						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
-						placeholder="99336, 99337, 99338, …"
-					>{ zipCodesLine(props.Shipping.LocalZipCodes) }</textarea>
-					<p class="mt-1 text-xs text-rr-muted">
-						Comma- or whitespace-separated 5-digit zips. Orders shipping to any of these zips ship free regardless of subtotal.
-					</p>
-				</div>
-				<div class="px-4 py-5 sm:px-6">
-					<h3 class="text-sm font-semibold text-rr-heading">Local fulfillment options</h3>
-					<p class="mt-1 text-xs text-rr-muted">
-						Channels offered to customers shipping to a local zip. Disable both to fall back to the standard shipped flow even for local zips.
-					</p>
-					<div class="mt-3 space-y-4">
-						<label class="flex items-start gap-3">
-							<input
-								type="checkbox"
-								name="local_delivery_enabled"
-								value="1"
-								checked?={ props.Shipping.LocalDeliveryEnabled }
-								class="mt-1 size-4 rounded-sm border border-rr-border"
-							/>
-							<span>
-								<span class="block text-sm font-medium text-rr-heading">Free local delivery</span>
-								<span class="block text-xs text-rr-muted">Customer's order is hand-delivered on the configured days.</span>
-							</span>
-						</label>
-						<div class="ml-7 space-y-3">
-							<div>
-								<span class="block text-sm font-medium text-rr-heading">Delivery days</span>
-								<div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-2">
-									for _, day := range weekdayOrder() {
-										<label class="flex items-center gap-2">
-											<input
-												type="checkbox"
-												name="local_delivery_weekdays"
-												value={ weekdayValue(day) }
-												checked?={ hasWeekday(props.Shipping.LocalDeliveryWeekdays, day) }
-												class="size-4 rounded-sm border border-rr-border"
-											/>
-											<span class="text-sm text-rr-heading">{ day.String() }</span>
-										</label>
-									}
-								</div>
-								<p class="mt-1 text-xs text-rr-muted">The days the van actually runs. Used to work out each order's delivery date — not just display copy.</p>
+					<div class="ml-7 space-y-3">
+						<div>
+							<span class="block text-sm font-medium text-rr-heading">Delivery days</span>
+							<div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-2">
+								for _, day := range weekdayOrder() {
+									<label class="flex items-center gap-2">
+										<input
+											type="checkbox"
+											name="local_delivery_weekdays"
+											value={ weekdayValue(day) }
+											checked?={ hasWeekday(props.Shipping.LocalDeliveryWeekdays, day) }
+											class="size-4 rounded-sm border border-rr-border"
+										/>
+										<span class="text-sm text-rr-heading">{ day.String() }</span>
+									</label>
+								}
 							</div>
-							<div class="sm:max-w-xs">
-								<label for="local-delivery-cutoff" class="block text-sm font-medium text-rr-heading">Order-by cutoff</label>
-								<input
-									id="local-delivery-cutoff"
-									type="time"
-									name="local_delivery_cutoff"
-									value={ props.Shipping.LocalDeliveryCutoff }
-									class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-								/>
+							@fieldNote(props.FieldErrors, "local_delivery_weekdays", "The days the van actually runs. Used to work out each order's delivery date — not just display copy.")
+						</div>
+						<div class="sm:max-w-xs">
+							<label for="local-delivery-cutoff" class="block text-sm font-medium text-rr-heading">Order-by cutoff</label>
+							<input
+								id="local-delivery-cutoff"
+								type="time"
+								name="local_delivery_cutoff"
+								value={ props.Shipping.LocalDeliveryCutoff }
+								class={ fieldInput(props.FieldErrors, "local_delivery_cutoff", "mt-1") }
+							/>
+							if _, bad := props.FieldErrors["local_delivery_cutoff"]; bad {
+								@fieldNote(props.FieldErrors, "local_delivery_cutoff", "")
+							} else {
 								<p class="mt-1 text-xs text-rr-muted">
 									Orders placed before this time on a delivery day go out that day. At or after it, they wait for the next one.
 									if props.MerchantTZ != nil {
 										{ " Times are " + props.MerchantTZ.String() + "." }
 									}
 								</p>
-							</div>
-							if len(props.Shipping.LocalDeliveryWeekdays) > 0 {
-								<p class="text-xs text-rr-muted">
-									Customers currently see: <span class="font-medium text-rr-heading">{ deliveryScheduleSummary(props.Shipping) }</span>
-								</p>
 							}
 						</div>
-						<label class="flex items-start gap-3">
-							<input
-								type="checkbox"
-								name="local_pickup_enabled"
-								value="1"
-								checked?={ props.Shipping.LocalPickupEnabled }
-								class="mt-1 size-4 rounded-sm border border-rr-border"
-							/>
-							<span>
-								<span class="block text-sm font-medium text-rr-heading">Free pickup at the shop</span>
-								<span class="block text-xs text-rr-muted">Customer is notified by email when the order is ready and picks it up at the shop.</span>
-							</span>
-						</label>
-						<div class="ml-7">
-							<label for="local-pickup-instructions" class="block text-sm font-medium text-rr-heading">Pickup instructions</label>
-							<textarea
-								id="local-pickup-instructions"
-								name="local_pickup_instructions"
-								rows="3"
-								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-								placeholder="101 W Kennewick Ave, Tue–Sat 8a–4p"
-							>{ props.Shipping.LocalPickupInstructions }</textarea>
-							<p class="mt-1 text-xs text-rr-muted">Shown at checkout when pickup is selected and in the "ready for pickup" email.</p>
-						</div>
+						if len(props.Shipping.LocalDeliveryWeekdays) > 0 {
+							<p class="text-xs text-rr-muted">
+								Customers currently see: <span class="font-medium text-rr-heading">{ deliveryScheduleSummary(props.Shipping) }</span>
+							</p>
+						}
+					</div>
+					<label class="flex items-start gap-3">
+						<input
+							type="checkbox"
+							name="local_pickup_enabled"
+							value="1"
+							checked?={ props.Shipping.LocalPickupEnabled }
+							class="mt-1 size-4 rounded-sm border border-rr-border"
+						/>
+						<span>
+							<span class="block text-sm font-medium text-rr-heading">Free pickup at the shop</span>
+							<span class="block text-xs text-rr-muted">Customer is notified by email when the order is ready and picks it up at the shop.</span>
+						</span>
+					</label>
+					<div class="ml-7">
+						<label for="local-pickup-instructions" class="block text-sm font-medium text-rr-heading">Pickup instructions</label>
+						<textarea
+							id="local-pickup-instructions"
+							name="local_pickup_instructions"
+							rows="3"
+							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							placeholder="101 W Kennewick Ave, Tue–Sat 8a–4p"
+						>{ props.Shipping.LocalPickupInstructions }</textarea>
+						<p class="mt-1 text-xs text-rr-muted">Shown at checkout when pickup is selected and in the "ready for pickup" email.</p>
 					</div>
 				</div>
-				<div class="px-4 py-5 sm:px-6">
-					<h3 class="text-sm font-semibold text-rr-heading">Pickup origin</h3>
-					<p class="mt-1 text-xs text-rr-muted">
-						Where shipments leave from. Email and phone are required by USPS when buying labels through Shippo — purchases fail without them.
-					</p>
-					<div class="mt-3 grid gap-4 sm:grid-cols-2">
-						<div class="sm:col-span-2">
-							<label for="origin-name" class="block text-sm font-medium text-rr-heading">Sender name</label>
+			</div>
+			<div id="origin" class="px-4 py-5 sm:px-6 scroll-mt-6">
+				<h2 class="text-sm font-semibold text-rr-heading">Pickup origin</h2>
+				<p class="mt-1 text-xs text-rr-muted">
+					Where shipments leave from. Email and phone are required by USPS when buying labels through Shippo — purchases fail without them.
+				</p>
+				<div class="mt-3 grid gap-4 sm:grid-cols-2">
+					<div class="sm:col-span-2">
+						<label for="origin-name" class="block text-sm font-medium text-rr-heading">Sender name</label>
+						<input
+							id="origin-name"
+							type="text"
+							name="origin_name"
+							value={ props.Shipping.OriginName }
+							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+						/>
+					</div>
+					<div>
+						<label for="origin-street1" class="block text-sm font-medium text-rr-heading">Street</label>
+						<input
+							id="origin-street1"
+							type="text"
+							name="origin_street1"
+							value={ props.Shipping.OriginStreet1 }
+							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+						/>
+					</div>
+					<div>
+						<label for="origin-street2" class="block text-sm font-medium text-rr-heading">Street (line 2)</label>
+						<input
+							id="origin-street2"
+							type="text"
+							name="origin_street2"
+							value={ props.Shipping.OriginStreet2 }
+							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+						/>
+					</div>
+					<div>
+						<label for="origin-city" class="block text-sm font-medium text-rr-heading">City</label>
+						<input
+							id="origin-city"
+							type="text"
+							name="origin_city"
+							value={ props.Shipping.OriginCity }
+							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+						/>
+					</div>
+					<div class="grid grid-cols-3 gap-3">
+						<div>
+							<label for="origin-state" class="block text-sm font-medium text-rr-heading">State</label>
 							<input
-								id="origin-name"
+								id="origin-state"
 								type="text"
-								name="origin_name"
-								value={ props.Shipping.OriginName }
-								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+								name="origin_state"
+								maxlength="2"
+								value={ props.Shipping.OriginState }
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
 							/>
 						</div>
 						<div>
-							<label for="origin-street1" class="block text-sm font-medium text-rr-heading">Street</label>
+							<label for="origin-zip" class="block text-sm font-medium text-rr-heading">ZIP</label>
 							<input
-								id="origin-street1"
+								id="origin-zip"
 								type="text"
-								name="origin_street1"
-								value={ props.Shipping.OriginStreet1 }
-								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-							/>
-						</div>
-						<div>
-							<label for="origin-street2" class="block text-sm font-medium text-rr-heading">Street (line 2)</label>
-							<input
-								id="origin-street2"
-								type="text"
-								name="origin_street2"
-								value={ props.Shipping.OriginStreet2 }
-								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-							/>
-						</div>
-						<div>
-							<label for="origin-city" class="block text-sm font-medium text-rr-heading">City</label>
-							<input
-								id="origin-city"
-								type="text"
-								name="origin_city"
-								value={ props.Shipping.OriginCity }
-								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-							/>
-						</div>
-						<div class="grid grid-cols-3 gap-3">
-							<div>
-								<label for="origin-state" class="block text-sm font-medium text-rr-heading">State</label>
-								<input
-									id="origin-state"
-									type="text"
-									name="origin_state"
-									maxlength="2"
-									value={ props.Shipping.OriginState }
-									class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
-								/>
-							</div>
-							<div>
-								<label for="origin-zip" class="block text-sm font-medium text-rr-heading">ZIP</label>
-								<input
-									id="origin-zip"
-									type="text"
-									name="origin_zip"
-									value={ props.Shipping.OriginZip }
-									class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
-								/>
-							</div>
-							<div>
-								<label for="origin-country" class="block text-sm font-medium text-rr-heading">Country</label>
-								<input
-									id="origin-country"
-									type="text"
-									name="origin_country"
-									maxlength="2"
-									value={ props.Shipping.OriginCountry }
-									class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
-								/>
-							</div>
-						</div>
-						<div>
-							<label for="origin-email" class="block text-sm font-medium text-rr-heading">Email</label>
-							<input
-								id="origin-email"
-								type="email"
-								name="origin_email"
-								value={ props.Shipping.OriginEmail }
-								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-							/>
-						</div>
-						<div>
-							<label for="origin-phone" class="block text-sm font-medium text-rr-heading">Phone</label>
-							<input
-								id="origin-phone"
-								type="tel"
-								name="origin_phone"
-								value={ props.Shipping.OriginPhone }
-								placeholder="5095852320"
+								name="origin_zip"
+								value={ props.Shipping.OriginZip }
 								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
 							/>
 						</div>
-					</div>
-				</div>
-				<div class="px-4 py-5 sm:px-6">
-					<h3 class="text-sm font-semibold text-rr-heading">Packaging tare weight</h3>
-					<p class="mt-1 text-xs text-rr-muted">
-						Weight of an empty box plus dunnage (in ounces). Added to every shipment on top of the product weights.
-					</p>
-					<div class="mt-3 sm:max-w-xs">
-						<label for="shipping-tare" class="sr-only">Tare weight (oz)</label>
-						<div class="mt-1 flex items-center">
+						<div>
+							<label for="origin-country" class="block text-sm font-medium text-rr-heading">Country</label>
 							<input
-								id="shipping-tare"
-								type="number"
-								name="tare_weight_oz"
-								step="0.01"
-								min="0"
-								value={ formatTareOz(props.Shipping.TareWeightOz) }
-								class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"
+								id="origin-country"
+								type="text"
+								name="origin_country"
+								maxlength="2"
+								value={ props.Shipping.OriginCountry }
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm uppercase font-mono"
 							/>
-							<span class="text-rr-muted pl-2">oz</span>
 						</div>
 					</div>
+					<div>
+						<label for="origin-email" class="block text-sm font-medium text-rr-heading">Email</label>
+						<input
+							id="origin-email"
+							type="email"
+							name="origin_email"
+							value={ props.Shipping.OriginEmail }
+							class={ fieldInput(props.FieldErrors, "origin_email", "mt-1") }
+						/>
+						@fieldNote(props.FieldErrors, "origin_email", "")
+					</div>
+					<div>
+						<label for="origin-phone" class="block text-sm font-medium text-rr-heading">Phone</label>
+						<input
+							id="origin-phone"
+							type="tel"
+							name="origin_phone"
+							value={ props.Shipping.OriginPhone }
+							placeholder="5095852320"
+							class={ fieldInput(props.FieldErrors, "origin_phone", "mt-1 font-mono") }
+						/>
+						@fieldNote(props.FieldErrors, "origin_phone", "")
+					</div>
 				</div>
-				<div class="px-4 py-4 sm:px-6 flex justify-end">
-					<button type="submit" class="inline-flex items-center rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper shadow-xs hover:opacity-90">
-						Save shipping settings
-					</button>
-				</div>
-			</form>
-		</div>
-		<!-- Box presets link -->
-		<div class="mt-4 border border-rr-border bg-rr-surface px-4 py-4 sm:px-6 flex items-center justify-between">
-			<div>
-				<h3 class="text-sm font-semibold text-rr-heading">Box presets</h3>
-				<p class="mt-1 text-xs text-rr-muted">Named cartons used when buying shipping labels. The smallest preset that fits an order's weight is selected automatically.</p>
 			</div>
-			<a href="/admin/settings/box-presets" class="rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised">
-				Manage presets
-			</a>
-		</div>
-	</div>
-	<!-- Wholesale pricing section -->
-	<div class="mt-8">
-		<h2 class="text-sm font-semibold text-rr-heading">Wholesale pricing</h2>
-		<p class="mt-1 text-sm text-rr-muted">The default price list every approved wholesale account sees — unless a specific list is assigned on their profile.</p>
-		<div class="mt-4 overflow-hidden border border-rr-border bg-rr-surface">
-			<form method="post" action="/admin/settings/default-price-list" class="px-4 py-5 sm:px-6">
-				<label for="default-price-list" class="block text-sm font-medium text-rr-heading">
-					Default wholesale price list
-				</label>
-				<div class="mt-1 flex items-center gap-3">
-					<select
-						id="default-price-list"
-						name="default_price_list_id"
-						class="w-full max-w-md rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-					>
-						<option value="" selected?={ props.DefaultPriceListID == nil }>Base prices (no default)</option>
-						for _, pl := range props.PriceLists {
-							<option
-								value={ pl.ID.String() }
-								selected?={ props.DefaultPriceListID != nil && *props.DefaultPriceListID == pl.ID }
-							>
-								{ pl.Name }
-								if pl.Status != domain.PriceListStatusActive {
-									({ string(pl.Status) })
-								}
-							</option>
-						}
-					</select>
-					<button type="submit" class="rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised whitespace-nowrap">
-						Save
-					</button>
-				</div>
-				<p class="mt-2 text-xs text-rr-muted">
-					Applies only to wholesale accounts with no list set on their own profile. Change it here and every unassigned wholesale account updates immediately. Retail customers are unaffected.
+			<div class="px-4 py-5 sm:px-6">
+				<h2 class="text-sm font-semibold text-rr-heading">Packaging tare weight</h2>
+				<p class="mt-1 text-xs text-rr-muted">
+					Weight of an empty box plus dunnage (in ounces). Added to every shipment on top of the product weights.
 				</p>
-			</form>
-		</div>
-	</div>
-	<!-- Integrations section -->
-	<div class="mt-8">
-		<h2 class="text-sm font-semibold text-rr-heading">Integrations</h2>
-		<p class="mt-1 text-sm text-rr-muted">Connect external services for billing and payments.</p>
-		<div class="mt-4 space-y-4">
-			<!-- QuickBooks Online -->
-			<div class="overflow-hidden border border-rr-border bg-rr-surface">
-				<div class="px-4 py-5 sm:px-6">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-3">
-							<!-- QB logo placeholder -->
-							<div class="flex size-10 items-center justify-center rounded-sm bg-green-50 ring-1 ring-green-600/20">
-								<svg class="size-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-									<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
-								</svg>
-							</div>
-							<div>
-								<h3 class="text-sm font-semibold text-rr-heading">QuickBooks Online</h3>
-								<p class="text-sm text-rr-muted">B2B wholesale invoicing and ACH payment collection</p>
-							</div>
-						</div>
-						<span class={ qbConnectionBadgeClasses(props.QB.Connected) }>
-							if props.QB.Connected {
-								Connected
-							} else {
-								Not connected
-							}
-						</span>
+				<div class="mt-3 sm:max-w-xs">
+					<label for="shipping-tare" class="sr-only">Tare weight (oz)</label>
+					<div class="flex items-center">
+						<input
+							id="shipping-tare"
+							type="number"
+							name="tare_weight_oz"
+							step="0.01"
+							min="0"
+							value={ props.Shipping.tareValue() }
+							class={ fieldInput(props.FieldErrors, "tare_weight_oz", "font-mono") }
+						/>
+						<span class="text-rr-muted pl-2">oz</span>
 					</div>
+					@fieldNote(props.FieldErrors, "tare_weight_oz", "")
 				</div>
-				if !props.QBEnabled {
-					<!-- QB not configured in env -->
-					<div class="border-t border-rr-border px-4 py-4 sm:px-6">
-						<p class="text-sm text-rr-muted">
-							QuickBooks integration is not configured. Set <code class="rounded bg-rr-raised px-1 py-0.5 text-xs font-mono">QB_CLIENT_ID</code> and related environment variables to enable.
-						</p>
-					</div>
-				} else if props.QB.Connected {
-					<!-- Connected state -->
-					<div class="border-t border-rr-border">
-						<dl class="divide-y divide-rr-border">
-							if props.QB.RealmID != "" {
-								<div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-									<dt class="text-sm font-medium text-rr-muted">Company ID (Realm)</dt>
-									<dd class="mt-1 text-sm text-rr-heading sm:col-span-2 sm:mt-0 font-mono">{ props.QB.RealmID }</dd>
-								</div>
-							}
-							if props.QB.RefreshExpiresAt != nil {
-								<div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-									<dt class="text-sm font-medium text-rr-muted">Refresh token expires</dt>
-									<dd class="mt-1 text-sm sm:col-span-2 sm:mt-0">
-										<span class={ refreshTokenUrgencyClasses(refreshTokenDaysRemaining(props.QB.RefreshExpiresAt)) }>
-											{ fmt.Sprintf("%d days", refreshTokenDaysRemaining(props.QB.RefreshExpiresAt)) }
-										</span>
-										<span class="text-rr-muted ml-1">
-											({ props.QB.RefreshExpiresAt.In(props.MerchantTZ).Format("Jan 2, 2006") })
-										</span>
-										if refreshTokenDaysRemaining(props.QB.RefreshExpiresAt) <= 14 {
-											<p class="mt-1 text-xs text-red-600">
-												Your QuickBooks connection will expire soon. Reconnect to avoid billing interruption.
-											</p>
-										}
-									</dd>
-								</div>
-							}
-						</dl>
-					</div>
-					<div class="border-t border-rr-border px-4 py-4 sm:px-6">
-						<div class="flex items-center gap-3">
-							<a
-								href="/admin/settings/integrations/quickbooks/connect"
-								class="inline-flex items-center rounded-sm bg-rr-surface px-3 py-2 text-sm font-semibold text-rr-heading shadow-xs border border-rr-border hover:bg-rr-raised"
-							>
-								Reconnect
-							</a>
-							<form method="post" action="/admin/settings/integrations/quickbooks/disconnect">
-								<button
-									type="submit"
-									class="btn-danger"
-									{ ConfirmAttrs(ActionConfirm{
-										Title: "Disconnect QuickBooks?",
-										Lead:  "Drops the connection between Hiri and your QuickBooks company.",
-										Points: []string{
-											"All automated B2B invoicing stops until you reconnect.",
-											"Invoices already in QuickBooks stay there — nothing is deleted on their side.",
-											"Reconnecting means going through the QuickBooks authorisation again.",
-										},
-										Confirm: "Disconnect",
-										Danger:  true,
-									})... }
-								>
-									Disconnect
-								</button>
-							</form>
-						</div>
-					</div>
-				} else {
-					<!-- Disconnected state -->
-					<div class="border-t border-rr-border px-4 py-4 sm:px-6">
-						<a
-							href="/admin/settings/integrations/quickbooks/connect"
-							class="inline-flex items-center rounded-sm bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-green-500"
-						>
-							Connect to QuickBooks
-						</a>
-					</div>
-				}
 			</div>
-		</div>
+			<!-- Save bar. Not sticky: the admin layout sets overflow-x-hidden on
+			     the content wrapper, which computes overflow-y to auto and makes
+			     that wrapper the scrollport for any position:sticky inside it —
+			     the bar would silently never pin. The "unsaved changes" note is
+			     what tells a staffer who scrolled past it that the trip back up
+			     is still owed. -->
+			<div class="flex items-center justify-end gap-3 border-t border-rr-border bg-rr-raised px-4 py-3 sm:px-6">
+				<span x-show="dirty" x-cloak class="text-xs font-medium text-rr-body">Unsaved changes</span>
+				<button type="submit" class="rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+					Save shipping settings
+				</button>
+			</div>
+		</form>
 	</div>
 }
 
 templ Settings(props SettingsProps) {
 	@layouts.Admin(layouts.AdminProps{
-		Title:      "Settings",
+		Title:      "Shipping settings",
 		ActivePath: "/admin/settings",
 		StaffName:  props.StaffName,
 		StaffRole:  props.StaffRole,
 	}) {
 		@SettingsContent(props)
+	}
+}
+
+templ SettingsWholesaleContent(props SettingsWholesaleProps) {
+	@ConfirmDialogHost()
+	@settingsSection(props.Nav, settingsTabWholesale)
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Wholesale</h1>
+			<p class="mt-1 text-sm text-rr-muted">Store-wide defaults for approved wholesale accounts.</p>
+		</div>
+	</div>
+	@adminFlash(props.Flash)
+	@settingsAttention(props.Nav.Issues)
+	<div class="mt-6 overflow-hidden border border-rr-border bg-rr-surface">
+		<form method="post" action="/admin/settings/default-price-list" class="px-4 py-5 sm:px-6">
+			<label for="default-price-list" class="block text-sm font-medium text-rr-heading">
+				Default wholesale price list
+			</label>
+			<div class="mt-1 flex items-center gap-3">
+				<select
+					id="default-price-list"
+					name="default_price_list_id"
+					class="w-full max-w-md rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+				>
+					<option value="" selected?={ props.DefaultPriceListID == nil }>Base prices (no default)</option>
+					for _, pl := range props.PriceLists {
+						<option
+							value={ pl.ID.String() }
+							selected?={ props.DefaultPriceListID != nil && *props.DefaultPriceListID == pl.ID }
+						>
+							{ pl.Name }
+							if pl.Status != domain.PriceListStatusActive {
+								({ string(pl.Status) })
+							}
+						</option>
+					}
+				</select>
+				<button type="submit" class="btn-secondary whitespace-nowrap">Save</button>
+			</div>
+			<p class="mt-2 text-xs text-rr-muted">
+				Applies only to wholesale accounts with no list set on their own profile. Change it here and every unassigned wholesale account updates immediately. Retail customers are unaffected.
+			</p>
+			<p class="mt-3 text-xs text-rr-muted">
+				Editing the prices themselves lives with the catalog — <a href="/admin/price-lists" class="font-medium text-rr-heading underline">Catalog → Pricing</a>.
+			</p>
+		</form>
+	</div>
+}
+
+templ SettingsWholesale(props SettingsWholesaleProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Wholesale settings",
+		ActivePath: "/admin/settings",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@SettingsWholesaleContent(props)
+	}
+}
+
+templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
+	@ConfirmDialogHost()
+	@settingsSection(props.Nav, settingsTabIntegrations)
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Integrations</h1>
+			<p class="mt-1 text-sm text-rr-muted">External services this shop is connected to.</p>
+		</div>
+	</div>
+	@adminFlash(props.Flash)
+	@settingsAttention(props.Nav.Issues)
+	<div class="mt-6 space-y-4">
+		<!-- QuickBooks Online -->
+		<div class="overflow-hidden border border-rr-border bg-rr-surface">
+			<div class="px-4 py-5 sm:px-6">
+				<div class="flex items-center justify-between">
+					<div class="flex items-center gap-3">
+						<div class="flex size-10 items-center justify-center rounded-sm bg-rr-raised ring-1 ring-rr-border">
+							<svg class="size-6 text-rr-heading" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+								<path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+							</svg>
+						</div>
+						<div>
+							<h2 class="text-sm font-semibold text-rr-heading">QuickBooks Online</h2>
+							<p class="text-sm text-rr-muted">B2B wholesale invoicing and ACH payment collection</p>
+						</div>
+					</div>
+					<span class={ qbConnectionBadgeClasses(props.QB.Connected) }>
+						if props.QB.Connected {
+							Connected
+						} else {
+							Not connected
+						}
+					</span>
+				</div>
+			</div>
+			if !props.QBEnabled {
+				<!-- QB not configured in env -->
+				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
+					<p class="text-sm text-rr-muted">
+						QuickBooks integration is not configured. Set <code class="rounded bg-rr-raised px-1 py-0.5 text-xs font-mono">QB_CLIENT_ID</code> and related environment variables to enable.
+					</p>
+				</div>
+			} else if props.QB.Connected {
+				<!-- Connected state -->
+				<div class="border-t border-rr-border">
+					<dl class="divide-y divide-rr-border">
+						if props.QB.RealmID != "" {
+							<div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+								<dt class="text-sm font-medium text-rr-muted">Company ID (Realm)</dt>
+								<dd class="mt-1 text-sm text-rr-heading sm:col-span-2 sm:mt-0 font-mono">{ props.QB.RealmID }</dd>
+							</div>
+						}
+						if props.QB.RefreshExpiresAt != nil {
+							<div class="px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+								<dt class="text-sm font-medium text-rr-muted">Access expires</dt>
+								<dd class="mt-1 text-sm sm:col-span-2 sm:mt-0">
+									<span class={ refreshTokenUrgencyClasses(refreshTokenDaysRemaining(props.QB.RefreshExpiresAt)) }>
+										{ fmt.Sprintf("%d days", refreshTokenDaysRemaining(props.QB.RefreshExpiresAt)) }
+									</span>
+									<span class="text-rr-muted ml-1">
+										({ props.QB.RefreshExpiresAt.In(props.MerchantTZ).Format("Jan 2, 2006") })
+									</span>
+									<p class="mt-1 text-xs text-rr-muted">
+										Nothing renews this on its own. When it lapses, wholesale invoicing stops without an error.
+									</p>
+								</dd>
+							</div>
+						}
+					</dl>
+				</div>
+				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
+					<div class="flex items-center gap-3">
+						<a href="/admin/settings/integrations/quickbooks/connect" class="btn-secondary">Reconnect</a>
+						<form method="post" action="/admin/settings/integrations/quickbooks/disconnect">
+							<button
+								type="submit"
+								class="btn-danger"
+								{ ConfirmAttrs(ActionConfirm{
+									Title: "Disconnect QuickBooks?",
+									Lead:  "Drops the connection between Hiri and your QuickBooks company.",
+									Points: []string{
+										"All automated B2B invoicing stops until you reconnect.",
+										"Invoices already in QuickBooks stay there — nothing is deleted on their side.",
+										"Reconnecting means going through the QuickBooks authorisation again.",
+									},
+									Confirm: "Disconnect",
+									Danger:  true,
+								})... }
+							>
+								Disconnect
+							</button>
+						</form>
+					</div>
+				</div>
+			} else {
+				<!-- Disconnected state -->
+				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
+					<a
+						href="/admin/settings/integrations/quickbooks/connect"
+						class="inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt"
+					>
+						Connect to QuickBooks
+					</a>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+templ SettingsIntegrations(props SettingsIntegrationsProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Integrations",
+		ActivePath: "/admin/settings",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@SettingsIntegrationsContent(props)
 	}
 }

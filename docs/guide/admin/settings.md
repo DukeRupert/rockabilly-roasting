@@ -1,6 +1,20 @@
 # Settings
 
-The Settings page lets you manage platform integrations and configuration. Navigate to **Admin > Settings** in the sidebar.
+Settings is a group of pages, reached from **Settings** in the user menu at the bottom of the sidebar. A tab strip across the top moves between them:
+
+| Tab | What lives there |
+|---|---|
+| **Shipping** | Rates, local zip codes, delivery and pickup, the pickup origin address, packaging tare weight |
+| **Box presets** | The cartons labels are quoted against |
+| **Wholesale** | The default price list unassigned wholesale accounts see |
+| **Integrations** | QuickBooks Online |
+| **Team** | Invite staff and set roles (admins only) |
+
+## What needs attention
+
+Any setting that is currently breaking work appears in a **Needs attention** list at the top of *every* Settings page, and the tab that owns the fix carries a count. Each row links straight to the field.
+
+Rows are marked either **Broken** -- something is failing right now, such as a missing origin phone number that makes every label purchase fail -- or **Check**, meaning it will bite soon, such as a QuickBooks connection a fortnight from expiry. Nothing wrong means no list at all; the panel only appears when it has something to say.
 
 ## Integrations
 
@@ -22,17 +36,14 @@ If QuickBooks environment variables (`QB_CLIENT_ID` and related keys) are not co
 The card displays:
 
 - **Company ID (Realm)** -- The QuickBooks company identifier your store is linked to.
-- **Refresh token expires** -- How many days remain before the OAuth connection needs to be renewed. The display changes color based on urgency:
-  - Green/muted text: more than 30 days remaining.
-  - Amber text: 14--30 days remaining.
-  - Red text: fewer than 14 days remaining, with a warning that you should reconnect soon to avoid billing interruption.
+- **Access expires** -- How many days remain before the OAuth connection needs to be renewed. The display changes colour based on urgency: muted above 30 days, amber at 14--30, rust below 14. From 14 days out it also appears in the Needs attention list on every Settings page, and from 7 days out it is marked Broken -- reconnecting needs someone with the QuickBooks login free, so the warning has to arrive before the day it stops working.
 
 #### Connecting
 
 1. Click **Connect to QuickBooks** (or **Reconnect** if already connected).
 2. You will be redirected to Intuit's authorization page.
 3. Sign in with your QuickBooks credentials and authorize the connection.
-4. You will be redirected back to the Settings page with a success or failure message.
+4. You will be redirected back to the Integrations tab with a success or failure message. Failures arrive in a red panel, successes in green -- if the message is red, nothing was saved.
 
 The OAuth flow uses CSRF protection via a signed state cookie. The authorization window is valid for 10 minutes.
 
@@ -57,6 +68,10 @@ These sync operations are tracked in the audit log under actions prefixed with `
 QuickBooks OAuth tokens expire periodically. If the refresh token is close to expiring (shown on the settings page), click **Reconnect** to re-authorize. This replaces the existing credentials without losing your company link.
 
 ## Shipping
+
+### If a save is rejected
+
+The shipping form is long, so a rejected save does not throw it away. The page comes back with everything you typed still in place, the offending field outlined in rust with a note under it, and a red banner saying nothing was saved. Fix the marked field and save again.
 
 ### Local delivery schedule
 

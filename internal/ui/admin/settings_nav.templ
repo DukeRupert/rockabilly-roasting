@@ -178,7 +178,9 @@ func SettingsIssuesFor(s ShippingSettings, qb QBConnectionStatus, qbEnabled bool
 		})
 	}
 
-	if qbEnabled {
+	// An unreadable status is not a finding: the page says so on the card, and
+	// an attention row claiming the integration is down would be a guess.
+	if qbEnabled && !qb.Unavailable {
 		switch {
 		case !qb.Connected:
 			issues = append(issues, SettingsIssue{

@@ -18,6 +18,15 @@ import (
 // Urgent band alongside orders on hold. /admin/jobs stays available for whoever
 // is diagnosing the alert.
 //
+// One class of failure never reaches this handler at all: River skips the
+// error handler for a job that returns river.JobCancel, and logs the cancel at
+// Debug (see jobexecutor's `if e.ErrorHandler != nil && !cancelJob`). This repo
+// cancels for permanent failures in a dozen places — a QuickBooks call that
+// will never succeed, a subscription that is no longer renewable — so those
+// workers do their own reporting at the cancel site, and pick the level
+// themselves: Error for a fault, Warn for terminal-but-expected. Do not assume
+// a cancelled job is covered by this file.
+//
 // Only the *final* attempt pages anyone. River retries with backoff, and a
 // single transient Stripe timeout that succeeds on attempt two is noise; the
 // intermediate attempts land as Warn, which the Sentry handler files as a

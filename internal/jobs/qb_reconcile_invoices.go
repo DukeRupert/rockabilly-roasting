@@ -55,7 +55,7 @@ func (w *ReconcileQBInvoicesWorker) Work(ctx context.Context, job *river.Job[Rec
 	err := w.work(ctx)
 	metrics.TrackJob(w.metrics, "qb_reconcile_invoices", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "job failed",
+		slog.ErrorContext(ctx, "background job qb_reconcile_invoices failed",
 			"job_kind", "qb_reconcile_invoices",
 			"job_id", job.ID,
 			"error", err.Error(),

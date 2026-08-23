@@ -48,24 +48,41 @@ func (s settingsSection) nav(role string) admin.SettingsNav {
 	}
 }
 
-// loadSettingsSection reads the section-wide state in one transaction. Three
-// small reads on a page staff open a handful of times a week — cheap enough to
-// pay on every settings page so a broken setting cannot hide behind a tab
-// nobody clicked.
+// loadSettingsSection reads the section-wide state: a few small reads on pages
+// staff open a handful of times a week, cheap enough to pay on every one of
+// them so a broken setting cannot hide behind a tab nobody clicked.
+//
+// Two transactions, not one, and deliberately — the QuickBooks status is read
+// on its own so a failure there stays a failure there. See the comment at that
+// read.
 func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error) {
 	out := settingsSection{QBEnabled: d.QBOAuthManager != nil}
 
-	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		if out.QBEnabled {
-			// A QB status read failing must not take the whole settings page
-			// down with it — the shipping form below is still editable.
-			if status, qbErr := d.QBOAuthManager.Status(ctx, tx); qbErr == nil {
-				out.QB.Connected = status.Connected
-				out.QB.RealmID = status.RealmID
-				out.QB.RefreshExpiresAt = status.RefreshExpiresAt
+	// The QuickBooks status gets its own transaction, deliberately. A failed
+	// status read must not take the settings page down — the shipping form
+	// below is still editable, and "not connected" is a different fact from
+	// "could not tell", which is what sends staff to reconnect a connection
+	// that was fine. Sharing the transaction below would make that graceful
+	// path unreachable: a real database error aborts the pgx transaction, so
+	// every read after it fails too and the page 500s regardless.
+	if out.QBEnabled {
+		qbErr := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			status, err := d.QBOAuthManager.Status(ctx, tx)
+			if err != nil {
+				return err
 			}
+			out.QB.Connected = status.Connected
+			out.QB.RealmID = status.RealmID
+			out.QB.RefreshExpiresAt = status.RefreshExpiresAt
+			return nil
+		})
+		if qbErr != nil {
+			slog.Error("admin settings: quickbooks status", "error", qbErr)
+			out.QB = admin.QBConnectionStatus{Unavailable: true}
 		}
+	}
 
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
 		if cfgErr != nil {
 			return cfgErr

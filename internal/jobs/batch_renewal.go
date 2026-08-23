@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -34,21 +35,50 @@ func NewBatchRenewalWorker(renewalSvc *app.RenewalService, pool *pgxpool.Pool, m
 func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenewalArgs]) error {
 	start := time.Now()
 
+	// River does not run the ErrorHandler for a cancelled job, so anything worth
+	// alerting on has to be logged here — see jobs.ErrorHandler. An empty batch
+	// means the scheduler built one, which is a bug in the scheduler rather than
+	// a subscription that moved on.
 	if len(job.Args.SubscriptionIDs) == 0 {
-		metrics.TrackJob(w.metrics, "batch_renewal", start, nil)
-		return river.JobCancel(fmt.Errorf("empty subscription batch"))
+		err := fmt.Errorf("empty subscription batch")
+		// Counted as a failure, not a success. This path used to pass nil to
+		// TrackJob, so a scheduler bug read as a clean run on the dashboard
+		// while the log beside it called the same event an error.
+		metrics.TrackJob(w.metrics, "batch_renewal", start, err)
+		slog.ErrorContext(ctx, "background job batch_renewal received an empty batch",
+			"job_kind", "batch_renewal",
+			"job_id", job.ID,
+		)
+		return river.JobCancel(err)
 	}
 
 	_, err := w.renewalSvc.RenewBatch(ctx, w.pool, job.Args.SubscriptionIDs)
 	metrics.TrackJob(w.metrics, "batch_renewal", start, err)
 
 	if err != nil {
+		// Both cancels below are terminal-but-expected, so they log at Warn:
+		// the slog handler files Warn as a Sentry breadcrumb rather than paging
+		// anyone. A subscription that was cancelled between scheduling and
+		// running is the system working, and a declined charge is dunning's
+		// business, not an outage.
 		if errors.Is(err, app.ErrSubscriptionNotActive) || errors.Is(err, app.ErrSubscriptionNotFound) {
+			slog.WarnContext(ctx, "background job batch_renewal cancelled: subscription no longer renewable",
+				"job_kind", "batch_renewal",
+				"job_id", job.ID,
+				"subscription_ids", job.Args.SubscriptionIDs,
+				"error", err.Error(),
+			)
 			return river.JobCancel(fmt.Errorf("batch renewal: %w", err))
 		}
 		// Declined charge: dunning state already advanced for every sub in the
 		// batch. The scheduler owns retries, so don't let River retry the job.
 		if errors.Is(err, app.ErrRenewalPaymentDeclined) {
+			slog.WarnContext(ctx, "background job batch_renewal cancelled: payment declined, dunning advanced",
+				"job_kind", "batch_renewal",
+				"job_id", job.ID,
+				"subscription_ids", job.Args.SubscriptionIDs,
+				"error", err.Error(),
+			)
 			return river.JobCancel(fmt.Errorf("batch renewal: %w", err))
 		}
 		w.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()

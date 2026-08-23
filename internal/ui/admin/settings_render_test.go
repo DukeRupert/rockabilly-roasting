@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -129,6 +130,57 @@ func TestSettingsIssues_QuickBooksAlreadyExpired(t *testing.T) {
 	assert.Equal(t, "1 day", refreshTokenRemainingLabel(ptrTime(time.Now().Add(25*time.Hour))))
 }
 
+// A status read that failed is a different fact from a disconnection, and only
+// one of them is worth sending someone to Intuit over.
+func TestSettingsIssues_UnreadableQuickBooksStatusIsNotADisconnection(t *testing.T) {
+	unavailable := QBConnectionStatus{Unavailable: true}
+	assert.Empty(t, SettingsIssuesFor(healthyShipping(), unavailable, true, 1))
+
+	// A genuine disconnection still warns.
+	issues := SettingsIssuesFor(healthyShipping(), QBConnectionStatus{}, true, 1)
+	require.Len(t, issues, 1)
+	assert.Equal(t, "QuickBooks is not connected", issues[0].Title)
+
+	html := renderIntegrations(t, SettingsIntegrationsProps{QB: unavailable, QBEnabled: true})
+	assert.Contains(t, html, "Status unknown")
+	assert.NotContains(t, html, "Not connected")
+	// Not knowing the status is exactly when someone may need to reconnect, so
+	// the way out has to stay on the page — but not the destructive one.
+	require.NotEmpty(t, anchorsTo(html, "/admin/settings/integrations/quickbooks/connect"))
+	// Asserted on the route rather than the label: the word appears in prose on
+	// this card, and it is the destructive *action* that must be absent.
+	assert.NotContains(t, html, "quickbooks/disconnect")
+}
+
+// The OAuth handoff 302s to intuit.com. A boosted link fetches that by XHR,
+// where a cross-origin redirect cannot become a navigation, so both entry
+// points have to opt out of hx-boost.
+func TestSettingsIntegrations_OAuthLinksAreNotBoosted(t *testing.T) {
+	// Asserted per-anchor rather than as one attribute-ordered string: the point
+	// is that every link to the connect route opts out, whatever order its
+	// attributes end up in.
+	// Every state that offers the connect route, not just the two obvious ones:
+	// the unavailable card offers it too, and a guard that misses an entry point
+	// is a guard that will not notice the one that regresses.
+	for name, html := range map[string]string{
+		"reconnect": renderIntegrations(t, SettingsIntegrationsProps{
+			QB:        QBConnectionStatus{Connected: true},
+			QBEnabled: true,
+		}),
+		"connect": renderIntegrations(t, SettingsIntegrationsProps{QBEnabled: true}),
+		"unavailable": renderIntegrations(t, SettingsIntegrationsProps{
+			QB:        QBConnectionStatus{Unavailable: true},
+			QBEnabled: true,
+		}),
+	} {
+		anchors := anchorsTo(html, "/admin/settings/integrations/quickbooks/connect")
+		require.NotEmpty(t, anchors, "%s state should offer a link to the connect route", name)
+		for _, anchor := range anchors {
+			assert.Contains(t, anchor, `hx-boost="false"`, "%s link must not be boosted: %s", name, anchor)
+		}
+	}
+}
+
 // Broken settings sort ahead of warnings: the list is read from the top and
 // attention runs out before the scrollbar does.
 func TestSettingsIssues_BrokenFirst(t *testing.T) {
@@ -205,8 +257,10 @@ func TestSettings_RejectedSaveKeepsInputAndMarksField(t *testing.T) {
 	assert.Contains(t, html, `value="45"`)
 	assert.Contains(t, html, "Enter a dollar amount, e.g. 6.00.")
 	assert.Contains(t, html, "border-rr-red")
-	// An error must not arrive in the success panel.
+	// An error must not arrive in the success panel, and it interrupts a screen
+	// reader where a success does not.
 	assert.Contains(t, html, "badge-red")
+	assert.Contains(t, html, `role="alert"`)
 	assert.NotContains(t, html, "badge-green")
 }
 
@@ -313,6 +367,28 @@ func TestShippingSettings_NonDraftRendersStoredValues(t *testing.T) {
 	assert.Equal(t, "6.00", s.flatRateValue())
 	assert.Equal(t, "45.00", s.thresholdValue())
 	assert.Equal(t, "2.50", s.tareValue())
+}
+
+func renderIntegrations(t *testing.T, props SettingsIntegrationsProps) string {
+	t.Helper()
+	if props.MerchantTZ == nil {
+		props.MerchantTZ = time.UTC
+	}
+	var buf bytes.Buffer
+	require.NoError(t, SettingsIntegrationsContent(props).Render(context.Background(), &buf))
+	return buf.String()
+}
+
+// anchorsTo returns every <a> tag in html whose href is exactly the given path.
+func anchorsTo(html, href string) []string {
+	var out []string
+	for _, chunk := range strings.Split(html, "<a ")[1:] {
+		tag := "<a " + chunk[:strings.Index(chunk, ">")+1]
+		if strings.Contains(tag, `href="`+href+`"`) {
+			out = append(out, tag)
+		}
+	}
+	return out
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }

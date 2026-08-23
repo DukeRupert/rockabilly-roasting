@@ -63,7 +63,7 @@ func (w *CreateQBInvoiceWorker) Work(ctx context.Context, job *river.Job[CreateQ
 
 	metrics.TrackJob(w.metrics, "qb_create_invoice", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "job failed",
+		slog.ErrorContext(ctx, "background job qb_create_invoice failed",
 			"job_kind", "qb_create_invoice",
 			"job_id", job.ID,
 			"order_id", job.Args.OrderID,

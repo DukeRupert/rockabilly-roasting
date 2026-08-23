@@ -63,6 +63,7 @@ type Deps struct {
 	PriceListService       *app.PriceListService
 	AuditQueryService      *app.AuditQueryService
 	WebhookService         *app.WebhookService
+	JobHealthService       *app.JobHealthService
 	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
 	PaymentProvider        payments.Provider
 	RiverClient            *river.Client[pgx.Tx]
@@ -626,6 +627,11 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)
 
 	// Admin audit log
+	// Background job health. Admin-only: retrying a job re-runs real work,
+	// including sending customer mail.
+	adminMux.Handle("GET /admin/jobs", deps.requirePermission(auth.PermManageSystem, http.HandlerFunc(deps.handleAdminJobList)))
+	adminMux.Handle("POST /admin/jobs/{id}/retry", deps.requirePermission(auth.PermManageSystem, http.HandlerFunc(deps.handleAdminJobRetry)))
+
 	adminMux.HandleFunc("GET /admin/audit", deps.handleAdminAuditList)
 
 	// Admin help

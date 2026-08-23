@@ -606,6 +606,9 @@ func run() error {
 	// and past-due email enqueues atomic with the renewal write).
 	enqueuer := jobs.NewEnqueuer(riverClient).WithQuietHours(merchantTZ, renewalEmailSendHour)
 	renewalSvc.WithJobEnqueuer(enqueuer)
+	// Job health reads River's own table and hands discarded jobs back through
+	// the same enqueuer, so it can only be built once the client exists.
+	jobHealthSvc := app.NewJobHealthService(store.NewJobStore(), enqueuer, auditWriter)
 	checkoutSvc.WithCheckoutConfirmDeps(cartStore, enqueuer)
 	orderSvc.WithEnqueuer(enqueuer)
 	announcementSvc.WithJobEnqueuer(enqueuer)
@@ -686,6 +689,7 @@ func run() error {
 		PriceListService:       priceListSvc,
 		AuditQueryService:      auditQuerySvc,
 		WebhookService:         webhookSvc,
+		JobHealthService:       jobHealthSvc,
 		AuditWriter:            auditWriter,
 		PaymentProvider:        paymentProvider,
 		RiverClient:            riverClient,

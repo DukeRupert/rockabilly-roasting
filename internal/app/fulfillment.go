@@ -92,6 +92,27 @@ func (s *FulfillmentService) ListOrdersWithFailedLabelAttempts(ctx context.Conte
 	return ids, nil
 }
 
+// CountFailedLabelOrders returns how many live orders are stuck without a
+// shipping label because their BuyLabel job gave up retrying. These do not
+// resolve on their own — nothing re-enqueues them — so they need a human.
+func (s *FulfillmentService) CountFailedLabelOrders(ctx context.Context, tx pgx.Tx) (int, error) {
+	n, err := s.shipments.CountFailedLabelOrders(ctx, tx)
+	if err != nil {
+		return 0, fmt.Errorf("count failed label orders: %w", err)
+	}
+	return n, nil
+}
+
+// ListFailedLabelOrders returns the oldest `limit` orders stuck without a
+// label, oldest first.
+func (s *FulfillmentService) ListFailedLabelOrders(ctx context.Context, tx pgx.Tx, limit int) ([]uuid.UUID, error) {
+	ids, err := s.shipments.ListFailedLabelOrders(ctx, tx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list failed label orders: %w", err)
+	}
+	return ids, nil
+}
+
 // CreateShipmentLabel calls the external label provider to create a shipping
 // label, then persists the shipment record in the database. The external API
 // call happens BEFORE the transaction — if it fails, nothing is written.

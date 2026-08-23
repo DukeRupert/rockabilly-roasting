@@ -917,7 +917,7 @@ func fulfillmentRow(row OrderRow, props FulfillmentListProps) templ.Component {
 			templ_7745c5c3_Var29 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		stale := orderIsStale(row.Order, props.Now)
+		stale := orderIsStale(row.Order, props.MerchantTZ, props.Now)
 		var templ_7745c5c3_Var30 = []any{"row-link", templ.KV("row-link-stale", stale)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var30...)
 		if templ_7745c5c3_Err != nil {

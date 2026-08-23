@@ -15,6 +15,10 @@ const (
 	PermManageStaff       = "staff:write"
 	PermCreateDraftOrders = "orders:draft"
 	PermManageInventory   = "inventory:write"
+	// PermManageSystem covers operator-level plumbing that is not any one
+	// department's job — background job health and retries. Admin only: a
+	// retried job can send customer mail or move money.
+	PermManageSystem = "system:write"
 )
 
 // rolePermissions maps each staff role to its allowed permissions.
@@ -23,7 +27,7 @@ var rolePermissions = map[domain.StaffRole][]string{
 		PermViewOrders, PermUpdateFulfillment, PermIssueRefunds,
 		PermViewReports, PermManageProducts, PermManagePricing,
 		PermViewCustomers, PermEditCustomers, PermManageStaff,
-		PermCreateDraftOrders, PermManageInventory,
+		PermCreateDraftOrders, PermManageInventory, PermManageSystem,
 	},
 	domain.StaffRoleFulfillment: {
 		PermViewOrders, PermUpdateFulfillment, PermManageInventory,

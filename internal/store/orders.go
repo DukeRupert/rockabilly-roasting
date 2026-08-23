@@ -320,9 +320,9 @@ type OrderFilter struct {
 	// staff hand-pick which orders ride along.
 	OrderIDs   []uuid.UUID
 	CustomerID *uuid.UUID
-	PlacedFrom          *time.Time
-	PlacedTo            *time.Time
-	Search              string // ILIKE on order number or customer name/email
+	PlacedFrom *time.Time
+	PlacedTo   *time.Time
+	Search     string // ILIKE on order number or customer name/email
 	// ExcludeUnconfirmed drops orders that are still in the "intent to buy"
 	// state — status=pending AND payment_status=awaiting. These exist between
 	// PI creation and webhook-driven confirmation (especially for async/BNPL
@@ -343,8 +343,8 @@ type OrderFilter struct {
 	TotalMax *int
 	// Sort orders the result. The zero value sorts newest-placed first, which
 	// is what every caller got before sorting existed.
-	Sort  OrderSort
-	Limit int
+	Sort   OrderSort
+	Limit  int
 	Offset int
 }
 
@@ -520,7 +520,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 	                 currency_code, subtotal, discount_total, shipping_total, tax_total, total,
 	                 shipping_address_id, billing_address_id, subscription_id, draft_by_user_id,
 	                 tax_exempt, tax_exempt_reason, stripe_tax_id, stripe_payment_intent_id,
-	                 shipping_method, requested_delivery_date,
+	                 shipping_method, requested_delivery_date, scheduled_delivery_date,
 	                 customer_po_number, internal_note,
 	                 notes, metadata, placed_at, created_at, updated_at
 	          FROM orders WHERE true`
@@ -554,6 +554,9 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 		var channel, status, paymentStatus, fulfillmentStatus string
 		var shippingMethod *string
 		var requestedDeliveryDate pgtype.Timestamptz
+		// Carried on every listed order so the queues can tell an order that is
+		// merely old from one that has missed the delivery run it was promised.
+		var scheduledDeliveryDate pgtype.Date
 		var subtotal, discountTotal, shippingTotal, taxTotal, total int32
 		var metadata json.RawMessage
 		if err := rows.Scan(
@@ -561,7 +564,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 			&o.CurrencyCode, &subtotal, &discountTotal, &shippingTotal, &taxTotal, &total,
 			&o.ShippingAddressID, &o.BillingAddressID, &o.SubscriptionID, &o.DraftByUserID,
 			&o.TaxExempt, &o.TaxExemptReason, &o.StripeTaxID, &o.StripePaymentIntentID,
-			&shippingMethod, &requestedDeliveryDate,
+			&shippingMethod, &requestedDeliveryDate, &scheduledDeliveryDate,
 			&o.CustomerPONumber, &o.InternalNote,
 			&o.Notes, &metadata, &o.PlacedAt, &o.CreatedAt, &o.UpdatedAt,
 		); err != nil {
@@ -581,6 +584,7 @@ func (s *OrderStore) ListOrders(ctx context.Context, tx pgx.Tx, f OrderFilter) (
 			o.ShippingMethod = &sm
 		}
 		o.RequestedDeliveryDate = timestampFromPG(requestedDeliveryDate)
+		o.ScheduledDeliveryDate = dateFromPG(scheduledDeliveryDate)
 		o.Metadata = metadataFromJSON(metadata)
 		orders = append(orders, o)
 	}
@@ -1606,39 +1610,39 @@ func (s *OrderStore) DeleteAdjustment(ctx context.Context, tx pgx.Tx, id uuid.UU
 
 func orderFromRow(r sqlcgen.Order) *domain.Order {
 	o := &domain.Order{
-		ID:                r.ID,
-		Number:            r.Number,
-		CustomerID:        r.CustomerID,
-		Channel:           domain.OrderChannel(r.Channel),
-		Status:            domain.OrderStatus(r.Status),
-		PaymentStatus:     domain.PaymentStatus(r.PaymentStatus),
-		FulfillmentStatus: domain.FulfillmentStatus(r.FulfillmentStatus),
-		CurrencyCode:      r.CurrencyCode,
-		Subtotal:          int(r.Subtotal),
-		DiscountTotal:     int(r.DiscountTotal),
-		ShippingTotal:     int(r.ShippingTotal),
-		TaxTotal:          int(r.TaxTotal),
-		Total:             int(r.Total),
-		ShippingAddressID: r.ShippingAddressID,
-		BillingAddressID:  r.BillingAddressID,
-		SubscriptionID:    r.SubscriptionID,
-		DraftByUserID:     r.DraftByUserID,
-		TaxExempt:         r.TaxExempt,
-		TaxExemptReason:   r.TaxExemptReason,
-		StripeTaxID:              r.StripeTaxID,
-		StripePaymentIntentID:    r.StripePaymentIntentID,
-		QBInvoiceID:              r.QbInvoiceID,
-		QBInvoiceNo:              r.QbInvoiceNo,
-		QBSyncedAt:               timestampFromPG(r.QbSyncedAt),
-		RequestedDeliveryDate:    timestampFromPG(r.RequestedDeliveryDate),
-		ScheduledDeliveryDate:    dateFromPG(r.ScheduledDeliveryDate),
-		CustomerPONumber:         r.CustomerPoNumber,
-		InternalNote:             r.InternalNote,
-		Notes:                    r.Notes,
-		Metadata:                 metadataFromJSON(r.Metadata),
-		PlacedAt:          r.PlacedAt,
-		CreatedAt:         r.CreatedAt,
-		UpdatedAt:         r.UpdatedAt,
+		ID:                    r.ID,
+		Number:                r.Number,
+		CustomerID:            r.CustomerID,
+		Channel:               domain.OrderChannel(r.Channel),
+		Status:                domain.OrderStatus(r.Status),
+		PaymentStatus:         domain.PaymentStatus(r.PaymentStatus),
+		FulfillmentStatus:     domain.FulfillmentStatus(r.FulfillmentStatus),
+		CurrencyCode:          r.CurrencyCode,
+		Subtotal:              int(r.Subtotal),
+		DiscountTotal:         int(r.DiscountTotal),
+		ShippingTotal:         int(r.ShippingTotal),
+		TaxTotal:              int(r.TaxTotal),
+		Total:                 int(r.Total),
+		ShippingAddressID:     r.ShippingAddressID,
+		BillingAddressID:      r.BillingAddressID,
+		SubscriptionID:        r.SubscriptionID,
+		DraftByUserID:         r.DraftByUserID,
+		TaxExempt:             r.TaxExempt,
+		TaxExemptReason:       r.TaxExemptReason,
+		StripeTaxID:           r.StripeTaxID,
+		StripePaymentIntentID: r.StripePaymentIntentID,
+		QBInvoiceID:           r.QbInvoiceID,
+		QBInvoiceNo:           r.QbInvoiceNo,
+		QBSyncedAt:            timestampFromPG(r.QbSyncedAt),
+		RequestedDeliveryDate: timestampFromPG(r.RequestedDeliveryDate),
+		ScheduledDeliveryDate: dateFromPG(r.ScheduledDeliveryDate),
+		CustomerPONumber:      r.CustomerPoNumber,
+		InternalNote:          r.InternalNote,
+		Notes:                 r.Notes,
+		Metadata:              metadataFromJSON(r.Metadata),
+		PlacedAt:              r.PlacedAt,
+		CreatedAt:             r.CreatedAt,
+		UpdatedAt:             r.UpdatedAt,
 	}
 	if r.ShippingMethod != nil {
 		sm := domain.ShippingMethod(*r.ShippingMethod)

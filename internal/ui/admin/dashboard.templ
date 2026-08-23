@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -73,10 +74,57 @@ func (p ActiveCustomersProps) channelLabel() string {
 	}
 }
 
+// DeliveryRunProps summarizes the next local-delivery run for the dashboard
+// strip. It is the one thing on this page with a hard clock: after the cutoff
+// the load is frozen and anything not packed misses the van until the next
+// scheduled day. Nil when the shop has no delivery schedule configured.
+//
+// CutoffAt is derived from the same ShippingConfig.NextDeliveryDate the
+// storefront quotes to customers, so the deadline staff work to and the
+// promise on the checkout page can never drift apart. It is always in the
+// future — the cutoff minute disqualifies its own day.
+type DeliveryRunProps struct {
+	DateLabel   string    // "Thursday, August 22"
+	CutoffLabel string    // "9am"
+	CutoffAt    time.Time
+	OrderCount  int  // local-delivery orders sitting in the fulfillment queue
+	IsToday     bool // the run leaves today, so the countdown is the story
+}
+
+// urgent reports whether the cutoff is close enough to lead with rust. Three
+// hours is the window in which an unpacked order is a problem rather than a
+// plan.
+func (p DeliveryRunProps) urgent() bool {
+	return p.IsToday && time.Until(p.CutoffAt) <= 3*time.Hour
+}
+
+// countdown renders the time left before the load freezes. Runs further out
+// than a day read as a weekday, not a duration — "in 68h" is not how anyone
+// thinks about next Monday.
+//
+// The remainder is floored, not rounded: a deadline should never claim more
+// time than is actually left, so 19m59s reads "19m".
+func (p DeliveryRunProps) countdown() string {
+	d := time.Until(p.CutoffAt)
+	if !p.IsToday || d <= 0 {
+		return fmt.Sprintf("cutoff %s", p.CutoffLabel)
+	}
+	h := int(d.Hours())
+	m := int(d.Minutes()) % 60
+	if h > 0 {
+		return fmt.Sprintf("cutoff %s · in %dh %dm", p.CutoffLabel, h, m)
+	}
+	return fmt.Sprintf("cutoff %s · in %dm", p.CutoffLabel, m)
+}
+
 type DashboardProps struct {
 	// Today stats
 	TodayOrderCount int
 	TodayRevenue    int
+
+	// DeliveryRun is the next local-delivery cutoff and its current load. Nil
+	// when no delivery schedule is configured.
+	DeliveryRun *DeliveryRunProps
 
 	// Subscriptions
 	ActiveSubCount  int
@@ -94,6 +142,19 @@ type DashboardProps struct {
 	OnHoldCount         int
 	FailedPayments      []domain.Order
 	FailedPaymentCount  int
+	// LabelFailures are orders whose shipping-label job gave up retrying. They
+	// look like ordinary "Ship" rows everywhere else on the dashboard, so
+	// without their own group they sit in the queue indefinitely — River will
+	// not pick them back up on its own.
+	LabelFailures      []domain.Order
+	LabelFailureCount  int
+	// DeadJobCount is background work that ran out of retries — emails,
+	// invoices, renewals. This is the failure the rest of the dashboard is
+	// blind to by construction: a broken worker makes the store look *quieter*,
+	// because the symptom is an absence rather than a queue entry. Label jobs
+	// are excluded; they have their own group above.
+	DeadJobCount int
+	DeadJobKinds []domain.DeadJobKindCount
 	PastDueSubs         []PastDueRow
 	PastDueAccounts     []PastDueAccountRow
 	PastDueAccountCount int
@@ -116,6 +177,9 @@ type DashboardProps struct {
 
 	// Merchant local timezone for date display.
 	MerchantTZ *time.Location
+	// Now is injected so relative ages and staleness are deterministic in
+	// tests, matching OrderListProps and FulfillmentListProps.
+	Now time.Time
 
 	StaffName string
 	StaffRole string
@@ -154,7 +218,27 @@ type PipelineRow struct {
 }
 
 func (p DashboardProps) urgentCount() int {
-	return p.PastDueAccountCount + p.PastDueSubCount + p.OnHoldCount + p.FailedPaymentCount
+	return p.PastDueAccountCount + p.PastDueSubCount + p.OnHoldCount + p.FailedPaymentCount + p.LabelFailureCount + p.DeadJobCount
+}
+
+// deadJobSummary names the kinds behind the dead-job count. Failures cluster by
+// cause, so "3 email_order_confirm, 1 qb_create_invoice" tells staff what broke
+// in a way a bare number never does. Caps at two kinds plus an overflow note —
+// this is a one-line summary, not the list page.
+func (p DashboardProps) deadJobSummary() string {
+	if len(p.DeadJobKinds) == 0 {
+		return "Nothing will retry these on its own — they need a look."
+	}
+	parts := make([]string, 0, 3)
+	for i, k := range p.DeadJobKinds {
+		if i == 2 {
+			rest := len(p.DeadJobKinds) - 2
+			parts = append(parts, fmt.Sprintf("and %d more kind%s", rest, pluralS(rest)))
+			break
+		}
+		parts = append(parts, fmt.Sprintf("%d %s", k.Count, k.Kind))
+	}
+	return strings.Join(parts, ", ") + " — nothing will retry these on its own."
 }
 
 func (p DashboardProps) reviewCount() int {
@@ -191,17 +275,15 @@ func ageLabel(t time.Time, loc *time.Location) string {
 	}
 }
 
-// ageIsStale flags pipeline items that have lingered too long.
-func ageIsStale(t time.Time) bool {
-	return time.Since(t) > 48*time.Hour
-}
-
 templ DashboardContent(props DashboardProps) {
 	<!-- Page title -->
 	<div class="flex items-baseline gap-3">
 		<h1 class="admin-page-title">Dashboard</h1>
 	</div>
 	@commandBar(props)
+	if props.DeliveryRun != nil {
+		@deliveryRunStrip(*props.DeliveryRun)
+	}
 	<!-- Actions first: triage queues lead the page; analytics follow below. -->
 	if !props.hasAnyAction() {
 		<!-- All caught up -->
@@ -244,20 +326,37 @@ templ DashboardContent(props DashboardProps) {
 						@urgentGroupLink(
 							fmt.Sprintf("%d order%s on hold", props.OnHoldCount, pluralS(props.OnHoldCount)),
 							"Manual review required before these move forward.",
-							"/admin/orders?status=on_hold",
+							"/admin/orders?view=on_hold",
 						)
 						for _, o := range props.OnHold {
-							@orderLinkRow(o, "On hold", "text-rr-red", true, props.MerchantTZ)
+							@orderLinkRow(o, "On hold", "text-rr-red", true, props.MerchantTZ, props.Now)
 						}
 					}
 					if props.FailedPaymentCount > 0 {
 						@urgentGroupLink(
 							fmt.Sprintf("%d failed payment%s", props.FailedPaymentCount, pluralS(props.FailedPaymentCount)),
 							"Charge did not go through — reach out or retry.",
-							"/admin/orders",
+							"/admin/orders?view=all&payment=failed",
 						)
 						for _, o := range props.FailedPayments {
-							@orderLinkRow(o, "Payment failed", "text-rr-red", true, props.MerchantTZ)
+							@orderLinkRow(o, "Payment failed", "text-rr-red", true, props.MerchantTZ, props.Now)
+						}
+					}
+					if props.DeadJobCount > 0 {
+						@urgentGroupLink(
+							fmt.Sprintf("%d background job%s failed", props.DeadJobCount, pluralS(props.DeadJobCount)),
+							props.deadJobSummary(),
+							"/admin/jobs",
+						)
+					}
+					if props.LabelFailureCount > 0 {
+						@urgentGroupLink(
+							fmt.Sprintf("%d shipping label%s failed", props.LabelFailureCount, pluralS(props.LabelFailureCount)),
+							"Label purchase gave up retrying — buy one by hand or these never ship.",
+							"/admin/fulfillment?view=ready_to_ship",
+						)
+						for _, o := range props.LabelFailures {
+							@orderLinkRow(o, "Label failed", "text-rr-red", true, props.MerchantTZ, props.Now)
 						}
 					}
 				</div>
@@ -310,7 +409,7 @@ templ DashboardContent(props DashboardProps) {
 			<div id="band-retail" class={ bandSpacing(props.urgentCount() + props.reviewCount()), "scroll-mt-6" }>
 				@bandHeader("Retail orders", props.retailCount(), "text-rr-heading")
 				<div class="mt-3">
-					@channelQueue(props.RetailCount, props.RetailRows, "/admin/fulfillment?view=needs_action", props.MerchantTZ)
+					@channelQueue(props.RetailCount, props.RetailRows, "/admin/fulfillment?view=needs_action", props.MerchantTZ, props.Now)
 				</div>
 			</div>
 		}
@@ -319,7 +418,7 @@ templ DashboardContent(props DashboardProps) {
 			<div id="band-wholesale" class={ bandSpacing(props.urgentCount() + props.reviewCount() + props.retailCount()), "scroll-mt-6" }>
 				@bandHeader("Wholesale orders", props.wholesaleCount(), "text-rr-amber")
 				<div class="mt-3">
-					@channelQueue(props.WholesaleCount, props.WholesaleRows, "/admin/wholesale/fulfillment?view=needs_action", props.MerchantTZ)
+					@channelQueue(props.WholesaleCount, props.WholesaleRows, "/admin/wholesale/fulfillment?view=needs_action", props.MerchantTZ, props.Now)
 				</div>
 			</div>
 		}
@@ -700,6 +799,50 @@ templ topSellersToggle(value, label, current string) {
 	}
 }
 
+// deliveryRunStrip is the dashboard's clock. Every other queue on this page is
+// "get to it today"; the delivery run is "get to it by nine or it doesn't go".
+// It sits directly under the command bar — above even the Urgent band — because
+// a past-due invoice is still actionable tomorrow and a missed van is not.
+//
+// Within three hours of a same-day cutoff it flips to the rust stamp treatment
+// used for urgent groups; the rest of the time it stays a quiet strip so it
+// doesn't cry wolf on a Tuesday.
+templ deliveryRunStrip(run DeliveryRunProps) {
+	<a
+		href="/admin/fulfillment/load-list"
+		class={ "mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border px-6 py-3 transition-transform hover:-translate-x-px hover:-translate-y-px",
+			templ.KV("border-rr-red bg-rr-surface", run.urgent()),
+			templ.KV("border-rr-border bg-rr-surface", !run.urgent()) }
+		style={ deliveryStripShadow(run.urgent()) }
+	>
+		<div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0">
+			<span class="label-font text-rr-muted">Next delivery run</span>
+			<span class="text-sm font-bold text-rr-heading">{ run.DateLabel }</span>
+			<span
+				class={ "label-font", templ.KV("text-rr-red", run.urgent()), templ.KV("text-rr-muted", !run.urgent()) }
+				style="font-size:0.6rem;"
+			>{ run.countdown() }</span>
+		</div>
+		<div class="flex items-center gap-3 shrink-0">
+			<span class="text-sm tabular-nums text-rr-heading">
+				<span class="font-bold">{ fmt.Sprintf("%d", run.OrderCount) }</span>
+				{ fmt.Sprintf(" order%s queued", pluralS(run.OrderCount)) }
+			</span>
+			<span class="label-font text-rr-red" style="font-size:0.6rem;">Load list</span>
+			@chevronRight()
+		</div>
+	</a>
+}
+
+// deliveryStripShadow gives the urgent state the same hard rust stamp the
+// Urgent band's group links carry, and no shadow otherwise.
+func deliveryStripShadow(urgent bool) string {
+	if urgent {
+		return "box-shadow: 4px 4px 0 0 var(--color-rr-red);"
+	}
+	return ""
+}
+
 // bandHeader renders a labeled band title with a count chip.
 templ bandHeader(label string, count int, accent string) {
 	<div class="flex items-baseline gap-3">
@@ -731,7 +874,7 @@ templ urgentGroupLink(title, detail, href string) {
 }
 
 // orderLinkRow renders a single order row inside a band.
-templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *time.Location) {
+templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *time.Location, now time.Time) {
 	<a
 		href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) }
 		class={ "flex items-center justify-between gap-4 border px-4 py-2.5 hover:bg-rr-raised transition-colors",
@@ -742,7 +885,7 @@ templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *t
 		<div class="flex items-center gap-3 min-w-0">
 			<span class="text-sm font-semibold text-rr-heading">{ o.Number }</span>
 			<span class="hidden sm:inline text-sm text-rr-muted tabular-nums">{ formatCents(o.Total) }</span>
-			if ageIsStale(o.PlacedAt) {
+			if orderIsStale(o, loc, now) {
 				<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt, loc) }</span>
 			} else {
 				<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(o.PlacedAt, loc) }</span>
@@ -821,7 +964,7 @@ func pastDueItemLabel(row PastDueRow) string {
 // with a "view all" link into that channel's fulfillment list, then up to
 // pipelineDisplayLimit rows. The owning band header already names the channel
 // and shows the count, so this bar carries only the link.
-templ channelQueue(count int, rows []PipelineRow, viewAllHref string, loc *time.Location) {
+templ channelQueue(count int, rows []PipelineRow, viewAllHref string, loc *time.Location, now time.Time) {
 	<div class="border border-rr-border bg-rr-surface">
 		<div class="flex items-baseline justify-end px-4 py-2 border-b border-rr-border bg-rr-raised">
 			if count > len(rows) {
@@ -839,7 +982,7 @@ templ channelQueue(count int, rows []PipelineRow, viewAllHref string, loc *time.
 		} else {
 			<div class="divide-y divide-rr-border">
 				for _, row := range rows {
-					@pipelineRow(row, loc)
+					@pipelineRow(row, loc, now)
 				}
 			</div>
 		}
@@ -857,7 +1000,7 @@ func stageClass(stage string) string {
 
 // pipelineRow renders one queue row. Stacks on small screens; on lg+ it lays out
 // item / qty / customer / price / stage / age as a compact grid.
-templ pipelineRow(row PipelineRow, loc *time.Location) {
+templ pipelineRow(row PipelineRow, loc *time.Location, now time.Time) {
 	<a
 		href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", row.Order.ID)) }
 		class="block px-4 py-2.5 hover:bg-rr-raised transition-colors"
@@ -873,7 +1016,7 @@ templ pipelineRow(row PipelineRow, loc *time.Location) {
 			<div class="flex items-center gap-2 shrink-0">
 				<span class={ "label-font", stageClass(row.Stage) } style="font-size:0.6rem;">{ row.Stage }</span>
 				<span class="text-sm font-semibold tabular-nums text-rr-heading">{ formatCents(row.Order.Total) }</span>
-				if ageIsStale(row.Order.PlacedAt) {
+				if orderIsStale(row.Order, loc, now) {
 					<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>
 				} else {
 					<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>
@@ -891,7 +1034,7 @@ templ pipelineRow(row PipelineRow, loc *time.Location) {
 			<div class="min-w-0 truncate text-sm text-rr-muted">{ row.CustomerName }</div>
 			<div class="text-right text-sm font-semibold tabular-nums text-rr-heading">{ formatCents(row.Order.Total) }</div>
 			<span class={ "label-font text-right", stageClass(row.Stage) } style="font-size:0.6rem;">{ row.Stage }</span>
-			if ageIsStale(row.Order.PlacedAt) {
+			if orderIsStale(row.Order, loc, now) {
 				<span class="label-font text-rr-red text-right" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>
 			} else {
 				<span class="label-font text-rr-muted text-right" style="font-size:0.6rem;">{ ageLabel(row.Order.PlacedAt, loc) }</span>

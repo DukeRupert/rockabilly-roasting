@@ -3,6 +3,9 @@ package audit
 // Audit action constants — namespaced as "resource.verb".
 const (
 	// Order actions
+	// Background jobs — an operator handing a discarded job back to River.
+	AuditJobRetried = "job.retried"
+
 	AuditOrderCreated                = "order.created"
 	AuditOrderStatusChanged          = "order.status_changed"
 	AuditOrderRefunded               = "order.refunded"

@@ -96,17 +96,77 @@ func relativeOrderDate(placedAt time.Time, tz *time.Location, now time.Time) str
 	return placed.Format("Jan 2, 2006")
 }
 
-// orderIsStale returns true when an order is in a non-terminal status and
-// has been sitting for at least 48 hours. Drives the rust-flag accent on
-// the row's leading edge — staff's visual cue that the order is overdue
-// for attention. Pending intents are excluded since they're awaiting
-// payment, not action.
-func orderIsStale(o domain.Order, now time.Time) bool {
+// How long an order may sit before the row earns its rust flag.
+//
+// One threshold cannot serve both channels. Retail ships on demand, so two days
+// in the queue means someone forgot. Wholesale runs a weekly cycle against a
+// Friday-afternoon order cutoff — the shop roasts and delivers to that rhythm
+// (see app.OrderReminderCutoffLabel) — so a wholesale order sitting three days
+// is the process working, not a problem. Flagging it at 48h would paint the
+// entire wholesale queue rust every week until staff learned the colour meant
+// nothing, and it would stop working for retail too.
+//
+// The wholesale window is one full cycle: if the order is still unfulfilled by
+// the time that customer is being asked to place their next one, it is late by
+// any reading.
+const (
+	retailStaleAfter    = 48 * time.Hour
+	wholesaleStaleAfter = 7 * 24 * time.Hour
+)
+
+// orderIsStale reports whether an order has waited long enough to deserve the
+// rust leading-edge flag. Drives the row accent on the dashboard, the order
+// list, and both fulfillment queues, so all four agree on what "overdue" means.
+//
+// now and loc are injected rather than read from the clock so staleness is
+// deterministic in tests — the same shape relativeOrderDate takes.
+func orderIsStale(o domain.Order, loc *time.Location, now time.Time) bool {
+	if !orderNeedsHands(o) {
+		return false
+	}
+
+	// A local-delivery order carries a real deadline — the run it was promised
+	// to — so age is the wrong measure entirely. An order placed Thursday
+	// morning for Monday's van is not late on Saturday, and one still sitting
+	// after its van left is late no matter how recently it arrived.
+	//
+	// The comparison is on calendar days, not instants. ScheduledDeliveryDate
+	// comes from a Postgres `date`, so its clock reads midnight UTC — treating
+	// that as a moment would call an order stale in the middle of its own
+	// delivery afternoon anywhere west of Greenwich.
+	if d := o.ScheduledDeliveryDate; d != nil {
+		if loc == nil {
+			loc = time.UTC
+		}
+		today := now.In(loc)
+		return dayNumber(today.Date()) > dayNumber(d.Date())
+	}
+
+	if o.Channel == domain.OrderChannelWholesale {
+		return now.Sub(o.PlacedAt) >= wholesaleStaleAfter
+	}
+	return now.Sub(o.PlacedAt) >= retailStaleAfter
+}
+
+// dayNumber collapses a calendar date to a single comparable integer, so two
+// dates can be ordered without constructing times in a zone either of them
+// might not belong to.
+func dayNumber(year int, month time.Month, day int) int {
+	return year*10000 + int(month)*100 + day
+}
+
+// orderNeedsHands reports whether an order is waiting on staff at all. Nothing
+// terminal can be overdue, and a pending intent is waiting on the customer to
+// finish paying rather than on us — with one exception: once the charge has
+// actually failed, chasing it is our job, so the clock starts.
+func orderNeedsHands(o domain.Order) bool {
 	switch o.Status {
 	case domain.OrderStatusConfirmed, domain.OrderStatusProcessing, domain.OrderStatusOnHold:
-		return now.Sub(o.PlacedAt) >= 48*time.Hour
+		return true
+	case domain.OrderStatusComplete, domain.OrderStatusCancelled, domain.OrderStatusRefunded:
+		return false
 	}
-	return false
+	return o.PaymentStatus == domain.PaymentStatusFailed
 }
 
 // OrderViewCounts holds tab counts for the orders list. Mirrors
@@ -558,7 +618,7 @@ templ OrderListContent(props OrderListProps) {
 						</thead>
 						<tbody class="divide-y divide-rr-border bg-rr-surface">
 							for _, row := range props.Rows {
-								{{ stale := orderIsStale(row.Order, props.Now) }}
+								{{ stale := orderIsStale(row.Order, props.MerchantTZ, props.Now) }}
 								<tr class={ "row-link", templ.KV("row-link-stale", stale) }>
 									<td class="relative z-10 w-10 px-3 py-4 sm:pl-6" @click.stop>
 										<input

@@ -27,6 +27,12 @@ func (r StaffRole) CanManageStaff() bool {
 	return r == StaffRoleAdmin
 }
 
+// CanManageSystem reports whether the role may see and retry failed background
+// jobs. Admin only — retrying a job re-runs real work, including sending mail.
+func (r StaffRole) CanManageSystem() bool {
+	return r == StaffRoleAdmin
+}
+
 // Valid reports whether the role is one of the known staff roles.
 func (r StaffRole) Valid() bool {
 	switch r {

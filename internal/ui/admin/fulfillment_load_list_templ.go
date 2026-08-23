@@ -1038,7 +1038,7 @@ func loadListRosterRow(row LoadListOrder, props LoadListProps) templ.Component {
 			templ_7745c5c3_Var43 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		stale := orderIsStale(row.Order, props.Now)
+		stale := orderIsStale(row.Order, props.MerchantTZ, props.Now)
 		var templ_7745c5c3_Var44 = []any{"row-link", templ.KV("row-link-stale", stale)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var44...)
 		if templ_7745c5c3_Err != nil {

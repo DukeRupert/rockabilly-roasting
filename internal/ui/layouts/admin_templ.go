@@ -635,7 +635,13 @@ func adminUserFooter(props AdminProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<a href=\"/admin/audit\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Audit log</a> <a href=\"/admin/help\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Help</a><div class=\"my-1 border-t border-rr-border\"></div><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div>")
+		if domain.StaffRole(props.StaffRole).CanManageSystem() {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<a href=\"/admin/jobs\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Failed jobs</a> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<a href=\"/admin/audit\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Audit log</a> <a href=\"/admin/help\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Help</a><div class=\"my-1 border-t border-rr-border\"></div><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

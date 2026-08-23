@@ -633,7 +633,11 @@ func NewRouter(deps *Deps) http.Handler {
 		adminMux.Handle(pattern, deps.requirePermission(auth.PermManageSystem, h))
 	}
 	settingsRoute("GET /admin/settings", deps.handleAdminSettings)
-	settingsRoute("POST /admin/settings/shipping", deps.handleAdminShippingSettingsUpdate)
+	// The shipping form posts to the tab's own URL rather than a verb path.
+	// A rejected save re-renders in place instead of redirecting, and hx-boost
+	// pushes the action into history — so that URL has to answer GET, or a
+	// refresh after a rejected save lands on a 405.
+	settingsRoute("POST /admin/settings", deps.handleAdminShippingSettingsUpdate)
 	settingsRoute("GET /admin/settings/wholesale", deps.handleAdminSettingsWholesale)
 	settingsRoute("GET /admin/settings/integrations", deps.handleAdminSettingsIntegrations)
 	settingsRoute("POST /admin/settings/default-price-list", deps.handleAdminDefaultPriceListUpdate)

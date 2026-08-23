@@ -368,7 +368,7 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"mt-6 border border-rr-border bg-rr-surface\"><form method=\"post\" action=\"/admin/settings/shipping\" class=\"divide-y divide-rr-border\" x-data=\"{ dirty: false }\" @input=\"dirty = true\" @change=\"dirty = true\"><div class=\"px-4 py-5 sm:px-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Rates</h2><div class=\"mt-3 grid gap-5 sm:grid-cols-2\"><div><label for=\"shipping-flat-rate\" class=\"block text-sm font-medium text-rr-heading\">Flat rate (USD)</label><div class=\"mt-1 flex items-center\"><span class=\"text-rr-muted pr-2\">$</span> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"mt-6 border border-rr-border bg-rr-surface\"><form method=\"post\" action=\"/admin/settings\" class=\"divide-y divide-rr-border\" x-data=\"{ dirty: false }\" @input=\"dirty = true\" @change=\"dirty = true\"><div class=\"px-4 py-5 sm:px-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Rates</h2><div class=\"mt-3 grid gap-5 sm:grid-cols-2\"><div><label for=\"shipping-flat-rate\" class=\"block text-sm font-medium text-rr-heading\">Flat rate (USD)</label><div class=\"mt-1 flex items-center\"><span class=\"text-rr-muted pr-2\">$</span> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

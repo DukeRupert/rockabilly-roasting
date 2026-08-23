@@ -222,4 +222,16 @@ func TestShippingRuleSummary(t *testing.T) {
 		shippingRuleSummary(s))
 }
 
+// A rejected save re-renders in place instead of redirecting, and hx-boost
+// pushes the form's action into history — so that action is the URL the staffer
+// is left on and the one a refresh will GET. It has to be the Shipping tab's own
+// URL, which has a GET route; a POST-only verb path would answer that refresh
+// with a 405 on the page they were just told to go fix.
+func TestSettings_FormPostsToATabURLThatAnswersGET(t *testing.T) {
+	html := renderSettings(t, SettingsProps{Shipping: healthyShipping()})
+
+	assert.Contains(t, html, `action="`+settingsTabShipping+`"`)
+	assert.NotContains(t, html, `action="`+settingsTabShipping+`/shipping"`)
+}
+
 func ptrTime(t time.Time) *time.Time { return &t }

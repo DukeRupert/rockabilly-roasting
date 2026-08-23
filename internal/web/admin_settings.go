@@ -159,6 +159,15 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 // htmx does not swap 4xx responses by default — a correct status code here would
 // mean the staffer clicks Save and the page silently does nothing. Same choice
 // the Team page makes for its form errors.
+//
+// Rendering in place rather than redirecting is what makes the form's POST
+// target load-bearing. hx-boost pushes the action URL into history, so whatever
+// the form posts to is what the address bar reads afterwards and what a refresh
+// or a back-then-forward will GET. The form therefore posts to /admin/settings —
+// the tab's own URL, which answers GET — and not to a POST-only verb path, which
+// would answer that refresh with a 405 on the very page the staffer was just
+// told to go fix. Team and Box presets are safe for the same reason: both post
+// to a URL that has a GET route.
 func (d *Deps) renderShippingSettings(w http.ResponseWriter, r *http.Request, props admin.SettingsProps) {
 	if IsHTMX(r) {
 		admin.SettingsContent(props).Render(r.Context(), w) //nolint:errcheck

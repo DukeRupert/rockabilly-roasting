@@ -234,4 +234,32 @@ func TestSettings_FormPostsToATabURLThatAnswersGET(t *testing.T) {
 	assert.NotContains(t, html, `action="`+settingsTabShipping+`/shipping"`)
 }
 
+// "Customers currently see" has to describe what a customer actually meets.
+// On a rejected save the form fields hold the draft, but nothing has reached
+// disk — so the echo reads from the saved config. Rendering the draft there
+// meant a mistyped rate announced "$0.00 shipping" directly under a banner
+// saying nothing had been saved: the page contradicted itself at the one
+// moment the staffer was reading it closely.
+func TestSettings_EchoShowsSavedRuleNotRejectedDraft(t *testing.T) {
+	saved := healthyShipping() // $6.00 flat rate, in force
+
+	// The staffer fluffs the rate; parsing leaves it at zero in the draft.
+	draft := healthyShipping()
+	draft.FlatRateCents = 0
+	draft.FlatRateInput = "6..00"
+
+	html := renderSettings(t, SettingsProps{
+		Shipping:    draft,
+		Saved:       saved,
+		FieldErrors: map[string]string{"flat_rate": "Enter a dollar amount, e.g. 6.00."},
+		Flash:       Flash{Message: "Nothing was saved — check the fields marked below.", Error: true},
+	})
+
+	// The echo states the rule still in force...
+	assert.Contains(t, html, "Every non-local order pays $6.00 shipping")
+	assert.NotContains(t, html, "pays $0.00 shipping")
+	// ...while the field still hands back exactly what was typed.
+	assert.Contains(t, html, `value="6..00"`)
+}
+
 func ptrTime(t time.Time) *time.Time { return &t }

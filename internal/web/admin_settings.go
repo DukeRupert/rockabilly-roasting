@@ -143,7 +143,7 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name, role := staffNameRole(r)
-	d.renderShippingSettings(w, r, admin.SettingsProps{
+	d.renderShippingSettings(w, r, section.Shipping, admin.SettingsProps{
 		Nav:        section.nav(role),
 		Shipping:   section.Shipping,
 		Flash:      settingsFlash(r),
@@ -168,7 +168,12 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 // would answer that refresh with a 405 on the very page the staffer was just
 // told to go fix. Team and Box presets are safe for the same reason: both post
 // to a URL that has a GET route.
-func (d *Deps) renderShippingSettings(w http.ResponseWriter, r *http.Request, props admin.SettingsProps) {
+func (d *Deps) renderShippingSettings(w http.ResponseWriter, r *http.Request, saved admin.ShippingSettings, props admin.SettingsProps) {
+	// Stamped here rather than at the call sites so the echo sentences cannot
+	// be handed a draft by a caller that forgot: props.Shipping is what the
+	// fields render, props.Saved is what is on disk, and only this function
+	// decides the second one.
+	props.Saved = saved
 	if IsHTMX(r) {
 		admin.SettingsContent(props).Render(r.Context(), w) //nolint:errcheck
 		return
@@ -276,9 +281,10 @@ func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.
 			return
 		}
 		name, role := staffNameRole(r)
-		// The nav's issue list is derived from what is *saved*, not from the
-		// rejected draft — nothing has changed on disk yet.
-		d.renderShippingSettings(w, r, admin.SettingsProps{
+		// The nav's issue list and the echo sentences are derived from what is
+		// *saved*, not from the rejected draft — nothing has changed on disk
+		// yet, so what a customer meets is still the stored rule.
+		d.renderShippingSettings(w, r, section.Shipping, admin.SettingsProps{
 			Nav:         section.nav(role),
 			Shipping:    submitted,
 			FieldErrors: fieldErrors,

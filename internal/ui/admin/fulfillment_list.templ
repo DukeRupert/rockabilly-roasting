@@ -554,7 +554,7 @@ templ fulfillmentFlatView(props FulfillmentListProps) {
 // Stale rows get the rust leading-edge flag so staff spot overdue items
 // without comparing dates by eye.
 templ fulfillmentRow(row OrderRow, props FulfillmentListProps) {
-	{{ stale := orderIsStale(row.Order, props.Now) }}
+	{{ stale := orderIsStale(row.Order, props.MerchantTZ, props.Now) }}
 	<tr class={ "row-link", templ.KV("row-link-stale", stale) }>
 		<td class="relative z-10 w-10 px-3 py-4 sm:pl-6" @click.stop>
 			<input

@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,18 @@ type Enqueuer struct {
 // NewEnqueuer returns an Enqueuer that uses client for transactional inserts.
 func NewEnqueuer(client *river.Client[pgx.Tx]) *Enqueuer {
 	return &Enqueuer{client: client}
+}
+
+// RetryJob implements app.JobRetrier: it hands a job River discarded back to
+// the queue, inside the caller's transaction so the re-queue commits with the
+// audit record that explains it. River bumps max_attempts itself when the job
+// has already burned through its allowance, so a retried job gets a real
+// attempt rather than being discarded again on sight.
+func (e *Enqueuer) RetryJob(ctx context.Context, tx pgx.Tx, jobID int64) error {
+	if _, err := e.client.JobRetryTx(ctx, tx, jobID); err != nil {
+		return fmt.Errorf("river retry job %d: %w", jobID, err)
+	}
+	return nil
 }
 
 // WithQuietHours holds subscription notification emails (renewal receipt,

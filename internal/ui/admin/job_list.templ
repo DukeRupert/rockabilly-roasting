@@ -1,0 +1,258 @@
+package admin
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// The failed-jobs page. Every customer email, shipping label, invoice and
+// subscription renewal in this system runs as a background job, so a job River
+// gave up on is a piece of work that silently did not happen — and its symptom
+// is an absence, which no queue or count anywhere else in the admin can show.
+//
+// The page is built around one question: what broke, and can I put it back?
+// Failures cluster by cause (one expired token discards every job of a kind),
+// so the kind rollup leads and the individual rows exist to be retried.
+
+type JobListProps struct {
+	Jobs       []domain.DeadJob
+	Kinds      []domain.DeadJobKindCount
+	KindFilter string // "" = every kind
+	Total      int    // every dead job, all kinds — the "All" chip's count
+	Page       int
+	PerPage    int
+	HasMore    bool
+	Flash      string
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
+}
+
+// jobKindDisplay turns a River job kind into something readable in a table —
+// "email_order_confirm" reads as "Email order confirm". The raw kind stays
+// available in the filter chips, since that is what shows up in logs.
+func jobKindDisplay(kind string) string {
+	if kind == "" {
+		return "—"
+	}
+	spaced := strings.ReplaceAll(kind, "_", " ")
+	return strings.ToUpper(spaced[:1]) + spaced[1:]
+}
+
+// jobErrorDisplay keeps a stack-trace-sized error from blowing out the row.
+// The full text is on the row's title attribute for anyone who needs it.
+func jobErrorDisplay(msg string) string {
+	msg = strings.TrimSpace(strings.SplitN(msg, "\n", 2)[0])
+	if msg == "" {
+		return "No error recorded"
+	}
+	// Truncate by runes, not bytes: error text carries provider messages and
+	// customer data, and slicing mid-rune renders a replacement character.
+	const max = 140
+	r := []rune(msg)
+	if len(r) > max {
+		return string(r[:max]) + "…"
+	}
+	return msg
+}
+
+// failureSpan answers the operator's next question after "how many": is this
+// happening right now, or has it been quietly piling up? A burst inside the
+// last hour is an outage in progress; a spread across days is rot nobody was
+// watching, and the two call for different responses.
+func (p JobListProps) failureSpan() string {
+	var oldest, newest time.Time
+	for _, k := range p.Kinds {
+		if oldest.IsZero() || (!k.Oldest.IsZero() && k.Oldest.Before(oldest)) {
+			oldest = k.Oldest
+		}
+		if k.Newest.After(newest) {
+			newest = k.Newest
+		}
+	}
+	if oldest.IsZero() || newest.IsZero() {
+		return ""
+	}
+	loc := p.MerchantTZ
+	if loc == nil {
+		loc = time.UTC
+	}
+	if oldest.Equal(newest) {
+		return fmt.Sprintf("Failed %s.", ageLabel(newest, loc))
+	}
+	return fmt.Sprintf("Oldest failed %s, most recent %s.", ageLabel(oldest, loc), ageLabel(newest, loc))
+}
+
+func jobListURL(page int, kind string) string {
+	url := fmt.Sprintf("/admin/jobs?page=%d", page)
+	if kind != "" {
+		url += "&kind=" + kind
+	}
+	return url
+}
+
+templ JobListContent(props JobListProps) {
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Failed Jobs</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				Background work that ran out of retries. Nothing picks these up again on their own.
+			</p>
+		</div>
+	</div>
+	if span := props.failureSpan(); span != "" {
+		<p class="mt-2 text-sm text-rr-body">{ span }</p>
+	}
+	if props.Flash != "" {
+		<div class="mt-4 border border-rr-border bg-rr-raised px-4 py-3 text-sm text-rr-heading">{ props.Flash }</div>
+	}
+	if props.Total == 0 && props.KindFilter == "" {
+		<div class="mt-8 border border-dashed border-rr-border py-12 text-center">
+			<svg class="mx-auto size-10 text-rr-teal" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"></path>
+			</svg>
+			<p class="mt-3 text-sm font-semibold text-rr-heading">Every job is landing.</p>
+			<p class="mt-1 text-sm text-rr-muted">No background job has run out of retries.</p>
+		</div>
+	} else {
+		<!-- Kind rollup: failures cluster by cause, so this is usually the diagnosis. -->
+		if len(props.Kinds) > 0 {
+			<div class="mt-6 flex flex-wrap items-center gap-2">
+				@jobKindChip("All", "", props.KindFilter, props.Total)
+				for _, k := range props.Kinds {
+					@jobKindChip(jobKindDisplay(k.Kind), k.Kind, props.KindFilter, k.Count)
+				}
+			</div>
+		}
+		<div class="mt-6 overflow-hidden border border-rr-border bg-rr-surface">
+			<table class="min-w-full divide-y divide-rr-border">
+				<thead class="bg-rr-raised">
+					<tr>
+						<th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6">Job</th>
+						<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading lg:table-cell">Last error</th>
+						<th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-rr-heading">Gave up</th>
+						<th scope="col" class="hidden px-3 py-3.5 text-left text-sm font-semibold text-rr-heading sm:table-cell">Tries</th>
+						<th scope="col" class="py-3.5 pl-3 pr-4 text-right text-sm font-semibold text-rr-heading sm:pr-6">Action</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-rr-border bg-rr-surface">
+					if len(props.Jobs) == 0 {
+						<tr>
+							<td colspan="5" class="px-4 py-8 text-center text-sm text-rr-muted">No failed jobs of this kind.</td>
+						</tr>
+					}
+					for _, j := range props.Jobs {
+						@jobRow(j, props.MerchantTZ)
+					}
+				</tbody>
+			</table>
+		</div>
+		<nav class="flex items-center justify-between border-t border-rr-border px-4 pt-4 sm:px-0" aria-label="Pagination">
+			<div class="-mt-px flex w-0 flex-1">
+				if props.Page > 1 {
+					<a
+						href={ templ.SafeURL(jobListURL(props.Page-1, props.KindFilter)) }
+						class="inline-flex items-center rounded-sm border border-rr-border px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+					>Previous</a>
+				}
+			</div>
+			<div class="-mt-px flex w-0 flex-1 justify-end">
+				if props.HasMore {
+					<a
+						href={ templ.SafeURL(jobListURL(props.Page+1, props.KindFilter)) }
+						class="inline-flex items-center rounded-sm border border-rr-border px-3 py-2 text-sm font-semibold text-rr-heading hover:bg-rr-raised"
+					>Next</a>
+				}
+			</div>
+		</nav>
+	}
+	@ConfirmDialogHost()
+}
+
+// jobKindChip filters the list to one kind. The count rides in the chip so the
+// rollup doubles as the breakdown — which kind is broken, and how badly.
+templ jobKindChip(label, kind, current string, count int) {
+	if kind == current {
+		<span class="inline-flex items-baseline gap-1.5 border border-rr-heading bg-rr-heading px-2.5 py-1 text-rr-bg">
+			<span class="text-sm font-bold tabular-nums">{ fmt.Sprintf("%d", count) }</span>
+			<span class="label-font" style="font-size:0.6rem;">{ label }</span>
+		</span>
+	} else {
+		<a
+			href={ templ.SafeURL(jobListURL(1, kind)) }
+			class="inline-flex items-baseline gap-1.5 border border-rr-border bg-rr-surface px-2.5 py-1 text-rr-heading hover:bg-rr-raised transition-colors"
+		>
+			<span class="text-sm font-bold tabular-nums">{ fmt.Sprintf("%d", count) }</span>
+			<span class="label-font text-rr-muted" style="font-size:0.6rem;">{ label }</span>
+		</a>
+	}
+}
+
+// jobRow renders one dead job and its retry action.
+//
+// Args are shown raw and monospaced: they are the only thing that says *which*
+// record was affected, and an operator deciding whether to retry needs to see
+// the order or customer id rather than a prettified summary of it.
+templ jobRow(j domain.DeadJob, loc *time.Location) {
+	<tr>
+		<td class="py-4 pl-4 pr-3 text-sm sm:pl-6">
+			<p class="font-medium text-rr-heading">{ jobKindDisplay(j.Kind) }</p>
+			<p class="mt-0.5 font-mono text-xs text-rr-muted break-all">{ j.Args }</p>
+		</td>
+		<td class="hidden px-3 py-4 text-sm text-rr-body lg:table-cell" title={ j.LastError }>
+			{ jobErrorDisplay(j.LastError) }
+		</td>
+		<td class="whitespace-nowrap px-3 py-4 text-sm text-rr-muted">
+			<time datetime={ j.FinalizedAt.Format("2006-01-02T15:04:05Z07:00") }>
+				{ ageLabel(j.FinalizedAt, loc) }
+			</time>
+		</td>
+		<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted tabular-nums sm:table-cell">
+			{ fmt.Sprintf("%d/%d", j.Attempt, j.MaxAttempts) }
+		</td>
+		<td class="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm sm:pr-6">
+			@ActionWrap(fmt.Sprintf("job-retry-hint-%d", j.ID), "Put this job back on the queue and run it again") {
+				<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/jobs/%d/retry", j.ID)) } class="inline">
+					<button
+						type="submit"
+						class="btn-secondary"
+						aria-describedby={ fmt.Sprintf("job-retry-hint-%d", j.ID) }
+						{ ConfirmAttrs(retryConfirm(j))... }
+					>Retry</button>
+				</form>
+			}
+		</td>
+	</tr>
+}
+
+// retryConfirm spells out what running the job again actually does. Jobs are
+// idempotent by contract, but "idempotent" covers the database, not the
+// customer's inbox — a retried email job sends the email. Staff should know
+// that before clicking, not after.
+func retryConfirm(j domain.DeadJob) ActionConfirm {
+	return ActionConfirm{
+		Title:   "Run this job again?",
+		Lead:    fmt.Sprintf("%s will go back on the queue and run as soon as a worker is free.", jobKindDisplay(j.Kind)),
+		Points: []string{
+			"If the job sends email, the email goes out now",
+			"Whatever made it fail before will fail it again unless that is fixed",
+			"It disappears from this list either way",
+		},
+		Confirm: "Retry job",
+	}
+}
+
+templ JobList(props JobListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Failed Jobs",
+		ActivePath: "/admin/jobs",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@JobListContent(props)
+	}
+}

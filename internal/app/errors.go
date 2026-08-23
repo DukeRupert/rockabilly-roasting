@@ -286,6 +286,16 @@ var (
 	// would fire it instantly, which is a surprising way to learn you typed the
 	// wrong date into a mailing that reaches every customer.
 	ErrScheduleInPast = errors.New("pick a send time in the future")
+
+	// Background job errors
+	//
+	// ErrJobNotDead guards the retry action: only a discarded job is eligible.
+	// A job that is queued or running is already on its way, and shoving it
+	// back in line helps nobody.
+	ErrJobNotDead = errors.New("this job is not waiting to be retried")
+	// ErrJobRetryUnavailable means no River client is wired in this process,
+	// so there is nothing to hand the job back to.
+	ErrJobRetryUnavailable = errors.New("background job retry is unavailable")
 )
 
 // MOQViolationError carries the per-line minimum/multiple violations so

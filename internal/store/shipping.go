@@ -365,16 +365,24 @@ func (s *ShippingStore) ListOrdersWithFailedLabelAttempts(ctx context.Context, t
 	return out, rows.Err()
 }
 
-// failedLabelOrdersCTE is the shared body behind CountFailedLabelOrders and
-// ListFailedLabelOrders. It finds every order whose most recent buy_label job
-// ended in a terminal failure (cancelled or discarded) and that still needs a
-// label: the order is live, and nothing has since produced a shipment for it.
+// failedLabelOrdersCTE is the shared body behind CountFailedLabelOrdersByChannel
+// and ListFailedLabelOrders. It finds every order whose most recent buy_label
+// job ended in a terminal failure (cancelled or discarded) and that still needs
+// a label: the order is live, still in the pack-and-ship queue, and nothing has
+// since produced a shipment for it.
 //
 // A queued or running attempt is deliberately not a match — those resolve on
 // their own. A later successful retry isn't either, since it becomes the
 // newest job for that order and its state is 'completed'. The shipments guard
 // covers the remaining case: staff bought the label by hand after the job gave
 // up, so the failure is already dealt with.
+//
+// The status and fulfillment_status predicates mirror the fulfillment list's
+// "needs action" bucket exactly (see CountFulfillmentViews and
+// applyFulfillmentViewFilter), because the dashboard group that reports this
+// count links straight into that queue. An order counted here that the
+// destination page filters out is the same class of bug as a count that
+// overstates: staff click through and can't find what they were sent for.
 const failedLabelOrdersCTE = `
 	WITH latest_attempt AS (
 		SELECT DISTINCT ON ((args->>'order_id'))
@@ -388,31 +396,49 @@ const failedLabelOrdersCTE = `
 	FROM orders o
 	JOIN latest_attempt la ON la.order_id = o.id::text
 	WHERE la.state IN ('cancelled', 'discarded')
-	  AND o.status NOT IN ('cancelled', 'refunded', 'complete')
+	  AND o.status NOT IN ('cancelled', 'refunded')
+	  AND NOT (o.status = 'pending' AND o.payment_status = 'awaiting')
+	  AND o.fulfillment_status IN ('unfulfilled', 'partially_fulfilled', 'fulfilled', 'ready_for_pickup')
 	  AND NOT EXISTS (SELECT 1 FROM shipments sh WHERE sh.order_id = o.id)`
 
-// CountFailedLabelOrders returns how many orders are stuck without a shipping
-// label because their buy_label job gave up. The dashboard needs a true count,
-// not the length of a display-capped list.
-func (s *ShippingStore) CountFailedLabelOrders(ctx context.Context, tx pgx.Tx) (_ int, err error) {
-	query := fmt.Sprintf(failedLabelOrdersCTE, "COUNT(*)")
-	var count int
-	if err := tx.QueryRow(ctx, query).Scan(&count); err != nil {
-		return 0, fmt.Errorf("count failed label orders: %w", err)
+// CountFailedLabelOrdersByChannel returns how many orders are stuck without a
+// shipping label because their buy_label job gave up, split by sales channel.
+//
+// The split is not cosmetic. Retail and wholesale have separate fulfillment
+// queues by design, so a single combined number would link to a page showing
+// only part of it. Channels with nothing stuck are absent from the map rather
+// than present with a zero.
+func (s *ShippingStore) CountFailedLabelOrdersByChannel(ctx context.Context, tx pgx.Tx) (_ map[domain.OrderChannel]int, err error) {
+	query := fmt.Sprintf(failedLabelOrdersCTE, "o.channel, COUNT(*)::int") + " GROUP BY o.channel"
+
+	rows, err := tx.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("count failed label orders by channel: %w", err)
 	}
-	return count, nil
+	defer rows.Close()
+
+	out := make(map[domain.OrderChannel]int)
+	for rows.Next() {
+		var channel string
+		var count int
+		if err := rows.Scan(&channel, &count); err != nil {
+			return nil, fmt.Errorf("scan failed label channel count: %w", err)
+		}
+		out[domain.OrderChannel(channel)] = count
+	}
+	return out, rows.Err()
 }
 
-// ListFailedLabelOrders returns the oldest `limit` orders stuck without a
-// label. Oldest first: a label failure that nobody noticed is the one worth
-// showing, and the newest ones are the likeliest to still be retrying.
-func (s *ShippingStore) ListFailedLabelOrders(ctx context.Context, tx pgx.Tx, limit int) (_ []uuid.UUID, err error) {
+// ListFailedLabelOrders returns the oldest `limit` orders of one channel stuck
+// without a label. Oldest first: a label failure that nobody noticed is the one
+// worth showing, and the newest ones are the likeliest to still be retrying.
+func (s *ShippingStore) ListFailedLabelOrders(ctx context.Context, tx pgx.Tx, channel domain.OrderChannel, limit int) (_ []uuid.UUID, err error) {
 	if limit <= 0 {
 		return nil, nil
 	}
-	query := fmt.Sprintf(failedLabelOrdersCTE, "o.id") + " ORDER BY o.placed_at ASC LIMIT $1"
+	query := fmt.Sprintf(failedLabelOrdersCTE, "o.id") + " AND o.channel = $1 ORDER BY o.placed_at ASC LIMIT $2"
 
-	rows, err := tx.Query(ctx, query, limit)
+	rows, err := tx.Query(ctx, query, string(channel), limit)
 	if err != nil {
 		return nil, fmt.Errorf("list failed label orders: %w", err)
 	}

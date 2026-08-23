@@ -48,10 +48,16 @@ func testOrder(number string) domain.Order {
 // the default tab.
 func TestDashboard_UrgentLinksCarryTheirFilter(t *testing.T) {
 	html := renderDashboard(t, DashboardProps{
-		OnHold:             []domain.Order{testOrder("RR-1001")},
-		OnHoldCount:        3,
-		FailedPayments:     []domain.Order{testOrder("RR-1002")},
-		FailedPaymentCount: 2,
+		OnHold: []UrgentOrderGroup{{
+			Channel: domain.OrderChannelRetail,
+			Count:   3,
+			Orders:  []domain.Order{testOrder("RR-1001")},
+		}},
+		FailedPayments: []UrgentOrderGroup{{
+			Channel: domain.OrderChannelRetail,
+			Count:   2,
+			Orders:  []domain.Order{testOrder("RR-1002")},
+		}},
 	})
 
 	assert.Contains(t, html, "/admin/orders?view=on_hold")
@@ -59,16 +65,75 @@ func TestDashboard_UrgentLinksCarryTheirFilter(t *testing.T) {
 	assert.NotContains(t, html, "/admin/orders?status=on_hold")
 }
 
+// Orders and Fulfillment are channel-split pages, so an urgent group has to be
+// too. A combined "5 orders on hold" linking to the retail list would send
+// staff somewhere that shows three of them — the same broken promise as a count
+// that overstates, just one click further in.
+func TestDashboard_UrgentGroupsSplitByChannel(t *testing.T) {
+	props := DashboardProps{
+		OnHold: []UrgentOrderGroup{
+			{Channel: domain.OrderChannelRetail, Count: 3, Orders: []domain.Order{testOrder("RR-1001")}},
+			{Channel: domain.OrderChannelWholesale, Count: 2, Orders: []domain.Order{testOrder("RR-1002")}},
+		},
+	}
+	html := renderDashboard(t, props)
+
+	// Each channel states its own count and links to its own list.
+	assert.Contains(t, html, "3 retail orders on hold")
+	assert.Contains(t, html, `href="/admin/orders?view=on_hold"`)
+	assert.Contains(t, html, "2 wholesale orders on hold")
+	assert.Contains(t, html, `href="/admin/orders/wholesale?view=on_hold"`)
+
+	// The band header still totals both — the split is in the links, not the
+	// arithmetic.
+	assert.Equal(t, 5, props.urgentCount())
+}
+
+// Failed payments and stuck labels take the same treatment, each landing on its
+// own channel's page. The label group aims at needs_action because that is the
+// bucket the store query mirrors; ready_to_ship would filter out every stuck
+// order that has not been packed yet.
+func TestDashboard_WholesaleUrgentGroupsLinkToWholesalePages(t *testing.T) {
+	html := renderDashboard(t, DashboardProps{
+		FailedPayments: []UrgentOrderGroup{{
+			Channel: domain.OrderChannelWholesale, Count: 1, Orders: []domain.Order{testOrder("RR-2002")},
+		}},
+		LabelFailures: []UrgentOrderGroup{{
+			Channel: domain.OrderChannelWholesale, Count: 1, Orders: []domain.Order{testOrder("RR-2003")},
+		}},
+	})
+
+	assert.Contains(t, html, `href="/admin/orders/wholesale?view=all&amp;payment=failed"`)
+	assert.Contains(t, html, `href="/admin/wholesale/fulfillment?view=needs_action"`)
+	assert.NotContains(t, html, "view=ready_to_ship")
+}
+
+// A channel with nothing stuck must not take up a line saying so.
+func TestDashboard_EmptyChannelGroupRendersNothing(t *testing.T) {
+	html := renderDashboard(t, DashboardProps{
+		OnHold: []UrgentOrderGroup{
+			{Channel: domain.OrderChannelRetail, Count: 2, Orders: []domain.Order{testOrder("RR-1001")}},
+			{Channel: domain.OrderChannelWholesale, Count: 0},
+		},
+	})
+
+	assert.Contains(t, html, "2 retail orders on hold")
+	assert.NotContains(t, html, "wholesale order")
+}
+
 // The count in a band header is the true total; the rows below it are a display
 // sample. They are allowed to disagree, and the header is the one that has to
 // be right — that is the number staff act on.
 func TestDashboard_CountsAreIndependentOfDisplayedRows(t *testing.T) {
 	html := renderDashboard(t, DashboardProps{
-		OnHold:      []domain.Order{testOrder("RR-1001")},
-		OnHoldCount: 30,
+		OnHold: []UrgentOrderGroup{{
+			Channel: domain.OrderChannelRetail,
+			Count:   30,
+			Orders:  []domain.Order{testOrder("RR-1001")},
+		}},
 	})
 
-	assert.Contains(t, html, "30 orders on hold")
+	assert.Contains(t, html, "30 retail orders on hold")
 	assert.Contains(t, html, "RR-1001")
 }
 
@@ -77,16 +142,22 @@ func TestDashboard_CountsAreIndependentOfDisplayedRows(t *testing.T) {
 // the Urgent band and count toward the urgent chip.
 func TestDashboard_LabelFailuresSurfaceAsUrgent(t *testing.T) {
 	props := DashboardProps{
-		LabelFailures:     []domain.Order{testOrder("RR-2001")},
-		LabelFailureCount: 2,
+		LabelFailures: []UrgentOrderGroup{{
+			Channel: domain.OrderChannelRetail,
+			Count:   2,
+			Orders:  []domain.Order{testOrder("RR-2001")},
+		}},
 	}
 	html := renderDashboard(t, props)
 
 	assert.Equal(t, 2, props.urgentCount())
-	assert.Contains(t, html, "2 shipping labels failed")
+	assert.Contains(t, html, "2 retail shipping labels failed")
 	assert.Contains(t, html, "Label failed")
 	assert.Contains(t, html, "RR-2001")
-	assert.Contains(t, html, "/admin/fulfillment?view=ready_to_ship")
+	// needs_action, not ready_to_ship: the store query mirrors that bucket, and
+	// ready_to_ship (fulfillment_status = 'fulfilled') would hide every stuck
+	// order still waiting to be packed.
+	assert.Contains(t, html, "/admin/fulfillment?view=needs_action")
 
 	// The command bar's urgent chip is how staff notice without scrolling.
 	assert.Contains(t, html, `href="#band-urgent"`)

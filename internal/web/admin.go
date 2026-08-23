@@ -90,13 +90,16 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		// capped like every other queue, but the count is a real COUNT(*) — a
 		// count derived from len(rows) would silently stop climbing past the cap
 		// and tell staff there are 8 holds when there are 30.
-		onHoldFilter := store.OrderFilter{Statuses: []domain.OrderStatus{domain.OrderStatusOnHold}}
-		props.OnHoldCount, txErr = d.OrderService.CountOrders(ctx, tx, onHoldFilter)
-		if txErr != nil {
-			return txErr
-		}
-		onHoldFilter.Limit = pipelineDisplayLimit
-		props.OnHold, txErr = d.OrderService.ListOrders(ctx, tx, onHoldFilter)
+		//
+		// Split by channel. Orders and Fulfillment are channel-split pages, so a
+		// combined count would link to a list holding only part of it — staff
+		// click "5 orders on hold" and count three.
+		props.OnHold, txErr = d.buildUrgentOrderGroups(ctx, tx, func(ch domain.OrderChannel) store.OrderFilter {
+			return store.OrderFilter{
+				Channel:  &ch,
+				Statuses: []domain.OrderStatus{domain.OrderStatusOnHold},
+			}
+		})
 		if txErr != nil {
 			return txErr
 		}
@@ -105,16 +108,13 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		// recent N orders — a scan window drops a payment that failed a day ago
 		// off the dashboard entirely once enough orders land behind it, which is
 		// the exact case staff most need to see.
-		failedFilter := store.OrderFilter{
-			PaymentStatuses:          []domain.PaymentStatus{domain.PaymentStatusFailed},
-			ExcludeCancelledRefunded: true,
-		}
-		props.FailedPaymentCount, txErr = d.OrderService.CountOrders(ctx, tx, failedFilter)
-		if txErr != nil {
-			return txErr
-		}
-		failedFilter.Limit = pipelineDisplayLimit
-		props.FailedPayments, txErr = d.OrderService.ListOrders(ctx, tx, failedFilter)
+		props.FailedPayments, txErr = d.buildUrgentOrderGroups(ctx, tx, func(ch domain.OrderChannel) store.OrderFilter {
+			return store.OrderFilter{
+				Channel:                  &ch,
+				PaymentStatuses:          []domain.PaymentStatus{domain.PaymentStatusFailed},
+				ExcludeCancelledRefunded: true,
+			}
+		})
 		if txErr != nil {
 			return txErr
 		}
@@ -122,24 +122,9 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		// Orders whose shipping-label job gave up. Nothing re-enqueues these —
 		// they sit in the Ship queue looking like ordinary work — so they get
 		// their own Urgent group rather than hiding in the channel pipelines.
-		props.LabelFailureCount, txErr = d.FulfillmentService.CountFailedLabelOrders(ctx, tx)
+		props.LabelFailures, txErr = d.buildLabelFailureGroups(ctx, tx)
 		if txErr != nil {
 			return txErr
-		}
-		if props.LabelFailureCount > 0 {
-			labelIDs, idErr := d.FulfillmentService.ListFailedLabelOrders(ctx, tx, pipelineDisplayLimit)
-			if idErr != nil {
-				return idErr
-			}
-			if len(labelIDs) > 0 {
-				props.LabelFailures, txErr = d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
-					OrderIDs: labelIDs,
-					Limit:    pipelineDisplayLimit,
-				})
-				if txErr != nil {
-					return txErr
-				}
-			}
 		}
 
 		// Background jobs River gave up on. Counted here rather than left to the
@@ -749,6 +734,102 @@ func (d *Deps) handleAdminTopSellers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.TopSellersCard(buildTopProducts(rows, by), by).Render(ctx, w) //nolint:errcheck
+}
+
+// urgentGroupChannels is the order the Urgent band lists channels in. Retail
+// leads because it is the higher-volume queue; wholesale follows rather than
+// being folded in, since the two have separate lists to click through to.
+var urgentGroupChannels = []domain.OrderChannel{
+	domain.OrderChannelRetail,
+	domain.OrderChannelWholesale,
+}
+
+// buildUrgentOrderGroups runs one urgent-order query per channel and returns a
+// group for each channel that has anything. filterFor supplies the category's
+// predicate; this function adds the count/list pairing and the display cap.
+//
+// The count is a real COUNT(*) and the rows are capped separately, so the two
+// are allowed to disagree — the count is what staff act on, the rows are a
+// sample. Channels with nothing are omitted entirely rather than returned as
+// zero-count groups, so the template never has to guard for them.
+func (d *Deps) buildUrgentOrderGroups(
+	ctx context.Context,
+	tx pgx.Tx,
+	filterFor func(domain.OrderChannel) store.OrderFilter,
+) ([]admin.UrgentOrderGroup, error) {
+	var groups []admin.UrgentOrderGroup
+	for _, ch := range urgentGroupChannels {
+		filter := filterFor(ch)
+		count, err := d.OrderService.CountOrders(ctx, tx, filter)
+		if err != nil {
+			return nil, err
+		}
+		if count == 0 {
+			continue
+		}
+		filter.Limit = pipelineDisplayLimit
+		orders, err := d.OrderService.ListOrders(ctx, tx, filter)
+		if err != nil {
+			return nil, err
+		}
+		groups = append(groups, admin.UrgentOrderGroup{Channel: ch, Count: count, Orders: orders})
+	}
+	return groups, nil
+}
+
+// buildLabelFailureGroups assembles the stuck-label groups, one per channel.
+//
+// The rows keep the store's oldest-first ordering rather than falling back to
+// the order list's newest-first default: the oldest stuck label is the one that
+// has been invisible longest, and it is the reason this group exists at all.
+func (d *Deps) buildLabelFailureGroups(ctx context.Context, tx pgx.Tx) ([]admin.UrgentOrderGroup, error) {
+	counts, err := d.FulfillmentService.CountFailedLabelOrdersByChannel(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	var groups []admin.UrgentOrderGroup
+	for _, ch := range urgentGroupChannels {
+		count := counts[ch]
+		if count == 0 {
+			continue
+		}
+		ids, err := d.FulfillmentService.ListFailedLabelOrders(ctx, tx, ch, pipelineDisplayLimit)
+		if err != nil {
+			return nil, err
+		}
+		orders, err := d.OrderService.ListOrders(ctx, tx, store.OrderFilter{
+			OrderIDs: ids,
+			Limit:    pipelineDisplayLimit,
+		})
+		if err != nil {
+			return nil, err
+		}
+		groups = append(groups, admin.UrgentOrderGroup{
+			Channel: ch,
+			Count:   count,
+			Orders:  reorderByID(orders, ids),
+		})
+	}
+	return groups, nil
+}
+
+// reorderByID puts orders back into the order ids names them. ListOrders sorts
+// by its own filter (newest placed first by default) and has no "preserve the
+// ids I gave you" mode, so a caller that selected a deliberate order — here,
+// oldest stuck label first — has to restore it afterwards.
+func reorderByID(orders []domain.Order, ids []uuid.UUID) []domain.Order {
+	byID := make(map[uuid.UUID]domain.Order, len(orders))
+	for _, o := range orders {
+		byID[o.ID] = o
+	}
+	out := make([]domain.Order, 0, len(orders))
+	for _, id := range ids {
+		if o, ok := byID[id]; ok {
+			out = append(out, o)
+		}
+	}
+	return out
 }
 
 // buildDeliveryRun assembles the dashboard's delivery-cutoff strip: when the

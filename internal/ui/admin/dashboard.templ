@@ -84,8 +84,8 @@ func (p ActiveCustomersProps) channelLabel() string {
 // promise on the checkout page can never drift apart. It is always in the
 // future — the cutoff minute disqualifies its own day.
 type DeliveryRunProps struct {
-	DateLabel   string    // "Thursday, August 22"
-	CutoffLabel string    // "9am"
+	DateLabel   string // "Thursday, August 22"
+	CutoffLabel string // "9am"
 	CutoffAt    time.Time
 	OrderCount  int  // local-delivery orders sitting in the fulfillment queue
 	IsToday     bool // the run leaves today, so the countdown is the story
@@ -117,6 +117,57 @@ func (p DeliveryRunProps) countdown() string {
 	return fmt.Sprintf("cutoff %s · in %dm", p.CutoffLabel, m)
 }
 
+// UrgentOrderGroup is one channel's share of an urgent order category — the
+// true count for that channel plus a display-capped sample of its rows.
+//
+// The channel split is load-bearing, not decoration. Orders and Fulfillment are
+// channel-split pages by design (the admin reaches wholesale through a channel
+// toggle, not a filter), so a single group carrying a both-channels total would
+// send staff to a list that shows only part of it. A count you cannot click
+// through to is the same failure as a count that lies — it just takes one extra
+// click to discover.
+type UrgentOrderGroup struct {
+	Channel domain.OrderChannel
+	Count   int            // every matching order in this channel
+	Orders  []domain.Order // display sample, capped by the caller
+}
+
+// channelWord names the channel inside a group title — "3 wholesale orders on
+// hold". It is always shown, even when only one channel has anything, because
+// it is also the promise about where the link goes.
+func (g UrgentOrderGroup) channelWord() string {
+	if g.Channel == domain.OrderChannelWholesale {
+		return "wholesale"
+	}
+	return "retail"
+}
+
+// ordersHref is the channel's orders list. query is the query string the list
+// reads (see normalizeOrderView / normalizeOrderPayment in web).
+func (g UrgentOrderGroup) ordersHref(query string) string {
+	if g.Channel == domain.OrderChannelWholesale {
+		return "/admin/orders/wholesale?" + query
+	}
+	return "/admin/orders?" + query
+}
+
+// fulfillmentHref is the channel's fulfillment queue.
+func (g UrgentOrderGroup) fulfillmentHref(query string) string {
+	if g.Channel == domain.OrderChannelWholesale {
+		return "/admin/wholesale/fulfillment?" + query
+	}
+	return "/admin/fulfillment?" + query
+}
+
+// urgentGroupTotal sums the per-channel counts of one urgent category.
+func urgentGroupTotal(groups []UrgentOrderGroup) int {
+	n := 0
+	for _, g := range groups {
+		n += g.Count
+	}
+	return n
+}
+
 type DashboardProps struct {
 	// Today stats
 	TodayOrderCount int
@@ -137,24 +188,21 @@ type DashboardProps struct {
 	// request is invisible.
 	PendingWhiteLabel int
 
-	// Urgent action queues
-	OnHold              []domain.Order
-	OnHoldCount         int
-	FailedPayments      []domain.Order
-	FailedPaymentCount  int
+	// Urgent action queues, each split by sales channel — see UrgentOrderGroup.
+	OnHold         []UrgentOrderGroup
+	FailedPayments []UrgentOrderGroup
 	// LabelFailures are orders whose shipping-label job gave up retrying. They
 	// look like ordinary "Ship" rows everywhere else on the dashboard, so
 	// without their own group they sit in the queue indefinitely — River will
 	// not pick them back up on its own.
-	LabelFailures      []domain.Order
-	LabelFailureCount  int
+	LabelFailures []UrgentOrderGroup
 	// DeadJobCount is background work that ran out of retries — emails,
 	// invoices, renewals. This is the failure the rest of the dashboard is
 	// blind to by construction: a broken worker makes the store look *quieter*,
 	// because the symptom is an absence rather than a queue entry. Label jobs
 	// are excluded; they have their own group above.
-	DeadJobCount int
-	DeadJobKinds []domain.DeadJobKindCount
+	DeadJobCount        int
+	DeadJobKinds        []domain.DeadJobKindCount
 	PastDueSubs         []PastDueRow
 	PastDueAccounts     []PastDueAccountRow
 	PastDueAccountCount int
@@ -218,7 +266,8 @@ type PipelineRow struct {
 }
 
 func (p DashboardProps) urgentCount() int {
-	return p.PastDueAccountCount + p.PastDueSubCount + p.OnHoldCount + p.FailedPaymentCount + p.LabelFailureCount + p.DeadJobCount
+	return p.PastDueAccountCount + p.PastDueSubCount + p.DeadJobCount +
+		urgentGroupTotal(p.OnHold) + urgentGroupTotal(p.FailedPayments) + urgentGroupTotal(p.LabelFailures)
 }
 
 // deadJobSummary names the kinds behind the dead-job count. Failures cluster by
@@ -322,25 +371,21 @@ templ DashboardContent(props DashboardProps) {
 							@pastDueSubRow(row, props.MerchantTZ)
 						}
 					}
-					if props.OnHoldCount > 0 {
-						@urgentGroupLink(
-							fmt.Sprintf("%d order%s on hold", props.OnHoldCount, pluralS(props.OnHoldCount)),
+					for _, g := range props.OnHold {
+						@urgentOrderGroup(g, props,
+							fmt.Sprintf("%d %s order%s on hold", g.Count, g.channelWord(), pluralS(g.Count)),
 							"Manual review required before these move forward.",
-							"/admin/orders?view=on_hold",
+							g.ordersHref("view=on_hold"),
+							"On hold",
 						)
-						for _, o := range props.OnHold {
-							@orderLinkRow(o, "On hold", "text-rr-red", true, props.MerchantTZ, props.Now)
-						}
 					}
-					if props.FailedPaymentCount > 0 {
-						@urgentGroupLink(
-							fmt.Sprintf("%d failed payment%s", props.FailedPaymentCount, pluralS(props.FailedPaymentCount)),
+					for _, g := range props.FailedPayments {
+						@urgentOrderGroup(g, props,
+							fmt.Sprintf("%d failed %s payment%s", g.Count, g.channelWord(), pluralS(g.Count)),
 							"Charge did not go through — reach out or retry.",
-							"/admin/orders?view=all&payment=failed",
+							g.ordersHref("view=all&payment=failed"),
+							"Payment failed",
 						)
-						for _, o := range props.FailedPayments {
-							@orderLinkRow(o, "Payment failed", "text-rr-red", true, props.MerchantTZ, props.Now)
-						}
 					}
 					if props.DeadJobCount > 0 {
 						@urgentGroupLink(
@@ -349,15 +394,13 @@ templ DashboardContent(props DashboardProps) {
 							"/admin/jobs",
 						)
 					}
-					if props.LabelFailureCount > 0 {
-						@urgentGroupLink(
-							fmt.Sprintf("%d shipping label%s failed", props.LabelFailureCount, pluralS(props.LabelFailureCount)),
+					for _, g := range props.LabelFailures {
+						@urgentOrderGroup(g, props,
+							fmt.Sprintf("%d %s shipping label%s failed", g.Count, g.channelWord(), pluralS(g.Count)),
 							"Label purchase gave up retrying — buy one by hand or these never ship.",
-							"/admin/fulfillment?view=ready_to_ship",
+							g.fulfillmentHref("view=needs_action"),
+							"Label failed",
 						)
-						for _, o := range props.LabelFailures {
-							@orderLinkRow(o, "Label failed", "text-rr-red", true, props.MerchantTZ, props.Now)
-						}
 					}
 				</div>
 			</div>
@@ -556,9 +599,7 @@ templ revenuePeriodToggle(value, current int) {
 
 templ revenueDelta(cr ChannelRevenue, days int) {
 	if cr.Prior > 0 {
-		{{
-			deltaPct := float64(cr.Current-cr.Prior) / float64(cr.Prior) * 100
-		}}
+		{{ deltaPct := float64(cr.Current-cr.Prior) / float64(cr.Prior) * 100 }}
 		<span class="text-xs">
 			if deltaPct >= 0.1 {
 				<span class="text-rr-teal font-bold">{ fmt.Sprintf("↑ %.1f%%", deltaPct) }</span>
@@ -636,9 +677,7 @@ templ activeCustomersWindow(label string, count, prior int, priorLabel string) {
 // (and dividing by zero would render an infinity).
 templ activeCustomersDelta(count, prior int, priorLabel string) {
 	if prior > 0 {
-		{{
-			deltaPct := float64(count-prior) / float64(prior) * 100
-		}}
+		{{ deltaPct := float64(count-prior) / float64(prior) * 100 }}
 		<span class="text-xs">
 			if deltaPct >= 0.1 {
 				<span class="text-rr-teal font-bold">{ fmt.Sprintf("↑ %.1f%%", deltaPct) }</span>
@@ -745,9 +784,7 @@ templ subscriptionsModeToggle(value, label, current string, days int) {
 // meaningful percentage (and a brand-new store would divide by zero).
 templ subscriptionsDelta(props SubscriptionsProps) {
 	if props.PriorActive > 0 {
-		{{
-			deltaPct := float64(props.CurrentActive-props.PriorActive) / float64(props.PriorActive) * 100
-		}}
+		{{ deltaPct := float64(props.CurrentActive-props.PriorActive) / float64(props.PriorActive) * 100 }}
 		<span class="text-xs">
 			if deltaPct >= 0.1 {
 				<span class="text-rr-teal font-bold">{ fmt.Sprintf("↑ %.1f%%", deltaPct) }</span>
@@ -853,6 +890,19 @@ templ bandHeader(label string, count int, accent string) {
 	</div>
 }
 
+// urgentOrderGroup renders one channel's slice of an urgent category: the
+// header link into that channel's list, then its sample rows. Groups with a
+// zero count render nothing — a channel with no stuck orders should not take
+// up a line saying so.
+templ urgentOrderGroup(g UrgentOrderGroup, props DashboardProps, title, detail, href, rowLabel string) {
+	if g.Count > 0 {
+		@urgentGroupLink(title, detail, href)
+		for _, o := range g.Orders {
+			@orderLinkRow(o, rowLabel, "text-rr-red", true, props.MerchantTZ, props.Now)
+		}
+	}
+}
+
 // urgentGroupLink renders the header row above an urgent order group.
 templ urgentGroupLink(title, detail, href string) {
 	<a
@@ -877,7 +927,8 @@ templ urgentGroupLink(title, detail, href string) {
 templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *time.Location, now time.Time) {
 	<a
 		href={ templ.SafeURL(fmt.Sprintf("/admin/orders/%s", o.ID)) }
-		class={ "flex items-center justify-between gap-4 border px-4 py-2.5 hover:bg-rr-raised transition-colors",
+		class={
+			"flex items-center justify-between gap-4 border px-4 py-2.5 hover:bg-rr-raised transition-colors",
 			templ.KV("border-rr-border bg-rr-surface", urgent),
 			templ.KV("border-rr-border bg-rr-surface", !urgent),
 		}
@@ -892,7 +943,7 @@ templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *t
 			}
 		</div>
 		<div class="flex items-center gap-3 shrink-0">
-			<span class={ "label-font", labelClass }  style="font-size:0.6rem;">{ label }</span>
+			<span class={ "label-font", labelClass } style="font-size:0.6rem;">{ label }</span>
 			@chevronRight()
 		</div>
 	</a>

@@ -190,8 +190,10 @@ func TestSettings_AttentionListSurfacesOtherTabsProblems(t *testing.T) {
 // does not look like success.
 func TestSettings_RejectedSaveKeepsInputAndMarksField(t *testing.T) {
 	s := healthyShipping()
+	s.Draft = true
 	s.FlatRateInput = "six dollars"
 	s.ThresholdInput = "45"
+	s.TareInput = "2.50"
 
 	html := renderSettings(t, SettingsProps{
 		Shipping:    s,
@@ -245,6 +247,7 @@ func TestSettings_EchoShowsSavedRuleNotRejectedDraft(t *testing.T) {
 
 	// The staffer fluffs the rate; parsing leaves it at zero in the draft.
 	draft := healthyShipping()
+	draft.Draft = true
 	draft.FlatRateCents = 0
 	draft.FlatRateInput = "6..00"
 
@@ -260,6 +263,56 @@ func TestSettings_EchoShowsSavedRuleNotRejectedDraft(t *testing.T) {
 	assert.NotContains(t, html, "pays $0.00 shipping")
 	// ...while the field still hands back exactly what was typed.
 	assert.Contains(t, html, `value="6..00"`)
+}
+
+// Clearing a number is an edit, not an absence. The threshold is how free
+// shipping gets switched off and the tare is optional, so emptying either is a
+// thing a staffer means to do — and if validation then trips on some other
+// field, the cleared box has to come back cleared. It used to come back holding
+// the old number, because the helpers inferred "no draft" from an empty input
+// string and could not tell a cleared field from an unsubmitted one. The form
+// would then argue with an edit the staffer had just made, and saving again
+// would quietly restore the value they had removed.
+func TestSettings_RejectedSaveKeepsClearedFieldsCleared(t *testing.T) {
+	stored := 4500
+	s := healthyShipping()
+	s.FreeShippingThreshold = &stored // $45.00 currently in force
+	s.TareWeightOz = 2.5
+
+	// The staffer clears both, then trips validation on the flat rate.
+	s.Draft = true
+	s.FlatRateInput = "six dollars"
+	s.ThresholdInput = ""
+	s.TareInput = ""
+
+	html := renderSettings(t, SettingsProps{
+		Shipping:    s,
+		Saved:       healthyShipping(),
+		FieldErrors: map[string]string{"flat_rate": "Enter a dollar amount, e.g. 6.00."},
+		Flash:       Flash{Message: "Nothing was saved — check the fields marked below.", Error: true},
+	})
+
+	// Both cleared boxes come back empty rather than repopulated.
+	assert.NotContains(t, html, `value="45.00"`)
+	assert.NotContains(t, html, `value="2.50"`)
+	assert.Contains(t, html, `name="free_threshold"`)
+	// The field that actually failed still shows what was typed.
+	assert.Contains(t, html, `value="six dollars"`)
+}
+
+// The flag is what separates a draft from a fresh load: with it unset the form
+// renders the stored config, so an ordinary GET is never at the mercy of a
+// stale input string.
+func TestShippingSettings_NonDraftRendersStoredValues(t *testing.T) {
+	stored := 4500
+	s := healthyShipping()
+	s.FreeShippingThreshold = &stored
+	s.TareWeightOz = 2.5
+	s.FlatRateInput = "ignored" // set, but Draft is false
+
+	assert.Equal(t, "6.00", s.flatRateValue())
+	assert.Equal(t, "45.00", s.thresholdValue())
+	assert.Equal(t, "2.50", s.tareValue())
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }

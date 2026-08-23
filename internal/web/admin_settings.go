@@ -391,8 +391,11 @@ func parseShippingForm(r *http.Request) (domain.ShippingConfig, admin.ShippingSe
 
 	// The submitted view keeps the raw strings for the numeric fields, so a
 	// rejected save shows the staffer what they typed rather than a silently
-	// coerced version of it.
+	// coerced version of it. Draft is what tells the form to render those raw
+	// strings verbatim — including the empty ones, so a field that was cleared
+	// comes back cleared instead of reverting to the stored number.
 	submitted := shippingSettingsFromConfig(&cfg)
+	submitted.Draft = true
 	submitted.LocalDeliveryCutoff = strings.TrimSpace(r.FormValue("local_delivery_cutoff"))
 	submitted.FlatRateInput = rawFlat
 	submitted.ThresholdInput = rawThreshold

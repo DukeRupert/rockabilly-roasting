@@ -16,8 +16,11 @@ const (
 	PermCreateDraftOrders = "orders:draft"
 	PermManageInventory   = "inventory:write"
 	// PermManageSystem covers operator-level plumbing that is not any one
-	// department's job — background job health and retries. Admin only: a
-	// retried job can send customer mail or move money.
+	// department's job — background job health and retries, and the whole
+	// Settings section. Admin only: a retried job can send customer mail or
+	// move money, and a settings change moves the rules under every order at
+	// once (the flat rate, the delivery schedule, the QuickBooks connection
+	// wholesale invoicing runs through).
 	PermManageSystem = "system:write"
 )
 

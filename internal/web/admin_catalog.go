@@ -292,6 +292,9 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 	var priceLists []domain.PriceList
 	var pricing admin.ProductPriceListPricing
 	var activity []domain.AuditEntry
+	var whiteLabelBase *domain.Product
+	var whiteLabelBaseChoices []admin.WhiteLabelBaseOption
+	var whiteLabelChildren []domain.Product
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -319,7 +322,34 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 				return txErr
 			}
 			customerAccessIDs, txErr = d.CatalogService.ListProductCustomerAccess(ctx, tx, id)
-			return txErr
+			if txErr != nil {
+				return txErr
+			}
+			// White-label lineage, both directions. Children are one cheap query and
+			// always worth showing — they are what blocks archiving this coffee. The
+			// base-choice list walks every active product's variants, so it is only
+			// built for products that actually have a base to reassign.
+			whiteLabelChildren, txErr = d.WhiteLabelService.ListChildren(ctx, tx, id)
+			if txErr != nil {
+				return txErr
+			}
+			if domain.IsWhiteLabelSubmission(product.Metadata) {
+				choices, cErr := d.WhiteLabelService.BaseCoffeeChoices(ctx, tx)
+				if cErr != nil {
+					return cErr
+				}
+				for _, c := range choices {
+					whiteLabelBaseChoices = append(whiteLabelBaseChoices, admin.WhiteLabelBaseOption{ID: c.ProductID, Title: c.Title})
+				}
+				if raw, ok := product.Metadata[domain.ProductMetaWhiteLabelBaseID].(string); ok {
+					if baseID, pErr := uuid.Parse(raw); pErr == nil {
+						// A missing base is not an error — the coffee may have been
+						// deleted outright. The panel just shows no selection.
+						whiteLabelBase, _ = d.CatalogService.GetProduct(ctx, tx, baseID)
+					}
+				}
+			}
+			return nil
 
 		case "media":
 			mediaList, txErr = d.CatalogService.ListProductMedia(ctx, tx, id)
@@ -434,6 +464,10 @@ func (d *Deps) handleAdminProductEdit(w http.ResponseWriter, r *http.Request) {
 		Pricing:            pricing,
 		Activity:           activity,
 		MerchantTZ:         d.MerchantTZ,
+
+		WhiteLabelBase:        whiteLabelBase,
+		WhiteLabelBaseChoices: whiteLabelBaseChoices,
+		WhiteLabelChildren:    whiteLabelChildren,
 	}
 
 	// htmx request (sidebar nav or tab click via hx-boost): return page content
@@ -720,7 +754,11 @@ func (d *Deps) handleAdminProductStatusUpdate(w http.ResponseWriter, r *http.Req
 			if current != nil {
 				admin.StatusToggle(current).Render(ctx, w) //nolint:errcheck
 			}
-			toast.Toast(toast.VariantError, "Failed to update product status.").Render(ctx, w) //nolint:errcheck
+			// Use the mapped message rather than a generic one: refusing to archive
+			// a coffee names the white-label products still based on it, and that
+			// list is the only place staff can see them.
+			_, msg := mapError(err)
+			toast.Toast(toast.VariantError, msg).Render(ctx, w) //nolint:errcheck
 			return
 		}
 		Error(w, r, err)
@@ -732,6 +770,41 @@ func (d *Deps) handleAdminProductStatusUpdate(w http.ResponseWriter, r *http.Req
 		return
 	}
 	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Status+updated", id), http.StatusSeeOther)
+}
+
+// handleAdminProductWhiteLabelBase repoints a white-label product at a different
+// base coffee. Staff reach for this when the original base is being retired —
+// archiving a coffee is refused while white-label products still name it.
+func (d *Deps) handleAdminProductWhiteLabelBase(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	baseID, err := uuid.Parse(r.FormValue("base_product_id"))
+	if err != nil {
+		Error(w, r, app.ErrWhiteLabelBaseInvalid)
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		_, txErr := d.WhiteLabelService.ReassignBase(ctx, tx, id, baseID, staffActor(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/admin/catalog/%s?flash=Base+coffee+updated", id), http.StatusSeeOther)
 }
 
 // handleAdminProductVisibilityUpdate sets a product's visibility tier and, when the tier

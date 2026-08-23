@@ -415,6 +415,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/catalog/{id}/subscribable", deps.handleAdminProductSubscribableUpdate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/featured", deps.handleAdminProductFeaturedUpdate)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/visibility", deps.handleAdminProductVisibilityUpdate)
+	adminMux.HandleFunc("POST /admin/catalog/{id}/white-label-base", deps.handleAdminProductWhiteLabelBase)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/clone", deps.handleAdminProductClone)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/delete", deps.handleAdminProductDelete)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/variants", deps.handleAdminVariantCreate)

@@ -145,6 +145,7 @@ const (
 	// White-label onboarding actions
 	AuditWhiteLabelInviteSent = "white_label.invite_sent"
 	AuditWhiteLabelSubmitted  = "white_label.submitted"
+	AuditWhiteLabelReassigned = "white_label.base_reassigned"
 
 	// Product visibility actions
 	AuditProductVisibilityUpdated = "product.visibility_updated"

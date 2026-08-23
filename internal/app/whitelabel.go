@@ -36,6 +36,7 @@ type WhiteLabelService struct {
 	catalog      *CatalogService
 	pricing      *PricingService
 	catalogStore *store.CatalogStore
+	attributes   *store.AttributeStore
 	customers    *store.CustomerStore
 	audit        *audit.AuditWriter
 	metrics      *metrics.Registry
@@ -48,6 +49,7 @@ func NewWhiteLabelService(
 	catalog *CatalogService,
 	pricing *PricingService,
 	catalogStore *store.CatalogStore,
+	attributes *store.AttributeStore,
 	customers *store.CustomerStore,
 	audit *audit.AuditWriter,
 	metrics *metrics.Registry,
@@ -56,6 +58,7 @@ func NewWhiteLabelService(
 		catalog:      catalog,
 		pricing:      pricing,
 		catalogStore: catalogStore,
+		attributes:   attributes,
 		customers:    customers,
 		audit:        audit,
 		metrics:      metrics,
@@ -184,6 +187,10 @@ func (s *WhiteLabelService) SubmitWhiteLabel(ctx context.Context, tx pgx.Tx, cus
 		return nil, err
 	}
 
+	if err := s.cloneAttributes(ctx, tx, base.ID, product.ID); err != nil {
+		return nil, err
+	}
+
 	product, err = s.catalog.UpdateProductVisibility(ctx, tx, product.ID, domain.ProductVisibilityPrivate, actor)
 	if err != nil {
 		return nil, fmt.Errorf("set white-label visibility: %w", err)
@@ -219,6 +226,102 @@ func (s *WhiteLabelService) SubmitWhiteLabel(ctx context.Context, tx pgx.Tx, cus
 	}
 
 	return product, nil
+}
+
+// WhiteLabelChildrenError reports the white-label products still based on a coffee
+// staff tried to archive. It carries the children rather than just a sentinel so the
+// error message can name them — "reassign them first" is useless without a list, and
+// nothing in the admin UI otherwise shows which labels a coffee backs.
+type WhiteLabelChildrenError struct {
+	Children []domain.Product
+}
+
+func (e *WhiteLabelChildrenError) Error() string {
+	titles := make([]string, 0, len(e.Children))
+	for _, c := range e.Children {
+		titles = append(titles, c.Title)
+	}
+	// Verb-neutral: the same error blocks archiving and deleting.
+	label := "products are"
+	if len(e.Children) == 1 {
+		label = "product is"
+	}
+	return fmt.Sprintf("%d white-label %s still based on this coffee (%s) — reassign them to another coffee first",
+		len(e.Children), label, strings.Join(titles, ", "))
+}
+
+// Unwrap lets callers match with errors.Is(err, ErrProductHasWhiteLabelChildren)
+// without caring about the detail payload.
+func (e *WhiteLabelChildrenError) Unwrap() error { return ErrProductHasWhiteLabelChildren }
+
+// ListChildren returns the live white-label products based on the given coffee.
+// Backs the "used as the base for" panel on a coffee's admin page and the check
+// that blocks archiving it.
+func (s *WhiteLabelService) ListChildren(ctx context.Context, tx pgx.Tx, baseID uuid.UUID) ([]domain.Product, error) {
+	children, err := s.catalogStore.ListWhiteLabelChildren(ctx, tx, baseID)
+	if err != nil {
+		return nil, fmt.Errorf("list white-label children: %w", err)
+	}
+	return children, nil
+}
+
+// ReassignBase repoints a white-label product at a different base coffee. Staff
+// reach for it when the original base is being retired — the label keeps its name,
+// art, SKUs, prices, and customer grant, and only the record of which coffee fills
+// the bag changes.
+//
+// Deliberately narrow: it rewrites the base stamp and nothing else. The child's
+// variants, prices, and attributes were cloned at submission and have been staff-
+// managed ever since, so silently re-cloning them from the new base would throw
+// away edits. Staff who want the new coffee's tasting notes copy them across on the
+// product's own attributes panel.
+func (s *WhiteLabelService) ReassignBase(ctx context.Context, tx pgx.Tx, productID, newBaseID uuid.UUID, actor Actor) (*domain.Product, error) {
+	product, err := s.catalog.GetProduct(ctx, tx, productID)
+	if err != nil {
+		return nil, fmt.Errorf("get white-label product: %w", err)
+	}
+	if !domain.IsWhiteLabelSubmission(product.Metadata) {
+		return nil, ErrNotWhiteLabelProduct
+	}
+	if newBaseID == productID {
+		return nil, ErrWhiteLabelBaseInvalid
+	}
+
+	// Same validation the client's own submission goes through: the new base must
+	// be an active, wholesale-orderable coffee, never another client's private label.
+	base, err := s.validateBase(ctx, tx, newBaseID)
+	if err != nil {
+		return nil, err
+	}
+
+	oldBaseID, _ := metaUUID(product.Metadata, WhiteLabelMetaBaseID)
+
+	updated, err := s.catalogStore.SetProductWhiteLabelBase(ctx, tx, productID, base.ID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrProductNotFound
+		}
+		return nil, fmt.Errorf("set white-label base: %w", err)
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditWhiteLabelReassigned,
+		ResourceType: "product",
+		ResourceID:   productID,
+		After:        updated,
+		Metadata: map[string]any{
+			"old_base_product_id": oldBaseID.String(),
+			"new_base_product_id": base.ID.String(),
+			"new_base_title":      base.Title,
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit white-label base reassigned: %w", err)
+	}
+
+	return updated, nil
 }
 
 // validateBase confirms the posted base product is one of the allowed choices and
@@ -297,6 +400,38 @@ func (s *WhiteLabelService) cloneVariants(ctx context.Context, tx pgx.Tx, base *
 			if _, err := s.pricing.SetBasePrice(ctx, tx, newVariant.ID, cents, "USD"); err != nil {
 				return fmt.Errorf("clone variant price %s: %w", v.SKU, err)
 			}
+		}
+	}
+	return nil
+}
+
+// cloneAttributes copies the base coffee's attribute sets and their values onto
+// the new product. A white-label label is the same coffee in a different bag —
+// its roast level, origin, process, and tasting notes are the base's, so they
+// carry over rather than starting blank and forcing staff to retype them.
+//
+// Sets come first: product_attribute_sets is what decides which attribute fields
+// the admin edit page renders, so copying values without the sets would leave the
+// data invisible and un-editable. Staff can still change either afterwards — this
+// is a starting point, not a permanent link to the base.
+func (s *WhiteLabelService) cloneAttributes(ctx context.Context, tx pgx.Tx, baseID, productID uuid.UUID) error {
+	sets, err := s.attributes.ListProductAttributeSets(ctx, tx, baseID)
+	if err != nil {
+		return fmt.Errorf("list base attribute sets: %w", err)
+	}
+	for _, set := range sets {
+		if err := s.attributes.AssignAttributeSetToProduct(ctx, tx, productID, set.ID); err != nil {
+			return fmt.Errorf("clone attribute set %s: %w", set.Slug, err)
+		}
+	}
+
+	values, err := s.attributes.ListProductAttributeValues(ctx, tx, baseID)
+	if err != nil {
+		return fmt.Errorf("list base attribute values: %w", err)
+	}
+	for _, v := range values {
+		if err := s.attributes.UpsertProductAttributeValue(ctx, tx, productID, v.KeyID, v.Value, v.Values); err != nil {
+			return fmt.Errorf("clone attribute value %s: %w", v.KeySlug, err)
 		}
 	}
 	return nil

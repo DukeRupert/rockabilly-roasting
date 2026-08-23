@@ -3,11 +3,22 @@ package jobs
 import (
 	"bytes"
 	"context"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// swapDefaultLogger points slog's default at buf for the duration of a test:
+// logWorkerFailure logs through the package-level logger rather than an
+// injected one.
+func swapDefaultLogger(t *testing.T, buf *bytes.Buffer) func() {
+	t.Helper()
+	prev := slog.Default()
+	slog.SetDefault(captureLogger(buf))
+	return func() { slog.SetDefault(prev) }
+}
 
 // The level is the alert switch: platform/sentry raises an Error record as a
 // Sentry event and files anything below it as a breadcrumb. A worker about to
@@ -24,7 +35,6 @@ func TestLogWorkerFailure_LevelFollowsWhatHappensNext(t *testing.T) {
 	rec := lastRecord(t, &buf)
 	assert.Equal(t, "WARN", rec["level"])
 	assert.Contains(t, rec["msg"], "qb_sync_customer")
-	assert.Contains(t, rec["msg"], "will retry")
 
 	logWorkerFailure(context.Background(), "qb_sync_customer", true, "job_id", int64(7))
 	rec = lastRecord(t, &buf)

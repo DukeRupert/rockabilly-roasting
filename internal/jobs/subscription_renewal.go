@@ -74,8 +74,13 @@ func (w *SubscriptionRenewalWorker) Work(ctx context.Context, job *river.Job[Sub
 			return river.JobCancel(fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err))
 		}
 
+		// Anything else is unexpected but retryable, so it logs like every other
+		// retryable failure: Warn here, and jobs.ErrorHandler pages if the job
+		// runs out of attempts. This was the last worker in the package still
+		// raising an event on attempt 1 of a failure the system was about to
+		// retry.
 		metrics.TrackJob(w.metrics, "subscription_renewal", start, err)
-		slog.ErrorContext(ctx, "background job subscription_renewal failed", attrs...)
+		logWorkerFailure(ctx, "subscription_renewal", false, attrs...)
 		return fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err)
 	}
 	metrics.TrackJob(w.metrics, "subscription_renewal", start, nil)

@@ -207,7 +207,7 @@
     },
     {
       "id": 9,
-      "title": "Job completion vs failure rate",
+      "title": "Job outcomes: completed vs failed vs cancelled",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },

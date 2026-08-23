@@ -18,16 +18,6 @@ func captureLogger(buf *bytes.Buffer) *slog.Logger {
 	return slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 }
 
-// swapDefaultLogger points slog's default at buf for the duration of a test,
-// for the helpers that log through the package-level logger rather than an
-// injected one.
-func swapDefaultLogger(t *testing.T, buf *bytes.Buffer) func() {
-	t.Helper()
-	prev := slog.Default()
-	slog.SetDefault(captureLogger(buf))
-	return func() { slog.SetDefault(prev) }
-}
-
 func lastRecord(t *testing.T, buf *bytes.Buffer) map[string]any {
 	t.Helper()
 	lines := bytes.Split(bytes.TrimSpace(buf.Bytes()), []byte("\n"))

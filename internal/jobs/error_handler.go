@@ -30,7 +30,11 @@ import (
 //
 // The other half of that split matters here: because this handler pages on the
 // final attempt, a worker must NOT log Error for a failure it is about to
-// return for retry. See logWorkerFailure.
+// return for retry. Every worker in this package honours that through
+// logWorkerFailure; the only Error logs left on a non-cancel path are for
+// errors that are swallowed rather than returned (qb_alerts, the per-invoice
+// failures inside qb_reconcile_invoices), where nothing else will ever report
+// them.
 //
 // Only the *final* attempt pages anyone. River retries with backoff, and a
 // single transient Stripe timeout that succeeds on attempt two is noise; the

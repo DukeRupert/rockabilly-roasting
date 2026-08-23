@@ -16,7 +16,9 @@ import (
 //     jobs.ErrorHandler for a cancelled job, so this log is the only report
 //     that will ever exist for it.
 //   - retryable: Warn. The job goes back on the queue, and jobs.ErrorHandler
-//     pages on the final attempt with the same facts.
+//     pages on the final attempt with the same facts. Every worker that returns
+//     an error for retry logs at this level — no exceptions, or the exception
+//     is the one that wakes someone.
 //
 // Every worker used to log Error unconditionally here, which meant attempt 1 of
 // 5 against a QuickBooks timeout raised a Sentry event for work that succeeded
@@ -32,5 +34,10 @@ func logWorkerFailure(ctx context.Context, kind string, terminal bool, attrs ...
 		slog.ErrorContext(ctx, "background job "+kind+" failed permanently", attrs...)
 		return
 	}
-	slog.WarnContext(ctx, "background job "+kind+" failed, will retry", attrs...)
+	// Deliberately makes no claim about what happens next. The worker cannot
+	// see whether this was the last attempt, and jobs.ErrorHandler — which can —
+	// says so in its own line. Saying "will retry" here was wrong on the final
+	// attempt, and being byte-identical to the handler's message meant every
+	// retryable failure emitted the same string twice.
+	slog.WarnContext(ctx, "background job "+kind+" failed", attrs...)
 }

@@ -71,16 +71,6 @@ func (s *JobHealthService) ListDeadJobs(ctx context.Context, tx pgx.Tx, kind str
 	return list, nil
 }
 
-// CountDeadJobsOfKind returns the total for one kind (or all kinds when kind is
-// empty), so a filtered list paginates against a real total.
-func (s *JobHealthService) CountDeadJobsOfKind(ctx context.Context, tx pgx.Tx, kind string) (int, error) {
-	n, err := s.jobs.CountDeadJobsOfKind(ctx, tx, kind)
-	if err != nil {
-		return 0, fmt.Errorf("count dead jobs of kind: %w", err)
-	}
-	return n, nil
-}
-
 // RetryDeadJob puts one discarded job back on the queue and records who did it.
 //
 // Jobs must be idempotent by contract, so re-running one is safe — but it is

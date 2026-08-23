@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -126,20 +127,6 @@ func (s *JobStore) ListDeadJobs(ctx context.Context, tx pgx.Tx, kind string, lim
 	return out, rows.Err()
 }
 
-// CountDeadJobsOfKind returns the total for one kind, so a filtered list can
-// paginate against a real total rather than the page it happens to show.
-func (s *JobStore) CountDeadJobsOfKind(ctx context.Context, tx pgx.Tx, kind string) (_ int, err error) {
-	if kind == "" {
-		return s.CountDeadJobs(ctx, tx)
-	}
-	var count int
-	query := `SELECT COUNT(*) FROM river_job` + deadJobWhere + ` AND kind = $1`
-	if err := tx.QueryRow(ctx, query, kind).Scan(&count); err != nil {
-		return 0, fmt.Errorf("count dead jobs of kind: %w", err)
-	}
-	return count, nil
-}
-
 // GetDeadJobKind returns a job's kind, or "" if the job is not discarded. The
 // retry handler uses it to confirm the job is actually dead before touching
 // it, and to name the kind in the audit record.
@@ -147,7 +134,7 @@ func (s *JobStore) GetDeadJobKind(ctx context.Context, tx pgx.Tx, id int64) (_ s
 	var kind string
 	query := `SELECT kind FROM river_job` + deadJobWhere + ` AND id = $1`
 	if err := tx.QueryRow(ctx, query, id).Scan(&kind); err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return "", nil
 		}
 		return "", fmt.Errorf("get dead job kind: %w", err)

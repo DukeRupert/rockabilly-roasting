@@ -41,7 +41,9 @@ func (d *Deps) handleAdminJobList(w http.ResponseWriter, r *http.Request) {
 		if txErr != nil {
 			return txErr
 		}
-		props.Total, txErr = d.JobHealthService.CountDeadJobsOfKind(ctx, tx, kind)
+		// Deliberately unfiltered: this is the "All" chip's number, and it has
+		// to keep reading 3 while the list is narrowed to the 1 of one kind.
+		props.Total, txErr = d.JobHealthService.CountDeadJobs(ctx, tx)
 		if txErr != nil {
 			return txErr
 		}

@@ -22,7 +22,7 @@ type JobListProps struct {
 	Jobs       []domain.DeadJob
 	Kinds      []domain.DeadJobKindCount
 	KindFilter string // "" = every kind
-	Total      int    // matching the active filter
+	Total      int    // every dead job, all kinds — the "All" chip's count
 	Page       int
 	PerPage    int
 	HasMore    bool
@@ -122,9 +122,9 @@ templ JobListContent(props JobListProps) {
 		<!-- Kind rollup: failures cluster by cause, so this is usually the diagnosis. -->
 		if len(props.Kinds) > 0 {
 			<div class="mt-6 flex flex-wrap items-center gap-2">
-				@jobKindChip("All", "", props.KindFilter, props.Total, props.KindFilter == "")
+				@jobKindChip("All", "", props.KindFilter, props.Total)
 				for _, k := range props.Kinds {
-					@jobKindChip(jobKindDisplay(k.Kind), k.Kind, props.KindFilter, k.Count, false)
+					@jobKindChip(jobKindDisplay(k.Kind), k.Kind, props.KindFilter, k.Count)
 				}
 			</div>
 		}
@@ -175,8 +175,8 @@ templ JobListContent(props JobListProps) {
 
 // jobKindChip filters the list to one kind. The count rides in the chip so the
 // rollup doubles as the breakdown — which kind is broken, and how badly.
-templ jobKindChip(label, kind, current string, count int, isAll bool) {
-	if kind == current || (isAll && current == "") {
+templ jobKindChip(label, kind, current string, count int) {
+	if kind == current {
 		<span class="inline-flex items-baseline gap-1.5 border border-rr-heading bg-rr-heading px-2.5 py-1 text-rr-bg">
 			<span class="text-sm font-bold tabular-nums">{ fmt.Sprintf("%d", count) }</span>
 			<span class="label-font" style="font-size:0.6rem;">{ label }</span>

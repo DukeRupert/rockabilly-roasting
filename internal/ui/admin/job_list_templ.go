@@ -30,7 +30,7 @@ type JobListProps struct {
 	Jobs       []domain.DeadJob
 	Kinds      []domain.DeadJobKindCount
 	KindFilter string // "" = every kind
-	Total      int    // matching the active filter
+	Total      int    // every dead job, all kinds — the "All" chip's count
 	Page       int
 	PerPage    int
 	HasMore    bool
@@ -181,12 +181,12 @@ func JobListContent(props JobListProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = jobKindChip("All", "", props.KindFilter, props.Total, props.KindFilter == "").Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = jobKindChip("All", "", props.KindFilter, props.Total).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				for _, k := range props.Kinds {
-					templ_7745c5c3_Err = jobKindChip(jobKindDisplay(k.Kind), k.Kind, props.KindFilter, k.Count, false).Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = jobKindChip(jobKindDisplay(k.Kind), k.Kind, props.KindFilter, k.Count).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -273,7 +273,7 @@ func JobListContent(props JobListProps) templ.Component {
 
 // jobKindChip filters the list to one kind. The count rides in the chip so the
 // rollup doubles as the breakdown — which kind is broken, and how badly.
-func jobKindChip(label, kind, current string, count int, isAll bool) templ.Component {
+func jobKindChip(label, kind, current string, count int) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -294,7 +294,7 @@ func jobKindChip(label, kind, current string, count int, isAll bool) templ.Compo
 			templ_7745c5c3_Var6 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		if kind == current || (isAll && current == "") {
+		if kind == current {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"inline-flex items-baseline gap-1.5 border border-rr-heading bg-rr-heading px-2.5 py-1 text-rr-bg\"><span class=\"text-sm font-bold tabular-nums\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

@@ -78,6 +78,35 @@ func TestJobList_KindChipsFilter(t *testing.T) {
 	assert.Contains(t, html, ">5<") // the "All" chip carries the unfiltered total
 }
 
+// The "All" chip is the escape hatch back to the full list, so its count must
+// stay the overall total while the list below it is narrowed. Feeding it a
+// filtered count made the page claim there was one dead job when there were
+// three — on a branch whose whole point is counts that do not lie.
+func TestJobList_AllChipKeepsTheUnfilteredTotalWhenNarrowed(t *testing.T) {
+	kinds := []domain.DeadJobKindCount{
+		{Kind: "email_order_confirm", Count: 2},
+		{Kind: "qb_create_invoice", Count: 1},
+	}
+	html := renderJobList(t, JobListProps{
+		Jobs:       []domain.DeadJob{deadJob(1, "qb_create_invoice")},
+		Kinds:      kinds,
+		KindFilter: "qb_create_invoice",
+		Total:      3,
+		Page:       1,
+	})
+
+	// All still reads 3 while the list shows the one job of the active kind.
+	// It renders as a link here — narrowed means All is no longer the active
+	// chip — so the assertion pins the muted label form.
+	assert.Contains(t, html, `<span class="text-sm font-bold tabular-nums">3</span> <span class="label-font text-rr-muted" style="font-size:0.6rem;">All</span>`)
+
+	// The active kind chip carries its own count, not the total.
+	assert.Contains(t, html, `<span class="text-sm font-bold tabular-nums">1</span> <span class="label-font" style="font-size:0.6rem;">Qb create invoice</span>`)
+
+	// And "All" is a live link back out to the unfiltered list.
+	assert.Contains(t, html, `href="/admin/jobs?page=1"`)
+}
+
 // An empty list is the healthy state and should read as reassurance, not as a
 // broken page.
 func TestJobList_EmptyStateIsPositive(t *testing.T) {

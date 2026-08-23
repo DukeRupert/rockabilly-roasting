@@ -116,7 +116,8 @@ func hasWeekday(days []time.Weekday, day time.Weekday) bool {
 
 // deliveryScheduleSummary echoes the saved schedule back in the exact wording
 // customers see, so staff can confirm the rule reads the way they meant without
-// opening a storefront tab.
+// opening a storefront tab. Takes the saved config — never the draft from a
+// rejected save, which describes a schedule nobody is being offered.
 func deliveryScheduleSummary(s ShippingSettings) string {
 	cfg := domain.ShippingConfig{LocalDeliveryWeekdays: s.LocalDeliveryWeekdays}
 	label := cfg.DeliveryDaysLabel()
@@ -132,7 +133,8 @@ func deliveryScheduleSummary(s ShippingSettings) string {
 // shippingRuleSummary states the saved rate rule as a customer meets it at
 // checkout. Two numbers in two boxes do not add up to a policy in anyone's
 // head; the sentence they combine into does, and reading it back is how a
-// staffer catches a threshold typed in cents.
+// staffer catches a threshold typed in cents. Takes the saved config — never
+// the draft from a rejected save, which states a policy that is not in force.
 func shippingRuleSummary(s ShippingSettings) string {
 	rate := centsToDollars(s.FlatRateCents)
 	var out string
@@ -150,8 +152,19 @@ func shippingRuleSummary(s ShippingSettings) string {
 
 // SettingsProps backs the Shipping tab — the section's landing page.
 type SettingsProps struct {
-	Nav      SettingsNav
+	Nav SettingsNav
+	// Shipping is what the form fields render: the stored config normally, the
+	// rejected draft after a failed save.
 	Shipping ShippingSettings
+	// Saved is what is actually on disk, always — the two diverge only on a
+	// rejected save. The echo sentences read from this rather than from the
+	// draft, because they are labelled "Customers currently see" and a customer
+	// meets the saved rule, not the one that was just refused. Rendering the
+	// draft there meant a mistyped rate announced "$0.00 shipping" directly
+	// under a banner saying nothing had been saved. Same rule the nav's issue
+	// list follows. renderShippingSettings stamps this, so no call site can
+	// forget it.
+	Saved ShippingSettings
 	// FieldErrors maps a form field name to what is wrong with it. Populated
 	// only on a rejected save; the page re-renders with the submitted values
 	// rather than redirecting, so nothing typed is thrown away.
@@ -329,7 +342,7 @@ templ SettingsContent(props SettingsProps) {
 				</div>
 				<!-- The saved rule, in the words a customer meets it in. -->
 				<p class="mt-4 border-l border-rr-border pl-3 text-xs text-rr-body">
-					Customers currently see: <span class="font-medium text-rr-heading">{ shippingRuleSummary(props.Shipping) }</span>
+					Customers currently see: <span class="font-medium text-rr-heading">{ shippingRuleSummary(props.Saved) }</span>
 				</p>
 			</div>
 			<div class="px-4 py-5 sm:px-6">
@@ -405,9 +418,9 @@ templ SettingsContent(props SettingsProps) {
 								</p>
 							}
 						</div>
-						if len(props.Shipping.LocalDeliveryWeekdays) > 0 {
+						if len(props.Saved.LocalDeliveryWeekdays) > 0 {
 							<p class="text-xs text-rr-muted">
-								Customers currently see: <span class="font-medium text-rr-heading">{ deliveryScheduleSummary(props.Shipping) }</span>
+								Customers currently see: <span class="font-medium text-rr-heading">{ deliveryScheduleSummary(props.Saved) }</span>
 							</p>
 						}
 					</div>

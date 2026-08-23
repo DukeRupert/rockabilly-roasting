@@ -55,23 +55,31 @@ func (s settingsSection) nav(role string) admin.SettingsNav {
 func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error) {
 	out := settingsSection{QBEnabled: d.QBOAuthManager != nil}
 
-	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		if out.QBEnabled {
-			// A QB status read failing must not take the whole settings page
-			// down with it — the shipping form below is still editable. But it
-			// must not read as "not connected" either: that is a different
-			// fact, and it sends staff to reconnect a connection that was fine.
-			status, qbErr := d.QBOAuthManager.Status(ctx, tx)
-			if qbErr != nil {
-				slog.Error("admin settings: quickbooks status", "error", qbErr)
-				out.QB.Unavailable = true
-			} else {
-				out.QB.Connected = status.Connected
-				out.QB.RealmID = status.RealmID
-				out.QB.RefreshExpiresAt = status.RefreshExpiresAt
+	// The QuickBooks status gets its own transaction, deliberately. A failed
+	// status read must not take the settings page down — the shipping form
+	// below is still editable, and "not connected" is a different fact from
+	// "could not tell", which is what sends staff to reconnect a connection
+	// that was fine. Sharing the transaction below would make that graceful
+	// path unreachable: a real database error aborts the pgx transaction, so
+	// every read after it fails too and the page 500s regardless.
+	if out.QBEnabled {
+		qbErr := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			status, err := d.QBOAuthManager.Status(ctx, tx)
+			if err != nil {
+				return err
 			}
+			out.QB.Connected = status.Connected
+			out.QB.RealmID = status.RealmID
+			out.QB.RefreshExpiresAt = status.RefreshExpiresAt
+			return nil
+		})
+		if qbErr != nil {
+			slog.Error("admin settings: quickbooks status", "error", qbErr)
+			out.QB = admin.QBConnectionStatus{Unavailable: true}
 		}
+	}
 
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
 		if cfgErr != nil {
 			return cfgErr

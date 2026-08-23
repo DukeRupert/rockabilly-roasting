@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,15 +150,20 @@ func TestSettingsIssues_UnreadableQuickBooksStatusIsNotADisconnection(t *testing
 // where a cross-origin redirect cannot become a navigation, so both entry
 // points have to opt out of hx-boost.
 func TestSettingsIntegrations_OAuthLinksAreNotBoosted(t *testing.T) {
-	connected := renderIntegrations(t, SettingsIntegrationsProps{
-		QB:        QBConnectionStatus{Connected: true},
-		QBEnabled: true,
-	})
-	assert.Contains(t, connected, `hx-boost="false" class="btn-secondary">Reconnect`)
-
-	disconnected := renderIntegrations(t, SettingsIntegrationsProps{QBEnabled: true})
-	assert.Contains(t, disconnected, "Connect to QuickBooks")
-	assert.Contains(t, disconnected, `hx-boost="false"`)
+	// Asserted per-anchor rather than as one attribute-ordered string: the point
+	// is that every link to the connect route opts out, whatever order its
+	// attributes end up in.
+	for name, html := range map[string]string{
+		"reconnect": renderIntegrations(t, SettingsIntegrationsProps{
+			QB:        QBConnectionStatus{Connected: true},
+			QBEnabled: true,
+		}),
+		"connect": renderIntegrations(t, SettingsIntegrationsProps{QBEnabled: true}),
+	} {
+		for _, anchor := range anchorsTo(html, "/admin/settings/integrations/quickbooks/connect") {
+			assert.Contains(t, anchor, `hx-boost="false"`, "%s link must not be boosted: %s", name, anchor)
+		}
+	}
 }
 
 // Broken settings sort ahead of warnings: the list is read from the top and
@@ -356,6 +362,18 @@ func renderIntegrations(t *testing.T, props SettingsIntegrationsProps) string {
 	var buf bytes.Buffer
 	require.NoError(t, SettingsIntegrationsContent(props).Render(context.Background(), &buf))
 	return buf.String()
+}
+
+// anchorsTo returns every <a> tag in html whose href is exactly the given path.
+func anchorsTo(html, href string) []string {
+	var out []string
+	for _, chunk := range strings.Split(html, "<a ")[1:] {
+		tag := "<a " + chunk[:strings.Index(chunk, ">")+1]
+		if strings.Contains(tag, `href="`+href+`"`) {
+			out = append(out, tag)
+		}
+	}
+	return out
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }

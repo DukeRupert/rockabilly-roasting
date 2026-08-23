@@ -28,8 +28,6 @@ func (f Flash) classes() string {
 	return "mt-4 rounded-sm badge-green p-4"
 }
 
-// adminFlash renders the message, with an icon that says which kind it is
-// before the words are read — a tick for saved, a warning for rejected.
 // role is alert for a rejection and status for a success. A screen reader has
 // to interrupt for "nothing was saved" — the staffer is about to walk away from
 // an unsaved form — and must not for "saved".
@@ -40,6 +38,8 @@ func (f Flash) role() string {
 	return "status"
 }
 
+// adminFlash renders the message, with an icon that says which kind it is
+// before the words are read — a tick for saved, a warning for rejected.
 func adminFlash(f Flash) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

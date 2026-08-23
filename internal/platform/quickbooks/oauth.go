@@ -180,12 +180,20 @@ type ConnectionStatus struct {
 }
 
 // Status returns the current connection status, reading from the credential
-// store. Returns Connected=false if no credentials are found (not an error).
+// store. No stored credentials means Connected=false, which is a fact rather
+// than an error.
+//
+// Anything else is returned. It used to be swallowed into the same
+// Connected=false, which made "the database is unreachable" and "nobody has
+// connected QuickBooks" the same answer — and the settings page then told staff
+// to go and reconnect a connection that was fine.
 func (m *OAuthManager) Status(ctx context.Context, tx pgx.Tx) (ConnectionStatus, error) {
 	creds, err := m.credStore.GetByTenantID(ctx, tx, m.tenantID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ConnectionStatus{}, nil
+	}
 	if err != nil {
-		// Treat any error (including NoRows) as "not connected".
-		return ConnectionStatus{}, nil //nolint:nilerr
+		return ConnectionStatus{}, fmt.Errorf("qb status: %w", err)
 	}
 	return ConnectionStatus{
 		Connected:        true,

@@ -726,6 +726,14 @@ templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
 					<p class="text-sm text-rr-muted">
 						Couldn't read the connection status just now. Reload in a moment — this says nothing about whether QuickBooks is connected.
 					</p>
+					<!-- The way out stays on the page: not knowing the status is
+					     exactly when someone may need to re-authorise, and the
+					     route starts the same flow either way. The destructive
+					     action is withheld, because we cannot say what it would
+					     be acting on. -->
+					<div class="mt-3">
+						<a href="/admin/settings/integrations/quickbooks/connect" hx-boost="false" class="btn-secondary">Reconnect anyway</a>
+					</div>
 				</div>
 			} else if !props.QBEnabled {
 				<!-- QB not configured in env -->

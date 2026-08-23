@@ -144,6 +144,12 @@ func TestSettingsIssues_UnreadableQuickBooksStatusIsNotADisconnection(t *testing
 	html := renderIntegrations(t, SettingsIntegrationsProps{QB: unavailable, QBEnabled: true})
 	assert.Contains(t, html, "Status unknown")
 	assert.NotContains(t, html, "Not connected")
+	// Not knowing the status is exactly when someone may need to reconnect, so
+	// the way out has to stay on the page — but not the destructive one.
+	require.NotEmpty(t, anchorsTo(html, "/admin/settings/integrations/quickbooks/connect"))
+	// Asserted on the route rather than the label: the word appears in prose on
+	// this card, and it is the destructive *action* that must be absent.
+	assert.NotContains(t, html, "quickbooks/disconnect")
 }
 
 // The OAuth handoff 302s to intuit.com. A boosted link fetches that by XHR,

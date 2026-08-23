@@ -1237,7 +1237,7 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 			return templ_7745c5c3_Err
 		}
 		if props.QB.Unavailable {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "<div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><p class=\"text-sm text-rr-muted\">Couldn't read the connection status just now. Reload in a moment — this says nothing about whether QuickBooks is connected.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "<div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><p class=\"text-sm text-rr-muted\">Couldn't read the connection status just now. Reload in a moment — this says nothing about whether QuickBooks is connected.</p><!-- The way out stays on the page: not knowing the status is\n\t\t\t\t\t     exactly when someone may need to re-authorise, and the\n\t\t\t\t\t     route starts the same flow either way. The destructive\n\t\t\t\t\t     action is withheld, because we cannot say what it would\n\t\t\t\t\t     be acting on. --><div class=\"mt-3\"><a href=\"/admin/settings/integrations/quickbooks/connect\" hx-boost=\"false\" class=\"btn-secondary\">Reconnect anyway</a></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1259,7 +1259,7 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 				var templ_7745c5c3_Var48 string
 				templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RealmID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 744, Col: 99}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 752, Col: 99}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 				if templ_7745c5c3_Err != nil {
@@ -1300,7 +1300,7 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 				var templ_7745c5c3_Var51 string
 				templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(refreshTokenRemainingLabel(props.QB.RefreshExpiresAt))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 752, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 760, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 				if templ_7745c5c3_Err != nil {
@@ -1313,7 +1313,7 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 				var templ_7745c5c3_Var52 string
 				templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RefreshExpiresAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 755, Col: 81}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 763, Col: 81}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 				if templ_7745c5c3_Err != nil {

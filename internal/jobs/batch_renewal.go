@@ -40,12 +40,16 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 	// means the scheduler built one, which is a bug in the scheduler rather than
 	// a subscription that moved on.
 	if len(job.Args.SubscriptionIDs) == 0 {
-		metrics.TrackJob(w.metrics, "batch_renewal", start, nil)
+		err := fmt.Errorf("empty subscription batch")
+		// Counted as a failure, not a success. This path used to pass nil to
+		// TrackJob, so a scheduler bug read as a clean run on the dashboard
+		// while the log beside it called the same event an error.
+		metrics.TrackJob(w.metrics, "batch_renewal", start, err)
 		slog.ErrorContext(ctx, "background job batch_renewal received an empty batch",
 			"job_kind", "batch_renewal",
 			"job_id", job.ID,
 		)
-		return river.JobCancel(fmt.Errorf("empty subscription batch"))
+		return river.JobCancel(err)
 	}
 
 	_, err := w.renewalSvc.RenewBatch(ctx, w.pool, job.Args.SubscriptionIDs)

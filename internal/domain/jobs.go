@@ -8,9 +8,11 @@ import "time"
 // renewal in this system runs through a job, so a discarded job is a piece of
 // work that silently did not happen.
 //
-// This is the failure mode the dashboard is worst at surfacing on its own: a
-// broken renewal worker makes the store look *quieter* — fewer orders, shorter
-// queues — which reads as a slow day rather than an outage.
+// Its symptom is an absence: a broken renewal worker makes the store look
+// *quieter* — fewer orders, shorter queues — which reads as a slow day rather
+// than an outage. That makes it an engineering alert rather than shop work, so
+// it reaches people through Sentry (jobs.ErrorHandler) and the admin-only
+// /admin/jobs page, not through the staff dashboard.
 
 // DeadJobKindBuyLabel is excluded from job-health counts because failed label
 // purchases have their own, more actionable dashboard group that names the

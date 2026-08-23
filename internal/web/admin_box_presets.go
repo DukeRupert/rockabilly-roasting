@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/app"
-	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
@@ -19,12 +18,11 @@ import (
 func (d *Deps) handleAdminBoxPresets(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var presets []domain.BoxPreset
-	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		var txErr error
-		presets, txErr = d.FulfillmentService.ListBoxPresets(ctx, tx)
-		return txErr
-	})
+	// The section load already reads the presets for the attention list, so the
+	// page's own table comes out of the same read — one query, one transaction,
+	// and no way for the "No box presets" warning to contradict the table under
+	// it.
+	section, err := d.loadSettingsSection(ctx)
 	if err != nil {
 		slog.Error("admin box presets: load", "error", err)
 		Error(w, r, err)
@@ -33,8 +31,9 @@ func (d *Deps) handleAdminBoxPresets(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.BoxPresetsProps{
-		Presets:   presets,
-		Flash:     r.URL.Query().Get("flash"),
+		Nav:       section.nav(role),
+		Presets:   section.BoxPresets,
+		Flash:     settingsFlash(r),
 		StaffName: name,
 		StaffRole: role,
 	}
@@ -50,7 +49,7 @@ func (d *Deps) handleAdminBoxPresets(w http.ResponseWriter, r *http.Request) {
 func (d *Deps) handleAdminBoxPresetCreate(w http.ResponseWriter, r *http.Request) {
 	in, err := parseBoxPresetInput(r)
 	if err != nil {
-		http.Redirect(w, r, "/admin/settings/box-presets?flash="+err.Error(), http.StatusSeeOther)
+		redirectFlashError(w, r, "/admin/settings/box-presets", err.Error())
 		return
 	}
 
@@ -62,10 +61,10 @@ func (d *Deps) handleAdminBoxPresetCreate(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		slog.Error("admin box presets: create", "error", err)
-		http.Redirect(w, r, "/admin/settings/box-presets?flash=Failed+to+add+preset", http.StatusSeeOther)
+		redirectFlashError(w, r, "/admin/settings/box-presets", "Failed to add preset")
 		return
 	}
-	http.Redirect(w, r, "/admin/settings/box-presets?flash=Preset+added", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/settings/box-presets", "Preset added")
 }
 
 // handleAdminBoxPresetUpdate edits an existing preset.
@@ -78,7 +77,7 @@ func (d *Deps) handleAdminBoxPresetUpdate(w http.ResponseWriter, r *http.Request
 
 	in, err := parseBoxPresetInput(r)
 	if err != nil {
-		http.Redirect(w, r, "/admin/settings/box-presets?flash="+err.Error(), http.StatusSeeOther)
+		redirectFlashError(w, r, "/admin/settings/box-presets", err.Error())
 		return
 	}
 
@@ -90,10 +89,10 @@ func (d *Deps) handleAdminBoxPresetUpdate(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		slog.Error("admin box presets: update", "error", err, "id", id)
-		http.Redirect(w, r, "/admin/settings/box-presets?flash=Failed+to+save+preset", http.StatusSeeOther)
+		redirectFlashError(w, r, "/admin/settings/box-presets", "Failed to save preset")
 		return
 	}
-	http.Redirect(w, r, "/admin/settings/box-presets?flash=Preset+saved", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/settings/box-presets", "Preset saved")
 }
 
 // handleAdminBoxPresetDelete removes a preset.
@@ -111,10 +110,10 @@ func (d *Deps) handleAdminBoxPresetDelete(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		slog.Error("admin box presets: delete", "error", err, "id", id)
-		http.Redirect(w, r, "/admin/settings/box-presets?flash=Failed+to+delete+preset", http.StatusSeeOther)
+		redirectFlashError(w, r, "/admin/settings/box-presets", "Failed to delete preset")
 		return
 	}
-	http.Redirect(w, r, "/admin/settings/box-presets?flash=Preset+deleted", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/settings/box-presets", "Preset deleted")
 }
 
 func parseBoxPresetInput(r *http.Request) (app.BoxPresetInput, error) {

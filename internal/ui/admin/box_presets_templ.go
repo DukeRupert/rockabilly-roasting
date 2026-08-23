@@ -15,8 +15,9 @@ import (
 )
 
 type BoxPresetsProps struct {
+	Nav       SettingsNav
 	Presets   []domain.BoxPreset
-	Flash     string
+	Flash     Flash
 	StaffName string
 	StaffRole string
 }
@@ -54,149 +55,142 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Box presets</h1><p class=\"mt-1 text-sm text-rr-muted\">Named cartons used when buying shipping labels. The smallest preset whose max weight covers an order's total physical weight (line items + tare) is selected automatically.</p></div><div class=\"mt-4 sm:ml-16 sm:mt-0 sm:flex-none\"><a href=\"/admin/settings\" class=\"block rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading hover:bg-rr-raised\">Back to settings</a></div></div>")
+		templ_7745c5c3_Err = settingsSection(props.Nav, settingsTabBoxPresets).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if props.Flash != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"mt-4 rounded-sm badge-green p-4 text-sm font-medium\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var2 string
-			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Flash)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 43, Col: 80}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Box presets</h1><p class=\"mt-1 text-sm text-rr-muted\">Named cartons used when buying shipping labels. The smallest preset whose max weight covers an order's total physical weight (line items + tare) is selected automatically.</p></div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<!-- Create form --><div class=\"mt-6 border border-rr-border bg-rr-surface p-4 sm:p-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Add a preset</h2><form method=\"post\" action=\"/admin/settings/box-presets\" class=\"mt-3 grid grid-cols-1 gap-3 sm:grid-cols-6\"><div class=\"sm:col-span-2\"><label for=\"new-name\" class=\"block text-xs font-medium text-rr-heading\">Name</label> <input id=\"new-name\" type=\"text\" name=\"name\" required placeholder=\"12oz bag box\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"new-length\" class=\"block text-xs font-medium text-rr-heading\">Length (in)</label> <input id=\"new-length\" type=\"number\" name=\"length_in\" step=\"0.25\" min=\"0.25\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-width\" class=\"block text-xs font-medium text-rr-heading\">Width (in)</label> <input id=\"new-width\" type=\"number\" name=\"width_in\" step=\"0.25\" min=\"0.25\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-height\" class=\"block text-xs font-medium text-rr-heading\">Height (in)</label> <input id=\"new-height\" type=\"number\" name=\"height_in\" step=\"0.25\" min=\"0.25\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-max-weight\" class=\"block text-xs font-medium text-rr-heading\">Max weight (oz)</label> <input id=\"new-max-weight\" type=\"number\" name=\"max_weight_oz\" step=\"0.1\" min=\"0.1\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div class=\"sm:col-span-6 flex justify-end\"><button type=\"submit\" class=\"rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper hover:opacity-90\">Add preset</button></div></form></div><!-- Existing presets --><div class=\"mt-8\">")
+		templ_7745c5c3_Err = adminFlash(props.Flash).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = settingsAttention(props.Nav.Issues).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<!-- Create form --><div class=\"mt-6 border border-rr-border bg-rr-surface p-4 sm:p-6\"><h2 class=\"text-sm font-semibold text-rr-heading\">Add a preset</h2><form method=\"post\" action=\"/admin/settings/box-presets\" class=\"mt-3 grid grid-cols-1 gap-3 sm:grid-cols-6\"><div class=\"sm:col-span-2\"><label for=\"new-name\" class=\"block text-xs font-medium text-rr-heading\">Name</label> <input id=\"new-name\" type=\"text\" name=\"name\" required placeholder=\"12oz bag box\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><div><label for=\"new-length\" class=\"block text-xs font-medium text-rr-heading\">Length (in)</label> <input id=\"new-length\" type=\"number\" name=\"length_in\" step=\"0.25\" min=\"0.25\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-width\" class=\"block text-xs font-medium text-rr-heading\">Width (in)</label> <input id=\"new-width\" type=\"number\" name=\"width_in\" step=\"0.25\" min=\"0.25\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-height\" class=\"block text-xs font-medium text-rr-heading\">Height (in)</label> <input id=\"new-height\" type=\"number\" name=\"height_in\" step=\"0.25\" min=\"0.25\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div><label for=\"new-max-weight\" class=\"block text-xs font-medium text-rr-heading\">Max weight (oz)</label> <input id=\"new-max-weight\" type=\"number\" name=\"max_weight_oz\" step=\"0.1\" min=\"0.1\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono\"></div><div class=\"sm:col-span-6 flex justify-end\"><button type=\"submit\" class=\"rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Add preset</button></div></form></div><!-- Existing presets --><div class=\"mt-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(props.Presets) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"border border-dashed border-rr-border p-12 text-center\"><h3 class=\"text-sm font-semibold text-rr-heading\">No box presets yet</h3><p class=\"mt-1 text-sm text-rr-muted\">Add at least one preset so labels can be purchased.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"border border-dashed border-rr-border p-12 text-center\"><h3 class=\"text-sm font-semibold text-rr-heading\">No box presets yet</h3><p class=\"mt-1 text-sm text-rr-muted\">Add at least one preset so labels can be purchased.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"overflow-hidden border border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Name</th><th class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">L × W × H (in)</th><th class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Max wt (oz)</th><th class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Sort</th><th class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"overflow-hidden border border-rr-border bg-rr-surface\"><table class=\"min-w-full divide-y divide-rr-border\"><thead class=\"bg-rr-raised\"><tr><th class=\"py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-rr-heading sm:pl-6\">Name</th><th class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">L × W × H (in)</th><th class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Max wt (oz)</th><th class=\"px-3 py-3.5 text-left text-sm font-semibold text-rr-heading\">Sort</th><th class=\"relative py-3.5 pl-3 pr-4 sm:pr-6\"><span class=\"sr-only\">Actions</span></th></tr></thead> <tbody class=\"divide-y divide-rr-border bg-rr-surface\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, p := range props.Presets {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<tr><td colspan=\"5\" class=\"px-4 sm:px-6 py-3\"><form method=\"post\" action=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<tr><td colspan=\"5\" class=\"px-4 sm:px-6 py-3\"><form method=\"post\" action=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var3 templ.SafeURL
-				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/settings/box-presets/%s", p.ID)))
+				var templ_7745c5c3_Var2 templ.SafeURL
+				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/settings/box-presets/%s", p.ID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 99, Col: 104}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 92, Col: 104}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" class=\"grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-end\"><div class=\"sm:col-span-3\"><label class=\"sr-only\">Name</label> <input type=\"text\" name=\"name\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"grid grid-cols-1 gap-2 sm:grid-cols-12 sm:items-end\"><div class=\"sm:col-span-3\"><label class=\"sr-only\">Name</label> <input type=\"text\" name=\"name\" required value=\"")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var3 string
+				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.Name)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 95, Col: 65}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm\"></div><div class=\"sm:col-span-2\"><label class=\"sr-only\">Length</label> <input type=\"number\" name=\"length_in\" step=\"0.25\" min=\"0.25\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var4 string
-				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(p.Name)
+				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatInches(p.LengthIn))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 102, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 99, Col: 113}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm\"></div><div class=\"sm:col-span-2\"><label class=\"sr-only\">Length</label> <input type=\"number\" name=\"length_in\" step=\"0.25\" min=\"0.25\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"width_in\" step=\"0.25\" min=\"0.25\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var5 string
-				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatInches(p.LengthIn))
+				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatInches(p.WidthIn))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 106, Col: 113}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 102, Col: 111}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"width_in\" step=\"0.25\" min=\"0.25\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"height_in\" step=\"0.25\" min=\"0.25\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var6 string
-				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatInches(p.WidthIn))
+				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatInches(p.HeightIn))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 109, Col: 111}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 105, Col: 113}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"height_in\" step=\"0.25\" min=\"0.25\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-2\"><input type=\"number\" name=\"max_weight_oz\" step=\"0.1\" min=\"0.1\" required value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var7 string
-				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatInches(p.HeightIn))
+				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatOz(p.MaxWeightOz))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 112, Col: 113}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 108, Col: 114}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-2\"><input type=\"number\" name=\"max_weight_oz\" step=\"0.1\" min=\"0.1\" required value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"sort_order\" step=\"1\" value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var8 string
-				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(formatOz(p.MaxWeightOz))
+				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", p.SortOrder))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 115, Col: 114}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 111, Col: 97}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-1\"><input type=\"number\" name=\"sort_order\" step=\"1\" value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-2 flex gap-2 justify-end\"><button type=\"submit\" class=\"btn-secondary\">Save</button></div></form><form method=\"post\" action=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var9 string
-				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", p.SortOrder))
+				var templ_7745c5c3_Var9 templ.SafeURL
+				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/settings/box-presets/%s/delete", p.ID)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 118, Col: 97}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 117, Col: 111}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono\"></div><div class=\"sm:col-span-2 flex gap-2 justify-end\"><button type=\"submit\" class=\"rounded-sm bg-rr-ink px-3 py-1.5 text-sm font-semibold text-rr-paper hover:opacity-90\">Save</button></div></form><form method=\"post\" action=\"")
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var10 templ.SafeURL
-				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/settings/box-presets/%s/delete", p.ID)))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/box_presets.templ`, Line: 124, Col: 111}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" class=\"mt-1 text-right\"><button type=\"submit\" class=\"text-xs text-rr-red hover:text-rr-red-lt\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" class=\"mt-1 text-right\"><button type=\"submit\" class=\"text-xs text-rr-red hover:text-rr-red-lt\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -213,17 +207,17 @@ func BoxPresetsContent(props BoxPresetsProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, ">Delete</button></form></td></tr>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, ">Delete</button></form></td></tr>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</tbody></table></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</tbody></table></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -247,12 +241,12 @@ func BoxPresets(props BoxPresetsProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var11 == nil {
-			templ_7745c5c3_Var11 = templ.NopComponent
+		templ_7745c5c3_Var10 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var10 == nil {
+			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var12 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var11 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -275,7 +269,7 @@ func BoxPresets(props BoxPresetsProps) templ.Component {
 			ActivePath: "/admin/settings",
 			StaffName:  props.StaffName,
 			StaffRole:  props.StaffRole,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var12), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var11), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

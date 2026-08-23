@@ -625,23 +625,29 @@ func adminUserFooter(props AdminProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</span></span> <svg data-sidebar-label class=\"size-5 text-rr-muted transition-opacity duration-200\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z\" clip-rule=\"evenodd\"></path></svg></button><div data-dropdown-menu class=\"hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border\"><a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Settings</a> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</span></span> <svg data-sidebar-label class=\"size-5 text-rr-muted transition-opacity duration-200\" viewBox=\"0 0 20 20\" fill=\"currentColor\"><path fill-rule=\"evenodd\" d=\"M10 3a.75.75 0 01.55.24l3.25 3.5a.75.75 0 11-1.1 1.02L10 4.852 7.3 7.76a.75.75 0 01-1.1-1.02l3.25-3.5A.75.75 0 0110 3zm-3.76 9.2a.75.75 0 011.06.04l2.7 2.908 2.7-2.908a.75.75 0 111.1 1.02l-3.25 3.5a.75.75 0 01-1.1 0l-3.25-3.5a.75.75 0 01.04-1.06z\" clip-rule=\"evenodd\"></path></svg></button><div data-dropdown-menu class=\"hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
+		if domain.StaffRole(props.StaffRole).CanManageSystem() {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<a href=\"/admin/settings\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Settings</a> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
 		if domain.StaffRole(props.StaffRole).CanManageStaff() {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<a href=\"/admin/staff\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Team</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<a href=\"/admin/staff\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Team</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		if domain.StaffRole(props.StaffRole).CanManageSystem() {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<a href=\"/admin/jobs\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Failed jobs</a> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<a href=\"/admin/jobs\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Failed jobs</a> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<a href=\"/admin/audit\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Audit log</a> <a href=\"/admin/help\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Help</a><div class=\"my-1 border-t border-rr-border\"></div><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<a href=\"/admin/audit\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Audit log</a> <a href=\"/admin/help\" class=\"block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Help</a><div class=\"my-1 border-t border-rr-border\"></div><form method=\"post\" action=\"/auth/staff/logout\"><button type=\"submit\" class=\"block w-full text-left px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised\">Sign out</button></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

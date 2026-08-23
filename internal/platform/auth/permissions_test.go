@@ -43,3 +43,27 @@ func TestSupportRemainsReadOnlyElsewhere(t *testing.T) {
 			"support should not hold %s", perm)
 	}
 }
+
+// system:write is the operator-plumbing grant: failed background jobs and the
+// whole Settings section. Both can reach past their own page — a retried job
+// sends real mail, and the flat rate applies to every order placed after it is
+// saved — so the grant stays admin-only. Assert the four departmental roles are
+// still out, so widening it has to break this test on the way through.
+func TestManageSystemIsAdminOnly(t *testing.T) {
+	assert.True(t, auth.HasPermission(domain.StaffRoleAdmin, auth.PermManageSystem))
+
+	for _, role := range []domain.StaffRole{
+		domain.StaffRoleFulfillment,
+		domain.StaffRoleFinance,
+		domain.StaffRoleCatalog,
+		domain.StaffRoleSupport,
+	} {
+		assert.False(t, auth.HasPermission(role, auth.PermManageSystem),
+			"role %s should not hold system:write", role)
+		// The UI helper hides the Settings and Failed jobs entries; it has to
+		// agree with the map above or staff get links that 403.
+		assert.False(t, role.CanManageSystem(),
+			"domain helper disagrees with the permission map for %s", role)
+	}
+	assert.True(t, domain.StaffRoleAdmin.CanManageSystem())
+}

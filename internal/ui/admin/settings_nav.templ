@@ -1,0 +1,257 @@
+package admin
+
+import (
+	"fmt"
+	"sort"
+
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+// Shared chrome for the Settings section.
+//
+// Settings used to be one long scroll: shipping, wholesale pricing and
+// integrations stacked on a single page, with box presets and the team roster
+// as unlinked strangers reachable only from the user menu. That made the page
+// hard to scan and, worse, hid the settings that were actively broken — the
+// QuickBooks token two weeks from expiry sat below three screens of address
+// fields.
+//
+// The section now works the way Catalog and Orders do: a tab strip for the
+// sibling pages (section_nav.templ), each page short enough to read whole. On
+// top of that the strip carries what the dashboard taught us — a setting that
+// is breaking real work is not something staff should have to go looking for,
+// so it announces itself on every tab and the tab that owns the fix wears the
+// count.
+
+const (
+	settingsTabShipping     = "/admin/settings"
+	settingsTabBoxPresets   = "/admin/settings/box-presets"
+	settingsTabWholesale    = "/admin/settings/wholesale"
+	settingsTabIntegrations = "/admin/settings/integrations"
+	settingsTabTeam         = "/admin/staff"
+)
+
+// SettingsIssue is one misconfiguration worth interrupting a staffer over.
+//
+// The bar for inclusion is consequence, not tidiness: every issue here names
+// something that fails or misleads a customer — a label that cannot be bought,
+// a pickup email with no address in it, invoices that stopped syncing. A
+// setting merely left at its default is not an issue.
+type SettingsIssue struct {
+	Tab    string // settings tab that owns the fix; drives the badge count
+	Anchor string // optional element id on that tab, e.g. "origin"
+	Title  string // what is wrong, in one line
+	Detail string // what it costs — the reason this is worth reading
+	// Broken separates "this is failing work right now" from "this will bite
+	// soon". Red is expensive: spend it only on the first kind, or staff learn
+	// to scroll past both.
+	Broken bool
+}
+
+func (i SettingsIssue) href() string {
+	if i.Anchor == "" {
+		return i.Tab
+	}
+	return i.Tab + "#" + i.Anchor
+}
+
+func (i SettingsIssue) badgeClass() string {
+	if i.Broken {
+		return "badge badge-red"
+	}
+	return "badge badge-amber"
+}
+
+// rowClass gives a broken setting the same persistent rust flag the order and
+// fulfillment lists use for work that is stuck — one visual language for "this
+// one is waiting on you" across the admin.
+func (i SettingsIssue) rowClass() string {
+	if i.Broken {
+		return "row-link row-link-stale"
+	}
+	return "row-link"
+}
+
+func (i SettingsIssue) badgeLabel() string {
+	if i.Broken {
+		return "Broken"
+	}
+	return "Check"
+}
+
+// SettingsNav is the per-request state every page in the Settings section
+// needs: who is looking (the team tab is admin-only) and what is currently
+// wrong anywhere in the section.
+type SettingsNav struct {
+	StaffRole string
+	Issues    []SettingsIssue
+}
+
+// tabs builds the strip, hanging each issue count off the tab that owns it.
+func (n SettingsNav) tabs() []sectionTab {
+	tabs := []sectionTab{
+		{Label: "Shipping", Href: settingsTabShipping},
+		{Label: "Box presets", Href: settingsTabBoxPresets},
+		{Label: "Wholesale", Href: settingsTabWholesale},
+		{Label: "Integrations", Href: settingsTabIntegrations},
+	}
+	// The team roster lives at /admin/staff and was reachable only from the
+	// user menu. It is settings — it belongs in the strip, for the staff who
+	// are allowed to see it.
+	if domain.StaffRole(n.StaffRole).CanManageStaff() {
+		tabs = append(tabs, sectionTab{Label: "Team", Href: settingsTabTeam})
+	}
+	for i := range tabs {
+		tabs[i].Count = n.countFor(tabs[i].Href)
+	}
+	return tabs
+}
+
+func (n SettingsNav) countFor(tab string) int {
+	count := 0
+	for _, issue := range n.Issues {
+		if issue.Tab == tab {
+			count++
+		}
+	}
+	return count
+}
+
+// SettingsIssuesFor derives the section's problem list from the config that is
+// actually saved. Pure and total so the rules can be tested without a database
+// — these are judgements about what breaks, and they are worth pinning down.
+func SettingsIssuesFor(s ShippingSettings, qb QBConnectionStatus, qbEnabled bool, boxPresetCount int) []SettingsIssue {
+	var issues []SettingsIssue
+
+	// Shippo passes the origin straight to the carrier. USPS rejects a label
+	// with no sender email or phone, so this one is not a nicety: every label
+	// purchase fails until it is filled in, and the failure surfaces three
+	// screens away in Fulfillment.
+	if s.OriginEmail == "" || s.OriginPhone == "" {
+		issues = append(issues, SettingsIssue{
+			Tab:    settingsTabShipping,
+			Anchor: "origin",
+			Title:  "Pickup origin is missing an email or phone number",
+			Detail: "USPS rejects label purchases without both. Every label buy fails until this is filled in.",
+			Broken: true,
+		})
+	}
+	if s.OriginStreet1 == "" || s.OriginCity == "" || s.OriginState == "" || s.OriginZip == "" {
+		issues = append(issues, SettingsIssue{
+			Tab:    settingsTabShipping,
+			Anchor: "origin",
+			Title:  "Pickup origin address is incomplete",
+			Detail: "Labels are quoted and priced from this address. An incomplete one fails at purchase.",
+			Broken: true,
+		})
+	}
+	// A delivery day list the handler refuses to save can still arrive from
+	// older data. Checkout quotes a date from these days; with none, local
+	// customers are offered a delivery that has no run to go out on.
+	if s.LocalDeliveryEnabled && len(s.LocalDeliveryWeekdays) == 0 {
+		issues = append(issues, SettingsIssue{
+			Tab:    settingsTabShipping,
+			Anchor: "local-fulfillment",
+			Title:  "Local delivery is on with no delivery days",
+			Detail: "Checkout offers delivery it cannot schedule. Pick the days the van runs.",
+			Broken: true,
+		})
+	}
+	// The "ready for pickup" email tells the customer to come and collect the
+	// order and then prints these instructions. Empty, it tells them to come
+	// to nowhere.
+	if s.LocalPickupEnabled && s.LocalPickupInstructions == "" {
+		issues = append(issues, SettingsIssue{
+			Tab:    settingsTabShipping,
+			Anchor: "local-fulfillment",
+			Title:  "Pickup is offered with no instructions",
+			Detail: "The \"ready for pickup\" email carries these — without them it names no address or hours.",
+			Broken: true,
+		})
+	}
+	if boxPresetCount == 0 {
+		issues = append(issues, SettingsIssue{
+			Tab:    settingsTabBoxPresets,
+			Title:  "No box presets",
+			Detail: "Label rates are quoted against a carton. With none defined, nothing can be shipped.",
+			Broken: true,
+		})
+	}
+
+	if qbEnabled {
+		switch {
+		case !qb.Connected:
+			issues = append(issues, SettingsIssue{
+				Tab:    settingsTabIntegrations,
+				Title:  "QuickBooks is not connected",
+				Detail: "Wholesale invoices and payments stop syncing while the connection is down.",
+			})
+		case qb.RefreshExpiresAt != nil:
+			// QuickBooks refresh tokens expire on a fixed clock whether or not
+			// the connection is used. Nothing renews them automatically, and
+			// the failure is silent: invoicing simply stops.
+			if days := refreshTokenDaysRemaining(qb.RefreshExpiresAt); days <= 14 {
+				title := fmt.Sprintf("QuickBooks access expires in %d days", days)
+				detail := "Reconnect before it lapses — invoicing stops the day it does, without an error."
+				// Past the expiry the countdown goes negative, which reads as a
+				// rendering bug at the exact moment the page is describing an
+				// outage. Say the outage instead.
+				if days <= 0 {
+					title = "QuickBooks access has expired"
+					detail = "Wholesale invoicing has already stopped. Reconnect to start it again."
+				}
+				issues = append(issues, SettingsIssue{
+					Tab:    settingsTabIntegrations,
+					Title:  title,
+					Detail: detail,
+					Broken: days <= 7,
+				})
+			}
+		}
+	}
+
+	// Broken first. Both kinds are worth reading, but the ones failing work
+	// right now have to be the ones staff hit before their attention runs out.
+	sort.SliceStable(issues, func(a, b int) bool { return issues[a].Broken && !issues[b].Broken })
+	return issues
+}
+
+// settingsSection renders the tab strip. The attention list is a separate call
+// so it can sit under the page title where the eye already is — see
+// settingsAttention.
+templ settingsSection(nav SettingsNav, activeHref string) {
+	@adminSectionTabs(nav.tabs(), activeHref)
+}
+
+// settingsAttention lists every open issue in the section, worst first —
+// including issues owned by other tabs, so a staffer editing box presets still
+// learns the QuickBooks token is about to lapse. It
+// renders nothing when there is nothing wrong: an empty "all clear" panel is a
+// thing to read every visit that never says anything.
+templ settingsAttention(issues []SettingsIssue) {
+	if len(issues) > 0 {
+		<div class="mt-6 border border-rr-border bg-rr-surface">
+			<div class="border-b border-rr-border px-4 py-2">
+				<span class="label-font text-rr-muted" style="font-size:0.6rem;">Needs attention</span>
+			</div>
+			<ul class="divide-y divide-rr-border">
+				for _, issue := range issues {
+					<li class={ issue.rowClass() }>
+						<!-- hx-boost="false": these links carry a fragment
+						     (/admin/settings#origin) and the whole promise of the
+						     row is landing on the field. A boosted navigation
+						     swaps the content and restores scroll rather than
+						     honouring the anchor; a plain one jumps. -->
+						<a href={ templ.SafeURL(issue.href()) } hx-boost="false" class="row-link-target flex items-start gap-3 px-4 py-3">
+							<span class={ issue.badgeClass() }>{ issue.badgeLabel() }</span>
+							<span class="min-w-0">
+								<span class="block text-sm font-semibold text-rr-heading">{ issue.Title }</span>
+								<span class="block text-xs text-rr-muted">{ issue.Detail }</span>
+							</span>
+						</a>
+					</li>
+				}
+			</ul>
+		</div>
+	}
+}

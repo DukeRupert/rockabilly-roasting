@@ -785,7 +785,9 @@ templ adminUserFooter(props AdminProps) {
 			</svg>
 		</button>
 		<div data-dropdown-menu class="hidden absolute bottom-full left-0 z-10 mb-2 w-48 rounded-sm bg-rr-surface py-2 shadow-lg ring-1 ring-rr-border">
-			<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Settings</a>
+			if domain.StaffRole(props.StaffRole).CanManageSystem() {
+				<a href="/admin/settings" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Settings</a>
+			}
 			if domain.StaffRole(props.StaffRole).CanManageStaff() {
 				<a href="/admin/staff" class="block px-3 py-1 text-sm/6 text-rr-heading hover:bg-rr-raised">Team</a>
 			}

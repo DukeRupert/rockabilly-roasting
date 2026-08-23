@@ -21,6 +21,10 @@ import "fmt"
 type sectionTab struct {
 	Label string
 	Href  string
+	// Count marks a tab with work waiting behind it — misconfigured settings,
+	// pending applications. Zero renders no badge: a "0" reads as a number to
+	// check rather than as nothing to do (same rule as adminChannelToggleCount).
+	Count int
 }
 
 // --- Tab data. One function per section so call sites stay a single line. ---
@@ -71,7 +75,12 @@ func sectionTabClass(active bool) string {
 templ adminSectionTabs(tabs []sectionTab, activeHref string) {
 	<nav class="mb-6 flex items-center gap-5 border-b border-rr-border" aria-label="Section">
 		for _, t := range tabs {
-			<a href={ templ.SafeURL(t.Href) } aria-current={ ariaCurrent(t.Href == activeHref) } class={ sectionTabClass(t.Href == activeHref) }>{ t.Label }</a>
+			<a href={ templ.SafeURL(t.Href) } aria-current={ ariaCurrent(t.Href == activeHref) } class={ sectionTabClass(t.Href == activeHref) }>
+				{ t.Label }
+				if t.Count > 0 {
+					<span class="badge badge-amber ml-1.5">{ fmt.Sprintf("%d", t.Count) }</span>
+				}
+			</a>
 		}
 	</nav>
 }

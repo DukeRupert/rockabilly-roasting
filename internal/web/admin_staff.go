@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -47,7 +48,19 @@ func (d *Deps) renderAdminStaffList(w http.ResponseWriter, r *http.Request, form
 		currentID = s.ID
 	}
 
+	// Team is a tab in the Settings section, so it carries the same strip and
+	// the same attention list. A failure loading them is not worth blocking the
+	// roster over — the tabs just lose their counts.
+	var nav admin.SettingsNav
+	if section, secErr := d.loadSettingsSection(ctx); secErr == nil {
+		nav = section.nav(role)
+	} else {
+		nav = admin.SettingsNav{StaffRole: role}
+		slog.Warn("admin staff: settings nav unavailable", "error", secErr)
+	}
+
 	props := admin.StaffListProps{
+		Nav:            nav,
 		Staff:          staff,
 		CurrentStaffID: currentID,
 		MerchantTZ:     d.MerchantTZ,

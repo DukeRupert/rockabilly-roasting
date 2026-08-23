@@ -614,17 +614,40 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/catalog/{id}/attributes/remove", deps.handleAdminProductAttributeRemove)
 	adminMux.HandleFunc("POST /admin/catalog/{id}/attributes/save", deps.handleAdminProductAttributeSave)
 
-	// Admin settings / integrations
-	adminMux.HandleFunc("GET /admin/settings", deps.handleAdminSettings)
-	adminMux.HandleFunc("POST /admin/settings/shipping", deps.handleAdminShippingSettingsUpdate)
-	adminMux.HandleFunc("POST /admin/settings/default-price-list", deps.handleAdminDefaultPriceListUpdate)
-	adminMux.HandleFunc("GET /admin/settings/box-presets", deps.handleAdminBoxPresets)
-	adminMux.HandleFunc("POST /admin/settings/box-presets", deps.handleAdminBoxPresetCreate)
-	adminMux.HandleFunc("POST /admin/settings/box-presets/{id}", deps.handleAdminBoxPresetUpdate)
-	adminMux.HandleFunc("POST /admin/settings/box-presets/{id}/delete", deps.handleAdminBoxPresetDelete)
-	adminMux.HandleFunc("GET /admin/settings/integrations/quickbooks/connect", deps.handleAdminQBConnect)
-	adminMux.HandleFunc("GET /admin/settings/integrations/quickbooks/callback", deps.handleAdminQBCallback)
-	adminMux.HandleFunc("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)
+	// Admin settings / integrations. Admin-only, every route: these are
+	// store-wide rules rather than any one department's work, and the blast
+	// radius is the whole shop — the flat rate every customer is charged, the
+	// origin address labels are bought against, the QuickBooks connection all
+	// wholesale invoicing runs through. The settings entry in the user menu is
+	// hidden for roles without the permission (layouts/admin.templ), so nobody
+	// is offered a link that 403s.
+	//
+	// The QuickBooks OAuth callback is gated on the same permission as the rest.
+	// It is the staffer's own browser coming back from Intuit, and only someone
+	// who could reach the connect route could have started the flow — but note
+	// the return is a cross-site top-level navigation and the staff session
+	// cookie is SameSite=Strict (auth.go), so whether the session is sent at all
+	// is a pre-existing open question about this flow, not something this gate
+	// changes. The OAuth state cookie is deliberately Lax for that reason.
+	settingsRoute := func(pattern string, h http.HandlerFunc) {
+		adminMux.Handle(pattern, deps.requirePermission(auth.PermManageSystem, h))
+	}
+	settingsRoute("GET /admin/settings", deps.handleAdminSettings)
+	// The shipping form posts to the tab's own URL rather than a verb path.
+	// A rejected save re-renders in place instead of redirecting, and hx-boost
+	// pushes the action into history — so that URL has to answer GET, or a
+	// refresh after a rejected save lands on a 405.
+	settingsRoute("POST /admin/settings", deps.handleAdminShippingSettingsUpdate)
+	settingsRoute("GET /admin/settings/wholesale", deps.handleAdminSettingsWholesale)
+	settingsRoute("GET /admin/settings/integrations", deps.handleAdminSettingsIntegrations)
+	settingsRoute("POST /admin/settings/default-price-list", deps.handleAdminDefaultPriceListUpdate)
+	settingsRoute("GET /admin/settings/box-presets", deps.handleAdminBoxPresets)
+	settingsRoute("POST /admin/settings/box-presets", deps.handleAdminBoxPresetCreate)
+	settingsRoute("POST /admin/settings/box-presets/{id}", deps.handleAdminBoxPresetUpdate)
+	settingsRoute("POST /admin/settings/box-presets/{id}/delete", deps.handleAdminBoxPresetDelete)
+	settingsRoute("GET /admin/settings/integrations/quickbooks/connect", deps.handleAdminQBConnect)
+	settingsRoute("GET /admin/settings/integrations/quickbooks/callback", deps.handleAdminQBCallback)
+	settingsRoute("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)
 
 	// Admin audit log
 	// Background job health. Admin-only: retrying a job re-runs real work,

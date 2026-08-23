@@ -11,6 +11,7 @@ import (
 )
 
 type StaffListProps struct {
+	Nav            SettingsNav
 	Staff          []domain.Staff
 	CurrentStaffID uuid.UUID
 	MerchantTZ     *time.Location
@@ -48,6 +49,7 @@ func staffRoleLabel(r domain.StaffRole) string {
 }
 
 templ StaffListContent(props StaffListProps) {
+	@settingsSection(props.Nav, settingsTabTeam)
 	<!-- Page header -->
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
@@ -60,6 +62,7 @@ templ StaffListContent(props StaffListProps) {
 			{ props.FormError }
 		</div>
 	}
+	@settingsAttention(props.Nav.Issues)
 	<!-- Invite form -->
 	<div class="mt-6 border border-rr-border bg-rr-surface p-6">
 		<h2 class="text-sm font-semibold text-rr-heading">Invite a team member</h2>

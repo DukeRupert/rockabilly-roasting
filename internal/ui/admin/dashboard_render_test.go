@@ -225,45 +225,6 @@ func TestDeliveryRunProps_Countdown(t *testing.T) {
 	assert.Equal(t, "cutoff 9am", future.countdown())
 }
 
-// A dead background job is the failure this dashboard is structurally worst at
-// showing: the symptom is an absence. It has to reach Urgent, count toward the
-// chip, and say which kinds broke — a bare number sends staff hunting.
-func TestDashboard_DeadJobsSurfaceWithKindBreakdown(t *testing.T) {
-	props := DashboardProps{
-		DeadJobCount: 5,
-		DeadJobKinds: []domain.DeadJobKindCount{
-			{Kind: "email_order_confirm", Count: 4},
-			{Kind: "qb_create_invoice", Count: 1},
-		},
-	}
-	html := renderDashboard(t, props)
-
-	assert.Equal(t, 5, props.urgentCount())
-	assert.Contains(t, html, "5 background jobs failed")
-	assert.Contains(t, html, "4 email_order_confirm, 1 qb_create_invoice")
-	assert.Contains(t, html, "/admin/jobs")
-}
-
-// The summary is one line, not the list page: past two kinds it counts the rest
-// rather than running off the row.
-func TestDashboardProps_DeadJobSummary(t *testing.T) {
-	two := DashboardProps{DeadJobKinds: []domain.DeadJobKindCount{
-		{Kind: "a", Count: 2}, {Kind: "b", Count: 1},
-	}}
-	assert.Equal(t, "2 a, 1 b — nothing will retry these on its own.", two.deadJobSummary())
-
-	four := DashboardProps{DeadJobKinds: []domain.DeadJobKindCount{
-		{Kind: "a", Count: 4}, {Kind: "b", Count: 3}, {Kind: "c", Count: 2}, {Kind: "d", Count: 1},
-	}}
-	assert.Equal(t, "4 a, 3 b, and 2 more kinds — nothing will retry these on its own.", four.deadJobSummary())
-
-	one := DashboardProps{DeadJobKinds: []domain.DeadJobKindCount{{Kind: "a", Count: 1}}}
-	assert.Equal(t, "1 a — nothing will retry these on its own.", one.deadJobSummary())
-
-	// Count with no rollup still reads as a sentence rather than a bare dash.
-	assert.Equal(t, "Nothing will retry these on its own — they need a look.", DashboardProps{}.deadJobSummary())
-}
-
 // The channel split has to survive the round trip through the template, not
 // just hold in the predicate: a wholesale order mid-cycle and a retail order of
 // the same age must not be painted the same.

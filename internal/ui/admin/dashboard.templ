@@ -2,7 +2,6 @@ package admin
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/dukerupert/hiri/internal/domain"
@@ -196,13 +195,6 @@ type DashboardProps struct {
 	// without their own group they sit in the queue indefinitely — River will
 	// not pick them back up on its own.
 	LabelFailures []UrgentOrderGroup
-	// DeadJobCount is background work that ran out of retries — emails,
-	// invoices, renewals. This is the failure the rest of the dashboard is
-	// blind to by construction: a broken worker makes the store look *quieter*,
-	// because the symptom is an absence rather than a queue entry. Label jobs
-	// are excluded; they have their own group above.
-	DeadJobCount        int
-	DeadJobKinds        []domain.DeadJobKindCount
 	PastDueSubs         []PastDueRow
 	PastDueAccounts     []PastDueAccountRow
 	PastDueAccountCount int
@@ -266,28 +258,8 @@ type PipelineRow struct {
 }
 
 func (p DashboardProps) urgentCount() int {
-	return p.PastDueAccountCount + p.PastDueSubCount + p.DeadJobCount +
+	return p.PastDueAccountCount + p.PastDueSubCount +
 		urgentGroupTotal(p.OnHold) + urgentGroupTotal(p.FailedPayments) + urgentGroupTotal(p.LabelFailures)
-}
-
-// deadJobSummary names the kinds behind the dead-job count. Failures cluster by
-// cause, so "3 email_order_confirm, 1 qb_create_invoice" tells staff what broke
-// in a way a bare number never does. Caps at two kinds plus an overflow note —
-// this is a one-line summary, not the list page.
-func (p DashboardProps) deadJobSummary() string {
-	if len(p.DeadJobKinds) == 0 {
-		return "Nothing will retry these on its own — they need a look."
-	}
-	parts := make([]string, 0, 3)
-	for i, k := range p.DeadJobKinds {
-		if i == 2 {
-			rest := len(p.DeadJobKinds) - 2
-			parts = append(parts, fmt.Sprintf("and %d more kind%s", rest, pluralS(rest)))
-			break
-		}
-		parts = append(parts, fmt.Sprintf("%d %s", k.Count, k.Kind))
-	}
-	return strings.Join(parts, ", ") + " — nothing will retry these on its own."
 }
 
 func (p DashboardProps) reviewCount() int {
@@ -385,13 +357,6 @@ templ DashboardContent(props DashboardProps) {
 							"Charge did not go through — reach out or retry.",
 							g.ordersHref("view=all&payment=failed"),
 							"Payment failed",
-						)
-					}
-					if props.DeadJobCount > 0 {
-						@urgentGroupLink(
-							fmt.Sprintf("%d background job%s failed", props.DeadJobCount, pluralS(props.DeadJobCount)),
-							props.deadJobSummary(),
-							"/admin/jobs",
 						)
 					}
 					for _, g := range props.LabelFailures {

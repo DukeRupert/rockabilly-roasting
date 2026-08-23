@@ -7,8 +7,9 @@ import (
 )
 
 type BoxPresetsProps struct {
+	Nav       SettingsNav
 	Presets   []domain.BoxPreset
-	Flash     string
+	Flash     Flash
 	StaffName string
 	StaffRole string
 }
@@ -23,6 +24,7 @@ func formatOz(oz float64) string {
 
 templ BoxPresetsContent(props BoxPresetsProps) {
 	@ConfirmDialogHost()
+	@settingsSection(props.Nav, settingsTabBoxPresets)
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">Box presets</h1>
@@ -30,18 +32,9 @@ templ BoxPresetsContent(props BoxPresetsProps) {
 				Named cartons used when buying shipping labels. The smallest preset whose max weight covers an order's total physical weight (line items + tare) is selected automatically.
 			</p>
 		</div>
-		<div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-			<a
-				href="/admin/settings"
-				class="block rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-center text-sm font-semibold text-rr-heading hover:bg-rr-raised"
-			>
-				Back to settings
-			</a>
-		</div>
 	</div>
-	if props.Flash != "" {
-		<div class="mt-4 rounded-sm badge-green p-4 text-sm font-medium">{ props.Flash }</div>
-	}
+	@adminFlash(props.Flash)
+	@settingsAttention(props.Nav.Issues)
 	<!-- Create form -->
 	<div class="mt-6 border border-rr-border bg-rr-surface p-4 sm:p-6">
 		<h2 class="text-sm font-semibold text-rr-heading">Add a preset</h2>
@@ -67,7 +60,7 @@ templ BoxPresetsContent(props BoxPresetsProps) {
 				<input id="new-max-weight" type="number" name="max_weight_oz" step="0.1" min="0.1" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm font-mono"/>
 			</div>
 			<div class="sm:col-span-6 flex justify-end">
-				<button type="submit" class="rounded-sm bg-rr-ink px-4 py-2 text-sm font-semibold text-rr-paper hover:opacity-90">
+				<button type="submit" class="rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
 					Add preset
 				</button>
 			</div>
@@ -118,7 +111,7 @@ templ BoxPresetsContent(props BoxPresetsProps) {
 											<input type="number" name="sort_order" step="1" value={ fmt.Sprintf("%d", p.SortOrder) } class="w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm font-mono"/>
 										</div>
 										<div class="sm:col-span-2 flex gap-2 justify-end">
-											<button type="submit" class="rounded-sm bg-rr-ink px-3 py-1.5 text-sm font-semibold text-rr-paper hover:opacity-90">Save</button>
+											<button type="submit" class="btn-secondary">Save</button>
 										</div>
 									</form>
 									<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/settings/box-presets/%s/delete", p.ID)) } class="mt-1 text-right">

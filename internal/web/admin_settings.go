@@ -1,10 +1,12 @@
 package web
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -19,26 +21,176 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
 
-// handleAdminSettings renders the Settings page with integration status and
-// merchant-level config (shipping).
-func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+// The Settings section: one page per concern (shipping, box presets,
+// wholesale, integrations, team), sharing a tab strip and a list of anything
+// currently misconfigured. Every page in the section loads the same section
+// data so that list is complete wherever the staffer is standing — see
+// ui/admin/settings_nav.templ.
 
-	qbStatus := admin.QBConnectionStatus{}
-	qbEnabled := d.QBOAuthManager != nil
-	var shipping admin.ShippingSettings
-	var priceLists []domain.PriceList
-	var defaultPriceListID *uuid.UUID
+// settingsSection is the shared state behind the section nav: the settings
+// whose values decide whether anything is broken.
+type settingsSection struct {
+	Shipping  admin.ShippingSettings
+	QB        admin.QBConnectionStatus
+	QBEnabled bool
+	// BoxPresets is the full list, not a count: the attention list needs to
+	// know whether any exist and the box-presets page needs to draw them, and
+	// reading it twice would let the "No box presets" warning render above a
+	// table that has one.
+	BoxPresets []domain.BoxPreset
+}
+
+// nav derives the tab strip + attention list for a staffer.
+func (s settingsSection) nav(role string) admin.SettingsNav {
+	return admin.SettingsNav{
+		StaffRole: role,
+		Issues:    admin.SettingsIssuesFor(s.Shipping, s.QB, s.QBEnabled, len(s.BoxPresets)),
+	}
+}
+
+// loadSettingsSection reads the section-wide state in one transaction. Three
+// small reads on a page staff open a handful of times a week — cheap enough to
+// pay on every settings page so a broken setting cannot hide behind a tab
+// nobody clicked.
+func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error) {
+	out := settingsSection{QBEnabled: d.QBOAuthManager != nil}
 
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		if qbEnabled {
+		if out.QBEnabled {
+			// A QB status read failing must not take the whole settings page
+			// down with it — the shipping form below is still editable.
 			if status, qbErr := d.QBOAuthManager.Status(ctx, tx); qbErr == nil {
-				qbStatus.Connected = status.Connected
-				qbStatus.RealmID = status.RealmID
-				qbStatus.RefreshExpiresAt = status.RefreshExpiresAt
+				out.QB.Connected = status.Connected
+				out.QB.RealmID = status.RealmID
+				out.QB.RefreshExpiresAt = status.RefreshExpiresAt
 			}
 		}
 
+		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
+		if cfgErr != nil {
+			return cfgErr
+		}
+		out.Shipping = shippingSettingsFromConfig(cfg)
+
+		presets, presetErr := d.FulfillmentService.ListBoxPresets(ctx, tx)
+		if presetErr != nil {
+			return presetErr
+		}
+		out.BoxPresets = presets
+		return nil
+	})
+	return out, err
+}
+
+// shippingSettingsFromConfig maps the stored config onto the form's props.
+func shippingSettingsFromConfig(cfg *domain.ShippingConfig) admin.ShippingSettings {
+	if cfg == nil {
+		return admin.ShippingSettings{}
+	}
+	return admin.ShippingSettings{
+		FlatRateCents:           cfg.FlatRateCents,
+		FreeShippingThreshold:   cfg.FreeShippingThreshold,
+		Currency:                cfg.Currency,
+		LocalZipCodes:           cfg.LocalZipCodes,
+		LocalDeliveryEnabled:    cfg.LocalDeliveryEnabled,
+		LocalPickupEnabled:      cfg.LocalPickupEnabled,
+		LocalPickupInstructions: cfg.LocalPickupInstructions,
+		LocalDeliveryWeekdays:   cfg.LocalDeliveryWeekdays,
+		LocalDeliveryCutoff:     formatCutoffInput(cfg.LocalDeliveryCutoffMinutes),
+		OriginName:              cfg.OriginName,
+		OriginStreet1:           cfg.OriginStreet1,
+		OriginStreet2:           cfg.OriginStreet2,
+		OriginCity:              cfg.OriginCity,
+		OriginState:             cfg.OriginState,
+		OriginZip:               cfg.OriginZip,
+		OriginCountry:           cfg.OriginCountry,
+		OriginEmail:             cfg.OriginEmail,
+		OriginPhone:             cfg.OriginPhone,
+		TareWeightOz:            cfg.TareWeightOz,
+	}
+}
+
+// settingsFlash reads the one-shot message off the query string. Errors travel
+// under their own parameter so the page can paint them as failures — a
+// rejected save used to arrive in the same green panel as a successful one.
+func settingsFlash(r *http.Request) admin.Flash {
+	if msg := r.URL.Query().Get("flash_error"); msg != "" {
+		return admin.Flash{Message: msg, Error: true}
+	}
+	return admin.Flash{Message: r.URL.Query().Get("flash")}
+}
+
+// redirectFlash and redirectFlashError send the staffer back to a settings page
+// with a message. Values are query-escaped here so callers can write the
+// sentence rather than its encoding.
+func redirectFlash(w http.ResponseWriter, r *http.Request, path, msg string) {
+	http.Redirect(w, r, path+"?flash="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+func redirectFlashError(w http.ResponseWriter, r *http.Request, path, msg string) {
+	http.Redirect(w, r, path+"?flash_error="+url.QueryEscape(msg), http.StatusSeeOther)
+}
+
+// handleAdminSettings renders the Shipping tab — the section's landing page.
+func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	section, err := d.loadSettingsSection(ctx)
+	if err != nil {
+		slog.Error("admin settings: load", "error", err)
+		Error(w, r, err)
+		return
+	}
+
+	name, role := staffNameRole(r)
+	d.renderShippingSettings(w, r, admin.SettingsProps{
+		Nav:        section.nav(role),
+		Shipping:   section.Shipping,
+		Flash:      settingsFlash(r),
+		MerchantTZ: d.MerchantTZ,
+		StaffName:  name,
+		StaffRole:  role,
+	})
+}
+
+// renderShippingSettings renders the shipping page, htmx partial or whole.
+//
+// A rejected save renders 200, not 422: hx-boost is on for the whole admin, and
+// htmx does not swap 4xx responses by default — a correct status code here would
+// mean the staffer clicks Save and the page silently does nothing. Same choice
+// the Team page makes for its form errors.
+//
+// Rendering in place rather than redirecting is what makes the form's POST
+// target load-bearing. hx-boost pushes the action URL into history, so whatever
+// the form posts to is what the address bar reads afterwards and what a refresh
+// or a back-then-forward will GET. The form therefore posts to /admin/settings —
+// the tab's own URL, which answers GET — and not to a POST-only verb path, which
+// would answer that refresh with a 405 on the very page the staffer was just
+// told to go fix. Team and Box presets are safe for the same reason: both post
+// to a URL that has a GET route.
+func (d *Deps) renderShippingSettings(w http.ResponseWriter, r *http.Request, props admin.SettingsProps) {
+	if IsHTMX(r) {
+		admin.SettingsContent(props).Render(r.Context(), w) //nolint:errcheck
+		return
+	}
+	admin.Settings(props).Render(r.Context(), w) //nolint:errcheck
+}
+
+// handleAdminSettingsWholesale renders the Wholesale tab: the store-wide
+// default price list.
+func (d *Deps) handleAdminSettingsWholesale(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	section, err := d.loadSettingsSection(ctx)
+	if err != nil {
+		slog.Error("admin settings: load", "error", err)
+		Error(w, r, err)
+		return
+	}
+
+	var priceLists []domain.PriceList
+	var defaultPriceListID *uuid.UUID
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		lists, listErr := d.PriceListService.List(ctx, tx)
 		if listErr != nil {
 			return listErr
@@ -50,34 +202,35 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 			return defErr
 		}
 		defaultPriceListID = defaultID
-
-		cfg, cfgErr := d.CheckoutService.GetShippingConfig(ctx, tx)
-		if cfgErr != nil {
-			return cfgErr
-		}
-		shipping = admin.ShippingSettings{
-			FlatRateCents:           cfg.FlatRateCents,
-			FreeShippingThreshold:   cfg.FreeShippingThreshold,
-			Currency:                cfg.Currency,
-			LocalZipCodes:           cfg.LocalZipCodes,
-			LocalDeliveryEnabled:    cfg.LocalDeliveryEnabled,
-			LocalPickupEnabled:      cfg.LocalPickupEnabled,
-			LocalPickupInstructions: cfg.LocalPickupInstructions,
-			LocalDeliveryWeekdays:   cfg.LocalDeliveryWeekdays,
-			LocalDeliveryCutoff:     formatCutoffInput(cfg.LocalDeliveryCutoffMinutes),
-			OriginName:              cfg.OriginName,
-			OriginStreet1:           cfg.OriginStreet1,
-			OriginStreet2:           cfg.OriginStreet2,
-			OriginCity:              cfg.OriginCity,
-			OriginState:             cfg.OriginState,
-			OriginZip:               cfg.OriginZip,
-			OriginCountry:           cfg.OriginCountry,
-			OriginEmail:             cfg.OriginEmail,
-			OriginPhone:             cfg.OriginPhone,
-			TareWeightOz:            cfg.TareWeightOz,
-		}
 		return nil
 	})
+	if err != nil {
+		slog.Error("admin settings: load wholesale", "error", err)
+		Error(w, r, err)
+		return
+	}
+
+	name, role := staffNameRole(r)
+	props := admin.SettingsWholesaleProps{
+		Nav:                section.nav(role),
+		PriceLists:         priceLists,
+		DefaultPriceListID: defaultPriceListID,
+		Flash:              settingsFlash(r),
+		StaffName:          name,
+		StaffRole:          role,
+	}
+	if IsHTMX(r) {
+		admin.SettingsWholesaleContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.SettingsWholesale(props).Render(ctx, w) //nolint:errcheck
+}
+
+// handleAdminSettingsIntegrations renders the Integrations tab.
+func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	section, err := d.loadSettingsSection(ctx)
 	if err != nil {
 		slog.Error("admin settings: load", "error", err)
 		Error(w, r, err)
@@ -85,84 +238,135 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name, role := staffNameRole(r)
-	props := admin.SettingsProps{
-		QB:                 qbStatus,
-		QBEnabled:          qbEnabled,
-		Shipping:           shipping,
-		PriceLists:         priceLists,
-		DefaultPriceListID: defaultPriceListID,
-		Flash:              r.URL.Query().Get("flash"),
-		MerchantTZ:         d.MerchantTZ,
-		StaffName:          name,
-		StaffRole:          role,
+	props := admin.SettingsIntegrationsProps{
+		Nav:        section.nav(role),
+		QB:         section.QB,
+		QBEnabled:  section.QBEnabled,
+		Flash:      settingsFlash(r),
+		MerchantTZ: d.MerchantTZ,
+		StaffName:  name,
+		StaffRole:  role,
 	}
-
 	if IsHTMX(r) {
-		admin.SettingsContent(props).Render(ctx, w) //nolint:errcheck
+		admin.SettingsIntegrationsContent(props).Render(ctx, w) //nolint:errcheck
 		return
 	}
-	admin.Settings(props).Render(ctx, w) //nolint:errcheck
+	admin.SettingsIntegrations(props).Render(ctx, w) //nolint:errcheck
 }
 
 // handleAdminShippingSettingsUpdate persists the edited shipping config and
 // records the audit event inside the same transaction.
+//
+// A rejected save re-renders the form with what was submitted rather than
+// redirecting with a flash. The form carries twenty-odd fields and a single
+// mistyped number used to discard every other edit on the page along with it.
 //
 // TODO: when the live-rate provider starts consuming the origin fields,
 // tighten state + zip + country validation here.
 func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	flatRateCents, err := parseDollarsCents(r.FormValue("flat_rate"))
-	if err != nil {
-		http.Redirect(w, r, "/admin/settings?flash=Invalid+flat+rate", http.StatusSeeOther)
+	cfg, submitted, fieldErrors := parseShippingForm(r)
+
+	if len(fieldErrors) > 0 {
+		section, err := d.loadSettingsSection(ctx)
+		if err != nil {
+			slog.Error("admin settings: load", "error", err)
+			Error(w, r, err)
+			return
+		}
+		name, role := staffNameRole(r)
+		// The nav's issue list is derived from what is *saved*, not from the
+		// rejected draft — nothing has changed on disk yet.
+		d.renderShippingSettings(w, r, admin.SettingsProps{
+			Nav:         section.nav(role),
+			Shipping:    submitted,
+			FieldErrors: fieldErrors,
+			Flash:       admin.Flash{Message: "Nothing was saved — check the fields marked below.", Error: true},
+			MerchantTZ:  d.MerchantTZ,
+			StaffName:   name,
+			StaffRole:   role,
+		})
 		return
 	}
-	var threshold *int
-	if raw := strings.TrimSpace(r.FormValue("free_threshold")); raw != "" {
-		cents, tErr := parseDollarsCents(raw)
-		if tErr != nil {
-			http.Redirect(w, r, "/admin/settings?flash=Invalid+free-shipping+threshold", http.StatusSeeOther)
-			return
-		}
-		threshold = &cents
-	}
-	zips := parseZipList(r.FormValue("local_zip_codes"))
 
-	tareOz := 0.0
-	if raw := strings.TrimSpace(r.FormValue("tare_weight_oz")); raw != "" {
-		oz, tErr := strconv.ParseFloat(raw, 64)
-		if tErr != nil || oz < 0 {
-			http.Redirect(w, r, "/admin/settings?flash=Invalid+tare+weight", http.StatusSeeOther)
-			return
+	actor := staffActor(r)
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.CheckoutService.UpdateShippingConfig(ctx, tx, cfg, actor)
+	})
+	if err != nil {
+		slog.Error("admin settings: update shipping", "error", err)
+		redirectFlashError(w, r, "/admin/settings", "Failed to save shipping settings")
+		return
+	}
+
+	redirectFlash(w, r, "/admin/settings", "Shipping settings saved")
+}
+
+// parseShippingForm reads the shipping form into a config, the submitted values
+// (so a rejected save can be handed straight back), and a per-field error map.
+//
+// It validates every field before returning rather than bailing on the first
+// problem: two mistyped numbers should be two marked fields, not two round
+// trips.
+func parseShippingForm(r *http.Request) (domain.ShippingConfig, admin.ShippingSettings, map[string]string) {
+	fieldErrors := map[string]string{}
+
+	rawFlat := strings.TrimSpace(r.FormValue("flat_rate"))
+	flatRateCents, err := parseDollarsCents(rawFlat)
+	if err != nil {
+		fieldErrors["flat_rate"] = "Enter a dollar amount, e.g. 6.00."
+	}
+
+	rawThreshold := strings.TrimSpace(r.FormValue("free_threshold"))
+	var threshold *int
+	if rawThreshold != "" {
+		cents, tErr := parseDollarsCents(rawThreshold)
+		if tErr != nil {
+			fieldErrors["free_threshold"] = "Enter a dollar amount, or leave blank for no threshold."
+		} else {
+			threshold = &cents
 		}
-		tareOz = oz
+	}
+
+	rawTare := strings.TrimSpace(r.FormValue("tare_weight_oz"))
+	tareOz := 0.0
+	if rawTare != "" {
+		oz, tErr := strconv.ParseFloat(rawTare, 64)
+		if tErr != nil || oz < 0 {
+			fieldErrors["tare_weight_oz"] = "Enter a weight in ounces, e.g. 2.50."
+		} else {
+			tareOz = oz
+		}
+	}
+
+	cutoffMinutes, err := parseCutoffInput(r.FormValue("local_delivery_cutoff"))
+	if err != nil {
+		fieldErrors["local_delivery_cutoff"] = "Enter a time of day, e.g. 09:00."
+	}
+
+	deliveryEnabled := r.FormValue("local_delivery_enabled") != ""
+	weekdays := parseWeekdayCheckboxes(r.Form["local_delivery_weekdays"])
+	// A delivery schedule with no days is unschedulable: checkout and the
+	// confirmation email would silently drop back to vague phrasing with no
+	// hint as to why. Refuse it rather than let the route quietly go dark.
+	if deliveryEnabled && len(weekdays) == 0 {
+		fieldErrors["local_delivery_weekdays"] = "Pick at least one day the van runs, or turn local delivery off."
 	}
 
 	originCountry := strings.ToUpper(strings.TrimSpace(r.FormValue("origin_country")))
 	if originCountry == "" {
 		originCountry = "US"
 	}
-
-	cutoffMinutes, err := parseCutoffInput(r.FormValue("local_delivery_cutoff"))
-	if err != nil {
-		http.Redirect(w, r, "/admin/settings?flash=Invalid+delivery+cutoff+time", http.StatusSeeOther)
-		return
-	}
-	weekdays := parseWeekdayCheckboxes(r.Form["local_delivery_weekdays"])
-	// A delivery schedule with no days is unschedulable: checkout and the
-	// confirmation email would silently drop back to vague phrasing with no
-	// hint as to why. Refuse it rather than let the route quietly go dark.
-	if r.FormValue("local_delivery_enabled") != "" && len(weekdays) == 0 {
-		http.Redirect(w, r, "/admin/settings?flash=Pick+at+least+one+local+delivery+day", http.StatusSeeOther)
-		return
-	}
+	originEmail := strings.TrimSpace(r.FormValue("origin_email"))
+	originPhone := strings.TrimSpace(r.FormValue("origin_phone"))
 
 	cfg := domain.ShippingConfig{
 		FlatRateCents:              flatRateCents,
 		FreeShippingThreshold:      threshold,
 		Currency:                   "usd",
-		LocalZipCodes:              zips,
-		LocalDeliveryEnabled:       r.FormValue("local_delivery_enabled") != "",
+		LocalZipCodes:              parseZipList(r.FormValue("local_zip_codes")),
+		LocalDeliveryEnabled:       deliveryEnabled,
 		LocalPickupEnabled:         r.FormValue("local_pickup_enabled") != "",
 		LocalPickupInstructions:    strings.TrimSpace(r.FormValue("local_pickup_instructions")),
 		LocalDeliveryWeekdays:      weekdays,
@@ -174,22 +378,21 @@ func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.
 		OriginState:                strings.ToUpper(strings.TrimSpace(r.FormValue("origin_state"))),
 		OriginZip:                  strings.TrimSpace(r.FormValue("origin_zip")),
 		OriginCountry:              originCountry,
-		OriginEmail:                strings.TrimSpace(r.FormValue("origin_email")),
-		OriginPhone:                strings.TrimSpace(r.FormValue("origin_phone")),
+		OriginEmail:                originEmail,
+		OriginPhone:                originPhone,
 		TareWeightOz:               tareOz,
 	}
 
-	actor := staffActor(r)
-	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.CheckoutService.UpdateShippingConfig(ctx, tx, cfg, actor)
-	})
-	if err != nil {
-		slog.Error("admin settings: update shipping", "error", err)
-		http.Redirect(w, r, "/admin/settings?flash=Failed+to+save+shipping+settings", http.StatusSeeOther)
-		return
-	}
+	// The submitted view keeps the raw strings for the numeric fields, so a
+	// rejected save shows the staffer what they typed rather than a silently
+	// coerced version of it.
+	submitted := shippingSettingsFromConfig(&cfg)
+	submitted.LocalDeliveryCutoff = strings.TrimSpace(r.FormValue("local_delivery_cutoff"))
+	submitted.FlatRateInput = rawFlat
+	submitted.ThresholdInput = rawThreshold
+	submitted.TareInput = rawTare
 
-	http.Redirect(w, r, "/admin/settings?flash=Shipping+settings+saved", http.StatusSeeOther)
+	return cfg, submitted, fieldErrors
 }
 
 // handleAdminDefaultPriceListUpdate sets the store-wide default wholesale price
@@ -202,7 +405,7 @@ func (d *Deps) handleAdminDefaultPriceListUpdate(w http.ResponseWriter, r *http.
 	if v := strings.TrimSpace(r.FormValue("default_price_list_id")); v != "" {
 		parsed, err := uuid.Parse(v)
 		if err != nil {
-			http.Redirect(w, r, "/admin/settings?flash=Invalid+price+list", http.StatusSeeOther)
+			redirectFlashError(w, r, "/admin/settings/wholesale", "That price list no longer exists")
 			return
 		}
 		priceListID = &parsed
@@ -214,11 +417,11 @@ func (d *Deps) handleAdminDefaultPriceListUpdate(w http.ResponseWriter, r *http.
 	})
 	if err != nil {
 		slog.Error("admin settings: update default price list", "error", err)
-		http.Redirect(w, r, "/admin/settings?flash=Failed+to+save+default+price+list", http.StatusSeeOther)
+		redirectFlashError(w, r, "/admin/settings/wholesale", "Failed to save default price list")
 		return
 	}
 
-	http.Redirect(w, r, "/admin/settings?flash=Default+wholesale+price+list+saved", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/settings/wholesale", "Default wholesale price list saved")
 }
 
 // parseDollarsCents converts a dollar amount (e.g. "6.00", "6", "6.5") into
@@ -359,14 +562,14 @@ func (d *Deps) handleAdminQBCallback(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, quickbooks.ErrInvalidState):
 			slog.Error("qb oauth: invalid state parameter")
-			http.Redirect(w, r, "/admin/settings?flash=QuickBooks+connection+failed+(invalid+state)", http.StatusSeeOther)
+			redirectFlashError(w, r, "/admin/settings/integrations", "QuickBooks connection failed (invalid state)")
 		case errors.Is(err, quickbooks.ErrMissingCallbackParams):
 			errorDesc := r.URL.Query().Get("error")
 			slog.Error("qb oauth: missing code or realmId", "error", errorDesc)
-			http.Redirect(w, r, "/admin/settings?flash=QuickBooks+connection+failed", http.StatusSeeOther)
+			redirectFlashError(w, r, "/admin/settings/integrations", "QuickBooks connection failed")
 		default:
 			slog.Error("qb oauth: exchange callback", "error", err)
-			http.Redirect(w, r, "/admin/settings?flash=QuickBooks+connection+failed+(token+exchange)", http.StatusSeeOther)
+			redirectFlashError(w, r, "/admin/settings/integrations", "QuickBooks connection failed (token exchange)")
 		}
 		return
 	}
@@ -388,12 +591,12 @@ func (d *Deps) handleAdminQBCallback(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("qb oauth: save credentials", "error", err)
-		http.Redirect(w, r, "/admin/settings?flash=QuickBooks+connection+failed+(database+error)", http.StatusSeeOther)
+		redirectFlashError(w, r, "/admin/settings/integrations", "QuickBooks connection failed (database error)")
 		return
 	}
 
 	slog.Info("qb: connected", "realm_id", creds.RealmID)
-	http.Redirect(w, r, "/admin/settings?flash=QuickBooks+connected+successfully", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/settings/integrations", "QuickBooks connected")
 }
 
 // handleAdminQBDisconnect removes the QuickBooks connection.
@@ -445,10 +648,10 @@ func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("qb: disconnect failed", "error", err)
-		http.Redirect(w, r, "/admin/settings?flash=Failed+to+disconnect+QuickBooks", http.StatusSeeOther)
+		redirectFlashError(w, r, "/admin/settings/integrations", "Failed to disconnect QuickBooks")
 		return
 	}
 
 	slog.Info("qb: disconnected")
-	http.Redirect(w, r, "/admin/settings?flash=QuickBooks+disconnected", http.StatusSeeOther)
+	redirectFlash(w, r, "/admin/settings/integrations", "QuickBooks disconnected")
 }

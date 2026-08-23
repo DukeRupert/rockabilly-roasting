@@ -23,9 +23,14 @@ import (
 // Debug (see jobexecutor's `if e.ErrorHandler != nil && !cancelJob`). This repo
 // cancels for permanent failures in a dozen places — a QuickBooks call that
 // will never succeed, a subscription that is no longer renewable — so those
-// workers do their own reporting at the cancel site, and pick the level
-// themselves: Error for a fault, Warn for terminal-but-expected. Do not assume
-// a cancelled job is covered by this file.
+// workers do their own reporting at the cancel site: logWorkerFailure for a
+// fault, an explicit Warn for the terminal-but-expected cases whose reasoning
+// lives at the call site. Do not assume a cancelled job is covered by this
+// file.
+//
+// The other half of that split matters here: because this handler pages on the
+// final attempt, a worker must NOT log Error for a failure it is about to
+// return for retry. See logWorkerFailure.
 //
 // Only the *final* attempt pages anyone. River retries with backoff, and a
 // single transient Stripe timeout that succeeds on attempt two is noise; the

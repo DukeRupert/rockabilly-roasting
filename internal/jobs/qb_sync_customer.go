@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -52,13 +51,17 @@ func (w *SyncQBCustomerWorker) Work(ctx context.Context, job *river.Job[SyncQBCu
 
 	metrics.TrackJob(w.metrics, "qb_sync_customer", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "background job qb_sync_customer failed",
+		// Permanent QuickBooks failures cancel, and a cancelled job never
+		// reaches jobs.ErrorHandler — so the level has to be decided here.
+		terminal := !quickbooks.IsRetryable(err)
+		logWorkerFailure(ctx, "qb_sync_customer", terminal,
 			"job_kind", "qb_sync_customer",
 			"job_id", job.ID,
+			"attempt", job.Attempt,
 			"customer_id", job.Args.CustomerID,
 			"error", err.Error(),
 		)
-		if !quickbooks.IsRetryable(err) {
+		if terminal {
 			return river.JobCancel(fmt.Errorf("sync qb customer %s: %w", job.Args.CustomerID, err))
 		}
 	}

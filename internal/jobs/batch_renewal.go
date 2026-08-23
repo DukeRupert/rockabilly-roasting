@@ -53,15 +53,18 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 	}
 
 	_, err := w.renewalSvc.RenewBatch(ctx, w.pool, job.Args.SubscriptionIDs)
-	metrics.TrackJob(w.metrics, "batch_renewal", start, err)
 
 	if err != nil {
-		// Both cancels below are terminal-but-expected, so they log at Warn:
+		// Both cancels below are terminal-but-expected, so they count as
+		// cancellations rather than job failures — river_jobs_failed_total is
+		// where someone looks to see whether a worker is broken — and log at
+		// Warn:
 		// the slog handler files Warn as a Sentry breadcrumb rather than paging
 		// anyone. A subscription that was cancelled between scheduling and
 		// running is the system working, and a declined charge is dunning's
 		// business, not an outage.
 		if errors.Is(err, app.ErrSubscriptionNotActive) || errors.Is(err, app.ErrSubscriptionNotFound) {
+			metrics.TrackJobCancelled(w.metrics, "batch_renewal", start)
 			slog.WarnContext(ctx, "background job batch_renewal cancelled: subscription no longer renewable",
 				"job_kind", "batch_renewal",
 				"job_id", job.ID,
@@ -73,6 +76,7 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 		// Declined charge: dunning state already advanced for every sub in the
 		// batch. The scheduler owns retries, so don't let River retry the job.
 		if errors.Is(err, app.ErrRenewalPaymentDeclined) {
+			metrics.TrackJobCancelled(w.metrics, "batch_renewal", start)
 			slog.WarnContext(ctx, "background job batch_renewal cancelled: payment declined, dunning advanced",
 				"job_kind", "batch_renewal",
 				"job_id", job.ID,
@@ -81,10 +85,12 @@ func (w *BatchRenewalWorker) Work(ctx context.Context, job *river.Job[BatchRenew
 			)
 			return river.JobCancel(fmt.Errorf("batch renewal: %w", err))
 		}
+		metrics.TrackJob(w.metrics, "batch_renewal", start, err)
 		w.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return fmt.Errorf("batch renewal: %w", err)
 	}
 
+	metrics.TrackJob(w.metrics, "batch_renewal", start, nil)
 	w.metrics.SubscriptionRenewals.WithLabelValues("success").Inc()
 	return nil
 }

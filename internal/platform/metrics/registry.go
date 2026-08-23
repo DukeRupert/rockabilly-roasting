@@ -25,6 +25,7 @@ type Registry struct {
 	RiverJobsEnqueued  *prometheus.CounterVec
 	RiverJobsCompleted *prometheus.CounterVec
 	RiverJobsFailed    *prometheus.CounterVec
+	RiverJobsCancelled *prometheus.CounterVec
 	RiverJobsPending   *prometheus.GaugeVec
 	RiverJobDuration   *prometheus.HistogramVec
 
@@ -137,6 +138,15 @@ func NewRegistry() *Registry {
 		RiverJobsFailed: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "river_jobs_failed_total",
 			Help: "Total River jobs that failed.",
+		}, []string{"job_kind"}),
+
+		// A third outcome, because some jobs end without either succeeding or
+		// failing: a renewal whose card declined did its work correctly and
+		// must not be retried, and counting it as a failure put it on the same
+		// graph line as a worker that is actually broken.
+		RiverJobsCancelled: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "river_jobs_cancelled_total",
+			Help: "Total River jobs cancelled deliberately: terminal, but working as intended.",
 		}, []string{"job_kind"}),
 
 		RiverJobsPending: prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -278,6 +288,7 @@ func NewRegistry() *Registry {
 		m.RiverJobsEnqueued,
 		m.RiverJobsCompleted,
 		m.RiverJobsFailed,
+		m.RiverJobsCancelled,
 		m.RiverJobsPending,
 		m.RiverJobDuration,
 		// Checkout

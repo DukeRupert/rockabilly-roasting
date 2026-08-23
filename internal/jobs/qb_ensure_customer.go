@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -65,16 +64,20 @@ func (w *EnsureQBCustomerWorker) Work(ctx context.Context, job *river.Job[Ensure
 
 	metrics.TrackJob(w.metrics, "qb_ensure_customer", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "background job qb_ensure_customer failed",
+		// Permanent QuickBooks failures cancel, and a cancelled job never
+		// reaches jobs.ErrorHandler — so the level has to be decided here.
+		terminal := !quickbooks.IsRetryable(err)
+		logWorkerFailure(ctx, "qb_ensure_customer", terminal,
 			"job_kind", "qb_ensure_customer",
 			"job_id", job.ID,
+			"attempt", job.Attempt,
 			"customer_id", job.Args.CustomerID,
 			"error", err.Error(),
 		)
 		// Bad request errors from QB are permanent — data needs fixing. This
 		// job is the head of the invoicing chain, so its failure also means
 		// the order never gets billed: alert staff.
-		if !quickbooks.IsRetryable(err) {
+		if terminal {
 			enqueueQBInvoiceAlert(ctx, w.pool, w.riverClient, job.Args.OrderID, "qb_ensure_customer", err)
 			return river.JobCancel(fmt.Errorf("ensure qb customer %s: %w", job.Args.CustomerID, err))
 		}

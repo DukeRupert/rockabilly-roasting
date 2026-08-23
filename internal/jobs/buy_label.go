@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -67,8 +66,13 @@ func (w *BuyLabelWorker) Work(ctx context.Context, job *river.Job[BuyLabelArgs])
 		// require an operator to fix data (add a box preset, set variant
 		// weight, etc.). Cancel the job so it doesn't bounce forever.
 		if isDeterministicPrepFailure(err) {
-			slog.Error("buy_label: prep failed permanently",
-				"order_id", args.OrderID, "error", err)
+			logWorkerFailure(ctx, "buy_label", true,
+				"job_kind", "buy_label",
+				"job_id", job.ID,
+				"attempt", job.Attempt,
+				"order_id", args.OrderID,
+				"error", err.Error(),
+			)
 			return river.JobCancel(fmt.Errorf("prepare label request: %w", err))
 		}
 		return fmt.Errorf("prepare label request: %w", err)

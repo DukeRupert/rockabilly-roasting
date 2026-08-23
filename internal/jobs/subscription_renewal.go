@@ -36,8 +36,6 @@ func (w *SubscriptionRenewalWorker) Work(ctx context.Context, job *river.Job[Sub
 	start := time.Now()
 	_, err := w.renewalSvc.RenewSubscription(ctx, w.pool, job.Args.SubscriptionID)
 	if err != nil {
-		metrics.TrackJob(w.metrics, "subscription_renewal", start, err)
-
 		attrs := []any{
 			"job_kind", "subscription_renewal",
 			"job_id", job.ID,
@@ -54,6 +52,12 @@ func (w *SubscriptionRenewalWorker) Work(ctx context.Context, job *river.Job[Sub
 		// attempt, so River must not retry either — that would double-charge
 		// the schedule.
 		//
+		// They are counted as cancellations rather than job failures for the
+		// same reason: river_jobs_failed_total is where someone looks to see if
+		// a worker is broken, and a declined card on that line makes the graph
+		// worth less. The renewal outcome itself is already counted by
+		// RenewalService against subscription_renewals_total.
+		//
 		// This has to be decided here rather than left to jobs.ErrorHandler:
 		// River does not run the handler for a cancelled job. The batch worker
 		// makes the same call on the same three sentinels; if that judgement
@@ -61,13 +65,16 @@ func (w *SubscriptionRenewalWorker) Work(ctx context.Context, job *river.Job[Sub
 		// a declined card is worth.
 		switch {
 		case errors.Is(err, app.ErrSubscriptionNotActive), errors.Is(err, app.ErrSubscriptionNotFound):
+			metrics.TrackJobCancelled(w.metrics, "subscription_renewal", start)
 			slog.WarnContext(ctx, "background job subscription_renewal cancelled: subscription no longer renewable", attrs...)
 			return river.JobCancel(fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err))
 		case errors.Is(err, app.ErrRenewalPaymentDeclined):
+			metrics.TrackJobCancelled(w.metrics, "subscription_renewal", start)
 			slog.WarnContext(ctx, "background job subscription_renewal cancelled: payment declined, dunning advanced", attrs...)
 			return river.JobCancel(fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err))
 		}
 
+		metrics.TrackJob(w.metrics, "subscription_renewal", start, err)
 		slog.ErrorContext(ctx, "background job subscription_renewal failed", attrs...)
 		return fmt.Errorf("renew subscription %s: %w", job.Args.SubscriptionID, err)
 	}

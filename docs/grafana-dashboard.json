@@ -223,6 +223,11 @@
           "expr": "sum by (job_kind) (rate(river_jobs_failed_total{job=\"$job\"}[5m]))",
           "legendFormat": "✗ {{job_kind}}",
           "refId": "B"
+        },
+        {
+          "expr": "sum by (job_kind) (rate(river_jobs_cancelled_total{job=\"$job\"}[5m]))",
+          "legendFormat": "○ {{job_kind}} (cancelled)",
+          "refId": "C"
         }
       ]
     },

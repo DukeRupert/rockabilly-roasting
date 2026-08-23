@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -58,9 +57,12 @@ func (w *CheckQBTokenWorker) Work(ctx context.Context, job *river.Job[CheckQBTok
 	err := w.work(ctx, job.ID)
 	metrics.TrackJob(w.metrics, "qb_token_check", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "background job qb_token_check failed",
+		// Never cancels, so every failure here is one River will retry and
+		// jobs.ErrorHandler will page on if it runs out of attempts.
+		logWorkerFailure(ctx, "qb_token_check", false,
 			"job_kind", "qb_token_check",
 			"job_id", job.ID,
+			"attempt", job.Attempt,
 			"error", err.Error(),
 		)
 	}

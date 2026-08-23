@@ -50,13 +50,17 @@ func (w *ProcessQBInvoiceUpdateWorker) Work(ctx context.Context, job *river.Job[
 
 	metrics.TrackJob(w.metrics, "qb_process_invoice_update", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "background job qb_process_invoice_update failed",
+		// Permanent QuickBooks failures cancel, and a cancelled job never
+		// reaches jobs.ErrorHandler — so the level has to be decided here.
+		terminal := !quickbooks.IsRetryable(err)
+		logWorkerFailure(ctx, "qb_process_invoice_update", terminal,
 			"job_kind", "qb_process_invoice_update",
 			"job_id", job.ID,
+			"attempt", job.Attempt,
 			"qb_invoice_id", job.Args.QBInvoiceID,
 			"error", err.Error(),
 		)
-		if !quickbooks.IsRetryable(err) {
+		if terminal {
 			return river.JobCancel(fmt.Errorf("process qb invoice update %s: %w", job.Args.QBInvoiceID, err))
 		}
 	}

@@ -50,34 +50,46 @@ type ShippingSettings struct {
 	OriginEmail           string
 	OriginPhone           string
 	TareWeightOz          float64
-	// TareWeightInput and FlatRate/Threshold inputs are the raw strings the
-	// staffer typed. They are set only when a save was rejected, so the form
-	// can hand back exactly what was submitted rather than silently reverting
-	// to the stored value — losing twenty other edited fields because one
-	// number was mistyped is the worst thing a settings form can do.
+	// Draft marks these values as coming back from a rejected save, and the
+	// raw *Input strings below as the ones to render.
+	//
+	// It exists because "" is two different answers. Without the flag the
+	// helpers infer "no draft" from an empty input string, which makes a field
+	// the staffer deliberately *cleared* indistinguishable from one that was
+	// never submitted — so clearing the threshold to turn it off, then tripping
+	// validation elsewhere, silently put the old number back in the box. The
+	// flag says which question is being asked.
+	Draft bool
+	// FlatRateInput, ThresholdInput and TareInput are the raw strings the
+	// staffer typed, kept verbatim so the form can hand back exactly what was
+	// submitted rather than a coerced version of it — losing twenty other
+	// edited fields because one number was mistyped is the worst thing a
+	// settings form can do. Meaningful only when Draft is set.
 	FlatRateInput  string
 	ThresholdInput string
 	TareInput      string
 }
 
-// flatRateValue and friends prefer the rejected input over the stored value, so
-// a re-rendered form shows what the staffer typed.
+// flatRateValue and friends render the rejected input when there is one and the
+// stored value otherwise. On a draft the input is returned verbatim, empty
+// included: a field the staffer cleared has to come back cleared, or the form
+// argues with them about an edit they just made.
 func (s ShippingSettings) flatRateValue() string {
-	if s.FlatRateInput != "" {
+	if s.Draft {
 		return s.FlatRateInput
 	}
 	return centsToDollars(s.FlatRateCents)
 }
 
 func (s ShippingSettings) thresholdValue() string {
-	if s.ThresholdInput != "" {
+	if s.Draft {
 		return s.ThresholdInput
 	}
 	return centsPtrToDollars(s.FreeShippingThreshold)
 }
 
 func (s ShippingSettings) tareValue() string {
-	if s.TareInput != "" {
+	if s.Draft {
 		return s.TareInput
 	}
 	return formatTareOz(s.TareWeightOz)

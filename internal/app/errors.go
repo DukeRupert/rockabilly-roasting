@@ -120,6 +120,13 @@ var (
 	ErrWhiteLabelBaseInvalid   = errors.New("selected base coffee is not available for white-label")
 	ErrWhiteLabelNameRequired  = errors.New("white-label product name is required")
 	ErrWhiteLabelLabelRequired = errors.New("white-label label image is required")
+	// ErrProductHasWhiteLabelChildren blocks archiving a coffee that white-label
+	// products are still based on. Errors wrapping it are *WhiteLabelChildrenError,
+	// whose message names the children staff need to reassign.
+	ErrProductHasWhiteLabelChildren = errors.New("product is the base coffee for white-label products")
+	// ErrNotWhiteLabelProduct guards the reassignment path — only a product created
+	// through white-label onboarding has a base coffee to repoint.
+	ErrNotWhiteLabelProduct = errors.New("product is not a white-label submission")
 
 	// Payment errors
 	ErrPaymentFailed         = errors.New("payment failed")

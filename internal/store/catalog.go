@@ -409,9 +409,7 @@ func productFilterWhere(f ProductFilter) (string, []any, int) {
 func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFilter) ([]domain.Product, error) {
 	where, args, argN := productFilterWhere(f)
 
-	query := `SELECT id, slug, title, description, status, product_type_id, taxon_id,
-	                 subscribable, visibility, tax_exempt, is_featured, metadata, available_on, discontinue_on,
-	                 created_at, updated_at
+	query := `SELECT ` + productColumns + `
 	          FROM products WHERE true` + where
 
 	query += " ORDER BY created_at DESC"
@@ -435,6 +433,18 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 	}
 	defer rows.Close()
 
+	return scanProducts(rows)
+}
+
+// productColumns is the select list every product listing scans, in the order
+// scanProducts expects. Kept as one constant so a listing and the scanner can
+// never drift apart.
+const productColumns = `id, slug, title, description, status, product_type_id, taxon_id,
+	subscribable, visibility, tax_exempt, is_featured, metadata, available_on, discontinue_on,
+	created_at, updated_at`
+
+// scanProducts drains rows selected with productColumns into domain products.
+func scanProducts(rows pgx.Rows) ([]domain.Product, error) {
 	var products []domain.Product
 	for rows.Next() {
 		var p domain.Product
@@ -460,6 +470,55 @@ func (s *CatalogStore) ListProducts(ctx context.Context, tx pgx.Tx, f ProductFil
 		products = append(products, p)
 	}
 	return products, rows.Err()
+}
+
+// ListWhiteLabelChildren returns the live white-label products based on the given
+// coffee — submissions stamped with its base_product_id — excluding ones already
+// archived. Deliberately unpaginated: this backs the check that blocks archiving a
+// base coffee, and a truncated list there would be a wrong answer, not a short one.
+func (s *CatalogStore) ListWhiteLabelChildren(ctx context.Context, tx pgx.Tx, baseID uuid.UUID) ([]domain.Product, error) {
+	query := `SELECT ` + productColumns + `
+	          FROM products
+	          WHERE metadata->>'` + domain.ProductMetaSource + `' = $1
+	            AND metadata->>'` + domain.ProductMetaWhiteLabelBaseID + `' = $2
+	            AND status <> $3
+	          ORDER BY title`
+
+	rows, err := tx.Query(ctx, query,
+		domain.ProductSourceWhiteLabel, baseID.String(), string(domain.ProductStatusArchived))
+	if err != nil {
+		return nil, fmt.Errorf("list white-label children: %w", err)
+	}
+	defer rows.Close()
+
+	return scanProducts(rows)
+}
+
+// SetProductWhiteLabelBase repoints a white-label product at a different base
+// coffee, rewriting only that one metadata key so the source stamp, the customer
+// stamp, and anything else staff have put in metadata survive.
+func (s *CatalogStore) SetProductWhiteLabelBase(ctx context.Context, tx pgx.Tx, productID, baseID uuid.UUID) (*domain.Product, error) {
+	query := `UPDATE products
+	          SET metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), $2, to_jsonb($3::text), true),
+	              updated_at = now()
+	          WHERE id = $1
+	          RETURNING ` + productColumns
+
+	rows, err := tx.Query(ctx, query, productID,
+		"{"+domain.ProductMetaWhiteLabelBaseID+"}", baseID.String())
+	if err != nil {
+		return nil, fmt.Errorf("set white-label base: %w", err)
+	}
+	defer rows.Close()
+
+	products, err := scanProducts(rows)
+	if err != nil {
+		return nil, err
+	}
+	if len(products) == 0 {
+		return nil, pgx.ErrNoRows
+	}
+	return &products[0], nil
 }
 
 // CountProducts returns the total number of products matching the filter (for pagination).

@@ -249,7 +249,23 @@ func (s *CatalogService) UpdateProduct(ctx context.Context, tx pgx.Tx, id uuid.U
 }
 
 // UpdateProductStatus updates a product's status and records an audit entry when archiving.
+//
+// Archiving is refused while white-label products are still based on this coffee.
+// A white-label product is a clone, not a view — archiving its base leaves it fully
+// orderable but with nothing on record saying which coffee actually goes in the bag.
+// Staff reassign the children to another coffee first; see
+// WhiteLabelService.ReassignBase.
 func (s *CatalogService) UpdateProductStatus(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.ProductStatus, actor Actor) (*domain.Product, error) {
+	if status == domain.ProductStatusArchived {
+		children, err := s.catalog.ListWhiteLabelChildren(ctx, tx, id)
+		if err != nil {
+			return nil, fmt.Errorf("check white-label children: %w", err)
+		}
+		if len(children) > 0 {
+			return nil, &WhiteLabelChildrenError{Children: children}
+		}
+	}
+
 	product, err := s.catalog.UpdateProductStatus(ctx, tx, id, status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -476,7 +492,21 @@ func (s *CatalogService) CloneProduct(ctx context.Context, tx pgx.Tx, sourceID u
 }
 
 // DeleteProduct removes a product by ID and records an audit entry.
+//
+// Blocked, like archiving, while white-label products are still based on it. The
+// base link is metadata rather than a foreign key, so nothing in the database
+// would stop the delete — it would just leave the children pointing at an ID that
+// no longer resolves, which is the same orphaning archiving is guarded against,
+// only unrecoverable.
 func (s *CatalogService) DeleteProduct(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
+	children, err := s.catalog.ListWhiteLabelChildren(ctx, tx, id)
+	if err != nil {
+		return fmt.Errorf("check white-label children: %w", err)
+	}
+	if len(children) > 0 {
+		return &WhiteLabelChildrenError{Children: children}
+	}
+
 	if err := s.catalog.DeleteProduct(ctx, tx, id); err != nil {
 		return fmt.Errorf("delete product: %w", err)
 	}

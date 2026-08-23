@@ -117,6 +117,17 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, app.ErrPermissionDenied):
 		return http.StatusForbidden, "permission denied"
 
+	// Naming the white-label products blocking an archive is the whole message —
+	// staff have no other view of which labels a coffee backs.
+	case errors.Is(err, app.ErrProductHasWhiteLabelChildren):
+		return http.StatusConflict, err.Error()
+
+	case errors.Is(err, app.ErrNotWhiteLabelProduct):
+		return http.StatusBadRequest, "this product has no base coffee to reassign"
+
+	case errors.Is(err, app.ErrWhiteLabelBaseInvalid):
+		return http.StatusBadRequest, "pick an active coffee with a wholesale size"
+
 	case errors.Is(err, app.ErrDuplicateVariantOptions):
 		return http.StatusConflict, err.Error()
 

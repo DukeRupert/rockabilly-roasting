@@ -23,6 +23,7 @@ func newWhiteLabelService() *app.WhiteLabelService {
 		newCatalogService(),
 		newPricingService(),
 		store.NewCatalogStore(),
+		store.NewAttributeStore(),
 		store.NewCustomerStore(),
 		audit.NewAuditWriter(),
 		metrics.NewRegistry(),
@@ -412,4 +413,213 @@ func TestWhiteLabelSKU_FallsBackWhenNoCompany(t *testing.T) {
 
 	product := submitLabel(t, tx, svc, customer, base.ID, "No Company Blend")
 	assert.Equal(t, "WL-LABEL-"+wsVariant.SKU, soleSKU(t, tx, catalog, product.ID))
+}
+
+func TestSubmitWhiteLabel_ClonesAttributes(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	svc := newWhiteLabelService()
+	attrs := app.NewAttributeService(store.NewAttributeStore(), audit.NewAuditWriter(), metrics.NewRegistry())
+
+	staffActor := testutil.TestActorFromStaff(testutil.CreateStaff(t, tx))
+	base, _, _ := baseCoffee(t, tx)
+
+	// A set with one single-value key and one multi-value key, both filled in on
+	// the base coffee.
+	set, err := attrs.CreateAttributeSet(ctx, tx, store.CreateAttributeSetParams{
+		Name: "Coffee", Slug: "coffee-" + uuid.New().String()[:8],
+	}, staffActor)
+	require.NoError(t, err)
+	roast, err := attrs.CreateAttributeKey(ctx, tx, store.CreateAttributeKeyParams{
+		AttributeSetID: set.ID, Name: "Roast level", Slug: "roast-level",
+		ValueType: domain.AttributeValueTypeText,
+	}, staffActor)
+	require.NoError(t, err)
+	notes, err := attrs.CreateAttributeKey(ctx, tx, store.CreateAttributeKeyParams{
+		AttributeSetID: set.ID, Name: "Tasting notes", Slug: "tasting-notes",
+		ValueType: domain.AttributeValueTypeMultiText,
+	}, staffActor)
+	require.NoError(t, err)
+	require.NoError(t, attrs.AssignAttributeSetToProduct(ctx, tx, base.ID, set.ID))
+	dark := "Dark"
+	require.NoError(t, attrs.SaveProductAttributes(ctx, tx, base.ID, map[uuid.UUID]store.AttributeValueInput{
+		roast.ID: {Value: &dark},
+		notes.ID: {Values: []string{"cocoa", "molasses"}},
+	}, staffActor))
+
+	customer := approvedWholesaleCustomer(t, tx)
+	product, err := svc.SubmitWhiteLabel(ctx, tx, customer.ID, app.WhiteLabelSubmission{
+		BaseProductID: base.ID,
+		Name:          "Midnight Diner Blend",
+		LabelR2Key:    "white-label/label.png",
+	}, customerActor(customer))
+	require.NoError(t, err)
+
+	// The set assignment carries over — without it the admin edit page renders no
+	// attribute fields and the values would be invisible.
+	sets, err := attrs.ListProductAttributeSets(ctx, tx, product.ID)
+	require.NoError(t, err)
+	require.Len(t, sets, 1)
+	assert.Equal(t, set.ID, sets[0].ID)
+
+	values, err := attrs.ListProductAttributeValues(ctx, tx, product.ID)
+	require.NoError(t, err)
+	require.Len(t, values, 2)
+	byKey := map[uuid.UUID]domain.ProductAttributeValue{}
+	for _, v := range values {
+		byKey[v.KeyID] = v
+	}
+	require.NotNil(t, byKey[roast.ID].Value)
+	assert.Equal(t, "Dark", *byKey[roast.ID].Value)
+	assert.Equal(t, []string{"cocoa", "molasses"}, byKey[notes.ID].Values)
+}
+
+// submitLabelFor is the common setup for the base-reassignment tests: a fresh
+// wholesale client plus one white-label product off the given base coffee.
+func submitLabelFor(t *testing.T, tx pgx.Tx, base *domain.Product, company string) (*domain.Product, *domain.Customer) {
+	t.Helper()
+	svc := newWhiteLabelService()
+	customer := approvedWholesaleCustomerNamed(t, tx, company)
+	product, err := svc.SubmitWhiteLabel(context.Background(), tx, customer.ID, app.WhiteLabelSubmission{
+		BaseProductID: base.ID,
+		Name:          company + " Blend",
+		LabelR2Key:    "white-label/label.png",
+	}, customerActor(customer))
+	require.NoError(t, err)
+	return product, customer
+}
+
+func TestArchiveBaseCoffee_BlockedByWhiteLabelChildren(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	catalog := newCatalogService()
+	staffActor := testutil.TestActorFromStaff(testutil.CreateStaff(t, tx))
+
+	base, _, _ := baseCoffee(t, tx)
+	child, _ := submitLabelFor(t, tx, base, "Midnight Diner")
+
+	_, err := catalog.UpdateProductStatus(ctx, tx, base.ID, domain.ProductStatusArchived, staffActor)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, app.ErrProductHasWhiteLabelChildren)
+	// The message has to name the label — it is the only place staff can see which
+	// products a coffee backs.
+	assert.Contains(t, err.Error(), child.Title)
+
+	// The base is untouched: a refused archive must not half-apply.
+	unchanged, err := catalog.GetProduct(ctx, tx, base.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.ProductStatusActive, unchanged.Status)
+
+	// Other status transitions are unaffected — only archiving is gated.
+	_, err = catalog.UpdateProductStatus(ctx, tx, base.ID, domain.ProductStatusDraft, staffActor)
+	require.NoError(t, err)
+}
+
+func TestArchiveBaseCoffee_AllowedOnceChildrenReassigned(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	svc := newWhiteLabelService()
+	catalog := newCatalogService()
+	staffActor := testutil.TestActorFromStaff(testutil.CreateStaff(t, tx))
+
+	base, _, _ := baseCoffee(t, tx)
+	child, _ := submitLabelFor(t, tx, base, "Midnight Diner")
+
+	// A second coffee to move the label onto.
+	replacement := testutil.CreateProduct(t, tx,
+		testutil.WithProductTitle("Switchblade"),
+		testutil.WithProductStatus(domain.ProductStatusActive))
+	rv := testutil.CreateVariant(t, tx, replacement.ID,
+		testutil.WithSKU("SWITCH-12OZ"), testutil.WithChannelAvailability(true, true))
+	testutil.SetBasePriceForVariant(t, tx, rv.ID, 2600, "USD")
+
+	reassigned, err := svc.ReassignBase(ctx, tx, child.ID, replacement.ID, staffActor)
+	require.NoError(t, err)
+	assert.Equal(t, replacement.ID.String(), reassigned.Metadata[app.WhiteLabelMetaBaseID])
+	// Repointing must not disturb the other stamps or the product's own identity.
+	assert.Equal(t, "white_label_onboarding", reassigned.Metadata[app.WhiteLabelMetaSource])
+	assert.Equal(t, child.Title, reassigned.Title)
+	assert.Equal(t, domain.ProductVisibilityPrivate, reassigned.Visibility)
+
+	// The old base is now free to archive; the new one is not.
+	_, err = catalog.UpdateProductStatus(ctx, tx, base.ID, domain.ProductStatusArchived, staffActor)
+	require.NoError(t, err)
+
+	_, err = catalog.UpdateProductStatus(ctx, tx, replacement.ID, domain.ProductStatusArchived, staffActor)
+	assert.ErrorIs(t, err, app.ErrProductHasWhiteLabelChildren)
+}
+
+func TestArchiveBaseCoffee_IgnoresArchivedChildren(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	catalog := newCatalogService()
+	staffActor := testutil.TestActorFromStaff(testutil.CreateStaff(t, tx))
+
+	base, _, _ := baseCoffee(t, tx)
+	child, _ := submitLabelFor(t, tx, base, "Midnight Diner")
+
+	// A retired label doesn't block anything — nobody is going to fill its bag.
+	_, err := catalog.UpdateProductStatus(ctx, tx, child.ID, domain.ProductStatusArchived, staffActor)
+	require.NoError(t, err)
+
+	_, err = catalog.UpdateProductStatus(ctx, tx, base.ID, domain.ProductStatusArchived, staffActor)
+	require.NoError(t, err)
+}
+
+func TestReassignBase_Validation(t *testing.T) {
+	ctx := context.Background()
+	svc := newWhiteLabelService()
+
+	t.Run("not a white-label product", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		base, _, _ := baseCoffee(t, tx)
+		other := testutil.CreateProduct(t, tx, testutil.WithProductStatus(domain.ProductStatusActive))
+		staffActor := testutil.TestActorFromStaff(testutil.CreateStaff(t, tx))
+
+		_, err := svc.ReassignBase(ctx, tx, other.ID, base.ID, staffActor)
+		assert.ErrorIs(t, err, app.ErrNotWhiteLabelProduct)
+	})
+
+	t.Run("new base must be an allowed choice", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		base, _, _ := baseCoffee(t, tx)
+		child, _ := submitLabelFor(t, tx, base, "Midnight Diner")
+		staffActor := testutil.TestActorFromStaff(testutil.CreateStaff(t, tx))
+
+		// Draft, so it never appears in BaseCoffeeChoices.
+		draft := testutil.CreateProduct(t, tx, testutil.WithProductStatus(domain.ProductStatusDraft))
+		_, err := svc.ReassignBase(ctx, tx, child.ID, draft.ID, staffActor)
+		assert.ErrorIs(t, err, app.ErrWhiteLabelBaseInvalid)
+	})
+
+	t.Run("cannot base a label on itself", func(t *testing.T) {
+		tx := testutil.NewTestTx(t, testPool)
+		base, _, _ := baseCoffee(t, tx)
+		child, _ := submitLabelFor(t, tx, base, "Midnight Diner")
+		staffActor := testutil.TestActorFromStaff(testutil.CreateStaff(t, tx))
+
+		_, err := svc.ReassignBase(ctx, tx, child.ID, child.ID, staffActor)
+		assert.ErrorIs(t, err, app.ErrWhiteLabelBaseInvalid)
+	})
+}
+
+func TestDeleteBaseCoffee_BlockedByWhiteLabelChildren(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := context.Background()
+	catalog := newCatalogService()
+	staffActor := testutil.TestActorFromStaff(testutil.CreateStaff(t, tx))
+
+	base, _, _ := baseCoffee(t, tx)
+	child, _ := submitLabelFor(t, tx, base, "Midnight Diner")
+
+	// Deleting is worse than archiving — the base ID stops resolving entirely — so
+	// it is gated the same way.
+	err := catalog.DeleteProduct(ctx, tx, base.ID, staffActor)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, app.ErrProductHasWhiteLabelChildren)
+	assert.Contains(t, err.Error(), child.Title)
+
+	still, err := catalog.GetProduct(ctx, tx, base.ID)
+	require.NoError(t, err)
+	assert.Equal(t, base.ID, still.ID)
 }

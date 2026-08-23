@@ -413,7 +413,7 @@ func run() error {
 	announcementSvc := app.NewAnnouncementService(announcementStore, customerStore, customerUserStore, auditWriter, metricsReg).
 		WithEmail(emailEnv).
 		WithUnsubscribeSigner(unsubscribeSigner)
-	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, customerStore, auditWriter, metricsReg).
+	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, attributeStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
 	invoiceSvc := app.NewInvoiceService(invoiceStore, orderStore, auditWriter, metricsReg).

@@ -27,11 +27,6 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	props.Now = time.Now()
 	props.StaffName, props.StaffRole = staffNameRole(r)
 
-	// The failed-jobs group links to an admin-only page. Showing a count that
-	// 403s on click is worse than not showing it, so the whole group is scoped
-	// to staff who can actually act on it.
-	canSeeJobs := domain.StaffRole(props.StaffRole).CanManageSystem()
-
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 
@@ -125,23 +120,6 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		props.LabelFailures, txErr = d.buildLabelFailureGroups(ctx, tx)
 		if txErr != nil {
 			return txErr
-		}
-
-		// Background jobs River gave up on. Counted here rather than left to the
-		// jobs page because this is the one failure the dashboard cannot infer
-		// from its other queues: a dead renewal worker produces fewer orders,
-		// not more alerts, so a broken store reads as a slow one.
-		if canSeeJobs {
-			props.DeadJobCount, txErr = d.JobHealthService.CountDeadJobs(ctx, tx)
-			if txErr != nil {
-				return txErr
-			}
-			if props.DeadJobCount > 0 {
-				props.DeadJobKinds, txErr = d.JobHealthService.CountDeadJobsByKind(ctx, tx)
-				if txErr != nil {
-					return txErr
-				}
-			}
 		}
 
 		// Past-due wholesale accounts — invoices past terms. Fulfillment for

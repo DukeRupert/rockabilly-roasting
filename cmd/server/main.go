@@ -596,6 +596,9 @@ func run() error {
 		},
 		Workers:      workers,
 		PeriodicJobs: periodicJobs,
+		// Job failures alert engineering rather than surfacing to staff — see
+		// jobs.ErrorHandler.
+		ErrorHandler: jobs.NewErrorHandler(logger),
 	})
 	if err != nil {
 		return fmt.Errorf("create river client: %w", err)

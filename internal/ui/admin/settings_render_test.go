@@ -159,12 +159,19 @@ func TestSettingsIntegrations_OAuthLinksAreNotBoosted(t *testing.T) {
 	// Asserted per-anchor rather than as one attribute-ordered string: the point
 	// is that every link to the connect route opts out, whatever order its
 	// attributes end up in.
+	// Every state that offers the connect route, not just the two obvious ones:
+	// the unavailable card offers it too, and a guard that misses an entry point
+	// is a guard that will not notice the one that regresses.
 	for name, html := range map[string]string{
 		"reconnect": renderIntegrations(t, SettingsIntegrationsProps{
 			QB:        QBConnectionStatus{Connected: true},
 			QBEnabled: true,
 		}),
 		"connect": renderIntegrations(t, SettingsIntegrationsProps{QBEnabled: true}),
+		"unavailable": renderIntegrations(t, SettingsIntegrationsProps{
+			QB:        QBConnectionStatus{Unavailable: true},
+			QBEnabled: true,
+		}),
 	} {
 		anchors := anchorsTo(html, "/admin/settings/integrations/quickbooks/connect")
 		require.NotEmpty(t, anchors, "%s state should offer a link to the connect route", name)

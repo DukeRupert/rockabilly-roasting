@@ -65,7 +65,7 @@ func (w *EnsureQBCustomerWorker) Work(ctx context.Context, job *river.Job[Ensure
 
 	metrics.TrackJob(w.metrics, "qb_ensure_customer", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "job failed",
+		slog.ErrorContext(ctx, "background job qb_ensure_customer failed",
 			"job_kind", "qb_ensure_customer",
 			"job_id", job.ID,
 			"customer_id", job.Args.CustomerID,

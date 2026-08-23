@@ -37,7 +37,7 @@ func (w *SubscriptionRenewalWorker) Work(ctx context.Context, job *river.Job[Sub
 	_, err := w.renewalSvc.RenewSubscription(ctx, w.pool, job.Args.SubscriptionID)
 	if err != nil {
 		metrics.TrackJob(w.metrics, "subscription_renewal", start, err)
-		slog.ErrorContext(ctx, "job failed",
+		slog.ErrorContext(ctx, "background job subscription_renewal failed",
 			"job_kind", "subscription_renewal",
 			"job_id", job.ID,
 			"attempt", job.Attempt,

@@ -58,7 +58,7 @@ func (w *CheckQBTokenWorker) Work(ctx context.Context, job *river.Job[CheckQBTok
 	err := w.work(ctx, job.ID)
 	metrics.TrackJob(w.metrics, "qb_token_check", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "job failed",
+		slog.ErrorContext(ctx, "background job qb_token_check failed",
 			"job_kind", "qb_token_check",
 			"job_id", job.ID,
 			"error", err.Error(),

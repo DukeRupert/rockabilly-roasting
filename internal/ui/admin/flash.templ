@@ -22,9 +22,19 @@ func (f Flash) classes() string {
 
 // adminFlash renders the message, with an icon that says which kind it is
 // before the words are read — a tick for saved, a warning for rejected.
+// role is alert for a rejection and status for a success. A screen reader has
+// to interrupt for "nothing was saved" — the staffer is about to walk away from
+// an unsaved form — and must not for "saved".
+func (f Flash) role() string {
+	if f.Error {
+		return "alert"
+	}
+	return "status"
+}
+
 templ adminFlash(f Flash) {
 	if f.shown() {
-		<div class={ f.classes() } role="status">
+		<div class={ f.classes() } role={ f.role() }>
 			<div class="flex">
 				<div class="flex-shrink-0">
 					if f.Error {

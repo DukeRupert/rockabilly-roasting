@@ -52,7 +52,7 @@ func (w *SyncQBCustomerWorker) Work(ctx context.Context, job *river.Job[SyncQBCu
 
 	metrics.TrackJob(w.metrics, "qb_sync_customer", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "job failed",
+		slog.ErrorContext(ctx, "background job qb_sync_customer failed",
 			"job_kind", "qb_sync_customer",
 			"job_id", job.ID,
 			"customer_id", job.Args.CustomerID,

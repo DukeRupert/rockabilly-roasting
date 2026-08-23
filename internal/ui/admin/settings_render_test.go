@@ -129,6 +129,37 @@ func TestSettingsIssues_QuickBooksAlreadyExpired(t *testing.T) {
 	assert.Equal(t, "1 day", refreshTokenRemainingLabel(ptrTime(time.Now().Add(25*time.Hour))))
 }
 
+// A status read that failed is a different fact from a disconnection, and only
+// one of them is worth sending someone to Intuit over.
+func TestSettingsIssues_UnreadableQuickBooksStatusIsNotADisconnection(t *testing.T) {
+	unavailable := QBConnectionStatus{Unavailable: true}
+	assert.Empty(t, SettingsIssuesFor(healthyShipping(), unavailable, true, 1))
+
+	// A genuine disconnection still warns.
+	issues := SettingsIssuesFor(healthyShipping(), QBConnectionStatus{}, true, 1)
+	require.Len(t, issues, 1)
+	assert.Equal(t, "QuickBooks is not connected", issues[0].Title)
+
+	html := renderIntegrations(t, SettingsIntegrationsProps{QB: unavailable, QBEnabled: true})
+	assert.Contains(t, html, "Status unknown")
+	assert.NotContains(t, html, "Not connected")
+}
+
+// The OAuth handoff 302s to intuit.com. A boosted link fetches that by XHR,
+// where a cross-origin redirect cannot become a navigation, so both entry
+// points have to opt out of hx-boost.
+func TestSettingsIntegrations_OAuthLinksAreNotBoosted(t *testing.T) {
+	connected := renderIntegrations(t, SettingsIntegrationsProps{
+		QB:        QBConnectionStatus{Connected: true},
+		QBEnabled: true,
+	})
+	assert.Contains(t, connected, `hx-boost="false" class="btn-secondary">Reconnect`)
+
+	disconnected := renderIntegrations(t, SettingsIntegrationsProps{QBEnabled: true})
+	assert.Contains(t, disconnected, "Connect to QuickBooks")
+	assert.Contains(t, disconnected, `hx-boost="false"`)
+}
+
 // Broken settings sort ahead of warnings: the list is read from the top and
 // attention runs out before the scrollbar does.
 func TestSettingsIssues_BrokenFirst(t *testing.T) {
@@ -205,8 +236,10 @@ func TestSettings_RejectedSaveKeepsInputAndMarksField(t *testing.T) {
 	assert.Contains(t, html, `value="45"`)
 	assert.Contains(t, html, "Enter a dollar amount, e.g. 6.00.")
 	assert.Contains(t, html, "border-rr-red")
-	// An error must not arrive in the success panel.
+	// An error must not arrive in the success panel, and it interrupts a screen
+	// reader where a success does not.
 	assert.Contains(t, html, "badge-red")
+	assert.Contains(t, html, `role="alert"`)
 	assert.NotContains(t, html, "badge-green")
 }
 
@@ -313,6 +346,16 @@ func TestShippingSettings_NonDraftRendersStoredValues(t *testing.T) {
 	assert.Equal(t, "6.00", s.flatRateValue())
 	assert.Equal(t, "45.00", s.thresholdValue())
 	assert.Equal(t, "2.50", s.tareValue())
+}
+
+func renderIntegrations(t *testing.T, props SettingsIntegrationsProps) string {
+	t.Helper()
+	if props.MerchantTZ == nil {
+		props.MerchantTZ = time.UTC
+	}
+	var buf bytes.Buffer
+	require.NoError(t, SettingsIntegrationsContent(props).Render(context.Background(), &buf))
+	return buf.String()
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }

@@ -55,7 +55,7 @@ func (w *SyncQBPaymentWorker) Work(ctx context.Context, job *river.Job[SyncQBPay
 
 	metrics.TrackJob(w.metrics, "qb_sync_payment", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "job failed",
+		slog.ErrorContext(ctx, "background job qb_sync_payment failed",
 			"job_kind", "qb_sync_payment",
 			"job_id", job.ID,
 			"order_id", job.Args.OrderID,

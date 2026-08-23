@@ -58,8 +58,14 @@ func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error)
 	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		if out.QBEnabled {
 			// A QB status read failing must not take the whole settings page
-			// down with it — the shipping form below is still editable.
-			if status, qbErr := d.QBOAuthManager.Status(ctx, tx); qbErr == nil {
+			// down with it — the shipping form below is still editable. But it
+			// must not read as "not connected" either: that is a different
+			// fact, and it sends staff to reconnect a connection that was fine.
+			status, qbErr := d.QBOAuthManager.Status(ctx, tx)
+			if qbErr != nil {
+				slog.Error("admin settings: quickbooks status", "error", qbErr)
+				out.QB.Unavailable = true
+			} else {
 				out.QB.Connected = status.Connected
 				out.QB.RealmID = status.RealmID
 				out.QB.RefreshExpiresAt = status.RefreshExpiresAt

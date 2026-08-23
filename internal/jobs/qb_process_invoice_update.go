@@ -50,7 +50,7 @@ func (w *ProcessQBInvoiceUpdateWorker) Work(ctx context.Context, job *river.Job[
 
 	metrics.TrackJob(w.metrics, "qb_process_invoice_update", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "job failed",
+		slog.ErrorContext(ctx, "background job qb_process_invoice_update failed",
 			"job_kind", "qb_process_invoice_update",
 			"job_id", job.ID,
 			"qb_invoice_id", job.Args.QBInvoiceID,

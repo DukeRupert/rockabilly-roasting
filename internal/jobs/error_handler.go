@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 
 	"github.com/riverqueue/river"
@@ -46,10 +47,15 @@ func (h *ErrorHandler) HandleError(ctx context.Context, job *rivertype.JobRow, e
 		"max_attempts", job.MaxAttempts,
 		"error", err.Error(),
 	}
+	// The kind rides in the message, not only the attrs: the slog handler
+	// captures the message as the Sentry title, so a constant string would
+	// fingerprint every worker's failures into one issue — resolve it for a
+	// fixed QuickBooks token and the next email worker's first failure lands
+	// silently in the same closed thread.
 	if job.Attempt >= job.MaxAttempts {
-		h.logger.ErrorContext(ctx, "background job discarded after final attempt", attrs...)
+		h.logger.ErrorContext(ctx, fmt.Sprintf("background job %s discarded after final attempt", job.Kind), attrs...)
 	} else {
-		h.logger.WarnContext(ctx, "background job attempt failed, will retry", attrs...)
+		h.logger.WarnContext(ctx, fmt.Sprintf("background job %s failed, will retry", job.Kind), attrs...)
 	}
 	return nil
 }
@@ -58,7 +64,7 @@ func (h *ErrorHandler) HandleError(ctx context.Context, job *rivertype.JobRow, e
 // reports, on every attempt: a panic is a bug in the worker, not a flaky
 // dependency, and the stack trace from the first occurrence is the useful one.
 func (h *ErrorHandler) HandlePanic(ctx context.Context, job *rivertype.JobRow, panicVal any, trace string) *river.ErrorHandlerResult {
-	h.logger.ErrorContext(ctx, "background job panicked",
+	h.logger.ErrorContext(ctx, fmt.Sprintf("background job %s panicked", job.Kind),
 		"job_id", job.ID,
 		"kind", job.Kind,
 		"queue", job.Queue,

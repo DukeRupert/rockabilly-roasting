@@ -199,10 +199,19 @@ func SettingsIssuesFor(s ShippingSettings, qb QBConnectionStatus, qbEnabled bool
 			// the connection is used. Nothing renews them automatically, and
 			// the failure is silent: invoicing simply stops.
 			if days := refreshTokenDaysRemaining(qb.RefreshExpiresAt); days <= 14 {
+				title := fmt.Sprintf("QuickBooks access expires in %d days", days)
+				detail := "Reconnect before it lapses — invoicing stops the day it does, without an error."
+				// Past the expiry the countdown goes negative, which reads as a
+				// rendering bug at the exact moment the page is describing an
+				// outage. Say the outage instead.
+				if days <= 0 {
+					title = "QuickBooks access has expired"
+					detail = "Wholesale invoicing has already stopped. Reconnect to start it again."
+				}
 				issues = append(issues, SettingsIssue{
 					Tab:    settingsTabIntegrations,
-					Title:  fmt.Sprintf("QuickBooks access expires in %d days", days),
-					Detail: "Reconnect before it lapses — invoicing stops the day it does, without an error.",
+					Title:  title,
+					Detail: detail,
 					Broken: days <= 7,
 				})
 			}
@@ -297,20 +306,20 @@ func settingsAttention(issues []SettingsIssue) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><a href=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><!-- hx-boost=\"false\": these links carry a fragment\n\t\t\t\t\t\t     (/admin/settings#origin) and the whole promise of the\n\t\t\t\t\t\t     row is landing on the field. A boosted navigation\n\t\t\t\t\t\t     swaps the content and restores scroll rather than\n\t\t\t\t\t\t     honouring the anchor; a plain one jumps. --><a href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var5 templ.SafeURL
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(issue.href()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 231, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 245, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" class=\"row-link-target flex items-start gap-3 px-4 py-3\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" hx-boost=\"false\" class=\"row-link-target flex items-start gap-3 px-4 py-3\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -339,7 +348,7 @@ func settingsAttention(issues []SettingsIssue) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(issue.badgeLabel())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 232, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 246, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -352,7 +361,7 @@ func settingsAttention(issues []SettingsIssue) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(issue.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 234, Col: 79}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 248, Col: 79}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -365,7 +374,7 @@ func settingsAttention(issues []SettingsIssue) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(issue.Detail)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 235, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 249, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {

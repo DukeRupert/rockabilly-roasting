@@ -47,6 +47,10 @@ func TestErrorHandler_OnlyFinalAttemptAlerts(t *testing.T) {
 	assert.Equal(t, "ERROR", rec["level"])
 	assert.Equal(t, "email_order_confirm", rec["kind"])
 	assert.Equal(t, "postmark timeout", rec["error"])
+	// The kind has to be in the message, not only the attrs: Sentry fingerprints
+	// on the message, so a constant string would file every worker's failures as
+	// one issue and let a resolved one swallow an unrelated worker's first.
+	assert.Contains(t, rec["msg"], "email_order_confirm")
 }
 
 // A panic is a bug in the worker rather than a flaky dependency, so it reports
@@ -59,6 +63,7 @@ func TestErrorHandler_PanicAlertsOnFirstAttempt(t *testing.T) {
 	require.Nil(t, h.HandlePanic(context.Background(), job, "nil map write", "goroutine 1 [running]"))
 	rec := lastRecord(t, &buf)
 	assert.Equal(t, "ERROR", rec["level"])
+	assert.Contains(t, rec["msg"], "qb_create_invoice")
 	assert.Equal(t, "nil map write", rec["panic"])
 	assert.Equal(t, "goroutine 1 [running]", rec["trace"])
 }

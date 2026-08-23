@@ -10,7 +10,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/dukerupert/hiri/internal/app"
-	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/store"
 	"github.com/dukerupert/hiri/internal/ui/admin"
 )
@@ -19,21 +18,11 @@ import (
 func (d *Deps) handleAdminBoxPresets(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// The section load already lists the presets (it counts them for the
-	// attention list), so the page costs no extra query for its own table.
+	// The section load already reads the presets for the attention list, so the
+	// page's own table comes out of the same read — one query, one transaction,
+	// and no way for the "No box presets" warning to contradict the table under
+	// it.
 	section, err := d.loadSettingsSection(ctx)
-	if err != nil {
-		slog.Error("admin box presets: load", "error", err)
-		Error(w, r, err)
-		return
-	}
-
-	var presets []domain.BoxPreset
-	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		var txErr error
-		presets, txErr = d.FulfillmentService.ListBoxPresets(ctx, tx)
-		return txErr
-	})
 	if err != nil {
 		slog.Error("admin box presets: load", "error", err)
 		Error(w, r, err)
@@ -43,7 +32,7 @@ func (d *Deps) handleAdminBoxPresets(w http.ResponseWriter, r *http.Request) {
 	name, role := staffNameRole(r)
 	props := admin.BoxPresetsProps{
 		Nav:       section.nav(role),
-		Presets:   presets,
+		Presets:   section.BoxPresets,
 		Flash:     settingsFlash(r),
 		StaffName: name,
 		StaffRole: role,

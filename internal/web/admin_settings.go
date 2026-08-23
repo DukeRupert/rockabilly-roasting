@@ -30,17 +30,21 @@ import (
 // settingsSection is the shared state behind the section nav: the settings
 // whose values decide whether anything is broken.
 type settingsSection struct {
-	Shipping       admin.ShippingSettings
-	QB             admin.QBConnectionStatus
-	QBEnabled      bool
-	BoxPresetCount int
+	Shipping  admin.ShippingSettings
+	QB        admin.QBConnectionStatus
+	QBEnabled bool
+	// BoxPresets is the full list, not a count: the attention list needs to
+	// know whether any exist and the box-presets page needs to draw them, and
+	// reading it twice would let the "No box presets" warning render above a
+	// table that has one.
+	BoxPresets []domain.BoxPreset
 }
 
 // nav derives the tab strip + attention list for a staffer.
 func (s settingsSection) nav(role string) admin.SettingsNav {
 	return admin.SettingsNav{
 		StaffRole: role,
-		Issues:    admin.SettingsIssuesFor(s.Shipping, s.QB, s.QBEnabled, s.BoxPresetCount),
+		Issues:    admin.SettingsIssuesFor(s.Shipping, s.QB, s.QBEnabled, len(s.BoxPresets)),
 	}
 }
 
@@ -72,7 +76,7 @@ func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error)
 		if presetErr != nil {
 			return presetErr
 		}
-		out.BoxPresetCount = len(presets)
+		out.BoxPresets = presets
 		return nil
 	})
 	return out, err

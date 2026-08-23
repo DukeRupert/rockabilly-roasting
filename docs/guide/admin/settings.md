@@ -1,6 +1,8 @@
 # Settings
 
-Settings is a group of pages, reached from **Settings** in the user menu at the bottom of the sidebar. A tab strip across the top moves between them:
+Settings is a group of pages, reached from **Settings** in the user menu at the bottom of the sidebar. **The whole section is admin-only** — these are store-wide rules rather than any one department's work, so the menu entry does not appear for fulfillment, finance, catalog, or support logins.
+
+A tab strip across the top moves between the pages:
 
 | Tab | What lives there |
 |---|---|
@@ -8,7 +10,7 @@ Settings is a group of pages, reached from **Settings** in the user menu at the 
 | **Box presets** | The cartons labels are quoted against |
 | **Wholesale** | The default price list unassigned wholesale accounts see |
 | **Integrations** | QuickBooks Online |
-| **Team** | Invite staff and set roles (admins only) |
+| **Team** | Invite staff and set roles |
 
 ## What needs attention
 

@@ -228,6 +228,22 @@ func refreshTokenDaysRemaining(expiresAt *time.Time) int {
 	return int(time.Until(*expiresAt).Hours() / 24)
 }
 
+// refreshTokenRemainingLabel words the countdown, including the case the raw
+// number cannot: a token that already lapsed. "-3 days" reads as a rendering
+// bug at the exact moment the page is describing an outage.
+func refreshTokenRemainingLabel(expiresAt *time.Time) string {
+	days := refreshTokenDaysRemaining(expiresAt)
+	switch {
+	case days < 0:
+		return "Expired"
+	case days == 0:
+		return "Expires today"
+	case days == 1:
+		return "1 day"
+	}
+	return fmt.Sprintf("%d days", days)
+}
+
 func refreshTokenUrgencyClasses(days int) string {
 	if days <= 14 {
 		return "text-rr-red font-semibold"
@@ -260,8 +276,6 @@ templ SettingsContent(props SettingsProps) {
 	</div>
 	@adminFlash(props.Flash)
 	@settingsAttention(props.Nav.Issues)
-	<!-- No overflow-hidden on this card: it would make itself the scroll
-	     container for the sticky save bar below and quietly unstick it. -->
 	<div class="mt-6 border border-rr-border bg-rr-surface">
 		<form
 			method="post"
@@ -693,7 +707,7 @@ templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
 								<dt class="text-sm font-medium text-rr-muted">Access expires</dt>
 								<dd class="mt-1 text-sm sm:col-span-2 sm:mt-0">
 									<span class={ refreshTokenUrgencyClasses(refreshTokenDaysRemaining(props.QB.RefreshExpiresAt)) }>
-										{ fmt.Sprintf("%d days", refreshTokenDaysRemaining(props.QB.RefreshExpiresAt)) }
+										{ refreshTokenRemainingLabel(props.QB.RefreshExpiresAt) }
 									</span>
 									<span class="text-rr-muted ml-1">
 										({ props.QB.RefreshExpiresAt.In(props.MerchantTZ).Format("Jan 2, 2006") })

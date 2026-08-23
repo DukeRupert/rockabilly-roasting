@@ -191,10 +191,19 @@ func SettingsIssuesFor(s ShippingSettings, qb QBConnectionStatus, qbEnabled bool
 			// the connection is used. Nothing renews them automatically, and
 			// the failure is silent: invoicing simply stops.
 			if days := refreshTokenDaysRemaining(qb.RefreshExpiresAt); days <= 14 {
+				title := fmt.Sprintf("QuickBooks access expires in %d days", days)
+				detail := "Reconnect before it lapses — invoicing stops the day it does, without an error."
+				// Past the expiry the countdown goes negative, which reads as a
+				// rendering bug at the exact moment the page is describing an
+				// outage. Say the outage instead.
+				if days <= 0 {
+					title = "QuickBooks access has expired"
+					detail = "Wholesale invoicing has already stopped. Reconnect to start it again."
+				}
 				issues = append(issues, SettingsIssue{
 					Tab:    settingsTabIntegrations,
-					Title:  fmt.Sprintf("QuickBooks access expires in %d days", days),
-					Detail: "Reconnect before it lapses — invoicing stops the day it does, without an error.",
+					Title:  title,
+					Detail: detail,
 					Broken: days <= 7,
 				})
 			}
@@ -228,7 +237,12 @@ templ settingsAttention(issues []SettingsIssue) {
 			<ul class="divide-y divide-rr-border">
 				for _, issue := range issues {
 					<li class={ issue.rowClass() }>
-						<a href={ templ.SafeURL(issue.href()) } class="row-link-target flex items-start gap-3 px-4 py-3">
+						<!-- hx-boost="false": these links carry a fragment
+						     (/admin/settings#origin) and the whole promise of the
+						     row is landing on the field. A boosted navigation
+						     swaps the content and restores scroll rather than
+						     honouring the anchor; a plain one jumps. -->
+						<a href={ templ.SafeURL(issue.href()) } hx-boost="false" class="row-link-target flex items-start gap-3 px-4 py-3">
 							<span class={ issue.badgeClass() }>{ issue.badgeLabel() }</span>
 							<span class="min-w-0">
 								<span class="block text-sm font-semibold text-rr-heading">{ issue.Title }</span>

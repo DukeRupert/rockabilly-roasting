@@ -113,6 +113,22 @@ func TestSettingsIssues_QuickBooksExpiryEscalates(t *testing.T) {
 	assert.Empty(t, SettingsIssuesFor(s, QBConnectionStatus{}, false, 1))
 }
 
+// Past the expiry the raw countdown goes negative. "-3 days" reads as a
+// rendering bug at the exact moment the page is describing an outage, so both
+// the attention row and the card say the outage instead.
+func TestSettingsIssues_QuickBooksAlreadyExpired(t *testing.T) {
+	expired := ptrTime(time.Now().Add(-3 * 24 * time.Hour))
+
+	issues := SettingsIssuesFor(healthyShipping(), QBConnectionStatus{Connected: true, RefreshExpiresAt: expired}, true, 1)
+	require.Len(t, issues, 1)
+	assert.Equal(t, "QuickBooks access has expired", issues[0].Title)
+	assert.True(t, issues[0].Broken)
+
+	assert.Equal(t, "Expired", refreshTokenRemainingLabel(expired))
+	assert.Equal(t, "Expires today", refreshTokenRemainingLabel(ptrTime(time.Now().Add(6*time.Hour))))
+	assert.Equal(t, "1 day", refreshTokenRemainingLabel(ptrTime(time.Now().Add(25*time.Hour))))
+}
+
 // Broken settings sort ahead of warnings: the list is read from the top and
 // attention runs out before the scrollbar does.
 func TestSettingsIssues_BrokenFirst(t *testing.T) {

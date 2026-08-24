@@ -91,25 +91,22 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 		}
 
 		for _, subID := range solo {
-			// ByArgs alone dedupes across all time, including against completed
-			// jobs still inside River's retention window, so yesterday's manual
-			// retry could swallow today's rung. Scoping to the day bounds that to
-			// a retry from the last 24 hours — which is a charge attempt for this
-			// same subscription, so riding on it is correct rather than a loss.
-			// The skip is logged below so it is visible either way.
+			// RenewalInsertOpts, never a literal: a renewal enqueued with
+			// different unique options gets a different unique_key and so
+			// deduplicates against nothing. That is exactly how this rung and a
+			// staff Retry both used to run, double-charging the subscription.
+			// The reasoning behind the options lives on the helper.
 			res, txErr := w.client.InsertTx(ctx, tx, SubscriptionRenewalArgs{
 				SubscriptionID: subID,
-			}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{
-				ByArgs:   true,
-				ByPeriod: 24 * time.Hour,
-			}})
+			}, RenewalInsertOpts())
 			if txErr != nil {
 				return fmt.Errorf("enqueue dead-card renewal: %w", txErr)
 			}
 			if res.UniqueSkippedAsDuplicate {
 				// Not an error — something already queued a charge for this
-				// subscription today. Worth saying out loud, because it means
-				// this rung is riding on that job rather than one of ours.
+				// subscription today, most likely a staff or customer Retry.
+				// Worth saying out loud, because it means this rung is riding on
+				// that job rather than one of ours.
 				logger.Info("dead-card renewal already queued", "subscription_id", subID)
 				continue
 			}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/riverqueue/river"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/audit"
@@ -33,6 +34,52 @@ type SubscriptionRenewalArgs struct {
 
 // Kind returns the job kind identifier.
 func (SubscriptionRenewalArgs) Kind() string { return "subscription_renewal" }
+
+// RenewalInsertOpts is the only sanctioned way to enqueue a
+// SubscriptionRenewalArgs. Every insert site must use it — the scheduler's
+// dead-card rung, the staff Retry button, and the customer's own retry.
+//
+// This is a function rather than a var because River's InsertOpts is a mutable
+// struct; handing out a shared pointer would let one caller's edit reach the
+// others.
+//
+// # Why every site has to agree
+//
+// River derives a job's unique_key by hashing a string assembled from the
+// unique options that were *set* (see riverqueue/river internal/dbunique). The
+// "&period=" segment is appended only when ByPeriod is non-zero, so opts that
+// differ produce different keys and can never collide — two inserts with
+// different UniqueOpts do not deduplicate against each other at all, however
+// identical their args.
+//
+// That bit us: the scheduler used ByArgs+ByPeriod while both manual-retry
+// buttons used ByArgs alone, so a staff Retry and the scheduler's rung for the
+// same subscription each got their own key and both ran. RenewSubscription has
+// no period guard, so two jobs mean two PaymentIntents and two renewal orders
+// for one billing period — a genuine double charge.
+//
+// # Why these particular options
+//
+// ByArgs keys on the subscription ID, which is the whole of the args, so the
+// unit of deduplication is "a charge attempt for this subscription".
+//
+// ByPeriod bounds it to a day. Without it, River's default unique states
+// include Completed, so a finished job anywhere inside the retention window
+// would swallow a legitimate later attempt — a customer who fixed their card on
+// Tuesday could never get a charge because Monday's attempt already existed. A
+// day is the right bound because a charge attempt already made today is one
+// this subscription has had: riding on it is correct rather than a loss.
+//
+// The bucket is truncation-based, not rolling, so two attempts either side of
+// UTC midnight land in different buckets and both run. That window is about as
+// wide as the scheduler's one-minute cadence and needs a human clicking Retry
+// inside it; the residual risk is noted in RenewSubscription.
+func RenewalInsertOpts() *river.InsertOpts {
+	return &river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByArgs:   true,
+		ByPeriod: 24 * time.Hour,
+	}}
+}
 
 // BatchRenewalArgs triggers a batched renewal for multiple subscriptions
 // belonging to the same customer and shipping address.

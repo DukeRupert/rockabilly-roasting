@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/riverqueue/river"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
@@ -456,13 +455,27 @@ func (d *Deps) handleAccountSubscriptionRetry(w http.ResponseWriter, r *http.Req
 			// Nothing to retry — fall through to a clean redirect.
 			return nil
 		}
-		// ByArgs unique keys on the subscription ID so a double-click (or a
-		// manual retry racing the scheduler) can't queue two charge attempts
-		// for the same subscription while one is still in flight.
-		_, txErr = d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionRenewalArgs{
+		// jobs.RenewalInsertOpts, never a literal — it is what stops a
+		// double-click, the staff Retry button, and the scheduler's dunning rung
+		// from each queueing their own charge attempt. Options that differ from
+		// the other insert sites hash to a different unique_key and deduplicate
+		// against none of them.
+		res, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionRenewalArgs{
 			SubscriptionID: sub.ID,
-		}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}})
-		return txErr
+		}, jobs.RenewalInsertOpts())
+		if txErr != nil {
+			return txErr
+		}
+		if res.UniqueSkippedAsDuplicate {
+			// Deliberately silent to the customer: an attempt for this
+			// subscription already exists today and this click rides on it, so
+			// the redirect below tells them the same thing either way. Logged
+			// because "I clicked retry and nothing happened" is otherwise
+			// unanswerable from support's side.
+			d.Logger.Info("customer renewal retry rode on an existing attempt",
+				"subscription_id", sub.ID, "customer_id", customer.ID)
+		}
+		return nil
 	})
 	if err != nil {
 		Error(w, r, err)

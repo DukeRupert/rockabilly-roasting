@@ -223,10 +223,10 @@ func (s *SubscriptionStore) UpdateStatus(ctx context.Context, tx pgx.Tx, id uuid
 	if err != nil {
 		return nil, fmt.Errorf("update subscription status: %w", err)
 	}
-	// Entering past_due is a (re)failure event. Drop any prior dashboard
-	// acknowledgement so the alert re-surfaces on the next failed charge —
-	// this is the single chokepoint every dunning path flows through, so no
-	// failure branch can leave a stale ack behind. No-op when the key is absent.
+	// Entering past_due is a (re)failure event. The dashboard alert this
+	// acknowledgement fed is gone, but rows written before it was removed can
+	// still carry the key, so keep stripping it here and let the data drain
+	// itself. No-op when the key is absent.
 	if status == domain.SubscriptionStatusPastDue {
 		if _, err = tx.Exec(ctx,
 			`UPDATE subscriptions SET metadata = metadata - 'dunning_acknowledged_at' WHERE id = $1`,
@@ -239,22 +239,26 @@ func (s *SubscriptionStore) UpdateStatus(ctx context.Context, tx pgx.Tx, id uuid
 }
 
 // SetDunningHardDecline marks a past-due subscription whose card the issuer has
-// permanently blocked, so no later renewal attempt charges it again. declineCode
-// is the issuer's reason, kept for staff and for the customer-facing copy; it
-// may be empty when the provider gave a decline without one.
+// permanently blocked, so no later renewal attempt charges that card again.
+// declineCode is the issuer's reason, kept for staff and for the customer-facing
+// copy; it may be empty when the provider gave a decline without one.
+// paymentMethodID is the card that died — recording it is what lets the latch
+// release when the customer puts a different one on file.
 //
 // Scoped to status = 'past_due' so a race against a charge that succeeded in the
 // meantime cannot brand a now-active subscription as dead.
-func (s *SubscriptionStore) SetDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID, declineCode string) (err error) {
+func (s *SubscriptionStore) SetDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID, declineCode, paymentMethodID string) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.set_dunning_hard_decline", time.Now(), &err)
 	_, err = tx.Exec(ctx,
 		`UPDATE subscriptions
 		 SET metadata = jsonb_set(
-		         jsonb_set(COALESCE(metadata, '{}'::jsonb), '{dunning_hard_decline}', 'true'::jsonb),
-		         '{dunning_decline_code}', to_jsonb($2::text)),
+		         jsonb_set(
+		             jsonb_set(COALESCE(metadata, '{}'::jsonb), '{dunning_hard_decline}', 'true'::jsonb),
+		             '{dunning_decline_code}', to_jsonb($2::text)),
+		         '{dunning_dead_payment_method}', to_jsonb($3::text)),
 		     updated_at = now()
 		 WHERE id = $1 AND status = 'past_due'`,
-		id, declineCode,
+		id, declineCode, paymentMethodID,
 	)
 	if err != nil {
 		return fmt.Errorf("set dunning hard decline: %w", err)
@@ -262,12 +266,33 @@ func (s *SubscriptionStore) SetDunningHardDecline(ctx context.Context, tx pgx.Tx
 	return nil
 }
 
+// ClearDunningHardDecline releases the hard-decline latch without touching the
+// rest of the dunning state. Called when the card on file is no longer the one
+// that died, so the charge that follows is judged on its own merits — the
+// attempt count and the deadline keep running, because a new card is not yet a
+// card that works.
+func (s *SubscriptionStore) ClearDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.clear_dunning_hard_decline", time.Now(), &err)
+	_, err = tx.Exec(ctx,
+		`UPDATE subscriptions
+		 SET metadata = metadata - 'dunning_hard_decline' - 'dunning_decline_code'
+		                         - 'dunning_dead_payment_method',
+		     updated_at = now()
+		 WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("clear dunning hard decline: %w", err)
+	}
+	return nil
+}
+
 // SetDunningRetry records a failed renewal charge: it moves the subscription
 // to past_due, schedules the next dunning retry by setting next_order_at (the
-// renewal scheduler picks up past_due rows whose next_order_at is due), stamps
-// the running attempt count in metadata, and clears any stale dashboard
-// acknowledgement so the alert re-surfaces. The attempt count drives the cap
-// in the app layer (ExpireForDunning) and the escalating retry cadence.
+// renewal scheduler picks up past_due rows whose next_order_at is due), and
+// stamps the running attempt count in metadata. The attempt count drives both
+// the cap in the app layer (ExpireForDunning) and the escalating retry cadence.
+// The legacy acknowledgement key is stripped for the reason given in UpdateStatus.
 func (s *SubscriptionStore) SetDunningRetry(ctx context.Context, tx pgx.Tx, id uuid.UUID, nextRetryAt time.Time, attempt int) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.set_dunning_retry", time.Now(), &err)
 	_, err = tx.Exec(ctx,
@@ -317,7 +342,8 @@ func (s *SubscriptionStore) ClearDunning(ctx context.Context, tx pgx.Tx, id uuid
 	_, err = tx.Exec(ctx,
 		`UPDATE subscriptions
 		 SET metadata = metadata - 'dunning_attempt' - 'dunning_acknowledged_at'
-		                         - 'dunning_hard_decline' - 'dunning_decline_code',
+		                         - 'dunning_hard_decline' - 'dunning_decline_code'
+		                         - 'dunning_dead_payment_method',
 		     updated_at = now()
 		 WHERE id = $1`,
 		id,

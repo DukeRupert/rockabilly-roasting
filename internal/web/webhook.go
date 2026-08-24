@@ -223,9 +223,10 @@ func (d *Deps) handlePaymentIntentFailed(ctx context.Context, event *payments.We
 			// Route through the enqueuer (not a raw InsertTx) so this past-due
 			// notice respects notification quiet hours like the renewal-batch
 			// path does — a 2am card-decline webhook shouldn't ping the customer.
-			// Stage 1: this webhook fires on the active → past_due transition, so
-			// it is always the customer's first word that a charge failed.
-			if err := d.Enqueuer.EnqueuePastDueNotice(ctx, tx, *order.SubscriptionID, *order.CustomerID, 1); err != nil {
+			// This webhook fires on the active → past_due transition, so it is
+			// always the customer's first word that a charge failed.
+			if err := d.Enqueuer.EnqueuePastDueNotice(ctx, tx, *order.SubscriptionID, *order.CustomerID,
+				jobs.SubscriptionPastDueStageFirst); err != nil {
 				return fmt.Errorf("enqueue past-due email: %w", err)
 			}
 		}

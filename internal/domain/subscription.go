@@ -176,6 +176,13 @@ const (
 	SubscriptionMetaDunningHardDecline = "dunning_hard_decline"
 	// SubscriptionMetaDunningDeclineCode is the issuer's last stated reason.
 	SubscriptionMetaDunningDeclineCode = "dunning_decline_code"
+	// SubscriptionMetaDunningDeadPaymentMethod is the payment method that came
+	// back permanently declined. It is what lets the hard-decline latch release
+	// on its own: when the customer puts a different card on file, the method we
+	// would charge no longer matches this one, and the subscription goes back
+	// into the normal charge path. Without it the latch would be a trap — no
+	// charge is attempted, so no charge can ever succeed to clear it.
+	SubscriptionMetaDunningDeadPaymentMethod = "dunning_dead_payment_method"
 )
 
 // SubscriptionMaxDunningAttempts is how many charge attempts a past-due
@@ -184,6 +191,17 @@ const (
 // the admin UI can render "attempt 3 of 5" without reaching across the layer
 // boundary. app asserts at compile time that its ladder agrees with this.
 const SubscriptionMaxDunningAttempts = 5
+
+// SubscriptionDunningRungNotifies says, for each rung of the past-due ladder,
+// whether the customer is emailed when that rung's charge attempt fails. Index i
+// is the rung entered after attempt i+1 fails.
+//
+// The ladder is not uniform — one rung is deliberately silent, so the rung
+// number and the notice number diverge — and the admin UI has to describe what
+// actually happens on a given date rather than assume every rung mails. The
+// schedule itself lives in the app layer; this mirrors only the notify/silent
+// shape, and TestDunningLadderShape fails if the two ever disagree.
+var SubscriptionDunningRungNotifies = [SubscriptionMaxDunningAttempts - 1]bool{true, false, true, true}
 
 // DunningAttempt reports how many charge attempts have failed on the current
 // past-due run. Zero for a subscription that has never failed. JSON decoding
@@ -211,6 +229,38 @@ func (s *Subscription) DunningHardDeclined() bool {
 		return false
 	}
 	v, _ := s.Metadata[SubscriptionMetaDunningHardDecline].(bool)
+	return v
+}
+
+// DunningChargeBlocked reports whether a renewal charge must be skipped, given
+// the payment method we would otherwise charge. True only when the card was
+// permanently declined *and* it is still the card on file.
+//
+// This is the whole release mechanism for the hard-decline latch: a customer who
+// adds a different card changes what paymentMethodID resolves to, which unblocks
+// the charge. An empty paymentMethodID (nothing on file) is not blocked here —
+// that case has its own failure path.
+func (s *Subscription) DunningChargeBlocked(paymentMethodID string) bool {
+	if !s.DunningHardDeclined() {
+		return false
+	}
+	dead := s.DunningDeadPaymentMethod()
+	// A latch with no recorded card cannot tell old from new. Stay blocked
+	// rather than risk re-charging the dead card: the emails still run, and the
+	// customer's way out is the same either way.
+	if dead == "" {
+		return true
+	}
+	return dead == paymentMethodID
+}
+
+// DunningDeadPaymentMethod returns the payment method that hard-declined, or ""
+// when none was recorded.
+func (s *Subscription) DunningDeadPaymentMethod() string {
+	if s.Metadata == nil {
+		return ""
+	}
+	v, _ := s.Metadata[SubscriptionMetaDunningDeadPaymentMethod].(string)
 	return v
 }
 

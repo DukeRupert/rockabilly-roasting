@@ -37,6 +37,16 @@ func TestDunningLadderShape(t *testing.T) {
 	assert.Equal(t, dunningEmailReminder, dunningLadder[2].emailStage)
 	assert.Equal(t, dunningEmailFinal, dunningLadder[3].emailStage)
 
+	// The domain mirror the admin UI reads must describe the same silent/notify
+	// shape as the ladder. These live apart because ui may only import domain,
+	// and a drift would make the admin say "the next reminder goes out <date>"
+	// on a rung that sends nothing.
+	require.Len(t, domain.SubscriptionDunningRungNotifies, len(dunningLadder))
+	for i, stage := range dunningLadder {
+		assert.Equalf(t, stage.emailStage != dunningEmailSilent, domain.SubscriptionDunningRungNotifies[i],
+			"rung %d: ladder and domain disagree about whether it notifies", i)
+	}
+
 	// Five attempts must stay inside the tighter card-network ceiling
 	// (Mastercard: 10 retries per 30 days). Blowing through it is fined per
 	// attempt.
@@ -148,5 +158,56 @@ func TestDunningMetadataAccessors(t *testing.T) {
 		}}
 		assert.False(t, sub.DunningHardDeclined())
 		assert.Empty(t, sub.DunningDeclineCode())
+	})
+}
+
+// TestDunningChargeBlocked covers the release mechanism for the hard-decline
+// latch — the single most dangerous piece of this feature.
+//
+// The latch stops us charging a card the issuer killed. But nothing else clears
+// it: ClearDunning only runs on a successful charge, and a latched subscription
+// never attempts one. So if the latch could not release on its own, every
+// hard-declined subscription would be guaranteed to expire regardless of what
+// card the customer added — and the one-click card link, the whole point of the
+// dunning emails, would be decorative.
+func TestDunningChargeBlocked(t *testing.T) {
+	latched := func(deadPM string) *domain.Subscription {
+		meta := map[string]any{
+			domain.SubscriptionMetaDunningAttempt:     float64(1),
+			domain.SubscriptionMetaDunningHardDecline: true,
+		}
+		if deadPM != "" {
+			meta[domain.SubscriptionMetaDunningDeadPaymentMethod] = deadPM
+		}
+		return &domain.Subscription{Metadata: meta}
+	}
+
+	t.Run("same card stays blocked", func(t *testing.T) {
+		assert.True(t, latched("pm_dead").DunningChargeBlocked("pm_dead"))
+	})
+
+	t.Run("different card releases the latch", func(t *testing.T) {
+		// This is the path that saves the subscription.
+		assert.False(t, latched("pm_dead").DunningChargeBlocked("pm_fresh"))
+	})
+
+	t.Run("unknown dead card stays blocked", func(t *testing.T) {
+		// We cannot tell old from new, so we do not risk re-charging a dead
+		// card. The emails still run and the customer's way out is unchanged.
+		assert.True(t, latched("").DunningChargeBlocked("pm_whatever"))
+	})
+
+	t.Run("no latch never blocks", func(t *testing.T) {
+		soft := &domain.Subscription{Metadata: map[string]any{
+			domain.SubscriptionMetaDunningAttempt: float64(2),
+		}}
+		assert.False(t, soft.DunningChargeBlocked("pm_any"))
+		assert.False(t, (&domain.Subscription{}).DunningChargeBlocked(""))
+	})
+
+	t.Run("empty resolved card is not blocked here", func(t *testing.T) {
+		// "no payment method on file" has its own failure path upstream; this
+		// predicate must not swallow it, or that branch becomes unreachable.
+		assert.False(t, latched("pm_dead").DunningChargeBlocked(""))
 	})
 }

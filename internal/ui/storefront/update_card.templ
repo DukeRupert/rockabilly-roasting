@@ -85,7 +85,11 @@ templ UpdateCardConfirmContent(props UpdateCardProps) {
 		<p class="font-oswald text-ink-soft text-sm mt-4 leading-relaxed">
 			The button takes you to our payment processor to put a card on file. Nothing else about your subscription changes.
 		</p>
-		<form method="post" action="/subscriptions/update-card" class="mt-6">
+		<!-- hx-boost="false": the handler 303s to billing.stripe.com, and a
+		     boosted form posts by XHR, where a cross-origin redirect cannot
+		     become a navigation — the customer would click and go nowhere.
+		     Same reasoning as the QuickBooks OAuth links in admin/settings. -->
+		<form method="post" action="/subscriptions/update-card" hx-boost="false" class="mt-6">
 			<input type="hidden" name="t" value={ props.Token }/>
 			<button type="submit" class="btn-stamp w-full border-2 border-ink bg-rust text-paper px-5 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
 				Update payment method

@@ -2014,29 +2014,65 @@ func dunningStatusPanel(props SubscriptionShowProps) templ.Component {
 	})
 }
 
+// dunningRungSendsEmail reports whether the rung that runs on next_order_at
+// mails the customer. attempt is how many attempts have already failed, so the
+// rung about to run is index attempt.
+func dunningRungSendsEmail(attempt int) bool {
+	if attempt < 0 || attempt >= len(domain.SubscriptionDunningRungNotifies) {
+		return false
+	}
+	return domain.SubscriptionDunningRungNotifies[attempt]
+}
+
 // dunningAttemptLabel is the badge text: where on the ladder this subscription
-// sits. Hard declines count notices rather than attempts, because no further
-// charge is being made.
+// sits.
+//
+// A hard decline reads "no retries — day N of M" rather than counting attempts,
+// because no attempts are being made. Counting notices instead was tried and is
+// worse: the rung number and the notice number are not the same (the ladder
+// sends three emails across four rungs), so any label pairing one with the
+// other's total is wrong on most rungs.
 func dunningAttemptLabel(sub *domain.Subscription) string {
 	attempt := sub.DunningAttempt()
 	if attempt <= 0 {
 		return "starting"
 	}
 	if sub.DunningHardDeclined() {
-		return fmt.Sprintf("notice %d of %d", attempt, domain.SubscriptionMaxDunningAttempts-1)
+		return fmt.Sprintf("no retries — step %d of %d", attempt, domain.SubscriptionMaxDunningAttempts-1)
 	}
 	return fmt.Sprintf("attempt %d of %d", attempt, domain.SubscriptionMaxDunningAttempts)
 }
 
 // dunningStatusLine is the sentence under the badge: what happens next and when.
+//
+// "What happens next" is deliberately derived rather than assumed. next_order_at
+// is when the *following* rung runs, and that rung may charge, may email, may do
+// neither, or may close the subscription out — saying "the next reminder goes
+// out" without checking produces a sentence that is simply false on the silent
+// rung, and hides the closeout on the last one.
 func dunningStatusLine(sub *domain.Subscription, tz *time.Location) string {
 	next := sub.NextOrderAt.In(tz).Format("Jan 2, 2006")
-	if sub.DunningHardDeclined() {
-		return "The bank has blocked this card for good, so we've stopped retrying it. " +
-			"The customer needs to put a different card on file; the next reminder goes out " + next + "."
+	attempt := sub.DunningAttempt()
+
+	// Past the last rung: next_order_at is the day it closes out.
+	if attempt >= domain.SubscriptionMaxDunningAttempts-1 {
+		if sub.DunningHardDeclined() {
+			return "The bank has blocked this card for good, so we've stopped retrying it. " +
+				"Unless the customer puts a different card on file, the subscription closes out " + next + "."
+		}
+		return "Final charge attempt runs " + next + ". If it declines, the subscription closes out that day."
 	}
-	if sub.DunningAttempt() >= domain.SubscriptionMaxDunningAttempts-1 {
-		return "Final attempt runs " + next + ". If it declines, the subscription closes out that day."
+
+	if sub.DunningHardDeclined() {
+		// No charge is coming, so the only thing next_order_at marks is the next
+		// step of the ladder — which is an email on some rungs and nothing on
+		// others.
+		if dunningRungSendsEmail(attempt) {
+			return "The bank has blocked this card for good, so we've stopped retrying it. " +
+				"The customer needs to put a different card on file; the next reminder goes out " + next + "."
+		}
+		return "The bank has blocked this card for good, so we've stopped retrying it. " +
+			"The customer needs to put a different card on file. Nothing is sent on " + next + " — the next reminder comes after that."
 	}
 	return "Next charge attempt runs " + next + "."
 }

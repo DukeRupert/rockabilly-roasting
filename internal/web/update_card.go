@@ -68,10 +68,13 @@ func (d *Deps) handleUpdateCardPage(w http.ResponseWriter, r *http.Request) {
 //
 // Nothing in our database changes here — the customer's new card lands on
 // Stripe's side, and the next renewal attempt picks it up via
-// pickRenewalPaymentMethod. The hard-decline latch is cleared by ClearDunning
-// when that attempt succeeds, not here: a card added is not yet a card that
-// works, and clearing the latch early would put us back to charging a number we
-// have no reason to trust.
+// pickRenewalPaymentMethod.
+//
+// The hard-decline latch is not cleared here, and does not need to be: the
+// renewal path compares the card on file against the one that died and releases
+// the latch itself when they differ. Clearing it on this request instead would
+// be wrong twice over — the customer may abandon the Stripe form without adding
+// anything, and a card added is not yet a card that works.
 func (d *Deps) handleUpdateCard(w http.ResponseWriter, r *http.Request) {
 	token := r.FormValue("t")
 	if token == "" {
@@ -136,7 +139,15 @@ func (d *Deps) updateCardProps(r *http.Request, tx pgx.Tx, sub *domain.Subscript
 	props := storefront.UpdateCardProps{
 		ProductName: "your subscription",
 		HardDecline: sub.DunningHardDeclined(),
-		EndsOn:      app.DunningExpiresAt(sub).In(d.MerchantTZ).Format("January 2, 2006"),
+	}
+	// Only promise a closeout date once the ladder is actually running. A
+	// subscription marked past_due by the payment-failed webhook has no recorded
+	// attempt yet, and DunningExpiresAt falls back to next_order_at for those —
+	// which is the next charge date, not the day it closes. Rendering that under
+	// "Closes out on" would tell the customer their subscription dies about ten
+	// days earlier than it does.
+	if sub.DunningAttempt() > 0 {
+		props.EndsOn = app.DunningExpiresAt(sub).In(d.MerchantTZ).Format("January 2, 2006")
 	}
 	if variant, err := d.CatalogService.GetVariant(r.Context(), tx, sub.VariantID); err == nil {
 		if product, err := d.CatalogService.GetProduct(r.Context(), tx, variant.ProductID); err == nil {

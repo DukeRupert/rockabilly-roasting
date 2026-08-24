@@ -106,13 +106,14 @@ func TestSubscriptionStore_ClearDunning(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, s.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Hour), 2))
-	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "lost_card"))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "lost_card", "pm_dead"))
 
 	// Sanity: the latch actually landed, so the assertions below are meaningful.
 	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
 	require.NoError(t, err)
 	require.Equal(t, true, got.Metadata["dunning_hard_decline"])
 	require.Equal(t, "lost_card", got.Metadata["dunning_decline_code"])
+	require.Equal(t, "pm_dead", got.Metadata["dunning_dead_payment_method"])
 
 	require.NoError(t, s.ClearDunning(ctx, tx, sub.ID))
 	got, err = s.GetByIDAsStaff(ctx, tx, sub.ID)
@@ -125,6 +126,8 @@ func TestSubscriptionStore_ClearDunning(t *testing.T) {
 	assert.False(t, hasHard, "dunning_hard_decline cleared")
 	_, hasCode := got.Metadata["dunning_decline_code"]
 	assert.False(t, hasCode, "dunning_decline_code cleared")
+	_, hasPM := got.Metadata["dunning_dead_payment_method"]
+	assert.False(t, hasPM, "dunning_dead_payment_method cleared")
 }
 
 // TestSubscriptionStore_SetDunningHardDecline verifies the latch only lands on a
@@ -150,7 +153,7 @@ func TestSubscriptionStore_SetDunningHardDecline(t *testing.T) {
 	require.NoError(t, err)
 
 	// Active subscription: the latch is a no-op.
-	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card"))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card", "pm_dead"))
 	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
 	require.NoError(t, err)
 	_, hasHard := got.Metadata["dunning_hard_decline"]
@@ -158,9 +161,51 @@ func TestSubscriptionStore_SetDunningHardDecline(t *testing.T) {
 
 	// Once past_due it takes.
 	require.NoError(t, s.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Hour), 1))
-	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card"))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card", "pm_dead"))
 	got, err = s.GetByIDAsStaff(ctx, tx, sub.ID)
 	require.NoError(t, err)
 	assert.Equal(t, true, got.Metadata["dunning_hard_decline"])
 	assert.Equal(t, "stolen_card", got.Metadata["dunning_decline_code"])
+	assert.Equal(t, "pm_dead", got.Metadata["dunning_dead_payment_method"])
+}
+
+// TestSubscriptionStore_ClearDunningHardDecline is the release valve for the
+// latch. Without it a hard-declined subscription could never be charged again —
+// no charge means no success, and success is the only other thing that clears
+// dunning state — so it would be guaranteed to expire no matter what card the
+// customer put on file.
+func TestSubscriptionStore_ClearDunningHardDecline(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+
+	s, custID, addrID, variantID, planID := subTrendFixture(t, tx)
+
+	sub, err := s.Create(ctx, tx, store.CreateSubscriptionParams{
+		CustomerID:         custID,
+		PlanID:             planID,
+		VariantID:          variantID,
+		Quantity:           1,
+		Status:             domain.SubscriptionStatusActive,
+		ShippingAddressID:  addrID,
+		CurrentPeriodStart: time.Now(),
+		CurrentPeriodEnd:   time.Now().AddDate(0, 0, 30),
+		NextOrderAt:        time.Now().AddDate(0, 0, 30),
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, s.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Hour), 2))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "lost_card", "pm_dead"))
+
+	require.NoError(t, s.ClearDunningHardDecline(ctx, tx, sub.ID))
+	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
+	require.NoError(t, err)
+
+	assert.False(t, got.DunningHardDeclined(), "latch released")
+	assert.Empty(t, got.DunningDeadPaymentMethod())
+	assert.Empty(t, got.DunningDeclineCode())
+
+	// The ladder itself keeps running. A new card is not yet a working card, so
+	// the customer does not get a fresh fourteen days for adding one.
+	assert.Equal(t, 2, got.DunningAttempt(), "attempt count survives the release")
+	assert.Equal(t, domain.SubscriptionStatusPastDue, got.Status)
 }

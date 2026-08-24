@@ -228,14 +228,14 @@ func UpdateCardConfirmContent(props UpdateCardProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " <p class=\"font-oswald text-ink-soft text-sm mt-4 leading-relaxed\">The button takes you to our payment processor to put a card on file. Nothing else about your subscription changes.</p><form method=\"post\" action=\"/subscriptions/update-card\" class=\"mt-6\"><input type=\"hidden\" name=\"t\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, " <p class=\"font-oswald text-ink-soft text-sm mt-4 leading-relaxed\">The button takes you to our payment processor to put a card on file. Nothing else about your subscription changes.</p><!-- hx-boost=\"false\": the handler 303s to billing.stripe.com, and a\n\t\t     boosted form posts by XHR, where a cross-origin redirect cannot\n\t\t     become a navigation — the customer would click and go nowhere.\n\t\t     Same reasoning as the QuickBooks OAuth links in admin/settings. --> <form method=\"post\" action=\"/subscriptions/update-card\" hx-boost=\"false\" class=\"mt-6\"><input type=\"hidden\" name=\"t\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Token)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/update_card.templ`, Line: 89, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/update_card.templ`, Line: 93, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 			if templ_7745c5c3_Err != nil {

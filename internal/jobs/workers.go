@@ -384,11 +384,24 @@ func (SubscriptionRenewalReceiptArgs) Kind() string { return "email:subscription
 type SubscriptionPastDueArgs struct {
 	SubscriptionID uuid.UUID `json:"subscription_id"`
 	CustomerID     uuid.UUID `json:"customer_id"`
-	// Stage is which notice this is: 1 on the first decline, 2 the mid-ladder
-	// reminder, 3 the final warning. A zero value (a job enqueued before the
-	// ladder existed) renders as stage 1.
+	// Stage is which notice this is — see the SubscriptionPastDueStage
+	// constants. A zero value (a job enqueued before the ladder existed) renders
+	// as the first notice.
 	Stage int `json:"stage"`
 }
+
+// Stage values for SubscriptionPastDueArgs. These are persisted in job args and
+// mirrored by the app layer's ladder, so append — never renumber.
+const (
+	// SubscriptionPastDueStageFirst is the notice sent on the first decline.
+	// The payment-failed webhook uses it directly; it is always a customer's
+	// first word that a charge failed.
+	SubscriptionPastDueStageFirst = 1
+	// SubscriptionPastDueStageReminder is the mid-window "shipment on hold".
+	SubscriptionPastDueStageReminder = 2
+	// SubscriptionPastDueStageFinal is the last warning before closeout.
+	SubscriptionPastDueStageFinal = 3
+)
 
 // Kind returns the job kind identifier.
 func (SubscriptionPastDueArgs) Kind() string { return "email:subscription_past_due" }

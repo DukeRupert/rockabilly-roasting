@@ -66,14 +66,35 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 			return fmt.Errorf("list due subscriptions: %w", txErr)
 		}
 
-		// Group by (customer_id, shipping_address_id)
+		// Group by (customer_id, shipping_address_id), except for subscriptions
+		// carrying a hard-decline latch. Whether that latch has been released
+		// depends on which card is currently on file, and answering that means
+		// calling Stripe — which the batch path cannot do at the point it decides
+		// what to charge. The individual renewal path resolves the payment method
+		// first and can compare it against the card that died, so route them
+		// there and let each one be judged on its own.
 		batches := make(map[batchKey][]uuid.UUID)
+		var solo []uuid.UUID
 		for _, sub := range subs {
+			if sub.DunningHardDeclined() {
+				solo = append(solo, sub.ID)
+				continue
+			}
 			key := batchKey{
 				CustomerID:        sub.CustomerID,
 				ShippingAddressID: sub.ShippingAddressID,
 			}
 			batches[key] = append(batches[key], sub.ID)
+		}
+
+		for _, subID := range solo {
+			if _, txErr = w.client.InsertTx(ctx, tx, SubscriptionRenewalArgs{
+				SubscriptionID: subID,
+			}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); txErr != nil {
+				return fmt.Errorf("enqueue hard-declined renewal: %w", txErr)
+			}
+			metrics.TrackJobEnqueued(w.metrics, "subscription_renewal")
+			batchCount++
 		}
 
 		// Enqueue one batch job per group

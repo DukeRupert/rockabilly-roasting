@@ -262,7 +262,7 @@ func DunningExpiresAt(sub *domain.Subscription) time.Time {
 //
 // Idempotent enough for River's at-least-once delivery: re-running bumps the
 // attempt by one, which at worst shortens the dunning window slightly.
-func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID, cause error) error {
+func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID, paymentMethodID string, cause error) error {
 	attempt := sub.DunningAttempt() + 1
 
 	// Latch the hard-decline verdict. Once true it stays true for the rest of
@@ -319,7 +319,14 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 		return err
 	}
 	if hardDecline {
-		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, declineCode); err != nil {
+		// Record which card died alongside the latch. A later attempt compares
+		// the card on file against this one, so a customer who adds a different
+		// card is charged again instead of being stuck behind the latch.
+		deadPM := paymentMethodID
+		if deadPM == "" {
+			deadPM = sub.DunningDeadPaymentMethod()
+		}
+		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, declineCode, deadPM); err != nil {
 			return fmt.Errorf("flag hard decline: %w", err)
 		}
 	}
@@ -416,18 +423,6 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 
 	totalCents := subtotalCents + shippingCents + taxCents
 
-	// A card the issuer has permanently blocked must not be charged again, so
-	// walk the rest of the dunning ladder without touching Stripe. The customer
-	// still gets the remaining emails, and a card they add through any of those
-	// links clears the flag and puts the subscription back in the charge path.
-	if sub.DunningHardDeclined() {
-		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, nil)
-		})
-		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
-		return nil, fmt.Errorf("subscription %s card hard-declined: %w", sub.ID, ErrRenewalPaymentDeclined)
-	}
-
 	if customer.StripeCustomerID == nil {
 		return nil, fmt.Errorf("customer %s has no Stripe customer ID", customer.ID)
 	}
@@ -444,10 +439,39 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	}
 	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, nil)
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, "", nil)
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
+	}
+
+	// A card the issuer permanently blocked must never be charged again — the
+	// networks fine per attempt, and retrying a dead number sours the issuer on
+	// this customer's next legitimate charge. So walk the rest of the ladder
+	// without touching Stripe: the emails still go out and the deadline still
+	// runs, which is what gives the customer a chance to fix it.
+	//
+	// The gate has to sit *after* the payment method is resolved, because the
+	// method is what releases it. Checking the latch alone before this point
+	// would make it permanent: no charge attempted means no charge can succeed,
+	// and success is the only thing that calls ClearDunning.
+	if sub.DunningChargeBlocked(paymentMethodID) {
+		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, paymentMethodID, nil)
+		})
+		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		return nil, fmt.Errorf("subscription %s card hard-declined: %w", sub.ID, ErrRenewalPaymentDeclined)
+	}
+
+	// A different card than the one that died: drop the latch before charging so
+	// a decline on the new card starts its own verdict rather than inheriting
+	// the old one. If this card is dead too, the charge below re-latches it.
+	if sub.DunningHardDeclined() {
+		if clearErr := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			return s.subscriptions.ClearDunningHardDecline(ctx, tx, sub.ID)
+		}); clearErr != nil {
+			return nil, fmt.Errorf("clear hard-decline latch: %w", clearErr)
+		}
 	}
 
 	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
@@ -475,7 +499,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		// carries the decline code, which decides whether we ever charge this
 		// card again.
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, err)
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, paymentMethodID, err)
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("create renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
@@ -652,15 +676,18 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				}
 			}
 
-			// Drop hard-declined subscriptions out of the batch rather than
-			// letting one dead card fail the whole box. They advance along the
-			// dunning ladder here — emails and expiry keep running, no charge is
-			// attempted — while the rest of the customer's subscriptions renew
-			// normally.
+			// Hard-declined subscriptions do not belong in a batch: whether their
+			// latch has been released depends on which card is on file, and that
+			// is a Stripe call we cannot make inside this transaction. The
+			// scheduler routes them to individual renewals for exactly that
+			// reason (see jobs/renewal_scheduler.go), so reaching here means one
+			// latched between being scheduled and being run.
+			//
+			// Drop it from the batch rather than let one dead card fail the whole
+			// box, and leave its ladder alone — the individual renewal the
+			// scheduler enqueues next time is where it gets a fair hearing.
+			// Advancing it here would burn a rung on a card we never tried.
 			if sub.DunningHardDeclined() {
-				if txErr := s.recordRenewalFailure(ctx, tx, sub, customerID, nil); txErr != nil {
-					return fmt.Errorf("advance dunning for %s: %w", subID, txErr)
-				}
 				continue
 			}
 
@@ -755,7 +782,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
-				if err := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, nil); err != nil {
+				if err := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, "", nil); err != nil {
 					return err
 				}
 			}
@@ -794,7 +821,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if err != nil {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
-				if rfErr := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, err); rfErr != nil {
+				if rfErr := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, paymentMethodID, err); rfErr != nil {
 					return rfErr
 				}
 			}

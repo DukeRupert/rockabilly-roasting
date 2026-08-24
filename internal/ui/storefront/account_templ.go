@@ -1795,7 +1795,7 @@ func AccountSubscriptionsContent(props AccountSubscriptionsProps) templ.Componen
 				}
 			} else {
 				if props.Customer.StripeCustomerID != nil {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, "<div class=\"mb-4 flex justify-end\"><form method=\"POST\" action=\"/account/billing-portal\"><button type=\"submit\" class=\"btn-stamp inline-flex items-center gap-2 border-2 border-ink bg-paper text-ink px-4 py-2 font-oswald font-bold text-[11px]\" style=\"letter-spacing:0.16em; text-transform:uppercase;\"><svg class=\"size-3.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z\"></path></svg> Update payment method</button></form></div>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, "<div class=\"mb-4 flex justify-end\"><!-- hx-boost=\"false\": this 303s to billing.stripe.com, and a boosted\n\t\t\t\t\t     form posts by XHR where a cross-origin redirect cannot become a\n\t\t\t\t\t     navigation. Same reasoning as the dunning card link. --><form method=\"POST\" action=\"/account/billing-portal\" hx-boost=\"false\"><button type=\"submit\" class=\"btn-stamp inline-flex items-center gap-2 border-2 border-ink bg-paper text-ink px-4 py-2 font-oswald font-bold text-[11px]\" style=\"letter-spacing:0.16em; text-transform:uppercase;\"><svg class=\"size-3.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z\"></path></svg> Update payment method</button></form></div>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -1859,7 +1859,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var86 string
 			templ_7745c5c3_Var86, templ_7745c5c3_Err = templ.ResolveAttributeValue(row.ThumbnailURL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 662, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 665, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var86)
 			if templ_7745c5c3_Err != nil {
@@ -1872,7 +1872,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var87 string
 			templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.ResolveAttributeValue(subProductTitle(row))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 662, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 665, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var87)
 			if templ_7745c5c3_Err != nil {
@@ -1890,7 +1890,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var88 string
 			templ_7745c5c3_Var88, templ_7745c5c3_Err = templ.JoinStringErrs(subProductInitial(row))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 666, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 669, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var88))
 			if templ_7745c5c3_Err != nil {
@@ -1913,7 +1913,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var89 templ.SafeURL
 			templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/catalog/" + row.Product.Slug))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 676, Col: 62}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 679, Col: 62}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var89))
 			if templ_7745c5c3_Err != nil {
@@ -1926,7 +1926,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var90 string
 			templ_7745c5c3_Var90, templ_7745c5c3_Err = templ.JoinStringErrs(row.Product.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 677, Col: 174}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 680, Col: 174}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var90))
 			if templ_7745c5c3_Err != nil {
@@ -1950,7 +1950,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var91 string
 			templ_7745c5c3_Var91, templ_7745c5c3_Err = templ.JoinStringErrs(row.Variant.SKU)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 683, Col: 82}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 686, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var91))
 			if templ_7745c5c3_Err != nil {
@@ -1969,7 +1969,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var92 string
 			templ_7745c5c3_Var92, templ_7745c5c3_Err = templ.JoinStringErrs(intervalLabel(row.Plan.Interval))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 687, Col: 75}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 690, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var92))
 			if templ_7745c5c3_Err != nil {
@@ -1982,7 +1982,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var93 string
 			templ_7745c5c3_Var93, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", sub.Quantity))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 688, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 691, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var93))
 			if templ_7745c5c3_Err != nil {
@@ -2000,7 +2000,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var94 string
 				templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(*row.UnitPrice))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 690, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 693, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var94))
 				if templ_7745c5c3_Err != nil {
@@ -2023,7 +2023,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var95 string
 			templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", sub.Quantity))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 695, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 698, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var95))
 			if templ_7745c5c3_Err != nil {
@@ -2054,7 +2054,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var96 string
 			templ_7745c5c3_Var96, templ_7745c5c3_Err = templ.JoinStringErrs(formatDate(sub.NextOrderAt))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 707, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 710, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var96))
 			if templ_7745c5c3_Err != nil {
@@ -2072,7 +2072,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var97 string
 			templ_7745c5c3_Var97, templ_7745c5c3_Err = templ.JoinStringErrs(formatDate(sub.NextOrderAt))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 713, Col: 177}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 716, Col: 177}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var97))
 			if templ_7745c5c3_Err != nil {
@@ -2100,7 +2100,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var98 string
 				templ_7745c5c3_Var98, templ_7745c5c3_Err = templ.JoinStringErrs(formatDate(*sub.CancelledAt))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 727, Col: 66}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 730, Col: 66}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var98))
 				if templ_7745c5c3_Err != nil {
@@ -2128,7 +2128,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var99 templ.SafeURL
 			templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/pause"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 742, Col: 103}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 745, Col: 103}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
 			if templ_7745c5c3_Err != nil {
@@ -2147,7 +2147,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var100 templ.SafeURL
 				templ_7745c5c3_Var100, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/undo-skip"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 749, Col: 107}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 752, Col: 107}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var100))
 				if templ_7745c5c3_Err != nil {
@@ -2160,7 +2160,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var101 string
 				templ_7745c5c3_Var101, templ_7745c5c3_Err = templ.JoinStringErrs(formatDate(restoreTo))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 751, Col: 115}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 754, Col: 115}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var101))
 				if templ_7745c5c3_Err != nil {
@@ -2178,7 +2178,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var102 templ.SafeURL
 			templ_7745c5c3_Var102, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/cancel"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 770, Col: 104}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 773, Col: 104}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var102))
 			if templ_7745c5c3_Err != nil {
@@ -2196,7 +2196,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var103 templ.SafeURL
 			templ_7745c5c3_Var103, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/skip"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 785, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 788, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var103))
 			if templ_7745c5c3_Err != nil {
@@ -2209,7 +2209,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var104 string
 			templ_7745c5c3_Var104, templ_7745c5c3_Err = templ.ResolveAttributeValue("skip-count-" + sub.ID.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 788, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 791, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var104)
 			if templ_7745c5c3_Err != nil {
@@ -2222,7 +2222,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var105 string
 			templ_7745c5c3_Var105, templ_7745c5c3_Err = templ.ResolveAttributeValue("skip-count-" + sub.ID.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 790, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 793, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var105)
 			if templ_7745c5c3_Err != nil {
@@ -2240,7 +2240,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var106 string
 				templ_7745c5c3_Var106, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", n))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 795, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 798, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var106)
 				if templ_7745c5c3_Err != nil {
@@ -2253,7 +2253,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var107 string
 				templ_7745c5c3_Var107, templ_7745c5c3_Err = templ.JoinStringErrs(skipShipmentLabel(n))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 795, Col: 70}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 798, Col: 70}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var107))
 				if templ_7745c5c3_Err != nil {
@@ -2276,7 +2276,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var108 templ.SafeURL
 				templ_7745c5c3_Var108, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/skip"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 802, Col: 103}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 805, Col: 103}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var108))
 				if templ_7745c5c3_Err != nil {
@@ -2289,7 +2289,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var109 string
 				templ_7745c5c3_Var109, templ_7745c5c3_Err = templ.ResolveAttributeValue("skip-date-" + sub.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 805, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 808, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var109)
 				if templ_7745c5c3_Err != nil {
@@ -2302,7 +2302,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var110 string
 				templ_7745c5c3_Var110, templ_7745c5c3_Err = templ.ResolveAttributeValue("skip-date-" + sub.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 807, Col: 44}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 810, Col: 44}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var110)
 				if templ_7745c5c3_Err != nil {
@@ -2315,7 +2315,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var111 string
 				templ_7745c5c3_Var111, templ_7745c5c3_Err = templ.ResolveAttributeValue(minDate)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 811, Col: 22}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 814, Col: 22}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var111)
 				if templ_7745c5c3_Err != nil {
@@ -2328,7 +2328,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var112 string
 				templ_7745c5c3_Var112, templ_7745c5c3_Err = templ.ResolveAttributeValue(maxDate)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 812, Col: 22}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 815, Col: 22}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var112)
 				if templ_7745c5c3_Err != nil {
@@ -2341,7 +2341,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var113 string
 				templ_7745c5c3_Var113, templ_7745c5c3_Err = templ.JoinStringErrs(formatDate(sub.NextOrderAt))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 819, Col: 50}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 822, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var113))
 				if templ_7745c5c3_Err != nil {
@@ -2354,7 +2354,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var114 string
 				templ_7745c5c3_Var114, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 819, Col: 154}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 822, Col: 154}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var114))
 				if templ_7745c5c3_Err != nil {
@@ -2372,7 +2372,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 				var templ_7745c5c3_Var115 string
 				templ_7745c5c3_Var115, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 823, Col: 128}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 826, Col: 128}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var115))
 				if templ_7745c5c3_Err != nil {
@@ -2396,7 +2396,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var116 templ.SafeURL
 			templ_7745c5c3_Var116, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/resume"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 831, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 834, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var116))
 			if templ_7745c5c3_Err != nil {
@@ -2408,14 +2408,14 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			}
 		}
 		if sub.Status == domain.SubscriptionStatusPastDue {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 187, "<div class=\"flex flex-wrap items-center gap-2\" x-data=\"{ confirming: false }\"><form method=\"POST\" action=\"/account/billing-portal\"><button type=\"submit\" class=\"btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-5 py-2.5 font-oswald font-bold text-[11px]\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Update payment method <svg class=\"size-3.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z\"></path></svg></button></form><form method=\"POST\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 187, "<div class=\"flex flex-wrap items-center gap-2\" x-data=\"{ confirming: false }\"><!-- hx-boost=\"false\": this 303s to billing.stripe.com, and a boosted\n\t\t\t\t     form posts by XHR where a cross-origin redirect cannot become a\n\t\t\t\t     navigation. Same reasoning as the dunning card link. --><form method=\"POST\" action=\"/account/billing-portal\" hx-boost=\"false\"><button type=\"submit\" class=\"btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-5 py-2.5 font-oswald font-bold text-[11px]\" style=\"letter-spacing:0.16em; text-transform:uppercase;\">Update payment method <svg class=\"size-3.5\" fill=\"none\" viewBox=\"0 0 24 24\" stroke-width=\"2.5\" stroke=\"currentColor\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z\"></path></svg></button></form><form method=\"POST\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var117 templ.SafeURL
 			templ_7745c5c3_Var117, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/retry"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 850, Col: 102}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 856, Col: 102}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var117))
 			if templ_7745c5c3_Err != nil {
@@ -2428,7 +2428,7 @@ func accountSubscriptionCard(row AccountSubscriptionRow, tz *time.Location) temp
 			var templ_7745c5c3_Var118 templ.SafeURL
 			templ_7745c5c3_Var118, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/subscriptions/" + sub.ID.String() + "/cancel"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 858, Col: 104}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 864, Col: 104}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var118))
 			if templ_7745c5c3_Err != nil {
@@ -2579,7 +2579,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 					var templ_7745c5c3_Var123 string
 					templ_7745c5c3_Var123, templ_7745c5c3_Err = templ.JoinStringErrs(addr.FirstName)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 934, Col: 121}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 940, Col: 121}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var123))
 					if templ_7745c5c3_Err != nil {
@@ -2592,7 +2592,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 					var templ_7745c5c3_Var124 string
 					templ_7745c5c3_Var124, templ_7745c5c3_Err = templ.JoinStringErrs(addr.LastName)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 934, Col: 139}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 940, Col: 139}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var124))
 					if templ_7745c5c3_Err != nil {
@@ -2615,7 +2615,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 					var templ_7745c5c3_Var125 string
 					templ_7745c5c3_Var125, templ_7745c5c3_Err = templ.JoinStringErrs(addr.Line1)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 942, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 948, Col: 20}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var125))
 					if templ_7745c5c3_Err != nil {
@@ -2629,7 +2629,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 						var templ_7745c5c3_Var126 string
 						templ_7745c5c3_Var126, templ_7745c5c3_Err = templ.JoinStringErrs(*addr.Line2)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 944, Col: 22}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 950, Col: 22}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var126))
 						if templ_7745c5c3_Err != nil {
@@ -2643,7 +2643,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 					var templ_7745c5c3_Var127 string
 					templ_7745c5c3_Var127, templ_7745c5c3_Err = templ.JoinStringErrs(addr.City)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 946, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 952, Col: 19}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var127))
 					if templ_7745c5c3_Err != nil {
@@ -2656,7 +2656,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 					var templ_7745c5c3_Var128 string
 					templ_7745c5c3_Var128, templ_7745c5c3_Err = templ.JoinStringErrs(addr.State)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 946, Col: 35}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 952, Col: 35}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var128))
 					if templ_7745c5c3_Err != nil {
@@ -2669,7 +2669,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 					var templ_7745c5c3_Var129 string
 					templ_7745c5c3_Var129, templ_7745c5c3_Err = templ.JoinStringErrs(addr.PostalCode)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 946, Col: 55}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 952, Col: 55}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var129))
 					if templ_7745c5c3_Err != nil {
@@ -2687,7 +2687,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 						var templ_7745c5c3_Var130 templ.SafeURL
 						templ_7745c5c3_Var130, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/addresses/" + addr.ID.String() + "/default"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 951, Col: 106}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 957, Col: 106}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var130))
 						if templ_7745c5c3_Err != nil {
@@ -2700,7 +2700,7 @@ func AccountAddressesContent(props AccountAddressesProps) templ.Component {
 						var templ_7745c5c3_Var131 templ.SafeURL
 						templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/account/addresses/" + addr.ID.String() + "/delete"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 954, Col: 105}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 960, Col: 105}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var131))
 						if templ_7745c5c3_Err != nil {
@@ -2767,7 +2767,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var133 templ.SafeURL
 		templ_7745c5c3_Var133, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(action))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 974, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 980, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var133))
 		if templ_7745c5c3_Err != nil {
@@ -2780,7 +2780,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var134 string
 		templ_7745c5c3_Var134, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "first_name"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 977, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 983, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var134)
 		if templ_7745c5c3_Err != nil {
@@ -2793,7 +2793,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var135 string
 		templ_7745c5c3_Var135, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "first_name"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 978, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 984, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var135)
 		if templ_7745c5c3_Err != nil {
@@ -2806,7 +2806,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var136 string
 		templ_7745c5c3_Var136, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrField(addr, "first_name"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 978, Col: 117}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 984, Col: 117}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var136)
 		if templ_7745c5c3_Err != nil {
@@ -2819,7 +2819,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var137 string
 		templ_7745c5c3_Var137, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "last_name"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 982, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 988, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var137)
 		if templ_7745c5c3_Err != nil {
@@ -2832,7 +2832,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var138 string
 		templ_7745c5c3_Var138, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "last_name"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 983, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 989, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var138)
 		if templ_7745c5c3_Err != nil {
@@ -2845,7 +2845,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var139 string
 		templ_7745c5c3_Var139, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrField(addr, "last_name"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 983, Col: 114}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 989, Col: 114}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var139)
 		if templ_7745c5c3_Err != nil {
@@ -2858,7 +2858,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var140 string
 		templ_7745c5c3_Var140, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "company"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 988, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 994, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var140)
 		if templ_7745c5c3_Err != nil {
@@ -2871,7 +2871,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var141 string
 		templ_7745c5c3_Var141, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "company"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 989, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 995, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var141)
 		if templ_7745c5c3_Err != nil {
@@ -2884,7 +2884,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var142 string
 		templ_7745c5c3_Var142, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrField(addr, "company"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 989, Col: 107}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 995, Col: 107}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var142)
 		if templ_7745c5c3_Err != nil {
@@ -2897,7 +2897,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var143 string
 		templ_7745c5c3_Var143, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "line1"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 993, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 999, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var143)
 		if templ_7745c5c3_Err != nil {
@@ -2910,7 +2910,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var144 string
 		templ_7745c5c3_Var144, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "line1"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 994, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1000, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var144)
 		if templ_7745c5c3_Err != nil {
@@ -2923,7 +2923,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var145 string
 		templ_7745c5c3_Var145, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrField(addr, "line1"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 994, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1000, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var145)
 		if templ_7745c5c3_Err != nil {
@@ -2936,7 +2936,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var146 string
 		templ_7745c5c3_Var146, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "line2"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 998, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1004, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var146)
 		if templ_7745c5c3_Err != nil {
@@ -2949,7 +2949,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var147 string
 		templ_7745c5c3_Var147, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "line2"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 999, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1005, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var147)
 		if templ_7745c5c3_Err != nil {
@@ -2962,7 +2962,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var148 string
 		templ_7745c5c3_Var148, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrField(addr, "line2"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 999, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1005, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var148)
 		if templ_7745c5c3_Err != nil {
@@ -2975,7 +2975,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var149 string
 		templ_7745c5c3_Var149, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "city"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1004, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1010, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var149)
 		if templ_7745c5c3_Err != nil {
@@ -2988,7 +2988,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var150 string
 		templ_7745c5c3_Var150, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "city"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1005, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1011, Col: 53}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var150)
 		if templ_7745c5c3_Err != nil {
@@ -3001,7 +3001,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var151 string
 		templ_7745c5c3_Var151, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrField(addr, "city"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1005, Col: 99}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1011, Col: 99}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var151)
 		if templ_7745c5c3_Err != nil {
@@ -3014,7 +3014,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var152 string
 		templ_7745c5c3_Var152, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "state"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1009, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1015, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var152)
 		if templ_7745c5c3_Err != nil {
@@ -3027,7 +3027,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var153 string
 		templ_7745c5c3_Var153, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "state"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1010, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1016, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var153)
 		if templ_7745c5c3_Err != nil {
@@ -3040,7 +3040,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var154 string
 		templ_7745c5c3_Var154, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrField(addr, "state"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1010, Col: 102}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1016, Col: 102}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var154)
 		if templ_7745c5c3_Err != nil {
@@ -3053,7 +3053,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var155 string
 		templ_7745c5c3_Var155, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "postal_code"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1014, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1020, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var155)
 		if templ_7745c5c3_Err != nil {
@@ -3066,7 +3066,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var156 string
 		templ_7745c5c3_Var156, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrInputID(addr, "postal_code"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1015, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1021, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var156)
 		if templ_7745c5c3_Err != nil {
@@ -3079,7 +3079,7 @@ func addressForm(action string, addr *domain.Address) templ.Component {
 		var templ_7745c5c3_Var157 string
 		templ_7745c5c3_Var157, templ_7745c5c3_Err = templ.ResolveAttributeValue(addrField(addr, "postal_code"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1015, Col: 120}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/storefront/account.templ`, Line: 1021, Col: 120}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var157)
 		if templ_7745c5c3_Err != nil {

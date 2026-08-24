@@ -216,6 +216,7 @@ func (p *ShippoProvider) createShipment(ctx context.Context, req LabelRequest) (
 		AddressFrom: shippoAddress{
 			Name:    req.FromName,
 			Street1: req.FromStreet1,
+			Street2: req.FromStreet2,
 			City:    req.FromCity,
 			State:   req.FromState,
 			Zip:     req.FromZip,
@@ -226,6 +227,7 @@ func (p *ShippoProvider) createShipment(ctx context.Context, req LabelRequest) (
 		AddressTo: shippoAddress{
 			Name:    req.ToName,
 			Street1: req.ToStreet1,
+			Street2: req.ToStreet2,
 			City:    req.ToCity,
 			State:   req.ToState,
 			Zip:     req.ToZip,
@@ -400,6 +402,7 @@ func dollarsStringToCents(s string) (int, error) {
 type shippoAddress struct {
 	Name    string `json:"name"`
 	Street1 string `json:"street1"`
+	Street2 string `json:"street2,omitempty"`
 	City    string `json:"city"`
 	State   string `json:"state"`
 	Zip     string `json:"zip"`

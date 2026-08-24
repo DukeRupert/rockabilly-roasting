@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -279,6 +280,7 @@ func (s *FulfillmentService) PrepareLabelRequest(
 	return shipping.LabelRequest{
 		FromName:    cfg.OriginName,
 		FromStreet1: cfg.OriginStreet1,
+		FromStreet2: strings.TrimSpace(cfg.OriginStreet2),
 		FromCity:    cfg.OriginCity,
 		FromState:   cfg.OriginState,
 		FromZip:     cfg.OriginZip,
@@ -287,6 +289,7 @@ func (s *FulfillmentService) PrepareLabelRequest(
 		FromPhone:   cfg.OriginPhone,
 		ToName:      joinName(addr.FirstName, addr.LastName),
 		ToStreet1:   addr.Line1,
+		ToStreet2:   strings.TrimSpace(derefString(addr.Line2)),
 		ToCity:      addr.City,
 		ToState:     addr.State,
 		ToZip:       addr.PostalCode,
@@ -508,6 +511,17 @@ func (s *FulfillmentService) ResolveRefund(ctx context.Context, tx pgx.Tx, shipm
 		return fmt.Errorf("audit refund resolved: %w", err)
 	}
 	return nil
+}
+
+// derefString reads through a nil-able string. Callers that put the result on
+// the wire trim it themselves — a whitespace-only value would otherwise defeat
+// the `omitempty` on the provider's optional fields, the same guard
+// domain.FormatForGeocode applies to Line2.
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 func derefUUID(p *uuid.UUID) uuid.UUID {

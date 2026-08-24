@@ -27,6 +27,7 @@ func (p *EasyPostProvider) CreateLabel(ctx context.Context, req LabelRequest) (*
 		FromAddress: &easypost.Address{
 			Name:    req.FromName,
 			Street1: req.FromStreet1,
+			Street2: req.FromStreet2,
 			City:    req.FromCity,
 			State:   req.FromState,
 			Zip:     req.FromZip,
@@ -35,6 +36,7 @@ func (p *EasyPostProvider) CreateLabel(ctx context.Context, req LabelRequest) (*
 		ToAddress: &easypost.Address{
 			Name:    req.ToName,
 			Street1: req.ToStreet1,
+			Street2: req.ToStreet2,
 			City:    req.ToCity,
 			State:   req.ToState,
 			Zip:     req.ToZip,

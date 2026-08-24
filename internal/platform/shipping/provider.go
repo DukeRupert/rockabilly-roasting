@@ -10,6 +10,10 @@ import "context"
 type LabelRequest struct {
 	FromName    string
 	FromStreet1 string
+	// FromStreet2 / ToStreet2 carry the secondary address line (apartment,
+	// suite, unit). Optional, but dropping it gets mail returned for any
+	// address where the unit number is what makes it deliverable.
+	FromStreet2 string
 	FromCity    string
 	FromState   string
 	FromZip     string
@@ -18,6 +22,7 @@ type LabelRequest struct {
 	FromPhone   string
 	ToName      string
 	ToStreet1   string
+	ToStreet2   string
 	ToCity      string
 	ToState     string
 	ToZip       string

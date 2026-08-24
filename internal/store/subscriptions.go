@@ -242,23 +242,32 @@ func (s *SubscriptionStore) UpdateStatus(ctx context.Context, tx pgx.Tx, id uuid
 // permanently blocked, so no later renewal attempt charges that card again.
 // declineCode is the issuer's reason, kept for staff and for the customer-facing
 // copy; it may be empty when the provider gave a decline without one.
-// paymentMethodID is the card that died — recording it is what lets the latch
-// release when the customer puts a different one on file.
+// deadPaymentMethods is every card known to be dead on this run — recording them
+// is what lets the latch release when the customer puts a different one on file,
+// and keeping the whole set is what stops a second dead card from making the
+// first one look chargeable again.
 //
 // Scoped to status = 'past_due' so a race against a charge that succeeded in the
 // meantime cannot brand a now-active subscription as dead.
-func (s *SubscriptionStore) SetDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID, declineCode, paymentMethodID string) (err error) {
+func (s *SubscriptionStore) SetDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID, declineCode string, deadPaymentMethods []string) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.set_dunning_hard_decline", time.Now(), &err)
+	// deadPaymentMethods is written whole rather than appended to, because the
+	// caller has already merged the new card into the set it read. Doing the
+	// merge here would need a read-modify-write inside the same statement for no
+	// benefit — the caller is holding the subscription either way.
+	if deadPaymentMethods == nil {
+		deadPaymentMethods = []string{}
+	}
 	_, err = tx.Exec(ctx,
 		`UPDATE subscriptions
 		 SET metadata = jsonb_set(
 		         jsonb_set(
 		             jsonb_set(COALESCE(metadata, '{}'::jsonb), '{dunning_hard_decline}', 'true'::jsonb),
 		             '{dunning_decline_code}', to_jsonb($2::text)),
-		         '{dunning_dead_payment_method}', to_jsonb($3::text)),
+		         '{dunning_dead_payment_methods}', to_jsonb($3::text[])),
 		     updated_at = now()
 		 WHERE id = $1 AND status = 'past_due'`,
-		id, declineCode, paymentMethodID,
+		id, declineCode, deadPaymentMethods,
 	)
 	if err != nil {
 		return fmt.Errorf("set dunning hard decline: %w", err)
@@ -347,7 +356,8 @@ func (s *SubscriptionStore) ClearDunning(ctx context.Context, tx pgx.Tx, id uuid
 		`UPDATE subscriptions
 		 SET metadata = metadata - 'dunning_attempt' - 'dunning_acknowledged_at'
 		                         - 'dunning_hard_decline' - 'dunning_decline_code'
-		                         - 'dunning_dead_payment_method',
+		                         - 'dunning_dead_payment_method'
+		                         - 'dunning_dead_payment_methods',
 		     updated_at = now()
 		 WHERE id = $1`,
 		id,

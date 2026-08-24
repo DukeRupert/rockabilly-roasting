@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -266,11 +267,11 @@ type dunningVerdict struct {
 	emailStage int
 	// hardDecline is whether charging is stopped after this failure.
 	hardDecline bool
-	// declineCode and deadPM describe the card we refuse to charge again. Both
-	// carry forward from the subscription when this failure says nothing new,
-	// because later rungs do not charge and so learn nothing.
+	// declineCode names the issuer's reason and deadPMs every card we refuse to
+	// charge again. Both carry forward from the subscription when this failure
+	// says nothing new, because later rungs do not charge and so learn nothing.
 	declineCode string
-	deadPM      string
+	deadPMs     []string
 }
 
 // dunningVerdictFor decides what a failed charge means. Pure: no clock, no
@@ -286,7 +287,7 @@ func dunningVerdictFor(sub *domain.Subscription, paymentMethodID string, cause e
 		// nothing new to say, and must not be read as an all-clear.
 		hardDecline: sub.DunningHardDeclined(),
 		declineCode: sub.DunningDeclineCode(),
-		deadPM:      sub.DunningDeadPaymentMethod(),
+		deadPMs:     sub.DunningDeadPaymentMethods(),
 	}
 
 	var declineErr *payments.DeclineError
@@ -297,10 +298,16 @@ func dunningVerdictFor(sub *domain.Subscription, paymentMethodID string, cause e
 		if declineErr.Permanent() {
 			v.hardDecline = true
 			// Only a permanent decline names a dead card. A soft decline must
-			// not overwrite the record with the card that just failed
-			// recoverably — that card is still worth retrying.
-			if paymentMethodID != "" {
-				v.deadPM = paymentMethodID
+			// not add the card that just failed recoverably — that card is still
+			// worth retrying.
+			//
+			// Added to the set, never replacing it: a customer who replaces a
+			// dead card with another dead one must not make the first one look
+			// chargeable again. Forgetting it had the ladder alternate between
+			// two cards that could never work, burning every remaining attempt
+			// and taking a network fine for each.
+			if paymentMethodID != "" && !slices.Contains(v.deadPMs, paymentMethodID) {
+				v.deadPMs = append(v.deadPMs, paymentMethodID)
 			}
 		}
 	}
@@ -367,7 +374,7 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 		return err
 	}
 	if v.hardDecline {
-		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, v.declineCode, v.deadPM); err != nil {
+		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, v.declineCode, v.deadPMs); err != nil {
 			return fmt.Errorf("flag hard decline: %w", err)
 		}
 	}
@@ -474,7 +481,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	// card via Stripe Billing Portal). Fall back to the first attached method
 	// for legacy customers without a default. ListPaymentMethods returns every
 	// attached PM regardless of type, which is required for Stripe Link users.
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, sub.DunningDeadPaymentMethod())
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, sub.DunningDeadPaymentMethods())
 	if err != nil {
 		return nil, err
 	}
@@ -835,9 +842,9 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 
 	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
 
-	// No card to avoid: every subscription with a dead-card record is filtered
+	// No cards to avoid: every subscription with a dead-card record is filtered
 	// out above, so nothing in this group has one.
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, "")
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1021,10 +1028,10 @@ func ptrVal(s *string) string {
 // off-session renewal. Returns the empty string when the customer has no usable
 // method (caller marks the subscription past_due).
 //
-// avoid names a card already known to be permanently dead. It is skipped in
-// favour of anything else on file, and returned only when it is the only card
-// there is — which is how the caller tells "they added a replacement" from
-// "the dead card is still all they have".
+// avoid names cards already known to be permanently dead. They are skipped in
+// favour of anything else on file, and one is returned only when nothing else is
+// there — which is how the caller tells "they added a replacement" from "the
+// dead cards are still all they have".
 //
 // Skipping matters because a customer can add a card without it becoming the
 // default. Stripe's payment_method_update flow does set the default, but the
@@ -1032,17 +1039,17 @@ func ptrVal(s *string) string {
 // working second card would strand exactly the customer who did what we asked.
 //
 // Resolution order:
-//  1. Customer's default_payment_method, unless that is the dead card.
-//  2. First attached method that is not the dead card (legacy customers without
-//     a default, or a customer whose default is the dead one).
-//  3. The dead card itself, if nothing else is attached.
-func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCustomerID, avoid string) (string, error) {
+//  1. Customer's default_payment_method, unless it is a dead card.
+//  2. First attached method that is not a dead card (legacy customers without a
+//     default, or a customer whose default is dead).
+//  3. A dead card, if nothing else is attached.
+func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCustomerID string, avoid []string) (string, error) {
 	stripeCust, err := s.payments.GetCustomer(ctx, stripeCustomerID)
 	if err != nil {
 		return "", fmt.Errorf("get stripe customer: %w", err)
 	}
 	defaultPM := stripeCust.DefaultPaymentMethodID
-	if defaultPM != "" && defaultPM != avoid {
+	if defaultPM != "" && !slices.Contains(avoid, defaultPM) {
 		return defaultPM, nil
 	}
 
@@ -1051,12 +1058,12 @@ func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCus
 		return "", fmt.Errorf("list payment methods: %w", err)
 	}
 	for _, m := range methods {
-		if m.ID != avoid {
+		if !slices.Contains(avoid, m.ID) {
 			return m.ID, nil
 		}
 	}
 
-	// Only the dead card remains (or nothing at all). Hand it back so the caller
+	// Only dead cards remain (or nothing at all). Hand one back so the caller
 	// blocks the charge rather than mistaking this for "no payment method".
 	if defaultPM != "" {
 		return defaultPM, nil

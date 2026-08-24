@@ -106,14 +106,14 @@ func TestSubscriptionStore_ClearDunning(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, s.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Hour), 2))
-	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "lost_card", "pm_dead"))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "lost_card", []string{"pm_dead"}))
 
 	// Sanity: the latch actually landed, so the assertions below are meaningful.
 	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
 	require.NoError(t, err)
 	require.Equal(t, true, got.Metadata["dunning_hard_decline"])
 	require.Equal(t, "lost_card", got.Metadata["dunning_decline_code"])
-	require.Equal(t, "pm_dead", got.Metadata["dunning_dead_payment_method"])
+	require.Equal(t, []string{"pm_dead"}, got.DunningDeadPaymentMethods())
 
 	require.NoError(t, s.ClearDunning(ctx, tx, sub.ID))
 	got, err = s.GetByIDAsStaff(ctx, tx, sub.ID)
@@ -126,8 +126,7 @@ func TestSubscriptionStore_ClearDunning(t *testing.T) {
 	assert.False(t, hasHard, "dunning_hard_decline cleared")
 	_, hasCode := got.Metadata["dunning_decline_code"]
 	assert.False(t, hasCode, "dunning_decline_code cleared")
-	_, hasPM := got.Metadata["dunning_dead_payment_method"]
-	assert.False(t, hasPM, "dunning_dead_payment_method cleared")
+	assert.Empty(t, got.DunningDeadPaymentMethods(), "dead-card set cleared")
 }
 
 // TestSubscriptionStore_SetDunningHardDecline verifies the latch only lands on a
@@ -153,7 +152,7 @@ func TestSubscriptionStore_SetDunningHardDecline(t *testing.T) {
 	require.NoError(t, err)
 
 	// Active subscription: the latch is a no-op.
-	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card", "pm_dead"))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card", []string{"pm_dead"}))
 	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
 	require.NoError(t, err)
 	_, hasHard := got.Metadata["dunning_hard_decline"]
@@ -161,12 +160,12 @@ func TestSubscriptionStore_SetDunningHardDecline(t *testing.T) {
 
 	// Once past_due it takes.
 	require.NoError(t, s.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Hour), 1))
-	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card", "pm_dead"))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card", []string{"pm_dead"}))
 	got, err = s.GetByIDAsStaff(ctx, tx, sub.ID)
 	require.NoError(t, err)
 	assert.Equal(t, true, got.Metadata["dunning_hard_decline"])
 	assert.Equal(t, "stolen_card", got.Metadata["dunning_decline_code"])
-	assert.Equal(t, "pm_dead", got.Metadata["dunning_dead_payment_method"])
+	assert.Equal(t, []string{"pm_dead"}, got.DunningDeadPaymentMethods())
 }
 
 // TestSubscriptionStore_ReleaseDunningHardDecline is the release valve for the
@@ -194,7 +193,7 @@ func TestSubscriptionStore_ReleaseDunningHardDecline(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, s.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Hour), 2))
-	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "lost_card", "pm_dead"))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "lost_card", []string{"pm_dead"}))
 
 	require.NoError(t, s.ReleaseDunningHardDecline(ctx, tx, sub.ID))
 	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
@@ -205,7 +204,7 @@ func TestSubscriptionStore_ReleaseDunningHardDecline(t *testing.T) {
 	// The dead card's record must outlive the release. It is what stops the next
 	// rung falling back to a card the issuer killed once the replacement card is
 	// gone — erasing it here would quietly re-authorise charging the dead card.
-	assert.Equal(t, "pm_dead", got.DunningDeadPaymentMethod(), "dead card record survives release")
+	assert.Equal(t, []string{"pm_dead"}, got.DunningDeadPaymentMethods(), "dead card record survives release")
 	assert.Equal(t, "lost_card", got.DunningDeclineCode(), "issuer reason survives release")
 	assert.True(t, got.DunningChargeBlocked("pm_dead"), "dead card still refused after release")
 	assert.False(t, got.DunningChargeBlocked("pm_new"), "a different card charges")
@@ -219,7 +218,7 @@ func TestSubscriptionStore_ReleaseDunningHardDecline(t *testing.T) {
 	require.NoError(t, s.ClearDunning(ctx, tx, sub.ID))
 	got, err = s.GetByIDAsStaff(ctx, tx, sub.ID)
 	require.NoError(t, err)
-	assert.Empty(t, got.DunningDeadPaymentMethod())
+	assert.Empty(t, got.DunningDeadPaymentMethods())
 	assert.Empty(t, got.DunningDeclineCode())
 	assert.False(t, got.DunningChargeBlocked("pm_dead"), "a recovered subscription starts clean")
 }

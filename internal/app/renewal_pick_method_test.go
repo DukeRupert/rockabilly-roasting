@@ -43,7 +43,7 @@ func (s *stubPaymentMethods) ListPaymentMethods(context.Context, string) ([]paym
 // email asked.
 func TestPickRenewalPaymentMethodAvoidsDeadCard(t *testing.T) {
 	ctx := context.Background()
-	pick := func(defaultPM string, attached []string, avoid string) string {
+	pick := func(defaultPM string, attached []string, avoid ...string) string {
 		s := &RenewalService{payments: &stubPaymentMethods{defaultPM: defaultPM, attached: attached}}
 		got, err := s.pickRenewalPaymentMethod(ctx, "cus_x", avoid)
 		require.NoError(t, err)
@@ -51,11 +51,11 @@ func TestPickRenewalPaymentMethodAvoidsDeadCard(t *testing.T) {
 	}
 
 	t.Run("no dead card: default wins", func(t *testing.T) {
-		assert.Equal(t, "pm_default", pick("pm_default", []string{"pm_other"}, ""))
+		assert.Equal(t, "pm_default", pick("pm_default", []string{"pm_other"}))
 	})
 
 	t.Run("no default: first attached", func(t *testing.T) {
-		assert.Equal(t, "pm_first", pick("", []string{"pm_first", "pm_second"}, ""))
+		assert.Equal(t, "pm_first", pick("", []string{"pm_first", "pm_second"}))
 	})
 
 	t.Run("dead card is the default, a working card exists", func(t *testing.T) {
@@ -77,6 +77,6 @@ func TestPickRenewalPaymentMethodAvoidsDeadCard(t *testing.T) {
 
 	t.Run("nothing on file at all", func(t *testing.T) {
 		assert.Empty(t, pick("", nil, "pm_dead"))
-		assert.Empty(t, pick("", nil, ""))
+		assert.Empty(t, pick("", nil))
 	})
 }

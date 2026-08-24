@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -240,7 +241,7 @@ func TestReleaseDunningHardDeclineLatch(t *testing.T) {
 
 	// The dead card's record survives the release — releasing the latch says
 	// "charge the new card", not "forget which card was dead".
-	assert.Equal(t, "pm_dead", sub.DunningDeadPaymentMethod())
+	assert.Equal(t, []string{"pm_dead"}, sub.DunningDeadPaymentMethods())
 	assert.True(t, sub.DunningChargeBlocked("pm_dead"), "the dead card stays refused")
 
 	// The ladder and everything unrelated survive: releasing the latch is not a
@@ -264,7 +265,7 @@ func applyVerdict(sub *domain.Subscription, v dunningVerdict) {
 	if v.hardDecline {
 		sub.Metadata[domain.SubscriptionMetaDunningHardDecline] = true
 		sub.Metadata[domain.SubscriptionMetaDunningDeclineCode] = v.declineCode
-		sub.Metadata[domain.SubscriptionMetaDunningDeadPaymentMethod] = v.deadPM
+		sub.Metadata[domain.SubscriptionMetaDunningDeadPaymentMethods] = v.deadPMs
 	}
 }
 
@@ -286,7 +287,7 @@ func TestDunningStoryDeadCardThenReplacement(t *testing.T) {
 	v := dunningVerdictFor(sub, "pm_dead", hard)
 	require.Equal(t, 1, v.attempt)
 	require.True(t, v.hardDecline)
-	assert.Equal(t, "pm_dead", v.deadPM)
+	assert.Equal(t, []string{"pm_dead"}, v.deadPMs)
 	assert.Equal(t, "lost_card", v.declineCode)
 	assert.Equal(t, dunningEmailFirst, v.emailStage, "the customer is told immediately")
 	applyVerdict(sub, v)
@@ -300,7 +301,7 @@ func TestDunningStoryDeadCardThenReplacement(t *testing.T) {
 	v = dunningVerdictFor(sub, "pm_dead", nil)
 	require.True(t, v.hardDecline, "a rung that does not charge cannot clear the verdict")
 	assert.Equal(t, "lost_card", v.declineCode, "the issuer's reason survives a silent rung")
-	assert.Equal(t, "pm_dead", v.deadPM)
+	assert.Equal(t, []string{"pm_dead"}, v.deadPMs)
 	assert.Equal(t, dunningEmailSilent, v.emailStage)
 	applyVerdict(sub, v)
 
@@ -314,7 +315,7 @@ func TestDunningStoryDeadCardThenReplacement(t *testing.T) {
 	// told their new card is dead too.
 	v = dunningVerdictFor(sub, "pm_new", soft)
 	require.False(t, v.hardDecline, "a soft decline on the replacement must not re-latch")
-	assert.Equal(t, "pm_dead", v.deadPM, "the dead card is still remembered")
+	assert.Equal(t, []string{"pm_dead"}, v.deadPMs, "the dead card is still remembered")
 	assert.Equal(t, "insufficient_funds", v.declineCode)
 	applyVerdict(sub, v)
 
@@ -334,15 +335,88 @@ func TestDunningStoryDeadCardThenReplacement(t *testing.T) {
 	assert.True(t, sub.DunningHardDeclined())
 }
 
+// TestDunningStoryTwoDeadCards continues the story down the branch the first one
+// stops short of: the replacement card is *also* permanently dead.
+//
+// A customer whose card was stolen often replaces it with another from the same
+// compromised batch, so this is not exotic. Remembering only the most recent
+// dead card made the previous one look chargeable again, and the ladder
+// alternated between two cards that could never work — every remaining attempt
+// spent, and a network fine for each.
+func TestDunningStoryTwoDeadCards(t *testing.T) {
+	sub := &domain.Subscription{}
+	lost := &payments.DeclineError{DeclineCode: "lost_card"}
+	stolen := &payments.DeclineError{DeclineCode: "stolen_card"}
+
+	// pm_A dies.
+	v := dunningVerdictFor(sub, "pm_A", lost)
+	applyVerdict(sub, v)
+	require.True(t, sub.DunningChargeBlocked("pm_A"))
+
+	// Customer adds pm_B; it is chargeable, so the latch releases and we try it.
+	require.False(t, sub.DunningChargeBlocked("pm_B"))
+	sub.ReleaseDunningHardDeclineLatch()
+
+	// pm_B is dead too.
+	v = dunningVerdictFor(sub, "pm_B", stolen)
+	require.True(t, v.hardDecline)
+	assert.ElementsMatch(t, []string{"pm_A", "pm_B"}, v.deadPMs,
+		"both dead cards are remembered — the set must not be replaced")
+	applyVerdict(sub, v)
+
+	// Neither card may ever be charged again. Forgetting pm_A here is what let
+	// the ladder ping-pong between them.
+	assert.True(t, sub.DunningChargeBlocked("pm_A"), "the first dead card is still refused")
+	assert.True(t, sub.DunningChargeBlocked("pm_B"), "the second dead card is refused")
+	assert.False(t, sub.DunningChargeBlocked("pm_C"), "a genuinely new card is still chargeable")
+	assert.True(t, sub.DunningHasDeadCard())
+}
+
+// TestPickRenewalPaymentMethodAvoidsEveryDeadCard is the picker half of the
+// same story: with two dead cards on file it must reach past both.
+func TestPickRenewalPaymentMethodAvoidsEveryDeadCard(t *testing.T) {
+	ctx := context.Background()
+	s := &RenewalService{payments: &stubPaymentMethods{
+		defaultPM: "pm_A",
+		attached:  []string{"pm_A", "pm_B", "pm_C"},
+	}}
+
+	got, err := s.pickRenewalPaymentMethod(ctx, "cus_x", []string{"pm_A", "pm_B"})
+	require.NoError(t, err)
+	assert.Equal(t, "pm_C", got, "must skip past every dead card, not just the first")
+
+	// Nothing but dead cards: hand one back so the gate blocks, rather than ""
+	// which would report "no payment method on file".
+	got, err = s.pickRenewalPaymentMethod(ctx, "cus_x", []string{"pm_A", "pm_B", "pm_C"})
+	require.NoError(t, err)
+	assert.Contains(t, []string{"pm_A", "pm_B", "pm_C"}, got)
+}
+
+// TestDunningDeadPaymentMethodsLegacyKey: rows written before the set existed
+// carry a single-card key, and must keep refusing the card they recorded.
+func TestDunningDeadPaymentMethodsLegacyKey(t *testing.T) {
+	sub := &domain.Subscription{Metadata: map[string]any{
+		domain.SubscriptionMetaDunningHardDecline:       true,
+		domain.SubscriptionMetaDunningDeadPaymentMethod: "pm_old",
+	}}
+	assert.Equal(t, []string{"pm_old"}, sub.DunningDeadPaymentMethods())
+	assert.True(t, sub.DunningChargeBlocked("pm_old"))
+	assert.False(t, sub.DunningChargeBlocked("pm_new"))
+
+	// Both keys present (a row mid-upgrade) merges without duplicating.
+	sub.Metadata[domain.SubscriptionMetaDunningDeadPaymentMethods] = []any{"pm_old", "pm_second"}
+	assert.ElementsMatch(t, []string{"pm_old", "pm_second"}, sub.DunningDeadPaymentMethods())
+}
+
 // TestDunningVerdictExpiry pins the end of the ladder, including that the final
 // verdict still carries the card verdict forward — the "subscription ended"
 // audit record is the last thing that can say why.
 func TestDunningVerdictExpiry(t *testing.T) {
 	sub := &domain.Subscription{Metadata: map[string]any{
-		domain.SubscriptionMetaDunningAttempt:           float64(MaxDunningAttempts - 1),
-		domain.SubscriptionMetaDunningHardDecline:       true,
-		domain.SubscriptionMetaDunningDeclineCode:       "stolen_card",
-		domain.SubscriptionMetaDunningDeadPaymentMethod: "pm_dead",
+		domain.SubscriptionMetaDunningAttempt:            float64(MaxDunningAttempts - 1),
+		domain.SubscriptionMetaDunningHardDecline:        true,
+		domain.SubscriptionMetaDunningDeclineCode:        "stolen_card",
+		domain.SubscriptionMetaDunningDeadPaymentMethods: []string{"pm_dead"},
 	}}
 
 	v := dunningVerdictFor(sub, "pm_dead", nil)
@@ -360,13 +434,13 @@ func TestDunningVerdictSoftDeclineNeverNamesADeadCard(t *testing.T) {
 	v := dunningVerdictFor(&domain.Subscription{}, "pm_fine",
 		&payments.DeclineError{DeclineCode: "do_not_honor"})
 	assert.False(t, v.hardDecline)
-	assert.Empty(t, v.deadPM)
+	assert.Empty(t, v.deadPMs)
 	assert.Equal(t, "do_not_honor", v.declineCode)
 
 	// A non-card error (an outage, a network blip) says nothing about the card
 	// at all and must not advance any verdict beyond the attempt count.
 	v = dunningVerdictFor(&domain.Subscription{}, "pm_fine", errors.New("connection reset"))
 	assert.False(t, v.hardDecline)
-	assert.Empty(t, v.deadPM)
+	assert.Empty(t, v.deadPMs)
 	assert.Empty(t, v.declineCode)
 }

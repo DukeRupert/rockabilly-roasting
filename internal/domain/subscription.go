@@ -176,12 +176,22 @@ const (
 	SubscriptionMetaDunningHardDecline = "dunning_hard_decline"
 	// SubscriptionMetaDunningDeclineCode is the issuer's last stated reason.
 	SubscriptionMetaDunningDeclineCode = "dunning_decline_code"
-	// SubscriptionMetaDunningDeadPaymentMethod is the payment method that came
-	// back permanently declined. It is what lets the hard-decline latch release
-	// on its own: when the customer puts a different card on file, the method we
-	// would charge no longer matches this one, and the subscription goes back
-	// into the normal charge path. Without it the latch would be a trap — no
-	// charge is attempted, so no charge can ever succeed to clear it.
+	// SubscriptionMetaDunningDeadPaymentMethods lists every payment method that
+	// has come back permanently declined on this past-due run. It is what lets
+	// the hard-decline latch release on its own: when the customer puts a card
+	// on file that is not in this set, the subscription goes back into the
+	// normal charge path. Without it the latch would be a trap — no charge is
+	// attempted, so no charge can ever succeed to clear it.
+	//
+	// A set, not a single card, because a customer can replace a dead card with
+	// another dead one. Remembering only the latest meant the previous card
+	// looked chargeable again, and the ladder alternated between two cards that
+	// could never work — spending every remaining attempt, and every attempt
+	// carries a network fine.
+	SubscriptionMetaDunningDeadPaymentMethods = "dunning_dead_payment_methods"
+	// SubscriptionMetaDunningDeadPaymentMethod is the superseded single-card
+	// form of the key above. Read-only, so rows written by an earlier build
+	// still refuse the card they recorded.
 	SubscriptionMetaDunningDeadPaymentMethod = "dunning_dead_payment_method"
 )
 
@@ -282,7 +292,7 @@ func (s *Subscription) LatchDunningHardDeclineMeta() {
 // Routing on the latch alone sent released subscriptions back into batching,
 // where nothing knew which card to avoid and the dead one got charged again.
 func (s *Subscription) DunningHasDeadCard() bool {
-	return s.DunningHardDeclined() || s.DunningDeadPaymentMethod() != ""
+	return s.DunningHardDeclined() || len(s.DunningDeadPaymentMethods()) > 0
 }
 
 // DunningChargeBlocked reports whether a renewal charge must be skipped, given
@@ -297,8 +307,13 @@ func (s *Subscription) DunningHasDeadCard() bool {
 // An empty paymentMethodID (nothing on file) is not blocked here; that case has
 // its own failure path upstream and must stay reachable.
 func (s *Subscription) DunningChargeBlocked(paymentMethodID string) bool {
-	if dead := s.DunningDeadPaymentMethod(); dead != "" {
-		return dead == paymentMethodID
+	if dead := s.DunningDeadPaymentMethods(); len(dead) > 0 {
+		for _, id := range dead {
+			if id == paymentMethodID {
+				return true
+			}
+		}
+		return false
 	}
 	// Latched but with no recorded card — a row written before the card was
 	// tracked, or a decline we could not attribute. We cannot tell old from new,
@@ -307,14 +322,43 @@ func (s *Subscription) DunningChargeBlocked(paymentMethodID string) bool {
 	return s.DunningHardDeclined()
 }
 
-// DunningDeadPaymentMethod returns the payment method that hard-declined, or ""
-// when none was recorded.
-func (s *Subscription) DunningDeadPaymentMethod() string {
+// DunningDeadPaymentMethods returns every payment method recorded as
+// permanently declined on this past-due run, newest last. Empty when none is
+// recorded.
+//
+// Reads the superseded single-card key too, so a subscription written by an
+// earlier build keeps refusing the card it recorded.
+func (s *Subscription) DunningDeadPaymentMethods() []string {
 	if s.Metadata == nil {
-		return ""
+		return nil
 	}
-	v, _ := s.Metadata[SubscriptionMetaDunningDeadPaymentMethod].(string)
-	return v
+	var out []string
+	seen := map[string]bool{}
+	add := func(id string) {
+		if id == "" || seen[id] {
+			return
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+
+	if legacy, ok := s.Metadata[SubscriptionMetaDunningDeadPaymentMethod].(string); ok {
+		add(legacy)
+	}
+	// jsonb arrays decode as []any of string; tolerate []string for callers that
+	// built the value in Go without a round-trip.
+	switch raw := s.Metadata[SubscriptionMetaDunningDeadPaymentMethods].(type) {
+	case []any:
+		for _, item := range raw {
+			id, _ := item.(string)
+			add(id)
+		}
+	case []string:
+		for _, id := range raw {
+			add(id)
+		}
+	}
+	return out
 }
 
 // DunningDeclineCode returns the issuer's last stated reason for declining

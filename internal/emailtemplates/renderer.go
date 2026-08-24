@@ -166,7 +166,7 @@ type QBInvoiceAlertData struct {
 // QBTokenAlertData holds data for the staff warning that the QuickBooks
 // connection (refresh token) is about to lapse or already has.
 type QBTokenAlertData struct {
-	DaysLeft    int  // days until the refresh token expires; <= 0 when expired
+	DaysLeft    int // days until the refresh token expires; <= 0 when expired
 	Expired     bool
 	ExpiresAt   time.Time
 	SettingsURL string // admin settings page with the Reconnect button
@@ -249,8 +249,8 @@ type OrderReminderData struct {
 	// UnsubscribeURL is the signed one-off opt-out link. Empty when no signing
 	// secret is configured; the footer then falls back to asking them to reply.
 	UnsubscribeURL string
-	StoreName     string
-	StoreURL      string
+	StoreName      string
+	StoreURL       string
 }
 
 // WholesaleNoticeData holds data for a staff-composed one-off notice sent to
@@ -340,14 +340,28 @@ type SubscriptionRenewalReceiptData struct {
 	AccountURL    string
 }
 
-// SubscriptionPastDueData holds data for the past-due / payment-failed notice.
+// SubscriptionPastDueData holds data for every rung of the past-due email
+// ladder — the first notice, the mid-window reminder, and the final warning all
+// render from this one shape.
 type SubscriptionPastDueData struct {
 	CustomerName string
 	ProductName  string
 	PlanName     string
-	StoreName    string
-	StoreURL     string
-	AccountURL   string
+	// HardDecline is true when the issuer has permanently blocked the card. The
+	// copy swaps to "this card won't work again, add a different one", because
+	// telling someone to check with their bank about a card reported stolen
+	// wastes their time.
+	HardDecline bool
+	// EndsOn is the day the subscription is given up on if nothing changes.
+	EndsOn    time.Time
+	StoreName string
+	StoreURL  string
+	// AccountURL is the signed-in account page — the fallback call to action.
+	AccountURL string
+	// UpdateCardURL is the one-click card link, empty when the signer is not
+	// configured. Templates must fall back to AccountURL when it is empty
+	// rather than rendering a dead link.
+	UpdateCardURL string
 }
 
 // SubscriptionCancelledData holds data for the subscription-cancelled confirmation.

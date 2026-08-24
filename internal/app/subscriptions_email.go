@@ -97,26 +97,77 @@ func (s *SubscriptionService) SendConfirmationEmail(ctx context.Context, pool *p
 	return nil
 }
 
-// SendPastDueEmail sends a payment-failed / past-due notice asking the customer
-// to update their card. Read → send → audit.
-func (s *SubscriptionService) SendPastDueEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID) error {
+// pastDueStageSpecs is the per-rung template, subject, and tag for the dunning
+// email ladder, keyed by the stage constants in renewal.go. Escalation lives in
+// the copy, not in the frequency: three messages over two weeks, each saying
+// something the last one didn't.
+var pastDueStageSpecs = map[int]struct {
+	template string
+	subject  string
+	tag      string
+}{
+	dunningEmailFirst: {
+		template: "subscription_past_due",
+		subject:  "We couldn't charge your card",
+		tag:      "subscription-past-due",
+	},
+	dunningEmailReminder: {
+		template: "subscription_past_due_reminder",
+		subject:  "Your coffee's on hold",
+		tag:      "subscription-past-due-reminder",
+	},
+	dunningEmailFinal: {
+		template: "subscription_past_due_final",
+		subject:  "Last call on your subscription",
+		tag:      "subscription-past-due-final",
+	},
+}
+
+// SendPastDueEmail sends one rung of the past-due email ladder, asking the
+// customer to put a working card on file. stage selects the notice; an
+// unrecognised stage (including the zero value on a job enqueued before the
+// ladder existed) falls back to the first notice, which is the safe default —
+// its copy makes sense at any point in the window. Read → send → audit.
+func (s *SubscriptionService) SendPastDueEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID, stage int) error {
+	spec, ok := pastDueStageSpecs[stage]
+	if !ok {
+		spec = pastDueStageSpecs[dunningEmailFirst]
+	}
 	return s.sendSubscriptionLifecycleEmail(ctx, pool, subscriptionID, customerID, lifecycleEmailSpec{
-		templateName: "subscription_past_due",
-		subject:      "We couldn't charge your card",
-		tag:          "subscription-past-due",
+		templateName: spec.template,
+		subject:      spec.subject,
+		tag:          spec.tag,
 		auditAction:  audit.AuditEmailSubscriptionPastDue,
 		actorName:    "subscription_past_due_worker",
-		buildData: func(customerName, productName, planName string) any {
+		buildData: func(d lifecycleEmailData) any {
 			return emailtemplates.SubscriptionPastDueData{
-				CustomerName: customerName,
-				ProductName:  productName,
-				PlanName:     planName,
-				StoreName:    s.email.StoreName,
-				StoreURL:     s.email.BaseURL,
-				AccountURL:   s.email.BaseURL + "/account/subscriptions",
+				CustomerName:  d.CustomerName,
+				ProductName:   d.ProductName,
+				PlanName:      d.PlanName,
+				HardDecline:   d.Sub.DunningHardDeclined(),
+				EndsOn:        DunningExpiresAt(d.Sub),
+				StoreName:     s.email.StoreName,
+				StoreURL:      s.email.BaseURL,
+				AccountURL:    s.email.BaseURL + "/account/subscriptions",
+				UpdateCardURL: s.updateCardURL(subscriptionID),
 			}
 		},
 	})
+}
+
+// updateCardURL mints the one-click "fix your card" link. Empty when no signer
+// is wired or the secret is unset — the templates fall back to the sign-in link
+// rather than emailing a token that could never be verified.
+func (s *SubscriptionService) updateCardURL(subscriptionID uuid.UUID) string {
+	if s.orderActions == nil || !s.orderActions.Enabled() {
+		return ""
+	}
+	token := s.orderActions.Sign(auth.OrderActionUpdateCard, subscriptionID, time.Now())
+	if token == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/subscriptions/update-card?t=%s",
+		strings.TrimRight(s.email.BaseURL, "/"), url.QueryEscape(token))
 }
 
 // SendCancellationEmail sends a confirmation that a subscription was cancelled.
@@ -128,11 +179,11 @@ func (s *SubscriptionService) SendCancellationEmail(ctx context.Context, pool *p
 		tag:          "subscription-cancelled",
 		auditAction:  audit.AuditEmailSubscriptionCancelled,
 		actorName:    "subscription_cancelled_worker",
-		buildData: func(customerName, productName, planName string) any {
+		buildData: func(d lifecycleEmailData) any {
 			return emailtemplates.SubscriptionCancelledData{
-				CustomerName: customerName,
-				ProductName:  productName,
-				PlanName:     planName,
+				CustomerName: d.CustomerName,
+				ProductName:  d.ProductName,
+				PlanName:     d.PlanName,
 				StoreName:    s.email.StoreName,
 				StoreURL:     s.email.BaseURL,
 				AccountURL:   s.email.BaseURL + "/account/subscriptions",
@@ -152,11 +203,11 @@ func (s *SubscriptionService) SendDunningEndedEmail(ctx context.Context, pool *p
 		tag:          "subscription-ended",
 		auditAction:  audit.AuditEmailSubscriptionEnded,
 		actorName:    "subscription_ended_worker",
-		buildData: func(customerName, productName, planName string) any {
+		buildData: func(d lifecycleEmailData) any {
 			return emailtemplates.SubscriptionDunningEndedData{
-				CustomerName: customerName,
-				ProductName:  productName,
-				PlanName:     planName,
+				CustomerName: d.CustomerName,
+				ProductName:  d.ProductName,
+				PlanName:     d.PlanName,
 				StoreName:    s.email.StoreName,
 				StoreURL:     s.email.BaseURL,
 				AccountURL:   s.email.BaseURL + "/account/subscriptions",
@@ -368,7 +419,18 @@ type lifecycleEmailSpec struct {
 	tag          string
 	auditAction  string
 	actorName    string
-	buildData    func(customerName, productName, planName string) any
+	buildData    func(lifecycleEmailData) any
+}
+
+// lifecycleEmailData is what the loader resolved before rendering. The
+// subscription is included because the past-due ladder needs more than display
+// names — it reads the dunning state to decide its copy and to mint a one-click
+// card link.
+type lifecycleEmailData struct {
+	CustomerName string
+	ProductName  string
+	PlanName     string
+	Sub          *domain.Subscription
 }
 
 func (s *SubscriptionService) sendSubscriptionLifecycleEmail(ctx context.Context, pool *pgxpool.Pool, subscriptionID, customerID uuid.UUID, spec lifecycleEmailSpec) error {
@@ -403,7 +465,12 @@ func (s *SubscriptionService) sendSubscriptionLifecycleEmail(ctx context.Context
 		return err
 	}
 
-	html, text, err := s.email.Renderer.Render(spec.templateName, spec.buildData(customer.FirstName, productName, plan.Name))
+	html, text, err := s.email.Renderer.Render(spec.templateName, spec.buildData(lifecycleEmailData{
+		CustomerName: customer.FirstName,
+		ProductName:  productName,
+		PlanName:     plan.Name,
+		Sub:          sub,
+	}))
 	if err != nil {
 		s.metrics.EmailsSent.WithLabelValues(spec.templateName, "failed").Inc()
 		return fmt.Errorf("render %s template: %w", spec.templateName, err)

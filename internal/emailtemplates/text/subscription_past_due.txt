@@ -4,9 +4,9 @@ Hi {{.CustomerName}},
 
 Your card on file didn't go through when we tried to renew your {{.ProductName}} subscription ({{.PlanName}}). Until it's sorted, we'll hold the next shipment.
 
-Common causes: expired card, new card number, or a hold from the bank. Updating your payment method takes about a minute.
+{{if .HardDecline}}Your bank has blocked this card for good -- a reissue, a report of loss, something on their end. It won't work again, so this one needs a different card.{{else}}Common causes: expired card, new card number, or a hold from the bank. Updating your payment method takes about a minute.{{end}}
 
-Update your payment method: {{.AccountURL}}
+Update your payment method: {{if .UpdateCardURL}}{{.UpdateCardURL}}{{else}}{{.AccountURL}}{{end}}
 
 Once we have a working card, the renewal will go out automatically. Reply to this email if you need a hand.
 

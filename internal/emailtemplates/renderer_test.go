@@ -355,6 +355,74 @@ func TestRender_SubscriptionPastDue(t *testing.T) {
 	assert.Contains(t, text, "Dark Roast 12oz")
 }
 
+// TestRender_SubscriptionPastDueLadder covers every rung of the dunning email
+// ladder, in both the states the copy branches on.
+//
+// The one thing that must never happen is a dead call to action: when the
+// signer is unconfigured UpdateCardURL is empty, and the templates have to fall
+// back to the sign-in link rather than rendering href="".
+func TestRender_SubscriptionPastDueLadder(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	base := SubscriptionPastDueData{
+		CustomerName: "Jane",
+		ProductName:  "Dark Roast 12oz",
+		PlanName:     "Every 30 Days",
+		EndsOn:       time.Date(2026, 8, 17, 0, 0, 0, 0, time.UTC),
+		StoreName:    "Test Store",
+		StoreURL:     "https://example.com",
+		AccountURL:   "https://example.com/account/subscriptions",
+	}
+
+	for _, name := range []string{
+		"subscription_past_due",
+		"subscription_past_due_reminder",
+		"subscription_past_due_final",
+	} {
+		t.Run(name+"/with one-click link", func(t *testing.T) {
+			data := base
+			data.UpdateCardURL = "https://example.com/subscriptions/update-card?t=tok"
+			html, text, rerr := r.Render(name, data)
+			require.NoError(t, rerr)
+			for _, body := range []string{html, text} {
+				assert.Contains(t, body, "Dark Roast 12oz")
+				assert.Contains(t, body, "/subscriptions/update-card?t=tok")
+			}
+		})
+
+		t.Run(name+"/no signer falls back to sign-in", func(t *testing.T) {
+			html, text, rerr := r.Render(name, base) // UpdateCardURL empty
+			require.NoError(t, rerr)
+			for _, body := range []string{html, text} {
+				assert.Contains(t, body, "/account/subscriptions")
+				assert.NotContains(t, body, `href=""`)
+				assert.NotContains(t, body, "update-card")
+			}
+		})
+
+		t.Run(name+"/hard decline swaps the explanation", func(t *testing.T) {
+			data := base
+			data.HardDecline = true
+			html, _, rerr := r.Render(name, data)
+			require.NoError(t, rerr)
+			// Telling someone to check with their bank about a card the bank
+			// already killed wastes their time — that copy must not survive.
+			assert.NotContains(t, html, "hold from the bank")
+			assert.NotContains(t, html, "keep trying the card on file")
+		})
+	}
+
+	// Only the later two notices name the closing date; the first is too early
+	// for a deadline to read as anything but a threat.
+	for _, name := range []string{"subscription_past_due_reminder", "subscription_past_due_final"} {
+		html, text, rerr := r.Render(name, base)
+		require.NoError(t, rerr)
+		assert.Contains(t, html, "August 17, 2026", name)
+		assert.Contains(t, text, "August 17, 2026", name)
+	}
+}
+
 func TestRender_SubscriptionCancelled(t *testing.T) {
 	r, err := New()
 	require.NoError(t, err)

@@ -257,6 +257,13 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			</div>
 		</div>
 	}
+	<!-- Dunning status. Only past-due subscriptions carry one, and it is the
+	     first thing staff need on this page: the dashboard no longer flags
+	     past-due subscriptions, so this panel is where "is anything being done
+	     about it?" gets answered. -->
+	if props.Subscription.Status == domain.SubscriptionStatusPastDue {
+		@dunningStatusPanel(props)
+	}
 	<!-- Schedule + plan stats -->
 	<div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
 		<div class="border border-rr-border bg-rr-surface p-4">
@@ -635,4 +642,54 @@ templ SubscriptionShow(props SubscriptionShowProps) {
 	}) {
 		@SubscriptionShowContent(props)
 	}
+}
+
+// dunningStatusPanel reports what the automated dunning ladder is doing with a
+// past-due subscription: which attempt it is on, when the next one fires, what
+// the issuer said, and the day it gives up.
+//
+// Amber, not red. This is a process running normally, not a fire — the only
+// thing a red panel would buy is staff learning to ignore amber elsewhere. The
+// one genuinely stuck state, a hard decline, says so in words instead.
+templ dunningStatusPanel(props SubscriptionShowProps) {
+	<div class="mt-4 border border-rr-border bg-rr-surface p-4">
+		<div class="flex flex-wrap items-center gap-2">
+			<h2 class="text-xs uppercase tracking-wide text-rr-muted label-font">Payment recovery</h2>
+			<span class="badge badge-amber">{ dunningAttemptLabel(props.Subscription) }</span>
+		</div>
+		<p class="mt-2 text-sm text-rr-heading">{ dunningStatusLine(props.Subscription, props.MerchantTZ) }</p>
+		if code := props.Subscription.DunningDeclineCode(); code != "" {
+			<p class="mt-1 text-xs text-rr-muted">Issuer said: { code }</p>
+		}
+		<p class="mt-2 text-xs text-rr-muted">
+			The customer is emailed automatically &mdash; on the first decline, again mid-window, and once more before it closes. No action needed here unless you want to reach out yourself.
+		</p>
+	</div>
+}
+
+// dunningAttemptLabel is the badge text: where on the ladder this subscription
+// sits. Hard declines count notices rather than attempts, because no further
+// charge is being made.
+func dunningAttemptLabel(sub *domain.Subscription) string {
+	attempt := sub.DunningAttempt()
+	if attempt <= 0 {
+		return "starting"
+	}
+	if sub.DunningHardDeclined() {
+		return fmt.Sprintf("notice %d of %d", attempt, domain.SubscriptionMaxDunningAttempts-1)
+	}
+	return fmt.Sprintf("attempt %d of %d", attempt, domain.SubscriptionMaxDunningAttempts)
+}
+
+// dunningStatusLine is the sentence under the badge: what happens next and when.
+func dunningStatusLine(sub *domain.Subscription, tz *time.Location) string {
+	next := sub.NextOrderAt.In(tz).Format("Jan 2, 2006")
+	if sub.DunningHardDeclined() {
+		return "The bank has blocked this card for good, so we've stopped retrying it. " +
+			"The customer needs to put a different card on file; the next reminder goes out " + next + "."
+	}
+	if sub.DunningAttempt() >= domain.SubscriptionMaxDunningAttempts-1 {
+		return "Final attempt runs " + next + ". If it declines, the subscription closes out that day."
+	}
+	return "Next charge attempt runs " + next + "."
 }

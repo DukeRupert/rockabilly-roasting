@@ -172,16 +172,6 @@ func (s *SubscriptionService) CountSubscriptionsByStatus(ctx context.Context, tx
 	return count, nil
 }
 
-// CountUnacknowledgedPastDue returns the number of past-due subscriptions that
-// staff have not yet acknowledged on the dashboard.
-func (s *SubscriptionService) CountUnacknowledgedPastDue(ctx context.Context, tx pgx.Tx) (int, error) {
-	count, err := s.subscriptions.CountPastDueUnacknowledged(ctx, tx)
-	if err != nil {
-		return 0, fmt.Errorf("count unacknowledged past-due: %w", err)
-	}
-	return count, nil
-}
-
 // ActiveSubscriptionsAsOf returns the number of subscriptions live (created and
 // not yet cancelled or expired) at the instant asOf. Seeds the running total
 // for the active-subscriptions-over-time chart.
@@ -862,43 +852,6 @@ func (s *SubscriptionService) MarkPastDue(ctx context.Context, tx pgx.Tx, id uui
 	}
 
 	return sub, nil
-}
-
-// AcknowledgeDunning marks a past-due subscription's dashboard alert as handled,
-// dropping it off the Urgent band until the next failed charge re-surfaces it.
-// It does not change the subscription's status — the customer is still past_due;
-// staff are only signalling "seen / in progress" so the queue reflects what
-// still needs a first look.
-func (s *SubscriptionService) AcknowledgeDunning(ctx context.Context, tx pgx.Tx, id uuid.UUID, actor Actor) error {
-	sub, err := s.subscriptions.GetByIDAsStaff(ctx, tx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrSubscriptionNotFound
-		}
-		return fmt.Errorf("get subscription for dunning ack: %w", err)
-	}
-
-	if sub.Status != domain.SubscriptionStatusPastDue {
-		return ErrSubscriptionNotPastDue
-	}
-
-	if err := s.subscriptions.SetDunningAcknowledged(ctx, tx, id); err != nil {
-		return fmt.Errorf("acknowledge dunning: %w", err)
-	}
-
-	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
-		ActorType:    actor.Type,
-		ActorID:      actor.ID,
-		ActorName:    actor.Name,
-		Action:       audit.AuditSubscriptionDunningAck,
-		ResourceType: "subscription",
-		ResourceID:   id,
-		After:        sub,
-	}); err != nil {
-		return fmt.Errorf("audit dunning acknowledged: %w", err)
-	}
-
-	return nil
 }
 
 // SetShippingGrandfathered flips a subscription's free-renewal-shipping

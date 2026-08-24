@@ -331,8 +331,8 @@ func (SyncQBCustomerArgs) Kind() string { return "qb_sync_customer" }
 type SyncQBPaymentArgs struct {
 	OrderID   uuid.UUID `json:"order_id"`
 	InvoiceID uuid.UUID `json:"invoice_id"` // Hiri invoice ID
-	Amount    int       `json:"amount"`      // payment amount in cents
-	Method    string    `json:"method"`      // check, cash, other
+	Amount    int       `json:"amount"`     // payment amount in cents
+	Method    string    `json:"method"`     // check, cash, other
 	Reference string    `json:"reference,omitempty"`
 }
 
@@ -376,9 +376,18 @@ func (SubscriptionRenewalReceiptArgs) Kind() string { return "email:subscription
 
 // SubscriptionPastDueArgs sends a payment-failed / past-due notice to the
 // customer asking them to update their card.
+//
+// One job kind covers every rung of the dunning ladder; Stage picks the
+// template. Following the same shape as EmailInvoicePastDueArgs keeps three
+// near-identical workers from existing, and means a change to how past-due mail
+// is rendered lands in one place.
 type SubscriptionPastDueArgs struct {
 	SubscriptionID uuid.UUID `json:"subscription_id"`
 	CustomerID     uuid.UUID `json:"customer_id"`
+	// Stage is which notice this is: 1 on the first decline, 2 the mid-ladder
+	// reminder, 3 the final warning. A zero value (a job enqueued before the
+	// ladder existed) renders as stage 1.
+	Stage int `json:"stage"`
 }
 
 // Kind returns the job kind identifier.

@@ -157,17 +157,6 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
-		// Past-due subscriptions — unacknowledged only, so a sub a staffer has
-		// already triaged drops off the Urgent band until its next failed charge.
-		props.PastDueSubCount, txErr = d.SubscriptionService.CountUnacknowledgedPastDue(ctx, tx)
-		if txErr != nil {
-			return txErr
-		}
-		props.PastDueSubs, txErr = d.buildPastDueRows(ctx, tx)
-		if txErr != nil {
-			return txErr
-		}
-
 		// Pending wholesale applications
 		wholesaleStatus := domain.WholesaleStatusPending
 		wholesaleType := domain.AccountTypeWholesale
@@ -974,45 +963,6 @@ func (d *Deps) buildPipelineRows(ctx context.Context, tx pgx.Tx, orders []domain
 				row.ExtraItems = len(items) - 1
 			}
 		}
-
-		rows[i] = row
-	}
-	return rows, nil
-}
-
-// buildPastDueRows lists the unacknowledged past-due subscriptions for the
-// Urgent band, most-overdue first, and enriches each with the customer name and
-// lead product title the row displays. Bounded by pipelineDisplayLimit, so the
-// per-row lookups need no batching — same shape as buildPipelineRows.
-func (d *Deps) buildPastDueRows(ctx context.Context, tx pgx.Tx) ([]admin.PastDueRow, error) {
-	pastDue := domain.SubscriptionStatusPastDue
-	subs, err := d.SubscriptionService.ListSubscriptions(ctx, tx, store.SubscriptionFilter{
-		Status:                     &pastDue,
-		ExcludeDunningAcknowledged: true,
-		Sort:                       store.SubscriptionSortNextOrderAsc,
-		Limit:                      pipelineDisplayLimit,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	rows := make([]admin.PastDueRow, len(subs))
-	for i, sub := range subs {
-		row := admin.PastDueRow{Subscription: sub, Quantity: sub.Quantity, CustomerName: "Guest"}
-
-		c, err := d.CustomerService.GetCustomer(ctx, tx, sub.CustomerID)
-		if err != nil && !errors.Is(err, app.ErrCustomerNotFound) {
-			return nil, err
-		}
-		if c != nil {
-			row.CustomerName = customerDisplayName(c)
-		}
-
-		title, err := d.lookupProductTitle(ctx, tx, sub.VariantID)
-		if err != nil {
-			return nil, err
-		}
-		row.ProductTitle = title
 
 		rows[i] = row
 	}

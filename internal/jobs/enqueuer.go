@@ -83,11 +83,13 @@ func (e *Enqueuer) EnqueueRenewalReceipt(ctx context.Context, tx pgx.Tx, orderID
 	return err
 }
 
-// EnqueuePastDueNotice enqueues a past-due notification email job in tx.
-func (e *Enqueuer) EnqueuePastDueNotice(ctx context.Context, tx pgx.Tx, subscriptionID, customerID uuid.UUID) error {
+// EnqueuePastDueNotice enqueues one rung of the past-due email ladder in tx.
+// stage selects the notice — see SubscriptionPastDueArgs.
+func (e *Enqueuer) EnqueuePastDueNotice(ctx context.Context, tx pgx.Tx, subscriptionID, customerID uuid.UUID, stage int) error {
 	_, err := e.client.InsertTx(ctx, tx, SubscriptionPastDueArgs{
 		SubscriptionID: subscriptionID,
 		CustomerID:     customerID,
+		Stage:          stage,
 	}, e.notifyOpts())
 	return err
 }

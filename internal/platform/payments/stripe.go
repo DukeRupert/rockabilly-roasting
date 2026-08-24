@@ -2,6 +2,7 @@ package payments
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/stripe/stripe-go/v82"
@@ -68,10 +69,26 @@ func (p *StripeProvider) CreatePaymentIntent(_ context.Context, req CreatePaymen
 
 	pi, err := p.client.PaymentIntents.New(params)
 	if err != nil {
-		return nil, fmt.Errorf("create payment intent: %w", err)
+		return nil, fmt.Errorf("create payment intent: %w", asDeclineError(err))
 	}
 
 	return paymentIntentFromStripe(pi), nil
+}
+
+// asDeclineError converts a Stripe card error into a *DeclineError so callers
+// can tell a dead card from a recoverable one; every other error is returned
+// unchanged. Only ErrorTypeCard qualifies — an API or network failure says
+// nothing about the card and must stay retryable.
+func asDeclineError(err error) error {
+	var stripeErr *stripe.Error
+	if !errors.As(err, &stripeErr) || stripeErr.Type != stripe.ErrorTypeCard {
+		return err
+	}
+	return &DeclineError{
+		Code:        string(stripeErr.Code),
+		DeclineCode: string(stripeErr.DeclineCode),
+		Message:     stripeErr.Msg,
+	}
 }
 
 func (p *StripeProvider) GetPaymentIntent(_ context.Context, paymentIntentID string) (*PaymentIntent, error) {
@@ -197,6 +214,30 @@ func (p *StripeProvider) CreatePortalSession(_ context.Context, customerID, retu
 	s, err := p.client.BillingPortalSessions.New(params)
 	if err != nil {
 		return "", fmt.Errorf("create billing portal session: %w", err)
+	}
+	return s.URL, nil
+}
+
+func (p *StripeProvider) CreatePaymentMethodUpdateSession(_ context.Context, customerID, returnURL string) (string, error) {
+	// flow_data narrows the session to the payment-method form on Stripe's side.
+	// The customer never reaches the billing history or invoice list, which is
+	// the whole point: this session is reachable from an emailed link.
+	params := &stripe.BillingPortalSessionParams{
+		Customer:  stripe.String(customerID),
+		ReturnURL: stripe.String(returnURL),
+		FlowData: &stripe.BillingPortalSessionFlowDataParams{
+			Type: stripe.String(string(stripe.BillingPortalSessionFlowTypePaymentMethodUpdate)),
+			AfterCompletion: &stripe.BillingPortalSessionFlowDataAfterCompletionParams{
+				Type: stripe.String("redirect"),
+				Redirect: &stripe.BillingPortalSessionFlowDataAfterCompletionRedirectParams{
+					ReturnURL: stripe.String(returnURL),
+				},
+			},
+		},
+	}
+	s, err := p.client.BillingPortalSessions.New(params)
+	if err != nil {
+		return "", fmt.Errorf("create payment method update session: %w", err)
 	}
 	return s.URL, nil
 }

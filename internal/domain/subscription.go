@@ -161,3 +161,65 @@ type SubscriptionOrder struct {
 	PeriodStart    time.Time
 	PeriodEnd      time.Time
 }
+
+// Metadata keys tracking a subscription's dunning state — the automated
+// past-due ladder that runs after a renewal charge is declined. The schedule
+// itself lives in the app layer; these are just the persisted fields it reads
+// and writes, exposed here so the admin UI and email templates can report on
+// dunning without importing the ladder.
+const (
+	// SubscriptionMetaDunningAttempt is the running count of failed charge
+	// attempts on the current past-due run.
+	SubscriptionMetaDunningAttempt = "dunning_attempt"
+	// SubscriptionMetaDunningHardDecline marks a subscription whose card the
+	// issuer has permanently blocked. Set, we stop charging but keep emailing.
+	SubscriptionMetaDunningHardDecline = "dunning_hard_decline"
+	// SubscriptionMetaDunningDeclineCode is the issuer's last stated reason.
+	SubscriptionMetaDunningDeclineCode = "dunning_decline_code"
+)
+
+// SubscriptionMaxDunningAttempts is how many charge attempts a past-due
+// subscription gets before it is given up on and expired. The schedule that
+// spaces those attempts lives in the app layer; only the count is shared, so
+// the admin UI can render "attempt 3 of 5" without reaching across the layer
+// boundary. app asserts at compile time that its ladder agrees with this.
+const SubscriptionMaxDunningAttempts = 5
+
+// DunningAttempt reports how many charge attempts have failed on the current
+// past-due run. Zero for a subscription that has never failed. JSON decoding
+// yields float64 for numbers, so both float64 and int are tolerated.
+func (s *Subscription) DunningAttempt() int {
+	if s.Metadata == nil {
+		return 0
+	}
+	switch v := s.Metadata[SubscriptionMetaDunningAttempt].(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	default:
+		return 0
+	}
+}
+
+// DunningHardDeclined reports whether this subscription's card has been
+// permanently blocked by the issuer, meaning no further charge will be
+// attempted against it. The customer can still rescue the subscription by
+// putting a different card on file.
+func (s *Subscription) DunningHardDeclined() bool {
+	if s.Metadata == nil {
+		return false
+	}
+	v, _ := s.Metadata[SubscriptionMetaDunningHardDecline].(bool)
+	return v
+}
+
+// DunningDeclineCode returns the issuer's last stated reason for declining
+// (e.g. "insufficient_funds"), or "" when none was recorded.
+func (s *Subscription) DunningDeclineCode() string {
+	if s.Metadata == nil {
+		return ""
+	}
+	v, _ := s.Metadata[SubscriptionMetaDunningDeclineCode].(string)
+	return v
+}

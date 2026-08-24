@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -163,50 +164,129 @@ func (s *RenewalService) taxExemptForVariant(ctx context.Context, tx pgx.Tx, var
 
 // --- Dunning ---
 
-// maxDunningAttempts is the number of charge attempts (including the first)
-// before a past-due subscription is given up on and expired. With the retry
-// delays below, the dunning window is roughly ten days.
-const maxDunningAttempts = 4
-
-// dunningRetryDelays are the gaps before each retry, indexed by the attempt
-// number that just failed (1-based). After attempt 1 fails we wait 3 days,
-// after attempt 2 another 3, after attempt 3 another 4 — then attempt 4's
-// failure exhausts the schedule and the subscription expires. Length must be
-// maxDunningAttempts-1.
-var dunningRetryDelays = [maxDunningAttempts - 1]time.Duration{
-	72 * time.Hour,
-	72 * time.Hour,
-	96 * time.Hour,
+// dunningStage is one rung of the past-due ladder: how long to wait before the
+// next charge attempt, and which email (if any) goes out when this attempt
+// fails.
+//
+// Keeping the delay and the copy in one table is deliberate — they only make
+// sense together, and the previous split between a length constant and a delay
+// array made it easy to change one without the other.
+type dunningStage struct {
+	// wait is the gap before the next charge attempt.
+	wait time.Duration
+	// emailStage selects the customer email sent when this attempt fails.
+	// Zero means stay quiet — see the silent rung below.
+	emailStage int
 }
 
-// dunningAttempt reads the running failed-charge count off a subscription's
-// metadata. Absent (a never-failed subscription) reads as 0. JSON decoding
-// yields float64 for numbers, so both float64 and int are tolerated.
-func dunningAttempt(metadata map[string]any) int {
-	if metadata == nil {
-		return 0
-	}
-	switch v := metadata["dunning_attempt"].(type) {
-	case float64:
-		return int(v)
-	case int:
-		return v
-	default:
-		return 0
-	}
+// dunningLadder is the schedule a subscription walks after its first declined
+// renewal. Index i is the stage entered when attempt i+1 fails; running off the
+// end expires the subscription.
+//
+//	attempt 1 fails  day 0   → "we couldn't charge your card", retry in 3d
+//	attempt 2 fails  day 3   → silent, retry in 5d
+//	attempt 3 fails  day 8   → "still no luck, your shipment is on hold", retry in 4d
+//	attempt 4 fails  day 12  → "last call, we end this in two days", retry in 2d
+//	attempt 5 fails  day 14  → expire, "your subscription has ended"
+//
+// Two weeks, four attempts after the first, three emails. The shape follows
+// what the payments industry has converged on: spacing retries across a couple
+// of weeks recovers more than clustering them, and recovery depends far more on
+// the customer seeing a message than on the number of charge attempts. The
+// earlier ladder ran four attempts in ten days on a single email, which meant
+// most subscriptions died before their owner had read anything.
+//
+// Attempt 2 is silent on purpose. Two emails in three days reads as dunning
+// spam and costs more in unsubscribes than it recovers.
+//
+// Five attempts total sits well inside the card networks' retry ceilings
+// (Mastercard is the tighter of the two at 10 per 30 days).
+var dunningLadder = [...]dunningStage{
+	{wait: 72 * time.Hour, emailStage: dunningEmailFirst},
+	{wait: 120 * time.Hour, emailStage: dunningEmailSilent},
+	{wait: 96 * time.Hour, emailStage: dunningEmailReminder},
+	{wait: 48 * time.Hour, emailStage: dunningEmailFinal},
 }
 
-// recordRenewalFailure advances dunning state after a declined charge, inside
-// the caller's transaction. It increments the attempt count and either
-// schedules the next retry (past_due, next_order_at pushed forward) or, at the
-// cap, expires the subscription. The past-due notice email goes out on the
-// first failure; the "subscription ended" email on expiry. Idempotent enough
-// for River's at-least-once delivery: re-running bumps the attempt by one,
-// which at worst shortens the dunning window slightly.
-func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID) error {
-	attempt := dunningAttempt(sub.Metadata) + 1
+// Email stages for the ladder above. These travel in the job args and pick the
+// template, so the numbers are persisted — append, never renumber.
+const (
+	dunningEmailSilent   = 0
+	dunningEmailFirst    = 1
+	dunningEmailReminder = 2
+	dunningEmailFinal    = 3
+)
 
-	if attempt >= maxDunningAttempts {
+// MaxDunningAttempts is the number of charge attempts (including the first)
+// before a past-due subscription is given up on and expired.
+const MaxDunningAttempts = len(dunningLadder) + 1
+
+// The ui layer may only import domain, so the attempt cap is mirrored there for
+// the admin's "attempt N of M". This fails the build if the two drift — adding
+// a rung to the ladder without updating domain would silently make every admin
+// page lie about how much runway a customer has left.
+var _ = [1]struct{}{}[MaxDunningAttempts-domain.SubscriptionMaxDunningAttempts]
+
+// DunningExpiresAt projects the day a past-due subscription will be given up on,
+// so the customer-facing emails can name it. Derived from where the
+// subscription currently sits on the ladder: next_order_at is the next attempt,
+// and every remaining rung's wait stacks on top of it.
+//
+// Returns next_order_at unchanged for a subscription that is not mid-ladder —
+// on the last rung that is already the expiry date, and for anything else the
+// question doesn't apply.
+func DunningExpiresAt(sub *domain.Subscription) time.Time {
+	attempt := sub.DunningAttempt()
+	if attempt <= 0 || attempt >= MaxDunningAttempts {
+		return sub.NextOrderAt
+	}
+	expiry := sub.NextOrderAt
+	for i := attempt; i < len(dunningLadder); i++ {
+		expiry = expiry.Add(dunningLadder[i].wait)
+	}
+	return expiry
+}
+
+// recordRenewalFailure advances dunning state after a failed charge, inside the
+// caller's transaction. It increments the attempt count and either schedules the
+// next attempt (past_due, next_order_at pushed forward) or, at the end of the
+// ladder, expires the subscription. Emails are enqueued per the ladder's stage.
+//
+// cause is the error the charge returned, and may be nil when there was nothing
+// to charge (no saved payment method). A *payments.DeclineError reporting a hard
+// decline latches metaDunningHardDecline: the remaining rungs still run their
+// clock and their emails, but no further charge is attempted. Retrying a card
+// the issuer has blocked cannot succeed, and the networks fine per attempt — but
+// the customer can still rescue the subscription by putting a different card on
+// file, which is exactly what the remaining emails ask for.
+//
+// Idempotent enough for River's at-least-once delivery: re-running bumps the
+// attempt by one, which at worst shortens the dunning window slightly.
+func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID, cause error) error {
+	attempt := sub.DunningAttempt() + 1
+
+	// Latch the hard-decline verdict. Once true it stays true for the rest of
+	// the ladder — a later rung sends email without charging, so it has no new
+	// decline to re-derive this from.
+	hardDecline := sub.DunningHardDeclined()
+	declineCode := ""
+	var declineErr *payments.DeclineError
+	if errors.As(cause, &declineErr) {
+		declineCode = declineErr.DeclineCode
+		if declineErr.Permanent() {
+			hardDecline = true
+		}
+	}
+
+	auditMeta := map[string]any{
+		"dunning_attempt": attempt,
+		"hard_decline":    hardDecline,
+	}
+	if declineCode != "" {
+		auditMeta["decline_code"] = declineCode
+	}
+
+	if attempt >= MaxDunningAttempts {
 		if err := s.subscriptions.ExpireForDunning(ctx, tx, sub.ID); err != nil {
 			return err
 		}
@@ -215,40 +295,47 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 				return fmt.Errorf("enqueue subscription-ended email: %w", err)
 			}
 		}
+		auditMeta["reason"] = "dunning_exhausted"
 		if err := s.audit.Record(ctx, tx, audit.AuditEntry{
 			ActorType:    domain.AuditActorTypeSystem,
 			ActorName:    "subscription_renewal",
 			Action:       audit.AuditSubscriptionExpired,
 			ResourceType: "subscription",
 			ResourceID:   sub.ID,
-			Metadata:     map[string]any{"dunning_attempt": attempt, "reason": "dunning_exhausted"},
+			Metadata:     auditMeta,
 		}); err != nil {
 			return fmt.Errorf("audit subscription expired: %w", err)
 		}
 		return nil
 	}
 
+	stage := dunningLadder[attempt-1]
+
 	// Anchor the retry to the renewal window too: a recovered charge produces a
 	// fulfillment order, and we want that in the morning batch like any renewal.
 	// Anchoring is forward-only, so the retry is never sooner than the dunning gap.
-	nextRetry := s.anchorRenewal(time.Now().Add(dunningRetryDelays[attempt-1]))
+	nextRetry := s.anchorRenewal(time.Now().Add(stage.wait))
 	if err := s.subscriptions.SetDunningRetry(ctx, tx, sub.ID, nextRetry, attempt); err != nil {
 		return err
 	}
-	// First failure only — re-notifying on every retry would be spam. The
-	// final outcome (recovery or expiry) is what the customer hears next.
-	if attempt == 1 && s.enqueuer != nil {
-		if err := s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customerID); err != nil {
+	if hardDecline {
+		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, declineCode); err != nil {
+			return fmt.Errorf("flag hard decline: %w", err)
+		}
+	}
+	if stage.emailStage != dunningEmailSilent && s.enqueuer != nil {
+		if err := s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customerID, stage.emailStage); err != nil {
 			return fmt.Errorf("enqueue past-due email: %w", err)
 		}
 	}
+	auditMeta["next_retry_at"] = nextRetry.Format(time.RFC3339)
 	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
 		ActorType:    domain.AuditActorTypeSystem,
 		ActorName:    "subscription_renewal",
 		Action:       audit.AuditSubscriptionFailed,
 		ResourceType: "subscription",
 		ResourceID:   sub.ID,
-		Metadata:     map[string]any{"dunning_attempt": attempt, "next_retry_at": nextRetry.Format(time.RFC3339)},
+		Metadata:     auditMeta,
 	}); err != nil {
 		return fmt.Errorf("audit renewal failed: %w", err)
 	}
@@ -329,6 +416,18 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 
 	totalCents := subtotalCents + shippingCents + taxCents
 
+	// A card the issuer has permanently blocked must not be charged again, so
+	// walk the rest of the dunning ladder without touching Stripe. The customer
+	// still gets the remaining emails, and a card they add through any of those
+	// links clears the flag and puts the subscription back in the charge path.
+	if sub.DunningHardDeclined() {
+		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, nil)
+		})
+		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		return nil, fmt.Errorf("subscription %s card hard-declined: %w", sub.ID, ErrRenewalPaymentDeclined)
+	}
+
 	if customer.StripeCustomerID == nil {
 		return nil, fmt.Errorf("customer %s has no Stripe customer ID", customer.ID)
 	}
@@ -345,7 +444,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	}
 	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID)
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, nil)
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
@@ -372,9 +471,11 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		},
 	})
 	if err != nil {
-		// Payment declined — advance dunning state (retry or expire).
+		// Payment declined — advance dunning state (retry or expire). err
+		// carries the decline code, which decides whether we ever charge this
+		// card again.
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID)
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, err)
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("create renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
@@ -551,6 +652,18 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				}
 			}
 
+			// Drop hard-declined subscriptions out of the batch rather than
+			// letting one dead card fail the whole box. They advance along the
+			// dunning ladder here — emails and expiry keep running, no charge is
+			// attempted — while the rest of the customer's subscriptions renew
+			// normally.
+			if sub.DunningHardDeclined() {
+				if txErr := s.recordRenewalFailure(ctx, tx, sub, customerID, nil); txErr != nil {
+					return fmt.Errorf("advance dunning for %s: %w", subID, txErr)
+				}
+				continue
+			}
+
 			plan, txErr := s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
 			if txErr != nil {
 				return fmt.Errorf("get plan for %s: %w", subID, txErr)
@@ -574,6 +687,14 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				TotalPrice: totalPrice,
 			})
 			subtotalCents += totalPrice
+		}
+
+		// Nothing survived the hard-decline filter — every subscription in the
+		// batch has already advanced its ladder above. Stop here rather than
+		// pricing, rating shipping, and calculating tax on an empty order; the
+		// caller checks len(items) and returns.
+		if len(items) == 0 {
+			return nil
 		}
 
 		var txErr error
@@ -612,6 +733,13 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		return nil, fmt.Errorf("batch renewal read phase: %w", err)
 	}
 
+	// Every subscription in the batch was hard-declined and skipped above. There
+	// is no order to place; the read tx already advanced each one's dunning.
+	if len(items) == 0 {
+		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		return nil, fmt.Errorf("all batched subscriptions hard-declined: %w", ErrRenewalPaymentDeclined)
+	}
+
 	orderTotal = subtotalCents + shippingCents + taxCents
 
 	if customer.StripeCustomerID == nil {
@@ -627,7 +755,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
-				if err := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID); err != nil {
+				if err := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, nil); err != nil {
 					return err
 				}
 			}
@@ -666,7 +794,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if err != nil {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
-				if rfErr := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID); rfErr != nil {
+				if rfErr := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, err); rfErr != nil {
 					return rfErr
 				}
 			}

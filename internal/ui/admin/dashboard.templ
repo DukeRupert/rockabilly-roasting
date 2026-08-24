@@ -177,8 +177,7 @@ type DashboardProps struct {
 	DeliveryRun *DeliveryRunProps
 
 	// Subscriptions
-	ActiveSubCount  int
-	PastDueSubCount int
+	ActiveSubCount int
 
 	// Pending review
 	PendingWholesale int
@@ -195,7 +194,13 @@ type DashboardProps struct {
 	// without their own group they sit in the queue indefinitely — River will
 	// not pick them back up on its own.
 	LabelFailures []UrgentOrderGroup
-	PastDueSubs         []PastDueRow
+	// Past-due subscriptions are deliberately absent. Dunning is automated —
+	// five charge attempts and three emails over two weeks — so there is no
+	// staff action to queue, and a standing red row for something nobody acts on
+	// only teaches the crew to skim past the Urgent band. Staff who want the
+	// list go to /admin/subscriptions?status=past_due, where each row shows
+	// which attempt the automation is on. Wholesale past-due *accounts* stay:
+	// those really do need someone to hold fulfillment and chase an invoice.
 	PastDueAccounts     []PastDueAccountRow
 	PastDueAccountCount int
 
@@ -225,15 +230,6 @@ type DashboardProps struct {
 	StaffRole string
 }
 
-// PastDueRow bundles a past-due subscription with the summary fields its Urgent
-// band row displays: who's behind on payment and what they subscribe to.
-type PastDueRow struct {
-	Subscription domain.Subscription
-	CustomerName string // company name, customer "First Last", or "Guest"
-	ProductTitle string // lead variant's product title (e.g., "Espresso Blend")
-	Quantity     int
-}
-
 // PastDueAccountRow summarizes a wholesale account that is not current — one
 // or more invoices past terms. Staff hold new fulfillment for these accounts
 // until the balance clears.
@@ -258,7 +254,7 @@ type PipelineRow struct {
 }
 
 func (p DashboardProps) urgentCount() int {
-	return p.PastDueAccountCount + p.PastDueSubCount +
+	return p.PastDueAccountCount +
 		urgentGroupTotal(p.OnHold) + urgentGroupTotal(p.FailedPayments) + urgentGroupTotal(p.LabelFailures)
 }
 
@@ -331,16 +327,6 @@ templ DashboardContent(props DashboardProps) {
 						)
 						for _, row := range props.PastDueAccounts {
 							@pastDueAccountRow(row, props.MerchantTZ)
-						}
-					}
-					if props.PastDueSubCount > 0 {
-						@urgentGroupLink(
-							fmt.Sprintf("%d past-due subscription%s", props.PastDueSubCount, pluralS(props.PastDueSubCount)),
-							"Payments failing — customer may churn if not contacted.",
-							"/admin/subscriptions?status=past_due",
-						)
-						for _, row := range props.PastDueSubs {
-							@pastDueSubRow(row, props.MerchantTZ)
 						}
 					}
 					for _, g := range props.OnHold {
@@ -914,37 +900,6 @@ templ orderLinkRow(o domain.Order, label, labelClass string, urgent bool, loc *t
 	</a>
 }
 
-// pastDueSubRow renders one past-due subscription in the Urgent band. Unlike the
-// order rows it is not a single full-row link: the left side links to the
-// subscription, the right side carries an Acknowledge action, so the two stay
-// separate interactive targets (no nested anchor/button). Acknowledging posts to
-// the dunning-ack endpoint and drops the row off the dashboard until the next
-// failed charge re-surfaces it.
-templ pastDueSubRow(row PastDueRow, loc *time.Location) {
-	<div class="flex items-center justify-between gap-4 border border-rr-border bg-rr-surface px-4 py-2.5">
-		<a
-			href={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s", row.Subscription.ID)) }
-			class="flex min-w-0 items-center gap-3 hover:opacity-80 transition-opacity"
-		>
-			<div class="min-w-0">
-				<p class="truncate text-sm font-semibold text-rr-heading">{ row.CustomerName }</p>
-				<p class="mt-0.5 truncate text-xs text-rr-muted">{ pastDueItemLabel(row) }</p>
-			</div>
-		</a>
-		<div class="flex items-center gap-3 shrink-0">
-			<span class="label-font text-rr-red" style="font-size:0.6rem;">{ ageLabel(row.Subscription.NextOrderAt, loc) }</span>
-			<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/dunning-ack", row.Subscription.ID)) }>
-				<button
-					type="submit"
-					title="Hide until the next failed charge"
-					class="border border-rr-border bg-rr-surface px-2.5 py-1 label-font text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
-					style="font-size:0.6rem;"
-				>Acknowledge</button>
-			</form>
-		</div>
-	</div>
-}
-
 // pastDueAccountRow renders one not-current wholesale account in the Urgent
 // band: who owes, how many invoices and how much, and how old the oldest debt
 // is. Links to the customer page where staff see every order and its status.
@@ -964,16 +919,6 @@ templ pastDueAccountRow(row PastDueAccountRow, loc *time.Location) {
 			@chevronRight()
 		</div>
 	</a>
-}
-
-// pastDueItemLabel renders the subscription's product and quantity, falling back
-// to "—" when the variant or product has been deleted from the catalog.
-func pastDueItemLabel(row PastDueRow) string {
-	title := row.ProductTitle
-	if title == "" {
-		title = "—"
-	}
-	return fmt.Sprintf("%s · ×%d", title, row.Quantity)
 }
 
 // channelQueue renders one channel's combined fulfillment queue: a header bar

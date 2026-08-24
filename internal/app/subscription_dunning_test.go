@@ -14,70 +14,6 @@ import (
 	"github.com/dukerupert/hiri/internal/testutil"
 )
 
-// TestSubscriptionStore_DunningAcknowledgement covers the dashboard past-due
-// alert lifecycle: a past-due subscription counts as unacknowledged until staff
-// acknowledge it, and a subsequent failed charge (any transition back into
-// past_due via UpdateStatus) clears the acknowledgement so the alert re-surfaces.
-func TestSubscriptionStore_DunningAcknowledgement(t *testing.T) {
-	ctx := context.Background()
-	tx := testutil.NewTestTx(t, testPool)
-
-	s, custID, addrID, variantID, planID := subTrendFixture(t, tx)
-
-	sub, err := s.Create(ctx, tx, store.CreateSubscriptionParams{
-		CustomerID:         custID,
-		PlanID:             planID,
-		VariantID:          variantID,
-		Quantity:           1,
-		Status:             domain.SubscriptionStatusPastDue,
-		ShippingAddressID:  addrID,
-		CurrentPeriodStart: time.Now(),
-		CurrentPeriodEnd:   time.Now().AddDate(0, 0, 30),
-		NextOrderAt:        time.Now().AddDate(0, 0, 30),
-	})
-	require.NoError(t, err)
-
-	pastDue := domain.SubscriptionStatusPastDue
-	listUnacked := func() []domain.Subscription {
-		rows, lerr := s.List(ctx, tx, store.SubscriptionFilter{
-			Status:                     &pastDue,
-			ExcludeDunningAcknowledged: true,
-		})
-		require.NoError(t, lerr)
-		return rows
-	}
-
-	// Fresh past-due: counts and lists as needing a first look.
-	count, err := s.CountPastDueUnacknowledged(ctx, tx)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count)
-	assert.Len(t, listUnacked(), 1)
-
-	// Acknowledge: drops off the count and the unacknowledged list.
-	require.NoError(t, s.SetDunningAcknowledged(ctx, tx, sub.ID))
-	count, err = s.CountPastDueUnacknowledged(ctx, tx)
-	require.NoError(t, err)
-	assert.Equal(t, 0, count, "acknowledged past-due should not count")
-	assert.Empty(t, listUnacked())
-
-	// A new failed charge re-enters past_due via UpdateStatus, which must clear
-	// the stale acknowledgement so the alert comes back.
-	_, err = s.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusPastDue)
-	require.NoError(t, err)
-	count, err = s.CountPastDueUnacknowledged(ctx, tx)
-	require.NoError(t, err)
-	assert.Equal(t, 1, count, "a new failed charge should re-surface the alert")
-	assert.Len(t, listUnacked(), 1)
-
-	// Resolving the subscription (payment succeeds → active) removes it from the
-	// past-due count regardless of acknowledgement state.
-	_, err = s.UpdateStatus(ctx, tx, sub.ID, domain.SubscriptionStatusActive)
-	require.NoError(t, err)
-	count, err = s.CountPastDueUnacknowledged(ctx, tx)
-	require.NoError(t, err)
-	assert.Equal(t, 0, count)
-}
-
 // TestSubscriptionStore_DunningRetryLifecycle covers the P3 dunning mechanics
 // at the store layer: a failed charge schedules a retry (past_due + next_order_at),
 // the renewal scheduler picks up past_due rows whose retry is due, a future
@@ -170,13 +106,61 @@ func TestSubscriptionStore_ClearDunning(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, s.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Hour), 2))
-	require.NoError(t, s.SetDunningAcknowledged(ctx, tx, sub.ID))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "lost_card"))
+
+	// Sanity: the latch actually landed, so the assertions below are meaningful.
+	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
+	require.NoError(t, err)
+	require.Equal(t, true, got.Metadata["dunning_hard_decline"])
+	require.Equal(t, "lost_card", got.Metadata["dunning_decline_code"])
 
 	require.NoError(t, s.ClearDunning(ctx, tx, sub.ID))
-	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
+	got, err = s.GetByIDAsStaff(ctx, tx, sub.ID)
 	require.NoError(t, err)
 	_, hasAttempt := got.Metadata["dunning_attempt"]
 	assert.False(t, hasAttempt, "dunning_attempt cleared")
-	_, hasAck := got.Metadata["dunning_acknowledged_at"]
-	assert.False(t, hasAck, "dunning_acknowledged_at cleared")
+	// The hard-decline latch is the one that must not survive: leaving it set
+	// would silently stop charging a subscription whose card now works.
+	_, hasHard := got.Metadata["dunning_hard_decline"]
+	assert.False(t, hasHard, "dunning_hard_decline cleared")
+	_, hasCode := got.Metadata["dunning_decline_code"]
+	assert.False(t, hasCode, "dunning_decline_code cleared")
+}
+
+// TestSubscriptionStore_SetDunningHardDecline verifies the latch only lands on a
+// subscription that is actually past_due — a charge that succeeded in the
+// meantime must not be branded as having a dead card.
+func TestSubscriptionStore_SetDunningHardDecline(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+
+	s, custID, addrID, variantID, planID := subTrendFixture(t, tx)
+
+	sub, err := s.Create(ctx, tx, store.CreateSubscriptionParams{
+		CustomerID:         custID,
+		PlanID:             planID,
+		VariantID:          variantID,
+		Quantity:           1,
+		Status:             domain.SubscriptionStatusActive,
+		ShippingAddressID:  addrID,
+		CurrentPeriodStart: time.Now(),
+		CurrentPeriodEnd:   time.Now().AddDate(0, 0, 30),
+		NextOrderAt:        time.Now().AddDate(0, 0, 30),
+	})
+	require.NoError(t, err)
+
+	// Active subscription: the latch is a no-op.
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card"))
+	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
+	require.NoError(t, err)
+	_, hasHard := got.Metadata["dunning_hard_decline"]
+	assert.False(t, hasHard, "an active subscription must not be flagged hard-declined")
+
+	// Once past_due it takes.
+	require.NoError(t, s.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Hour), 1))
+	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "stolen_card"))
+	got, err = s.GetByIDAsStaff(ctx, tx, sub.ID)
+	require.NoError(t, err)
+	assert.Equal(t, true, got.Metadata["dunning_hard_decline"])
+	assert.Equal(t, "stolen_card", got.Metadata["dunning_decline_code"])
 }

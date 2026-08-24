@@ -40,6 +40,23 @@ const OrderActionSwitchToPickup OrderActionPurpose = "pickup"
 // replayed against the other.
 const OrderActionUndoSkip OrderActionPurpose = "undo_skip"
 
+// OrderActionUpdateCard authorizes opening a payment-method-update session for
+// the customer behind a past-due subscription. Like OrderActionUndoSkip it
+// carries a subscription ID rather than an order ID.
+//
+// This is the most sensitive of the three purposes, because it hands the holder
+// a session on Stripe. Two things keep it narrow and both are load-bearing: the
+// session is created through Provider.CreatePaymentMethodUpdateSession, which
+// Stripe scopes to the card form alone (no billing history, no invoices), and
+// the handler refuses any subscription that is not past_due. The token is not
+// a login and must never gate anything that reveals customer data.
+//
+// It shares DefaultOrderActionTTL deliberately: the dunning ladder runs 14 days
+// and the first email goes out on day zero, so a shorter TTL would kill that
+// link while the subscription was still recoverable. The link and the
+// subscription expire at roughly the same time, which is the behaviour we want.
+const OrderActionUpdateCard OrderActionPurpose = "update_card"
+
 // OrderActionSigner mints and verifies the tokens behind one-click order links
 // in transactional email.
 //

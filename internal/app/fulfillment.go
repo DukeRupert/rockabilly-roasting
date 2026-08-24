@@ -279,6 +279,7 @@ func (s *FulfillmentService) PrepareLabelRequest(
 	return shipping.LabelRequest{
 		FromName:    cfg.OriginName,
 		FromStreet1: cfg.OriginStreet1,
+		FromStreet2: cfg.OriginStreet2,
 		FromCity:    cfg.OriginCity,
 		FromState:   cfg.OriginState,
 		FromZip:     cfg.OriginZip,
@@ -287,6 +288,7 @@ func (s *FulfillmentService) PrepareLabelRequest(
 		FromPhone:   cfg.OriginPhone,
 		ToName:      joinName(addr.FirstName, addr.LastName),
 		ToStreet1:   addr.Line1,
+		ToStreet2:   derefString(addr.Line2),
 		ToCity:      addr.City,
 		ToState:     addr.State,
 		ToZip:       addr.PostalCode,
@@ -508,6 +510,13 @@ func (s *FulfillmentService) ResolveRefund(ctx context.Context, tx pgx.Tx, shipm
 		return fmt.Errorf("audit refund resolved: %w", err)
 	}
 	return nil
+}
+
+func derefString(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 func derefUUID(p *uuid.UUID) uuid.UUID {

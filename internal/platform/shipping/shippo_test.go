@@ -395,3 +395,71 @@ func TestShippoProvider_BuyRate_TransactionError(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "rate is no longer available")
 }
+
+// TestShippoProvider_CreateLabel_Street2 pins the secondary address line onto
+// the wire. Apartment/suite numbers were silently dropped before, so anything
+// that needed a unit number to be deliverable came back returned-to-sender.
+func TestShippoProvider_CreateLabel_Street2(t *testing.T) {
+	var sawShipmentBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/shipments":
+			sawShipmentBody = string(body)
+			w.Write([]byte(`{"object_id":"ship_1","status":"SUCCESS","rates":[{"object_id":"rate_ground","amount":"7.58","currency":"USD","provider":"USPS","servicelevel":{"name":"Ground Advantage","token":"usps_ground_advantage"}}]}`)) //nolint:errcheck
+		case "/transactions":
+			w.Write([]byte(`{"object_id":"tx_1","status":"SUCCESS","tracking_number":"940011","label_url":"https://example.com/a.pdf"}`)) //nolint:errcheck
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	p := shipping.NewShippoProviderWithBase("test-key", srv.URL, srv.Client())
+	_, err := p.CreateLabel(context.Background(), shipping.LabelRequest{
+		FromName: "Rockabilly Roasting", FromStreet1: "101 W Kennewick Ave", FromStreet2: "Suite 200",
+		FromCity: "Kennewick", FromState: "WA", FromZip: "99336", FromCountry: "US",
+		ToName: "Alex Customer", ToStreet1: "965 Mission St", ToStreet2: "Apt 572",
+		ToCity: "San Francisco", ToState: "CA", ToZip: "94103", ToCountry: "US",
+		WeightOz: 12.5, LengthIn: 10, WidthIn: 8, HeightIn: 4,
+		ServiceCode: "usps_ground_advantage",
+	})
+	require.NoError(t, err)
+
+	var shipReq map[string]any
+	require.NoError(t, json.Unmarshal([]byte(sawShipmentBody), &shipReq))
+	assert.Equal(t, "Apt 572", shipReq["address_to"].(map[string]any)["street2"])
+	assert.Equal(t, "Suite 200", shipReq["address_from"].(map[string]any)["street2"])
+}
+
+// TestShippoProvider_CreateLabel_Street2Omitted keeps the field out of the
+// payload entirely when there is no secondary line.
+func TestShippoProvider_CreateLabel_Street2Omitted(t *testing.T) {
+	var sawShipmentBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/shipments":
+			sawShipmentBody = string(body)
+			w.Write([]byte(`{"object_id":"ship_1","status":"SUCCESS","rates":[{"object_id":"rate_ground","amount":"7.58","currency":"USD","provider":"USPS","servicelevel":{"name":"Ground Advantage","token":"usps_ground_advantage"}}]}`)) //nolint:errcheck
+		default:
+			w.Write([]byte(`{"object_id":"tx_1","status":"SUCCESS","tracking_number":"940011","label_url":"https://example.com/a.pdf"}`)) //nolint:errcheck
+		}
+	}))
+	defer srv.Close()
+
+	p := shipping.NewShippoProviderWithBase("test-key", srv.URL, srv.Client())
+	_, err := p.CreateLabel(context.Background(), shipping.LabelRequest{
+		ToStreet1: "965 Mission St", ToCity: "San Francisco", ToState: "CA", ToZip: "94103", ToCountry: "US",
+		WeightOz: 12.5, LengthIn: 10, WidthIn: 8, HeightIn: 4,
+		ServiceCode: "usps_ground_advantage",
+	})
+	require.NoError(t, err)
+
+	var shipReq map[string]any
+	require.NoError(t, json.Unmarshal([]byte(sawShipmentBody), &shipReq))
+	_, present := shipReq["address_to"].(map[string]any)["street2"]
+	assert.False(t, present, "street2 should be omitted when empty")
+}

@@ -169,12 +169,12 @@ func TestSubscriptionStore_SetDunningHardDecline(t *testing.T) {
 	assert.Equal(t, "pm_dead", got.Metadata["dunning_dead_payment_method"])
 }
 
-// TestSubscriptionStore_ClearDunningHardDecline is the release valve for the
+// TestSubscriptionStore_ReleaseDunningHardDecline is the release valve for the
 // latch. Without it a hard-declined subscription could never be charged again —
 // no charge means no success, and success is the only other thing that clears
 // dunning state — so it would be guaranteed to expire no matter what card the
 // customer put on file.
-func TestSubscriptionStore_ClearDunningHardDecline(t *testing.T) {
+func TestSubscriptionStore_ReleaseDunningHardDecline(t *testing.T) {
 	ctx := context.Background()
 	tx := testutil.NewTestTx(t, testPool)
 
@@ -196,16 +196,30 @@ func TestSubscriptionStore_ClearDunningHardDecline(t *testing.T) {
 	require.NoError(t, s.SetDunningRetry(ctx, tx, sub.ID, time.Now().Add(-time.Hour), 2))
 	require.NoError(t, s.SetDunningHardDecline(ctx, tx, sub.ID, "lost_card", "pm_dead"))
 
-	require.NoError(t, s.ClearDunningHardDecline(ctx, tx, sub.ID))
+	require.NoError(t, s.ReleaseDunningHardDecline(ctx, tx, sub.ID))
 	got, err := s.GetByIDAsStaff(ctx, tx, sub.ID)
 	require.NoError(t, err)
 
 	assert.False(t, got.DunningHardDeclined(), "latch released")
-	assert.Empty(t, got.DunningDeadPaymentMethod())
-	assert.Empty(t, got.DunningDeclineCode())
+
+	// The dead card's record must outlive the release. It is what stops the next
+	// rung falling back to a card the issuer killed once the replacement card is
+	// gone — erasing it here would quietly re-authorise charging the dead card.
+	assert.Equal(t, "pm_dead", got.DunningDeadPaymentMethod(), "dead card record survives release")
+	assert.Equal(t, "lost_card", got.DunningDeclineCode(), "issuer reason survives release")
+	assert.True(t, got.DunningChargeBlocked("pm_dead"), "dead card still refused after release")
+	assert.False(t, got.DunningChargeBlocked("pm_new"), "a different card charges")
 
 	// The ladder itself keeps running. A new card is not yet a working card, so
 	// the customer does not get a fresh fourteen days for adding one.
 	assert.Equal(t, 2, got.DunningAttempt(), "attempt count survives the release")
 	assert.Equal(t, domain.SubscriptionStatusPastDue, got.Status)
+
+	// Only a charge that actually succeeded wipes the whole record.
+	require.NoError(t, s.ClearDunning(ctx, tx, sub.ID))
+	got, err = s.GetByIDAsStaff(ctx, tx, sub.ID)
+	require.NoError(t, err)
+	assert.Empty(t, got.DunningDeadPaymentMethod())
+	assert.Empty(t, got.DunningDeclineCode())
+	assert.False(t, got.DunningChargeBlocked("pm_dead"), "a recovered subscription starts clean")
 }

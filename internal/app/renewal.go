@@ -476,17 +476,17 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	// the old one. If this card is dead too, the charge below re-latches it
 	// against the new number.
 	if sub.DunningHardDeclined() {
-		if clearErr := store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.subscriptions.ClearDunningHardDecline(ctx, tx, sub.ID)
-		}); clearErr != nil {
-			return nil, fmt.Errorf("clear hard-decline latch: %w", clearErr)
+		if relErr := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			return s.subscriptions.ReleaseDunningHardDecline(ctx, tx, sub.ID)
+		}); relErr != nil {
+			return nil, fmt.Errorf("release hard-decline latch: %w", relErr)
 		}
 		// The in-memory copy has to drop it too. recordRenewalFailure below
 		// reads the latch back off this struct, so leaving it set here would
 		// re-latch the *replacement* card on an ordinary soft decline —
 		// insufficient funds would be recorded as "the bank blocked this card
 		// for good" and no further attempt would be made.
-		sub.ClearDunningHardDeclineMeta()
+		sub.ReleaseDunningHardDeclineLatch()
 	}
 
 	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{

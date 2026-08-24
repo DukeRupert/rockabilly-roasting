@@ -266,23 +266,27 @@ func (s *SubscriptionStore) SetDunningHardDecline(ctx context.Context, tx pgx.Tx
 	return nil
 }
 
-// ClearDunningHardDecline releases the hard-decline latch without touching the
-// rest of the dunning state. Called when the card on file is no longer the one
-// that died, so the charge that follows is judged on its own merits — the
-// attempt count and the deadline keep running, because a new card is not yet a
-// card that works.
-func (s *SubscriptionStore) ClearDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
-	defer trackQuery(s.metrics, "subscriptions.clear_dunning_hard_decline", time.Now(), &err)
+// ReleaseDunningHardDecline lifts the hard-decline latch so the next renewal
+// charge goes ahead. Called when the card on file is no longer the one that
+// died, so that charge is judged on its own merits — the attempt count and the
+// deadline keep running, because a new card is not yet a card that works.
+//
+// It removes the latch and nothing else. The dead card's ID and the issuer's
+// reason stay put: they are the record that stops us charging that card again,
+// and a release that erased them would let the very next rung fall back to it
+// once the replacement card went away. Only ClearDunning, on a charge that
+// actually succeeded, wipes the whole set.
+func (s *SubscriptionStore) ReleaseDunningHardDecline(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.release_dunning_hard_decline", time.Now(), &err)
 	_, err = tx.Exec(ctx,
 		`UPDATE subscriptions
-		 SET metadata = metadata - 'dunning_hard_decline' - 'dunning_decline_code'
-		                         - 'dunning_dead_payment_method',
+		 SET metadata = metadata - 'dunning_hard_decline',
 		     updated_at = now()
 		 WHERE id = $1`,
 		id,
 	)
 	if err != nil {
-		return fmt.Errorf("clear dunning hard decline: %w", err)
+		return fmt.Errorf("release dunning hard decline: %w", err)
 	}
 	return nil
 }

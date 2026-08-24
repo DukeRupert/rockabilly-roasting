@@ -212,8 +212,8 @@ func TestDunningChargeBlocked(t *testing.T) {
 	})
 }
 
-// TestClearDunningHardDeclineMeta is the in-memory half of releasing the latch,
-// and it exists because getting it wrong is silent and severe.
+// TestReleaseDunningHardDeclineLatch is the in-memory half of releasing the
+// latch, and it exists because getting it wrong is silent and severe.
 //
 // RenewSubscription drops the latch in the database and then keeps using the
 // same struct. recordRenewalFailure reads the latch back off that struct to
@@ -222,7 +222,7 @@ func TestDunningChargeBlocked(t *testing.T) {
 // insufficient funds recorded as "your bank blocked this card for good", every
 // remaining charge attempt skipped, and the subscription expiring anyway. That
 // is the original bug wearing a different hat, one step further along.
-func TestClearDunningHardDeclineMeta(t *testing.T) {
+func TestReleaseDunningHardDeclineLatch(t *testing.T) {
 	sub := &domain.Subscription{Metadata: map[string]any{
 		domain.SubscriptionMetaDunningAttempt:           float64(2),
 		domain.SubscriptionMetaDunningHardDecline:       true,
@@ -231,12 +231,15 @@ func TestClearDunningHardDeclineMeta(t *testing.T) {
 		domain.SubscriptionMetaShippingGrandfathered:    true,
 	}}
 
-	sub.ClearDunningHardDeclineMeta()
+	sub.ReleaseDunningHardDeclineLatch()
 
 	assert.False(t, sub.DunningHardDeclined(), "latch must be gone in memory, not just in the row")
-	assert.Empty(t, sub.DunningDeadPaymentMethod())
-	assert.Empty(t, sub.DunningDeclineCode())
 	assert.False(t, sub.DunningChargeBlocked("pm_new"), "a released latch must not block the new card")
+
+	// The dead card's record survives the release — releasing the latch says
+	// "charge the new card", not "forget which card was dead".
+	assert.Equal(t, "pm_dead", sub.DunningDeadPaymentMethod())
+	assert.True(t, sub.DunningChargeBlocked("pm_dead"), "the dead card stays refused")
 
 	// The ladder and everything unrelated survive: releasing the latch is not a
 	// reset, and a customer does not lose free shipping by fixing their card.
@@ -244,5 +247,46 @@ func TestClearDunningHardDeclineMeta(t *testing.T) {
 	assert.True(t, sub.ShippingGrandfathered())
 
 	// Safe on a subscription that never had metadata.
-	assert.NotPanics(t, func() { (&domain.Subscription{}).ClearDunningHardDeclineMeta() })
+	assert.NotPanics(t, func() { (&domain.Subscription{}).ReleaseDunningHardDeclineLatch() })
+}
+
+// TestLatchReleaseSurvivesSoftDecline walks the whole release sequence, which is
+// the gap that let two separate versions of the same bug reach review.
+//
+// Each piece — the domain predicate, the store method, the picker — passed in
+// isolation while the composition was broken. What matters is the sequence: a
+// customer replaces a dead card, the replacement declines for an ordinary
+// reason, and the rung after that must still refuse the dead card while
+// happily retrying the replacement.
+func TestLatchReleaseSurvivesSoftDecline(t *testing.T) {
+	// Latched on pm_dead, mid-ladder.
+	sub := &domain.Subscription{Metadata: map[string]any{
+		domain.SubscriptionMetaDunningAttempt:           float64(2),
+		domain.SubscriptionMetaDunningHardDecline:       true,
+		domain.SubscriptionMetaDunningDeclineCode:       "lost_card",
+		domain.SubscriptionMetaDunningDeadPaymentMethod: "pm_dead",
+	}}
+	require.True(t, sub.DunningChargeBlocked("pm_dead"))
+
+	// Customer adds pm_new. The picker avoids the dead card, the gate opens, and
+	// the latch comes off — in the row and on this struct.
+	require.False(t, sub.DunningChargeBlocked("pm_new"))
+	sub.ReleaseDunningHardDeclineLatch()
+
+	// pm_new declines softly. This must NOT be recorded as permanent: the whole
+	// first version of this bug was a stale in-memory latch re-branding the
+	// replacement card as dead.
+	assert.False(t, sub.DunningHardDeclined(),
+		"a released latch must not re-assert itself on the next failure")
+
+	// The rung after that. pm_new is still on file and still retryable...
+	assert.False(t, sub.DunningChargeBlocked("pm_new"), "the replacement card keeps its turn")
+
+	// ...and the dead card is still refused, even though no latch is set. This
+	// is the second version of the bug: the release used to erase the dead-card
+	// record, so the next rung forgot and charged pm_dead again — a fine per
+	// attempt, and an email telling a customer who already replaced their card
+	// that they need to replace their card.
+	assert.True(t, sub.DunningChargeBlocked("pm_dead"),
+		"a card the issuer killed is never charged again, latch or no latch")
 }

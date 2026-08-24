@@ -232,9 +232,9 @@ func (s *Subscription) DunningHardDeclined() bool {
 	return v
 }
 
-// ClearDunningHardDeclineMeta drops the hard-decline latch from this in-memory
-// copy, mirroring what SubscriptionStore.ClearDunningHardDecline does to the
-// row.
+// ReleaseDunningHardDeclineLatch drops the hard-decline latch from this
+// in-memory copy, mirroring what SubscriptionStore.ReleaseDunningHardDecline
+// does to the row.
 //
 // Callers that release the latch and then keep using the same struct must call
 // this. The failure path reads the latch back off the struct to decide whether a
@@ -242,35 +242,39 @@ func (s *Subscription) DunningHardDeclined() bool {
 // replacement card on any soft decline — turning "your card didn't go through"
 // into "your bank has blocked this card for good" and stopping every remaining
 // charge attempt.
-func (s *Subscription) ClearDunningHardDeclineMeta() {
+//
+// It releases the *latch* only. The record of which card died outlives it, on
+// purpose: that record is what keeps the dead card from being charged again, and
+// it has to survive a release or the next rung forgets and goes right back to
+// the card the issuer killed. Only a successful charge clears the whole set —
+// see SubscriptionStore.ClearDunning.
+func (s *Subscription) ReleaseDunningHardDeclineLatch() {
 	if s.Metadata == nil {
 		return
 	}
 	delete(s.Metadata, SubscriptionMetaDunningHardDecline)
-	delete(s.Metadata, SubscriptionMetaDunningDeclineCode)
-	delete(s.Metadata, SubscriptionMetaDunningDeadPaymentMethod)
 }
 
 // DunningChargeBlocked reports whether a renewal charge must be skipped, given
-// the payment method we would otherwise charge. True only when the card was
-// permanently declined *and* it is still the card on file.
+// the payment method we would otherwise charge.
 //
-// This is the whole release mechanism for the hard-decline latch: a customer who
-// adds a different card changes what paymentMethodID resolves to, which unblocks
-// the charge. An empty paymentMethodID (nothing on file) is not blocked here —
-// that case has its own failure path.
+// The rule it enforces is about the card, not about the flag: a card the issuer
+// permanently declined is never charged again. Keying on the recorded card
+// rather than on the latch is what makes that hold across a release — the latch
+// comes off as soon as a different card appears, and if that card later goes
+// away we must still not fall back to the dead one.
+//
+// An empty paymentMethodID (nothing on file) is not blocked here; that case has
+// its own failure path upstream and must stay reachable.
 func (s *Subscription) DunningChargeBlocked(paymentMethodID string) bool {
-	if !s.DunningHardDeclined() {
-		return false
+	if dead := s.DunningDeadPaymentMethod(); dead != "" {
+		return dead == paymentMethodID
 	}
-	dead := s.DunningDeadPaymentMethod()
-	// A latch with no recorded card cannot tell old from new. Stay blocked
-	// rather than risk re-charging the dead card: the emails still run, and the
-	// customer's way out is the same either way.
-	if dead == "" {
-		return true
-	}
-	return dead == paymentMethodID
+	// Latched but with no recorded card — a row written before the card was
+	// tracked, or a decline we could not attribute. We cannot tell old from new,
+	// so stay blocked rather than risk re-charging the dead one. The emails
+	// still run, and the customer's way out is unchanged.
+	return s.DunningHardDeclined()
 }
 
 // DunningDeadPaymentMethod returns the payment method that hard-declined, or ""

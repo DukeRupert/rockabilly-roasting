@@ -89,9 +89,11 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 
 		for _, subID := range solo {
 			// ByArgs alone dedupes across all time, including against completed
-			// jobs still inside River's retention window — a manual retry from
-			// the account or admin page would silently swallow this rung. Scope
-			// the uniqueness to the day so the scheduler's insert always lands.
+			// jobs still inside River's retention window, so yesterday's manual
+			// retry could swallow today's rung. Scoping to the day bounds that to
+			// a retry from the last 24 hours — which is a charge attempt for this
+			// same subscription, so riding on it is correct rather than a loss.
+			// The skip is logged below so it is visible either way.
 			res, txErr := w.client.InsertTx(ctx, tx, SubscriptionRenewalArgs{
 				SubscriptionID: subID,
 			}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{

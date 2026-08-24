@@ -247,46 +247,96 @@ func DunningExpiresAt(sub *domain.Subscription) time.Time {
 	return expiry
 }
 
-// recordRenewalFailure advances dunning state after a failed charge, inside the
-// caller's transaction. It increments the attempt count and either schedules the
-// next attempt (past_due, next_order_at pushed forward) or, at the end of the
-// ladder, expires the subscription. Emails are enqueued per the ladder's stage.
+// dunningVerdict is the decision a failed charge produces: where the ladder goes
+// next, and what we now believe about the card.
 //
-// cause is the error the charge returned, and may be nil when there was nothing
-// to charge (no saved payment method). A *payments.DeclineError reporting a hard
-// decline latches metaDunningHardDecline: the remaining rungs still run their
-// clock and their emails, but no further charge is attempted. Retrying a card
-// the issuer has blocked cannot succeed, and the networks fine per attempt — but
-// the customer can still rescue the subscription by putting a different card on
-// file, which is exactly what the remaining emails ask for.
+// It is separated from the code that writes it because every dunning bug this
+// feature has had lived in this decision, and the decision was only reachable
+// through a database transaction and a Stripe client — so it got tested one
+// field at a time while the sequence it forms went uncovered. As a pure value it
+// can be driven through a whole customer's story in a table test.
+type dunningVerdict struct {
+	// attempt is the failed-charge count this failure produces.
+	attempt int
+	// expire is true when the ladder is exhausted and the subscription ends.
+	expire bool
+	// wait is the gap before the next attempt (zero when expiring).
+	wait time.Duration
+	// emailStage selects the customer notice, or dunningEmailSilent for none.
+	emailStage int
+	// hardDecline is whether charging is stopped after this failure.
+	hardDecline bool
+	// declineCode and deadPM describe the card we refuse to charge again. Both
+	// carry forward from the subscription when this failure says nothing new,
+	// because later rungs do not charge and so learn nothing.
+	declineCode string
+	deadPM      string
+}
+
+// dunningVerdictFor decides what a failed charge means. Pure: no clock, no
+// database, no network.
+//
+// paymentMethodID is the card that was charged (or would have been, on a rung
+// that refused). cause is the charge error, nil when there was nothing to charge
+// or when the rung skipped Stripe entirely.
+func dunningVerdictFor(sub *domain.Subscription, paymentMethodID string, cause error) dunningVerdict {
+	v := dunningVerdict{
+		attempt: sub.DunningAttempt() + 1,
+		// Carry the existing verdict forward. A rung that does not charge has
+		// nothing new to say, and must not be read as an all-clear.
+		hardDecline: sub.DunningHardDeclined(),
+		declineCode: sub.DunningDeclineCode(),
+		deadPM:      sub.DunningDeadPaymentMethod(),
+	}
+
+	var declineErr *payments.DeclineError
+	if errors.As(cause, &declineErr) {
+		if declineErr.DeclineCode != "" {
+			v.declineCode = declineErr.DeclineCode
+		}
+		if declineErr.Permanent() {
+			v.hardDecline = true
+			// Only a permanent decline names a dead card. A soft decline must
+			// not overwrite the record with the card that just failed
+			// recoverably — that card is still worth retrying.
+			if paymentMethodID != "" {
+				v.deadPM = paymentMethodID
+			}
+		}
+	}
+
+	if v.attempt >= MaxDunningAttempts {
+		v.expire = true
+		return v
+	}
+	stage := dunningLadder[v.attempt-1]
+	v.wait = stage.wait
+	v.emailStage = stage.emailStage
+	return v
+}
+
+// recordRenewalFailure applies dunningVerdictFor to the database, inside the
+// caller's transaction: it advances the attempt count and either schedules the
+// next attempt (past_due, next_order_at pushed forward) or, at the end of the
+// ladder, expires the subscription. Emails are enqueued per the verdict's stage.
+//
+// The decision lives in dunningVerdictFor; this function only writes it down.
 //
 // Idempotent enough for River's at-least-once delivery: re-running bumps the
 // attempt by one, which at worst shortens the dunning window slightly.
 func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID, paymentMethodID string, cause error) error {
-	attempt := sub.DunningAttempt() + 1
-
-	// Latch the hard-decline verdict. Once true it stays true for the rest of
-	// the ladder — a later rung sends email without charging, so it has no new
-	// decline to re-derive this from.
-	hardDecline := sub.DunningHardDeclined()
-	declineCode := ""
-	var declineErr *payments.DeclineError
-	if errors.As(cause, &declineErr) {
-		declineCode = declineErr.DeclineCode
-		if declineErr.Permanent() {
-			hardDecline = true
-		}
-	}
+	v := dunningVerdictFor(sub, paymentMethodID, cause)
+	attempt := v.attempt
 
 	auditMeta := map[string]any{
 		"dunning_attempt": attempt,
-		"hard_decline":    hardDecline,
+		"hard_decline":    v.hardDecline,
 	}
-	if declineCode != "" {
-		auditMeta["decline_code"] = declineCode
+	if v.declineCode != "" {
+		auditMeta["decline_code"] = v.declineCode
 	}
 
-	if attempt >= MaxDunningAttempts {
+	if v.expire {
 		if err := s.subscriptions.ExpireForDunning(ctx, tx, sub.ID); err != nil {
 			return err
 		}
@@ -309,37 +359,20 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 		return nil
 	}
 
-	stage := dunningLadder[attempt-1]
-
 	// Anchor the retry to the renewal window too: a recovered charge produces a
 	// fulfillment order, and we want that in the morning batch like any renewal.
 	// Anchoring is forward-only, so the retry is never sooner than the dunning gap.
-	nextRetry := s.anchorRenewal(time.Now().Add(stage.wait))
+	nextRetry := s.anchorRenewal(time.Now().Add(v.wait))
 	if err := s.subscriptions.SetDunningRetry(ctx, tx, sub.ID, nextRetry, attempt); err != nil {
 		return err
 	}
-	if hardDecline {
-		// Record which card died alongside the latch. A later attempt compares
-		// the card on file against this one, so a customer who adds a different
-		// card is charged again instead of being stuck behind the latch.
-		deadPM := paymentMethodID
-		if deadPM == "" {
-			deadPM = sub.DunningDeadPaymentMethod()
-		}
-		// Later rungs do not charge, so they have no decline to report. Carry
-		// the original reason forward rather than overwriting it with blank —
-		// staff read it off the subscription page, and it is the only record of
-		// *why* we stopped trying.
-		code := declineCode
-		if code == "" {
-			code = sub.DunningDeclineCode()
-		}
-		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, code, deadPM); err != nil {
+	if v.hardDecline {
+		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, v.declineCode, v.deadPM); err != nil {
 			return fmt.Errorf("flag hard decline: %w", err)
 		}
 	}
-	if stage.emailStage != dunningEmailSilent && s.enqueuer != nil {
-		if err := s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customerID, stage.emailStage); err != nil {
+	if v.emailStage != dunningEmailSilent && s.enqueuer != nil {
+		if err := s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customerID, v.emailStage); err != nil {
 			return fmt.Errorf("enqueue past-due email: %w", err)
 		}
 	}
@@ -464,6 +497,13 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	// would make it permanent: no charge attempted means no charge can succeed,
 	// and success is the only thing that calls ClearDunning.
 	if sub.DunningChargeBlocked(paymentMethodID) {
+		// Re-assert the latch. We are refusing to charge, and the latch is what
+		// every reader — the admin badge and status line, the reminder email's
+		// copy, the update-card page — takes to mean exactly that. A release
+		// followed by the replacement card going away lands here with the latch
+		// off, and leaving it off would have the admin promise a charge attempt
+		// that is never going to run.
+		sub.LatchDunningHardDeclineMeta()
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, paymentMethodID, nil)
 		})
@@ -691,18 +731,20 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				}
 			}
 
-			// Hard-declined subscriptions do not belong in a batch: whether their
-			// latch has been released depends on which card is on file, and that
-			// is a Stripe call we cannot make inside this transaction. The
-			// scheduler routes them to individual renewals for exactly that
-			// reason (see jobs/renewal_scheduler.go), so reaching here means one
-			// latched between being scheduled and being run.
+			// Any subscription carrying a dead-card record is kept out of batches,
+			// latched or not. Deciding whether its dead card is still the card on
+			// file means resolving the payment method against Stripe, which this
+			// transaction cannot do — and a batch resolves one payment method for
+			// the whole group with nothing to avoid. The scheduler routes these to
+			// individual renewals for that reason (see jobs/renewal_scheduler.go);
+			// reaching here means one picked up a dead card between being
+			// scheduled and being run.
 			//
 			// Drop it from the batch rather than let one dead card fail the whole
 			// box, and leave its ladder alone — the individual renewal the
 			// scheduler enqueues next time is where it gets a fair hearing.
 			// Advancing it here would burn a rung on a card we never tried.
-			if sub.DunningHardDeclined() {
+			if sub.DunningHasDeadCard() {
 				continue
 			}
 
@@ -793,7 +835,8 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 
 	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
 
-	// No card to avoid: latched subscriptions are routed out of batching.
+	// No card to avoid: every subscription with a dead-card record is filtered
+	// out above, so nothing in this group has one.
 	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, "")
 	if err != nil {
 		return nil, err

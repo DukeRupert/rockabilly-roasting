@@ -67,16 +67,19 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 		}
 
 		// Group by (customer_id, shipping_address_id), except for subscriptions
-		// carrying a hard-decline latch. Whether that latch has been released
-		// depends on which card is currently on file, and answering that means
-		// calling Stripe — which the batch path cannot do at the point it decides
-		// what to charge. The individual renewal path resolves the payment method
-		// first and can compare it against the card that died, so route them
-		// there and let each one be judged on its own.
+		// carrying any memory of a permanently declined card. Whether that card is
+		// still the one on file is a Stripe question, and the batch path cannot
+		// ask it: it resolves one payment method for the whole group with nothing
+		// to avoid. The individual renewal path resolves the method against the
+		// dead card and can tell the two apart, so route them there.
+		//
+		// Keyed on the record rather than the latch on purpose. A subscription
+		// whose latch was released still has a dead card to avoid, and routing it
+		// back into a batch is precisely how that card gets charged again.
 		batches := make(map[batchKey][]uuid.UUID)
 		var solo []uuid.UUID
 		for _, sub := range subs {
-			if sub.DunningHardDeclined() {
+			if sub.DunningHasDeadCard() {
 				solo = append(solo, sub.ID)
 				continue
 			}
@@ -101,13 +104,13 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 				ByPeriod: 24 * time.Hour,
 			}})
 			if txErr != nil {
-				return fmt.Errorf("enqueue hard-declined renewal: %w", txErr)
+				return fmt.Errorf("enqueue dead-card renewal: %w", txErr)
 			}
 			if res.UniqueSkippedAsDuplicate {
 				// Not an error — something already queued a charge for this
 				// subscription today. Worth saying out loud, because it means
 				// this rung is riding on that job rather than one of ours.
-				logger.Info("hard-declined renewal already queued", "subscription_id", subID)
+				logger.Info("dead-card renewal already queued", "subscription_id", subID)
 				continue
 			}
 			metrics.TrackJobEnqueued(w.metrics, "subscription_renewal")
@@ -139,7 +142,7 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 		// Counted separately: a solo renewal is not a batch, and conflating them
 		// made the log overstate how much consolidation was happening.
 		logger.Info("enqueued subscription renewals",
-			"batches", batchCount, "solo_hard_declined", soloCount)
+			"batches", batchCount, "solo_dead_card", soloCount)
 	}
 	return nil
 }

@@ -658,8 +658,17 @@ templ dunningStatusPanel(props SubscriptionShowProps) {
 			<span class="badge badge-amber">{ dunningAttemptLabel(props.Subscription) }</span>
 		</div>
 		<p class="mt-2 text-sm text-rr-heading">{ dunningStatusLine(props.Subscription, props.MerchantTZ) }</p>
+		<!-- The decline reason outlives the latch, so it has to say which card it
+		     describes. Once a replacement card is in play the stored reason
+		     belongs to the card that died, not to the one being charged now, and
+		     an unqualified "Issuer said: lost_card" reads as a verdict on the
+		     wrong card. -->
 		if code := props.Subscription.DunningDeclineCode(); code != "" {
-			<p class="mt-1 text-xs text-rr-muted">Issuer said: { code }</p>
+			if props.Subscription.DunningHardDeclined() {
+				<p class="mt-1 text-xs text-rr-muted">Issuer said: { code }</p>
+			} else {
+				<p class="mt-1 text-xs text-rr-muted">Previous card: { code }</p>
+			}
 		}
 		<p class="mt-2 text-xs text-rr-muted">
 			The customer is emailed automatically &mdash; on the first decline, again mid-window, and once more before it closes. No action needed here unless you want to reach out yourself.

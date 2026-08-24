@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/platform/payments"
 )
 
 // The dunning ladder is pure data, so these tests need no database. What they
@@ -250,43 +252,121 @@ func TestReleaseDunningHardDeclineLatch(t *testing.T) {
 	assert.NotPanics(t, func() { (&domain.Subscription{}).ReleaseDunningHardDeclineLatch() })
 }
 
-// TestLatchReleaseSurvivesSoftDecline walks the whole release sequence, which is
-// the gap that let two separate versions of the same bug reach review.
-//
-// Each piece — the domain predicate, the store method, the picker — passed in
-// isolation while the composition was broken. What matters is the sequence: a
-// customer replaces a dead card, the replacement declines for an ordinary
-// reason, and the rung after that must still refuse the dead card while
-// happily retrying the replacement.
-func TestLatchReleaseSurvivesSoftDecline(t *testing.T) {
-	// Latched on pm_dead, mid-ladder.
-	sub := &domain.Subscription{Metadata: map[string]any{
-		domain.SubscriptionMetaDunningAttempt:           float64(2),
-		domain.SubscriptionMetaDunningHardDecline:       true,
-		domain.SubscriptionMetaDunningDeclineCode:       "lost_card",
-		domain.SubscriptionMetaDunningDeadPaymentMethod: "pm_dead",
-	}}
-	require.True(t, sub.DunningChargeBlocked("pm_dead"))
+// applyVerdict mutates sub the way recordRenewalFailure's database writes do, so
+// a test can run several rungs in sequence against one subscription. It mirrors
+// SetDunningRetry + SetDunningHardDecline; keeping it this small is the point,
+// since anything more would be re-implementing the thing under test.
+func applyVerdict(sub *domain.Subscription, v dunningVerdict) {
+	if sub.Metadata == nil {
+		sub.Metadata = map[string]any{}
+	}
+	sub.Metadata[domain.SubscriptionMetaDunningAttempt] = float64(v.attempt)
+	if v.hardDecline {
+		sub.Metadata[domain.SubscriptionMetaDunningHardDecline] = true
+		sub.Metadata[domain.SubscriptionMetaDunningDeclineCode] = v.declineCode
+		sub.Metadata[domain.SubscriptionMetaDunningDeadPaymentMethod] = v.deadPM
+	}
+}
 
-	// Customer adds pm_new. The picker avoids the dead card, the gate opens, and
-	// the latch comes off — in the row and on this struct.
-	require.False(t, sub.DunningChargeBlocked("pm_new"))
+// TestDunningStoryDeadCardThenReplacement walks one customer's whole story, rung
+// by rung, because every bug this feature has shipped lived in the sequence
+// rather than in any single step.
+//
+// Three separate review rounds caught three variants of the same defect — the
+// latch could not be released; the release was undone in memory; the release
+// erased the record the release depended on — and all three survived a suite
+// that tested each piece on its own. This is the test that would have caught
+// every one of them.
+func TestDunningStoryDeadCardThenReplacement(t *testing.T) {
+	sub := &domain.Subscription{}
+	hard := &payments.DeclineError{Code: "card_declined", DeclineCode: "lost_card"}
+	soft := &payments.DeclineError{Code: "card_declined", DeclineCode: "insufficient_funds"}
+
+	// Rung 1 — the original card is reported lost.
+	v := dunningVerdictFor(sub, "pm_dead", hard)
+	require.Equal(t, 1, v.attempt)
+	require.True(t, v.hardDecline)
+	assert.Equal(t, "pm_dead", v.deadPM)
+	assert.Equal(t, "lost_card", v.declineCode)
+	assert.Equal(t, dunningEmailFirst, v.emailStage, "the customer is told immediately")
+	applyVerdict(sub, v)
+
+	// Charging is stopped, and stopped specifically for that card.
+	require.True(t, sub.DunningChargeBlocked("pm_dead"))
+	require.True(t, sub.DunningHasDeadCard(), "must be routed to a solo renewal, not a batch")
+
+	// Rung 2 — nothing to charge, so the rung only advances the clock. The
+	// verdict must not read the absence of a decline as an all-clear.
+	v = dunningVerdictFor(sub, "pm_dead", nil)
+	require.True(t, v.hardDecline, "a rung that does not charge cannot clear the verdict")
+	assert.Equal(t, "lost_card", v.declineCode, "the issuer's reason survives a silent rung")
+	assert.Equal(t, "pm_dead", v.deadPM)
+	assert.Equal(t, dunningEmailSilent, v.emailStage)
+	applyVerdict(sub, v)
+
+	// The customer adds a card. It does not become the Stripe default, so the
+	// picker has to skip the dead one to find it.
+	require.False(t, sub.DunningChargeBlocked("pm_new"), "the replacement card is chargeable")
 	sub.ReleaseDunningHardDeclineLatch()
 
-	// pm_new declines softly. This must NOT be recorded as permanent: the whole
-	// first version of this bug was a stale in-memory latch re-branding the
-	// replacement card as dead.
-	assert.False(t, sub.DunningHardDeclined(),
-		"a released latch must not re-assert itself on the next failure")
+	// Rung 3 — the replacement card declines for an ordinary reason. This must
+	// NOT be recorded as permanent, or the customer who did what we asked gets
+	// told their new card is dead too.
+	v = dunningVerdictFor(sub, "pm_new", soft)
+	require.False(t, v.hardDecline, "a soft decline on the replacement must not re-latch")
+	assert.Equal(t, "pm_dead", v.deadPM, "the dead card is still remembered")
+	assert.Equal(t, "insufficient_funds", v.declineCode)
+	applyVerdict(sub, v)
 
-	// The rung after that. pm_new is still on file and still retryable...
-	assert.False(t, sub.DunningChargeBlocked("pm_new"), "the replacement card keeps its turn")
-
-	// ...and the dead card is still refused, even though no latch is set. This
-	// is the second version of the bug: the release used to erase the dead-card
-	// record, so the next rung forgot and charged pm_dead again — a fine per
-	// attempt, and an email telling a customer who already replaced their card
-	// that they need to replace their card.
+	// Rung 4 — the state that broke three times over. The replacement card is
+	// still retryable, and the dead card is still refused even though no latch
+	// is set. Routing must still keep this off the batch path, which has no way
+	// to know which card to avoid.
+	assert.False(t, sub.DunningChargeBlocked("pm_new"), "the replacement keeps its turn")
 	assert.True(t, sub.DunningChargeBlocked("pm_dead"),
 		"a card the issuer killed is never charged again, latch or no latch")
+	assert.True(t, sub.DunningHasDeadCard(), "still routed solo after the release")
+
+	// And if the replacement card is removed, the picker falls back to the dead
+	// card — we refuse it, and re-latching is what keeps the admin and the
+	// customer email from promising a charge that will not happen.
+	sub.LatchDunningHardDeclineMeta()
+	assert.True(t, sub.DunningHardDeclined())
+}
+
+// TestDunningVerdictExpiry pins the end of the ladder, including that the final
+// verdict still carries the card verdict forward — the "subscription ended"
+// audit record is the last thing that can say why.
+func TestDunningVerdictExpiry(t *testing.T) {
+	sub := &domain.Subscription{Metadata: map[string]any{
+		domain.SubscriptionMetaDunningAttempt:           float64(MaxDunningAttempts - 1),
+		domain.SubscriptionMetaDunningHardDecline:       true,
+		domain.SubscriptionMetaDunningDeclineCode:       "stolen_card",
+		domain.SubscriptionMetaDunningDeadPaymentMethod: "pm_dead",
+	}}
+
+	v := dunningVerdictFor(sub, "pm_dead", nil)
+	assert.True(t, v.expire)
+	assert.Equal(t, MaxDunningAttempts, v.attempt)
+	assert.True(t, v.hardDecline)
+	assert.Equal(t, "stolen_card", v.declineCode)
+	assert.Zero(t, v.wait, "an expiring verdict schedules nothing")
+}
+
+// TestDunningVerdictSoftDeclineNeverNamesADeadCard: only a permanent decline
+// records a dead card. A soft decline naming one would freeze a perfectly good
+// card out of every future charge.
+func TestDunningVerdictSoftDeclineNeverNamesADeadCard(t *testing.T) {
+	v := dunningVerdictFor(&domain.Subscription{}, "pm_fine",
+		&payments.DeclineError{DeclineCode: "do_not_honor"})
+	assert.False(t, v.hardDecline)
+	assert.Empty(t, v.deadPM)
+	assert.Equal(t, "do_not_honor", v.declineCode)
+
+	// A non-card error (an outage, a network blip) says nothing about the card
+	// at all and must not advance any verdict beyond the attempt count.
+	v = dunningVerdictFor(&domain.Subscription{}, "pm_fine", errors.New("connection reset"))
+	assert.False(t, v.hardDecline)
+	assert.Empty(t, v.deadPM)
+	assert.Empty(t, v.declineCode)
 }

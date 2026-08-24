@@ -255,6 +255,36 @@ func (s *Subscription) ReleaseDunningHardDeclineLatch() {
 	delete(s.Metadata, SubscriptionMetaDunningHardDecline)
 }
 
+// LatchDunningHardDeclineMeta asserts the hard-decline latch on this in-memory
+// copy so the write path persists it.
+//
+// The latch is an invariant, not a historical fact: it means "we are not
+// charging this subscription", and roughly a dozen places — the admin badge and
+// status line, the customer email's copy, the update-card page — read it that
+// way. So whenever a charge is refused because the card is the dead one, the
+// latch is re-asserted, even if a release had lifted it earlier. Letting it drift
+// out of step with what the charge path actually does is what made the admin
+// promise a "next charge attempt" that was never going to run.
+func (s *Subscription) LatchDunningHardDeclineMeta() {
+	if s.Metadata == nil {
+		s.Metadata = map[string]any{}
+	}
+	s.Metadata[SubscriptionMetaDunningHardDecline] = true
+}
+
+// DunningHasDeadCard reports whether this subscription carries any memory of a
+// permanently declined card — latched or released.
+//
+// Renewal routing keys on this rather than on the latch. A released
+// subscription still needs the solo path: the release only means "a different
+// card turned up", and deciding whether that is still true requires resolving
+// the payment method against the dead one, which the batch path cannot do.
+// Routing on the latch alone sent released subscriptions back into batching,
+// where nothing knew which card to avoid and the dead one got charged again.
+func (s *Subscription) DunningHasDeadCard() bool {
+	return s.DunningHardDeclined() || s.DunningDeadPaymentMethod() != ""
+}
+
 // DunningChargeBlocked reports whether a renewal charge must be skipped, given
 // the payment method we would otherwise charge.
 //

@@ -232,6 +232,25 @@ func (s *Subscription) DunningHardDeclined() bool {
 	return v
 }
 
+// ClearDunningHardDeclineMeta drops the hard-decline latch from this in-memory
+// copy, mirroring what SubscriptionStore.ClearDunningHardDecline does to the
+// row.
+//
+// Callers that release the latch and then keep using the same struct must call
+// this. The failure path reads the latch back off the struct to decide whether a
+// subsequent decline is permanent, so a stale true there re-latches the
+// replacement card on any soft decline — turning "your card didn't go through"
+// into "your bank has blocked this card for good" and stopping every remaining
+// charge attempt.
+func (s *Subscription) ClearDunningHardDeclineMeta() {
+	if s.Metadata == nil {
+		return
+	}
+	delete(s.Metadata, SubscriptionMetaDunningHardDecline)
+	delete(s.Metadata, SubscriptionMetaDunningDeclineCode)
+	delete(s.Metadata, SubscriptionMetaDunningDeadPaymentMethod)
+}
+
 // DunningChargeBlocked reports whether a renewal charge must be skipped, given
 // the payment method we would otherwise charge. True only when the card was
 // permanently declined *and* it is still the card on file.

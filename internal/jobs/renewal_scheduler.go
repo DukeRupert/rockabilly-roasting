@@ -59,7 +59,7 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 	start := time.Now()
 	logger := slog.Default()
 
-	var batchCount int
+	var batchCount, soloCount int
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		subs, txErr := w.subscriptionSvc.ListDueForRenewal(ctx, tx)
 		if txErr != nil {
@@ -88,13 +88,28 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 		}
 
 		for _, subID := range solo {
-			if _, txErr = w.client.InsertTx(ctx, tx, SubscriptionRenewalArgs{
+			// ByArgs alone dedupes across all time, including against completed
+			// jobs still inside River's retention window — a manual retry from
+			// the account or admin page would silently swallow this rung. Scope
+			// the uniqueness to the day so the scheduler's insert always lands.
+			res, txErr := w.client.InsertTx(ctx, tx, SubscriptionRenewalArgs{
 				SubscriptionID: subID,
-			}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); txErr != nil {
+			}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{
+				ByArgs:   true,
+				ByPeriod: 24 * time.Hour,
+			}})
+			if txErr != nil {
 				return fmt.Errorf("enqueue hard-declined renewal: %w", txErr)
 			}
+			if res.UniqueSkippedAsDuplicate {
+				// Not an error — something already queued a charge for this
+				// subscription today. Worth saying out loud, because it means
+				// this rung is riding on that job rather than one of ours.
+				logger.Info("hard-declined renewal already queued", "subscription_id", subID)
+				continue
+			}
 			metrics.TrackJobEnqueued(w.metrics, "subscription_renewal")
-			batchCount++
+			soloCount++
 		}
 
 		// Enqueue one batch job per group
@@ -118,8 +133,11 @@ func (w *RenewalSchedulerWorker) Work(ctx context.Context, _ *river.Job[RenewalS
 		return err
 	}
 
-	if batchCount > 0 {
-		logger.Info("enqueued subscription renewal batches", "count", batchCount)
+	if batchCount > 0 || soloCount > 0 {
+		// Counted separately: a solo renewal is not a batch, and conflating them
+		// made the log overstate how much consolidation was happening.
+		logger.Info("enqueued subscription renewals",
+			"batches", batchCount, "solo_hard_declined", soloCount)
 	}
 	return nil
 }

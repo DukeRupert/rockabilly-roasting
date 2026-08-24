@@ -326,7 +326,15 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 		if deadPM == "" {
 			deadPM = sub.DunningDeadPaymentMethod()
 		}
-		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, declineCode, deadPM); err != nil {
+		// Later rungs do not charge, so they have no decline to report. Carry
+		// the original reason forward rather than overwriting it with blank —
+		// staff read it off the subscription page, and it is the only record of
+		// *why* we stopped trying.
+		code := declineCode
+		if code == "" {
+			code = sub.DunningDeclineCode()
+		}
+		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, code, deadPM); err != nil {
 			return fmt.Errorf("flag hard decline: %w", err)
 		}
 	}
@@ -433,7 +441,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	// card via Stripe Billing Portal). Fall back to the first attached method
 	// for legacy customers without a default. ListPaymentMethods returns every
 	// attached PM regardless of type, which is required for Stripe Link users.
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID)
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, sub.DunningDeadPaymentMethod())
 	if err != nil {
 		return nil, err
 	}
@@ -465,13 +473,20 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 
 	// A different card than the one that died: drop the latch before charging so
 	// a decline on the new card starts its own verdict rather than inheriting
-	// the old one. If this card is dead too, the charge below re-latches it.
+	// the old one. If this card is dead too, the charge below re-latches it
+	// against the new number.
 	if sub.DunningHardDeclined() {
 		if clearErr := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			return s.subscriptions.ClearDunningHardDecline(ctx, tx, sub.ID)
 		}); clearErr != nil {
 			return nil, fmt.Errorf("clear hard-decline latch: %w", clearErr)
 		}
+		// The in-memory copy has to drop it too. recordRenewalFailure below
+		// reads the latch back off this struct, so leaving it set here would
+		// re-latch the *replacement* card on an ordinary soft decline —
+		// insufficient funds would be recorded as "the bank blocked this card
+		// for good" and no further attempt would be made.
+		sub.ClearDunningHardDeclineMeta()
 	}
 
 	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
@@ -716,10 +731,11 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			subtotalCents += totalPrice
 		}
 
-		// Nothing survived the hard-decline filter — every subscription in the
-		// batch has already advanced its ladder above. Stop here rather than
-		// pricing, rating shipping, and calculating tax on an empty order; the
-		// caller checks len(items) and returns.
+		// Nothing survived the hard-decline filter. Stop here rather than pricing,
+		// rating shipping, and calculating tax on an empty order; the caller
+		// checks len(items) and returns. Their ladders are deliberately left
+		// alone — the scheduler re-enqueues them individually, which is where a
+		// latched subscription gets a real charge attempt.
 		if len(items) == 0 {
 			return nil
 		}
@@ -761,7 +777,9 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	}
 
 	// Every subscription in the batch was hard-declined and skipped above. There
-	// is no order to place; the read tx already advanced each one's dunning.
+	// is no order to place and no ladder to advance here; the scheduler routes
+	// these to individual renewals, which is the path that can resolve their
+	// payment method and decide whether the latch still holds.
 	if len(items) == 0 {
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("all batched subscriptions hard-declined: %w", ErrRenewalPaymentDeclined)
@@ -775,7 +793,8 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 
 	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
 
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID)
+	// No card to avoid: latched subscriptions are routed out of batching.
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, "")
 	if err != nil {
 		return nil, err
 	}
@@ -959,30 +978,50 @@ func ptrVal(s *string) string {
 // off-session renewal. Returns the empty string when the customer has no usable
 // method (caller marks the subscription past_due).
 //
-// Resolution order:
-//  1. Customer's default_payment_method (set when they update their card via
-//     Stripe Billing Portal — works for any PM type, including Stripe Link).
-//  2. First attached payment method (legacy customers without a default set).
+// avoid names a card already known to be permanently dead. It is skipped in
+// favour of anything else on file, and returned only when it is the only card
+// there is — which is how the caller tells "they added a replacement" from
+// "the dead card is still all they have".
 //
-// Filtering by type=card was tried previously and broke Link customers — do
-// not reintroduce it.
-func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCustomerID string) (string, error) {
+// Skipping matters because a customer can add a card without it becoming the
+// default. Stripe's payment_method_update flow does set the default, but the
+// full billing portal need not, and preferring a known-dead default over a
+// working second card would strand exactly the customer who did what we asked.
+//
+// Resolution order:
+//  1. Customer's default_payment_method, unless that is the dead card.
+//  2. First attached method that is not the dead card (legacy customers without
+//     a default, or a customer whose default is the dead one).
+//  3. The dead card itself, if nothing else is attached.
+func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCustomerID, avoid string) (string, error) {
 	stripeCust, err := s.payments.GetCustomer(ctx, stripeCustomerID)
 	if err != nil {
 		return "", fmt.Errorf("get stripe customer: %w", err)
 	}
-	if stripeCust.DefaultPaymentMethodID != "" {
-		return stripeCust.DefaultPaymentMethodID, nil
+	defaultPM := stripeCust.DefaultPaymentMethodID
+	if defaultPM != "" && defaultPM != avoid {
+		return defaultPM, nil
 	}
 
 	methods, err := s.payments.ListPaymentMethods(ctx, stripeCustomerID)
 	if err != nil {
 		return "", fmt.Errorf("list payment methods: %w", err)
 	}
-	if len(methods) == 0 {
-		return "", nil
+	for _, m := range methods {
+		if m.ID != avoid {
+			return m.ID, nil
+		}
 	}
-	return methods[0].ID, nil
+
+	// Only the dead card remains (or nothing at all). Hand it back so the caller
+	// blocks the charge rather than mistaking this for "no payment method".
+	if defaultPM != "" {
+		return defaultPM, nil
+	}
+	if len(methods) > 0 {
+		return methods[0].ID, nil
+	}
+	return "", nil
 }
 
 // pickRenewalLocalMethod returns the shipping method to stamp on a renewal

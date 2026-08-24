@@ -211,3 +211,38 @@ func TestDunningChargeBlocked(t *testing.T) {
 		assert.False(t, latched("pm_dead").DunningChargeBlocked(""))
 	})
 }
+
+// TestClearDunningHardDeclineMeta is the in-memory half of releasing the latch,
+// and it exists because getting it wrong is silent and severe.
+//
+// RenewSubscription drops the latch in the database and then keeps using the
+// same struct. recordRenewalFailure reads the latch back off that struct to
+// decide whether a decline is permanent, so a stale true there means the
+// customer's *replacement* card gets branded dead on an ordinary soft decline —
+// insufficient funds recorded as "your bank blocked this card for good", every
+// remaining charge attempt skipped, and the subscription expiring anyway. That
+// is the original bug wearing a different hat, one step further along.
+func TestClearDunningHardDeclineMeta(t *testing.T) {
+	sub := &domain.Subscription{Metadata: map[string]any{
+		domain.SubscriptionMetaDunningAttempt:           float64(2),
+		domain.SubscriptionMetaDunningHardDecline:       true,
+		domain.SubscriptionMetaDunningDeclineCode:       "lost_card",
+		domain.SubscriptionMetaDunningDeadPaymentMethod: "pm_dead",
+		domain.SubscriptionMetaShippingGrandfathered:    true,
+	}}
+
+	sub.ClearDunningHardDeclineMeta()
+
+	assert.False(t, sub.DunningHardDeclined(), "latch must be gone in memory, not just in the row")
+	assert.Empty(t, sub.DunningDeadPaymentMethod())
+	assert.Empty(t, sub.DunningDeclineCode())
+	assert.False(t, sub.DunningChargeBlocked("pm_new"), "a released latch must not block the new card")
+
+	// The ladder and everything unrelated survive: releasing the latch is not a
+	// reset, and a customer does not lose free shipping by fixing their card.
+	assert.Equal(t, 2, sub.DunningAttempt())
+	assert.True(t, sub.ShippingGrandfathered())
+
+	// Safe on a subscription that never had metadata.
+	assert.NotPanics(t, func() { (&domain.Subscription{}).ClearDunningHardDeclineMeta() })
+}

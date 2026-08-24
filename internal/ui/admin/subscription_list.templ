@@ -309,7 +309,10 @@ func dunningProgressLabel(sub domain.Subscription) string {
 		return "awaiting first retry"
 	}
 	if sub.DunningHardDeclined() {
-		return fmt.Sprintf("card blocked — not retrying · notice %d of %d",
+		// Steps, not notices: the ladder sends three emails across four rungs,
+		// so pairing an attempt number with a notice total is wrong on most of
+		// them. Matches dunningAttemptLabel on the detail page.
+		return fmt.Sprintf("card blocked — not retrying · step %d of %d",
 			attempt, domain.SubscriptionMaxDunningAttempts-1)
 	}
 	return fmt.Sprintf("attempt %d of %d", attempt, domain.SubscriptionMaxDunningAttempts)

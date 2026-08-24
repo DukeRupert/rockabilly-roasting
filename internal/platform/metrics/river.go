@@ -32,6 +32,22 @@ func TrackJob(reg *Registry, kind string, start time.Time, err error) {
 		Observe(time.Since(start).Seconds())
 }
 
+// TrackJobCancelled records a job the worker ended on purpose — terminal, but
+// not a fault. Call it instead of TrackJob, never as well as.
+//
+// The two counters TrackJob writes both say something untrue about these:
+// "completed" claims the work happened, and "failed" puts a declined card on
+// the same graph line as a broken worker, which is how a dashboard stops being
+// worth looking at. The duration still gets observed, labelled "cancelled", so
+// a query filtering success="false" no longer picks these up.
+func TrackJobCancelled(reg *Registry, kind string, start time.Time) {
+	if reg == nil {
+		return
+	}
+	reg.RiverJobsCancelled.WithLabelValues(kind).Inc()
+	reg.RiverJobDuration.WithLabelValues(kind, "cancelled").Observe(time.Since(start).Seconds())
+}
+
 // TrackJobEnqueued increments the enqueue counter for a job kind.
 func TrackJobEnqueued(reg *Registry, kind string) {
 	if reg == nil {

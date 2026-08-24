@@ -55,14 +55,18 @@ func (w *SendQBInvoiceWorker) Work(ctx context.Context, job *river.Job[SendQBInv
 
 	metrics.TrackJob(w.metrics, "qb_send_invoice", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "background job qb_send_invoice failed",
+		// Permanent QuickBooks failures cancel, and a cancelled job never
+		// reaches jobs.ErrorHandler — so the level has to be decided here.
+		terminal := !quickbooks.IsRetryable(err)
+		logWorkerFailure(ctx, "qb_send_invoice", terminal,
 			"job_kind", "qb_send_invoice",
 			"job_id", job.ID,
+			"attempt", job.Attempt,
 			"order_id", job.Args.OrderID,
 			"qb_invoice_id", job.Args.QBInvoiceID,
 			"error", err.Error(),
 		)
-		if !quickbooks.IsRetryable(err) {
+		if terminal {
 			enqueueQBInvoiceAlert(ctx, w.pool, w.riverClient, job.Args.OrderID, "qb_send_invoice", err)
 			return river.JobCancel(fmt.Errorf("send qb invoice %s: %w", job.Args.QBInvoiceID, err))
 		}

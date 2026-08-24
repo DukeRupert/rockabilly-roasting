@@ -3,7 +3,6 @@ package jobs
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -63,13 +62,17 @@ func (w *CreateQBInvoiceWorker) Work(ctx context.Context, job *river.Job[CreateQ
 
 	metrics.TrackJob(w.metrics, "qb_create_invoice", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "background job qb_create_invoice failed",
+		// Permanent QuickBooks failures cancel, and a cancelled job never
+		// reaches jobs.ErrorHandler — so the level has to be decided here.
+		terminal := !quickbooks.IsRetryable(err)
+		logWorkerFailure(ctx, "qb_create_invoice", terminal,
 			"job_kind", "qb_create_invoice",
 			"job_id", job.ID,
+			"attempt", job.Attempt,
 			"order_id", job.Args.OrderID,
 			"error", err.Error(),
 		)
-		if !quickbooks.IsRetryable(err) {
+		if terminal {
 			enqueueQBInvoiceAlert(ctx, w.pool, w.riverClient, job.Args.OrderID, "qb_create_invoice", err)
 			return river.JobCancel(fmt.Errorf("create qb invoice for order %s: %w", job.Args.OrderID, err))
 		}

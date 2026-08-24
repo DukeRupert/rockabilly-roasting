@@ -207,7 +207,7 @@
     },
     {
       "id": 9,
-      "title": "Job completion vs failure rate",
+      "title": "Job outcomes: completed vs failed vs cancelled",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
       "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
@@ -223,6 +223,11 @@
           "expr": "sum by (job_kind) (rate(river_jobs_failed_total{job=\"$job\"}[5m]))",
           "legendFormat": "✗ {{job_kind}}",
           "refId": "B"
+        },
+        {
+          "expr": "sum by (job_kind) (rate(river_jobs_cancelled_total{job=\"$job\"}[5m]))",
+          "legendFormat": "○ {{job_kind}} (cancelled)",
+          "refId": "C"
         }
       ]
     },

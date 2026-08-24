@@ -55,13 +55,17 @@ func (w *SyncQBPaymentWorker) Work(ctx context.Context, job *river.Job[SyncQBPay
 
 	metrics.TrackJob(w.metrics, "qb_sync_payment", start, err)
 	if err != nil {
-		slog.ErrorContext(ctx, "background job qb_sync_payment failed",
+		// Permanent QuickBooks failures cancel, and a cancelled job never
+		// reaches jobs.ErrorHandler — so the level has to be decided here.
+		terminal := !quickbooks.IsRetryable(err)
+		logWorkerFailure(ctx, "qb_sync_payment", terminal,
 			"job_kind", "qb_sync_payment",
 			"job_id", job.ID,
+			"attempt", job.Attempt,
 			"order_id", job.Args.OrderID,
 			"error", err.Error(),
 		)
-		if !quickbooks.IsRetryable(err) {
+		if terminal {
 			return river.JobCancel(fmt.Errorf("sync qb payment for order %s: %w", job.Args.OrderID, err))
 		}
 	}
@@ -134,11 +138,11 @@ func (w *SyncQBPaymentWorker) work(ctx context.Context, job *river.Job[SyncQBPay
 			ResourceType: "invoice",
 			ResourceID:   job.Args.InvoiceID,
 			Metadata: map[string]any{
-				"qb_payment_id":  payment.ID,
-				"qb_invoice_id":  *order.QBInvoiceID,
-				"amount_cents":   job.Args.Amount,
-				"method":         job.Args.Method,
-				"river_job_id":   job.ID,
+				"qb_payment_id": payment.ID,
+				"qb_invoice_id": *order.QBInvoiceID,
+				"amount_cents":  job.Args.Amount,
+				"method":        job.Args.Method,
+				"river_job_id":  job.ID,
 			},
 		})
 	})

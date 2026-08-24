@@ -71,6 +71,11 @@ func (w *BuyLabelWorker) Work(ctx context.Context, job *river.Job[BuyLabelArgs])
 				"job_id", job.ID,
 				"attempt", job.Attempt,
 				"order_id", args.OrderID,
+				// The shared message names the kind but not the phase, and
+				// this worker has three that can fail. Only this one cancels,
+				// so only this one says which it was — carrying over the
+				// detail the old "prep failed permanently" message held.
+				"stage", "prepare_label_request",
 				"error", err.Error(),
 			)
 			return river.JobCancel(fmt.Errorf("prepare label request: %w", err))

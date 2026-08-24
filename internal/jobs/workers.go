@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/riverqueue/river"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/audit"
@@ -34,14 +35,125 @@ type SubscriptionRenewalArgs struct {
 // Kind returns the job kind identifier.
 func (SubscriptionRenewalArgs) Kind() string { return "subscription_renewal" }
 
+// RenewalInsertOpts is the only sanctioned way to enqueue a
+// SubscriptionRenewalArgs. Every insert site must use it — the scheduler's
+// dead-card rung, the staff Retry button, and the customer's own retry.
+//
+// This is a function rather than a var because River's InsertOpts is a mutable
+// struct; handing out a shared pointer would let one caller's edit reach the
+// others.
+//
+// # Why every site has to agree
+//
+// River derives a job's unique_key by hashing a string assembled from the
+// unique options that were *set* (see riverqueue/river internal/dbunique). The
+// "&period=" segment is appended only when ByPeriod is non-zero, so opts that
+// differ produce different keys and can never collide — two inserts with
+// different UniqueOpts do not deduplicate against each other at all, however
+// identical their args.
+//
+// That bit us: the scheduler used ByArgs+ByPeriod while both manual-retry
+// buttons used ByArgs alone, so a staff Retry and the scheduler's rung for the
+// same subscription each got their own key and both ran. RenewSubscription has
+// no period guard, so two jobs mean two PaymentIntents and two renewal orders
+// for one billing period — a genuine double charge.
+//
+// # Why these particular options
+//
+// ByArgs keys on the subscription ID, which is the whole of the args, so the
+// unit of deduplication is "a charge attempt for this subscription".
+//
+// ByPeriod bounds it to a day. Without it, River's default unique states
+// include Completed, so a finished job anywhere inside the retention window
+// would swallow a legitimate later attempt — a customer who fixed their card on
+// Tuesday could never get a charge because Monday's attempt already existed. A
+// day is the right bound because a charge attempt already made today is one
+// this subscription has had: riding on it is correct rather than a loss.
+//
+// The bucket is truncation-based, not rolling, so two attempts either side of
+// UTC midnight land in different buckets and both run. That window is about as
+// wide as the scheduler's one-minute cadence and needs a human clicking Retry
+// inside it; the residual risk is noted in RenewSubscription.
+func RenewalInsertOpts() *river.InsertOpts {
+	return &river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByArgs:   true,
+		ByPeriod: 24 * time.Hour,
+	}}
+}
+
 // BatchRenewalArgs triggers a batched renewal for multiple subscriptions
 // belonging to the same customer and shipping address.
+//
+// CustomerID and ShippingAddressID are not read by the worker — RenewBatch
+// derives both from the subscriptions themselves and rejects a batch whose
+// members disagree. They are here to be the deduplication key, and carrying
+// them is what lets that key be the *group* rather than the exact membership
+// list. See BatchRenewalInsertOpts.
 type BatchRenewalArgs struct {
-	SubscriptionIDs []uuid.UUID `json:"subscription_ids"`
+	SubscriptionIDs   []uuid.UUID `json:"subscription_ids"`
+	CustomerID        uuid.UUID   `json:"customer_id"        river:"unique"`
+	ShippingAddressID uuid.UUID   `json:"shipping_address_id" river:"unique"`
 }
 
 // Kind returns the job kind identifier.
 func (BatchRenewalArgs) Kind() string { return "batch_renewal" }
+
+// BatchRenewalInsertOpts is the only sanctioned way to enqueue a
+// BatchRenewalArgs, for the same reason RenewalInsertOpts is for the solo path:
+// options that differ between insert sites hash to different unique keys and so
+// deduplicate against nothing.
+//
+// # Why this needed uniqueness at all
+//
+// The batch insert used to pass nil — no uniqueness whatsoever. The scheduler
+// runs every minute and ListSubscriptionsDueForRenewal returns anything with
+// next_order_at <= now(), and next_order_at only moves once the batch job has
+// actually run. So every tick between enqueueing a batch and that batch
+// finishing enqueued another one for the same group. Seconds of overlap on a
+// good day; on a bad one, a job sitting in retryable with backoff while a fresh
+// duplicate is minted every sixty seconds. Each duplicate that runs charges the
+// customer and places an order.
+//
+// # Why the key is the group, not the members
+//
+// ByArgs would otherwise hash SubscriptionIDs, and that is the wrong key twice
+// over. Slice order is not guaranteed stable across runs — the source query
+// orders by next_order_at with no tiebreak — and group membership genuinely
+// changes between ticks as more subscriptions come due, so [A,B] and [A,B,C]
+// would be different keys and both would run, charging A and B twice.
+//
+// The `river:"unique"` tags on CustomerID and ShippingAddressID make River build
+// the key from those two fields alone (see rivershared/structtag), so the unit
+// of deduplication is "a batch renewal for this customer at this address" —
+// which is exactly what batchKey groups on.
+//
+// ByPeriod bounds it to a day, matching RenewalInsertOpts. Renewal times are
+// anchored to a single hour (anchorRenewalTime), so a group has at most one
+// legitimate renewal instant per day and a day-long bucket cannot orphan a
+// second batch that should have run. Discarded jobs are outside River's default
+// unique states, so a batch that exhausts its retries does not wedge the group
+// until midnight.
+//
+// # The trade-off, so nobody "fixes" it blindly
+//
+// Completed is one of River's default unique states, so a finished batch keeps
+// blocking its group for the rest of the day. If two subscriptions at the same
+// customer and address somehow come due *after* today's batch already ran, they
+// are skipped and renew tomorrow instead — a day late.
+//
+// That is the deliberate side of the trade. Dropping Completed from the states
+// would close it, at the price of re-enqueueing every sixty seconds after a
+// batch is discarded, hammering a renewal that is already failing. Between a
+// bounded one-day delay and an unbounded retry storm against Stripe, the delay
+// is the one to take — and it needs an unanchored next_order_at plus two
+// subscriptions sharing an address to happen at all, since a group of one goes
+// down the solo path instead.
+func BatchRenewalInsertOpts() *river.InsertOpts {
+	return &river.InsertOpts{UniqueOpts: river.UniqueOpts{
+		ByArgs:   true,
+		ByPeriod: 24 * time.Hour,
+	}}
+}
 
 // PaymentRetryArgs retries a failed payment.
 type PaymentRetryArgs struct {
@@ -331,8 +443,8 @@ func (SyncQBCustomerArgs) Kind() string { return "qb_sync_customer" }
 type SyncQBPaymentArgs struct {
 	OrderID   uuid.UUID `json:"order_id"`
 	InvoiceID uuid.UUID `json:"invoice_id"` // Hiri invoice ID
-	Amount    int       `json:"amount"`      // payment amount in cents
-	Method    string    `json:"method"`      // check, cash, other
+	Amount    int       `json:"amount"`     // payment amount in cents
+	Method    string    `json:"method"`     // check, cash, other
 	Reference string    `json:"reference,omitempty"`
 }
 
@@ -376,10 +488,32 @@ func (SubscriptionRenewalReceiptArgs) Kind() string { return "email:subscription
 
 // SubscriptionPastDueArgs sends a payment-failed / past-due notice to the
 // customer asking them to update their card.
+//
+// One job kind covers every rung of the dunning ladder; Stage picks the
+// template. Following the same shape as EmailInvoicePastDueArgs keeps three
+// near-identical workers from existing, and means a change to how past-due mail
+// is rendered lands in one place.
 type SubscriptionPastDueArgs struct {
 	SubscriptionID uuid.UUID `json:"subscription_id"`
 	CustomerID     uuid.UUID `json:"customer_id"`
+	// Stage is which notice this is — see the SubscriptionPastDueStage
+	// constants. A zero value (a job enqueued before the ladder existed) renders
+	// as the first notice.
+	Stage int `json:"stage"`
 }
+
+// Stage values for SubscriptionPastDueArgs. These are persisted in job args and
+// mirrored by the app layer's ladder, so append — never renumber.
+const (
+	// SubscriptionPastDueStageFirst is the notice sent on the first decline.
+	// The payment-failed webhook uses it directly; it is always a customer's
+	// first word that a charge failed.
+	SubscriptionPastDueStageFirst = 1
+	// SubscriptionPastDueStageReminder is the mid-window "shipment on hold".
+	SubscriptionPastDueStageReminder = 2
+	// SubscriptionPastDueStageFinal is the last warning before closeout.
+	SubscriptionPastDueStageFinal = 3
+)
 
 // Kind returns the job kind identifier.
 func (SubscriptionPastDueArgs) Kind() string { return "email:subscription_past_due" }

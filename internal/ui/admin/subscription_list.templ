@@ -296,6 +296,28 @@ func subscriptionNextOrderClass(sub EnrichedSubscription, now time.Time) string 
 	return "hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted sm:table-cell"
 }
 
+// dunningProgressLabel says where a past-due subscription sits on the automated
+// dunning ladder. It exists because the dashboard no longer carries a past-due
+// row: staff who come looking need to see that something *is* happening, and
+// what, rather than a bare "past due" badge that reads as neglect.
+//
+// A hard decline is called out because it is the one case where more waiting
+// will not help — the card is dead and only the customer can fix it.
+func dunningProgressLabel(sub domain.Subscription) string {
+	attempt := sub.DunningAttempt()
+	if attempt <= 0 {
+		return "awaiting first retry"
+	}
+	if sub.DunningHardDeclined() {
+		// Steps, not notices: the ladder sends three emails across four rungs,
+		// so pairing an attempt number with a notice total is wrong on most of
+		// them. Matches dunningAttemptLabel on the detail page.
+		return fmt.Sprintf("card blocked — not retrying · step %d of %d",
+			attempt, domain.SubscriptionMaxDunningAttempts-1)
+	}
+	return fmt.Sprintf("attempt %d of %d", attempt, domain.SubscriptionMaxDunningAttempts)
+}
+
 // subscriptionSortHeader renders a clickable column header. Inactive columns
 // keep a dimmed ↕ so they read as sortable before you hover them.
 templ subscriptionSortHeader(props SubscriptionListProps, col, label string) {
@@ -593,6 +615,9 @@ templ SubscriptionListContent(props SubscriptionListProps) {
 								</td>
 								<td class="whitespace-nowrap px-3 py-4 text-sm">
 									@SubscriptionStatusBadge(sub.Status)
+									if sub.Status == domain.SubscriptionStatusPastDue {
+										<p class="mt-1 text-xs text-rr-muted">{ dunningProgressLabel(sub.Subscription) }</p>
+									}
 								</td>
 								<td class={ subscriptionNextOrderClass(sub, props.Now) }>
 									{ sub.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006") }

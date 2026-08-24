@@ -1,4 +1,4 @@
-{{define "subscription_past_due.html"}}<!DOCTYPE html>
+{{define "subscription_past_due_final.html"}}<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
 <body style="margin:0;padding:0;background-color:#F5F0E6;font-family:Arial,Helvetica,sans-serif;color:#1A1612;">
@@ -9,17 +9,17 @@
     <span style="color:#F5F0E6;font-size:20px;font-weight:bold;">{{.StoreName}}</span>
   </td></tr>
   <tr><td style="padding:32px 24px;">
-    <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">We couldn't charge your card</h1>
+    <h1 style="margin:0 0 16px;font-size:24px;color:#1A1612;">Last call on your subscription</h1>
     <p style="margin:0 0 8px;">Hi {{.CustomerName}},</p>
-    <p style="margin:0 0 16px;">Your card on file didn't go through when we tried to renew your <strong>{{.ProductName}}</strong> subscription ({{.PlanName}}). Until it's sorted, we'll hold the next shipment.</p>
+    <p style="margin:0 0 16px;">We've been trying for two weeks to renew your <strong>{{.ProductName}}</strong> subscription ({{.PlanName}}) and haven't been able to. On <strong>{{date .EndsOn}}</strong> we'll stop trying and close it out.</p>
 
-    {{if .HardDecline}}<p style="margin:0 0 24px;">Your bank has blocked this card for good — a reissue, a report of loss, something on their end. It won't work again, so this one needs a different card.</p>{{else}}<p style="margin:0 0 24px;">Common causes: expired card, new card number, or a hold from the bank. Updating your payment method takes about a minute.</p>{{end}}
+    {{if .HardDecline}}<p style="margin:0 0 24px;">The card on file has been blocked by your bank, so this needs a different one. That's the only thing standing between you and the next bag.</p>{{else}}<p style="margin:0 0 24px;">One working card is all it takes, and everything picks up where it left off — same coffee, same schedule, no re-signup.</p>{{end}}
 
     <p style="margin:0 0 24px;text-align:center;">
       <a href="{{if .UpdateCardURL}}{{.UpdateCardURL}}{{else}}{{.AccountURL}}{{end}}" style="display:inline-block;background-color:#C0271D;color:#ffffff;text-decoration:none;padding:12px 24px;font-weight:bold;border-radius:4px;">Update payment method</a>
     </p>
 
-    <p style="margin:0;font-size:13px;color:#666;">Once we have a working card, the renewal will go out automatically. Reply to this email if you need a hand.</p>
+    <p style="margin:0;font-size:13px;color:#666;">If you'd rather let it go, you don't have to do a thing — it'll close on its own. Either way, no hard feelings, and the door's open whenever you want back in.</p>
   </td></tr>
   <tr><td style="background-color:#F5F0E6;padding:16px 24px;text-align:center;font-size:12px;color:#666;">
     {{.StoreName}} &middot; <a href="{{.StoreURL}}" style="color:#C0271D;">{{.StoreURL}}</a>

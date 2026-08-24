@@ -55,7 +55,6 @@ var (
 	ErrSubscriptionNotResumable   = errors.New("subscription cannot be resumed")
 	ErrSubscriptionNotCancellable = errors.New("subscription cannot be cancelled")
 	ErrSubscriptionNotEditable    = errors.New("subscription cannot be edited in its current state")
-	ErrSubscriptionNotPastDue     = errors.New("subscription is not past due")
 	ErrSubscriptionNotSkippable   = errors.New("subscription cannot be skipped")
 	ErrInvalidSkipRequest         = errors.New("choose a number of shipments to skip or a restart date, not both")
 	ErrSkipIntervalsOutOfRange    = errors.New("skip count is out of range")

@@ -142,7 +142,21 @@ type Provider interface {
 	// CreatePortalSession creates a Stripe Billing Portal session for a customer
 	// and returns the hosted URL the customer should be redirected to. The
 	// returnURL is where the portal sends the customer when they are done.
+	//
+	// This opens the full portal: billing history, invoices, every saved payment
+	// method. Only hand it to a customer who is already signed in.
 	CreatePortalSession(ctx context.Context, customerID, returnURL string) (string, error)
+
+	// CreatePaymentMethodUpdateSession creates a Billing Portal session scoped to
+	// updating the payment method and nothing else.
+	//
+	// It exists so a past-due dunning email can offer a one-click "fix your card"
+	// link. The holder of that link is not authenticated — it arrives by email and
+	// could be forwarded — so the session must not expose billing history or
+	// invoices the way the full portal does. Stripe enforces the narrowing on
+	// their side via flow_data; do not reimplement this by calling
+	// CreatePortalSession and hoping the customer only touches one page.
+	CreatePaymentMethodUpdateSession(ctx context.Context, customerID, returnURL string) (string, error)
 
 	// ConstructWebhookEvent verifies a webhook signature and parses the event.
 	ConstructWebhookEvent(payload []byte, signature string) (*WebhookEvent, error)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/riverqueue/river"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
@@ -537,30 +536,6 @@ func (d *Deps) handleAdminSubscriptionResume(w http.ResponseWriter, r *http.Requ
 	http.Redirect(w, r, "/admin/subscriptions/"+id.String()+"?flash=Subscription+resumed", http.StatusSeeOther)
 }
 
-// handleAdminSubscriptionDunningAck clears a past-due subscription from the
-// dashboard's Urgent band. Invoked from the dashboard row, so it redirects back
-// there; htmx (hx-boost) follows the redirect and re-renders with the row gone
-// and the urgent count decremented.
-func (d *Deps) handleAdminSubscriptionDunningAck(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	id, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.SubscriptionService.AcknowledgeDunning(ctx, tx, id, staffActor(r))
-	})
-	if err != nil {
-		Error(w, r, err)
-		return
-	}
-
-	http.Redirect(w, r, "/admin/", http.StatusSeeOther)
-}
-
 // handleAdminSubscriptionRetry triggers an immediate renewal charge on a
 // past-due subscription — the staff counterpart to the customer's retry, for
 // when a customer calls in after sorting their card. Enqueues the renewal job;
@@ -584,12 +559,24 @@ func (d *Deps) handleAdminSubscriptionRetry(w http.ResponseWriter, r *http.Reque
 			flash = "Subscription+is+not+past+due"
 			return nil
 		}
-		// ByArgs unique on the subscription ID prevents stacking duplicate
-		// charge attempts (double-click, or a race with the scheduler).
-		if _, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionRenewalArgs{
+		// jobs.RenewalInsertOpts, never a literal — it is what stops this from
+		// stacking on a double-click, on the customer's own retry, or on the
+		// scheduler's dunning rung. Options that differ from the other insert
+		// sites would hash to a different unique_key and deduplicate against
+		// none of them.
+		res, txErr := d.RiverClient.InsertTx(ctx, tx, jobs.SubscriptionRenewalArgs{
 			SubscriptionID: sub.ID,
-		}, &river.InsertOpts{UniqueOpts: river.UniqueOpts{ByArgs: true}}); txErr != nil {
+		}, jobs.RenewalInsertOpts())
+		if txErr != nil {
 			return txErr
+		}
+		if res.UniqueSkippedAsDuplicate {
+			// Say so rather than claiming we queued something. A charge attempt
+			// for this subscription is already in flight or already ran today,
+			// and this click is riding on it — staff who are told "queued" would
+			// otherwise wait for a charge that no second job is going to make.
+			flash = "Charge+attempt+already+queued+today"
+			return nil
 		}
 		flash = "Renewal+charge+queued"
 		return nil

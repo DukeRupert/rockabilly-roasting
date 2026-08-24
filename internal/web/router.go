@@ -187,6 +187,12 @@ func NewRouter(deps *Deps) http.Handler {
 	mux.HandleFunc("POST /orders/switch-to-pickup", deps.handleSwitchToPickup)
 	mux.HandleFunc("GET /subscriptions/undo-skip", deps.handleUndoSkipPage)
 	mux.HandleFunc("POST /subscriptions/undo-skip", deps.handleUndoSkip)
+	// Put a working card on a past-due subscription straight from a dunning
+	// email. Public and token-authenticated for the same reasons as the two
+	// above; the Stripe session it opens is scoped to the card form alone.
+	// See web/update_card.go.
+	mux.HandleFunc("GET /subscriptions/update-card", deps.handleUpdateCardPage)
+	mux.HandleFunc("POST /subscriptions/update-card", deps.handleUpdateCard)
 	mux.HandleFunc("GET /privacy", deps.handlePrivacyPage)
 	mux.HandleFunc("GET /terms", deps.handleTermsPage)
 	mux.HandleFunc("GET /shipping", deps.handleShippingPage)
@@ -513,7 +519,6 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/resume", deps.handleAdminSubscriptionResume)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/skip", deps.handleAdminSubscriptionSkip)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/undo-skip", deps.handleAdminSubscriptionUndoSkip)
-	adminMux.HandleFunc("POST /admin/subscriptions/{id}/dunning-ack", deps.handleAdminSubscriptionDunningAck)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/retry", deps.handleAdminSubscriptionRetry)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/grandfather-shipping", deps.handleAdminSubscriptionGrandfatherShipping)
 	adminMux.HandleFunc("POST /admin/subscriptions/{id}/cancel", deps.handleAdminSubscriptionCancel)

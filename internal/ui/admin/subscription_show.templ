@@ -257,6 +257,13 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 			</div>
 		</div>
 	}
+	<!-- Dunning status. Only past-due subscriptions carry one, and it is the
+	     first thing staff need on this page: the dashboard no longer flags
+	     past-due subscriptions, so this panel is where "is anything being done
+	     about it?" gets answered. -->
+	if props.Subscription.Status == domain.SubscriptionStatusPastDue {
+		@dunningStatusPanel(props)
+	}
 	<!-- Schedule + plan stats -->
 	<div class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
 		<div class="border border-rr-border bg-rr-surface p-4">
@@ -635,4 +642,99 @@ templ SubscriptionShow(props SubscriptionShowProps) {
 	}) {
 		@SubscriptionShowContent(props)
 	}
+}
+
+// dunningStatusPanel reports what the automated dunning ladder is doing with a
+// past-due subscription: which attempt it is on, when the next one fires, what
+// the issuer said, and the day it gives up.
+//
+// Amber, not red. This is a process running normally, not a fire — the only
+// thing a red panel would buy is staff learning to ignore amber elsewhere. The
+// one genuinely stuck state, a hard decline, says so in words instead.
+templ dunningStatusPanel(props SubscriptionShowProps) {
+	<div class="mt-4 border border-rr-border bg-rr-surface p-4">
+		<div class="flex flex-wrap items-center gap-2">
+			<h2 class="text-xs uppercase tracking-wide text-rr-muted label-font">Payment recovery</h2>
+			<span class="badge badge-amber">{ dunningAttemptLabel(props.Subscription) }</span>
+		</div>
+		<p class="mt-2 text-sm text-rr-heading">{ dunningStatusLine(props.Subscription, props.MerchantTZ) }</p>
+		<!-- The decline reason outlives the latch, so it has to say which card it
+		     describes. Once a replacement card is in play the stored reason
+		     belongs to the card that died, not to the one being charged now, and
+		     an unqualified "Issuer said: lost_card" reads as a verdict on the
+		     wrong card. -->
+		if code := props.Subscription.DunningDeclineCode(); code != "" {
+			if props.Subscription.DunningHardDeclined() {
+				<p class="mt-1 text-xs text-rr-muted">Issuer said: { code }</p>
+			} else {
+				<p class="mt-1 text-xs text-rr-muted">Previous card: { code }</p>
+			}
+		}
+		<p class="mt-2 text-xs text-rr-muted">
+			The customer is emailed automatically &mdash; on the first decline, again mid-window, and once more before it closes. No action needed here unless you want to reach out yourself.
+		</p>
+	</div>
+}
+
+// dunningRungSendsEmail reports whether the rung that runs on next_order_at
+// mails the customer. attempt is how many attempts have already failed, so the
+// rung about to run is index attempt.
+func dunningRungSendsEmail(attempt int) bool {
+	if attempt < 0 || attempt >= len(domain.SubscriptionDunningRungNotifies) {
+		return false
+	}
+	return domain.SubscriptionDunningRungNotifies[attempt]
+}
+
+// dunningAttemptLabel is the badge text: where on the ladder this subscription
+// sits.
+//
+// A hard decline reads "no retries — day N of M" rather than counting attempts,
+// because no attempts are being made. Counting notices instead was tried and is
+// worse: the rung number and the notice number are not the same (the ladder
+// sends three emails across four rungs), so any label pairing one with the
+// other's total is wrong on most rungs.
+func dunningAttemptLabel(sub *domain.Subscription) string {
+	attempt := sub.DunningAttempt()
+	if attempt <= 0 {
+		return "starting"
+	}
+	if sub.DunningHardDeclined() {
+		return fmt.Sprintf("no retries — step %d of %d", attempt, domain.SubscriptionMaxDunningAttempts-1)
+	}
+	return fmt.Sprintf("attempt %d of %d", attempt, domain.SubscriptionMaxDunningAttempts)
+}
+
+// dunningStatusLine is the sentence under the badge: what happens next and when.
+//
+// "What happens next" is deliberately derived rather than assumed. next_order_at
+// is when the *following* rung runs, and that rung may charge, may email, may do
+// neither, or may close the subscription out — saying "the next reminder goes
+// out" without checking produces a sentence that is simply false on the silent
+// rung, and hides the closeout on the last one.
+func dunningStatusLine(sub *domain.Subscription, tz *time.Location) string {
+	next := sub.NextOrderAt.In(tz).Format("Jan 2, 2006")
+	attempt := sub.DunningAttempt()
+
+	// Past the last rung: next_order_at is the day it closes out.
+	if attempt >= domain.SubscriptionMaxDunningAttempts-1 {
+		if sub.DunningHardDeclined() {
+			return "The bank has blocked this card for good, so we've stopped retrying it. " +
+				"Unless the customer puts a different card on file, the subscription closes out " + next + "."
+		}
+		return "Final charge attempt runs " + next + ". If it declines, the subscription closes out that day."
+	}
+
+	if sub.DunningHardDeclined() {
+		// No charge is coming, so the only thing next_order_at marks is the next
+		// step of the ladder — which is an email on some rungs and nothing on
+		// others.
+		if dunningRungSendsEmail(attempt) {
+			return "The bank has blocked this card for good, so we've stopped retrying it. " +
+				"The customer needs to put a different card on file; the next reminder goes out " + next + "."
+		}
+		return "The bank has blocked this card for good, so we've stopped retrying it. " +
+			"The customer needs to put a different card on file. Nothing is sent on " + next + " — the next reminder comes after that."
+	}
+	return "Next charge attempt runs " + next + "."
 }

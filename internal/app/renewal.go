@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -163,50 +165,185 @@ func (s *RenewalService) taxExemptForVariant(ctx context.Context, tx pgx.Tx, var
 
 // --- Dunning ---
 
-// maxDunningAttempts is the number of charge attempts (including the first)
-// before a past-due subscription is given up on and expired. With the retry
-// delays below, the dunning window is roughly ten days.
-const maxDunningAttempts = 4
-
-// dunningRetryDelays are the gaps before each retry, indexed by the attempt
-// number that just failed (1-based). After attempt 1 fails we wait 3 days,
-// after attempt 2 another 3, after attempt 3 another 4 — then attempt 4's
-// failure exhausts the schedule and the subscription expires. Length must be
-// maxDunningAttempts-1.
-var dunningRetryDelays = [maxDunningAttempts - 1]time.Duration{
-	72 * time.Hour,
-	72 * time.Hour,
-	96 * time.Hour,
+// dunningStage is one rung of the past-due ladder: how long to wait before the
+// next charge attempt, and which email (if any) goes out when this attempt
+// fails.
+//
+// Keeping the delay and the copy in one table is deliberate — they only make
+// sense together, and the previous split between a length constant and a delay
+// array made it easy to change one without the other.
+type dunningStage struct {
+	// wait is the gap before the next charge attempt.
+	wait time.Duration
+	// emailStage selects the customer email sent when this attempt fails.
+	// Zero means stay quiet — see the silent rung below.
+	emailStage int
 }
 
-// dunningAttempt reads the running failed-charge count off a subscription's
-// metadata. Absent (a never-failed subscription) reads as 0. JSON decoding
-// yields float64 for numbers, so both float64 and int are tolerated.
-func dunningAttempt(metadata map[string]any) int {
-	if metadata == nil {
-		return 0
+// dunningLadder is the schedule a subscription walks after its first declined
+// renewal. Index i is the stage entered when attempt i+1 fails; running off the
+// end expires the subscription.
+//
+//	attempt 1 fails  day 0   → "we couldn't charge your card", retry in 3d
+//	attempt 2 fails  day 3   → silent, retry in 5d
+//	attempt 3 fails  day 8   → "still no luck, your shipment is on hold", retry in 4d
+//	attempt 4 fails  day 12  → "last call, we end this in two days", retry in 2d
+//	attempt 5 fails  day 14  → expire, "your subscription has ended"
+//
+// Two weeks, four attempts after the first, three emails. The shape follows
+// what the payments industry has converged on: spacing retries across a couple
+// of weeks recovers more than clustering them, and recovery depends far more on
+// the customer seeing a message than on the number of charge attempts. The
+// earlier ladder ran four attempts in ten days on a single email, which meant
+// most subscriptions died before their owner had read anything.
+//
+// Attempt 2 is silent on purpose. Two emails in three days reads as dunning
+// spam and costs more in unsubscribes than it recovers.
+//
+// Five attempts total sits well inside the card networks' retry ceilings
+// (Mastercard is the tighter of the two at 10 per 30 days).
+var dunningLadder = [...]dunningStage{
+	{wait: 72 * time.Hour, emailStage: dunningEmailFirst},
+	{wait: 120 * time.Hour, emailStage: dunningEmailSilent},
+	{wait: 96 * time.Hour, emailStage: dunningEmailReminder},
+	{wait: 48 * time.Hour, emailStage: dunningEmailFinal},
+}
+
+// Email stages for the ladder above. These travel in the job args and pick the
+// template, so the numbers are persisted — append, never renumber.
+const (
+	dunningEmailSilent   = 0
+	dunningEmailFirst    = 1
+	dunningEmailReminder = 2
+	dunningEmailFinal    = 3
+)
+
+// MaxDunningAttempts is the number of charge attempts (including the first)
+// before a past-due subscription is given up on and expired.
+const MaxDunningAttempts = len(dunningLadder) + 1
+
+// The ui layer may only import domain, so the attempt cap is mirrored there for
+// the admin's "attempt N of M". This fails the build if the two drift — adding
+// a rung to the ladder without updating domain would silently make every admin
+// page lie about how much runway a customer has left.
+var _ = [1]struct{}{}[MaxDunningAttempts-domain.SubscriptionMaxDunningAttempts]
+
+// DunningExpiresAt projects the day a past-due subscription will be given up on,
+// so the customer-facing emails can name it. Derived from where the
+// subscription currently sits on the ladder: next_order_at is the next attempt,
+// and every remaining rung's wait stacks on top of it.
+//
+// Returns next_order_at unchanged for a subscription that is not mid-ladder —
+// on the last rung that is already the expiry date, and for anything else the
+// question doesn't apply.
+func DunningExpiresAt(sub *domain.Subscription) time.Time {
+	attempt := sub.DunningAttempt()
+	if attempt <= 0 || attempt >= MaxDunningAttempts {
+		return sub.NextOrderAt
 	}
-	switch v := metadata["dunning_attempt"].(type) {
-	case float64:
-		return int(v)
-	case int:
+	expiry := sub.NextOrderAt
+	for i := attempt; i < len(dunningLadder); i++ {
+		expiry = expiry.Add(dunningLadder[i].wait)
+	}
+	return expiry
+}
+
+// dunningVerdict is the decision a failed charge produces: where the ladder goes
+// next, and what we now believe about the card.
+//
+// It is separated from the code that writes it because every dunning bug this
+// feature has had lived in this decision, and the decision was only reachable
+// through a database transaction and a Stripe client — so it got tested one
+// field at a time while the sequence it forms went uncovered. As a pure value it
+// can be driven through a whole customer's story in a table test.
+type dunningVerdict struct {
+	// attempt is the failed-charge count this failure produces.
+	attempt int
+	// expire is true when the ladder is exhausted and the subscription ends.
+	expire bool
+	// wait is the gap before the next attempt (zero when expiring).
+	wait time.Duration
+	// emailStage selects the customer notice, or dunningEmailSilent for none.
+	emailStage int
+	// hardDecline is whether charging is stopped after this failure.
+	hardDecline bool
+	// declineCode names the issuer's reason and deadPMs every card we refuse to
+	// charge again. Both carry forward from the subscription when this failure
+	// says nothing new, because later rungs do not charge and so learn nothing.
+	declineCode string
+	deadPMs     []string
+}
+
+// dunningVerdictFor decides what a failed charge means. Pure: no clock, no
+// database, no network.
+//
+// paymentMethodID is the card that was charged (or would have been, on a rung
+// that refused). cause is the charge error, nil when there was nothing to charge
+// or when the rung skipped Stripe entirely.
+func dunningVerdictFor(sub *domain.Subscription, paymentMethodID string, cause error) dunningVerdict {
+	v := dunningVerdict{
+		attempt: sub.DunningAttempt() + 1,
+		// Carry the existing verdict forward. A rung that does not charge has
+		// nothing new to say, and must not be read as an all-clear.
+		hardDecline: sub.DunningHardDeclined(),
+		declineCode: sub.DunningDeclineCode(),
+		deadPMs:     sub.DunningDeadPaymentMethods(),
+	}
+
+	var declineErr *payments.DeclineError
+	if errors.As(cause, &declineErr) {
+		if declineErr.DeclineCode != "" {
+			v.declineCode = declineErr.DeclineCode
+		}
+		if declineErr.Permanent() {
+			v.hardDecline = true
+			// Only a permanent decline names a dead card. A soft decline must
+			// not add the card that just failed recoverably — that card is still
+			// worth retrying.
+			//
+			// Added to the set, never replacing it: a customer who replaces a
+			// dead card with another dead one must not make the first one look
+			// chargeable again. Forgetting it had the ladder alternate between
+			// two cards that could never work, burning every remaining attempt
+			// and taking a network fine for each.
+			if paymentMethodID != "" && !slices.Contains(v.deadPMs, paymentMethodID) {
+				v.deadPMs = append(v.deadPMs, paymentMethodID)
+			}
+		}
+	}
+
+	if v.attempt >= MaxDunningAttempts {
+		v.expire = true
 		return v
-	default:
-		return 0
 	}
+	stage := dunningLadder[v.attempt-1]
+	v.wait = stage.wait
+	v.emailStage = stage.emailStage
+	return v
 }
 
-// recordRenewalFailure advances dunning state after a declined charge, inside
-// the caller's transaction. It increments the attempt count and either
-// schedules the next retry (past_due, next_order_at pushed forward) or, at the
-// cap, expires the subscription. The past-due notice email goes out on the
-// first failure; the "subscription ended" email on expiry. Idempotent enough
-// for River's at-least-once delivery: re-running bumps the attempt by one,
-// which at worst shortens the dunning window slightly.
-func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID) error {
-	attempt := dunningAttempt(sub.Metadata) + 1
+// recordRenewalFailure applies dunningVerdictFor to the database, inside the
+// caller's transaction: it advances the attempt count and either schedules the
+// next attempt (past_due, next_order_at pushed forward) or, at the end of the
+// ladder, expires the subscription. Emails are enqueued per the verdict's stage.
+//
+// The decision lives in dunningVerdictFor; this function only writes it down.
+//
+// Idempotent enough for River's at-least-once delivery: re-running bumps the
+// attempt by one, which at worst shortens the dunning window slightly.
+func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, sub *domain.Subscription, customerID uuid.UUID, paymentMethodID string, cause error) error {
+	v := dunningVerdictFor(sub, paymentMethodID, cause)
+	attempt := v.attempt
 
-	if attempt >= maxDunningAttempts {
+	auditMeta := map[string]any{
+		"dunning_attempt": attempt,
+		"hard_decline":    v.hardDecline,
+	}
+	if v.declineCode != "" {
+		auditMeta["decline_code"] = v.declineCode
+	}
+
+	if v.expire {
 		if err := s.subscriptions.ExpireForDunning(ctx, tx, sub.ID); err != nil {
 			return err
 		}
@@ -215,13 +352,14 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 				return fmt.Errorf("enqueue subscription-ended email: %w", err)
 			}
 		}
+		auditMeta["reason"] = "dunning_exhausted"
 		if err := s.audit.Record(ctx, tx, audit.AuditEntry{
 			ActorType:    domain.AuditActorTypeSystem,
 			ActorName:    "subscription_renewal",
 			Action:       audit.AuditSubscriptionExpired,
 			ResourceType: "subscription",
 			ResourceID:   sub.ID,
-			Metadata:     map[string]any{"dunning_attempt": attempt, "reason": "dunning_exhausted"},
+			Metadata:     auditMeta,
 		}); err != nil {
 			return fmt.Errorf("audit subscription expired: %w", err)
 		}
@@ -231,24 +369,28 @@ func (s *RenewalService) recordRenewalFailure(ctx context.Context, tx pgx.Tx, su
 	// Anchor the retry to the renewal window too: a recovered charge produces a
 	// fulfillment order, and we want that in the morning batch like any renewal.
 	// Anchoring is forward-only, so the retry is never sooner than the dunning gap.
-	nextRetry := s.anchorRenewal(time.Now().Add(dunningRetryDelays[attempt-1]))
+	nextRetry := s.anchorRenewal(time.Now().Add(v.wait))
 	if err := s.subscriptions.SetDunningRetry(ctx, tx, sub.ID, nextRetry, attempt); err != nil {
 		return err
 	}
-	// First failure only — re-notifying on every retry would be spam. The
-	// final outcome (recovery or expiry) is what the customer hears next.
-	if attempt == 1 && s.enqueuer != nil {
-		if err := s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customerID); err != nil {
+	if v.hardDecline {
+		if err := s.subscriptions.SetDunningHardDecline(ctx, tx, sub.ID, v.declineCode, v.deadPMs); err != nil {
+			return fmt.Errorf("flag hard decline: %w", err)
+		}
+	}
+	if v.emailStage != dunningEmailSilent && s.enqueuer != nil {
+		if err := s.enqueuer.EnqueuePastDueNotice(ctx, tx, sub.ID, customerID, v.emailStage); err != nil {
 			return fmt.Errorf("enqueue past-due email: %w", err)
 		}
 	}
+	auditMeta["next_retry_at"] = nextRetry.Format(time.RFC3339)
 	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
 		ActorType:    domain.AuditActorTypeSystem,
 		ActorName:    "subscription_renewal",
 		Action:       audit.AuditSubscriptionFailed,
 		ResourceType: "subscription",
 		ResourceID:   sub.ID,
-		Metadata:     map[string]any{"dunning_attempt": attempt, "next_retry_at": nextRetry.Format(time.RFC3339)},
+		Metadata:     auditMeta,
 	}); err != nil {
 		return fmt.Errorf("audit renewal failed: %w", err)
 	}
@@ -339,16 +481,59 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 	// card via Stripe Billing Portal). Fall back to the first attached method
 	// for legacy customers without a default. ListPaymentMethods returns every
 	// attached PM regardless of type, which is required for Stripe Link users.
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID)
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, sub.DunningDeadPaymentMethods())
 	if err != nil {
 		return nil, err
 	}
 	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID)
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, "", nil)
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("customer %s has no saved payment methods: %w", customer.ID, ErrRenewalPaymentDeclined)
+	}
+
+	// A card the issuer permanently blocked must never be charged again — the
+	// networks fine per attempt, and retrying a dead number sours the issuer on
+	// this customer's next legitimate charge. So walk the rest of the ladder
+	// without touching Stripe: the emails still go out and the deadline still
+	// runs, which is what gives the customer a chance to fix it.
+	//
+	// The gate has to sit *after* the payment method is resolved, because the
+	// method is what releases it. Checking the latch alone before this point
+	// would make it permanent: no charge attempted means no charge can succeed,
+	// and success is the only thing that calls ClearDunning.
+	if sub.DunningChargeBlocked(paymentMethodID) {
+		// Re-assert the latch. We are refusing to charge, and the latch is what
+		// every reader — the admin badge and status line, the reminder email's
+		// copy, the update-card page — takes to mean exactly that. A release
+		// followed by the replacement card going away lands here with the latch
+		// off, and leaving it off would have the admin promise a charge attempt
+		// that is never going to run.
+		sub.LatchDunningHardDeclineMeta()
+		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, paymentMethodID, nil)
+		})
+		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		return nil, fmt.Errorf("subscription %s card hard-declined: %w", sub.ID, ErrRenewalPaymentDeclined)
+	}
+
+	// A different card than the one that died: drop the latch before charging so
+	// a decline on the new card starts its own verdict rather than inheriting
+	// the old one. If this card is dead too, the charge below re-latches it
+	// against the new number.
+	if sub.DunningHardDeclined() {
+		if relErr := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+			return s.subscriptions.ReleaseDunningHardDecline(ctx, tx, sub.ID)
+		}); relErr != nil {
+			return nil, fmt.Errorf("release hard-decline latch: %w", relErr)
+		}
+		// The in-memory copy has to drop it too. recordRenewalFailure below
+		// reads the latch back off this struct, so leaving it set here would
+		// re-latch the *replacement* card on an ordinary soft decline —
+		// insufficient funds would be recorded as "the bank blocked this card
+		// for good" and no further attempt would be made.
+		sub.ReleaseDunningHardDeclineLatch()
 	}
 
 	pi, err := s.payments.CreatePaymentIntent(ctx, payments.CreatePaymentIntentRequest{
@@ -372,9 +557,11 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		},
 	})
 	if err != nil {
-		// Payment declined — advance dunning state (retry or expire).
+		// Payment declined — advance dunning state (retry or expire). err
+		// carries the decline code, which decides whether we ever charge this
+		// card again.
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
-			return s.recordRenewalFailure(ctx, tx, sub, customer.ID)
+			return s.recordRenewalFailure(ctx, tx, sub, customer.ID, paymentMethodID, err)
 		})
 		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
 		return nil, fmt.Errorf("create renewal payment intent: %w: %w", err, ErrRenewalPaymentDeclined)
@@ -551,6 +738,23 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				}
 			}
 
+			// Any subscription carrying a dead-card record is kept out of batches,
+			// latched or not. Deciding whether its dead card is still the card on
+			// file means resolving the payment method against Stripe, which this
+			// transaction cannot do — and a batch resolves one payment method for
+			// the whole group with nothing to avoid. The scheduler routes these to
+			// individual renewals for that reason (see jobs/renewal_scheduler.go);
+			// reaching here means one picked up a dead card between being
+			// scheduled and being run.
+			//
+			// Drop it from the batch rather than let one dead card fail the whole
+			// box, and leave its ladder alone — the individual renewal the
+			// scheduler enqueues next time is where it gets a fair hearing.
+			// Advancing it here would burn a rung on a card we never tried.
+			if sub.DunningHasDeadCard() {
+				continue
+			}
+
 			plan, txErr := s.subscriptions.GetPlanByID(ctx, tx, sub.PlanID)
 			if txErr != nil {
 				return fmt.Errorf("get plan for %s: %w", subID, txErr)
@@ -574,6 +778,15 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 				TotalPrice: totalPrice,
 			})
 			subtotalCents += totalPrice
+		}
+
+		// Nothing survived the hard-decline filter. Stop here rather than pricing,
+		// rating shipping, and calculating tax on an empty order; the caller
+		// checks len(items) and returns. Their ladders are deliberately left
+		// alone — the scheduler re-enqueues them individually, which is where a
+		// latched subscription gets a real charge attempt.
+		if len(items) == 0 {
+			return nil
 		}
 
 		var txErr error
@@ -612,6 +825,15 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		return nil, fmt.Errorf("batch renewal read phase: %w", err)
 	}
 
+	// Every subscription in the batch was hard-declined and skipped above. There
+	// is no order to place and no ladder to advance here; the scheduler routes
+	// these to individual renewals, which is the path that can resolve their
+	// payment method and decide whether the latch still holds.
+	if len(items) == 0 {
+		s.metrics.SubscriptionRenewals.WithLabelValues("failed").Inc()
+		return nil, fmt.Errorf("all batched subscriptions hard-declined: %w", ErrRenewalPaymentDeclined)
+	}
+
 	orderTotal = subtotalCents + shippingCents + taxCents
 
 	if customer.StripeCustomerID == nil {
@@ -620,14 +842,16 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 
 	// --- Phase 2: create PaymentIntent (external call, outside tx) ---
 
-	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID)
+	// No cards to avoid: every subscription with a dead-card record is filtered
+	// out above, so nothing in this group has one.
+	paymentMethodID, err := s.pickRenewalPaymentMethod(ctx, *customer.StripeCustomerID, nil)
 	if err != nil {
 		return nil, err
 	}
 	if paymentMethodID == "" {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
-				if err := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID); err != nil {
+				if err := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, "", nil); err != nil {
 					return err
 				}
 			}
@@ -666,7 +890,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 	if err != nil {
 		_ = store.Tx(ctx, pool, func(tx pgx.Tx) error {
 			for _, item := range items {
-				if rfErr := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID); rfErr != nil {
+				if rfErr := s.recordRenewalFailure(ctx, tx, item.Sub, customer.ID, paymentMethodID, err); rfErr != nil {
 					return rfErr
 				}
 			}
@@ -804,30 +1028,50 @@ func ptrVal(s *string) string {
 // off-session renewal. Returns the empty string when the customer has no usable
 // method (caller marks the subscription past_due).
 //
-// Resolution order:
-//  1. Customer's default_payment_method (set when they update their card via
-//     Stripe Billing Portal — works for any PM type, including Stripe Link).
-//  2. First attached payment method (legacy customers without a default set).
+// avoid names cards already known to be permanently dead. They are skipped in
+// favour of anything else on file, and one is returned only when nothing else is
+// there — which is how the caller tells "they added a replacement" from "the
+// dead cards are still all they have".
 //
-// Filtering by type=card was tried previously and broke Link customers — do
-// not reintroduce it.
-func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCustomerID string) (string, error) {
+// Skipping matters because a customer can add a card without it becoming the
+// default. Stripe's payment_method_update flow does set the default, but the
+// full billing portal need not, and preferring a known-dead default over a
+// working second card would strand exactly the customer who did what we asked.
+//
+// Resolution order:
+//  1. Customer's default_payment_method, unless it is a dead card.
+//  2. First attached method that is not a dead card (legacy customers without a
+//     default, or a customer whose default is dead).
+//  3. A dead card, if nothing else is attached.
+func (s *RenewalService) pickRenewalPaymentMethod(ctx context.Context, stripeCustomerID string, avoid []string) (string, error) {
 	stripeCust, err := s.payments.GetCustomer(ctx, stripeCustomerID)
 	if err != nil {
 		return "", fmt.Errorf("get stripe customer: %w", err)
 	}
-	if stripeCust.DefaultPaymentMethodID != "" {
-		return stripeCust.DefaultPaymentMethodID, nil
+	defaultPM := stripeCust.DefaultPaymentMethodID
+	if defaultPM != "" && !slices.Contains(avoid, defaultPM) {
+		return defaultPM, nil
 	}
 
 	methods, err := s.payments.ListPaymentMethods(ctx, stripeCustomerID)
 	if err != nil {
 		return "", fmt.Errorf("list payment methods: %w", err)
 	}
-	if len(methods) == 0 {
-		return "", nil
+	for _, m := range methods {
+		if !slices.Contains(avoid, m.ID) {
+			return m.ID, nil
+		}
 	}
-	return methods[0].ID, nil
+
+	// Only dead cards remain (or nothing at all). Hand one back so the caller
+	// blocks the charge rather than mistaking this for "no payment method".
+	if defaultPM != "" {
+		return defaultPM, nil
+	}
+	if len(methods) > 0 {
+		return methods[0].ID, nil
+	}
+	return "", nil
 }
 
 // pickRenewalLocalMethod returns the shipping method to stamp on a renewal

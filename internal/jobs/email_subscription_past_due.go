@@ -23,5 +23,5 @@ func NewSubscriptionPastDueWorker(subs *app.SubscriptionService, pool *pgxpool.P
 
 // Work processes a past-due notification email job.
 func (w *SubscriptionPastDueWorker) Work(ctx context.Context, job *river.Job[SubscriptionPastDueArgs]) error {
-	return w.subs.SendPastDueEmail(ctx, w.pool, job.Args.SubscriptionID, job.Args.CustomerID)
+	return w.subs.SendPastDueEmail(ctx, w.pool, job.Args.SubscriptionID, job.Args.CustomerID, job.Args.Stage)
 }

@@ -47,7 +47,6 @@ const (
 	AuditSubscriptionShippingGrandfathered = "subscription.shipping_grandfathered_changed"
 	AuditSubscriptionVariantChanged        = "subscription.variant_changed"
 	AuditSubscriptionPlanChanged           = "subscription.plan_changed"
-	AuditSubscriptionDunningAck            = "subscription.dunning_acknowledged"
 	AuditSubscriptionSkipped               = "subscription.skipped"
 	AuditSubscriptionSkipUndone            = "subscription.skip_undone"
 	AuditPlanCreated                       = "subscription_plan.created"

@@ -1,0 +1,15 @@
+{{define "subscription_past_due_final.txt"}}Last call on your subscription
+
+Hi {{.CustomerName}},
+
+We've been trying for two weeks to renew your {{.ProductName}} subscription ({{.PlanName}}) and haven't been able to. On {{date .EndsOn}} we'll stop trying and close it out.
+
+{{if .HardDecline}}The card on file has been blocked by your bank, so this needs a different one. That's the only thing standing between you and the next bag.{{else}}One working card is all it takes, and everything picks up where it left off -- same coffee, same schedule, no re-signup.{{end}}
+
+Update your payment method: {{if .UpdateCardURL}}{{.UpdateCardURL}}{{else}}{{.AccountURL}}{{end}}
+
+If you'd rather let it go, you don't have to do a thing -- it'll close on its own. Either way, no hard feelings, and the door's open whenever you want back in.
+
+{{.StoreName}}
+{{.StoreURL}}
+{{end}}

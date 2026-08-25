@@ -19,6 +19,28 @@ import (
 // postponementDateLayout is the value an <input type="date"> submits.
 const postponementDateLayout = "2006-01-02"
 
+// postponementNoteMaxRunes bounds the staff note. Matches the maxlength on the
+// input, which the browser enforces first; this is the server saying the same
+// thing to anything that did not come from the form.
+const postponementNoteMaxRunes = 200
+
+// clipNote trims a staff note to postponementNoteMaxRunes, counting runes
+// rather than bytes.
+//
+// Bytes would be wrong twice over. The input's maxlength counts characters, so
+// a note of accented text passes the browser at 200 characters and arrives as
+// four hundred bytes; slicing that at byte 200 can land in the middle of a
+// multi-byte character, and Postgres rejects the invalid UTF-8 outright. The
+// staffer would get a generic failure on a note the form had just told them was
+// the right length, with the postponement not saved.
+func clipNote(s string) string {
+	r := []rune(s)
+	if len(r) <= postponementNoteMaxRunes {
+		return s
+	}
+	return string(r[:postponementNoteMaxRunes])
+}
+
 // handleAdminDeliveryPostponementCreate moves one delivery run to a later day.
 //
 // Both dates are parsed in the merchant's zone, not UTC. They arrive as bare
@@ -38,10 +60,7 @@ func (d *Deps) handleAdminDeliveryPostponementCreate(w http.ResponseWriter, r *h
 		redirectFlashError(w, r, "/admin/settings", "Pick the day the run happens instead.")
 		return
 	}
-	note := strings.TrimSpace(r.FormValue("note"))
-	if len(note) > 200 {
-		note = note[:200]
-	}
+	note := clipNote(strings.TrimSpace(r.FormValue("note")))
 
 	var result *app.PostponeDeliveryRunResult
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -67,6 +86,12 @@ func (d *Deps) handleAdminDeliveryPostponementCreate(w http.ResponseWriter, r *h
 		case errors.Is(err, app.ErrPostponeAlreadyRun):
 			redirectFlashError(w, r, "/admin/settings",
 				"That run has already gone out — only a future run can be moved.")
+		case errors.Is(err, app.ErrPostponeTargetRunMoved):
+			redirectFlashError(w, r, "/admin/settings",
+				"That day's own run has already been moved somewhere else, so the shop isn't running then either. Put that one back first, then move both.")
+		case errors.Is(err, app.ErrPostponeStrandsMovedRun):
+			redirectFlashError(w, r, "/admin/settings",
+				"Another run has already been moved onto that day, and it would be left pointing at a day with no run. Put that one back first, then move both.")
 		case errors.Is(err, app.ErrPostponeNoSchedule):
 			redirectFlashError(w, r, "/admin/settings", "Set up a delivery schedule first.")
 		default:

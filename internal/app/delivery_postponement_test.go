@@ -539,3 +539,90 @@ func TestRestoreDeliveryRunUnknownPastDateIsStillNoOp(t *testing.T) {
 	require.NoError(t, err)
 	assert.EqualValues(t, 0, result.OrdersMoved)
 }
+
+// A postponement resolves one hop and does not chase chains, so a chain must
+// never be allowed to form: with Monday moved onto Thursday and Thursday then
+// moved onto Saturday, Monday's run still reports Thursday — a day the shop is
+// shut, which is the exact failure this feature exists to prevent. The panel
+// would show two innocuous rows and nothing would warn.
+//
+// Both orders of doing it are refused, because the hazard is symmetric and this
+// feature has been bitten three times by a rule written for one half of a pair.
+func TestPostponeRefusesChainedRuns(t *testing.T) {
+	loc := merchantTZ(t)
+	monday, thursday, _ := runDays(loc)
+	saturday := thursday.AddDate(0, 0, 2)
+
+	t.Run("onto a day whose own run has been moved away", func(t *testing.T) {
+		ctx := context.Background()
+		tx := testutil.NewTestTx(t, testPool)
+		svc := postponementService()
+
+		_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), thursday, saturday, "closed Thursday", staffActorFixture())
+		require.NoError(t, err)
+
+		_, err = svc.PostponeDeliveryRun(ctx, tx, testNow(loc), monday, thursday, "Labor Day", staffActorFixture())
+		assert.ErrorIs(t, err, app.ErrPostponeTargetRunMoved)
+
+		// Refused before anything was written: the Thursday move is untouched
+		// and Monday was not recorded.
+		cfg, err := store.NewShippingStore().GetConfig(ctx, tx)
+		require.NoError(t, err)
+		require.Len(t, cfg.DeliveryPostponements, 1)
+		assert.Equal(t, thursday.Day(), dateOnlyIn(cfg.DeliveryPostponements[0].OriginalDate).Day())
+	})
+
+	t.Run("off a day another run has been moved onto", func(t *testing.T) {
+		ctx := context.Background()
+		tx := testutil.NewTestTx(t, testPool)
+		svc := postponementService()
+
+		_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), monday, thursday, "Labor Day", staffActorFixture())
+		require.NoError(t, err)
+
+		_, err = svc.PostponeDeliveryRun(ctx, tx, testNow(loc), thursday, saturday, "closed Thursday", staffActorFixture())
+		assert.ErrorIs(t, err, app.ErrPostponeStrandsMovedRun)
+
+		cfg, err := store.NewShippingStore().GetConfig(ctx, tx)
+		require.NoError(t, err)
+		require.Len(t, cfg.DeliveryPostponements, 1)
+		assert.Equal(t, monday.Day(), dateOnlyIn(cfg.DeliveryPostponements[0].OriginalDate).Day())
+	})
+
+	// The guard must not mistake a run for its own chain partner. Correcting an
+	// existing postponement replaces the row rather than adding to it, so the
+	// row being replaced cannot chain with itself — and correction is the path
+	// staff use most.
+	t.Run("correcting an existing postponement is not a chain", func(t *testing.T) {
+		ctx := context.Background()
+		tx := testutil.NewTestTx(t, testPool)
+		svc := postponementService()
+
+		_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), monday, thursday, "Labor Day", staffActorFixture())
+		require.NoError(t, err)
+
+		_, err = svc.PostponeDeliveryRun(ctx, tx, testNow(loc), monday, monday.AddDate(0, 0, 1), "Tuesday after all", staffActorFixture())
+		assert.NoError(t, err)
+
+		cfg, err := store.NewShippingStore().GetConfig(ctx, tx)
+		require.NoError(t, err)
+		require.Len(t, cfg.DeliveryPostponements, 1)
+		assert.Equal(t, monday.AddDate(0, 0, 1).Day(), dateOnlyIn(cfg.DeliveryPostponements[0].MovedTo).Day())
+	})
+
+	// Restoring the other postponement is the way out, and it has to actually
+	// clear the way — otherwise the refusal above is a dead end.
+	t.Run("restoring the other run clears the way", func(t *testing.T) {
+		ctx := context.Background()
+		tx := testutil.NewTestTx(t, testPool)
+		svc := postponementService()
+
+		_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), thursday, saturday, "closed Thursday", staffActorFixture())
+		require.NoError(t, err)
+		_, err = svc.RestoreDeliveryRun(ctx, tx, testNow(loc), thursday, staffActorFixture())
+		require.NoError(t, err)
+
+		_, err = svc.PostponeDeliveryRun(ctx, tx, testNow(loc), monday, thursday, "Labor Day", staffActorFixture())
+		assert.NoError(t, err)
+	})
+}

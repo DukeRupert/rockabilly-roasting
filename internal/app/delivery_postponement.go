@@ -100,6 +100,37 @@ func (s *CheckoutService) PostponeDeliveryRun(
 	if moved.Before(today) {
 		return nil, ErrPostponeIntoPast
 	}
+	// A postponement resolves one hop and deliberately does not chase chains: a
+	// run moved onto Thursday happens Thursday, whatever Thursday's own run
+	// does. That is the right reading of any single row, and it is exactly why a
+	// chain must never be allowed to form — nothing downstream would notice one,
+	// and the panel would show two innocuous-looking rows.
+	//
+	// Refused in both directions, because this is the same shape that has bitten
+	// this feature three times: a rule written for one half of a symmetric pair.
+	//
+	//   - Moving a run onto a day whose own run has already been moved away. The
+	//     shop is shut that day — that is why the other run left — so this lands
+	//     the van on precisely the closed day the feature exists to avoid.
+	//   - Moving a run off a day that another run has already been moved onto.
+	//     The same closed day, reached by doing the two in the other order.
+	//
+	// The fix for staff is to restore the other postponement, then move both.
+	// Enforced here rather than in the schema because a cross-row rule is not a
+	// CHECK, and this service is the only writer.
+	for _, p := range cfg.DeliveryPostponements {
+		if sameDate(p.OriginalDate, original) {
+			// The row being corrected. It is about to be replaced, so it cannot
+			// chain with itself.
+			continue
+		}
+		if sameDate(p.OriginalDate, moved) {
+			return nil, ErrPostponeTargetRunMoved
+		}
+		if sameDate(p.MovedTo, original) {
+			return nil, ErrPostponeStrandsMovedRun
+		}
+	}
 
 	if err := s.shipping.UpsertDeliveryPostponement(ctx, tx, original, moved, note); err != nil {
 		return nil, err

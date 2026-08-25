@@ -617,7 +617,12 @@ templ SettingsContent(props SettingsProps) {
 			</div>
 		</form>
 	</div>
-	if props.Shipping.LocalDeliveryEnabled && len(props.Shipping.LocalDeliveryWeekdays) > 0 {
+	<!-- Gated on the saved config, not the draft. On a rejected save
+	     props.Shipping is what was typed, so unticking local delivery alongside
+	     a mistyped rate would make the whole panel vanish from the re-render
+	     while the postponements sat untouched on disk. Same rule the echo
+	     sentences follow. -->
+	if props.Saved.LocalDeliveryEnabled && len(props.Saved.LocalDeliveryWeekdays) > 0 {
 		@postponementsPanel(props)
 	}
 }

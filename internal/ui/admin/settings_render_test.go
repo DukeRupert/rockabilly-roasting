@@ -395,42 +395,64 @@ func ptrTime(t time.Time) *time.Time { return &t }
 
 // --- Moved delivery runs ---
 
+// renderPostponements renders the settings page the way production does: the
+// panel reads the saved schedule, so the helper sets both halves rather than
+// letting a test accidentally prove the draft path.
+func renderPostponements(t *testing.T, saved ShippingSettings, rows []PostponementRow) string {
+	t.Helper()
+	return renderSettings(t, SettingsProps{Shipping: saved, Saved: saved, Postponements: rows})
+}
+
 // The panel only exists to amend a schedule, so it must not appear when there
 // is no schedule to amend. A shop that has not set up local delivery would
 // otherwise be offered a form whose every submission the service refuses.
 func TestPostponementsPanel_HiddenWithoutSchedule(t *testing.T) {
 	noDelivery := healthyShipping()
 	noDelivery.LocalDeliveryEnabled = false
-	assert.NotContains(t, renderSettings(t, SettingsProps{Shipping: noDelivery}), "Moved delivery runs")
+	assert.NotContains(t, renderPostponements(t, noDelivery, nil), "Moved delivery runs")
 
 	noDays := healthyShipping()
 	noDays.LocalDeliveryWeekdays = nil
-	assert.NotContains(t, renderSettings(t, SettingsProps{Shipping: noDays}), "Moved delivery runs")
+	assert.NotContains(t, renderPostponements(t, noDays, nil), "Moved delivery runs")
 
 	// With a schedule, it is there.
-	assert.Contains(t, renderSettings(t, SettingsProps{Shipping: healthyShipping()}), "Moved delivery runs")
+	assert.Contains(t, renderPostponements(t, healthyShipping(), nil), "Moved delivery runs")
+}
+
+// The panel's visibility follows the *saved* schedule, not the draft. A rejected
+// save re-renders with what was typed, so gating on the draft meant unticking
+// local delivery alongside a mistyped rate made the whole panel disappear —
+// while the postponements sat untouched on disk, invisible and unmanageable
+// until the staffer got the rest of the form right.
+func TestPostponementsPanel_FollowsSavedNotDraft(t *testing.T) {
+	draft := healthyShipping()
+	draft.LocalDeliveryEnabled = false // what the staffer just typed, and got rejected
+
+	html := renderSettings(t, SettingsProps{
+		Shipping:      draft,
+		Saved:         healthyShipping(),
+		Postponements: []PostponementRow{{OriginalValue: "2026-09-07", OriginalLabel: "Monday, September 7", MovedToLabel: "Tuesday, September 8"}},
+	})
+	assert.Contains(t, html, "Moved delivery runs", "a rejected draft must not hide runs that are still on disk")
+	assert.Contains(t, html, "Monday, September 7")
 }
 
 // An empty panel has to say so. Rendering just the add form would read as
 // "nothing loaded" rather than "nothing moved", and the difference matters to a
 // staffer checking whether somebody already handled a holiday.
 func TestPostponementsPanel_EmptyState(t *testing.T) {
-	html := renderSettings(t, SettingsProps{Shipping: healthyShipping()})
-	assert.Contains(t, html, "No runs have been moved.")
+	assert.Contains(t, renderPostponements(t, healthyShipping(), nil), "No runs have been moved.")
 }
 
 // A recorded postponement renders both dates, its note, and a Restore control
 // carrying the date the handler needs back.
 func TestPostponementsPanel_RendersRows(t *testing.T) {
-	html := renderSettings(t, SettingsProps{
-		Shipping: healthyShipping(),
-		Postponements: []PostponementRow{{
-			OriginalValue: "2026-09-07",
-			OriginalLabel: "Monday, September 7",
-			MovedToLabel:  "Tuesday, September 8",
-			Note:          "Labor Day",
-		}},
-	})
+	html := renderPostponements(t, healthyShipping(), []PostponementRow{{
+		OriginalValue: "2026-09-07",
+		OriginalLabel: "Monday, September 7",
+		MovedToLabel:  "Tuesday, September 8",
+		Note:          "Labor Day",
+	}})
 
 	assert.Contains(t, html, "Monday, September 7")
 	assert.Contains(t, html, "Tuesday, September 8")
@@ -448,15 +470,12 @@ func TestPostponementsPanel_RendersRows(t *testing.T) {
 // than hidden — a staffer looking back at a holiday should be able to see it
 // was handled.
 func TestPostponementsPanel_MarksPastRuns(t *testing.T) {
-	html := renderSettings(t, SettingsProps{
-		Shipping: healthyShipping(),
-		Postponements: []PostponementRow{{
-			OriginalValue: "2026-01-01",
-			OriginalLabel: "Thursday, January 1",
-			MovedToLabel:  "Friday, January 2",
-			Past:          true,
-		}},
-	})
+	html := renderPostponements(t, healthyShipping(), []PostponementRow{{
+		OriginalValue: "2026-01-01",
+		OriginalLabel: "Thursday, January 1",
+		MovedToLabel:  "Friday, January 2",
+		Past:          true,
+	}})
 	assert.Contains(t, html, "Already run")
 }
 
@@ -464,7 +483,7 @@ func TestPostponementsPanel_MarksPastRuns(t *testing.T) {
 // the shipping POST would mean a mistyped flat rate discards a holiday somebody
 // just marked, which is the whole reason this is a separate form.
 func TestPostponementsPanel_HasItsOwnForm(t *testing.T) {
-	html := renderSettings(t, SettingsProps{Shipping: healthyShipping()})
+	html := renderPostponements(t, healthyShipping(), nil)
 	assert.Contains(t, html, `action="/admin/settings/delivery-postponements"`)
 	assert.Contains(t, html, `name="moved_to_date"`)
 	assert.Contains(t, html, `name="note"`)

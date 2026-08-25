@@ -63,32 +63,31 @@ func (s *CheckoutService) PostponeDeliveryRun(
 	if !moved.After(original) {
 		return nil, ErrPostponeNotForward
 	}
-	if moved.Sub(original) > domain.MaxDeliveryPostponementDays*24*time.Hour {
+	// Calendar arithmetic, not a duration. Both sides are local midnights, so
+	// subtracting them across a daylight-saving transition yields 337 hours for
+	// an exact fortnight and would reject a move the database constraint
+	// accepts.
+	if moved.After(original.AddDate(0, 0, domain.MaxDeliveryPostponementDays)) {
 		return nil, ErrPostponeTooFar
 	}
-
-	// Where the orders for this run are sitting *now*, which is not necessarily
-	// the scheduled date. Correcting an earlier postponement — staff marked
-	// Tuesday, meant Wednesday — has already moved them once, and looking for
-	// them on the original date would find nothing and quietly strand them on
-	// the first answer while the schedule moved on to the second.
-	from := original
-	existing, err := s.shipping.ListDeliveryPostponements(ctx, tx)
-	if err != nil {
-		return nil, err
-	}
-	for _, p := range existing {
-		if sameDate(p.OriginalDate, original) {
-			from = dateOnly(p.MovedTo)
-			break
-		}
+	// A run that has already gone cannot be moved. Without this, marking a
+	// Monday from three months ago rewrites the promised date on orders that
+	// were delivered that day — silently corrupting the record of what happened
+	// while changing nothing about any future run.
+	if original.Before(todayIn(original.Location())) {
+		return nil, ErrPostponeAlreadyRun
 	}
 
 	if err := s.shipping.UpsertDeliveryPostponement(ctx, tx, original, moved, note); err != nil {
 		return nil, err
 	}
 
-	moveCount, err := s.shipping.RescheduleOrdersOnDate(ctx, tx, from, moved)
+	// Selected by the run they ride, not by the date they currently show. That
+	// is what makes correcting an earlier postponement work — the orders have
+	// already moved once and no longer sit on the scheduled date — and what
+	// keeps a run postponed onto another run day from sweeping up that day's
+	// own orders.
+	moveCount, err := s.shipping.RescheduleDeliveryRun(ctx, tx, original, moved)
 	if err != nil {
 		return nil, err
 	}
@@ -103,11 +102,8 @@ func (s *CheckoutService) PostponeDeliveryRun(
 		After: map[string]any{
 			"original_date": original.Format(dateLayout),
 			"moved_to":      moved.Format(dateLayout),
-			// moved_from records where the orders actually came from, which
-			// differs from original_date when this corrects an earlier move.
-			"moved_from":   from.Format(dateLayout),
-			"note":         note,
-			"orders_moved": moveCount,
+			"note":          note,
+			"orders_moved":  moveCount,
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("audit delivery run postponed: %w", err)
@@ -157,7 +153,10 @@ func (s *CheckoutService) RestoreDeliveryRun(
 		return nil, err
 	}
 
-	moveCount, err := s.shipping.RescheduleOrdersOnDate(ctx, tx, moved, original)
+	// Back onto the scheduled day, again selected by run rather than by date.
+	// Selecting on the date they were moved to would sweep up the orders of any
+	// run that legitimately falls on that day.
+	moveCount, err := s.shipping.RescheduleDeliveryRun(ctx, tx, original, original)
 	if err != nil {
 		return nil, err
 	}
@@ -199,6 +198,16 @@ const dateLayout = "2006-01-02"
 // same day look different.
 func dateOnly(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+// todayIn is the current calendar day in loc, as local midnight — the boundary
+// a run has to be on or after to still be movable.
+func todayIn(loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.UTC
+	}
+	now := time.Now().In(loc)
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 }
 
 // sameDate compares two times by the calendar day each names, ignoring clock

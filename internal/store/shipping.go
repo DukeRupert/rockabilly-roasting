@@ -133,8 +133,8 @@ func (s *ShippingStore) DeleteDeliveryPostponement(ctx context.Context, tx pgx.T
 	return nil
 }
 
-// RescheduleOrdersOnDate moves every local-delivery order promised one date
-// onto another, and reports how many moved.
+// RescheduleDeliveryRun moves every order riding the run scheduled for runDate
+// onto the day that run now goes out, and reports how many moved.
 //
 // This is what keeps the fulfillment queue and the load list honest after a run
 // is postponed: those read the stored scheduled_delivery_date, not the schedule
@@ -142,16 +142,23 @@ func (s *ShippingStore) DeleteDeliveryPostponement(ctx context.Context, tx pgx.T
 // are not emailed — the confirmation they already have names the old date, and
 // the shop announces a moved holiday through the Announcements composer if it
 // wants to say more.
-func (s *ShippingStore) RescheduleOrdersOnDate(ctx context.Context, tx pgx.Tx, from, to time.Time) (int64, error) {
+//
+// Selection is by delivery_run_date, never by the promised date. A promised
+// date stops identifying a run the moment two runs can share one: postpone a
+// Monday onto a Thursday and its orders sit alongside Thursday's own, after
+// which "everything promised Thursday" is the wrong set — restoring the Monday
+// would drag Thursday's orders onto a day they never rode. The run column says
+// which orders belong to which run, whatever date they currently show.
+func (s *ShippingStore) RescheduleDeliveryRun(ctx context.Context, tx pgx.Tx, runDate, to time.Time) (int64, error) {
 	tag, err := tx.Exec(ctx,
 		`UPDATE orders
 		    SET scheduled_delivery_date = $2::date,
 		        updated_at = now()
-		  WHERE scheduled_delivery_date = $1::date`,
-		from, to,
+		  WHERE delivery_run_date = $1::date`,
+		runDate, to,
 	)
 	if err != nil {
-		return 0, fmt.Errorf("reschedule orders on date: %w", err)
+		return 0, fmt.Errorf("reschedule delivery run: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }

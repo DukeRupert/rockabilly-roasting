@@ -223,8 +223,22 @@ func (c ShippingConfig) HasDeliverySchedule() bool {
 //
 // ok is false when no schedule is configured (see HasDeliverySchedule).
 func (c ShippingConfig) NextDeliveryDate(now time.Time, loc *time.Location) (time.Time, bool) {
+	_, effective, ok := c.NextDeliveryRun(now, loc)
+	return effective, ok
+}
+
+// NextDeliveryRun answers the same question as NextDeliveryDate but returns the
+// run's identity alongside its date: scheduled is the weekday the run belongs
+// to, effective is the day it actually goes out. The two differ only when the
+// run has been postponed.
+//
+// Order placement needs both. The date is what the customer is promised; the
+// scheduled day is what says *which run* the order rides, and a date alone
+// cannot say that once two runs can land on the same day. See the
+// delivery_run_date column in migration 072.
+func (c ShippingConfig) NextDeliveryRun(now time.Time, loc *time.Location) (scheduled, effective time.Time, ok bool) {
 	if !c.HasDeliverySchedule() {
-		return time.Time{}, false
+		return time.Time{}, time.Time{}, false
 	}
 	if loc == nil {
 		loc = time.UTC
@@ -239,24 +253,28 @@ func (c ShippingConfig) NextDeliveryDate(now time.Time, loc *time.Location) (tim
 	// wall clock without shifting which date we land on.
 	base := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
 
-	// The window runs from MaxDeliveryPostponementDays before today to a full
-	// week after. The lookback catches a run scheduled in the past that was
-	// postponed into the future; the constraint bounding how far a run may move
-	// is what keeps that lookback finite. The eighth forward offset matters
-	// too: with a single-weekday schedule, an order placed past that day's
-	// cutoff has to roll to the same weekday seven days out, which a 0..6
-	// window would miss.
+	// The window runs from MaxDeliveryPostponementDays before today to a week
+	// plus that same span after.
+	//
+	// The lookback catches a run scheduled in the past that was postponed into
+	// the future; the constraint bounding how far a run may move is what keeps
+	// it finite. The forward reach needs the same slack for the opposite
+	// reason: a plain weekday schedule guarantees the next run within seven
+	// days, but postponement voids that guarantee — push two consecutive runs
+	// far enough forward and the true next run sits beyond day seven, where a
+	// narrower window would never look. It would then answer with a run further
+	// out than the real one, over-promising the wait at checkout.
 	//
 	// Candidates are collected rather than returned on first hit, because
 	// postponement breaks the ordering — scanning days in sequence no longer
 	// yields run dates in sequence once one of them has been moved.
-	var best time.Time
-	for offset := -MaxDeliveryPostponementDays; offset <= 7; offset++ {
-		scheduled := base.AddDate(0, 0, offset)
-		if !c.DeliversOn(scheduled.Weekday()) {
+	var bestScheduled, bestRun time.Time
+	for offset := -MaxDeliveryPostponementDays; offset <= 7+MaxDeliveryPostponementDays; offset++ {
+		day := base.AddDate(0, 0, offset)
+		if !c.DeliversOn(day.Weekday()) {
 			continue
 		}
-		run := c.effectiveRunDate(scheduled, loc)
+		run := c.effectiveRunDate(day, loc)
 
 		// The run has already left.
 		if run.Before(base) {
@@ -268,14 +286,14 @@ func (c ShippingConfig) NextDeliveryDate(now time.Time, loc *time.Location) (tim
 		if run.Equal(base) && minutesIn >= c.LocalDeliveryCutoffMinutes {
 			continue
 		}
-		if best.IsZero() || run.Before(best) {
-			best = run
+		if bestRun.IsZero() || run.Before(bestRun) {
+			bestScheduled, bestRun = day, run
 		}
 	}
-	if best.IsZero() {
-		return time.Time{}, false
+	if bestRun.IsZero() {
+		return time.Time{}, time.Time{}, false
 	}
-	return best, true
+	return bestScheduled, bestRun, true
 }
 
 // effectiveRunDate maps a scheduled delivery day to the day the van actually

@@ -61,6 +61,9 @@ func (d *Deps) handleAdminDeliveryPostponementCreate(w http.ResponseWriter, r *h
 		case errors.Is(err, app.ErrPostponeTooFar):
 			redirectFlashError(w, r, "/admin/settings",
 				"A run can only be moved up to two weeks. Further than that, change the delivery days instead.")
+		case errors.Is(err, app.ErrPostponeAlreadyRun):
+			redirectFlashError(w, r, "/admin/settings",
+				"That run has already gone out — only a future run can be moved.")
 		case errors.Is(err, app.ErrPostponeNoSchedule):
 			redirectFlashError(w, r, "/admin/settings", "Set up a delivery schedule first.")
 		default:

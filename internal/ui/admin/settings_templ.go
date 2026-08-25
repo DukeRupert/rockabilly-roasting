@@ -914,11 +914,11 @@ func SettingsContent(props SettingsProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</div></div><!-- Save bar. Not sticky: the admin layout sets overflow-x-hidden on\n\t\t\t     the content wrapper, which computes overflow-y to auto and makes\n\t\t\t     that wrapper the scrollport for any position:sticky inside it —\n\t\t\t     the bar would silently never pin. The \"unsaved changes\" note is\n\t\t\t     what tells a staffer who scrolled past it that the trip back up\n\t\t\t     is still owed. --><div class=\"flex items-center justify-end gap-3 border-t border-rr-border bg-rr-raised px-4 py-3 sm:px-6\"><span x-show=\"dirty\" x-cloak class=\"text-xs font-medium text-rr-body\">Unsaved changes</span> <button type=\"submit\" class=\"rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Save shipping settings</button></div></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</div></div><!-- Save bar. Not sticky: the admin layout sets overflow-x-hidden on\n\t\t\t     the content wrapper, which computes overflow-y to auto and makes\n\t\t\t     that wrapper the scrollport for any position:sticky inside it —\n\t\t\t     the bar would silently never pin. The \"unsaved changes\" note is\n\t\t\t     what tells a staffer who scrolled past it that the trip back up\n\t\t\t     is still owed. --><div class=\"flex items-center justify-end gap-3 border-t border-rr-border bg-rr-raised px-4 py-3 sm:px-6\"><span x-show=\"dirty\" x-cloak class=\"text-xs font-medium text-rr-body\">Unsaved changes</span> <button type=\"submit\" class=\"rounded-sm bg-rr-red px-4 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Save shipping settings</button></div></form></div><!-- Gated on the saved config, not the draft. On a rejected save\n\t     props.Shipping is what was typed, so unticking local delivery alongside\n\t     a mistyped rate would make the whole panel vanish from the re-render\n\t     while the postponements sat untouched on disk. Same rule the echo\n\t     sentences follow. -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if props.Shipping.LocalDeliveryEnabled && len(props.Shipping.LocalDeliveryWeekdays) > 0 {
+		if props.Saved.LocalDeliveryEnabled && len(props.Saved.LocalDeliveryWeekdays) > 0 {
 			templ_7745c5c3_Err = postponementsPanel(props).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -974,7 +974,7 @@ func postponementsPanel(props SettingsProps) templ.Component {
 				var templ_7745c5c3_Var38 string
 				templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(row.OriginalLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 647, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 652, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 				if templ_7745c5c3_Err != nil {
@@ -987,7 +987,7 @@ func postponementsPanel(props SettingsProps) templ.Component {
 				var templ_7745c5c3_Var39 string
 				templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(row.MovedToLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 649, Col: 52}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 654, Col: 52}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 				if templ_7745c5c3_Err != nil {
@@ -1005,7 +1005,7 @@ func postponementsPanel(props SettingsProps) templ.Component {
 					var templ_7745c5c3_Var40 string
 					templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(row.Note)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 652, Col: 58}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 657, Col: 58}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 					if templ_7745c5c3_Err != nil {
@@ -1029,7 +1029,7 @@ func postponementsPanel(props SettingsProps) templ.Component {
 				var templ_7745c5c3_Var41 string
 				templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.ResolveAttributeValue(row.OriginalValue)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 659, Col: 74}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 664, Col: 74}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 				if templ_7745c5c3_Err != nil {
@@ -1058,7 +1058,7 @@ func postponementsPanel(props SettingsProps) templ.Component {
 					var templ_7745c5c3_Var43 string
 					templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.ResolveAttributeValue("hint-restore-" + row.OriginalValue)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 665, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 670, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
 					if templ_7745c5c3_Err != nil {
@@ -1212,7 +1212,7 @@ func SettingsWholesaleContent(props SettingsWholesaleProps) templ.Component {
 			var templ_7745c5c3_Var47 string
 			templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.ResolveAttributeValue(pl.ID.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 755, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 760, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
 			if templ_7745c5c3_Err != nil {
@@ -1235,7 +1235,7 @@ func SettingsWholesaleContent(props SettingsWholesaleProps) templ.Component {
 			var templ_7745c5c3_Var48 string
 			templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(pl.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 758, Col: 16}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 763, Col: 16}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 			if templ_7745c5c3_Err != nil {
@@ -1253,7 +1253,7 @@ func SettingsWholesaleContent(props SettingsWholesaleProps) templ.Component {
 				var templ_7745c5c3_Var49 string
 				templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(string(pl.Status))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 760, Col: 28}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 765, Col: 28}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 				if templ_7745c5c3_Err != nil {
@@ -1439,7 +1439,7 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 				var templ_7745c5c3_Var55 string
 				templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RealmID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 854, Col: 99}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 859, Col: 99}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 				if templ_7745c5c3_Err != nil {
@@ -1480,7 +1480,7 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 				var templ_7745c5c3_Var58 string
 				templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(refreshTokenRemainingLabel(props.QB.RefreshExpiresAt))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 862, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 867, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 				if templ_7745c5c3_Err != nil {
@@ -1493,7 +1493,7 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 				var templ_7745c5c3_Var59 string
 				templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RefreshExpiresAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 865, Col: 81}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 870, Col: 81}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 				if templ_7745c5c3_Err != nil {

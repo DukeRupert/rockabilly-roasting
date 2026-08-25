@@ -10,8 +10,15 @@ import (
 	"github.com/dukerupert/hiri/internal/store"
 )
 
-// scheduleLocalDelivery resolves the delivery run an order should be promised,
-// or nil when no promise applies.
+// scheduleLocalDelivery resolves the delivery run an order should be promised.
+// promised is the date the customer is told; runDate is which run that is, and
+// the two differ only when the run has been postponed. Both are nil when no
+// promise applies.
+//
+// The run date is stored alongside the promise because a date cannot identify a
+// run once two of them can share one — see the delivery_run_date column in
+// migration 072. Returning them together is what stops a caller recording one
+// without the other.
 //
 // Nil is returned — rather than an error — for every ordinary "no date" case:
 // the order isn't going out on the van, no schedule is configured, or the
@@ -30,17 +37,17 @@ func scheduleLocalDelivery(
 	method *domain.ShippingMethod,
 	placedAt time.Time,
 	loc *time.Location,
-) *time.Time {
+) (promised, runDate *time.Time) {
 	if shipping == nil || method == nil || *method != domain.ShippingMethodLocalDelivery {
-		return nil
+		return nil, nil
 	}
 	cfg, err := shipping.GetConfig(ctx, tx)
 	if err != nil || cfg == nil {
-		return nil
+		return nil, nil
 	}
-	date, ok := cfg.NextDeliveryDate(placedAt, loc)
+	scheduled, effective, ok := cfg.NextDeliveryRun(placedAt, loc)
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	return &date
+	return &effective, &scheduled
 }

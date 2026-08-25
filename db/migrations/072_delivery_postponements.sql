@@ -44,5 +44,37 @@ CREATE TABLE delivery_postponements (
 -- handful of rows — a working year has maybe six observed holidays), so no
 -- index beyond the primary key is warranted.
 
+-- Which run an order belongs to, as distinct from when that run goes out.
+--
+-- scheduled_delivery_date is the day the customer was promised, and once a run
+-- is postponed it stops being able to identify the run: a Monday moved onto
+-- Thursday leaves its orders sharing a date with Thursday's own, and nothing
+-- can afterwards say which were which. Restoring the Monday then drags
+-- Thursday's orders back to a Monday they were never on — which, if that
+-- Monday is the holiday the shop was closed for, points the van's paperwork at
+-- a shut day. That is the exact failure the postponement feature exists to
+-- prevent.
+--
+-- This column is the identity: the scheduled weekday the order rides,
+-- unaffected by any postponement. Postpone and restore match on it, so they
+-- move exactly the orders that belong to the run being moved.
+--
+-- Backfilled from scheduled_delivery_date because no postponement exists yet —
+-- every historical local-delivery order rode the day it was promised.
+ALTER TABLE orders
+    ADD COLUMN delivery_run_date date;
+
+UPDATE orders
+   SET delivery_run_date = scheduled_delivery_date
+ WHERE scheduled_delivery_date IS NOT NULL;
+
+-- Postpone and restore both filter on this column. Partial for the same reason
+-- the scheduled_delivery_date index is: NULL for the large majority of orders.
+CREATE INDEX idx_orders_delivery_run_date
+    ON orders (delivery_run_date)
+    WHERE delivery_run_date IS NOT NULL;
+
 -- +goose Down
+DROP INDEX IF EXISTS idx_orders_delivery_run_date;
+ALTER TABLE orders DROP COLUMN IF EXISTS delivery_run_date;
 DROP TABLE IF EXISTS delivery_postponements;

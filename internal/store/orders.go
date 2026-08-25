@@ -54,6 +54,9 @@ type CreateOrderParams struct {
 	// ScheduledDeliveryDate is the local-delivery run this order was promised.
 	// Nil for every other method; see domain.Order.ScheduledDeliveryDate.
 	ScheduledDeliveryDate *time.Time
+	// DeliveryRunDate is which run the order rides, as opposed to when that run
+	// goes out. The two differ only for a postponed run. See migration 072.
+	DeliveryRunDate *time.Time
 	Notes                 *string
 	Metadata              map[string]any
 	PlacedAt              time.Time
@@ -97,6 +100,7 @@ func (s *OrderStore) CreateOrder(ctx context.Context, tx pgx.Tx, p CreateOrderPa
 		ShippingMethod:        shippingMethod,
 		RequestedDeliveryDate: timestampToPG(p.RequestedDeliveryDate),
 		ScheduledDeliveryDate: dateTimeToPG(p.ScheduledDeliveryDate),
+		DeliveryRunDate:       dateTimeToPG(p.DeliveryRunDate),
 		Notes:                 p.Notes,
 		Metadata:              metadataToJSON(p.Metadata),
 		PlacedAt:              p.PlacedAt,

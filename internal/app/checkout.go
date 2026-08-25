@@ -313,7 +313,7 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 	// may have sat on the checkout page across the cutoff, in which case the
 	// date quoted on the payment step is stale and this is the real one.
 	placedAt := time.Now()
-	scheduledDelivery := scheduleLocalDelivery(ctx, tx, s.shipping, p.ShippingMethod, placedAt, s.merchantTZ)
+	scheduledDelivery, deliveryRun := scheduleLocalDelivery(ctx, tx, s.shipping, p.ShippingMethod, placedAt, s.merchantTZ)
 
 	order, err := s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
 		Number:            orderNumber,
@@ -332,6 +332,7 @@ func (s *CheckoutService) PlaceOrder(ctx context.Context, tx pgx.Tx, p PlaceOrde
 		SubscriptionID:    p.SubscriptionID,
 		ShippingMethod:        p.ShippingMethod,
 		ScheduledDeliveryDate: scheduledDelivery,
+		DeliveryRunDate:       deliveryRun,
 		Notes:                 p.Notes,
 		Metadata:              p.Metadata,
 		PlacedAt:              placedAt,

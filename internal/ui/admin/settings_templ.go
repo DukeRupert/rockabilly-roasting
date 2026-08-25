@@ -1016,35 +1016,48 @@ func postponementsPanel(props SettingsProps) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				if row.Past {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<p class=\"mt-0.5 text-xs text-rr-muted\">Already run &mdash; kept for the record.</p>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</div>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				if row.Restorable {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "<form method=\"post\" action=\"/admin/settings/delivery-postponements/delete\"><input type=\"hidden\" name=\"original_date\" value=\"")
+				if row.StatusNote != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "<p class=\"mt-0.5 text-xs text-rr-muted\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var41 string
-					templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.ResolveAttributeValue(row.OriginalValue)
+					templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(row.StatusNote)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 660, Col: 64}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</p>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if row.Restorable {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<form method=\"post\" action=\"/admin/settings/delivery-postponements/delete\"><input type=\"hidden\" name=\"original_date\" value=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var42 string
+					templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.ResolveAttributeValue(row.OriginalValue)
 					if templ_7745c5c3_Err != nil {
 						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 665, Col: 75}
 					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Var42 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+					templ_7745c5c3_Var43 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 						templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 						templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 						if !templ_7745c5c3_IsBuffer {
@@ -1056,20 +1069,20 @@ func postponementsPanel(props SettingsProps) templ.Component {
 							}()
 						}
 						ctx = templ.InitializeContext(ctx)
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<button type=\"submit\" class=\"border border-rr-border bg-rr-surface px-2.5 py-1 label-font text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors\" style=\"font-size:0.6rem;\" aria-describedby=\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<button type=\"submit\" class=\"border border-rr-border bg-rr-surface px-2.5 py-1 label-font text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors\" style=\"font-size:0.6rem;\" aria-describedby=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						var templ_7745c5c3_Var43 string
-						templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.ResolveAttributeValue("hint-restore-" + row.OriginalValue)
+						var templ_7745c5c3_Var44 string
+						templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.ResolveAttributeValue("hint-restore-" + row.OriginalValue)
 						if templ_7745c5c3_Err != nil {
 							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 671, Col: 64}
 						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "\"")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -1085,37 +1098,37 @@ func postponementsPanel(props SettingsProps) templ.Component {
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, ">Restore</button>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, ">Restore</button>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						return nil
 					})
-					templ_7745c5c3_Err = ActionWrap("hint-restore-"+row.OriginalValue, "Puts this run back on its scheduled day, and moves any orders promised the new day back with it.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var42), templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = ActionWrap("hint-restore-"+row.OriginalValue, "Puts this run back on its scheduled day, and moves any orders promised the new day back with it.").Render(templ.WithChildren(ctx, templ_7745c5c3_Var43), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "</form>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</form>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "</li>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "</li>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "</ul>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "</ul>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "<p class=\"px-4 py-4 text-sm text-rr-muted sm:px-6\">No runs have been moved.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<p class=\"px-4 py-4 text-sm text-rr-muted sm:px-6\">No runs have been moved.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<form method=\"post\" action=\"/admin/settings/delivery-postponements\" class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex flex-wrap items-end gap-3\"><div><label for=\"postpone-original\" class=\"block text-xs font-medium text-rr-heading\">Run scheduled for</label> <input type=\"date\" id=\"postpone-original\" name=\"original_date\" required class=\"mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading\"></div><div><label for=\"postpone-moved\" class=\"block text-xs font-medium text-rr-heading\">Happens instead on</label> <input type=\"date\" id=\"postpone-moved\" name=\"moved_to_date\" required class=\"mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading\"></div><div class=\"min-w-[12rem] flex-1\"><label for=\"postpone-note\" class=\"block text-xs font-medium text-rr-heading\">Why (staff only)</label> <input type=\"text\" id=\"postpone-note\" name=\"note\" maxlength=\"200\" placeholder=\"Labor Day\" class=\"mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading\"></div><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Move run</button></div><p class=\"mt-2 text-xs text-rr-muted\">The scheduled day has to be one the van already runs, and the new day has to be later &mdash; up to two weeks out.</p></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "<form method=\"post\" action=\"/admin/settings/delivery-postponements\" class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex flex-wrap items-end gap-3\"><div><label for=\"postpone-original\" class=\"block text-xs font-medium text-rr-heading\">Run scheduled for</label> <input type=\"date\" id=\"postpone-original\" name=\"original_date\" required class=\"mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading\"></div><div><label for=\"postpone-moved\" class=\"block text-xs font-medium text-rr-heading\">Happens instead on</label> <input type=\"date\" id=\"postpone-moved\" name=\"moved_to_date\" required class=\"mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading\"></div><div class=\"min-w-[12rem] flex-1\"><label for=\"postpone-note\" class=\"block text-xs font-medium text-rr-heading\">Why (staff only)</label> <input type=\"text\" id=\"postpone-note\" name=\"note\" maxlength=\"200\" placeholder=\"Labor Day\" class=\"mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading\"></div><button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Move run</button></div><p class=\"mt-2 text-xs text-rr-muted\">The scheduled day has to be one the van already runs, and the new day has to be later &mdash; up to two weeks out.</p></form></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1139,12 +1152,12 @@ func Settings(props SettingsProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var44 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var44 == nil {
-			templ_7745c5c3_Var44 = templ.NopComponent
+		templ_7745c5c3_Var45 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var45 == nil {
+			templ_7745c5c3_Var45 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var45 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var46 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -1167,7 +1180,7 @@ func Settings(props SettingsProps) templ.Component {
 			ActivePath: "/admin/settings",
 			StaffName:  props.StaffName,
 			StaffRole:  props.StaffRole,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var45), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var46), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1191,9 +1204,9 @@ func SettingsWholesaleContent(props SettingsWholesaleProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var46 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var46 == nil {
-			templ_7745c5c3_Var46 = templ.NopComponent
+		templ_7745c5c3_Var47 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var47 == nil {
+			templ_7745c5c3_Var47 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = ConfirmDialogHost().Render(ctx, templ_7745c5c3_Buffer)
@@ -1204,7 +1217,7 @@ func SettingsWholesaleContent(props SettingsWholesaleProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Wholesale</h1><p class=\"mt-1 text-sm text-rr-muted\">Store-wide defaults for approved wholesale accounts.</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Wholesale</h1><p class=\"mt-1 text-sm text-rr-muted\">Store-wide defaults for approved wholesale accounts.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1216,86 +1229,86 @@ func SettingsWholesaleContent(props SettingsWholesaleProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "<div class=\"mt-6 overflow-hidden border border-rr-border bg-rr-surface\"><form method=\"post\" action=\"/admin/settings/default-price-list\" class=\"px-4 py-5 sm:px-6\"><label for=\"default-price-list\" class=\"block text-sm font-medium text-rr-heading\">Default wholesale price list</label><div class=\"mt-1 flex items-center gap-3\"><select id=\"default-price-list\" name=\"default_price_list_id\" class=\"w-full max-w-md rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><option value=\"\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "<div class=\"mt-6 overflow-hidden border border-rr-border bg-rr-surface\"><form method=\"post\" action=\"/admin/settings/default-price-list\" class=\"px-4 py-5 sm:px-6\"><label for=\"default-price-list\" class=\"block text-sm font-medium text-rr-heading\">Default wholesale price list</label><div class=\"mt-1 flex items-center gap-3\"><select id=\"default-price-list\" name=\"default_price_list_id\" class=\"w-full max-w-md rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><option value=\"\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.DefaultPriceListID == nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, " selected")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, " selected")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, ">Base prices (no default)</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, ">Base prices (no default)</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, pl := range props.PriceLists {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<option value=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var47 string
-			templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.ResolveAttributeValue(pl.ID.String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 771, Col: 29}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if props.DefaultPriceListID != nil && *props.DefaultPriceListID == pl.ID {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, " selected")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, ">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "<option value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var48 string
-			templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(pl.Name)
+			templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.ResolveAttributeValue(pl.ID.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 774, Col: 16}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 771, Col: 29}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if props.DefaultPriceListID != nil && *props.DefaultPriceListID == pl.ID {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var49 string
+			templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(pl.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 774, Col: 16}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, " ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if pl.Status != domain.PriceListStatusActive {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "(")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "(")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var49 string
-				templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(string(pl.Status))
+				var templ_7745c5c3_Var50 string
+				templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(string(pl.Status))
 				if templ_7745c5c3_Err != nil {
 					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 776, Col: 28}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, ")")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, ")")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "</select> <button type=\"submit\" class=\"btn-secondary whitespace-nowrap\">Save</button></div><p class=\"mt-2 text-xs text-rr-muted\">Applies only to wholesale accounts with no list set on their own profile. Change it here and every unassigned wholesale account updates immediately. Retail customers are unaffected.</p><p class=\"mt-3 text-xs text-rr-muted\">Editing the prices themselves lives with the catalog — <a href=\"/admin/price-lists\" class=\"font-medium text-rr-heading underline\">Catalog → Pricing</a>.</p></form></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "</select> <button type=\"submit\" class=\"btn-secondary whitespace-nowrap\">Save</button></div><p class=\"mt-2 text-xs text-rr-muted\">Applies only to wholesale accounts with no list set on their own profile. Change it here and every unassigned wholesale account updates immediately. Retail customers are unaffected.</p><p class=\"mt-3 text-xs text-rr-muted\">Editing the prices themselves lives with the catalog — <a href=\"/admin/price-lists\" class=\"font-medium text-rr-heading underline\">Catalog → Pricing</a>.</p></form></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1319,12 +1332,12 @@ func SettingsWholesale(props SettingsWholesaleProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var50 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var50 == nil {
-			templ_7745c5c3_Var50 = templ.NopComponent
+		templ_7745c5c3_Var51 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var51 == nil {
+			templ_7745c5c3_Var51 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var51 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var52 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -1347,7 +1360,7 @@ func SettingsWholesale(props SettingsWholesaleProps) templ.Component {
 			ActivePath: "/admin/settings",
 			StaffName:  props.StaffName,
 			StaffRole:  props.StaffRole,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var51), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var52), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1371,9 +1384,9 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var52 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var52 == nil {
-			templ_7745c5c3_Var52 = templ.NopComponent
+		templ_7745c5c3_Var53 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var53 == nil {
+			templ_7745c5c3_Var53 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = ConfirmDialogHost().Render(ctx, templ_7745c5c3_Buffer)
@@ -1384,7 +1397,7 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Integrations</h1><p class=\"mt-1 text-sm text-rr-muted\">External services this shop is connected to.</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "<div class=\"sm:flex sm:items-center\"><div class=\"sm:flex-auto\"><h1 class=\"admin-page-title\">Integrations</h1><p class=\"mt-1 text-sm text-rr-muted\">External services this shop is connected to.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1396,141 +1409,141 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "<div class=\"mt-6 space-y-4\"><!-- QuickBooks Online --><div class=\"overflow-hidden border border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><div class=\"flex size-10 items-center justify-center rounded-sm bg-rr-raised ring-1 ring-rr-border\"><svg class=\"size-6 text-rr-heading\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg></div><div><h2 class=\"text-sm font-semibold text-rr-heading\">QuickBooks Online</h2><p class=\"text-sm text-rr-muted\">B2B wholesale invoicing and ACH payment collection</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "<div class=\"mt-6 space-y-4\"><!-- QuickBooks Online --><div class=\"overflow-hidden border border-rr-border bg-rr-surface\"><div class=\"px-4 py-5 sm:px-6\"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><div class=\"flex size-10 items-center justify-center rounded-sm bg-rr-raised ring-1 ring-rr-border\"><svg class=\"size-6 text-rr-heading\" fill=\"none\" viewBox=\"0 0 24 24\" stroke=\"currentColor\" stroke-width=\"2\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z\"></path></svg></div><div><h2 class=\"text-sm font-semibold text-rr-heading\">QuickBooks Online</h2><p class=\"text-sm text-rr-muted\">B2B wholesale invoicing and ACH payment collection</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var53 = []any{qbConnectionBadgeClasses(props.QB)}
-		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var53...)
+		var templ_7745c5c3_Var54 = []any{qbConnectionBadgeClasses(props.QB)}
+		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var54...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "<span class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "<span class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var54 string
-		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var53).String())
+		var templ_7745c5c3_Var55 string
+		templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var54).String())
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 1, Col: 0}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var54)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.QB.Unavailable {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "Status unknown")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, "Status unknown")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if props.QB.Connected {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, "Connected")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "Connected")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "Not connected")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "Not connected")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "</span></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "</span></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.QB.Unavailable {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "<div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><p class=\"text-sm text-rr-muted\">Couldn't read the connection status just now. Reload in a moment — this says nothing about whether QuickBooks is connected.</p><!-- The way out stays on the page: not knowing the status is\n\t\t\t\t\t     exactly when someone may need to re-authorise, and the\n\t\t\t\t\t     route starts the same flow either way. The destructive\n\t\t\t\t\t     action is withheld, because we cannot say what it would\n\t\t\t\t\t     be acting on. --><div class=\"mt-3\"><a href=\"/admin/settings/integrations/quickbooks/connect\" hx-boost=\"false\" class=\"btn-secondary\">Reconnect anyway</a></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, "<div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><p class=\"text-sm text-rr-muted\">Couldn't read the connection status just now. Reload in a moment — this says nothing about whether QuickBooks is connected.</p><!-- The way out stays on the page: not knowing the status is\n\t\t\t\t\t     exactly when someone may need to re-authorise, and the\n\t\t\t\t\t     route starts the same flow either way. The destructive\n\t\t\t\t\t     action is withheld, because we cannot say what it would\n\t\t\t\t\t     be acting on. --><div class=\"mt-3\"><a href=\"/admin/settings/integrations/quickbooks/connect\" hx-boost=\"false\" class=\"btn-secondary\">Reconnect anyway</a></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if !props.QBEnabled {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, "<!-- QB not configured in env --> <div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><p class=\"text-sm text-rr-muted\">QuickBooks integration is not configured. Set <code class=\"rounded bg-rr-raised px-1 py-0.5 text-xs font-mono\">QB_CLIENT_ID</code> and related environment variables to enable.</p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, "<!-- QB not configured in env --> <div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><p class=\"text-sm text-rr-muted\">QuickBooks integration is not configured. Set <code class=\"rounded bg-rr-raised px-1 py-0.5 text-xs font-mono\">QB_CLIENT_ID</code> and related environment variables to enable.</p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if props.QB.Connected {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, "<!-- Connected state --> <div class=\"border-t border-rr-border\"><dl class=\"divide-y divide-rr-border\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, "<!-- Connected state --> <div class=\"border-t border-rr-border\"><dl class=\"divide-y divide-rr-border\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if props.QB.RealmID != "" {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, "<div class=\"px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\"><dt class=\"text-sm font-medium text-rr-muted\">Company ID (Realm)</dt><dd class=\"mt-1 text-sm text-rr-heading sm:col-span-2 sm:mt-0 font-mono\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, "<div class=\"px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\"><dt class=\"text-sm font-medium text-rr-muted\">Company ID (Realm)</dt><dd class=\"mt-1 text-sm text-rr-heading sm:col-span-2 sm:mt-0 font-mono\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var55 string
-				templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RealmID)
+				var templ_7745c5c3_Var56 string
+				templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RealmID)
 				if templ_7745c5c3_Err != nil {
 					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 870, Col: 99}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, "</dd></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "</dd></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			if props.QB.RefreshExpiresAt != nil {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "<div class=\"px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\"><dt class=\"text-sm font-medium text-rr-muted\">Access expires</dt><dd class=\"mt-1 text-sm sm:col-span-2 sm:mt-0\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "<div class=\"px-4 py-3 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6\"><dt class=\"text-sm font-medium text-rr-muted\">Access expires</dt><dd class=\"mt-1 text-sm sm:col-span-2 sm:mt-0\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var56 = []any{refreshTokenUrgencyClasses(refreshTokenDaysRemaining(props.QB.RefreshExpiresAt))}
-				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var56...)
+				var templ_7745c5c3_Var57 = []any{refreshTokenUrgencyClasses(refreshTokenDaysRemaining(props.QB.RefreshExpiresAt))}
+				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var57...)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "<span class=\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var57 string
-				templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var56).String())
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 1, Col: 0}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, "\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, "<span class=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var58 string
-				templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(refreshTokenRemainingLabel(props.QB.RefreshExpiresAt))
+				templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.ResolveAttributeValue(templ.CSSClasses(templ_7745c5c3_Var57).String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 878, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 1, Col: 0}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var58)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "</span> <span class=\"text-rr-muted ml-1\">(")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var59 string
-				templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RefreshExpiresAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
+				templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(refreshTokenRemainingLabel(props.QB.RefreshExpiresAt))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 881, Col: 81}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 878, Col: 65}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, ")</span><p class=\"mt-1 text-xs text-rr-muted\">Nothing renews this on its own. When it lapses, wholesale invoicing stops without an error.</p></dd></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "</span> <span class=\"text-rr-muted ml-1\">(")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var60 string
+				templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(props.QB.RefreshExpiresAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings.templ`, Line: 881, Col: 81}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, ")</span><p class=\"mt-1 text-xs text-rr-muted\">Nothing renews this on its own. When it lapses, wholesale invoicing stops without an error.</p></dd></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, "</dl></div><div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex items-center gap-3\"><!-- hx-boost=\"false\" on both OAuth entry points: the route 302s to\n\t\t\t\t\t\t     intuit.com, and a boosted link fetches it by XHR, where a\n\t\t\t\t\t\t     cross-origin redirect cannot become a navigation. The handoff\n\t\t\t\t\t\t     has to be a real browser trip. --><a href=\"/admin/settings/integrations/quickbooks/connect\" hx-boost=\"false\" class=\"btn-secondary\">Reconnect</a><form method=\"post\" action=\"/admin/settings/integrations/quickbooks/disconnect\"><button type=\"submit\" class=\"btn-danger\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "</dl></div><div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><div class=\"flex items-center gap-3\"><!-- hx-boost=\"false\" on both OAuth entry points: the route 302s to\n\t\t\t\t\t\t     intuit.com, and a boosted link fetches it by XHR, where a\n\t\t\t\t\t\t     cross-origin redirect cannot become a navigation. The handoff\n\t\t\t\t\t\t     has to be a real browser trip. --><a href=\"/admin/settings/integrations/quickbooks/connect\" hx-boost=\"false\" class=\"btn-secondary\">Reconnect</a><form method=\"post\" action=\"/admin/settings/integrations/quickbooks/disconnect\"><button type=\"submit\" class=\"btn-danger\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1548,17 +1561,17 @@ func SettingsIntegrationsContent(props SettingsIntegrationsProps) templ.Componen
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, ">Disconnect</button></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, ">Disconnect</button></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "<!-- Disconnected state --> <div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><a href=\"/admin/settings/integrations/quickbooks/connect\" hx-boost=\"false\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Connect to QuickBooks</a></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "<!-- Disconnected state --> <div class=\"border-t border-rr-border px-4 py-4 sm:px-6\"><a href=\"/admin/settings/integrations/quickbooks/connect\" hx-boost=\"false\" class=\"inline-flex items-center rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt\">Connect to QuickBooks</a></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "</div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, "</div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1582,12 +1595,12 @@ func SettingsIntegrations(props SettingsIntegrationsProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var60 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var60 == nil {
-			templ_7745c5c3_Var60 = templ.NopComponent
+		templ_7745c5c3_Var61 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var61 == nil {
+			templ_7745c5c3_Var61 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var61 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var62 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -1610,7 +1623,7 @@ func SettingsIntegrations(props SettingsIntegrationsProps) templ.Component {
 			ActivePath: "/admin/settings",
 			StaffName:  props.StaffName,
 			StaffRole:  props.StaffRole,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var61), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var62), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1629,10 +1642,11 @@ type PostponementRow struct {
 	OriginalLabel string
 	MovedToLabel  string
 	Note          string
-	// Past marks a run that has already been and gone. Kept on the page rather
-	// than hidden: a staffer checking what happened over a holiday should be
-	// able to see that it was handled.
-	Past bool
+	// StatusNote explains a row that carries no action — either the run has been
+	// and gone, or its scheduled day has passed while the run itself is still
+	// ahead. Empty for a row whose Restore button is live, where the button is
+	// the explanation.
+	StatusNote string
 	// Restorable is whether the run can still be put back on its scheduled day
 	// — that is, whether that day is still ahead. False rows render without the
 	// Restore button, because restoring into the past would rewrite the promised

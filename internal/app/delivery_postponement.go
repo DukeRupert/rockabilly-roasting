@@ -85,8 +85,20 @@ func (s *CheckoutService) PostponeDeliveryRun(
 	// and on Tuesday morning the van still cannot go. The run has not gone, and
 	// refusing to move it again would leave staff with no correct action —
 	// Restore would only put the orders back on the closed Monday.
-	if cfg.EffectiveRunDate(original, original.Location()).Before(dateOnly(now.In(original.Location()))) {
+	today := dateOnly(now.In(original.Location()))
+	if cfg.EffectiveRunDate(original, original.Location()).Before(today) {
 		return nil, ErrPostponeAlreadyRun
+	}
+	// And it cannot be moved onto a day that has gone. The checks above are all
+	// measured against the run's own scheduled day — "later than it was", "not
+	// more than a fortnight" — none of which says anything about today. Without
+	// this, correcting a run postponed a week out to a date now behind us stamps
+	// yesterday onto every order riding it, and neither half of the pair will
+	// touch it again: postpone sees a run that has gone, restore sees a
+	// scheduled day that has passed. The orders are then stranded on a dead date
+	// with the panel reporting the run as settled.
+	if moved.Before(today) {
+		return nil, ErrPostponeIntoPast
 	}
 
 	if err := s.shipping.UpsertDeliveryPostponement(ctx, tx, original, moved, note); err != nil {
@@ -142,19 +154,6 @@ func (s *CheckoutService) RestoreDeliveryRun(
 ) (*PostponeDeliveryRunResult, error) {
 	original := dateOnly(originalDate)
 
-	// Restoring puts the run — and its orders — back on the scheduled day, so
-	// that day has to still be ahead of us. Judged on the scheduled date rather
-	// than the moved one, which is the opposite of the postpone guard and for
-	// the opposite reason: postponing asks "has the run gone?", restoring asks
-	// "is there still a day to put it back on?".
-	//
-	// Without this, the Restore button on a holiday that has been and gone
-	// rewrites the promised date on orders delivered days ago, moving them onto
-	// the closed day the shop postponed away from.
-	if original.Before(dateOnly(now.In(original.Location()))) {
-		return nil, ErrRestoreRunPassed
-	}
-
 	// Read the postponement before deleting it: undoing the order move needs to
 	// know where they went, and after the delete nothing records that.
 	existing, err := s.shipping.ListDeliveryPostponements(ctx, tx)
@@ -171,7 +170,22 @@ func (s *CheckoutService) RestoreDeliveryRun(
 	if moved.IsZero() {
 		// Nothing recorded for that day. Treated as done rather than as an
 		// error: a second click on Restore should be a no-op, not a failure.
+		// Checked before the date guard below so a repeated click on a run that
+		// has since passed still reads as done rather than as a refusal.
 		return &PostponeDeliveryRunResult{OriginalDate: original}, nil
+	}
+
+	// Restoring puts the run — and its orders — back on the scheduled day, so
+	// that day has to still be ahead of us. Judged on the scheduled date rather
+	// than the moved one, which is the opposite of the postpone guard and for
+	// the opposite reason: postponing asks "has the run gone?", restoring asks
+	// "is there still a day to put it back on?".
+	//
+	// Without this, the Restore button on a holiday that has been and gone
+	// rewrites the promised date on orders delivered days ago, moving them onto
+	// the closed day the shop postponed away from.
+	if original.Before(dateOnly(now.In(original.Location()))) {
+		return nil, ErrRestoreRunPassed
 	}
 
 	if err := s.shipping.DeleteDeliveryPostponement(ctx, tx, original); err != nil {

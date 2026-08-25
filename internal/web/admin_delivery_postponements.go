@@ -61,6 +61,9 @@ func (d *Deps) handleAdminDeliveryPostponementCreate(w http.ResponseWriter, r *h
 		case errors.Is(err, app.ErrPostponeTooFar):
 			redirectFlashError(w, r, "/admin/settings",
 				"A run can only be moved up to two weeks. Further than that, change the delivery days instead.")
+		case errors.Is(err, app.ErrPostponeIntoPast):
+			redirectFlashError(w, r, "/admin/settings",
+				"That day has already passed — pick a day still ahead.")
 		case errors.Is(err, app.ErrPostponeAlreadyRun):
 			redirectFlashError(w, r, "/admin/settings",
 				"That run has already gone out — only a future run can be moved.")
@@ -160,18 +163,29 @@ func postponementRows(ps []domain.DeliveryPostponement, loc *time.Location, now 
 		// and formatting them as they arrive would shift the printed day.
 		original := time.Date(p.OriginalDate.Year(), p.OriginalDate.Month(), p.OriginalDate.Day(), 0, 0, 0, 0, loc)
 		moved := time.Date(p.MovedTo.Year(), p.MovedTo.Month(), p.MovedTo.Day(), 0, 0, 0, 0, loc)
-		rows = append(rows, admin.PostponementRow{
+		row := admin.PostponementRow{
 			OriginalValue: original.Format(postponementDateLayout),
 			OriginalLabel: original.Format("Monday, January 2"),
 			MovedToLabel:  moved.Format("Monday, January 2"),
 			Note:          p.Note,
-			Past:          moved.Before(today),
 			// Restoring puts the run back on its scheduled day, so it is only
 			// offered while that day is still ahead. Rendering the button on a
 			// holiday that has been and gone would invite a click that rewrites
 			// the promised date on orders delivered days ago.
 			Restorable: !original.Before(today),
-		})
+		}
+		// A run passes through three states, not two, and the middle one is the
+		// ordinary case for a Monday moved to Thursday viewed on the Wednesday.
+		// Without a word for it the row simply loses its button and says nothing
+		// about why.
+		switch {
+		case moved.Before(today):
+			row.StatusNote = "Already run — kept for the record."
+		case !row.Restorable:
+			row.StatusNote = "Its scheduled day has passed; the run still goes out " +
+				moved.Format("Monday, January 2") + "."
+		}
+		rows = append(rows, row)
 	}
 	return rows
 }

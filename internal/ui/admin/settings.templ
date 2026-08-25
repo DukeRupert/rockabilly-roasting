@@ -656,8 +656,8 @@ templ postponementsPanel(props SettingsProps) {
 							if row.Note != "" {
 								<p class="mt-0.5 text-xs text-rr-muted">{ row.Note }</p>
 							}
-							if row.Past {
-								<p class="mt-0.5 text-xs text-rr-muted">Already run &mdash; kept for the record.</p>
+							if row.StatusNote != "" {
+								<p class="mt-0.5 text-xs text-rr-muted">{ row.StatusNote }</p>
 							}
 						</div>
 						if row.Restorable {
@@ -954,10 +954,11 @@ type PostponementRow struct {
 	OriginalLabel string
 	MovedToLabel  string
 	Note          string
-	// Past marks a run that has already been and gone. Kept on the page rather
-	// than hidden: a staffer checking what happened over a holiday should be
-	// able to see that it was handled.
-	Past bool
+	// StatusNote explains a row that carries no action — either the run has been
+	// and gone, or its scheduled day has passed while the run itself is still
+	// ahead. Empty for a row whose Restore button is live, where the button is
+	// the explanation.
+	StatusNote string
 	// Restorable is whether the run can still be put back on its scheduled day
 	// — that is, whether that day is still ahead. False rows render without the
 	// Restore button, because restoring into the past would rewrite the promised

@@ -486,3 +486,56 @@ func TestPostponeDeliveryRunFortnightBoundary(t *testing.T) {
 		assert.ErrorIs(t, err, app.ErrPostponeTooFar)
 	})
 }
+
+// A run cannot be corrected onto a day that has already gone.
+//
+// The checks on a move are all relative to the run's own scheduled day —
+// "later than it was", "within a fortnight" — and none of them mentions today.
+// Loosening the past-run guard to ask about the effective date (so a run
+// already moved once stays correctable) opened the gap: a run postponed a week
+// out could be corrected back onto yesterday, stamping a dead date on every
+// order riding it. Neither half of the pair would touch it again — postpone
+// would see a run that had gone, restore a scheduled day that had passed — so
+// the orders were stranded while the panel called the run settled.
+func TestPostponeDeliveryRunRejectsMoveIntoThePast(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+	loc := merchantTZ(t)
+	svc := postponementService()
+
+	holiday, _ := laborDay2026(loc)
+	weekOut := holiday.AddDate(0, 0, 8)
+
+	_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, weekOut, "", staffActorFixture())
+	require.NoError(t, err)
+
+	// Two days after the scheduled Monday, correct it onto the day before.
+	//nolint:gocritic // the point is that this date is behind `now`
+	wednesday := holiday.AddDate(0, 0, 2).Add(9 * time.Hour)
+	_, err = svc.PostponeDeliveryRun(ctx, tx, wednesday, holiday, holiday.AddDate(0, 0, 1), "", staffActorFixture())
+	assert.ErrorIs(t, err, app.ErrPostponeIntoPast)
+
+	// The run is still where it was, and still correctable to a day ahead.
+	cfg, err := store.NewShippingStore().GetConfig(ctx, tx)
+	require.NoError(t, err)
+	require.Len(t, cfg.DeliveryPostponements, 1)
+	assert.Equal(t, weekOut.Day(), dateOnlyIn(cfg.DeliveryPostponements[0].MovedTo).Day())
+
+	_, err = svc.PostponeDeliveryRun(ctx, tx, wednesday, holiday, holiday.AddDate(0, 0, 3), "", staffActorFixture())
+	assert.NoError(t, err, "a day still ahead is fine")
+}
+
+// Restoring a day nothing was recorded for stays a no-op even once that day has
+// passed — a second click should read as done, not as a refusal.
+func TestRestoreDeliveryRunUnknownPastDateIsStillNoOp(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+	loc := merchantTZ(t)
+
+	monday, _, _ := runDays(loc)
+	past := monday.AddDate(0, 0, -7)
+
+	result, err := postponementService().RestoreDeliveryRun(ctx, tx, testNow(loc), past, staffActorFixture())
+	require.NoError(t, err)
+	assert.EqualValues(t, 0, result.OrdersMoved)
+}

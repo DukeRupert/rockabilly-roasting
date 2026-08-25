@@ -63,6 +63,7 @@ var (
 	ErrPostponeTooFar             = errors.New("a run can only be moved up to two weeks")
 	ErrPostponeAlreadyRun         = errors.New("that run has already gone out")
 	ErrRestoreRunPassed           = errors.New("that run's scheduled day has already passed")
+	ErrPostponeIntoPast           = errors.New("a run cannot be moved onto a day that has passed")
 	ErrPostponeNoSchedule         = errors.New("no delivery schedule is configured")
 	ErrSkipDateOutOfRange         = errors.New("pick a restart date within the next 60 days")
 	ErrSkipDateBeforeNextOrder    = errors.New("pick a restart date after the shipment already scheduled")

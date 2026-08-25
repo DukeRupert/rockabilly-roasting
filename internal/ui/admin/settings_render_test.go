@@ -477,7 +477,7 @@ func TestPostponementsPanel_MarksPastRunsAndWithholdsRestore(t *testing.T) {
 		OriginalValue: "2026-01-01",
 		OriginalLabel: "Thursday, January 1",
 		MovedToLabel:  "Friday, January 2",
-		Past:          true,
+		StatusNote:    "Already run — kept for the record.",
 		Restorable:    false,
 	}})
 	assert.Contains(t, html, "Already run")
@@ -512,4 +512,21 @@ func TestPostponementsPanel_HasItsOwnForm(t *testing.T) {
 	// date and bounce back with an error the staffer could have been spared.
 	postponeForm := html[strings.Index(html, "Moved delivery runs"):]
 	assert.GreaterOrEqual(t, strings.Count(postponeForm, `type="date"`), 2)
+}
+
+// A run whose scheduled day has passed but which has not gone out yet — a
+// Monday moved to Thursday, viewed on the Wednesday — is the ordinary middle
+// state, and the one a two-flag model had no word for. It must say why it
+// carries no button rather than silently dropping it.
+func TestPostponementsPanel_ExplainsWhyRestoreIsMissing(t *testing.T) {
+	html := renderPostponements(t, healthyShipping(), []PostponementRow{{
+		OriginalValue: "2026-09-07",
+		OriginalLabel: "Monday, September 7",
+		MovedToLabel:  "Thursday, September 10",
+		StatusNote:    "Its scheduled day has passed; the run still goes out Thursday, September 10.",
+		Restorable:    false,
+	}})
+	assert.Contains(t, html, "Its scheduled day has passed")
+	assert.NotContains(t, html, "/admin/settings/delivery-postponements/delete")
+	assert.NotContains(t, html, "Already run", "it has not run yet")
 }

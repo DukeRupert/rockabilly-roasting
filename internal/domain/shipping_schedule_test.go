@@ -443,3 +443,52 @@ func TestNextDeliveryRunReportsScheduledDay(t *testing.T) {
 	assert.Equal(t, scheduled, effective)
 	assert.Equal(t, 7, scheduled.Day())
 }
+
+// When a postponed run lands on a day that already has one, NextDeliveryRun has
+// to say which of the two an order placed now is riding — and that answer is
+// written into the order as its run identity.
+//
+// It must be the day's own run. Naming the postponed one would put the order on
+// a run whose scheduled day is already behind it, and restoring that
+// postponement would then drag the order backwards onto a date that has gone.
+// NextDeliveryDate cannot see this: both candidates share an effective date, so
+// the bug is invisible from the promised day alone.
+func TestNextDeliveryRunPrefersTheDaysOwnRunOnCollapse(t *testing.T) {
+	loc := pacific(t)
+	monday := time.Date(2026, time.September, 7, 0, 0, 0, 0, loc)
+	thursday := time.Date(2026, time.September, 10, 0, 0, 0, 0, loc)
+
+	cfg := monThuAt9()
+	cfg.DeliveryPostponements = []DeliveryPostponement{{OriginalDate: monday, MovedTo: thursday}}
+
+	// Placed on the Wednesday in between: both Monday's moved run and
+	// Thursday's own land on the 10th.
+	scheduled, effective, ok := cfg.NextDeliveryRun(
+		time.Date(2026, time.September, 9, 14, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 10, effective.Day(), "both runs go out on the Thursday")
+	assert.Equal(t, 10, scheduled.Day(),
+		"the order rides Thursday's own run, not the Monday postponed onto it")
+
+	// Same answer asked before the Monday. Both runs are in play from here too,
+	// so the order still rides Thursday's — which is the point: an order is
+	// never attached to a postponed run while a native run shares its day, so
+	// restoring that postponement can never move it.
+	scheduled, effective, ok = cfg.NextDeliveryRun(
+		time.Date(2026, time.September, 4, 10, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 10, effective.Day())
+	assert.Equal(t, 10, scheduled.Day())
+
+	// Without a native run to collapse onto, the order does ride the postponed
+	// one — moved to a Tuesday, which the van does not otherwise serve.
+	tuesdayOnly := monThuAt9()
+	tuesdayOnly.DeliveryPostponements = []DeliveryPostponement{
+		{OriginalDate: monday, MovedTo: monday.AddDate(0, 0, 1)},
+	}
+	scheduled, effective, ok = tuesdayOnly.NextDeliveryRun(
+		time.Date(2026, time.September, 4, 10, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 8, effective.Day())
+	assert.Equal(t, 7, scheduled.Day(), "it is Monday's run, going out on the Tuesday")
+}

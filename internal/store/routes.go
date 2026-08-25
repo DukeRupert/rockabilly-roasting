@@ -247,6 +247,25 @@ func (s *RouteStore) CompleteRoute(ctx context.Context, tx pgx.Tx, id uuid.UUID)
 	return scanRoute(row)
 }
 
+// UpdateRouteDate moves a route onto a different delivery day, keeping its
+// stops and their order.
+//
+// Used when a run is postponed: the same orders ride, just on another day, so
+// re-dating the plan is strictly better than making staff build it again. The
+// caller is responsible for checking the target day has no live route of its
+// own — the partial unique index will otherwise reject this, which is the
+// behaviour we want but not the message staff should meet.
+func (s *RouteStore) UpdateRouteDate(ctx context.Context, tx pgx.Tx, id uuid.UUID, date time.Time) (_ *domain.DeliveryRoute, err error) {
+	defer trackQuery(s.metrics, "routes.update_date", time.Now(), &err)
+	row := tx.QueryRow(ctx,
+		`UPDATE delivery_routes
+		    SET route_date = $2::date
+		  WHERE id = $1
+		 RETURNING `+routeColumns,
+		id, date)
+	return scanRoute(row)
+}
+
 // DeleteRoute removes a route and its stops (ON DELETE CASCADE). Used when
 // staff re-plan: the previous draft is replaced rather than accumulated.
 func (s *RouteStore) DeleteRoute(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {

@@ -92,6 +92,9 @@ func (d *Deps) handleAdminDeliveryPostponementCreate(w http.ResponseWriter, r *h
 		case errors.Is(err, app.ErrPostponeStrandsMovedRun):
 			redirectFlashError(w, r, "/admin/settings",
 				"Another run has already been moved onto that day, and it would be left pointing at a day with no run. Put that one back first, then move both.")
+		case errors.Is(err, app.ErrRunRouteActive):
+			redirectFlashError(w, r, "/admin/settings",
+				"A route for that run is already out with the driver. Complete it first, then move the run.")
 		case errors.Is(err, app.ErrPostponeNoSchedule):
 			redirectFlashError(w, r, "/admin/settings", "Set up a delivery schedule first.")
 		default:
@@ -122,9 +125,14 @@ func (d *Deps) handleAdminDeliveryPostponementDelete(w http.ResponseWriter, r *h
 		return txErr
 	})
 	if err != nil {
-		if errors.Is(err, app.ErrRestoreRunPassed) {
+		switch {
+		case errors.Is(err, app.ErrRestoreRunPassed):
 			redirectFlashError(w, r, "/admin/settings",
 				"That run's scheduled day has already passed — it can't be put back.")
+			return
+		case errors.Is(err, app.ErrRunRouteActive):
+			redirectFlashError(w, r, "/admin/settings",
+				"A route for that run is already out with the driver. Complete it first, then put the run back.")
 			return
 		}
 		slog.Error("admin settings: restore delivery run", "error", err)
@@ -136,7 +144,7 @@ func (d *Deps) handleAdminDeliveryPostponementDelete(w http.ResponseWriter, r *h
 	if result != nil && result.OrdersMoved > 0 {
 		msg = fmt.Sprintf("%s %s moved back.", msg, pluralOrders(result.OrdersMoved))
 	}
-	redirectFlash(w, r, "/admin/settings", msg)
+	redirectFlash(w, r, "/admin/settings", msg+routeSentence(result))
 }
 
 // parsePostponementDate reads a date input in the merchant's zone.
@@ -165,7 +173,26 @@ func postponementFlash(result *app.PostponeDeliveryRunResult, loc *time.Location
 	if result.OrdersMoved > 0 {
 		msg = fmt.Sprintf("%s %s moved with it.", msg, pluralOrders(result.OrdersMoved))
 	}
-	return msg
+	return msg + routeSentence(result)
+}
+
+// routeSentence says what became of the run's planned route, and only when
+// something became of it.
+//
+// The dropped case is the one that has to be said out loud: staff would
+// otherwise find out on the morning of the run, when the load list is there and
+// the driver's sheet is not.
+func routeSentence(result *app.PostponeDeliveryRunResult) string {
+	switch {
+	case result == nil:
+		return ""
+	case result.RouteDropped:
+		return " The planned route was dropped — that day already had one — so it needs planning again."
+	case result.RouteMoved:
+		return " The planned route moved with it."
+	default:
+		return ""
+	}
 }
 
 func pluralOrders(n int64) string {

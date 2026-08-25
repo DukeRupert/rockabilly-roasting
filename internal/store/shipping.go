@@ -149,12 +149,32 @@ func (s *ShippingStore) DeleteDeliveryPostponement(ctx context.Context, tx pgx.T
 // which "everything promised Thursday" is the wrong set — restoring the Monday
 // would drag Thursday's orders onto a day they never rode. The run column says
 // which orders belong to which run, whatever date they currently show.
+//
+// Narrowed to orders the van has still to carry, and deliberately to the same
+// set the load list counts (see dashboard counts in orders.go) — postponement
+// exists to keep the load list honest, so moving a different set than the one
+// it shows would be the bug wearing a different hat.
+//
+// That exclusion is what makes the day-granular postpone guard safe. The guard
+// asks whether the run has gone, judged by date, so at six in the evening staff
+// can still move today's run; without this filter that would rewrite the
+// promised date on orders the driver delivered this morning, claiming a
+// delivery on a day it did not happen. Delivered orders now stay where they
+// are. Cancelled and refunded orders stay put for the same reason — nothing is
+// riding for them.
+//
+// They keep their delivery_run_date, so they remain attached to the run for the
+// record; they simply stop being re-dated by it.
 func (s *ShippingStore) RescheduleDeliveryRun(ctx context.Context, tx pgx.Tx, runDate, to time.Time) (int64, error) {
 	tag, err := tx.Exec(ctx,
 		`UPDATE orders
 		    SET scheduled_delivery_date = $2::date,
 		        updated_at = now()
-		  WHERE delivery_run_date = $1::date`,
+		  WHERE delivery_run_date = $1::date
+		    AND shipping_method = 'local_delivery'
+		    AND status NOT IN ('cancelled', 'refunded')
+		    AND fulfillment_status IN ('unfulfilled', 'partially_fulfilled',
+		                               'fulfilled', 'ready_for_pickup')`,
 		runDate, to,
 	)
 	if err != nil {

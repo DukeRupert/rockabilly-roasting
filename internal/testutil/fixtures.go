@@ -445,14 +445,21 @@ func WithPlacedAt(t time.Time) OrderOption {
 //
 // Stored as bare dates, matching the columns — the commitment is "Thursday",
 // not an instant.
+//
+// The shipping method comes with them. An order on a delivery run is a
+// local-delivery order by definition, and RescheduleDeliveryRun says so in its
+// WHERE clause; a fixture that set the dates alone would be a state order
+// placement never produces, and would quietly stop matching.
 func WithDeliveryRun(d time.Time) OrderOption {
 	day := pgtype.Date{
 		Time:  time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC),
 		Valid: true,
 	}
+	method := string(domain.ShippingMethodLocalDelivery)
 	return func(p *sqlcgen.CreateOrderParams) {
 		p.ScheduledDeliveryDate = day
 		p.DeliveryRunDate = day
+		p.ShippingMethod = &method
 	}
 }
 

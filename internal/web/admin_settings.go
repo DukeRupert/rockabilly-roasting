@@ -30,7 +30,11 @@ import (
 // settingsSection is the shared state behind the section nav: the settings
 // whose values decide whether anything is broken.
 type settingsSection struct {
-	Shipping  admin.ShippingSettings
+	Shipping admin.ShippingSettings
+	// Postponements are the delivery runs moved off their scheduled day, read
+	// alongside the shipping config because they are edited on the same page
+	// and are meaningless without the schedule they amend.
+	Postponements []domain.DeliveryPostponement
 	QB        admin.QBConnectionStatus
 	QBEnabled bool
 	// BoxPresets is the full list, not a count: the attention list needs to
@@ -88,6 +92,7 @@ func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error)
 			return cfgErr
 		}
 		out.Shipping = shippingSettingsFromConfig(cfg)
+		out.Postponements = cfg.DeliveryPostponements
 
 		presets, presetErr := d.FulfillmentService.ListBoxPresets(ctx, tx)
 		if presetErr != nil {
@@ -160,7 +165,7 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	name, role := staffNameRole(r)
-	d.renderShippingSettings(w, r, section.Shipping, admin.SettingsProps{
+	d.renderShippingSettings(w, r, section, admin.SettingsProps{
 		Nav:        section.nav(role),
 		Shipping:   section.Shipping,
 		Flash:      settingsFlash(r),
@@ -185,12 +190,17 @@ func (d *Deps) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 // would answer that refresh with a 405 on the very page the staffer was just
 // told to go fix. Team and Box presets are safe for the same reason: both post
 // to a URL that has a GET route.
-func (d *Deps) renderShippingSettings(w http.ResponseWriter, r *http.Request, saved admin.ShippingSettings, props admin.SettingsProps) {
+func (d *Deps) renderShippingSettings(w http.ResponseWriter, r *http.Request, section settingsSection, props admin.SettingsProps) {
 	// Stamped here rather than at the call sites so the echo sentences cannot
 	// be handed a draft by a caller that forgot: props.Shipping is what the
 	// fields render, props.Saved is what is on disk, and only this function
 	// decides the second one.
-	props.Saved = saved
+	props.Saved = section.Shipping
+	// Same reasoning for the moved runs. They are never a draft — the
+	// postponement forms are their own POSTs, so a rejected shipping save has
+	// not touched them — and stamping them here means the rejected-save path
+	// cannot render the panel empty by forgetting to carry them over.
+	props.Postponements = postponementRows(section.Postponements, d.MerchantTZ, time.Now())
 	if IsHTMX(r) {
 		admin.SettingsContent(props).Render(r.Context(), w) //nolint:errcheck
 		return
@@ -301,7 +311,7 @@ func (d *Deps) handleAdminShippingSettingsUpdate(w http.ResponseWriter, r *http.
 		// The nav's issue list and the echo sentences are derived from what is
 		// *saved*, not from the rejected draft — nothing has changed on disk
 		// yet, so what a customer meets is still the stored rule.
-		d.renderShippingSettings(w, r, section.Shipping, admin.SettingsProps{
+		d.renderShippingSettings(w, r, section, admin.SettingsProps{
 			Nav:         section.nav(role),
 			Shipping:    submitted,
 			FieldErrors: fieldErrors,

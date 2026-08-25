@@ -74,6 +74,11 @@ type ShippingConfig struct {
 	// back to method-only messaging rather than inventing a date.
 	LocalDeliveryWeekdays []time.Weekday
 
+	// DeliveryPostponements are the individual runs that have been moved off
+	// their scheduled weekday — a holiday, a closure, a van in the shop. Empty
+	// for an ordinary week. See DeliveryPostponement.
+	DeliveryPostponements []DeliveryPostponement
+
 	// LocalDeliveryCutoffMinutes is the order-by time on a delivery day,
 	// expressed as minutes past local midnight (540 = 9:00am). An order placed
 	// at or after the cutoff on a delivery day rides the *next* run, not that
@@ -210,10 +215,30 @@ func (c ShippingConfig) HasDeliverySchedule() bool {
 // The boundary is exclusive at the cutoff minute: 08:59 makes today's van,
 // 09:00 does not. Staff start loading at nine, so nine itself is already late.
 //
+// A postponed run (see DeliveryPostponements) is answered on the day it
+// actually happens, not the day it was scheduled for. That means the search
+// looks *backwards* as well as forwards: a Monday run moved to Tuesday is still
+// the next run when you ask on Tuesday morning, even though Tuesday is not a
+// delivery weekday and Monday is behind us.
+//
 // ok is false when no schedule is configured (see HasDeliverySchedule).
 func (c ShippingConfig) NextDeliveryDate(now time.Time, loc *time.Location) (time.Time, bool) {
+	_, effective, ok := c.NextDeliveryRun(now, loc)
+	return effective, ok
+}
+
+// NextDeliveryRun answers the same question as NextDeliveryDate but returns the
+// run's identity alongside its date: scheduled is the weekday the run belongs
+// to, effective is the day it actually goes out. The two differ only when the
+// run has been postponed.
+//
+// Order placement needs both. The date is what the customer is promised; the
+// scheduled day is what says *which run* the order rides, and a date alone
+// cannot say that once two runs can land on the same day. See the
+// delivery_run_date column in migration 072.
+func (c ShippingConfig) NextDeliveryRun(now time.Time, loc *time.Location) (scheduled, effective time.Time, ok bool) {
 	if !c.HasDeliverySchedule() {
-		return time.Time{}, false
+		return time.Time{}, time.Time{}, false
 	}
 	if loc == nil {
 		loc = time.UTC
@@ -228,25 +253,91 @@ func (c ShippingConfig) NextDeliveryDate(now time.Time, loc *time.Location) (tim
 	// wall clock without shifting which date we land on.
 	base := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, loc)
 
-	// Search today plus a full week. The eighth offset matters: with a
-	// single-weekday schedule, an order placed past that day's cutoff has to
-	// roll to the same weekday seven days out, which a 0..6 window would miss.
-	// offset 0 is today and is the only candidate the cutoff can disqualify.
-	for offset := 0; offset <= 7; offset++ {
-		candidate := base.AddDate(0, 0, offset)
-		if !c.deliversOn(candidate.Weekday()) {
+	// The window runs from MaxDeliveryPostponementDays before today to a week
+	// plus that same span after.
+	//
+	// The lookback catches a run scheduled in the past that was postponed into
+	// the future; the constraint bounding how far a run may move is what keeps
+	// it finite. The forward reach needs the same slack for the opposite
+	// reason: a plain weekday schedule guarantees the next run within seven
+	// days, but postponement voids that guarantee — push two consecutive runs
+	// far enough forward and the true next run sits beyond day seven, where a
+	// narrower window would never look. It would then answer with a run further
+	// out than the real one, over-promising the wait at checkout.
+	//
+	// Candidates are collected rather than returned on first hit, because
+	// postponement breaks the ordering — scanning days in sequence no longer
+	// yields run dates in sequence once one of them has been moved.
+	var bestScheduled, bestRun time.Time
+	for offset := -MaxDeliveryPostponementDays; offset <= 7+MaxDeliveryPostponementDays; offset++ {
+		day := base.AddDate(0, 0, offset)
+		if !c.DeliversOn(day.Weekday()) {
 			continue
 		}
-		if offset == 0 && minutesIn >= c.LocalDeliveryCutoffMinutes {
+		run := c.EffectiveRunDate(day, loc)
+
+		// The run has already left.
+		if run.Before(base) {
 			continue
 		}
-		return candidate, true
+		// Today's run, judged against the cutoff. The comparison stays in
+		// minutes-past-midnight rather than adding a duration to midnight, so
+		// it holds its wall-clock hour across a DST transition.
+		if run.Equal(base) && minutesIn >= c.LocalDeliveryCutoffMinutes {
+			continue
+		}
+		switch {
+		case bestRun.IsZero() || run.Before(bestRun):
+			bestScheduled, bestRun = day, run
+		case run.Equal(bestRun) && day.After(bestScheduled):
+			// Two runs collapsed onto one day: a postponed one and that day's
+			// own. Prefer the later scheduled day, which is the run that
+			// natively falls here — a postponed run's scheduled day is always
+			// earlier than the day it lands on.
+			//
+			// It matters because this is the run an order placed now will be
+			// recorded as riding. Picking the postponed one would put the order
+			// on a run whose scheduled day is already behind it, and restoring
+			// that postponement would then drag the order onto a past date.
+			bestScheduled = day
+		}
 	}
-	return time.Time{}, false
+	if bestRun.IsZero() {
+		return time.Time{}, time.Time{}, false
+	}
+	return bestScheduled, bestRun, true
 }
 
-// deliversOn reports whether the van runs on the given weekday.
-func (c ShippingConfig) deliversOn(day time.Weekday) bool {
+// EffectiveRunDate maps a scheduled delivery day to the day the van actually
+// goes out, applying any postponement recorded for it. Returns scheduled
+// unchanged when the run was not moved.
+//
+// The result is rebuilt in loc rather than returned as stored: postponement
+// dates come off a Postgres `date` column with whatever zone the driver hands
+// back, and every other date this file produces is local midnight in the
+// merchant's zone. Mixing the two would compare midnights that are not the
+// same instant.
+func (c ShippingConfig) EffectiveRunDate(scheduled time.Time, loc *time.Location) time.Time {
+	for _, p := range c.DeliveryPostponements {
+		if sameCalendarDate(p.OriginalDate, scheduled) {
+			return time.Date(p.MovedTo.Year(), p.MovedTo.Month(), p.MovedTo.Day(), 0, 0, 0, 0, loc)
+		}
+	}
+	return scheduled
+}
+
+// sameCalendarDate compares two times by the calendar day each names, ignoring
+// clock and zone. Postponements are dates, not instants — "September 7th" is
+// the same September 7th whichever zone the value arrived in.
+func sameCalendarDate(a, b time.Time) bool {
+	ay, am, ad := a.Date()
+	by, bm, bd := b.Date()
+	return ay == by && am == bm && ad == bd
+}
+
+// DeliversOn reports whether the van runs on the given weekday. Exported for
+// the app layer, which has to refuse a postponement for a day with no run.
+func (c ShippingConfig) DeliversOn(day time.Weekday) bool {
 	for _, d := range c.LocalDeliveryWeekdays {
 		if d == day {
 			return true
@@ -265,7 +356,7 @@ func (c ShippingConfig) deliversOn(day time.Weekday) bool {
 func (c ShippingConfig) DeliveryDaysLabel() string {
 	names := make([]string, 0, len(c.LocalDeliveryWeekdays))
 	for day := time.Sunday; day <= time.Saturday; day++ {
-		if c.deliversOn(day) {
+		if c.DeliversOn(day) {
 			names = append(names, day.String()+"s")
 		}
 	}
@@ -462,4 +553,31 @@ func (s Shipment) CanRequestRefund() bool {
 		return false
 	}
 	return s.Status != ShipmentStatusDelivered
+}
+
+// MaxDeliveryPostponementDays bounds how far a run may be pushed. Mirrors the
+// CHECK constraint on delivery_postponements, and is what lets
+// NextDeliveryDate's backwards scan be a fixed window rather than an open
+// search. A run that needs to move further than a fortnight is not a
+// postponement — the shop has changed its schedule, which belongs in
+// LocalDeliveryWeekdays.
+const MaxDeliveryPostponementDays = 14
+
+// DeliveryPostponement records that the run scheduled for OriginalDate actually
+// happens on MovedTo.
+//
+// This is a per-date exception rather than a recurring holiday calendar. Which
+// holidays this shop observes is a business fact that changes — some years the
+// van runs the day after Thanksgiving, some years it doesn't — and a hardcoded
+// federal-holiday list would be confidently wrong about it. Staff mark the
+// handful of days that actually move.
+type DeliveryPostponement struct {
+	// OriginalDate is the scheduled delivery day being moved. Always a weekday
+	// the van normally runs; postponing a day with no run means nothing.
+	OriginalDate time.Time
+	// MovedTo is the day it happens instead. Always after OriginalDate and
+	// within MaxDeliveryPostponementDays of it.
+	MovedTo time.Time
+	// Note is why, for staff. Never shown to customers.
+	Note string
 }

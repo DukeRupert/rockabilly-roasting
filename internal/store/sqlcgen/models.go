@@ -238,6 +238,13 @@ type CustomerUserInviteToken struct {
 	CreatedAt      time.Time          `json:"created_at"`
 }
 
+type DeliveryPostponement struct {
+	OriginalDate pgtype.Date `json:"original_date"`
+	MovedToDate  pgtype.Date `json:"moved_to_date"`
+	Note         string      `json:"note"`
+	CreatedAt    time.Time   `json:"created_at"`
+}
+
 type DeliveryRoute struct {
 	ID             uuid.UUID          `json:"id"`
 	RouteDate      pgtype.Date        `json:"route_date"`
@@ -420,6 +427,7 @@ type Order struct {
 	OverdueReminderStage  int16              `json:"overdue_reminder_stage"`
 	Channel               string             `json:"channel"`
 	ScheduledDeliveryDate pgtype.Date        `json:"scheduled_delivery_date"`
+	DeliveryRunDate       pgtype.Date        `json:"delivery_run_date"`
 }
 
 type Price struct {

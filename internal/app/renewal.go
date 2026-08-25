@@ -575,6 +575,7 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 		customerID := customer.ID
 		subID := sub.ID
 		renewalPlacedAt := time.Now()
+		renewalPromised, renewalRun := scheduleLocalDelivery(ctx, tx, s.shipping, shipMethod, renewalPlacedAt, s.merchantTZ)
 
 		var txErr error
 		order, txErr = s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
@@ -592,7 +593,8 @@ func (s *RenewalService) RenewSubscription(ctx context.Context, pool *pgxpool.Po
 			BillingAddressID:      sub.ShippingAddressID,
 			SubscriptionID:        &subID,
 			ShippingMethod:        shipMethod,
-			ScheduledDeliveryDate: scheduleLocalDelivery(ctx, tx, s.shipping, shipMethod, renewalPlacedAt, s.merchantTZ),
+			ScheduledDeliveryDate: renewalPromised,
+			DeliveryRunDate:       renewalRun,
 			PlacedAt:              renewalPlacedAt,
 			Metadata: map[string]any{
 				"subscription_renewal": true,
@@ -907,6 +909,7 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 		orderNumber := fmt.Sprintf("SUB-%d", time.Now().UnixMilli())
 		customerID := customer.ID
 		renewalPlacedAt := time.Now()
+		renewalPromised, renewalRun := scheduleLocalDelivery(ctx, tx, s.shipping, shipMethod, renewalPlacedAt, s.merchantTZ)
 
 		var txErr error
 		order, txErr = s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
@@ -924,7 +927,8 @@ func (s *RenewalService) RenewBatch(ctx context.Context, pool *pgxpool.Pool, sub
 			BillingAddressID:      addr.ID,
 			SubscriptionID:        nil, // batched — use subscription_orders for linking
 			ShippingMethod:        shipMethod,
-			ScheduledDeliveryDate: scheduleLocalDelivery(ctx, tx, s.shipping, shipMethod, renewalPlacedAt, s.merchantTZ),
+			ScheduledDeliveryDate: renewalPromised,
+			DeliveryRunDate:       renewalRun,
 			PlacedAt:              renewalPlacedAt,
 			Metadata: map[string]any{
 				"subscription_renewal": true,

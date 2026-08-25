@@ -392,3 +392,141 @@ func anchorsTo(html, href string) []string {
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }
+
+// --- Moved delivery runs ---
+
+// renderPostponements renders the settings page the way production does: the
+// panel reads the saved schedule, so the helper sets both halves rather than
+// letting a test accidentally prove the draft path.
+func renderPostponements(t *testing.T, saved ShippingSettings, rows []PostponementRow) string {
+	t.Helper()
+	return renderSettings(t, SettingsProps{Shipping: saved, Saved: saved, Postponements: rows})
+}
+
+// The panel only exists to amend a schedule, so it must not appear when there
+// is no schedule to amend. A shop that has not set up local delivery would
+// otherwise be offered a form whose every submission the service refuses.
+func TestPostponementsPanel_HiddenWithoutSchedule(t *testing.T) {
+	noDelivery := healthyShipping()
+	noDelivery.LocalDeliveryEnabled = false
+	assert.NotContains(t, renderPostponements(t, noDelivery, nil), "Moved delivery runs")
+
+	noDays := healthyShipping()
+	noDays.LocalDeliveryWeekdays = nil
+	assert.NotContains(t, renderPostponements(t, noDays, nil), "Moved delivery runs")
+
+	// With a schedule, it is there.
+	assert.Contains(t, renderPostponements(t, healthyShipping(), nil), "Moved delivery runs")
+}
+
+// The panel's visibility follows the *saved* schedule, not the draft. A rejected
+// save re-renders with what was typed, so gating on the draft meant unticking
+// local delivery alongside a mistyped rate made the whole panel disappear —
+// while the postponements sat untouched on disk, invisible and unmanageable
+// until the staffer got the rest of the form right.
+func TestPostponementsPanel_FollowsSavedNotDraft(t *testing.T) {
+	draft := healthyShipping()
+	draft.LocalDeliveryEnabled = false // what the staffer just typed, and got rejected
+
+	html := renderSettings(t, SettingsProps{
+		Shipping:      draft,
+		Saved:         healthyShipping(),
+		Postponements: []PostponementRow{{OriginalValue: "2026-09-07", OriginalLabel: "Monday, September 7", MovedToLabel: "Tuesday, September 8", Restorable: true}},
+	})
+	assert.Contains(t, html, "Moved delivery runs", "a rejected draft must not hide runs that are still on disk")
+	assert.Contains(t, html, "Monday, September 7")
+}
+
+// An empty panel has to say so. Rendering just the add form would read as
+// "nothing loaded" rather than "nothing moved", and the difference matters to a
+// staffer checking whether somebody already handled a holiday.
+func TestPostponementsPanel_EmptyState(t *testing.T) {
+	assert.Contains(t, renderPostponements(t, healthyShipping(), nil), "No runs have been moved.")
+}
+
+// A recorded postponement renders both dates, its note, and a Restore control
+// carrying the date the handler needs back.
+func TestPostponementsPanel_RendersRows(t *testing.T) {
+	html := renderPostponements(t, healthyShipping(), []PostponementRow{{
+		OriginalValue: "2026-09-07",
+		OriginalLabel: "Monday, September 7",
+		MovedToLabel:  "Tuesday, September 8",
+		Note:          "Labor Day",
+		Restorable:    true,
+	}})
+
+	assert.Contains(t, html, "Monday, September 7")
+	assert.Contains(t, html, "Tuesday, September 8")
+	assert.Contains(t, html, "Labor Day")
+	assert.NotContains(t, html, "No runs have been moved.")
+
+	// The Restore form has to post the date back, or the handler cannot tell
+	// which run to put back.
+	assert.Contains(t, html, `name="original_date"`)
+	assert.Contains(t, html, `value="2026-09-07"`)
+	assert.Contains(t, html, "/admin/settings/delivery-postponements/delete")
+}
+
+// A run that has already been and gone is kept on the page and labelled, rather
+// than hidden — a staffer looking back at a holiday should be able to see it
+// was handled. But it gets no Restore button: putting a past run back would
+// rewrite the promised date on orders delivered days ago, moving them onto the
+// closed day the shop postponed away from.
+func TestPostponementsPanel_MarksPastRunsAndWithholdsRestore(t *testing.T) {
+	html := renderPostponements(t, healthyShipping(), []PostponementRow{{
+		OriginalValue: "2026-01-01",
+		OriginalLabel: "Thursday, January 1",
+		MovedToLabel:  "Friday, January 2",
+		StatusNote:    "Already run — kept for the record.",
+		Restorable:    false,
+	}})
+	assert.Contains(t, html, "Already run")
+	assert.Contains(t, html, "Thursday, January 1", "the record itself stays visible")
+	assert.NotContains(t, html, "/admin/settings/delivery-postponements/delete",
+		"a run that cannot be restored must not offer the button")
+}
+
+// Restoring re-dates customer orders, so it asks first — the convention every
+// other destructive admin action follows.
+func TestPostponementsPanel_RestoreConfirms(t *testing.T) {
+	html := renderPostponements(t, healthyShipping(), []PostponementRow{{
+		OriginalValue: "2026-09-07",
+		OriginalLabel: "Monday, September 7",
+		MovedToLabel:  "Tuesday, September 8",
+		Restorable:    true,
+	}})
+	assert.Contains(t, html, "/admin/settings/delivery-postponements/delete")
+	assert.Contains(t, html, "Put this run back on its scheduled day?")
+}
+
+// The add form posts to its own endpoint, not to the shipping form's. Sharing
+// the shipping POST would mean a mistyped flat rate discards a holiday somebody
+// just marked, which is the whole reason this is a separate form.
+func TestPostponementsPanel_HasItsOwnForm(t *testing.T) {
+	html := renderPostponements(t, healthyShipping(), nil)
+	assert.Contains(t, html, `action="/admin/settings/delivery-postponements"`)
+	assert.Contains(t, html, `name="moved_to_date"`)
+	assert.Contains(t, html, `name="note"`)
+
+	// Both date inputs are required — a blank one would post an unparseable
+	// date and bounce back with an error the staffer could have been spared.
+	postponeForm := html[strings.Index(html, "Moved delivery runs"):]
+	assert.GreaterOrEqual(t, strings.Count(postponeForm, `type="date"`), 2)
+}
+
+// A run whose scheduled day has passed but which has not gone out yet — a
+// Monday moved to Thursday, viewed on the Wednesday — is the ordinary middle
+// state, and the one a two-flag model had no word for. It must say why it
+// carries no button rather than silently dropping it.
+func TestPostponementsPanel_ExplainsWhyRestoreIsMissing(t *testing.T) {
+	html := renderPostponements(t, healthyShipping(), []PostponementRow{{
+		OriginalValue: "2026-09-07",
+		OriginalLabel: "Monday, September 7",
+		MovedToLabel:  "Thursday, September 10",
+		StatusNote:    "Its scheduled day has passed; the run still goes out Thursday, September 10.",
+		Restorable:    false,
+	}})
+	assert.Contains(t, html, "Its scheduled day has passed")
+	assert.NotContains(t, html, "/admin/settings/delivery-postponements/delete")
+	assert.NotContains(t, html, "Already run", "it has not run yet")
+}

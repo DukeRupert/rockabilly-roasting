@@ -438,6 +438,24 @@ func WithPlacedAt(t time.Time) OrderOption {
 	return func(p *sqlcgen.CreateOrderParams) { p.PlacedAt = t }
 }
 
+// WithDeliveryRun puts the order on a local-delivery run: promised on that day
+// and riding that run. Both columns, because a fixture that set only the
+// promised date would be a state order placement never produces, and would let
+// a postpone/restore test pass while the real thing had nothing to match on.
+//
+// Stored as bare dates, matching the columns — the commitment is "Thursday",
+// not an instant.
+func WithDeliveryRun(d time.Time) OrderOption {
+	day := pgtype.Date{
+		Time:  time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC),
+		Valid: true,
+	}
+	return func(p *sqlcgen.CreateOrderParams) {
+		p.ScheduledDeliveryDate = day
+		p.DeliveryRunDate = day
+	}
+}
+
 func WithShippingMethod(m domain.ShippingMethod) OrderOption {
 	return func(p *sqlcgen.CreateOrderParams) {
 		s := string(m)

@@ -535,7 +535,7 @@ func (s *WholesaleService) PlaceWholesaleOrder(ctx context.Context, tx pgx.Tx, p
 	customerID := p.CustomerID
 
 	placedAt := time.Now()
-	scheduledDelivery := scheduleLocalDelivery(ctx, tx, s.shipping, p.ShippingMethod, placedAt, s.merchantTZ)
+	scheduledDelivery, deliveryRun := scheduleLocalDelivery(ctx, tx, s.shipping, p.ShippingMethod, placedAt, s.merchantTZ)
 
 	order, err := s.orders.CreateOrder(ctx, tx, store.CreateOrderParams{
 		Number:                orderNumber,
@@ -553,6 +553,7 @@ func (s *WholesaleService) PlaceWholesaleOrder(ctx context.Context, tx pgx.Tx, p
 		BillingAddressID:      p.BillingAddressID,
 		ShippingMethod:        p.ShippingMethod,
 		ScheduledDeliveryDate: scheduledDelivery,
+		DeliveryRunDate:       deliveryRun,
 		Notes:                 p.Notes,
 		Metadata:              p.Metadata,
 		PlacedAt:              placedAt,

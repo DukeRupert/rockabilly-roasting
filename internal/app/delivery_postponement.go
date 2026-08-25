@@ -36,9 +36,13 @@ type PostponeDeliveryRunResult struct {
 // names the old date, and a shop that wants to explain a moved holiday has the
 // Announcements composer for exactly that — sending an automatic "your delivery
 // moved" on top of it would be two messages about one change.
+// now is passed in rather than read from the clock so the "has this run already
+// gone?" judgement is testable, and so one request judges every date against a
+// single instant.
 func (s *CheckoutService) PostponeDeliveryRun(
 	ctx context.Context,
 	tx pgx.Tx,
+	now time.Time,
 	originalDate, movedTo time.Time,
 	note string,
 	actor Actor,
@@ -74,7 +78,14 @@ func (s *CheckoutService) PostponeDeliveryRun(
 	// Monday from three months ago rewrites the promised date on orders that
 	// were delivered that day — silently corrupting the record of what happened
 	// while changing nothing about any future run.
-	if original.Before(todayIn(original.Location())) {
+	//
+	// Judged on when the run actually goes out, not on its scheduled day. Those
+	// differ precisely when it has already been postponed once, which is the
+	// case where a correction is most likely: a Monday holiday moved to Tuesday,
+	// and on Tuesday morning the van still cannot go. The run has not gone, and
+	// refusing to move it again would leave staff with no correct action —
+	// Restore would only put the orders back on the closed Monday.
+	if cfg.EffectiveRunDate(original, original.Location()).Before(dateOnly(now.In(original.Location()))) {
 		return nil, ErrPostponeAlreadyRun
 	}
 
@@ -125,10 +136,24 @@ func (s *CheckoutService) PostponeDeliveryRun(
 func (s *CheckoutService) RestoreDeliveryRun(
 	ctx context.Context,
 	tx pgx.Tx,
+	now time.Time,
 	originalDate time.Time,
 	actor Actor,
 ) (*PostponeDeliveryRunResult, error) {
 	original := dateOnly(originalDate)
+
+	// Restoring puts the run — and its orders — back on the scheduled day, so
+	// that day has to still be ahead of us. Judged on the scheduled date rather
+	// than the moved one, which is the opposite of the postpone guard and for
+	// the opposite reason: postponing asks "has the run gone?", restoring asks
+	// "is there still a day to put it back on?".
+	//
+	// Without this, the Restore button on a holiday that has been and gone
+	// rewrites the promised date on orders delivered days ago, moving them onto
+	// the closed day the shop postponed away from.
+	if original.Before(dateOnly(now.In(original.Location()))) {
+		return nil, ErrRestoreRunPassed
+	}
 
 	// Read the postponement before deleting it: undoing the order move needs to
 	// know where they went, and after the delete nothing records that.
@@ -198,16 +223,6 @@ const dateLayout = "2006-01-02"
 // same day look different.
 func dateOnly(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
-}
-
-// todayIn is the current calendar day in loc, as local midnight — the boundary
-// a run has to be on or after to still be movable.
-func todayIn(loc *time.Location) time.Time {
-	if loc == nil {
-		loc = time.UTC
-	}
-	now := time.Now().In(loc)
-	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 }
 
 // sameDate compares two times by the calendar day each names, ignoring clock

@@ -660,17 +660,28 @@ templ postponementsPanel(props SettingsProps) {
 								<p class="mt-0.5 text-xs text-rr-muted">Already run &mdash; kept for the record.</p>
 							}
 						</div>
-						<form method="post" action="/admin/settings/delivery-postponements/delete">
-							<input type="hidden" name="original_date" value={ row.OriginalValue }/>
-							@ActionWrap("hint-restore-"+row.OriginalValue, "Puts this run back on its scheduled day, and moves any orders promised the new day back with it.") {
-								<button
-									type="submit"
-									class="border border-rr-border bg-rr-surface px-2.5 py-1 label-font text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
-									style="font-size:0.6rem;"
-									aria-describedby={ "hint-restore-" + row.OriginalValue }
-								>Restore</button>
-							}
-						</form>
+						if row.Restorable {
+							<form method="post" action="/admin/settings/delivery-postponements/delete">
+								<input type="hidden" name="original_date" value={ row.OriginalValue }/>
+								@ActionWrap("hint-restore-"+row.OriginalValue, "Puts this run back on its scheduled day, and moves any orders promised the new day back with it.") {
+									<button
+										type="submit"
+										class="border border-rr-border bg-rr-surface px-2.5 py-1 label-font text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
+										style="font-size:0.6rem;"
+										aria-describedby={ "hint-restore-" + row.OriginalValue }
+										{ ConfirmAttrs(ActionConfirm{
+											Title: "Put this run back on its scheduled day?",
+											Lead:  "The run returns to the day it was scheduled for, and the orders that moved with it come back too.",
+											Points: []string{
+												"Customers are not emailed — anyone already told the moved date will not hear about this.",
+												"Orders on other runs are untouched.",
+											},
+											Confirm: "Restore run",
+										})... }
+									>Restore</button>
+								}
+							</form>
+						}
 					</li>
 				}
 			</ul>
@@ -947,4 +958,9 @@ type PostponementRow struct {
 	// than hidden: a staffer checking what happened over a holiday should be
 	// able to see that it was handled.
 	Past bool
+	// Restorable is whether the run can still be put back on its scheduled day
+	// — that is, whether that day is still ahead. False rows render without the
+	// Restore button, because restoring into the past would rewrite the promised
+	// date on orders that have already been delivered.
+	Restorable bool
 }

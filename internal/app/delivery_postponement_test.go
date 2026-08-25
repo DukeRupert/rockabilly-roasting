@@ -44,10 +44,37 @@ func merchantTZ(t *testing.T) *time.Location {
 	return loc
 }
 
-// laborDay2026 is Monday September 7th, a real run day on the Mon/Thu route.
+// testNow is the instant every postponement test judges "has this run gone?"
+// against. Fixed rather than time.Now(): the service takes a clock precisely so
+// these tests do not rot, and pinning it here is what makes the dates below
+// mean the same thing forever.
+//
+// A Friday, so the Monday it points at is genuinely ahead.
+func testNow(loc *time.Location) time.Time {
+	return time.Date(2026, time.September, 4, 10, 0, 0, 0, loc)
+}
+
+// runDays returns the Mon/Thu run days around testNow, derived from it rather
+// than written out. An earlier version hard-coded September dates, which passed
+// only until the wall clock caught up with them — the past-run guard would have
+// turned the whole suite red four days after it was written.
+func runDays(loc *time.Location) (monday, thursday, nextMonday time.Time) {
+	base := dateOnlyIn(testNow(loc))
+	for base.Weekday() != time.Monday {
+		base = base.AddDate(0, 0, 1)
+	}
+	return base, base.AddDate(0, 0, 3), base.AddDate(0, 0, 7)
+}
+
+// laborDay2026 is the upcoming Monday run and the Tuesday it moves to — the
+// shape of the Labor Day case this feature was built for.
 func laborDay2026(loc *time.Location) (holiday, tuesday time.Time) {
-	return time.Date(2026, time.September, 7, 0, 0, 0, 0, loc),
-		time.Date(2026, time.September, 8, 0, 0, 0, 0, loc)
+	monday, _, _ := runDays(loc)
+	return monday, monday.AddDate(0, 0, 1)
+}
+
+func dateOnlyIn(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
 }
 
 // TestPostponeDeliveryRunMovesQuotesAndOrders is the whole feature end to end:
@@ -72,40 +99,40 @@ func TestPostponeDeliveryRunMovesQuotesAndOrders(t *testing.T) {
 	onHoliday := testutil.CreateOrder(t, tx, custID, shipID, billID,
 		testutil.WithDeliveryRun(holiday))
 	// And one on an untouched run, to prove the update is not a blanket rewrite.
-	thursday := time.Date(2026, time.September, 10, 0, 0, 0, 0, loc)
+	_, thursday, _ := runDays(loc)
 	onThursday := testutil.CreateOrder(t, tx, custID, shipID, billID,
 		testutil.WithDeliveryRun(thursday))
 
 	// Before: a customer ordering the Friday before is quoted the holiday.
 	cfg, err := shipping.GetConfig(ctx, tx)
 	require.NoError(t, err)
-	before, ok := cfg.NextDeliveryDate(time.Date(2026, time.September, 4, 10, 0, 0, 0, loc), loc)
+	before, ok := cfg.NextDeliveryDate(testNow(loc), loc)
 	require.True(t, ok)
-	require.Equal(t, 7, before.Day(), "fixture assumes the Mon/Thu schedule")
+	require.Equal(t, holiday.Day(), before.Day(), "fixture assumes the Mon/Thu schedule")
 
-	result, err := svc.PostponeDeliveryRun(ctx, tx, holiday, tuesday, "Labor Day", staffActorFixture())
+	result, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "Labor Day", staffActorFixture())
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, result.OrdersMoved, "only the holiday order moves")
 
 	// After: the same customer is quoted Tuesday.
 	cfg, err = shipping.GetConfig(ctx, tx)
 	require.NoError(t, err)
-	after, ok := cfg.NextDeliveryDate(time.Date(2026, time.September, 4, 10, 0, 0, 0, loc), loc)
+	after, ok := cfg.NextDeliveryDate(testNow(loc), loc)
 	require.True(t, ok)
-	assert.Equal(t, 8, after.Day(), "checkout now quotes the moved run")
+	assert.Equal(t, tuesday.Day(), after.Day(), "checkout now quotes the moved run")
 
 	// The order the shop already promised moved with it.
 	orders := store.NewOrderStore(nil)
 	moved, err := orders.GetOrderByIDAsStaff(ctx, tx, onHoliday.ID)
 	require.NoError(t, err)
 	require.NotNil(t, moved.ScheduledDeliveryDate)
-	assert.Equal(t, 8, moved.ScheduledDeliveryDate.Day(), "the order followed the van")
+	assert.Equal(t, tuesday.Day(), moved.ScheduledDeliveryDate.Day(), "the order followed the van")
 
 	// The unrelated run is untouched.
 	untouched, err := orders.GetOrderByIDAsStaff(ctx, tx, onThursday.ID)
 	require.NoError(t, err)
 	require.NotNil(t, untouched.ScheduledDeliveryDate)
-	assert.Equal(t, 10, untouched.ScheduledDeliveryDate.Day())
+	assert.Equal(t, thursday.Day(), untouched.ScheduledDeliveryDate.Day())
 }
 
 // Restoring a run puts both the schedule and the orders back. A staffer who
@@ -124,10 +151,10 @@ func TestRestoreDeliveryRunPutsOrdersBack(t *testing.T) {
 	order := testutil.CreateOrder(t, tx, custID, shipID, billID,
 		testutil.WithDeliveryRun(holiday))
 
-	_, err := svc.PostponeDeliveryRun(ctx, tx, holiday, tuesday, "wrong day", staffActorFixture())
+	_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "wrong day", staffActorFixture())
 	require.NoError(t, err)
 
-	result, err := svc.RestoreDeliveryRun(ctx, tx, holiday, staffActorFixture())
+	result, err := svc.RestoreDeliveryRun(ctx, tx, testNow(loc), holiday, staffActorFixture())
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, result.OrdersMoved)
 
@@ -135,15 +162,15 @@ func TestRestoreDeliveryRunPutsOrdersBack(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, cfg.DeliveryPostponements, "the postponement is gone")
 
-	back, ok := cfg.NextDeliveryDate(time.Date(2026, time.September, 4, 10, 0, 0, 0, loc), loc)
+	back, ok := cfg.NextDeliveryDate(testNow(loc), loc)
 	require.True(t, ok)
-	assert.Equal(t, 7, back.Day(), "quotes are back on the scheduled day")
+	assert.Equal(t, holiday.Day(), back.Day(), "quotes are back on the scheduled day")
 
 	orders := store.NewOrderStore(nil)
 	restored, err := orders.GetOrderByIDAsStaff(ctx, tx, order.ID)
 	require.NoError(t, err)
 	require.NotNil(t, restored.ScheduledDeliveryDate)
-	assert.Equal(t, 7, restored.ScheduledDeliveryDate.Day())
+	assert.Equal(t, holiday.Day(), restored.ScheduledDeliveryDate.Day())
 }
 
 // Restoring a day that was never moved is a no-op, not an error — a second
@@ -155,7 +182,7 @@ func TestRestoreDeliveryRunUnknownDate(t *testing.T) {
 	svc := postponementService()
 
 	holiday, _ := laborDay2026(loc)
-	result, err := svc.RestoreDeliveryRun(ctx, tx, holiday, staffActorFixture())
+	result, err := svc.RestoreDeliveryRun(ctx, tx, testNow(loc), holiday, staffActorFixture())
 	require.NoError(t, err)
 	assert.EqualValues(t, 0, result.OrdersMoved)
 }
@@ -171,32 +198,32 @@ func TestPostponeDeliveryRunTwiceCorrects(t *testing.T) {
 	shipping := store.NewShippingStore()
 
 	holiday, tuesday := laborDay2026(loc)
-	wednesday := time.Date(2026, time.September, 9, 0, 0, 0, 0, loc)
+	wednesday := holiday.AddDate(0, 0, 2)
 
 	custID, shipID, billID := orderFixtures(t, tx)
 	order := testutil.CreateOrder(t, tx, custID, shipID, billID,
 		testutil.WithDeliveryRun(holiday))
 
-	_, err := svc.PostponeDeliveryRun(ctx, tx, holiday, tuesday, "", staffActorFixture())
+	_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "", staffActorFixture())
 	require.NoError(t, err)
 	// Corrected to Wednesday. The order is now sitting on Tuesday, so the
 	// second move has to find it there rather than on the original date.
-	_, err = svc.PostponeDeliveryRun(ctx, tx, holiday, wednesday, "actually Wednesday", staffActorFixture())
+	_, err = svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, wednesday, "actually Wednesday", staffActorFixture())
 	require.NoError(t, err)
 
 	cfg, err := shipping.GetConfig(ctx, tx)
 	require.NoError(t, err)
 	require.Len(t, cfg.DeliveryPostponements, 1, "one run, one answer")
 
-	got, ok := cfg.NextDeliveryDate(time.Date(2026, time.September, 4, 10, 0, 0, 0, loc), loc)
+	got, ok := cfg.NextDeliveryDate(testNow(loc), loc)
 	require.True(t, ok)
-	assert.Equal(t, 9, got.Day())
+	assert.Equal(t, wednesday.Day(), got.Day())
 
 	orders := store.NewOrderStore(nil)
 	moved, err := orders.GetOrderByIDAsStaff(ctx, tx, order.ID)
 	require.NoError(t, err)
 	require.NotNil(t, moved.ScheduledDeliveryDate)
-	assert.Equal(t, 9, moved.ScheduledDeliveryDate.Day(),
+	assert.Equal(t, wednesday.Day(), moved.ScheduledDeliveryDate.Day(),
 		"the order follows the correction, not the first answer")
 }
 
@@ -215,14 +242,14 @@ func TestPostponeDeliveryRunRejects(t *testing.T) {
 		{
 			// Wednesday has no run. Marking it would look handled and do nothing.
 			name:     "a day the van does not run",
-			original: time.Date(2026, time.September, 9, 0, 0, 0, 0, loc),
-			move:     time.Date(2026, time.September, 10, 0, 0, 0, 0, loc),
+			original: holiday.AddDate(0, 0, 2), // Wednesday
+			move:     holiday.AddDate(0, 0, 3),
 			want:     app.ErrPostponeNotDeliveryDay,
 		},
 		{
 			name:     "moving a run earlier",
 			original: holiday,
-			move:     time.Date(2026, time.September, 5, 0, 0, 0, 0, loc),
+			move:     holiday.AddDate(0, 0, -2),
 			want:     app.ErrPostponeNotForward,
 		},
 		{
@@ -245,7 +272,7 @@ func TestPostponeDeliveryRunRejects(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tx := testutil.NewTestTx(t, testPool)
 			svc := postponementService()
-			_, err := svc.PostponeDeliveryRun(ctx, tx, tc.original, tc.move, "", staffActorFixture())
+			_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), tc.original, tc.move, "", staffActorFixture())
 			assert.ErrorIs(t, err, tc.want)
 
 			// Nothing was recorded, so quotes are unchanged.
@@ -257,7 +284,7 @@ func TestPostponeDeliveryRunRejects(t *testing.T) {
 
 	// Sanity: the fixture the rejections are measured against does work.
 	tx := testutil.NewTestTx(t, testPool)
-	_, err := postponementService().PostponeDeliveryRun(ctx, tx, holiday, tuesday, "", staffActorFixture())
+	_, err := postponementService().PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "", staffActorFixture())
 	require.NoError(t, err)
 }
 
@@ -281,8 +308,7 @@ func TestPostponeOntoAnotherRunDayKeepsRunsApart(t *testing.T) {
 	svc := postponementService()
 	orders := store.NewOrderStore(nil)
 
-	holiday, _ := laborDay2026(loc)                                  // Mon Sep 7
-	thursday := time.Date(2026, time.September, 10, 0, 0, 0, 0, loc) // its own run
+	holiday, thursday, _ := runDays(loc) // Monday's run, and Thursday's own
 
 	custID, shipID, billID := orderFixtures(t, tx)
 	onMonday := testutil.CreateOrder(t, tx, custID, shipID, billID,
@@ -291,7 +317,7 @@ func TestPostponeOntoAnotherRunDayKeepsRunsApart(t *testing.T) {
 		testutil.WithDeliveryRun(thursday))
 
 	// Monday's run collapses onto Thursday.
-	result, err := svc.PostponeDeliveryRun(ctx, tx, holiday, thursday, "Labor Day", staffActorFixture())
+	result, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, thursday, "Labor Day", staffActorFixture())
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, result.OrdersMoved, "only Monday's order moves")
 
@@ -299,20 +325,20 @@ func TestPostponeOntoAnotherRunDayKeepsRunsApart(t *testing.T) {
 	// no longer tell them apart.
 	moved, err := orders.GetOrderByIDAsStaff(ctx, tx, onMonday.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 10, moved.ScheduledDeliveryDate.Day())
+	assert.Equal(t, thursday.Day(), moved.ScheduledDeliveryDate.Day())
 
 	// Restore. Only the order that actually rode Monday goes back.
-	result, err = svc.RestoreDeliveryRun(ctx, tx, holiday, staffActorFixture())
+	result, err = svc.RestoreDeliveryRun(ctx, tx, testNow(loc), holiday, staffActorFixture())
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, result.OrdersMoved, "Thursday's own order is not swept up")
 
 	back, err := orders.GetOrderByIDAsStaff(ctx, tx, onMonday.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 7, back.ScheduledDeliveryDate.Day(), "Monday's order returns to Monday")
+	assert.Equal(t, holiday.Day(), back.ScheduledDeliveryDate.Day(), "Monday's order returns to Monday")
 
 	untouched, err := orders.GetOrderByIDAsStaff(ctx, tx, nativeThursday.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 10, untouched.ScheduledDeliveryDate.Day(),
+	assert.Equal(t, thursday.Day(), untouched.ScheduledDeliveryDate.Day(),
 		"an order that never rode the moved run must not be dragged onto it")
 }
 
@@ -325,9 +351,8 @@ func TestPostponeCorrectionOffAnotherRunDay(t *testing.T) {
 	svc := postponementService()
 	orders := store.NewOrderStore(nil)
 
-	holiday, _ := laborDay2026(loc)
-	thursday := time.Date(2026, time.September, 10, 0, 0, 0, 0, loc)
-	friday := time.Date(2026, time.September, 11, 0, 0, 0, 0, loc)
+	holiday, thursday, _ := runDays(loc)
+	friday := thursday.AddDate(0, 0, 1)
 
 	custID, shipID, billID := orderFixtures(t, tx)
 	onMonday := testutil.CreateOrder(t, tx, custID, shipID, billID,
@@ -335,20 +360,20 @@ func TestPostponeCorrectionOffAnotherRunDay(t *testing.T) {
 	nativeThursday := testutil.CreateOrder(t, tx, custID, shipID, billID,
 		testutil.WithDeliveryRun(thursday))
 
-	_, err := svc.PostponeDeliveryRun(ctx, tx, holiday, thursday, "", staffActorFixture())
+	_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, thursday, "", staffActorFixture())
 	require.NoError(t, err)
 	// Actually, make it Friday.
-	result, err := svc.PostponeDeliveryRun(ctx, tx, holiday, friday, "actually Friday", staffActorFixture())
+	result, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, friday, "actually Friday", staffActorFixture())
 	require.NoError(t, err)
 	assert.EqualValues(t, 1, result.OrdersMoved)
 
 	corrected, err := orders.GetOrderByIDAsStaff(ctx, tx, onMonday.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 11, corrected.ScheduledDeliveryDate.Day())
+	assert.Equal(t, friday.Day(), corrected.ScheduledDeliveryDate.Day())
 
 	stayed, err := orders.GetOrderByIDAsStaff(ctx, tx, nativeThursday.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 10, stayed.ScheduledDeliveryDate.Day(),
+	assert.Equal(t, thursday.Day(), stayed.ScheduledDeliveryDate.Day(),
 		"Thursday's own order stays on Thursday")
 }
 
@@ -362,14 +387,66 @@ func TestPostponeDeliveryRunRejectsPastRun(t *testing.T) {
 	loc := merchantTZ(t)
 	svc := postponementService()
 
-	// The most recent Monday strictly before today.
-	past := todayInTest(loc).AddDate(0, 0, -7)
-	for past.Weekday() != time.Monday {
-		past = past.AddDate(0, 0, -1)
-	}
+	monday, _, _ := runDays(loc)
+	past := monday.AddDate(0, 0, -7) // the Monday before the clock
 
-	_, err := svc.PostponeDeliveryRun(ctx, tx, past, past.AddDate(0, 0, 1), "", staffActorFixture())
+	_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), past, past.AddDate(0, 0, 1), "", staffActorFixture())
 	assert.ErrorIs(t, err, app.ErrPostponeAlreadyRun)
+}
+
+// The guard asks whether the run has *gone*, not whether its scheduled day has
+// passed — and those differ exactly when it has already been moved once.
+//
+// A Monday holiday postponed to Tuesday, and on Tuesday morning the van still
+// cannot go: the run has not happened, so correcting it must be allowed.
+// Judging on the scheduled Monday would refuse with a message that is untrue
+// and leave staff no correct action at all, since Restore would only put the
+// orders back on the closed Monday.
+func TestPostponeAlreadyMovedRunOnTheDayItWasMovedTo(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+	loc := merchantTZ(t)
+	svc := postponementService()
+
+	holiday, tuesday := laborDay2026(loc)
+	wednesday := holiday.AddDate(0, 0, 2)
+
+	_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "Labor Day", staffActorFixture())
+	require.NoError(t, err)
+
+	// It is now Tuesday morning — the scheduled Monday is behind us, the run is not.
+	tuesdayMorning := tuesday.Add(7 * time.Hour)
+	_, err = svc.PostponeDeliveryRun(ctx, tx, tuesdayMorning, holiday, wednesday, "still no van", staffActorFixture())
+	assert.NoError(t, err, "a run that has not gone must still be movable")
+
+	// Once the moved day is behind us too, it really has gone.
+	thursdayMorning := tuesday.AddDate(0, 0, 2).Add(7 * time.Hour)
+	_, err = svc.PostponeDeliveryRun(ctx, tx, thursdayMorning, holiday, wednesday.AddDate(0, 0, 2), "", staffActorFixture())
+	assert.ErrorIs(t, err, app.ErrPostponeAlreadyRun)
+}
+
+// Restore asks the opposite question: is there still a day to put the run back
+// on? Restoring into the past would rewrite the promised date on orders already
+// delivered, moving them onto the closed day the shop postponed away from —
+// which is what the Restore button used to offer on every past row.
+func TestRestoreDeliveryRunRejectsPassedRun(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+	loc := merchantTZ(t)
+	svc := postponementService()
+
+	holiday, tuesday := laborDay2026(loc)
+	_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "Labor Day", staffActorFixture())
+	require.NoError(t, err)
+
+	// Tuesday morning: the scheduled Monday has passed, so there is nothing to
+	// put the run back onto.
+	_, err = svc.RestoreDeliveryRun(ctx, tx, tuesday.Add(7*time.Hour), holiday, staffActorFixture())
+	assert.ErrorIs(t, err, app.ErrRestoreRunPassed)
+
+	// Before the scheduled day it is fine.
+	_, err = svc.RestoreDeliveryRun(ctx, tx, testNow(loc), holiday, staffActorFixture())
+	assert.NoError(t, err)
 }
 
 // The fortnight cap has to agree with the database CHECK. Measuring it as a
@@ -380,8 +457,17 @@ func TestPostponeDeliveryRunFortnightBoundary(t *testing.T) {
 	ctx := context.Background()
 	loc := merchantTZ(t)
 
-	// Monday 2026-10-26 + 14 days spans the 2026-11-01 fall-back.
-	original := time.Date(2026, time.October, 26, 0, 0, 0, 0, loc)
+	// A Monday whose fortnight spans a daylight-saving transition, found rather
+	// than written down so this cannot rot the way the first version did.
+	monday, _, _ := runDays(loc)
+	var original time.Time
+	for d := monday; d.Before(monday.AddDate(1, 0, 0)); d = d.AddDate(0, 0, 7) {
+		if d.AddDate(0, 0, 14).Sub(d) != 14*24*time.Hour {
+			original = d
+			break
+		}
+	}
+	require.False(t, original.IsZero(), "no DST-spanning fortnight found within a year")
 	require.Equal(t, time.Monday, original.Weekday())
 	require.Greater(t, original.AddDate(0, 0, 14).Sub(original), 14*24*time.Hour,
 		"fixture must actually span the transition, or it proves nothing")
@@ -389,20 +475,14 @@ func TestPostponeDeliveryRunFortnightBoundary(t *testing.T) {
 	t.Run("exactly a fortnight is allowed", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		_, err := postponementService().PostponeDeliveryRun(
-			ctx, tx, original, original.AddDate(0, 0, 14), "", staffActorFixture())
+			ctx, tx, testNow(loc), original, original.AddDate(0, 0, 14), "", staffActorFixture())
 		assert.NoError(t, err)
 	})
 
 	t.Run("a day past it is not", func(t *testing.T) {
 		tx := testutil.NewTestTx(t, testPool)
 		_, err := postponementService().PostponeDeliveryRun(
-			ctx, tx, original, original.AddDate(0, 0, 15), "", staffActorFixture())
+			ctx, tx, testNow(loc), original, original.AddDate(0, 0, 15), "", staffActorFixture())
 		assert.ErrorIs(t, err, app.ErrPostponeTooFar)
 	})
-}
-
-// todayInTest is local midnight today in loc.
-func todayInTest(loc *time.Location) time.Time {
-	n := time.Now().In(loc)
-	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, loc)
 }

@@ -431,7 +431,7 @@ func TestPostponementsPanel_FollowsSavedNotDraft(t *testing.T) {
 	html := renderSettings(t, SettingsProps{
 		Shipping:      draft,
 		Saved:         healthyShipping(),
-		Postponements: []PostponementRow{{OriginalValue: "2026-09-07", OriginalLabel: "Monday, September 7", MovedToLabel: "Tuesday, September 8"}},
+		Postponements: []PostponementRow{{OriginalValue: "2026-09-07", OriginalLabel: "Monday, September 7", MovedToLabel: "Tuesday, September 8", Restorable: true}},
 	})
 	assert.Contains(t, html, "Moved delivery runs", "a rejected draft must not hide runs that are still on disk")
 	assert.Contains(t, html, "Monday, September 7")
@@ -452,6 +452,7 @@ func TestPostponementsPanel_RendersRows(t *testing.T) {
 		OriginalLabel: "Monday, September 7",
 		MovedToLabel:  "Tuesday, September 8",
 		Note:          "Labor Day",
+		Restorable:    true,
 	}})
 
 	assert.Contains(t, html, "Monday, September 7")
@@ -468,15 +469,34 @@ func TestPostponementsPanel_RendersRows(t *testing.T) {
 
 // A run that has already been and gone is kept on the page and labelled, rather
 // than hidden — a staffer looking back at a holiday should be able to see it
-// was handled.
-func TestPostponementsPanel_MarksPastRuns(t *testing.T) {
+// was handled. But it gets no Restore button: putting a past run back would
+// rewrite the promised date on orders delivered days ago, moving them onto the
+// closed day the shop postponed away from.
+func TestPostponementsPanel_MarksPastRunsAndWithholdsRestore(t *testing.T) {
 	html := renderPostponements(t, healthyShipping(), []PostponementRow{{
 		OriginalValue: "2026-01-01",
 		OriginalLabel: "Thursday, January 1",
 		MovedToLabel:  "Friday, January 2",
 		Past:          true,
+		Restorable:    false,
 	}})
 	assert.Contains(t, html, "Already run")
+	assert.Contains(t, html, "Thursday, January 1", "the record itself stays visible")
+	assert.NotContains(t, html, "/admin/settings/delivery-postponements/delete",
+		"a run that cannot be restored must not offer the button")
+}
+
+// Restoring re-dates customer orders, so it asks first — the convention every
+// other destructive admin action follows.
+func TestPostponementsPanel_RestoreConfirms(t *testing.T) {
+	html := renderPostponements(t, healthyShipping(), []PostponementRow{{
+		OriginalValue: "2026-09-07",
+		OriginalLabel: "Monday, September 7",
+		MovedToLabel:  "Tuesday, September 8",
+		Restorable:    true,
+	}})
+	assert.Contains(t, html, "/admin/settings/delivery-postponements/delete")
+	assert.Contains(t, html, "Put this run back on its scheduled day?")
 }
 
 // The add form posts to its own endpoint, not to the shipping form's. Sharing

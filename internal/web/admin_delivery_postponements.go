@@ -46,7 +46,7 @@ func (d *Deps) handleAdminDeliveryPostponementCreate(w http.ResponseWriter, r *h
 	var result *app.PostponeDeliveryRunResult
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		result, txErr = d.CheckoutService.PostponeDeliveryRun(ctx, tx, original, moved, note, staffActor(r))
+		result, txErr = d.CheckoutService.PostponeDeliveryRun(ctx, tx, time.Now(), original, moved, note, staffActor(r))
 		return txErr
 	})
 	if err != nil {
@@ -90,10 +90,15 @@ func (d *Deps) handleAdminDeliveryPostponementDelete(w http.ResponseWriter, r *h
 	var result *app.PostponeDeliveryRunResult
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
-		result, txErr = d.CheckoutService.RestoreDeliveryRun(ctx, tx, original, staffActor(r))
+		result, txErr = d.CheckoutService.RestoreDeliveryRun(ctx, tx, time.Now(), original, staffActor(r))
 		return txErr
 	})
 	if err != nil {
+		if errors.Is(err, app.ErrRestoreRunPassed) {
+			redirectFlashError(w, r, "/admin/settings",
+				"That run's scheduled day has already passed — it can't be put back.")
+			return
+		}
 		slog.Error("admin settings: restore delivery run", "error", err)
 		redirectFlashError(w, r, "/admin/settings", "Failed to restore that run")
 		return
@@ -161,6 +166,11 @@ func postponementRows(ps []domain.DeliveryPostponement, loc *time.Location, now 
 			MovedToLabel:  moved.Format("Monday, January 2"),
 			Note:          p.Note,
 			Past:          moved.Before(today),
+			// Restoring puts the run back on its scheduled day, so it is only
+			// offered while that day is still ahead. Rendering the button on a
+			// holiday that has been and gone would invite a click that rewrites
+			// the promised date on orders delivered days ago.
+			Restorable: !original.Before(today),
 		})
 	}
 	return rows

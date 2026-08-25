@@ -274,7 +274,7 @@ func (c ShippingConfig) NextDeliveryRun(now time.Time, loc *time.Location) (sche
 		if !c.DeliversOn(day.Weekday()) {
 			continue
 		}
-		run := c.effectiveRunDate(day, loc)
+		run := c.EffectiveRunDate(day, loc)
 
 		// The run has already left.
 		if run.Before(base) {
@@ -286,8 +286,20 @@ func (c ShippingConfig) NextDeliveryRun(now time.Time, loc *time.Location) (sche
 		if run.Equal(base) && minutesIn >= c.LocalDeliveryCutoffMinutes {
 			continue
 		}
-		if bestRun.IsZero() || run.Before(bestRun) {
+		switch {
+		case bestRun.IsZero() || run.Before(bestRun):
 			bestScheduled, bestRun = day, run
+		case run.Equal(bestRun) && day.After(bestScheduled):
+			// Two runs collapsed onto one day: a postponed one and that day's
+			// own. Prefer the later scheduled day, which is the run that
+			// natively falls here — a postponed run's scheduled day is always
+			// earlier than the day it lands on.
+			//
+			// It matters because this is the run an order placed now will be
+			// recorded as riding. Picking the postponed one would put the order
+			// on a run whose scheduled day is already behind it, and restoring
+			// that postponement would then drag the order onto a past date.
+			bestScheduled = day
 		}
 	}
 	if bestRun.IsZero() {
@@ -296,7 +308,7 @@ func (c ShippingConfig) NextDeliveryRun(now time.Time, loc *time.Location) (sche
 	return bestScheduled, bestRun, true
 }
 
-// effectiveRunDate maps a scheduled delivery day to the day the van actually
+// EffectiveRunDate maps a scheduled delivery day to the day the van actually
 // goes out, applying any postponement recorded for it. Returns scheduled
 // unchanged when the run was not moved.
 //
@@ -305,7 +317,7 @@ func (c ShippingConfig) NextDeliveryRun(now time.Time, loc *time.Location) (sche
 // back, and every other date this file produces is local midnight in the
 // merchant's zone. Mixing the two would compare midnights that are not the
 // same instant.
-func (c ShippingConfig) effectiveRunDate(scheduled time.Time, loc *time.Location) time.Time {
+func (c ShippingConfig) EffectiveRunDate(scheduled time.Time, loc *time.Location) time.Time {
 	for _, p := range c.DeliveryPostponements {
 		if sameCalendarDate(p.OriginalDate, scheduled) {
 			return time.Date(p.MovedTo.Year(), p.MovedTo.Month(), p.MovedTo.Day(), 0, 0, 0, 0, loc)

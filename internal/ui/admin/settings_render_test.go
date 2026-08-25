@@ -392,3 +392,85 @@ func anchorsTo(html, href string) []string {
 }
 
 func ptrTime(t time.Time) *time.Time { return &t }
+
+// --- Moved delivery runs ---
+
+// The panel only exists to amend a schedule, so it must not appear when there
+// is no schedule to amend. A shop that has not set up local delivery would
+// otherwise be offered a form whose every submission the service refuses.
+func TestPostponementsPanel_HiddenWithoutSchedule(t *testing.T) {
+	noDelivery := healthyShipping()
+	noDelivery.LocalDeliveryEnabled = false
+	assert.NotContains(t, renderSettings(t, SettingsProps{Shipping: noDelivery}), "Moved delivery runs")
+
+	noDays := healthyShipping()
+	noDays.LocalDeliveryWeekdays = nil
+	assert.NotContains(t, renderSettings(t, SettingsProps{Shipping: noDays}), "Moved delivery runs")
+
+	// With a schedule, it is there.
+	assert.Contains(t, renderSettings(t, SettingsProps{Shipping: healthyShipping()}), "Moved delivery runs")
+}
+
+// An empty panel has to say so. Rendering just the add form would read as
+// "nothing loaded" rather than "nothing moved", and the difference matters to a
+// staffer checking whether somebody already handled a holiday.
+func TestPostponementsPanel_EmptyState(t *testing.T) {
+	html := renderSettings(t, SettingsProps{Shipping: healthyShipping()})
+	assert.Contains(t, html, "No runs have been moved.")
+}
+
+// A recorded postponement renders both dates, its note, and a Restore control
+// carrying the date the handler needs back.
+func TestPostponementsPanel_RendersRows(t *testing.T) {
+	html := renderSettings(t, SettingsProps{
+		Shipping: healthyShipping(),
+		Postponements: []PostponementRow{{
+			OriginalValue: "2026-09-07",
+			OriginalLabel: "Monday, September 7",
+			MovedToLabel:  "Tuesday, September 8",
+			Note:          "Labor Day",
+		}},
+	})
+
+	assert.Contains(t, html, "Monday, September 7")
+	assert.Contains(t, html, "Tuesday, September 8")
+	assert.Contains(t, html, "Labor Day")
+	assert.NotContains(t, html, "No runs have been moved.")
+
+	// The Restore form has to post the date back, or the handler cannot tell
+	// which run to put back.
+	assert.Contains(t, html, `name="original_date"`)
+	assert.Contains(t, html, `value="2026-09-07"`)
+	assert.Contains(t, html, "/admin/settings/delivery-postponements/delete")
+}
+
+// A run that has already been and gone is kept on the page and labelled, rather
+// than hidden — a staffer looking back at a holiday should be able to see it
+// was handled.
+func TestPostponementsPanel_MarksPastRuns(t *testing.T) {
+	html := renderSettings(t, SettingsProps{
+		Shipping: healthyShipping(),
+		Postponements: []PostponementRow{{
+			OriginalValue: "2026-01-01",
+			OriginalLabel: "Thursday, January 1",
+			MovedToLabel:  "Friday, January 2",
+			Past:          true,
+		}},
+	})
+	assert.Contains(t, html, "Already run")
+}
+
+// The add form posts to its own endpoint, not to the shipping form's. Sharing
+// the shipping POST would mean a mistyped flat rate discards a holiday somebody
+// just marked, which is the whole reason this is a separate form.
+func TestPostponementsPanel_HasItsOwnForm(t *testing.T) {
+	html := renderSettings(t, SettingsProps{Shipping: healthyShipping()})
+	assert.Contains(t, html, `action="/admin/settings/delivery-postponements"`)
+	assert.Contains(t, html, `name="moved_to_date"`)
+	assert.Contains(t, html, `name="note"`)
+
+	// Both date inputs are required — a blank one would post an unparseable
+	// date and bounce back with an error the staffer could have been spared.
+	postponeForm := html[strings.Index(html, "Moved delivery runs"):]
+	assert.GreaterOrEqual(t, strings.Count(postponeForm, `type="date"`), 2)
+}

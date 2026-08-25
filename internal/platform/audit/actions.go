@@ -124,6 +124,8 @@ const (
 	AuditShipmentStatusUpdated        = "shipment.status_updated"
 	AuditShipmentImported             = "shipment.imported"
 	AuditShippingConfigUpdated        = "shipping_config.updated"
+	AuditDeliveryRunPostponed         = "delivery_run.postponed"
+	AuditDeliveryRunRestored          = "delivery_run.restored"
 	AuditBoxPresetCreated             = "box_preset.created"
 	AuditBoxPresetUpdated             = "box_preset.updated"
 	AuditBoxPresetDeleted             = "box_preset.deleted"

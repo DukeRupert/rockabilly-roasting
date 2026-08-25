@@ -29,7 +29,7 @@ func (s *ShippingStore) GetConfig(ctx context.Context, tx pgx.Tx) (*domain.Shipp
 	if err != nil {
 		return nil, fmt.Errorf("get shipping config: %w", err)
 	}
-	return &domain.ShippingConfig{
+	cfg := &domain.ShippingConfig{
 		FlatRateCents:              int(row.FlatRateCents),
 		FreeShippingThreshold:      int32PtrToIntPtr(row.FreeShippingThreshold),
 		Currency:                   row.Currency,
@@ -49,7 +49,111 @@ func (s *ShippingStore) GetConfig(ctx context.Context, tx pgx.Tx) (*domain.Shipp
 		OriginEmail:                row.OriginEmail,
 		OriginPhone:                row.OriginPhone,
 		TareWeightOz:               numericToFloat64(row.TareWeightOz),
-	}, nil
+	}
+
+	// Postponements ride along with the config rather than being fetched
+	// separately by callers. NextDeliveryDate cannot give a correct answer
+	// without them, and every caller of it — checkout, the wholesale portal,
+	// route building, the dashboard strip, order placement — goes through this
+	// one loader. Attaching them here is what stops a future caller from
+	// quoting a holiday because it forgot a second query.
+	postponements, err := s.ListDeliveryPostponements(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	cfg.DeliveryPostponements = postponements
+
+	return cfg, nil
+}
+
+// --- Delivery postponements ---
+
+// ListDeliveryPostponements returns every recorded postponement, soonest first.
+//
+// Deliberately unfiltered by date: the set is tiny (a working year has a
+// handful of observed holidays), and NextDeliveryDate scans backwards as well
+// as forwards, so filtering to "future only" here would hide the run that moved
+// out of yesterday and into today.
+func (s *ShippingStore) ListDeliveryPostponements(ctx context.Context, tx pgx.Tx) ([]domain.DeliveryPostponement, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT original_date, moved_to_date, note
+		   FROM delivery_postponements
+		  ORDER BY original_date`)
+	if err != nil {
+		return nil, fmt.Errorf("list delivery postponements: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.DeliveryPostponement
+	for rows.Next() {
+		var p domain.DeliveryPostponement
+		if err := rows.Scan(&p.OriginalDate, &p.MovedTo, &p.Note); err != nil {
+			return nil, fmt.Errorf("scan delivery postponement: %w", err)
+		}
+		out = append(out, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate delivery postponements: %w", err)
+	}
+	return out, nil
+}
+
+// UpsertDeliveryPostponement records that the run scheduled for originalDate
+// happens on movedTo instead, replacing any postponement already recorded for
+// that day.
+//
+// Upsert rather than insert because marking the same holiday twice is a
+// correction, not a conflict — staff who typed the wrong Tuesday should be able
+// to fix it by saying it again.
+func (s *ShippingStore) UpsertDeliveryPostponement(ctx context.Context, tx pgx.Tx, originalDate, movedTo time.Time, note string) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO delivery_postponements (original_date, moved_to_date, note)
+		 VALUES ($1::date, $2::date, $3)
+		 ON CONFLICT (original_date) DO UPDATE
+		    SET moved_to_date = EXCLUDED.moved_to_date,
+		        note          = EXCLUDED.note`,
+		originalDate, movedTo, note,
+	)
+	if err != nil {
+		return fmt.Errorf("upsert delivery postponement: %w", err)
+	}
+	return nil
+}
+
+// DeleteDeliveryPostponement removes a postponement, putting the run back on
+// its scheduled day.
+func (s *ShippingStore) DeleteDeliveryPostponement(ctx context.Context, tx pgx.Tx, originalDate time.Time) error {
+	_, err := tx.Exec(ctx,
+		`DELETE FROM delivery_postponements WHERE original_date = $1::date`,
+		originalDate,
+	)
+	if err != nil {
+		return fmt.Errorf("delete delivery postponement: %w", err)
+	}
+	return nil
+}
+
+// RescheduleOrdersOnDate moves every local-delivery order promised one date
+// onto another, and reports how many moved.
+//
+// This is what keeps the fulfillment queue and the load list honest after a run
+// is postponed: those read the stored scheduled_delivery_date, not the schedule
+// rule, so without it the van's own paperwork would still say Monday. Customers
+// are not emailed — the confirmation they already have names the old date, and
+// the shop announces a moved holiday through the Announcements composer if it
+// wants to say more.
+func (s *ShippingStore) RescheduleOrdersOnDate(ctx context.Context, tx pgx.Tx, from, to time.Time) (int64, error) {
+	tag, err := tx.Exec(ctx,
+		`UPDATE orders
+		    SET scheduled_delivery_date = $2::date,
+		        updated_at = now()
+		  WHERE scheduled_delivery_date = $1::date`,
+		from, to,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("reschedule orders on date: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 // UpdateConfig updates the shipping configuration.

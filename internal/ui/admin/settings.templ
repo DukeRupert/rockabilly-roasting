@@ -183,6 +183,11 @@ type SettingsProps struct {
 	// list follows. renderShippingSettings stamps this, so no call site can
 	// forget it.
 	Saved ShippingSettings
+	// Postponements are the delivery runs moved off their scheduled day. Kept
+	// apart from ShippingSettings because they are per-date exceptions edited
+	// one at a time, not fields of the big shipping form — a mistyped rate must
+	// not discard a holiday somebody marked, and vice versa.
+	Postponements []PostponementRow
 	// FieldErrors maps a form field name to what is wrong with it. Populated
 	// only on a rejected save; the page re-renders with the submitted values
 	// rather than redirecting, so nothing typed is thrown away.
@@ -612,6 +617,103 @@ templ SettingsContent(props SettingsProps) {
 			</div>
 		</form>
 	</div>
+	if props.Shipping.LocalDeliveryEnabled && len(props.Shipping.LocalDeliveryWeekdays) > 0 {
+		@postponementsPanel(props)
+	}
+}
+
+// postponementsPanel edits the runs that have been moved off their scheduled
+// day. Its own card and its own form, not fields on the shipping form above:
+// these are per-date exceptions added one at a time, and folding them into a
+// twenty-field form would mean a mistyped flat rate discards a holiday somebody
+// just marked.
+//
+// Only rendered when a delivery schedule exists, because there is no run to
+// move without one.
+templ postponementsPanel(props SettingsProps) {
+	<div class="mt-6 border border-rr-border bg-rr-surface">
+		<div class="border-b border-rr-border px-4 py-4 sm:px-6">
+			<h2 class="text-sm font-semibold text-rr-heading">Moved delivery runs</h2>
+			<p class="mt-1 text-xs text-rr-muted">
+				For a holiday or a closure &mdash; the run still happens, just on a different day. Customers are quoted the moved date from the moment you save it, and orders already promised the old day move with it. Nobody is emailed automatically; send an announcement if you want to explain it.
+			</p>
+		</div>
+		if len(props.Postponements) > 0 {
+			<ul class="divide-y divide-rr-border">
+				for _, row := range props.Postponements {
+					<li class="flex items-center justify-between gap-4 px-4 py-3 sm:px-6">
+						<div class="min-w-0">
+							<p class="text-sm text-rr-heading">
+								<span class="font-medium">{ row.OriginalLabel }</span>
+								<span class="text-rr-muted">&rarr;</span>
+								<span class="font-medium">{ row.MovedToLabel }</span>
+							</p>
+							if row.Note != "" {
+								<p class="mt-0.5 text-xs text-rr-muted">{ row.Note }</p>
+							}
+							if row.Past {
+								<p class="mt-0.5 text-xs text-rr-muted">Already run &mdash; kept for the record.</p>
+							}
+						</div>
+						<form method="post" action="/admin/settings/delivery-postponements/delete">
+							<input type="hidden" name="original_date" value={ row.OriginalValue }/>
+							@ActionWrap("hint-restore-"+row.OriginalValue, "Puts this run back on its scheduled day, and moves any orders promised the new day back with it.") {
+								<button
+									type="submit"
+									class="border border-rr-border bg-rr-surface px-2.5 py-1 label-font text-rr-muted hover:text-rr-heading hover:bg-rr-raised transition-colors"
+									style="font-size:0.6rem;"
+									aria-describedby={ "hint-restore-" + row.OriginalValue }
+								>Restore</button>
+							}
+						</form>
+					</li>
+				}
+			</ul>
+		} else {
+			<p class="px-4 py-4 text-sm text-rr-muted sm:px-6">No runs have been moved.</p>
+		}
+		<form method="post" action="/admin/settings/delivery-postponements" class="border-t border-rr-border px-4 py-4 sm:px-6">
+			<div class="flex flex-wrap items-end gap-3">
+				<div>
+					<label for="postpone-original" class="block text-xs font-medium text-rr-heading">Run scheduled for</label>
+					<input
+						type="date"
+						id="postpone-original"
+						name="original_date"
+						required
+						class="mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+					/>
+				</div>
+				<div>
+					<label for="postpone-moved" class="block text-xs font-medium text-rr-heading">Happens instead on</label>
+					<input
+						type="date"
+						id="postpone-moved"
+						name="moved_to_date"
+						required
+						class="mt-1 border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+					/>
+				</div>
+				<div class="min-w-[12rem] flex-1">
+					<label for="postpone-note" class="block text-xs font-medium text-rr-heading">Why (staff only)</label>
+					<input
+						type="text"
+						id="postpone-note"
+						name="note"
+						maxlength="200"
+						placeholder="Labor Day"
+						class="mt-1 w-full border border-rr-border bg-rr-surface px-2 py-1 text-sm text-rr-heading"
+					/>
+				</div>
+				<button type="submit" class="rounded-sm bg-rr-red px-3 py-1.5 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt">
+					Move run
+				</button>
+			</div>
+			<p class="mt-2 text-xs text-rr-muted">
+				The scheduled day has to be one the van already runs, and the new day has to be later &mdash; up to two weeks out.
+			</p>
+		</form>
+	</div>
 }
 
 templ Settings(props SettingsProps) {
@@ -823,4 +925,21 @@ templ SettingsIntegrations(props SettingsIntegrationsProps) {
 	}) {
 		@SettingsIntegrationsContent(props)
 	}
+}
+
+// PostponementRow is one moved delivery run, formatted for display. Dates are
+// rendered by the handler in the merchant's zone rather than here, so the whole
+// page shows one clock — see the delivery cutoff strip on the dashboard, which
+// makes the same choice.
+type PostponementRow struct {
+	// OriginalValue is the yyyy-mm-dd the Restore form posts back.
+	OriginalValue string
+	// OriginalLabel and MovedToLabel are the human dates ("Monday, September 7").
+	OriginalLabel string
+	MovedToLabel  string
+	Note          string
+	// Past marks a run that has already been and gone. Kept on the page rather
+	// than hidden: a staffer checking what happened over a holiday should be
+	// able to see that it was handled.
+	Past bool
 }

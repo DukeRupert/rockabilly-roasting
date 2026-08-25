@@ -75,7 +75,7 @@ func TestNextDeliveryDate(t *testing.T) {
 			assert.Equal(t, loc, got.Location())
 
 			// Whatever comes back must actually be a day the van runs.
-			assert.True(t, cfg.deliversOn(got.Weekday()),
+			assert.True(t, cfg.DeliversOn(got.Weekday()),
 				"resolved %s, which is not a delivery weekday", got.Weekday())
 		})
 	}
@@ -234,4 +234,161 @@ func TestDeliveryDateLabel(t *testing.T) {
 		DeliveryDateLabel(time.Date(2026, time.August, 13, 0, 0, 0, 0, loc)))
 	assert.Equal(t, "Monday, September 7",
 		DeliveryDateLabel(time.Date(2026, time.September, 7, 0, 0, 0, 0, loc)))
+}
+
+// laborDay2026 is Monday, September 7th 2026 — a real scheduled run day for the
+// Mon/Thu route, and the case that prompted this feature. Tuesday the 8th is
+// where the shop moves it to.
+func laborDay2026(loc *time.Location) (holiday, movedTo time.Time) {
+	return time.Date(2026, time.September, 7, 0, 0, 0, 0, loc),
+		time.Date(2026, time.September, 8, 0, 0, 0, 0, loc)
+}
+
+// TestNextDeliveryDateHonoursPostponement covers the whole point of the
+// feature: a holiday run answers on the day it actually happens, from every
+// vantage point a customer or staffer might ask from.
+//
+// Without this, Labor Day is quoted at checkout, promised in the confirmation
+// email, and printed on the dashboard cutoff strip — for a day the shop is shut.
+func TestNextDeliveryDateHonoursPostponement(t *testing.T) {
+	loc := pacific(t)
+	holiday, movedTo := laborDay2026(loc)
+
+	cfg := monThuAt9()
+	cfg.DeliveryPostponements = []DeliveryPostponement{
+		{OriginalDate: holiday, MovedTo: movedTo, Note: "Labor Day"},
+	}
+
+	at := func(month time.Month, day, hour, min int) time.Time {
+		return time.Date(2026, month, day, hour, min, 0, 0, loc)
+	}
+
+	tests := []struct {
+		name     string
+		placedAt time.Time
+		wantDay  int
+	}{
+		// Approaching the holiday, the answer is already the moved date — a
+		// customer ordering Friday must not be promised Monday.
+		{"friday before the holiday", at(time.September, 4, 10, 0), 8},
+		{"saturday before", at(time.September, 5, 12, 0), 8},
+		{"sunday before", at(time.September, 6, 20, 0), 8},
+
+		// On the holiday itself there is no run, but the moved one is tomorrow.
+		// The cutoff must not apply here: the van is not loading today.
+		{"labor day morning, before what would have been the cutoff", at(time.September, 7, 6, 0), 8},
+		{"labor day after the old cutoff", at(time.September, 7, 11, 0), 8},
+		{"labor day evening", at(time.September, 7, 22, 0), 8},
+
+		// Tuesday is the run. This is the case the forward-only search could
+		// never answer: Tuesday is not a delivery weekday and the scheduled day
+		// is behind us.
+		{"tuesday before cutoff makes the moved run", at(time.September, 8, 8, 30), 8},
+		{"tuesday one minute before cutoff still makes it", at(time.September, 8, 8, 59), 8},
+
+		// Once the moved run's cutoff passes, the next scheduled day resumes.
+		{"tuesday at cutoff misses it", at(time.September, 8, 9, 0), 10},
+		{"tuesday afternoon rolls to thursday", at(time.September, 8, 15, 0), 10},
+		{"wednesday rolls to thursday", at(time.September, 9, 9, 0), 10},
+
+		// The following week is untouched — a postponement moves one run, not
+		// the schedule.
+		{"thursday after the holiday week", at(time.September, 10, 9, 30), 14},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := cfg.NextDeliveryDate(tc.placedAt, loc)
+			require.True(t, ok)
+			assert.Equal(t, tc.wantDay, got.Day(), "got %s", got.Format("Mon 2006-01-02"))
+			assert.Equal(t, time.September, got.Month())
+			assert.Equal(t, 0, got.Hour(), "must be local midnight")
+			assert.Equal(t, loc, got.Location())
+		})
+	}
+}
+
+// A postponement must not leak into weeks it does not name. The regression this
+// guards is a lookback that matches on weekday rather than on the calendar date.
+func TestNextDeliveryDatePostponementIsOneRunOnly(t *testing.T) {
+	loc := pacific(t)
+	holiday, movedTo := laborDay2026(loc)
+
+	cfg := monThuAt9()
+	cfg.DeliveryPostponements = []DeliveryPostponement{
+		{OriginalDate: holiday, MovedTo: movedTo},
+	}
+
+	// The Monday a week after the holiday is an ordinary run.
+	got, ok := cfg.NextDeliveryDate(time.Date(2026, time.September, 14, 7, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 14, got.Day(), "the next Monday is not postponed")
+
+	// And the Monday a week before it was too.
+	got, ok = cfg.NextDeliveryDate(time.Date(2026, time.August, 31, 7, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 31, got.Day(), "the previous Monday is not postponed")
+}
+
+// Two runs moved in the same window must each answer for themselves, and the
+// nearest one wins. Collecting candidates rather than returning the first hit
+// is what makes this work — postponement breaks the assumption that scanning
+// days in order yields run dates in order.
+func TestNextDeliveryDateMultiplePostponements(t *testing.T) {
+	loc := pacific(t)
+	cfg := monThuAt9()
+	cfg.DeliveryPostponements = []DeliveryPostponement{
+		// Thursday Sep 10 pushed to Friday Sep 11.
+		{OriginalDate: time.Date(2026, time.September, 10, 0, 0, 0, 0, loc),
+			MovedTo: time.Date(2026, time.September, 11, 0, 0, 0, 0, loc)},
+		// Monday Sep 7 pushed to Tuesday Sep 8.
+		{OriginalDate: time.Date(2026, time.September, 7, 0, 0, 0, 0, loc),
+			MovedTo: time.Date(2026, time.September, 8, 0, 0, 0, 0, loc)},
+	}
+
+	// Asked on the holiday, the nearer moved run (Tuesday) wins even though the
+	// other postponement appears first in the slice.
+	got, ok := cfg.NextDeliveryDate(time.Date(2026, time.September, 7, 12, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 8, got.Day())
+
+	// Past Tuesday's cutoff, the second moved run is next — Friday, not the
+	// Thursday it was scheduled for.
+	got, ok = cfg.NextDeliveryDate(time.Date(2026, time.September, 8, 10, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 11, got.Day())
+}
+
+// A run moved onto another scheduled run day collapses into it, rather than
+// producing two answers or an earlier one than either.
+func TestNextDeliveryDatePostponedOntoAnotherRunDay(t *testing.T) {
+	loc := pacific(t)
+	cfg := monThuAt9()
+	// Monday Sep 7 pushed all the way to Thursday Sep 10, which already runs.
+	cfg.DeliveryPostponements = []DeliveryPostponement{
+		{OriginalDate: time.Date(2026, time.September, 7, 0, 0, 0, 0, loc),
+			MovedTo: time.Date(2026, time.September, 10, 0, 0, 0, 0, loc)},
+	}
+
+	got, ok := cfg.NextDeliveryDate(time.Date(2026, time.September, 7, 12, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 10, got.Day(), "both runs land on the same day")
+}
+
+// Postponement dates arrive from a Postgres `date` column, which the driver
+// hands back in UTC. The comparison has to be by calendar date, not by instant,
+// or a merchant west of Greenwich matches the wrong day.
+func TestNextDeliveryDatePostponementFromUTCDate(t *testing.T) {
+	loc := pacific(t)
+	cfg := monThuAt9()
+	cfg.DeliveryPostponements = []DeliveryPostponement{{
+		OriginalDate: time.Date(2026, time.September, 7, 0, 0, 0, 0, time.UTC),
+		MovedTo:      time.Date(2026, time.September, 8, 0, 0, 0, 0, time.UTC),
+	}}
+
+	got, ok := cfg.NextDeliveryDate(time.Date(2026, time.September, 6, 12, 0, 0, 0, loc), loc)
+	require.True(t, ok)
+	assert.Equal(t, 8, got.Day())
+	assert.Equal(t, loc, got.Location(), "the answer is rebuilt in the merchant zone")
+	assert.Equal(t, 0, got.Hour())
 }

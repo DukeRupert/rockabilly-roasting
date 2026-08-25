@@ -643,6 +643,12 @@ func NewRouter(deps *Deps) http.Handler {
 	// pushes the action into history — so that URL has to answer GET, or a
 	// refresh after a rejected save lands on a 405.
 	settingsRoute("POST /admin/settings", deps.handleAdminShippingSettingsUpdate)
+	// Postponements get verb paths of their own rather than sharing the shipping
+	// form's POST. They are separate small forms on the same page, and folding
+	// them into the twenty-field save would mean a mistyped rate discards a
+	// holiday somebody just marked. Both redirect, so neither needs a GET route.
+	settingsRoute("POST /admin/settings/delivery-postponements", deps.handleAdminDeliveryPostponementCreate)
+	settingsRoute("POST /admin/settings/delivery-postponements/delete", deps.handleAdminDeliveryPostponementDelete)
 	settingsRoute("GET /admin/settings/wholesale", deps.handleAdminSettingsWholesale)
 	settingsRoute("GET /admin/settings/integrations", deps.handleAdminSettingsIntegrations)
 	settingsRoute("POST /admin/settings/default-price-list", deps.handleAdminDefaultPriceListUpdate)

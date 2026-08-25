@@ -438,6 +438,18 @@ func WithPlacedAt(t time.Time) OrderOption {
 	return func(p *sqlcgen.CreateOrderParams) { p.PlacedAt = t }
 }
 
+// WithScheduledDeliveryDate promises the order a local-delivery run. Stored as
+// a bare date, matching the column — the commitment is "Thursday", not an
+// instant.
+func WithScheduledDeliveryDate(d time.Time) OrderOption {
+	return func(p *sqlcgen.CreateOrderParams) {
+		p.ScheduledDeliveryDate = pgtype.Date{
+			Time:  time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC),
+			Valid: true,
+		}
+	}
+}
+
 func WithShippingMethod(m domain.ShippingMethod) OrderOption {
 	return func(p *sqlcgen.CreateOrderParams) {
 		s := string(m)

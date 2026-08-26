@@ -392,7 +392,8 @@ func run() error {
 	fulfillmentSvc := app.NewFulfillmentService(fulfillmentStore, shippingStore, orderStore, boxPresetStore, customerStore, catalogStore, labelProvider, auditWriter, metricsReg)
 	discountSvc := app.NewDiscountService(discountStore, auditWriter, metricsReg)
 	checkoutSvc := app.NewCheckoutService(orderStore, customerStore, discountStore, settingsStore, shippingStore, paymentProvider, auditWriter, metricsReg).
-		WithMerchantTZ(merchantTZ)
+		WithMerchantTZ(merchantTZ).
+		WithDeliveryRoutes(routeStore)
 	pricingSvc := app.NewPricingService(pricingStore, customerStore).
 		WithSettings(settingsStore)
 	cartSvc := app.NewCartService(cartStore, catalogStore, pricingSvc, catalogSvc)

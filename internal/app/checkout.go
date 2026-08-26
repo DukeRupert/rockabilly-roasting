@@ -35,6 +35,11 @@ type CheckoutService struct {
 	carts    *store.CartStore
 	enqueuer JobEnqueuer
 
+	// Optional — lets a postponement carry the run's planned route onto the new
+	// day. Nil simply leaves routes alone, which is what every caller that has
+	// no route store wants.
+	routes *store.RouteStore
+
 	// merchantTZ is the zone the local-delivery cutoff is judged in. Nil falls
 	// back to UTC, which only misplaces the cutoff in dev — production wires
 	// MERCHANT_TIMEZONE.
@@ -69,6 +74,17 @@ func NewCheckoutService(
 		audit:     audit,
 		metrics:   metrics,
 	}
+}
+
+// WithDeliveryRoutes lets postponements reconcile the planned delivery route
+// for a run that moves.
+//
+// Optional rather than a constructor argument because it is needed by exactly
+// one pair of methods, and a nil store means "no routes to worry about" rather
+// than a broken service — the postponement itself still works.
+func (s *CheckoutService) WithDeliveryRoutes(routes *store.RouteStore) *CheckoutService {
+	s.routes = routes
+	return s
 }
 
 // WithCheckoutConfirmDeps wires the cart store and job enqueuer required by

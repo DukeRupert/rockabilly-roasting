@@ -247,6 +247,55 @@ func (s *RouteStore) CompleteRoute(ctx context.Context, tx pgx.Tx, id uuid.UUID)
 	return scanRoute(row)
 }
 
+// RouteCoversOnlyRun reports whether every stop on a route belongs to the
+// delivery run of runDate, judged by the orders' delivery_run_date.
+//
+// Routes key on route_date alone, and two runs are allowed to collapse onto one
+// day, so "the route for that day" and "the route for that run" are not the
+// same thing. When a run moves, its route may only travel with it if nothing
+// else is riding on it — otherwise re-dating the route would take the other
+// run's driver sheet away with it. A route with no stops counts as covering
+// only the run: there is nothing on it to strand.
+//
+// Callers are responsible for what to do with a false: see planRouteMove, which
+// drops the plan and asks staff to build it again.
+func (s *RouteStore) RouteCoversOnlyRun(ctx context.Context, tx pgx.Tx, routeID uuid.UUID, runDate time.Time) (_ bool, err error) {
+	defer trackQuery(s.metrics, "routes.covers_only_run", time.Now(), &err)
+	var only bool
+	// IS DISTINCT FROM rather than <>, so a stop whose order has no run date at
+	// all counts as somebody else's — it is certainly not this run's.
+	if err := tx.QueryRow(ctx,
+		`SELECT NOT EXISTS (
+		    SELECT 1
+		      FROM route_stops rs
+		      JOIN orders o ON o.id = rs.order_id
+		     WHERE rs.route_id = $1
+		       AND o.delivery_run_date IS DISTINCT FROM $2::date)`,
+		routeID, runDate).Scan(&only); err != nil {
+		return false, fmt.Errorf("check route run coverage: %w", err)
+	}
+	return only, nil
+}
+
+// UpdateRouteDate moves a route onto a different delivery day, keeping its
+// stops and their order.
+//
+// Used when a run is postponed: the same orders ride, just on another day, so
+// re-dating the plan is strictly better than making staff build it again. The
+// caller is responsible for checking the target day has no live route of its
+// own — the partial unique index will otherwise reject this, which is the
+// behaviour we want but not the message staff should meet.
+func (s *RouteStore) UpdateRouteDate(ctx context.Context, tx pgx.Tx, id uuid.UUID, date time.Time) (_ *domain.DeliveryRoute, err error) {
+	defer trackQuery(s.metrics, "routes.update_date", time.Now(), &err)
+	row := tx.QueryRow(ctx,
+		`UPDATE delivery_routes
+		    SET route_date = $2::date
+		  WHERE id = $1
+		 RETURNING `+routeColumns,
+		id, date)
+	return scanRoute(row)
+}
+
 // DeleteRoute removes a route and its stops (ON DELETE CASCADE). Used when
 // staff re-plan: the previous draft is replaced rather than accumulated.
 func (s *RouteStore) DeleteRoute(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {

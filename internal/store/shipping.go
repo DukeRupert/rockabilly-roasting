@@ -149,12 +149,43 @@ func (s *ShippingStore) DeleteDeliveryPostponement(ctx context.Context, tx pgx.T
 // which "everything promised Thursday" is the wrong set — restoring the Monday
 // would drag Thursday's orders onto a day they never rode. The run column says
 // which orders belong to which run, whatever date they currently show.
+//
+// Narrowed to orders the van has still to carry, which is the load list's set
+// (CountFulfillmentViews in orders.go, and the roster filter behind the page)
+// with exactly one deliberate difference — postponement exists to keep the load
+// list honest, so any *other* divergence would be the bug wearing a different
+// hat.
+//
+// The difference is unconfirmed orders: status='pending' with payment_status=
+// 'awaiting', the gap between a payment intent and the webhook that confirms
+// it. The load list drops them because they do not belong in a pack-and-ship
+// queue. They are moved here anyway, because the delivery date is written at
+// order creation and never recomputed on confirmation: leaving one behind means
+// a payment that lands after the holiday is announced gets confirmed onto the
+// closed day, and the customer is emailed a date the van does not run. Not
+// moving them would be the same bug this exists to prevent, arriving a day
+// late. TestPostponeMovesAnOrderStillBeingPaidFor pins it.
+//
+// Excluding the delivered is what makes the day-granular postpone guard safe. The guard
+// asks whether the run has gone, judged by date, so at six in the evening staff
+// can still move today's run; without this filter that would rewrite the
+// promised date on orders the driver delivered this morning, claiming a
+// delivery on a day it did not happen. Delivered orders now stay where they
+// are. Cancelled and refunded orders stay put for the same reason — nothing is
+// riding for them.
+//
+// They keep their delivery_run_date, so they remain attached to the run for the
+// record; they simply stop being re-dated by it.
 func (s *ShippingStore) RescheduleDeliveryRun(ctx context.Context, tx pgx.Tx, runDate, to time.Time) (int64, error) {
 	tag, err := tx.Exec(ctx,
 		`UPDATE orders
 		    SET scheduled_delivery_date = $2::date,
 		        updated_at = now()
-		  WHERE delivery_run_date = $1::date`,
+		  WHERE delivery_run_date = $1::date
+		    AND shipping_method = 'local_delivery'
+		    AND status NOT IN ('cancelled', 'refunded')
+		    AND fulfillment_status IN ('unfulfilled', 'partially_fulfilled',
+		                               'fulfilled', 'ready_for_pickup')`,
 		runDate, to,
 	)
 	if err != nil {

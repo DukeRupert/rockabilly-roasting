@@ -398,7 +398,7 @@ td code { font-size: 0.86em; }
       <p class="kicker">Hiri &middot; optional module</p>
       <h1>Equipment Service</h1>
       <div class="chips">
-        <span class="chip chip-done">Step 1 built</span>
+        <span class="chip chip-done">Steps 1&ndash;2 built</span>
         <span class="chip">Updated 2026-08-25</span>
         <span class="chip">Source: docs/equipment-service-module.md</span>
       </div>
@@ -517,7 +517,7 @@ CREATE INDEX equipment_serial_idx   ON equipment (serial_number) WHERE serial_nu
       <div class="block">
 <pre><code>CREATE TABLE service_tickets (
     id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    number         text NOT NULL UNIQUE,          -- human handle, e.g. SVC-1042
+    number         text NOT NULL UNIQUE,          -- e.g. SVC-3A9F2C1B04
     customer_id    uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     equipment_id   uuid REFERENCES equipment(id) ON DELETE SET NULL,
     address_id     uuid REFERENCES addresses(id) ON DELETE SET NULL,
@@ -532,7 +532,7 @@ CREATE INDEX equipment_serial_idx   ON equipment (serial_number) WHERE serial_nu
     resolved_at     timestamptz,
     resolution      text NOT NULL DEFAULT '',
     billable        boolean NOT NULL DEFAULT false,
-    last_contact_at timestamptz,
+    last_contact_at timestamptz NOT NULL DEFAULT now(),
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now()
 );</code></pre>
@@ -543,10 +543,10 @@ CREATE INDEX equipment_serial_idx   ON equipment (serial_number) WHERE serial_nu
 
       <div class="note">
         <span class="note-label">The load-bearing column</span>
-        <p><code>last_contact_at</code> is updated only by communication events &mdash; a note of kind <code>call</code>/<code>email</code>/<code>visit</code>, an outbound status email, or a customer reply &mdash; never by an internal edit. An open ticket whose <code>last_contact_at</code> is older than the configured window (default 7 days) renders with the persistent inset rust bar the admin already uses for stale rows, and gets counted on the Service tab badge. That single rule is what turns this from a filing cabinet into something that prevents a lost account.</p>
+        <p><code>last_contact_at</code> is <code>NOT NULL</code>, defaulting to creation time — the clock starts when the ticket opens, so every staleness query is a plain comparison with no <code>COALESCE</code> onto <code>created_at</code> and no null case to get wrong. It then moves only on communication events &mdash; a note of kind <code>call</code>/<code>email</code>/<code>visit</code>, an outbound status email, or a customer reply &mdash; never by an internal edit. An open ticket whose <code>last_contact_at</code> is older than the configured window (default 7 days) renders with the persistent inset rust bar the admin already uses for stale rows, and gets counted on the Service tab badge. That single rule is what turns this from a filing cabinet into something that prevents a lost account.</p>
       </div>
 
-      <p><code>number</code> mirrors <code>orders.number</code>: a short human handle staff can say out loud, <code>UNIQUE</code> so re-runs and imports are duplicate-safe.</p>
+      <p><code>number</code> mirrors <code>orders.number</code> exactly &mdash; <code>SVC-</code> plus ten random hex characters, generated in the app layer, <code>UNIQUE</code> so re-runs and imports are duplicate-safe. Random rather than sequential: it leaks no volume and needs no counter. It is not sayable down a phone, which was the original hope, but a second numbering scheme in one codebase costs more than staff ever gain from reading a ticket number aloud &mdash; they click the row.</p>
 
       <h3><code>service_ticket_notes</code></h3>
       <div class="block">
@@ -794,11 +794,6 @@ AuditServiceTimeLogged      = "service_ticket.time_logged"</code></pre>
       </div>
 
       <div class="note note-open">
-        <span class="note-label">Ticket numbering format</span>
-        <p><code>SVC-1042</code> assumed; match whatever <code>orders</code> does if there&rsquo;s a house style.</p>
-      </div>
-
-      <div class="note note-open">
         <span class="note-label">Loaner machines and volume commitments</span>
         <p>If loaners are placed against a pounds-per-month commitment, tracking that commitment is a natural neighbour of this module &mdash; but it&rsquo;s a sales feature wearing a service costume. Keep it out of v1.</p>
       </div>
@@ -808,10 +803,10 @@ AuditServiceTimeLogged      = "service_ticket.time_logged"</code></pre>
       <p class="eyebrow">Plan</p>
       <h2>Build order</h2>
       <p>The only genuine sequence in this document &mdash; each step is shippable, and step 1 is testable with nothing behind it.</p>
-      <div class="note"><span class="note-label">Status &mdash; 25 Aug 2026</span><p>Step 1 is built and green through <code>mage check</code>: the toggle writes an audit record, an unknown module key is refused with a 404, and disabling leaves the row (and every record behind it) in place. Steps 2&ndash;7 are open.</p></div>
+      <div class="note"><span class="note-label">Status &mdash; 25 Aug 2026</span><p>Steps 1 and 2 are built and green through <code>mage check</code>. The registry toggles and audits correctly; the five tables migrate up and back down cleanly; the store layer has its own Postgres-backed tests, covering customer scoping, the staleness query, and the roll-ups. Steps 3&ndash;7 are open.</p></div>
       <ol>
         <li><strong>Done.</strong> <code>modules</code> table (migration <code>073_modules.sql</code>), <code>domain/module.go</code>, <code>app.ModuleService</code>, the Settings &rarr; Modules tab, <code>requireModule</code> middleware, and <code>filterNavItems</code> in the admin layout. Shipped alone, as planned.</li>
-        <li>Migration 074, store layer, domain enums.</li>
+        <li><strong>Done.</strong> Migration <code>074_equipment_service.sql</code>, <code>domain/equipment.go</code> and <code>domain/service_ticket.go</code>, <code>store/equipment.go</code> and <code>store/service_tickets.go</code>.</li>
         <li>Equipment register: list, detail, create/edit, customer-detail card.</li>
         <li>Tickets: list, detail, timeline, status machine, notes.</li>
         <li>Parts and time entries on the ticket detail.</li>

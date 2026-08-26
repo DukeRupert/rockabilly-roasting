@@ -1,6 +1,6 @@
 # Equipment Service — an optional Hiri module
 
-Status: step 1 (the module registry) is built; the service tables and UI are not.
+Status: steps 1-2 built (module registry, schema, domain, store layer); no service UI yet.
 Written 2026-08-24, last updated 2026-08-25.
 
 ## The job
@@ -134,7 +134,7 @@ moment.
 ```sql
 CREATE TABLE service_tickets (
     id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    number         text NOT NULL UNIQUE,          -- human handle, e.g. SVC-1042
+    number         text NOT NULL UNIQUE,          -- e.g. SVC-3A9F2C1B04
     customer_id    uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     equipment_id   uuid REFERENCES equipment(id) ON DELETE SET NULL,
     address_id     uuid REFERENCES addresses(id) ON DELETE SET NULL,
@@ -149,7 +149,7 @@ CREATE TABLE service_tickets (
     resolved_at    timestamptz,
     resolution     text NOT NULL DEFAULT '',
     billable       boolean NOT NULL DEFAULT false,
-    last_contact_at timestamptz,
+    last_contact_at timestamptz NOT NULL DEFAULT now(),
     created_at     timestamptz NOT NULL DEFAULT now(),
     updated_at     timestamptz NOT NULL DEFAULT now()
 );
@@ -172,7 +172,10 @@ list view. Badge mapping uses the existing admin palette: `badge-red` (down /
 new), `badge-amber` (waiting_*), `badge-blue` (scheduled/in_progress),
 `badge-green` (resolved), `badge-grey` (cancelled).
 
-**`last_contact_at` is the load-bearing column.** It is updated only by
+**`last_contact_at` is the load-bearing column.** It is `NOT NULL`, defaulting
+to creation time — the clock starts when the ticket opens, so every staleness
+query is a plain comparison with no `COALESCE` onto `created_at` and no null
+case to get wrong. It then moves only on
 communication events — a note of kind `call`/`email`/`visit`, an outbound status
 email, or a customer reply — never by an internal edit. An open ticket whose
 `last_contact_at` is older than the configured window (default 7 days) renders
@@ -180,8 +183,12 @@ with the persistent inset rust bar the admin already uses for stale rows, and
 gets counted on the Service tab badge. That single rule is what turns this from
 a filing cabinet into something that prevents a lost account.
 
-`number` mirrors `orders.number`: a short human handle staff can say out loud,
-`UNIQUE` so re-runs and imports are duplicate-safe.
+`number` mirrors `orders.number` exactly — `SVC-` plus ten random hex
+characters, generated in the app layer, `UNIQUE` so re-runs and imports are
+duplicate-safe. Random rather than sequential: it leaks no volume and needs no
+counter. It is not sayable down a phone, which was the original hope, but a
+second numbering scheme in one codebase costs more than staff ever gain from
+reading a ticket number aloud — they click the row.
 
 ### `service_ticket_notes`
 
@@ -434,8 +441,6 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
    with schedules.
 2. **Stale window default.** 7 days is a guess. Make it a settings field, ship
    7, and look at real data.
-3. **Ticket numbering format.** `SVC-1042` assumed; match whatever `orders`
-   does if there's a house style.
 4. **Loaner machines and volume commitments.** If loaners are placed against a
    pounds-per-month commitment, tracking that commitment is a natural neighbour
    of this module — but it's a sales feature wearing a service costume. Keep it
@@ -446,7 +451,8 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
 1. **Done.** `modules` table (migration `073_modules.sql`) + `domain/module.go`
    + `app.ModuleService` + Settings → Modules tab + `requireModule` middleware
    + `filterNavItems` in the admin layout. Shipped alone, as planned.
-2. Migration 074, store layer, domain enums.
+2. **Done.** Migration `074_equipment_service.sql`, `domain/equipment.go` and
+   `domain/service_ticket.go`, `store/equipment.go` and `store/service_tickets.go`.
 3. Equipment register: list, detail, create/edit, customer-detail card.
 4. Tickets: list, detail, timeline, status machine, notes.
 5. Parts and time entries on the ticket detail.

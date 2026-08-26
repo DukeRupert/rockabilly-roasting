@@ -1,6 +1,7 @@
 # Equipment Service — an optional Hiri module
 
-Status: steps 1-2 built (module registry, schema, domain, store layer); no service UI yet.
+Status: steps 1-3 built — module registry, schema, store layer, and the equipment register
+(list, detail, add/edit, customer card). Tickets are next.
 Written 2026-08-24, last updated 2026-08-25.
 
 ## The job
@@ -313,6 +314,9 @@ Section tabs under Service (`section_nav.templ`, not sidebar rows):
   loaner-only view is worth a saved filter.
 - **Schedules** — v2, hidden until then.
 
+Until Tickets exists the strip is not drawn at all — a one-tab strip is chrome
+with nothing to choose — and `/admin/service` simply redirects to the register.
+
 **Ticket detail** follows `docs/admin-detail-pages.md`: main column holds the
 timeline (notes + audit, merged, newest first) with the note composer at the
 top; the rail holds the machine card, customer card with a link back to their
@@ -453,7 +457,9 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
    + `filterNavItems` in the admin layout. Shipped alone, as planned.
 2. **Done.** Migration `074_equipment_service.sql`, `domain/equipment.go` and
    `domain/service_ticket.go`, `store/equipment.go` and `store/service_tickets.go`.
-3. Equipment register: list, detail, create/edit, customer-detail card.
+3. **Done.** Equipment register: list with filters, detail page, add/edit form,
+   and the Equipment card on the customer rail. The **Service** sidebar row
+   arrived with it — module-gated, so it exists only where the module is on.
 4. Tickets: list, detail, timeline, status machine, notes.
 5. Parts and time entries on the ticket detail.
 6. Stale-contact flagging + the daily sweep.

@@ -246,6 +246,10 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	var announcementsEnabled bool
 	var approvedByName string
 	var teamMembers []domain.CustomerUser
+	// Only read when the equipment service module is on. A shop that does not
+	// service machines pays nothing for a card it will never see.
+	serviceEnabled := d.ModuleService.Enabled(domain.ModuleEquipmentService)
+	var equipment []domain.Equipment
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -305,6 +309,13 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		if serviceEnabled {
+			equipment, txErr = d.EquipmentService.ListForCustomer(ctx, tx, id)
+			if txErr != nil {
+				return txErr
+			}
+		}
+
 		// Who approved the wholesale application. A staff record that has since
 		// been removed leaves the name blank rather than failing the page — the
 		// approval date is still worth showing on its own.
@@ -346,6 +357,9 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		StaffName:            name,
 		StaffRole:            role,
 		CanEditEmail:         staffCan(r, auth.PermEditCustomers),
+		Equipment:            equipment,
+		ServiceEnabled:       serviceEnabled,
+		CanWriteService:      staffCan(r, auth.PermWriteService),
 		ApprovedByName:       approvedByName,
 		TeamMembers:          teamMembers,
 	}

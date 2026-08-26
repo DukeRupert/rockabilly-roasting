@@ -281,6 +281,17 @@ var (
 	// not something to do from a phone in a van.
 	ErrStopAlreadyDelivered = errors.New("this stop is already marked delivered")
 
+	// --- Equipment service ---
+
+	ErrEquipmentNotFound = errors.New("equipment not found")
+	// ErrEquipmentMakeRequired guards the nameless machine. A register row with
+	// no make is unsearchable and unrecognisable — it is the one field that has
+	// to be there, since model and serial are genuinely often unknown.
+	ErrEquipmentMakeRequired     = errors.New("what make is the machine?")
+	ErrInvalidEquipmentCategory  = errors.New("pick a valid equipment category")
+	ErrInvalidEquipmentOwnership = errors.New("pick a valid ownership")
+	ErrInvalidEquipmentStatus    = errors.New("pick a valid equipment status")
+
 	// --- Optional feature modules ---
 
 	// ErrUnknownModule is returned when a toggle names a key this binary does

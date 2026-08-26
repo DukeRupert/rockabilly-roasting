@@ -66,6 +66,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrLineItemNotFound),
 		errors.Is(err, app.ErrInvoiceNotFound),
 		errors.Is(err, app.ErrAnnouncementNotFound),
+		errors.Is(err, app.ErrEquipmentNotFound),
 		// Access denial is surfaced as 404 so we never confirm a restricted
 		// product/SKU exists to a viewer who may not see it.
 		errors.Is(err, app.ErrProductNotAccessible):
@@ -113,6 +114,14 @@ func mapError(err error) (int, string) {
 
 	case errors.Is(err, app.ErrInvalidCredentials):
 		return http.StatusUnauthorized, "invalid credentials"
+
+	// Equipment validation. Each message is the correction to make, not a
+	// restatement of the rule.
+	case errors.Is(err, app.ErrEquipmentMakeRequired),
+		errors.Is(err, app.ErrInvalidEquipmentCategory),
+		errors.Is(err, app.ErrInvalidEquipmentOwnership),
+		errors.Is(err, app.ErrInvalidEquipmentStatus):
+		return http.StatusBadRequest, err.Error()
 
 	// A toggle naming a module this binary does not know about. 404 rather
 	// than 400: from the caller's side the module genuinely does not exist.

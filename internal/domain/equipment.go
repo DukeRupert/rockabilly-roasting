@@ -185,3 +185,15 @@ func (e Equipment) UnderWarranty(on time.Time) bool {
 	}
 	return !on.After(*e.WarrantyExpiresOn)
 }
+
+// EquipmentWithCustomer is a register row: the machine plus enough of its owner
+// to render the line without a second query per row.
+//
+// The register is the one view that spans customers, so every row has to name
+// one — and a list of forty machines must not become forty customer lookups.
+type EquipmentWithCustomer struct {
+	Equipment
+	// CustomerName is the company where there is one, otherwise the person.
+	// A cafe is known by its name on the sign, not by whoever signed up.
+	CustomerName string
+}

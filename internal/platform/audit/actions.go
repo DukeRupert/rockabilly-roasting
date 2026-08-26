@@ -6,6 +6,17 @@ const (
 	// Background jobs — an operator handing a discarded job back to River.
 	AuditJobRetried = "job.retried"
 
+	// Equipment service — the machines a shop maintains for its customers.
+	// Retiring and returning to service get their own actions rather than one
+	// status_changed: the timeline's label and marker are chosen from the
+	// action string alone, so a generic verb could not colour a retirement
+	// differently from a machine coming back.
+	AuditEquipmentCreated           = "equipment.created"
+	AuditEquipmentUpdated           = "equipment.updated"
+	AuditEquipmentSentToShop        = "equipment.sent_to_shop"
+	AuditEquipmentReturnedToService = "equipment.returned_to_service"
+	AuditEquipmentRetired           = "equipment.retired"
+
 	// Optional feature modules — turning a whole section of the app on or off.
 	// Worth an audit entry because enabling one can start sending customer mail
 	// nobody was expecting, and "who did this" is the first question asked.

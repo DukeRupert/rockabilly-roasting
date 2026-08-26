@@ -363,6 +363,7 @@ func run() error {
 	customerUserStore := store.NewCustomerUserStore()
 	announcementStore := store.NewAnnouncementStore()
 	moduleStore := store.NewModuleStore()
+	equipmentStore := store.NewEquipmentStore()
 	customerUserInviteTokenStore := store.NewCustomerUserInviteTokenStore()
 	geocodeStore := store.NewGeocodeStore(metricsReg)
 	routeStore := store.NewRouteStore(metricsReg)
@@ -426,6 +427,7 @@ func run() error {
 		logger.Error("load feature modules", "error", err)
 		os.Exit(1)
 	}
+	equipmentSvc := app.NewEquipmentService(equipmentStore, auditWriter)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, attributeStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -711,6 +713,7 @@ func run() error {
 		RiverClient:            riverClient,
 		AnnouncementService:    announcementSvc,
 		ModuleService:          moduleSvc,
+		EquipmentService:       equipmentSvc,
 		Enqueuer:               enqueuer,
 		R2Client:               r2Client,
 		MediaConfig:            mediaConfig,

@@ -1,0 +1,263 @@
+package admin
+
+import (
+	"github.com/google/uuid"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// The add/edit form for a machine. One template serves both: the fields are
+// identical, and two copies would drift the moment a field is added.
+
+// EquipmentOption is a customer or address the form can be pointed at.
+type EquipmentOption struct {
+	ID    uuid.UUID
+	Label string
+}
+
+// EquipmentFormProps is the state of the add/edit form.
+type EquipmentFormProps struct {
+	// Equipment is nil when adding.
+	Equipment *domain.Equipment
+	// CustomerID is prefilled when the form was opened from a customer's page,
+	// and locked — a machine changing hands is a new register entry, not an
+	// edit, because its repair history belongs to the cafe that had it.
+	CustomerID uuid.UUID
+	Customers  []EquipmentOption
+	Addresses  []EquipmentOption
+	// Values echo back what was typed when a save is rejected, so a fat-fingered
+	// serial does not cost the other eight fields.
+	Values    EquipmentFormValues
+	Error     string
+	StaffName string
+	StaffRole string
+}
+
+// EquipmentFormValues is the raw form state, as strings — what the browser sent
+// and what gets re-rendered on rejection.
+type EquipmentFormValues struct {
+	CustomerID        string
+	AddressID         string
+	Category          string
+	Make              string
+	Model             string
+	SerialNumber      string
+	Ownership         string
+	InstalledOn       string
+	WarrantyExpiresOn string
+	Notes             string
+}
+
+// EquipmentFormValuesFrom fills the form from a stored machine.
+func EquipmentFormValuesFrom(e *domain.Equipment) EquipmentFormValues {
+	if e == nil {
+		// A new machine is an espresso machine owned by the cafe until told
+		// otherwise — that is what most of them are.
+		return EquipmentFormValues{
+			Category:  string(domain.EquipmentCategoryEspressoMachine),
+			Ownership: string(domain.EquipmentOwnershipCustomer),
+		}
+	}
+	v := EquipmentFormValues{
+		CustomerID:   e.CustomerID.String(),
+		Category:     string(e.Category),
+		Make:         e.Make,
+		Model:        e.Model,
+		SerialNumber: e.SerialNumber,
+		Ownership:    string(e.Ownership),
+		Notes:        e.Notes,
+	}
+	if e.AddressID != nil {
+		v.AddressID = e.AddressID.String()
+	}
+	if e.InstalledOn != nil {
+		v.InstalledOn = e.InstalledOn.Format("2006-01-02")
+	}
+	if e.WarrantyExpiresOn != nil {
+		v.WarrantyExpiresOn = e.WarrantyExpiresOn.Format("2006-01-02")
+	}
+	return v
+}
+
+func (p EquipmentFormProps) isEdit() bool { return p.Equipment != nil }
+
+func (p EquipmentFormProps) title() string {
+	if p.isEdit() {
+		return "Edit machine"
+	}
+	return "Add a machine"
+}
+
+func (p EquipmentFormProps) action() string {
+	if p.isEdit() {
+		return "/admin/service/equipment/" + p.Equipment.ID.String()
+	}
+	return "/admin/service/equipment"
+}
+
+func (p EquipmentFormProps) cancelHref() string {
+	if p.isEdit() {
+		return "/admin/service/equipment/" + p.Equipment.ID.String()
+	}
+	return "/admin/service/equipment"
+}
+
+templ EquipmentFormContent(props EquipmentFormProps) {
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">{ props.title() }</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				Make is the only thing that has to be filled in. Model and serial are often unknown when a machine first goes on the register, and a half-filled row beats no row.
+			</p>
+		</div>
+	</div>
+	if props.Error != "" {
+		<div class="mt-4 border border-rr-border bg-rr-surface px-4 py-3">
+			<p class="text-sm font-medium text-rr-red">{ props.Error }</p>
+		</div>
+	}
+	<form method="post" action={ templ.SafeURL(props.action()) } class="mt-6 border border-rr-border bg-rr-surface p-6">
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-6">
+			<div class="sm:col-span-3">
+				<label for="customer_id" class="block text-sm font-medium text-rr-heading">Customer</label>
+				if props.isEdit() {
+					<input type="hidden" name="customer_id" value={ props.Values.CustomerID }/>
+					<p class="mt-1 text-sm text-rr-body">{ equipmentOptionLabel(props.Customers, props.Values.CustomerID) }</p>
+					<p class="mt-1 text-xs text-rr-muted">
+						A machine that changes hands goes on the register as a new entry — its repair history belongs to the cafe that had it.
+					</p>
+				} else {
+					<select id="customer_id" name="customer_id" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+						<option value="">Choose a customer</option>
+						for _, c := range props.Customers {
+							<option value={ c.ID.String() } selected?={ props.Values.CustomerID == c.ID.String() }>{ c.Label }</option>
+						}
+					</select>
+				}
+			</div>
+			<div class="sm:col-span-3">
+				<label for="address_id" class="block text-sm font-medium text-rr-heading">Site</label>
+				<select id="address_id" name="address_id" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+					<option value="">Not recorded</option>
+					for _, a := range props.Addresses {
+						<option value={ a.ID.String() } selected?={ props.Values.AddressID == a.ID.String() }>{ a.Label }</option>
+					}
+				</select>
+				<p class="mt-1 text-xs text-rr-muted">Which shop it sits at — the first thing a tech asks about a chain.</p>
+			</div>
+			<div class="sm:col-span-2">
+				<label for="category" class="block text-sm font-medium text-rr-heading">Category</label>
+				<select id="category" name="category" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+					for _, c := range domain.EquipmentCategories() {
+						<option value={ string(c) } selected?={ props.Values.Category == string(c) }>{ c.Label() }</option>
+					}
+				</select>
+			</div>
+			<div class="sm:col-span-2">
+				<label for="make" class="block text-sm font-medium text-rr-heading">Make</label>
+				<input
+					type="text"
+					id="make"
+					name="make"
+					required
+					value={ props.Values.Make }
+					placeholder="La Marzocco"
+					class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+				/>
+			</div>
+			<div class="sm:col-span-2">
+				<label for="model" class="block text-sm font-medium text-rr-heading">Model</label>
+				<input
+					type="text"
+					id="model"
+					name="model"
+					value={ props.Values.Model }
+					placeholder="Linea PB"
+					class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+				/>
+			</div>
+			<div class="sm:col-span-3">
+				<label for="serial_number" class="block text-sm font-medium text-rr-heading">Serial number</label>
+				<input
+					type="text"
+					id="serial_number"
+					name="serial_number"
+					value={ props.Values.SerialNumber }
+					class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+				/>
+			</div>
+			<div class="sm:col-span-3">
+				<label for="ownership" class="block text-sm font-medium text-rr-heading">Ownership</label>
+				<select id="ownership" name="ownership" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+					for _, o := range domain.EquipmentOwnerships() {
+						<option value={ string(o) } selected?={ props.Values.Ownership == string(o) }>{ o.Label() }</option>
+					}
+				</select>
+				<p class="mt-1 text-xs text-rr-muted">Ours on loan, or theirs? It decides who pays for the next repair.</p>
+			</div>
+			<div class="sm:col-span-3">
+				<label for="installed_on" class="block text-sm font-medium text-rr-heading">Installed</label>
+				<input
+					type="date"
+					id="installed_on"
+					name="installed_on"
+					value={ props.Values.InstalledOn }
+					class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+				/>
+			</div>
+			<div class="sm:col-span-3">
+				<label for="warranty_expires_on" class="block text-sm font-medium text-rr-heading">Warranty ends</label>
+				<input
+					type="date"
+					id="warranty_expires_on"
+					name="warranty_expires_on"
+					value={ props.Values.WarrantyExpiresOn }
+					class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+				/>
+				<p class="mt-1 text-xs text-rr-muted">Leave blank if unknown — blank is read as no warranty, never as cover.</p>
+			</div>
+			<div class="sm:col-span-6">
+				<label for="notes" class="block text-sm font-medium text-rr-heading">Notes</label>
+				<textarea
+					id="notes"
+					name="notes"
+					rows="3"
+					class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+				>{ props.Values.Notes }</textarea>
+			</div>
+		</div>
+		<div class="mt-6 flex items-center gap-3">
+			<button type="submit" class="btn-confirm">
+				if props.isEdit() {
+					Save changes
+				} else {
+					Add machine
+				}
+			</button>
+			<a href={ templ.SafeURL(props.cancelHref()) } class="text-sm text-rr-muted underline">Cancel</a>
+		</div>
+	</form>
+}
+
+// equipmentOptionLabel resolves a stored id back to its label for the read-only
+// customer line on the edit form.
+func equipmentOptionLabel(options []EquipmentOption, id string) string {
+	for _, o := range options {
+		if o.ID.String() == id {
+			return o.Label
+		}
+	}
+	return "Unknown customer"
+}
+
+templ EquipmentForm(props EquipmentFormProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      props.title(),
+		ActivePath: "/admin/service",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@EquipmentFormContent(props)
+	}
+}

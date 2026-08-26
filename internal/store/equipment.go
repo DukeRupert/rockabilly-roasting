@@ -120,8 +120,13 @@ type EquipmentFilter struct {
 	Limit  int
 }
 
-// List returns machines matching the filter, newest first.
-func (s *EquipmentStore) List(ctx context.Context, tx pgx.Tx, f EquipmentFilter) ([]domain.Equipment, error) {
+// equipmentWhere builds the filter's WHERE clause and its arguments.
+//
+// Shared by List and ListWithCustomer so the two cannot drift — a register that
+// hid retired machines in one view and showed them in the other would be a
+// genuinely confusing bug, and the only thing keeping them honest is that they
+// are the same code. prefix qualifies the columns for the joined variant.
+func equipmentWhere(f EquipmentFilter, prefix string) (string, []any) {
 	var where []string
 	var args []any
 
@@ -131,29 +136,35 @@ func (s *EquipmentStore) List(ctx context.Context, tx pgx.Tx, f EquipmentFilter)
 	}
 
 	if f.CustomerID != nil {
-		add("customer_id = $%d", *f.CustomerID)
+		add(prefix+"customer_id = $%d", *f.CustomerID)
 	}
 	if f.Category != "" {
-		add("category = $%d", string(f.Category))
+		add(prefix+"category = $%d", string(f.Category))
 	}
 	if f.Ownership != "" {
-		add("ownership = $%d", string(f.Ownership))
+		add(prefix+"ownership = $%d", string(f.Ownership))
 	}
 	switch {
 	case f.Status != "":
-		add("status = $%d", string(f.Status))
+		add(prefix+"status = $%d", string(f.Status))
 	case !f.IncludeRetired:
-		where = append(where, "status <> 'retired'")
+		where = append(where, prefix+"status <> 'retired'")
 	}
 	if f.Search != "" {
-		add("(make ILIKE '%%' || $%d || '%%' OR model ILIKE '%%' || $%[1]d || '%%' OR serial_number ILIKE '%%' || $%[1]d || '%%')", f.Search)
+		add("("+prefix+"make ILIKE '%%' || $%d || '%%' OR "+prefix+"model ILIKE '%%' || $%[1]d || '%%' OR "+prefix+"serial_number ILIKE '%%' || $%[1]d || '%%')", f.Search)
 	}
 
-	query := `SELECT ` + equipmentColumns + ` FROM equipment`
-	if len(where) > 0 {
-		query += ` WHERE ` + strings.Join(where, " AND ")
+	if len(where) == 0 {
+		return "", args
 	}
-	query += ` ORDER BY created_at DESC`
+	return " WHERE " + strings.Join(where, " AND "), args
+}
+
+// List returns machines matching the filter, newest first.
+func (s *EquipmentStore) List(ctx context.Context, tx pgx.Tx, f EquipmentFilter) ([]domain.Equipment, error) {
+	whereSQL, args := equipmentWhere(f, "")
+
+	query := `SELECT ` + equipmentColumns + ` FROM equipment` + whereSQL + ` ORDER BY created_at DESC`
 	if f.Limit > 0 {
 		args = append(args, f.Limit)
 		query += fmt.Sprintf(" LIMIT $%d", len(args))
@@ -230,4 +241,52 @@ func (s *EquipmentStore) UpdateStatus(ctx context.Context, tx pgx.Tx, id uuid.UU
 		return nil, fmt.Errorf("update equipment %s status: %w", id, err)
 	}
 	return e, nil
+}
+
+// ListWithCustomer returns machines with their owner's display name attached,
+// for the register — the one view that spans customers.
+func (s *EquipmentStore) ListWithCustomer(ctx context.Context, tx pgx.Tx, f EquipmentFilter) ([]domain.EquipmentWithCustomer, error) {
+	whereSQL, args := equipmentWhere(f, "e.")
+
+	// Company where there is one, otherwise the person's name — a cafe is known
+	// by the name on the sign. NULLIF catches the empty-string company that a
+	// retail signup leaves behind, which COALESCE alone would happily return.
+	query := `SELECT e.id, e.customer_id, e.address_id, e.category, e.make, e.model,
+	                 e.serial_number, e.ownership, e.status, e.installed_on,
+	                 e.warranty_expires_on, e.notes, e.created_at, e.updated_at,
+	                 COALESCE(NULLIF(c.company_name, ''), TRIM(c.first_name || ' ' || c.last_name), c.email)
+	          FROM equipment e
+	          JOIN customers c ON c.id = e.customer_id` + whereSQL + ` ORDER BY e.created_at DESC`
+	if f.Limit > 0 {
+		args = append(args, f.Limit)
+		query += fmt.Sprintf(" LIMIT $%d", len(args))
+	}
+
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list equipment with customer: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.EquipmentWithCustomer
+	for rows.Next() {
+		var row domain.EquipmentWithCustomer
+		var category, ownership, status string
+		if err := rows.Scan(
+			&row.ID, &row.CustomerID, &row.AddressID, &category, &row.Make, &row.Model,
+			&row.SerialNumber, &ownership, &status, &row.InstalledOn,
+			&row.WarrantyExpiresOn, &row.Notes, &row.CreatedAt, &row.UpdatedAt,
+			&row.CustomerName,
+		); err != nil {
+			return nil, fmt.Errorf("scan equipment with customer: %w", err)
+		}
+		row.Category = domain.EquipmentCategory(category)
+		row.Ownership = domain.EquipmentOwnership(ownership)
+		row.Status = domain.EquipmentStatus(status)
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list equipment with customer: %w", err)
+	}
+	return out, nil
 }

@@ -49,6 +49,9 @@ func adminNavItems() []navItem {
 		{Label: "Customers", Href: "/admin/customers", IconFn: icon.Users},
 		{Label: "Subscriptions", Href: "/admin/subscriptions", IconFn: icon.Repeat},
 		{Label: "Discounts", Href: "/admin/discounts", IconFn: icon.Tag},
+		// Optional. Only present on a shop that has switched the equipment
+		// service module on — filterNavItems drops it otherwise.
+		{Label: "Service", Href: "/admin/service", IconFn: icon.Wrench, Module: domain.ModuleEquipmentService},
 	}
 }
 
@@ -82,6 +85,8 @@ func resolveActiveNav(path string) string {
 		return "/admin/subscriptions"
 	case strings.HasPrefix(path, "/admin/discounts"):
 		return "/admin/discounts"
+	case strings.HasPrefix(path, "/admin/service"):
+		return "/admin/service"
 	}
 	return path
 }

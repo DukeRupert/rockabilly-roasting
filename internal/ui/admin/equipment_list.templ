@@ -1,0 +1,240 @@
+package admin
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// The equipment register — every machine the shop looks after, across all
+// customers. Part of the equipment service module; see
+// docs/equipment-service-module.md.
+
+// EquipmentListProps is the register's state.
+type EquipmentListProps struct {
+	Equipment []domain.EquipmentWithCustomer
+	// Filters, echoed back so the controls show what is actually applied.
+	Category       string
+	Ownership      string
+	Search         string
+	IncludeRetired bool
+	MerchantTZ     *time.Location
+	StaffName      string
+	StaffRole      string
+	CanWrite       bool
+	Flash          Flash
+}
+
+func equipmentStatusBadge(s domain.EquipmentStatus) string {
+	switch s {
+	case domain.EquipmentStatusActive:
+		return "badge badge-green"
+	case domain.EquipmentStatusInShop:
+		return "badge badge-amber"
+	case domain.EquipmentStatusRetired:
+		return "badge badge-grey"
+	}
+	return "badge badge-neutral"
+}
+
+// equipmentOwnershipBadge marks the machines that are the shop's own property.
+// Customer-owned is the common case and gets no badge — a badge on every row
+// is a badge nobody reads.
+func equipmentOwnershipBadge(o domain.EquipmentOwnership) string {
+	switch o {
+	case domain.EquipmentOwnershipLoaner:
+		return "badge badge-teal"
+	case domain.EquipmentOwnershipLeased:
+		return "badge badge-slate"
+	}
+	return ""
+}
+
+func equipmentSerialLabel(e domain.Equipment) string {
+	if e.SerialNumber == "" {
+		return "No serial recorded"
+	}
+	return e.SerialNumber
+}
+
+func equipmentDateLabel(t *time.Time, loc *time.Location) string {
+	if t == nil {
+		return "—"
+	}
+	if loc == nil {
+		loc = time.UTC
+	}
+	return t.In(loc).Format("2 Jan 2006")
+}
+
+// equipmentWarrantyNote is shown under the installed date. It says nothing at
+// all when no warranty was recorded: an unknown warranty is not a warranty, and
+// a blank "Warranty: —" invites someone to read it as expired.
+func equipmentWarrantyNote(e domain.Equipment, loc *time.Location) string {
+	if e.WarrantyExpiresOn == nil {
+		return ""
+	}
+	if e.UnderWarranty(time.Now()) {
+		return "Under warranty to " + equipmentDateLabel(e.WarrantyExpiresOn, loc)
+	}
+	return "Warranty ended " + equipmentDateLabel(e.WarrantyExpiresOn, loc)
+}
+
+func equipmentFilterHref(category, ownership, search string, includeRetired bool) string {
+	q := "?"
+	if category != "" {
+		q += "category=" + category + "&"
+	}
+	if ownership != "" {
+		q += "ownership=" + ownership + "&"
+	}
+	if search != "" {
+		q += "q=" + search + "&"
+	}
+	if includeRetired {
+		q += "retired=1&"
+	}
+	if q == "?" {
+		return "/admin/service/equipment"
+	}
+	return "/admin/service/equipment" + q[:len(q)-1]
+}
+
+templ EquipmentListContent(props EquipmentListProps) {
+	@ConfirmDialogHost()
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Equipment</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				Every machine the shop looks after. Retired machines are kept out of the way but never deleted — their repair history is the argument for replacing one.
+			</p>
+		</div>
+		if props.CanWrite {
+			<div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+				<a href="/admin/service/equipment/new" class="inline-flex items-center bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90">
+					Add a machine
+				</a>
+			</div>
+		}
+	</div>
+	@adminFlash(props.Flash)
+	<!-- Filters -->
+	<form method="get" action="/admin/service/equipment" class="mt-6 flex flex-wrap items-end gap-3 border border-rr-border bg-rr-surface p-4">
+		<div>
+			<label for="equipment-search" class="label-font block text-rr-muted">Search</label>
+			<input
+				type="search"
+				id="equipment-search"
+				name="q"
+				value={ props.Search }
+				placeholder="Make, model or serial"
+				class="mt-1 w-56 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+			/>
+		</div>
+		<div>
+			<label for="equipment-category" class="label-font block text-rr-muted">Category</label>
+			<select id="equipment-category" name="category" class="mt-1 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+				<option value="" selected?={ props.Category == "" }>All</option>
+				for _, c := range domain.EquipmentCategories() {
+					<option value={ string(c) } selected?={ props.Category == string(c) }>{ c.Label() }</option>
+				}
+			</select>
+		</div>
+		<div>
+			<label for="equipment-ownership" class="label-font block text-rr-muted">Ownership</label>
+			<select id="equipment-ownership" name="ownership" class="mt-1 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+				<option value="" selected?={ props.Ownership == "" }>All</option>
+				for _, o := range domain.EquipmentOwnerships() {
+					<option value={ string(o) } selected?={ props.Ownership == string(o) }>{ o.Label() }</option>
+				}
+			</select>
+		</div>
+		<label class="flex items-center gap-2 text-sm text-rr-body">
+			<input type="checkbox" name="retired" value="1" checked?={ props.IncludeRetired } class="rounded-sm border-rr-border"/>
+			Include retired
+		</label>
+		<button type="submit" class="btn-secondary">Apply</button>
+		if props.Category != "" || props.Ownership != "" || props.Search != "" || props.IncludeRetired {
+			<a href="/admin/service/equipment" class="text-sm text-rr-muted underline">Clear</a>
+		}
+	</form>
+	<!-- Register -->
+	<div class="mt-6 overflow-hidden border border-rr-border bg-rr-surface">
+		if len(props.Equipment) == 0 {
+			<div class="px-4 py-12 text-center">
+				<p class="text-sm text-rr-muted">
+					if props.Category != "" || props.Ownership != "" || props.Search != "" {
+						No machines match those filters.
+					} else {
+						No machines on the register yet.
+					}
+				</p>
+				if props.CanWrite && props.Category == "" && props.Ownership == "" && props.Search == "" {
+					<a href="/admin/service/equipment/new" class="mt-2 inline-block text-sm font-medium text-rr-heading underline">
+						Add the first one
+					</a>
+				}
+			</div>
+		} else {
+			<div class="overflow-x-auto">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead>
+						<tr>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Machine</th>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Customer</th>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Serial</th>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Installed</th>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Status</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border">
+						for _, e := range props.Equipment {
+							<tr class="row-link">
+								<td class="px-4 py-3 text-sm">
+									<a href={ templ.SafeURL("/admin/service/equipment/" + e.ID.String()) } class="row-link-target font-medium text-rr-heading">
+										{ e.Description() }
+									</a>
+									<div class="text-rr-muted">{ e.Category.Label() }</div>
+								</td>
+								<td class="px-4 py-3 text-sm text-rr-body">
+									{ e.CustomerName }
+									if badge := equipmentOwnershipBadge(e.Ownership); badge != "" {
+										<span class={ badge }>{ e.Ownership.Label() }</span>
+									}
+								</td>
+								<td class="px-4 py-3 font-mono text-sm text-rr-muted">{ equipmentSerialLabel(e.Equipment) }</td>
+								<td class="px-4 py-3 text-sm text-rr-body">
+									{ equipmentDateLabel(e.InstalledOn, props.MerchantTZ) }
+									if note := equipmentWarrantyNote(e.Equipment, props.MerchantTZ); note != "" {
+										<div class="text-xs text-rr-muted">{ note }</div>
+									}
+								</td>
+								<td class="px-4 py-3 text-sm">
+									<span class={ equipmentStatusBadge(e.Status) }>{ e.Status.Label() }</span>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+	if len(props.Equipment) > 0 {
+		<p class="mt-3 text-xs text-rr-muted">
+			{ fmt.Sprintf("%d machine%s", len(props.Equipment), pluralS(len(props.Equipment))) }
+		</p>
+	}
+}
+
+templ EquipmentList(props EquipmentListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Equipment",
+		ActivePath: "/admin/service",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@EquipmentListContent(props)
+	}
+}

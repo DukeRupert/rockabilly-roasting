@@ -65,6 +65,7 @@ type Deps struct {
 	WebhookService         *app.WebhookService
 	JobHealthService       *app.JobHealthService
 	ModuleService          *app.ModuleService
+	EquipmentService       *app.EquipmentService
 	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
 	PaymentProvider        payments.Provider
 	RiverClient            *river.Client[pgx.Tx]
@@ -662,6 +663,35 @@ func NewRouter(deps *Deps) http.Handler {
 	settingsRoute("GET /admin/settings/integrations/quickbooks/connect", deps.handleAdminQBConnect)
 	settingsRoute("GET /admin/settings/integrations/quickbooks/callback", deps.handleAdminQBCallback)
 	settingsRoute("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)
+
+	// --- Equipment service module ---
+	//
+	// requireModule wraps requirePermission, not the other way round: on a shop
+	// that has not switched the module on these URLs must 404 for everyone,
+	// including admins, rather than 403 for some roles and 404 for others.
+	serviceRead := func(pattern string, h http.HandlerFunc) {
+		adminMux.Handle(pattern, deps.requireModule(domain.ModuleEquipmentService,
+			deps.requirePermission(auth.PermViewService, h)))
+	}
+	serviceWrite := func(pattern string, h http.HandlerFunc) {
+		adminMux.Handle(pattern, deps.requireModule(domain.ModuleEquipmentService,
+			deps.requirePermission(auth.PermWriteService, h)))
+	}
+	// The section's front door. Tickets take this slot in step 4; until then
+	// the register is the only thing behind it.
+	serviceRead("GET /admin/service", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/service/equipment", http.StatusSeeOther)
+	})
+	serviceRead("GET /admin/service/equipment", deps.handleAdminEquipmentList)
+	// Registered before the {id} pattern would shadow it — "new" is not a uuid,
+	// but Go's mux prefers the more specific literal either way, and stating it
+	// here keeps the intent obvious.
+	serviceWrite("GET /admin/service/equipment/new", deps.handleAdminEquipmentNew)
+	serviceWrite("POST /admin/service/equipment", deps.handleAdminEquipmentCreate)
+	serviceRead("GET /admin/service/equipment/{id}", deps.handleAdminEquipmentShow)
+	serviceWrite("GET /admin/service/equipment/{id}/edit", deps.handleAdminEquipmentEdit)
+	serviceWrite("POST /admin/service/equipment/{id}", deps.handleAdminEquipmentUpdate)
+	serviceWrite("POST /admin/service/equipment/{id}/status", deps.handleAdminEquipmentStatus)
 
 	// Admin audit log
 	// Background job health. Admin-only: retrying a job re-runs real work,

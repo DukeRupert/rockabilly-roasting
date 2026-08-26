@@ -179,20 +179,24 @@ func postponementFlash(result *app.PostponeDeliveryRunResult, loc *time.Location
 // routeSentence says what became of the run's planned route, and only when
 // something became of it.
 //
-// The dropped case is the one that has to be said out loud: staff would
+// The dropped cases are the ones that have to be said out loud: staff would
 // otherwise find out on the morning of the run, when the load list is there and
-// the driver's sheet is not.
+// the driver's sheet is not. The two reasons leave a different day short of a
+// plan, so they get a sentence each rather than a shared one.
 func routeSentence(result *app.PostponeDeliveryRunResult) string {
-	switch {
-	case result == nil:
-		return ""
-	case result.RouteDropped:
-		return " The planned route was dropped — that day already had one — so it needs planning again."
-	case result.RouteMoved:
-		return " The planned route moved with it."
-	default:
+	if result == nil {
 		return ""
 	}
+	switch result.RouteDropped {
+	case app.RouteDropTargetOccupied:
+		return " The planned route was dropped — that day already had one — so it needs planning again."
+	case app.RouteDropSharedRun:
+		return " The planned route was dropped — it covered another run too, and that run stays put — so both days need planning again."
+	}
+	if result.RouteMoved {
+		return " The planned route moved with it."
+	}
+	return ""
 }
 
 func pluralOrders(n int64) string {

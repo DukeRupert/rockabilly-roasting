@@ -25,11 +25,28 @@ type PostponeDeliveryRunResult struct {
 	// RouteMoved reports that the run's planned delivery route followed it onto
 	// the new day, stops and order intact.
 	RouteMoved bool
-	// RouteDropped reports that the route could not follow, because the day the
-	// run moved onto already had a live route of its own, and was discarded.
-	// Staff have to re-plan; the flash says so.
-	RouteDropped bool
+	// RouteDropped says why the run's planned route could not follow it and was
+	// discarded instead. Empty when nothing was dropped. Staff have to re-plan;
+	// the flash says so, and says which of the two reasons it was.
+	RouteDropped RouteDropReason
 }
+
+// RouteDropReason is why a run's planned route could not travel with it.
+//
+// Both outcomes are the same for staff — the route is gone and needs building
+// again — but they differ in which day is now short of a plan, which is the
+// part the flash has to get right.
+type RouteDropReason string
+
+const (
+	// RouteDropTargetOccupied — the day the run moved onto already had a live
+	// route of its own. One day, one stop list for the driver.
+	RouteDropTargetOccupied RouteDropReason = "target_occupied"
+	// RouteDropSharedRun — the route was carrying another run's stops too,
+	// because two runs had collapsed onto the day it was planned for. Taking it
+	// along would have stolen the sheet for the run that stayed behind.
+	RouteDropSharedRun RouteDropReason = "shared_run"
+)
 
 // PostponeDeliveryRun moves the delivery run scheduled for originalDate onto
 // movedTo, and drags the orders already promised that date along with it.
@@ -146,7 +163,7 @@ func (s *CheckoutService) PostponeDeliveryRun(
 
 	// Decided before anything is written. An active route refuses the whole
 	// postponement, and a refusal has to leave the schedule as it found it.
-	routeMove, err := s.planRouteMove(ctx, tx, oldEffective, moved)
+	routeMove, err := s.planRouteMove(ctx, tx, original, oldEffective, moved)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +200,7 @@ func (s *CheckoutService) PostponeDeliveryRun(
 			"note":          note,
 			"orders_moved":  moveCount,
 			"route_moved":   routeMoved,
-			"route_dropped": routeDropped,
+			"route_dropped": string(routeDropped),
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("audit delivery run postponed: %w", err)
@@ -249,7 +266,7 @@ func (s *CheckoutService) RestoreDeliveryRun(
 
 	// The route was planned for the day the run currently goes out, and follows
 	// it back. Same pre-flight as postpone, for the same reason.
-	routeMove, err := s.planRouteMove(ctx, tx, moved, original)
+	routeMove, err := s.planRouteMove(ctx, tx, original, moved, original)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +300,7 @@ func (s *CheckoutService) RestoreDeliveryRun(
 			"was_moved_to":  moved.Format(dateLayout),
 			"orders_moved":  moveCount,
 			"route_moved":   routeMoved,
-			"route_dropped": routeDropped,
+			"route_dropped": string(routeDropped),
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("audit delivery run restored: %w", err)
@@ -317,21 +334,27 @@ type routeMove struct {
 	id uuid.UUID
 	// to is the day the route follows the run onto. Ignored when drop is set.
 	to time.Time
-	// drop says the route cannot follow, because the day the run is moving onto
-	// already has a live route of its own, and is discarded instead. A route is
-	// a plan over orders rather than a record of anything — deleting it loses
-	// the stop order and nothing else (see migration 067) — so dropping it and
-	// telling staff to re-plan beats blocking a holiday move on it.
-	drop bool
+	// drop, when set, says the route cannot follow and is discarded instead,
+	// and why. A route is a plan over orders rather than a record of anything —
+	// deleting it loses the stop order and nothing else (see migration 067) —
+	// so dropping it and telling staff to re-plan beats blocking a holiday move
+	// on it.
+	drop RouteDropReason
 }
 
-// planRouteMove works out what happens to the live route for a run moving from
-// one day to another. Returns the zero routeMove when there is nothing to do.
+// planRouteMove works out what happens to the live route for the run of runDate
+// as it moves from one day to another. Returns the zero routeMove when there is
+// nothing to do.
 //
 // A run that moves leaves its planned route behind on the old day otherwise:
 // routes key on route_date, so the driver's sheet would sit on a day the van no
 // longer goes out, and the orders it lists would have moved on without it.
-func (s *CheckoutService) planRouteMove(ctx context.Context, tx pgx.Tx, from, to time.Time) (routeMove, error) {
+//
+// runDate is the run's own identity — orders.delivery_run_date, the scheduled
+// day whatever day the van currently leaves — and is not interchangeable with
+// from. Two runs may collapse onto one day, and then the route sitting on that
+// day belongs to both of them; only the run that owns it outright may take it.
+func (s *CheckoutService) planRouteMove(ctx context.Context, tx pgx.Tx, runDate, from, to time.Time) (routeMove, error) {
 	if s.routes == nil || sameDate(from, to) {
 		return routeMove{}, nil
 	}
@@ -354,7 +377,8 @@ func (s *CheckoutService) planRouteMove(ctx context.Context, tx pgx.Tx, from, to
 	existing, err := s.routes.GetLiveRouteForDate(ctx, tx, to)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
-		return routeMove{id: route.ID, to: to}, nil
+		// The new day is clear. The route may follow, but only if it is this
+		// run's alone — see below.
 	case err != nil:
 		return routeMove{}, fmt.Errorf("look up route for new run day: %w", err)
 	case existing.Status == domain.RouteStatusActive:
@@ -362,26 +386,43 @@ func (s *CheckoutService) planRouteMove(ctx context.Context, tx pgx.Tx, from, to
 		// is allowed, but not while a driver is working it.
 		return routeMove{}, ErrRunRouteActive
 	default:
-		return routeMove{id: route.ID, drop: true}, nil
+		// That day already has a plan of its own, and one day gets one stop
+		// list. Ours is the one that gives way.
+		return routeMove{id: route.ID, drop: RouteDropTargetOccupied}, nil
 	}
+
+	// Whose route is it? If another run had already collapsed onto this day,
+	// the route covers both, and re-dating it would take the staying run's
+	// driver sheet along with ours. Neither day can keep it: the moving run's
+	// stops are leaving, so what is left behind would list orders that are not
+	// going out. It is a plan over orders, so it is dropped and re-planned.
+	onlyRun, err := s.routes.RouteCoversOnlyRun(ctx, tx, route.ID, runDate)
+	if err != nil {
+		return routeMove{}, err
+	}
+	if !onlyRun {
+		return routeMove{id: route.ID, drop: RouteDropSharedRun}, nil
+	}
+
+	return routeMove{id: route.ID, to: to}, nil
 }
 
 // applyRouteMove carries out what planRouteMove decided, reporting which of the
-// two things happened so the flash can say it.
-func (s *CheckoutService) applyRouteMove(ctx context.Context, tx pgx.Tx, m routeMove) (moved, dropped bool, err error) {
+// two things happened — and, for a drop, why — so the flash can say it.
+func (s *CheckoutService) applyRouteMove(ctx context.Context, tx pgx.Tx, m routeMove) (moved bool, dropped RouteDropReason, err error) {
 	if m.id == uuid.Nil {
-		return false, false, nil
+		return false, "", nil
 	}
-	if m.drop {
+	if m.drop != "" {
 		if err := s.routes.DeleteRoute(ctx, tx, m.id); err != nil {
-			return false, false, err
+			return false, "", err
 		}
-		return false, true, nil
+		return false, m.drop, nil
 	}
 	if _, err := s.routes.UpdateRouteDate(ctx, tx, m.id, m.to); err != nil {
-		return false, false, fmt.Errorf("move route with run: %w", err)
+		return false, "", fmt.Errorf("move route with run: %w", err)
 	}
-	return true, false, nil
+	return true, "", nil
 }
 
 // dateLayout is how postponement dates are written into audit metadata: a plain

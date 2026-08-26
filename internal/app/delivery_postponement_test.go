@@ -726,7 +726,7 @@ func TestPostponeCarriesThePlannedRoute(t *testing.T) {
 	result, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "Labor Day", staffActorFixture())
 	require.NoError(t, err)
 	assert.True(t, result.RouteMoved, "the flash has to be able to say the route came too")
-	assert.False(t, result.RouteDropped)
+	assert.Empty(t, result.RouteDropped)
 
 	assert.Equal(t, 0, liveRouteDay(t, tx, holiday), "nothing left on the closed day")
 	assert.Equal(t, tuesday.Day(), liveRouteDay(t, tx, tuesday))
@@ -760,7 +760,7 @@ func TestPostponeDropsTheRouteWhenTheNewDayHasOne(t *testing.T) {
 
 	result, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), monday, thursday, "Labor Day", staffActorFixture())
 	require.NoError(t, err)
-	assert.True(t, result.RouteDropped)
+	assert.Equal(t, app.RouteDropTargetOccupied, result.RouteDropped)
 	assert.False(t, result.RouteMoved)
 
 	assert.Equal(t, 0, liveRouteDay(t, tx, monday))
@@ -810,5 +810,129 @@ func TestPostponeWithoutRouteStore(t *testing.T) {
 	result, err := postponementService().PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "", staffActorFixture())
 	require.NoError(t, err)
 	assert.False(t, result.RouteMoved)
-	assert.False(t, result.RouteDropped)
+	assert.Empty(t, result.RouteDropped)
+}
+
+// stopFor puts one order on a route, so the route has an owner. planRoute alone
+// makes an empty one, which belongs to nobody in particular.
+func stopFor(routeID, orderID uuid.UUID, position int) store.CreateRouteStopParams {
+	return store.CreateRouteStopParams{
+		RouteID:      routeID,
+		OrderID:      orderID,
+		Position:     position,
+		Address:      "123 Last Chance Gulch",
+		Lat:          46.5891,
+		Lng:          -112.0391,
+		CustomerName: "A customer",
+		Channel:      domain.OrderChannelRetail,
+	}
+}
+
+// planRouteOver plans a route for a day and puts the given orders on it, in the
+// order given — what staff get when they plan from that day's load list.
+func planRouteOver(t *testing.T, tx pgx.Tx, date time.Time, orderIDs ...uuid.UUID) *domain.DeliveryRoute {
+	t.Helper()
+	route := planRoute(t, tx, date)
+	stops := make([]store.CreateRouteStopParams, 0, len(orderIDs))
+	for i, id := range orderIDs {
+		stops = append(stops, stopFor(route.ID, id, i+1))
+	}
+	require.NoError(t, store.NewRouteStore(nil).CreateStops(context.Background(), tx, stops))
+	return route
+}
+
+// Two runs collapsed onto one day share that day's route, because routes key on
+// route_date and nothing else. When one of them leaves again, the route is not
+// its to take: re-dating it would carry the staying run's stops off to a day its
+// van does not go, leaving the run that stayed put with no sheet at all.
+//
+// Neither day can keep the plan — what is left behind would list orders that
+// are no longer going out — so it is dropped, and both days are re-planned. The
+// restore direction, which is how staff reach this: move a Monday onto Thursday,
+// plan Thursday, then think better of it.
+func TestRestoreDoesNotStealASharedDayRoute(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+	loc := merchantTZ(t)
+	svc := postponementService().WithDeliveryRoutes(store.NewRouteStore(nil))
+
+	monday, thursday, _ := runDays(loc)
+	custID, shipID, billID := orderFixtures(t, tx)
+	mondayOrder := testutil.CreateOrder(t, tx, custID, shipID, billID, testutil.WithDeliveryRun(monday))
+	thursdayOrder := testutil.CreateOrder(t, tx, custID, shipID, billID, testutil.WithDeliveryRun(thursday))
+
+	// Monday's run collapses onto Thursday. Nothing is planned yet.
+	_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), monday, thursday, "Labor Day", staffActorFixture())
+	require.NoError(t, err)
+
+	// Staff now plan Thursday, and the sheet covers both runs' orders.
+	planRouteOver(t, tx, thursday, mondayOrder.ID, thursdayOrder.ID)
+
+	result, err := svc.RestoreDeliveryRun(ctx, tx, testNow(loc), monday, staffActorFixture())
+	require.NoError(t, err)
+	assert.Equal(t, app.RouteDropSharedRun, result.RouteDropped)
+	assert.False(t, result.RouteMoved, "a route carrying another run's stops is not ours to move")
+
+	assert.Equal(t, 0, liveRouteDay(t, tx, monday), "Monday must not end up with Thursday's stops")
+	assert.Equal(t, 0, liveRouteDay(t, tx, thursday), "and the stale half is not left standing either")
+}
+
+// The same rule on the postpone side, reached by correcting a postponement: the
+// Monday already sits on Thursday and Thursday has been planned when staff move
+// the Monday again.
+func TestPostponeDoesNotStealASharedDayRoute(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+	loc := merchantTZ(t)
+	svc := postponementService().WithDeliveryRoutes(store.NewRouteStore(nil))
+
+	monday, thursday, _ := runDays(loc)
+	tuesday := monday.AddDate(0, 0, 1)
+	custID, shipID, billID := orderFixtures(t, tx)
+	mondayOrder := testutil.CreateOrder(t, tx, custID, shipID, billID, testutil.WithDeliveryRun(monday))
+	thursdayOrder := testutil.CreateOrder(t, tx, custID, shipID, billID, testutil.WithDeliveryRun(thursday))
+
+	_, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), monday, thursday, "Labor Day", staffActorFixture())
+	require.NoError(t, err)
+	staying := planRouteOver(t, tx, thursday, mondayOrder.ID, thursdayOrder.ID)
+
+	// Correcting the earlier move: the Monday goes to Tuesday after all.
+	result, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), monday, tuesday, "Labor Day", staffActorFixture())
+	require.NoError(t, err)
+	assert.Equal(t, app.RouteDropSharedRun, result.RouteDropped)
+	assert.False(t, result.RouteMoved)
+
+	assert.Equal(t, 0, liveRouteDay(t, tx, tuesday), "Thursday's stops must not follow the Monday run")
+	assert.Equal(t, 0, liveRouteDay(t, tx, thursday))
+
+	_, err = store.NewRouteStore(nil).GetRouteByID(ctx, tx, staying.ID)
+	assert.ErrorIs(t, err, pgx.ErrNoRows, "the shared plan is gone, not half-alive")
+}
+
+// A route that is only the moving run's still travels with it, stops and order
+// intact — the shared-run check must not cost the ordinary case its route.
+func TestPostponeCarriesARouteOfItsOwnOrders(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+	loc := merchantTZ(t)
+	routes := store.NewRouteStore(nil)
+	svc := postponementService().WithDeliveryRoutes(routes)
+
+	holiday, tuesday := laborDay2026(loc)
+	custID, shipID, billID := orderFixtures(t, tx)
+	first := testutil.CreateOrder(t, tx, custID, shipID, billID, testutil.WithDeliveryRun(holiday))
+	second := testutil.CreateOrder(t, tx, custID, shipID, billID, testutil.WithDeliveryRun(holiday))
+	route := planRouteOver(t, tx, holiday, first.ID, second.ID)
+
+	result, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "Labor Day", staffActorFixture())
+	require.NoError(t, err)
+	assert.True(t, result.RouteMoved)
+	assert.Empty(t, result.RouteDropped)
+
+	assert.Equal(t, tuesday.Day(), liveRouteDay(t, tx, tuesday))
+	stops, err := routes.ListStops(ctx, tx, route.ID)
+	require.NoError(t, err)
+	require.Len(t, stops, 2, "the stops came along")
+	assert.Equal(t, first.ID, stops[0].OrderID, "and in the order staff planned")
+	assert.Equal(t, second.ID, stops[1].OrderID)
 }

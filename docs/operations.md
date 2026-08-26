@@ -98,6 +98,9 @@ That workflow also declares `workflow_dispatch`, so a manual run from the Action
 
 ```bash
 git fetch --tags origin
+git checkout main && git pull --ff-only   # the check below reads origin/main but `git tag` tags
+                                          # wherever you are standing — a stale local main means
+                                          # reviewing the right contents and tagging the wrong commit
 LAST=$(git tag -l --sort=-v:refname 'v*' | head -1)   # -l is load-bearing: without it 'v*' is read as a
                                                       # tag to create, LAST comes back empty, and both
                                                       # commands below silently report an empty release
@@ -107,10 +110,11 @@ git diff --name-only --diff-filter=A "$LAST"..origin/main -- db/migrations/   # 
 
 This is not a formality. `v1.111.0` was cut believing it carried one PR's route fix; it carried two PRs and migration 072, because #11 had been merged the previous day and never tagged. Read the commit list before writing the tag message — the tag message should describe the release, not the last PR.
 
-Then cut an annotated tag (`git tag -a v<x.y.z>`, subject line plus prose body — see any recent tag with `git show v1.111.0`) and push it:
+Then cut an annotated tag — subject line plus a prose body describing the release; `git show v1.111.0` is the shape — and push it:
 
 ```bash
 TAG=v<x.y.z>
+git tag -a "$TAG"          # opens $EDITOR: subject, blank line, body
 git push origin "$TAG"
 
 # Wait for the run for THIS tag. `gh run list --limit 1` straight after the push

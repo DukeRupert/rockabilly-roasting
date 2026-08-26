@@ -86,6 +86,88 @@ Needs `DATABASE_URL` and `GOOGLE_GEOCODING_API_KEY` (except `--dry-run`). Exits 
 
 ---
 
+## Releasing to production
+
+Production deploys on a pushed tag matching `v*`. `.github/workflows/deploy-prod.yml` builds the image, pushes it to DockerHub as both `:<tag>` and `:latest`, then over SSH runs `docker compose pull` and `docker compose up -d` on the VPS — two separate lines, in a script with no `set -e`.
+
+That workflow also declares `workflow_dispatch`, so a manual run from the Actions tab is a second path to production — and not a passive one. It builds the ref you dispatch (`main` unless you pick another), pushes it as `:latest`, and deploys it. That is an unannotated release of trunk, not a restart of the current one, and it overwrites the `:latest` that had been pointing at the last release. `deploy-dev.yml` only ever pushes `:dev-<sha>`, so this workflow is the only writer of `:latest`. Use a tag unless you are deliberately deploying something that is not a release.
+
+### 1. Check what you are about to ship
+
+**Merging is not releasing.** A PR merged to `main` sits there until someone cuts a tag, and more than one merge can accumulate between tags.
+
+```bash
+git fetch --tags origin
+LAST=$(git tag -l --sort=-v:refname 'v*' | head -1)   # -l is load-bearing: without it 'v*' is read as a
+                                                      # tag to create, LAST comes back empty, and both
+                                                      # commands below silently report an empty release
+git log --oneline "$LAST"..origin/main                          # every commit in this release
+git diff --name-only --diff-filter=A "$LAST"..origin/main -- db/migrations/   # migrations that will run
+```
+
+This is not a formality. `v1.111.0` was cut believing it carried one PR's route fix; it carried two PRs and migration 072, because #11 had been merged an hour earlier and never tagged. Read the commit list before writing the tag message — the tag message should describe the release, not the last PR.
+
+### 2. Cut the tag
+
+Annotated, with a subject line and a prose body describing the release; `git show v1.111.0` is the shape.
+
+```bash
+TAG=                              # your version, e.g. v1.112.0 — steps 3 and 4 reuse it
+git tag -a "$TAG" origin/main     # opens an editor; keep it the last line you paste
+```
+
+Two things are deliberate. `git tag -a` with no `-m` opens an editor, so anything pasted after it is fed to the editor as keystrokes — hence the two lines standing alone. And tagging `origin/main` explicitly means the tag lands on the ref step 1 inspected, not on a stale local `main` or whatever branch you are standing on; it needs no checkout and is unaffected by uncommitted work.
+
+### 3. Push it and watch the deploy
+
+```bash
+if [ -z "$TAG" ]; then
+  echo "TAG is unset — set it as in step 2 first"
+else
+  git push origin "$TAG"
+
+  # Wait for the run belonging to THIS tag. `gh run list --limit 1` straight after
+  # the push often still returns the previous release — watching that one reports a
+  # stale green for a deploy that has not started.
+  RUN=""
+  for _ in $(seq 24); do
+    RUN=$(gh run list -w "Deploy Prod" -b "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId')
+    [ -n "$RUN" ] && break
+    sleep 5
+  done
+  if [ -n "$RUN" ]; then
+    gh run watch "$RUN" --exit-status
+  else
+    echo "no Deploy Prod run for $TAG yet — check the Actions tab"
+  fi
+fi
+```
+
+The `TAG` guard is not defensive padding. If you come back to this step in a fresh shell, `gh run list -b ""` does not match nothing — it ignores the filter and hands back the newest run, which is the *previous* release's. Watching that reports a green tick for a deploy that never started, which is the one thing this block exists to prevent.
+
+### 4. Confirm it is actually live
+
+```bash
+# The run can go green while the container is still inside `goose up`, so poll.
+for _ in $(seq 20); do
+  LIVE=$(curl -sS --max-time 5 https://rockabillyroasting.com/version 2>&1)
+  printf '%s\n' "$LIVE" | grep -q "\"version\":\"$TAG\"" && break
+  sleep 5
+done
+printf '%s\n' "$LIVE"
+# {"version":"v1.111.0","commit":"7c0bcb5...","go":"go1.25.14"}
+```
+
+It has to report **your** `$TAG`. If it still names the previous release after a minute or two, or reports nothing, the new container did not come up: `ssh` to the VPS and read `docker compose logs`.
+
+**A green workflow run is not this check**, for two independent reasons. `docker compose up -d` has no `--wait`, so it returns as soon as the containers are *started* — one that then dies in `entrypoint.sh` on a failed migration does so after the run has already gone green. And because the SSH script runs `pull` and `up -d` as separate lines with no `set -e`, a `pull` that fails is followed by an `up -d` that does nothing, leaving the previous image serving while the run goes green all the same. That second case is why a 200 from the storefront proves nothing either: the site is up, it is just the old build.
+
+`/version` settles it because `entrypoint.sh` runs `goose ... up` and only then `exec ./server`, under `set -e`. A server answering with your `$TAG` is therefore proof that that build's migrations ran.
+
+Version by what the release contains, not by how much work it was: new user-visible capability is a minor bump, a fix to shipped behaviour is a patch.
+
+---
+
 ## Operational runbooks
 
 | Runbook | Covers |

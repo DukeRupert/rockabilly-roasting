@@ -689,6 +689,13 @@ func NewRouter(deps *Deps) http.Handler {
 	serviceWrite("POST /admin/service/tickets/{id}/status", deps.handleAdminServiceTicketStatus)
 	serviceWrite("POST /admin/service/tickets/{id}/assign", deps.handleAdminServiceTicketAssign)
 	serviceWrite("POST /admin/service/tickets/{id}/notes", deps.handleAdminServiceTicketNote)
+	// Parts and hours are sub-records of a ticket: every one of these posts
+	// from the ticket page and redirects straight back to it.
+	serviceWrite("POST /admin/service/tickets/{id}/parts", deps.handleAdminServicePartAdd)
+	serviceWrite("POST /admin/service/tickets/{id}/parts/{childID}/status", deps.handleAdminServicePartStatus)
+	serviceWrite("POST /admin/service/tickets/{id}/parts/{childID}/delete", deps.handleAdminServicePartDelete)
+	serviceWrite("POST /admin/service/tickets/{id}/time", deps.handleAdminServiceTimeLog)
+	serviceWrite("POST /admin/service/tickets/{id}/time/{childID}/delete", deps.handleAdminServiceTimeDelete)
 
 	serviceRead("GET /admin/service/equipment", deps.handleAdminEquipmentList)
 	// Registered before the {id} pattern would shadow it — "new" is not a uuid,

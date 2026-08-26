@@ -154,3 +154,23 @@ func TestEquipmentFormRoundTripsAStoredMachine(t *testing.T) {
 	// unrecorded rather than as 1 Jan year one.
 	assert.Empty(t, values.WarrantyExpiresOn)
 }
+
+// A `date` has no time zone. pgx returns it as midnight UTC, and shifting that
+// into a negative-offset zone lands on the previous day — a part ordered on the
+// 25th was rendering as the 24th.
+func TestDayLabelDoesNotShiftACalendarDate(t *testing.T) {
+	stored := time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC)
+
+	assert.Equal(t, "25 Aug 2026", dayLabel(&stored))
+	assert.Equal(t, "—", dayLabel(nil))
+}
+
+// The moment-shaped values still belong in merchant time; the two helpers are
+// deliberately different and must not be collapsed back together.
+func TestEquipmentDateLabelStillConvertsAMoment(t *testing.T) {
+	la, err := time.LoadLocation("America/Los_Angeles")
+	require.NoError(t, err)
+	moment := time.Date(2026, 8, 25, 3, 0, 0, 0, time.UTC) // 8pm on the 24th in LA
+
+	assert.Equal(t, "24 Aug 2026", equipmentDateLabel(&moment, la))
+}

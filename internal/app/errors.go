@@ -311,6 +311,23 @@ var (
 	// another's page.
 	ErrTicketEquipmentMismatch = errors.New("that machine belongs to a different customer")
 
+	// --- Service parts and time ---
+
+	ErrServicePartNotFound = errors.New("that part is not on this ticket")
+	// ErrPartNameRequired guards the nameless line. "1 × £4.25" on a repair
+	// record six months later is worse than no line at all.
+	ErrPartNameRequired    = errors.New("what part is it?")
+	ErrInvalidPartQuantity = errors.New("quantity has to be at least one")
+	ErrInvalidPartCost     = errors.New("a part cannot cost less than nothing")
+	ErrInvalidPartStatus   = errors.New("pick a valid part status")
+
+	ErrServiceTimeEntryNotFound = errors.New("that time entry is not on this ticket")
+	// ErrInvalidTimeMinutes rejects zero and negative stints. Zero minutes is
+	// someone tabbing past the field, and it would quietly dilute every
+	// hours-per-account number computed later.
+	ErrInvalidTimeMinutes     = errors.New("how long did it take? minutes, at least one")
+	ErrInvalidServiceTimeKind = errors.New("pick labour or travel")
+
 	// --- Optional feature modules ---
 
 	// ErrUnknownModule is returned when a toggle names a key this binary does

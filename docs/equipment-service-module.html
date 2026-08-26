@@ -398,7 +398,7 @@ td code { font-size: 0.86em; }
       <p class="kicker">Hiri &middot; optional module</p>
       <h1>Equipment Service</h1>
       <div class="chips">
-        <span class="chip chip-done">Steps 1&ndash;4 built</span>
+        <span class="chip chip-done">Steps 1&ndash;5 built</span>
         <span class="chip">Updated 2026-08-25</span>
         <span class="chip">Source: docs/equipment-service-module.md</span>
       </div>
@@ -669,7 +669,7 @@ CREATE INDEX service_ticket_notes_ticket_idx ON service_ticket_notes (ticket_id,
         <li><strong>Schedules</strong> &mdash; v2, hidden until then.</li>
       </ul>
       <p><code>/admin/service</code> is the queue itself: it is what staff open the section to look at. Scopes across the top &mdash; Open, Mine, Gone quiet, Closed &mdash; are links rather than a filter dropdown, because they are the four questions actually asked.</p>
-      <p><strong>Ticket detail</strong> follows <code>docs/admin-detail-pages.md</code>: main column holds the timeline (notes + audit, merged, newest first) with the note composer at the top; the rail holds the machine card, customer card with a link back to their account, parts list, time total, and the status control. Destructive or outward-facing actions (email the customer, cancel the ticket) use the existing tooltip + Alpine confirm pattern &mdash; and remember the confirm hook binds to the <strong>button click</strong>, never form submit, because of <code>hx-boost</code>.</p>
+      <p><strong>Ticket detail</strong> follows <code>docs/admin-detail-pages.md</code>: main column holds the parts table, the hours table, and the timeline (notes + audit, merged, newest first) with the note composer above it; the rail holds the next action, the assignee, the machine card, customer card with a link back to their account, and the cost roll-up. Parts and hours went to the main column rather than the rail as first sketched &mdash; rule 2 puts a control that acts on a sub-record next to that sub-record, and a 22rem rail wraps every line of a table with per-row buttons. The rail keeps the summary, which is what a rail is for. Destructive or outward-facing actions (email the customer, cancel the ticket) use the existing tooltip + Alpine confirm pattern &mdash; and remember the confirm hook binds to the <strong>button click</strong>, never form submit, because of <code>hx-boost</code>.</p>
       <p><strong>Equipment detail</strong> is the machine&rsquo;s life story: identity block, warranty countdown, and every ticket against it in date order. This is the screen that answers &ldquo;we&rsquo;ve replaced this pump twice in a year, the machine is the problem&rdquo;, which is the argument a merchant needs when a shop is angry.</p>
       <p>Entry points from existing pages, all module-gated: an <strong>Equipment</strong> card on the admin customer detail rail, and a &ldquo;Log service&rdquo; action on it.</p>
     </section>
@@ -804,13 +804,13 @@ AuditServiceTimeLogged      = "service_ticket.time_logged"</code></pre>
       <p class="eyebrow">Plan</p>
       <h2>Build order</h2>
       <p>The only genuine sequence in this document &mdash; each step is shippable, and step 1 is testable with nothing behind it.</p>
-      <div class="note"><span class="note-label">Status &mdash; 26 Aug 2026</span><p>Steps 1&ndash;4 are built and green through <code>mage check</code>, and driven end to end against a real server. The load-bearing rule holds through the real UI: an internal note leaves a ticket flagged as quiet, a logged call clears it. A ticket filed against another cafe’s machine is refused with a 400. Steps 5&ndash;7 are open.</p></div>
+      <div class="note"><span class="note-label">Status &mdash; 26 Aug 2026</span><p>Steps 1&ndash;5 are built and green through <code>mage check</code>, and driven end to end against a real server. The load-bearing rule holds through the real UI: an internal note leaves a ticket flagged as quiet, a logged call clears it. Driving step 5 turned up a real bug and fixed it &mdash; calendar dates were being timezone-converted, so a part ordered on the 25th displayed as the 24th, and warranties expired a day early. Steps 6&ndash;7 are open.</p></div>
       <ol>
         <li><strong>Done.</strong> <code>modules</code> table (migration <code>073_modules.sql</code>), <code>domain/module.go</code>, <code>app.ModuleService</code>, the Settings &rarr; Modules tab, <code>requireModule</code> middleware, and <code>filterNavItems</code> in the admin layout. Shipped alone, as planned.</li>
         <li><strong>Done.</strong> Migration <code>074_equipment_service.sql</code>, <code>domain/equipment.go</code> and <code>domain/service_ticket.go</code>, <code>store/equipment.go</code> and <code>store/service_tickets.go</code>.</li>
         <li><strong>Done.</strong> Equipment register: list with filters, detail page, add/edit form, and the Equipment card on the customer rail. The <strong>Service</strong> sidebar row arrived with it &mdash; module-gated, so it exists only where the module is on.</li>
         <li><strong>Done.</strong> Tickets: queue with scopes and the stale flag, detail page with the merged notes-and-audit timeline, status machine, note composer, assignment, and the repair history on the machine page. The section tab strip arrived with it.</li>
-        <li>Parts and time entries on the ticket detail.</li>
+        <li><strong>Done.</strong> Parts and time entries on the ticket detail, with per-row status advance, removal, and the parts/hours roll-up in the rail.</li>
         <li>Stale-contact flagging + the daily sweep.</li>
         <li>Wholesale portal equipment list + report-a-problem + notification email.</li>
       </ol>

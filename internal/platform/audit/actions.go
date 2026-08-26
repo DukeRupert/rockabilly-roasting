@@ -29,6 +29,15 @@ const (
 	AuditServiceTicketReopened  = "service_ticket.reopened"
 	AuditServiceTicketCancelled = "service_ticket.cancelled"
 	AuditServiceTicketNoteAdded = "service_ticket.note_added"
+	// Parts and hours. Removals are audited as loudly as additions: a part
+	// line or a stint deleted after the fact changes what a repair appears to
+	// have cost, and that is exactly the kind of edit somebody will later want
+	// to attribute.
+	AuditServicePartAdded   = "service_ticket.part_added"
+	AuditServicePartStatus  = "service_ticket.part_status_changed"
+	AuditServicePartRemoved = "service_ticket.part_removed"
+	AuditServiceTimeLogged  = "service_ticket.time_logged"
+	AuditServiceTimeRemoved = "service_ticket.time_removed"
 
 	// Optional feature modules — turning a whole section of the app on or off.
 	// Worth an audit entry because enabling one can start sending customer mail

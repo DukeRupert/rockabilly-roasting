@@ -68,6 +68,8 @@ func equipmentSerialLabel(e domain.Equipment) string {
 	return e.SerialNumber
 }
 
+// equipmentDateLabel renders a *moment* in merchant time — a created_at, a
+// scheduled_for. For a calendar date use dayLabel instead.
 func equipmentDateLabel(t *time.Time, loc *time.Location) string {
 	if t == nil {
 		return "—"
@@ -78,17 +80,33 @@ func equipmentDateLabel(t *time.Time, loc *time.Location) string {
 	return t.In(loc).Format("2 Jan 2006")
 }
 
+// dayLabel renders a calendar date — installed_on, ordered_on, performed_on.
+//
+// Deliberately *not* converted to merchant time. A `date` column has no zone;
+// pgx hands it back as midnight UTC, and shifting that into a negative-offset
+// zone lands on the previous day. A part ordered on the 25th was showing as the
+// 24th, which is the sort of thing nobody notices until they are arguing with a
+// supplier about when the order went in.
+func dayLabel(t *time.Time) string {
+	if t == nil {
+		return "—"
+	}
+	return t.UTC().Format("2 Jan 2006")
+}
+
 // equipmentWarrantyNote is shown under the installed date. It says nothing at
 // all when no warranty was recorded: an unknown warranty is not a warranty, and
 // a blank "Warranty: —" invites someone to read it as expired.
-func equipmentWarrantyNote(e domain.Equipment, loc *time.Location) string {
+// loc is unused now that warranty dates render as calendar days; kept so the
+// call sites read the same as the others.
+func equipmentWarrantyNote(e domain.Equipment, _ *time.Location) string {
 	if e.WarrantyExpiresOn == nil {
 		return ""
 	}
 	if e.UnderWarranty(time.Now()) {
-		return "Under warranty to " + equipmentDateLabel(e.WarrantyExpiresOn, loc)
+		return "Under warranty to " + dayLabel(e.WarrantyExpiresOn)
 	}
-	return "Warranty ended " + equipmentDateLabel(e.WarrantyExpiresOn, loc)
+	return "Warranty ended " + dayLabel(e.WarrantyExpiresOn)
 }
 
 func equipmentFilterHref(category, ownership, search string, includeRetired bool) string {
@@ -165,7 +183,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Search)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 133, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 151, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
@@ -193,7 +211,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(c))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 143, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 161, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
@@ -216,7 +234,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 143, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 161, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -249,7 +267,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(o))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 152, Col: 30}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 170, Col: 30}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -272,7 +290,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(o.Label())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 152, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 170, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -350,7 +368,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 				var templ_7745c5c3_Var7 templ.SafeURL
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/equipment/" + e.ID.String()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 198, Col: 77}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 216, Col: 77}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -363,7 +381,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(e.Description())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 199, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 217, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -376,7 +394,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(e.Category.Label())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 201, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 219, Col: 56}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -389,7 +407,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(e.CustomerName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 204, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 222, Col: 25}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -425,7 +443,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(e.Ownership.Label())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 206, Col: 53}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 224, Col: 53}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 					if templ_7745c5c3_Err != nil {
@@ -443,7 +461,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(equipmentSerialLabel(e.Equipment))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 209, Col: 97}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 227, Col: 97}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -454,9 +472,9 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var15 string
-				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(equipmentDateLabel(e.InstalledOn, props.MerchantTZ))
+				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(dayLabel(e.InstalledOn))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 211, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 229, Col: 34}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -474,7 +492,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(note)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 213, Col: 51}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 231, Col: 51}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 					if templ_7745c5c3_Err != nil {
@@ -514,7 +532,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(e.Status.Label())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 217, Col: 74}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 235, Col: 74}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -542,7 +560,7 @@ func EquipmentListContent(props EquipmentListProps) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d machine%s", len(props.Equipment), pluralS(len(props.Equipment))))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 228, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_list.templ`, Line: 246, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {

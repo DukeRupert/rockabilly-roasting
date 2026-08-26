@@ -248,7 +248,28 @@ func (d *Deps) handleAdminServiceTicketShow(w http.ResponseWriter, r *http.Reque
 			return txErr
 		}
 		props.Totals, txErr = d.ServiceTicketService.Totals(ctx, tx, ticket.ID)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+
+		parts, txErr := d.ServiceTicketService.ListParts(ctx, tx, ticket.ID)
+		if txErr != nil {
+			return txErr
+		}
+		props.Parts = admin.PartRowsFrom(parts)
+
+		entries, txErr := d.ServiceTicketService.ListTimeEntries(ctx, tx, ticket.ID)
+		if txErr != nil {
+			return txErr
+		}
+		for _, e := range entries {
+			name := staffBy[e.StaffID]
+			if name == "" {
+				name = "Staff"
+			}
+			props.TimeEntries = append(props.TimeEntries, admin.TimeEntryRow{Entry: e, StaffName: name})
+		}
+		return nil
 	}); err != nil {
 		Error(w, r, err)
 		return
@@ -272,6 +293,10 @@ func (d *Deps) handleAdminServiceTicketShow(w http.ResponseWriter, r *http.Reque
 
 	props.Ticket = *ticket
 	props.Timeline = admin.ServiceTimelineEntries(notes, activity, authorName)
+	if staff, ok := auth.StaffFromContext(ctx); ok {
+		id := staff.ID
+		props.CurrentStaffID = &id
+	}
 	props.Stale = ticket.StaleSince(staleCutoff())
 	props.MerchantTZ = d.MerchantTZ
 	props.StaffName, props.StaffRole = staffNameRole(r)

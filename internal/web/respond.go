@@ -68,6 +68,8 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrAnnouncementNotFound),
 		errors.Is(err, app.ErrEquipmentNotFound),
 		errors.Is(err, app.ErrServiceTicketNotFound),
+		errors.Is(err, app.ErrServicePartNotFound),
+		errors.Is(err, app.ErrServiceTimeEntryNotFound),
 		// Access denial is surfaced as 404 so we never confirm a restricted
 		// product/SKU exists to a viewer who may not see it.
 		errors.Is(err, app.ErrProductNotAccessible):
@@ -117,6 +119,14 @@ func mapError(err error) (int, string) {
 		return http.StatusUnauthorized, "invalid credentials"
 
 	// Service ticket validation. Same rule as equipment: say what to fix.
+	case errors.Is(err, app.ErrPartNameRequired),
+		errors.Is(err, app.ErrInvalidPartQuantity),
+		errors.Is(err, app.ErrInvalidPartCost),
+		errors.Is(err, app.ErrInvalidPartStatus),
+		errors.Is(err, app.ErrInvalidTimeMinutes),
+		errors.Is(err, app.ErrInvalidServiceTimeKind):
+		return http.StatusBadRequest, err.Error()
+
 	case errors.Is(err, app.ErrServiceTicketTitleRequired),
 		errors.Is(err, app.ErrInvalidServiceSeverity),
 		errors.Is(err, app.ErrInvalidServiceTicketStatus),

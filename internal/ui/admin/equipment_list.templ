@@ -60,6 +60,8 @@ func equipmentSerialLabel(e domain.Equipment) string {
 	return e.SerialNumber
 }
 
+// equipmentDateLabel renders a *moment* in merchant time — a created_at, a
+// scheduled_for. For a calendar date use dayLabel instead.
 func equipmentDateLabel(t *time.Time, loc *time.Location) string {
 	if t == nil {
 		return "—"
@@ -70,17 +72,33 @@ func equipmentDateLabel(t *time.Time, loc *time.Location) string {
 	return t.In(loc).Format("2 Jan 2006")
 }
 
+// dayLabel renders a calendar date — installed_on, ordered_on, performed_on.
+//
+// Deliberately *not* converted to merchant time. A `date` column has no zone;
+// pgx hands it back as midnight UTC, and shifting that into a negative-offset
+// zone lands on the previous day. A part ordered on the 25th was showing as the
+// 24th, which is the sort of thing nobody notices until they are arguing with a
+// supplier about when the order went in.
+func dayLabel(t *time.Time) string {
+	if t == nil {
+		return "—"
+	}
+	return t.UTC().Format("2 Jan 2006")
+}
+
 // equipmentWarrantyNote is shown under the installed date. It says nothing at
 // all when no warranty was recorded: an unknown warranty is not a warranty, and
 // a blank "Warranty: —" invites someone to read it as expired.
-func equipmentWarrantyNote(e domain.Equipment, loc *time.Location) string {
+// loc is unused now that warranty dates render as calendar days; kept so the
+// call sites read the same as the others.
+func equipmentWarrantyNote(e domain.Equipment, _ *time.Location) string {
 	if e.WarrantyExpiresOn == nil {
 		return ""
 	}
 	if e.UnderWarranty(time.Now()) {
-		return "Under warranty to " + equipmentDateLabel(e.WarrantyExpiresOn, loc)
+		return "Under warranty to " + dayLabel(e.WarrantyExpiresOn)
 	}
-	return "Warranty ended " + equipmentDateLabel(e.WarrantyExpiresOn, loc)
+	return "Warranty ended " + dayLabel(e.WarrantyExpiresOn)
 }
 
 func equipmentFilterHref(category, ownership, search string, includeRetired bool) string {
@@ -208,7 +226,7 @@ templ EquipmentListContent(props EquipmentListProps) {
 								</td>
 								<td class="px-4 py-3 font-mono text-sm text-rr-muted">{ equipmentSerialLabel(e.Equipment) }</td>
 								<td class="px-4 py-3 text-sm text-rr-body">
-									{ equipmentDateLabel(e.InstalledOn, props.MerchantTZ) }
+									{ dayLabel(e.InstalledOn) }
 									if note := equipmentWarrantyNote(e.Equipment, props.MerchantTZ); note != "" {
 										<div class="text-xs text-rr-muted">{ note }</div>
 									}

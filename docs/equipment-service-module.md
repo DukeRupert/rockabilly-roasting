@@ -1,7 +1,8 @@
 # Equipment Service — an optional Hiri module
 
-Status: steps 1-4 built — module registry, schema, store layer, the equipment
-register, and the ticket queue with its merged timeline. Parts and hours are next.
+Status: steps 1-5 built — module registry, schema, store layer, the equipment
+register, the ticket queue with its merged timeline, and parts and hours.
+The stale sweep and the customer portal are next.
 Written 2026-08-24, last updated 2026-08-25.
 
 ## The job
@@ -319,9 +320,13 @@ at. Scopes across the top — Open, Mine, Gone quiet, Closed — are links rathe
 than a filter dropdown, because they are the four questions actually asked.
 
 **Ticket detail** follows `docs/admin-detail-pages.md`: main column holds the
-timeline (notes + audit, merged, newest first) with the note composer at the
-top; the rail holds the machine card, customer card with a link back to their
-account, parts list, time total, and the status control. Destructive or
+parts table, the hours table, and the timeline (notes + audit, merged, newest
+first) with the note composer above it; the rail holds the next action, the
+assignee, the machine card, customer card with a link back to their account, and
+the cost roll-up. Parts and hours went to the main column rather than the rail
+as first sketched — rule 2 puts a control that acts on a sub-record next to that
+sub-record, and a 22rem rail wraps every line of a table with per-row buttons.
+The rail keeps the summary, which is what a rail is for. Destructive or
 outward-facing actions (email the customer, cancel the ticket) use the existing
 tooltip + Alpine confirm pattern — and remember the confirm hook binds to the
 **button click**, never form submit, because of `hx-boost`.
@@ -467,6 +472,7 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
    merged notes-and-audit timeline, status machine, note composer, assignment,
    and the repair history on the machine page. The section tab strip arrived
    with it.
-5. Parts and time entries on the ticket detail.
+5. **Done.** Parts and time entries on the ticket detail, with per-row status
+   advance, removal, and the parts/hours roll-up in the rail.
 6. Stale-contact flagging + the daily sweep.
 7. Wholesale portal equipment list + report-a-problem + notification email.

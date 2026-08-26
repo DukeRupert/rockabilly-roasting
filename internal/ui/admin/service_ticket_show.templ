@@ -36,8 +36,16 @@ type ServiceTicketShowProps struct {
 	Staff        []StaffOption
 	// Timeline is notes and audit entries already merged — see
 	// ServiceTimelineEntries.
-	Timeline   []domain.AuditEntry
-	Totals     domain.ServiceTotals
+	Timeline []domain.AuditEntry
+	// Parts and TimeEntries are the sub-records; Totals is their roll-up,
+	// summed in the database rather than over these lists.
+	Parts       []PartRow
+	TimeEntries []TimeEntryRow
+	Totals      domain.ServiceTotals
+	// CurrentStaffID preselects whoever is logged in on the "who did the work"
+	// picker. A manager writing up the van crew can change it; the tech logging
+	// their own stint should not have to.
+	CurrentStaffID *uuid.UUID
 	Stale      bool
 	MerchantTZ *time.Location
 	StaffName  string
@@ -188,6 +196,8 @@ templ ServiceTicketShowContent(props ServiceTicketShowProps) {
 					</div>
 				</div>
 			}
+			@serviceTicketParts(props)
+			@serviceTicketTime(props)
 			if props.CanWrite {
 				@serviceNoteComposer(props)
 			}
@@ -261,7 +271,6 @@ templ ServiceTicketShowContent(props ServiceTicketShowProps) {
 					<h2 class="text-sm font-semibold text-rr-heading">Cost so far</h2>
 					<p class="mt-2 text-sm text-rr-body">{ props.hoursLine() }</p>
 					<p class="mt-0.5 text-sm text-rr-muted">Parts: { formatCents(props.Totals.PartsCostCents) }</p>
-					<p class="mt-2 text-xs text-rr-muted">Parts and hours get their own controls in the next step.</p>
 				</div>
 			</div>
 			if props.CanWrite && props.Ticket.Status.Open() {

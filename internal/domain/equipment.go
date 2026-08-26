@@ -179,11 +179,26 @@ func (e Equipment) Description() string {
 // given day. False when no warranty date was recorded — an unknown warranty is
 // not a warranty, and quoting a repair as covered when it is not is worse than
 // the reverse.
+//
+// Both sides are collapsed to a calendar day before comparing. warranty_expires_on
+// is a `date`, which pgx hands back as midnight UTC; comparing that to an instant
+// would expire the cover at midnight *on* the last day rather than at the end of
+// it. Cover therefore runs through the whole expiry day.
+//
+// A merchant west of UTC late in the day reads as expired a few hours early.
+// That is the safe direction and is left alone: this function must never
+// over-promise cover.
 func (e Equipment) UnderWarranty(on time.Time) bool {
 	if e.WarrantyExpiresOn == nil {
 		return false
 	}
-	return !on.After(*e.WarrantyExpiresOn)
+	return !calendarDay(on).After(calendarDay(*e.WarrantyExpiresOn))
+}
+
+// calendarDay strips a value to its UTC date.
+func calendarDay(t time.Time) time.Time {
+	y, m, d := t.UTC().Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
 // EquipmentWithCustomer is a register row: the machine plus enough of its owner

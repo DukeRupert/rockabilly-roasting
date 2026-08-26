@@ -44,14 +44,22 @@ type ServiceTicketShowProps struct {
 	Staff        []StaffOption
 	// Timeline is notes and audit entries already merged — see
 	// ServiceTimelineEntries.
-	Timeline   []domain.AuditEntry
-	Totals     domain.ServiceTotals
-	Stale      bool
-	MerchantTZ *time.Location
-	StaffName  string
-	StaffRole  string
-	CanWrite   bool
-	Flash      Flash
+	Timeline []domain.AuditEntry
+	// Parts and TimeEntries are the sub-records; Totals is their roll-up,
+	// summed in the database rather than over these lists.
+	Parts       []PartRow
+	TimeEntries []TimeEntryRow
+	Totals      domain.ServiceTotals
+	// CurrentStaffID preselects whoever is logged in on the "who did the work"
+	// picker. A manager writing up the van crew can change it; the tech logging
+	// their own stint should not have to.
+	CurrentStaffID *uuid.UUID
+	Stale          bool
+	MerchantTZ     *time.Location
+	StaffName      string
+	StaffRole      string
+	CanWrite       bool
+	Flash          Flash
 }
 
 func (p ServiceTicketShowProps) machineLabel() string {
@@ -182,7 +190,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Ticket.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 151, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 159, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -195,7 +203,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Ticket.Number)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 153, Col: 71}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 161, Col: 71}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -230,7 +238,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.Ticket.Status.Label())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 154, Col: 89}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 162, Col: 89}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -265,7 +273,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.Ticket.Severity.Label())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 156, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 164, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -301,7 +309,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(props.contactSentence())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 169, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 177, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -324,7 +332,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(props.Ticket.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 179, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 187, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -343,7 +351,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(props.Ticket.Resolution)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 187, Col: 88}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 195, Col: 88}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -353,6 +361,14 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
+		}
+		templ_7745c5c3_Err = serviceTicketParts(props).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = serviceTicketTime(props).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
 		}
 		if props.CanWrite {
 			templ_7745c5c3_Err = serviceNoteComposer(props).Render(ctx, templ_7745c5c3_Buffer)
@@ -376,7 +392,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(reason)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 202, Col: 52}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 212, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -394,7 +410,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 				var templ_7745c5c3_Var14 templ.SafeURL
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/tickets/" + props.Ticket.ID.String() + "/status"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 204, Col: 115}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 214, Col: 115}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -418,7 +434,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 				var templ_7745c5c3_Var15 templ.SafeURL
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/tickets/" + props.Ticket.ID.String() + "/status"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 212, Col: 116}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 222, Col: 116}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -431,7 +447,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(st))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 213, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 223, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 				if templ_7745c5c3_Err != nil {
@@ -444,7 +460,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(st.Label())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 214, Col: 72}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 224, Col: 72}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -472,7 +488,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var18 templ.SafeURL
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/tickets/" + props.Ticket.ID.String() + "/assign"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 225, Col: 114}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 235, Col: 114}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -490,7 +506,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.ResolveAttributeValue(st.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 230, Col: 32}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 240, Col: 32}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 				if templ_7745c5c3_Err != nil {
@@ -513,7 +529,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(st.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 232, Col: 19}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 242, Col: 19}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -536,7 +552,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(props.assigneeLabel())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 238, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 248, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -559,7 +575,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var22 templ.SafeURL
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/equipment/" + props.MachineID.String()))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 246, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 256, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -572,7 +588,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(props.machineLabel())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 247, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 257, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
@@ -590,7 +606,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(props.machineLabel())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 250, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 260, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 			if templ_7745c5c3_Err != nil {
@@ -608,7 +624,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(props.CustomerName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 252, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 262, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -621,7 +637,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(props.siteLine())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 253, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 263, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
@@ -634,7 +650,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var27 templ.SafeURL
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/customers/" + props.Ticket.CustomerID.String()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 254, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 264, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
@@ -647,7 +663,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(props.hoursLine())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 262, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 272, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
@@ -660,13 +676,13 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.Totals.PartsCostCents))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 263, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 273, Col: 94}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</p><p class=\"mt-2 text-xs text-rr-muted\">Parts and hours get their own controls in the next step.</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -678,7 +694,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var30 templ.SafeURL
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/tickets/" + props.Ticket.ID.String() + "/status"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 271, Col: 114}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 280, Col: 114}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -699,7 +715,7 @@ func ServiceTicketShowContent(props ServiceTicketShowProps) templ.Component {
 			var templ_7745c5c3_Var31 templ.SafeURL
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/tickets/" + props.Ticket.ID.String() + "/status"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 291, Col: 114}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 300, Col: 114}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
@@ -760,7 +776,7 @@ func serviceNoteComposer(props ServiceTicketShowProps) templ.Component {
 		var templ_7745c5c3_Var33 templ.SafeURL
 		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/tickets/" + props.Ticket.ID.String() + "/notes"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 312, Col: 109}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_show.templ`, Line: 321, Col: 109}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {

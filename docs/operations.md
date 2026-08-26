@@ -88,7 +88,7 @@ Needs `DATABASE_URL` and `GOOGLE_GEOCODING_API_KEY` (except `--dry-run`). Exits 
 
 ## Releasing to production
 
-Production deploys on a pushed tag matching `v*`. `.github/workflows/deploy-prod.yml` builds the image, pushes it to DockerHub as both `:<tag>` and `:latest`, and runs `docker compose pull && up -d` on the VPS over SSH.
+Production deploys on a pushed tag matching `v*`. `.github/workflows/deploy-prod.yml` builds the image, pushes it to DockerHub as both `:<tag>` and `:latest`, then over SSH runs `docker compose pull` and `docker compose up -d` on the VPS — two separate lines, in a script with no `set -e`.
 
 That workflow also declares `workflow_dispatch`, so a manual run from the Actions tab is a second path to production — and not a passive one. It builds the ref you dispatch (`main` unless you pick another), pushes it as `:latest`, and deploys it. That is an unannotated release of trunk, not a restart of the current one, and it overwrites the `:latest` that had been pointing at the last release. `deploy-dev.yml` only ever pushes `:dev-<sha>`, so this workflow is the only writer of `:latest`. Use a tag unless you are deliberately deploying something that is not a release.
 
@@ -109,18 +109,18 @@ This is not a formality. `v1.111.0` was cut believing it carried one PR's route 
 
 ### 2. Cut the tag
 
-Annotated, with a subject line and a prose body describing the release; `git show v1.111.0` is the shape. Run this line on its own — with no `-m` it opens an editor, so pasting it as part of a block feeds the following lines to the editor as keystrokes:
+Annotated, with a subject line and a prose body describing the release; `git show v1.111.0` is the shape.
 
 ```bash
-git tag -a v<x.y.z> origin/main
+TAG=v<x.y.z>                      # set once — steps 3 and 4 reuse it
+git tag -a "$TAG" origin/main     # opens an editor; keep it the last line you paste
 ```
 
-Tagging `origin/main` explicitly is deliberate: it is the ref step 1 inspected, so the tag cannot land on a stale local `main` or on whatever branch you happen to be standing on. It needs no checkout and is unaffected by uncommitted work.
+Two things are deliberate. `git tag -a` with no `-m` opens an editor, so anything pasted after it is fed to the editor as keystrokes — hence the two lines standing alone. And tagging `origin/main` explicitly means the tag lands on the ref step 1 inspected, not on a stale local `main` or whatever branch you are standing on; it needs no checkout and is unaffected by uncommitted work.
 
 ### 3. Push it and watch the deploy
 
 ```bash
-TAG=v<x.y.z>
 git push origin "$TAG"
 
 # Wait for the run belonging to THIS tag. `gh run list --limit 1` straight after
@@ -135,18 +135,26 @@ done
 if [ -n "$RUN" ]; then
   gh run watch "$RUN" --exit-status
 else
-  echo "no Deploy Prod run for $TAG after 2min — check the Actions tab"
+  echo "no Deploy Prod run for $TAG yet — check the Actions tab"
 fi
 ```
 
 ### 4. Confirm it is actually live
 
 ```bash
-curl -s https://rockabillyroasting.com/version
+# The run can go green while the container is still inside `goose up`, so poll.
+for _ in $(seq 20); do
+  LIVE=$(curl -sS --max-time 5 https://rockabillyroasting.com/version 2>&1)
+  printf '%s\n' "$LIVE" | grep -q "\"version\":\"$TAG\"" && break
+  sleep 5
+done
+printf '%s\n' "$LIVE"
 # {"version":"v1.111.0","commit":"7c0bcb5...","go":"go1.25.14"}
 ```
 
-**A green workflow run is not this check.** The SSH step ends in `docker compose up -d` with no `--wait`, so it returns as soon as the containers are *started*. A container that then dies in `entrypoint.sh` — a failed migration, say — does so after the run has already gone green. Nor is a 200 from the storefront enough: a new container that fails can leave the previous one serving.
+It has to report **your** `$TAG`. If it still names the previous release after a minute or two, or reports nothing, the new container did not come up: `ssh` to the VPS and read `docker compose logs`.
+
+**A green workflow run is not this check**, for two independent reasons. `docker compose up -d` has no `--wait`, so it returns as soon as the containers are *started* — one that then dies in `entrypoint.sh` on a failed migration does so after the run has already gone green. And because the SSH script runs `pull` and `up -d` as separate lines with no `set -e`, a `pull` that fails is followed by an `up -d` that does nothing, leaving the previous image serving while the run goes green all the same. That second case is why a 200 from the storefront proves nothing either: the site is up, it is just the old build.
 
 `/version` settles it because `entrypoint.sh` runs `goose ... up` and only then `exec ./server`, under `set -e`. A server answering with your commit is therefore proof that your migrations ran.
 

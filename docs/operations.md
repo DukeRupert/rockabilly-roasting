@@ -112,7 +112,7 @@ This is not a formality. `v1.111.0` was cut believing it carried one PR's route 
 Annotated, with a subject line and a prose body describing the release; `git show v1.111.0` is the shape.
 
 ```bash
-TAG=v<x.y.z>                      # set once — steps 3 and 4 reuse it
+TAG=                              # your version, e.g. v1.112.0 — steps 3 and 4 reuse it
 git tag -a "$TAG" origin/main     # opens an editor; keep it the last line you paste
 ```
 
@@ -121,23 +121,29 @@ Two things are deliberate. `git tag -a` with no `-m` opens an editor, so anythin
 ### 3. Push it and watch the deploy
 
 ```bash
-git push origin "$TAG"
-
-# Wait for the run belonging to THIS tag. `gh run list --limit 1` straight after
-# the push often still returns the previous release — watching that one reports a
-# stale green for a deploy that has not started.
-RUN=""
-for _ in $(seq 24); do
-  RUN=$(gh run list -w "Deploy Prod" -b "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId')
-  [ -n "$RUN" ] && break
-  sleep 5
-done
-if [ -n "$RUN" ]; then
-  gh run watch "$RUN" --exit-status
+if [ -z "$TAG" ]; then
+  echo "TAG is unset — set it as in step 2 first"
 else
-  echo "no Deploy Prod run for $TAG yet — check the Actions tab"
+  git push origin "$TAG"
+
+  # Wait for the run belonging to THIS tag. `gh run list --limit 1` straight after
+  # the push often still returns the previous release — watching that one reports a
+  # stale green for a deploy that has not started.
+  RUN=""
+  for _ in $(seq 24); do
+    RUN=$(gh run list -w "Deploy Prod" -b "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId')
+    [ -n "$RUN" ] && break
+    sleep 5
+  done
+  if [ -n "$RUN" ]; then
+    gh run watch "$RUN" --exit-status
+  else
+    echo "no Deploy Prod run for $TAG yet — check the Actions tab"
+  fi
 fi
 ```
+
+The `TAG` guard is not defensive padding. If you come back to this step in a fresh shell, `gh run list -b ""` does not match nothing — it ignores the filter and hands back the newest run, which is the *previous* release's. Watching that reports a green tick for a deploy that never started, which is the one thing this block exists to prevent.
 
 ### 4. Confirm it is actually live
 
@@ -156,7 +162,7 @@ It has to report **your** `$TAG`. If it still names the previous release after a
 
 **A green workflow run is not this check**, for two independent reasons. `docker compose up -d` has no `--wait`, so it returns as soon as the containers are *started* — one that then dies in `entrypoint.sh` on a failed migration does so after the run has already gone green. And because the SSH script runs `pull` and `up -d` as separate lines with no `set -e`, a `pull` that fails is followed by an `up -d` that does nothing, leaving the previous image serving while the run goes green all the same. That second case is why a 200 from the storefront proves nothing either: the site is up, it is just the old build.
 
-`/version` settles it because `entrypoint.sh` runs `goose ... up` and only then `exec ./server`, under `set -e`. A server answering with your commit is therefore proof that your migrations ran.
+`/version` settles it because `entrypoint.sh` runs `goose ... up` and only then `exec ./server`, under `set -e`. A server answering with your `$TAG` is therefore proof that that build's migrations ran.
 
 Version by what the release contains, not by how much work it was: new user-visible capability is a minor bump, a fix to shipped behaviour is a patch.
 

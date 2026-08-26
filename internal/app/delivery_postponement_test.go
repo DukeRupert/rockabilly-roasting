@@ -936,3 +936,41 @@ func TestPostponeCarriesARouteOfItsOwnOrders(t *testing.T) {
 	assert.Equal(t, first.ID, stops[0].OrderID, "and in the order staff planned")
 	assert.Equal(t, second.ID, stops[1].OrderID)
 }
+
+// The one place the moving set and the load list's set part company, pinned so
+// that closing the gap has to be a decision rather than an accident.
+//
+// An order between its payment intent and the webhook that confirms it is not
+// on the load list — it does not belong in a pack-and-ship queue — but it does
+// move with the run. The promised date is written once, at order creation, and
+// nothing recomputes it when the payment lands: leave the order behind and a
+// card that clears after the holiday is announced confirms onto the closed day,
+// and the confirmation email names a date the van does not run.
+func TestPostponeMovesAnOrderStillBeingPaidFor(t *testing.T) {
+	ctx := context.Background()
+	tx := testutil.NewTestTx(t, testPool)
+	loc := merchantTZ(t)
+	svc := postponementService()
+	orders := store.NewOrderStore(nil)
+
+	holiday, tuesday := laborDay2026(loc)
+	custID, shipID, billID := orderFixtures(t, tx)
+	unconfirmed := testutil.CreateOrder(t, tx, custID, shipID, billID,
+		testutil.WithDeliveryRun(holiday),
+		testutil.WithOrderStatus(domain.OrderStatusPending),
+		testutil.WithPaymentStatus(domain.PaymentStatusAwaiting))
+
+	counts, err := orders.CountFulfillmentViews(ctx, tx, nil)
+	require.NoError(t, err)
+	require.Zero(t, counts.LoadList, "the load list does not count an order still being paid for")
+
+	result, err := svc.PostponeDeliveryRun(ctx, tx, testNow(loc), holiday, tuesday, "Labor Day", staffActorFixture())
+	require.NoError(t, err)
+	assert.EqualValues(t, 1, result.OrdersMoved, "the run takes it anyway")
+
+	o, err := orders.GetOrderByIDAsStaff(ctx, tx, unconfirmed.ID)
+	require.NoError(t, err)
+	require.NotNil(t, o.ScheduledDeliveryDate)
+	assert.Equal(t, tuesday.Day(), o.ScheduledDeliveryDate.Day(),
+		"or it would confirm onto the day the shop is shut")
+}

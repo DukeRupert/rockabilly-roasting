@@ -76,9 +76,6 @@ func NewCheckoutService(
 	}
 }
 
-// WithCheckoutConfirmDeps wires the cart store and job enqueuer required by
-// ConfirmCheckoutPayment. Must be called at startup before any checkout
-// confirmation paths run.
 // WithDeliveryRoutes lets postponements reconcile the planned delivery route
 // for a run that moves.
 //
@@ -90,6 +87,9 @@ func (s *CheckoutService) WithDeliveryRoutes(routes *store.RouteStore) *Checkout
 	return s
 }
 
+// WithCheckoutConfirmDeps wires the cart store and job enqueuer required by
+// ConfirmCheckoutPayment. Must be called at startup before any checkout
+// confirmation paths run.
 func (s *CheckoutService) WithCheckoutConfirmDeps(carts *store.CartStore, enqueuer JobEnqueuer) *CheckoutService {
 	s.carts = carts
 	s.enqueuer = enqueuer

@@ -359,7 +359,14 @@ func (s *CheckoutService) planRouteMove(ctx context.Context, tx pgx.Tx, runDate,
 		return routeMove{}, nil
 	}
 
-	route, err := s.routes.GetLiveRouteForDate(ctx, tx, from)
+	// Re-anchored to UTC before any of it reaches the route store. route_date is
+	// a bare calendar day, and the planner normalises the same way before it
+	// writes (planRouteDate in web/admin_routes.go); the dates here are merchant
+	// midnights instead, and pgx encodes a date by the UTC day the instant falls
+	// in — so a shop east of UTC would look up the day before its own.
+	runDay, fromDay, toDay := utcDay(runDate), utcDay(from), utcDay(to)
+
+	route, err := s.routes.GetLiveRouteForDate(ctx, tx, fromDay)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Nothing planned for that run. The ordinary case — staff usually
@@ -374,7 +381,7 @@ func (s *CheckoutService) planRouteMove(ctx context.Context, tx pgx.Tx, runDate,
 		return routeMove{}, ErrRunRouteActive
 	}
 
-	existing, err := s.routes.GetLiveRouteForDate(ctx, tx, to)
+	existing, err := s.routes.GetLiveRouteForDate(ctx, tx, toDay)
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 		// The new day is clear. The route may follow, but only if it is this
@@ -396,7 +403,7 @@ func (s *CheckoutService) planRouteMove(ctx context.Context, tx pgx.Tx, runDate,
 	// driver sheet along with ours. Neither day can keep it: the moving run's
 	// stops are leaving, so what is left behind would list orders that are not
 	// going out. It is a plan over orders, so it is dropped and re-planned.
-	onlyRun, err := s.routes.RouteCoversOnlyRun(ctx, tx, route.ID, runDate)
+	onlyRun, err := s.routes.RouteCoversOnlyRun(ctx, tx, route.ID, runDay)
 	if err != nil {
 		return routeMove{}, err
 	}
@@ -404,7 +411,7 @@ func (s *CheckoutService) planRouteMove(ctx context.Context, tx pgx.Tx, runDate,
 		return routeMove{id: route.ID, drop: RouteDropSharedRun}, nil
 	}
 
-	return routeMove{id: route.ID, to: to}, nil
+	return routeMove{id: route.ID, to: toDay}, nil
 }
 
 // applyRouteMove carries out what planRouteMove decided, reporting which of the
@@ -434,6 +441,13 @@ const dateLayout = "2006-01-02"
 // same day look different.
 func dateOnly(t time.Time) time.Time {
 	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+// utcDay is the same calendar day anchored at UTC midnight, which is how a bare
+// `date` column round-trips and how routes are stored. Use it on the way into a
+// query that compares against one.
+func utcDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 }
 
 // sameDate compares two times by the calendar day each names, ignoring clock

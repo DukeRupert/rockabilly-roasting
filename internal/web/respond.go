@@ -114,6 +114,11 @@ func mapError(err error) (int, string) {
 	case errors.Is(err, app.ErrInvalidCredentials):
 		return http.StatusUnauthorized, "invalid credentials"
 
+	// A toggle naming a module this binary does not know about. 404 rather
+	// than 400: from the caller's side the module genuinely does not exist.
+	case errors.Is(err, app.ErrUnknownModule):
+		return http.StatusNotFound, "no such module"
+
 	case errors.Is(err, app.ErrPermissionDenied):
 		return http.StatusForbidden, "permission denied"
 

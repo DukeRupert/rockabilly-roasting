@@ -64,6 +64,7 @@ type Deps struct {
 	AuditQueryService      *app.AuditQueryService
 	WebhookService         *app.WebhookService
 	JobHealthService       *app.JobHealthService
+	ModuleService          *app.ModuleService
 	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
 	PaymentProvider        payments.Provider
 	RiverClient            *river.Client[pgx.Tx]
@@ -652,6 +653,8 @@ func NewRouter(deps *Deps) http.Handler {
 	settingsRoute("GET /admin/settings/wholesale", deps.handleAdminSettingsWholesale)
 	settingsRoute("GET /admin/settings/integrations", deps.handleAdminSettingsIntegrations)
 	settingsRoute("POST /admin/settings/default-price-list", deps.handleAdminDefaultPriceListUpdate)
+	settingsRoute("GET /admin/settings/modules", deps.handleAdminSettingsModules)
+	settingsRoute("POST /admin/settings/modules", deps.handleAdminModuleToggle)
 	settingsRoute("GET /admin/settings/box-presets", deps.handleAdminBoxPresets)
 	settingsRoute("POST /admin/settings/box-presets", deps.handleAdminBoxPresetCreate)
 	settingsRoute("POST /admin/settings/box-presets/{id}", deps.handleAdminBoxPresetUpdate)
@@ -681,12 +684,12 @@ func NewRouter(deps *Deps) http.Handler {
 	})
 
 	// Mount admin mux behind session middleware
-	mux.Handle("GET /admin/", deps.requireStaffSession(deps.withAdminBadges(adminMux)))
-	mux.Handle("POST /admin/{path...}", deps.requireStaffSession(deps.withAdminBadges(adminMux)))
+	mux.Handle("GET /admin/", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(adminMux))))
+	mux.Handle("POST /admin/{path...}", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(adminMux))))
 	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
-	mux.Handle("POST /auth/staff/logout", deps.requireStaffSession(deps.withAdminBadges(adminMux)))
+	mux.Handle("POST /auth/staff/logout", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(adminMux))))
 
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)

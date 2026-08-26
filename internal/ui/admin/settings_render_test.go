@@ -205,11 +205,14 @@ func TestSettingsNav_TabCountsAndTeamVisibility(t *testing.T) {
 		},
 	}
 	tabs := nav.tabs()
-	require.Len(t, tabs, 5)
+	require.Len(t, tabs, 6)
 	assert.Equal(t, 2, tabs[0].Count)
 	assert.Equal(t, 0, tabs[1].Count)
 	assert.Equal(t, 1, tabs[3].Count)
-	assert.Equal(t, settingsTabTeam, tabs[4].Href)
+	assert.Equal(t, settingsTabModules, tabs[4].Href)
+	// Team stays last, after Modules — it is the one tab that disappears for
+	// staff who cannot manage the roster, so it is the only index that moves.
+	assert.Equal(t, settingsTabTeam, tabs[5].Href)
 
 	support := SettingsNav{StaffRole: string(domain.StaffRoleSupport)}
 	for _, tab := range support.tabs() {

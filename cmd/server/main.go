@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/riverqueue/river"
@@ -361,6 +362,7 @@ func run() error {
 	staffInviteTokenStore := store.NewStaffInviteTokenStore()
 	customerUserStore := store.NewCustomerUserStore()
 	announcementStore := store.NewAnnouncementStore()
+	moduleStore := store.NewModuleStore()
 	customerUserInviteTokenStore := store.NewCustomerUserInviteTokenStore()
 	geocodeStore := store.NewGeocodeStore(metricsReg)
 	routeStore := store.NewRouteStore(metricsReg)
@@ -414,6 +416,16 @@ func run() error {
 	announcementSvc := app.NewAnnouncementService(announcementStore, customerStore, customerUserStore, auditWriter, metricsReg).
 		WithEmail(emailEnv).
 		WithUnsubscribeSigner(unsubscribeSigner)
+	// Optional feature modules. The enabled set is cached in memory, so it has
+	// to be loaded before anything serves — an unloaded cache reads as "every
+	// module off", which would hide a section the merchant switched on.
+	moduleSvc := app.NewModuleService(moduleStore, auditWriter)
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return moduleSvc.Refresh(ctx, tx)
+	}); err != nil {
+		logger.Error("load feature modules", "error", err)
+		os.Exit(1)
+	}
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, attributeStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -698,6 +710,7 @@ func run() error {
 		PaymentProvider:        paymentProvider,
 		RiverClient:            riverClient,
 		AnnouncementService:    announcementSvc,
+		ModuleService:          moduleSvc,
 		Enqueuer:               enqueuer,
 		R2Client:               r2Client,
 		MediaConfig:            mediaConfig,

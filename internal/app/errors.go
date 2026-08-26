@@ -281,6 +281,13 @@ var (
 	// not something to do from a phone in a van.
 	ErrStopAlreadyDelivered = errors.New("this stop is already marked delivered")
 
+	// --- Optional feature modules ---
+
+	// ErrUnknownModule is returned when a toggle names a key this binary does
+	// not have in its registry. Not a module to create on the fly — either the
+	// request was hand-made, or the caller is a deploy behind.
+	ErrUnknownModule = errors.New("unknown module")
+
 	// --- Announcements ---
 
 	ErrAnnouncementNotFound = errors.New("announcement not found")

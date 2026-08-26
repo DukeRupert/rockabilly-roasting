@@ -6,6 +6,12 @@ const (
 	// Background jobs — an operator handing a discarded job back to River.
 	AuditJobRetried = "job.retried"
 
+	// Optional feature modules — turning a whole section of the app on or off.
+	// Worth an audit entry because enabling one can start sending customer mail
+	// nobody was expecting, and "who did this" is the first question asked.
+	AuditModuleEnabled  = "module.enabled"
+	AuditModuleDisabled = "module.disabled"
+
 	AuditOrderCreated                = "order.created"
 	AuditOrderStatusChanged          = "order.status_changed"
 	AuditOrderRefunded               = "order.refunded"

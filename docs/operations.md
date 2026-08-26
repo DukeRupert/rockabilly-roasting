@@ -86,6 +86,43 @@ Needs `DATABASE_URL` and `GOOGLE_GEOCODING_API_KEY` (except `--dry-run`). Exits 
 
 ---
 
+## Releasing to production
+
+Production deploys on a pushed tag matching `v*`. `.github/workflows/deploy-prod.yml` builds the image, pushes it to DockerHub as both `:<tag>` and `:latest`, and runs `docker compose pull && up -d` on the VPS over SSH.
+
+That workflow also declares `workflow_dispatch`, so a manual run from the Actions tab is a second path to production. It deploys whatever `:latest` currently is, with no tag and no release notes, which makes it a debugging tool rather than a way to ship. Prefer the tag.
+
+`entrypoint.sh` runs `goose ... up` before `exec ./server` under `set -e`, so a migration that fails takes the container down instead of starting a server against a half-migrated schema. A green deploy therefore means the migrations ran.
+
+**Merging is not releasing.** A PR merged to `main` sits there until someone cuts a tag, and more than one merge can accumulate between tags. Before tagging, look at what you are actually about to ship:
+
+```bash
+git fetch --tags origin
+LAST=$(git tag --sort=-v:refname 'v*' | head -1)   # 'v*': a stray non-release tag must not become the baseline
+git log --oneline "$LAST"..origin/main                          # every commit in this release
+git diff --name-only --diff-filter=A "$LAST"..origin/main -- db/migrations/   # migrations that will run
+```
+
+This is not a formality. `v1.111.0` was cut believing it carried one PR's route fix; it carried two PRs and migration 072, because #11 had been merged the previous day and never tagged. Read the commit list before writing the tag message — the tag message should describe the release, not the last PR.
+
+Then cut an annotated tag (`git tag -a v<x.y.z>`, subject line plus prose body — see any recent tag with `git show v1.111.0`) and push it:
+
+```bash
+TAG=v<x.y.z>
+git push origin "$TAG"
+
+# Wait for the run for THIS tag. `gh run list --limit 1` straight after the push
+# often still returns the previous release — watching that one reports a stale
+# green and you believe a deploy landed that has not started.
+until RUN=$(gh run list -w "Deploy Prod" -b "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId') \
+      && [ -n "$RUN" ]; do sleep 5; done
+gh run watch "$RUN" --exit-status
+```
+
+Version by what the release contains, not by how much work it was: new user-visible capability is a minor bump, a fix to shipped behaviour is a patch.
+
+---
+
 ## Operational runbooks
 
 | Runbook | Covers |

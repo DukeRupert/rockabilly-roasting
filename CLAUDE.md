@@ -173,7 +173,7 @@ mage testVerbose                             # verbose output
 Live docs in `docs/`:
 - `CLAUDE-backend.md` — backend conventions (the authoritative reference) + a "Design rationale" appendix capturing non-obvious decisions
 - `admin-ui.md` / `admin-detail-pages.md` — admin visual conventions (lint-enforced) and detail-page structure
-- `operations.md` — one-shot tools (`cmd/support-reply`, `cmd/seed`, `cmd/sentrycheck`) and runbook index
+- `operations.md` — releasing to production (tag `v*`; check `git log <last-tag>..origin/main` first — merging is not releasing), one-shot tools (`cmd/support-reply`, `cmd/seed`, `cmd/sentrycheck`), and the runbook index
 - `backup-restore-runbook.md` — daily backup procedure and full restore steps
 - `stripe-setup.md` — Stripe wiring (keys, webhooks, tax)
 - `guide/` — end-user how-tos for admin, storefront, and wholesale

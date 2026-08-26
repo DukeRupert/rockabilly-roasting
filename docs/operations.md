@@ -92,15 +92,12 @@ Production deploys on a pushed tag matching `v*`. `.github/workflows/deploy-prod
 
 That workflow also declares `workflow_dispatch`, so a manual run from the Actions tab is a second path to production — and not a passive one. It builds the ref you dispatch (`main` unless you pick another), pushes it as `:latest`, and deploys it. That is an unannotated release of trunk, not a restart of the current one, and it overwrites the `:latest` that had been pointing at the last release. `deploy-dev.yml` only ever pushes `:dev-<sha>`, so this workflow is the only writer of `:latest`. Use a tag unless you are deliberately deploying something that is not a release.
 
-`entrypoint.sh` runs `goose ... up` before `exec ./server` under `set -e`, so a migration that fails takes the container down instead of starting a server against a half-migrated schema. A green deploy therefore means the migrations ran.
+### 1. Check what you are about to ship
 
-**Merging is not releasing.** A PR merged to `main` sits there until someone cuts a tag, and more than one merge can accumulate between tags. Before tagging, look at what you are actually about to ship:
+**Merging is not releasing.** A PR merged to `main` sits there until someone cuts a tag, and more than one merge can accumulate between tags.
 
 ```bash
 git fetch --tags origin
-git checkout main && git pull --ff-only   # the check below reads origin/main but `git tag` tags
-                                          # wherever you are standing — a stale local main means
-                                          # reviewing the right contents and tagging the wrong commit
 LAST=$(git tag -l --sort=-v:refname 'v*' | head -1)   # -l is load-bearing: without it 'v*' is read as a
                                                       # tag to create, LAST comes back empty, and both
                                                       # commands below silently report an empty release
@@ -108,26 +105,50 @@ git log --oneline "$LAST"..origin/main                          # every commit i
 git diff --name-only --diff-filter=A "$LAST"..origin/main -- db/migrations/   # migrations that will run
 ```
 
-This is not a formality. `v1.111.0` was cut believing it carried one PR's route fix; it carried two PRs and migration 072, because #11 had been merged the previous day and never tagged. Read the commit list before writing the tag message — the tag message should describe the release, not the last PR.
+This is not a formality. `v1.111.0` was cut believing it carried one PR's route fix; it carried two PRs and migration 072, because #11 had been merged an hour earlier and never tagged. Read the commit list before writing the tag message — the tag message should describe the release, not the last PR.
 
-Then cut an annotated tag — subject line plus a prose body describing the release; `git show v1.111.0` is the shape — and push it:
+### 2. Cut the tag
+
+Annotated, with a subject line and a prose body describing the release; `git show v1.111.0` is the shape. Run this line on its own — with no `-m` it opens an editor, so pasting it as part of a block feeds the following lines to the editor as keystrokes:
+
+```bash
+git tag -a v<x.y.z> origin/main
+```
+
+Tagging `origin/main` explicitly is deliberate: it is the ref step 1 inspected, so the tag cannot land on a stale local `main` or on whatever branch you happen to be standing on. It needs no checkout and is unaffected by uncommitted work.
+
+### 3. Push it and watch the deploy
 
 ```bash
 TAG=v<x.y.z>
-git tag -a "$TAG"          # opens $EDITOR: subject, blank line, body
 git push origin "$TAG"
 
-# Wait for the run for THIS tag. `gh run list --limit 1` straight after the push
-# often still returns the previous release — watching that one reports a stale
-# green and you believe a deploy landed that has not started.
+# Wait for the run belonging to THIS tag. `gh run list --limit 1` straight after
+# the push often still returns the previous release — watching that one reports a
+# stale green for a deploy that has not started.
+RUN=""
 for _ in $(seq 24); do
   RUN=$(gh run list -w "Deploy Prod" -b "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId')
   [ -n "$RUN" ] && break
   sleep 5
 done
-[ -n "$RUN" ] || { echo "no Deploy Prod run for $TAG after 2min — check the Actions tab"; exit 1; }
-gh run watch "$RUN" --exit-status
+if [ -n "$RUN" ]; then
+  gh run watch "$RUN" --exit-status
+else
+  echo "no Deploy Prod run for $TAG after 2min — check the Actions tab"
+fi
 ```
+
+### 4. Confirm it is actually live
+
+```bash
+curl -s https://rockabillyroasting.com/version
+# {"version":"v1.111.0","commit":"7c0bcb5...","go":"go1.25.14"}
+```
+
+**A green workflow run is not this check.** The SSH step ends in `docker compose up -d` with no `--wait`, so it returns as soon as the containers are *started*. A container that then dies in `entrypoint.sh` — a failed migration, say — does so after the run has already gone green. Nor is a 200 from the storefront enough: a new container that fails can leave the previous one serving.
+
+`/version` settles it because `entrypoint.sh` runs `goose ... up` and only then `exec ./server`, under `set -e`. A server answering with your commit is therefore proof that your migrations ran.
 
 Version by what the release contains, not by how much work it was: new user-visible capability is a minor bump, a fix to shipped behaviour is a patch.
 

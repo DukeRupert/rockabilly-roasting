@@ -90,7 +90,7 @@ Needs `DATABASE_URL` and `GOOGLE_GEOCODING_API_KEY` (except `--dry-run`). Exits 
 
 Production deploys on a pushed tag matching `v*`. `.github/workflows/deploy-prod.yml` builds the image, pushes it to DockerHub as both `:<tag>` and `:latest`, and runs `docker compose pull && up -d` on the VPS over SSH.
 
-That workflow also declares `workflow_dispatch`, so a manual run from the Actions tab is a second path to production. It deploys whatever `:latest` currently is, with no tag and no release notes, which makes it a debugging tool rather than a way to ship. Prefer the tag.
+That workflow also declares `workflow_dispatch`, so a manual run from the Actions tab is a second path to production — and not a passive one. It builds the ref you dispatch (`main` unless you pick another), pushes it as `:latest`, and deploys it. That is an unannotated release of trunk, not a restart of the current one, and it overwrites the `:latest` that had been pointing at the last release. `deploy-dev.yml` only ever pushes `:dev-<sha>`, so this workflow is the only writer of `:latest`. Use a tag unless you are deliberately deploying something that is not a release.
 
 `entrypoint.sh` runs `goose ... up` before `exec ./server` under `set -e`, so a migration that fails takes the container down instead of starting a server against a half-migrated schema. A green deploy therefore means the migrations ran.
 
@@ -98,7 +98,9 @@ That workflow also declares `workflow_dispatch`, so a manual run from the Action
 
 ```bash
 git fetch --tags origin
-LAST=$(git tag --sort=-v:refname 'v*' | head -1)   # 'v*': a stray non-release tag must not become the baseline
+LAST=$(git tag -l --sort=-v:refname 'v*' | head -1)   # -l is load-bearing: without it 'v*' is read as a
+                                                      # tag to create, LAST comes back empty, and both
+                                                      # commands below silently report an empty release
 git log --oneline "$LAST"..origin/main                          # every commit in this release
 git diff --name-only --diff-filter=A "$LAST"..origin/main -- db/migrations/   # migrations that will run
 ```
@@ -114,8 +116,12 @@ git push origin "$TAG"
 # Wait for the run for THIS tag. `gh run list --limit 1` straight after the push
 # often still returns the previous release — watching that one reports a stale
 # green and you believe a deploy landed that has not started.
-until RUN=$(gh run list -w "Deploy Prod" -b "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId') \
-      && [ -n "$RUN" ]; do sleep 5; done
+for _ in $(seq 24); do
+  RUN=$(gh run list -w "Deploy Prod" -b "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId')
+  [ -n "$RUN" ] && break
+  sleep 5
+done
+[ -n "$RUN" ] || { echo "no Deploy Prod run for $TAG after 2min — check the Actions tab"; exit 1; }
 gh run watch "$RUN" --exit-status
 ```
 

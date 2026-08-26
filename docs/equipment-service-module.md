@@ -1,7 +1,7 @@
 # Equipment Service — an optional Hiri module
 
-Status: steps 1-3 built — module registry, schema, store layer, and the equipment register
-(list, detail, add/edit, customer card). Tickets are next.
+Status: steps 1-4 built — module registry, schema, store layer, the equipment
+register, and the ticket queue with its merged timeline. Parts and hours are next.
 Written 2026-08-24, last updated 2026-08-25.
 
 ## The job
@@ -314,8 +314,9 @@ Section tabs under Service (`section_nav.templ`, not sidebar rows):
   loaner-only view is worth a saved filter.
 - **Schedules** — v2, hidden until then.
 
-Until Tickets exists the strip is not drawn at all — a one-tab strip is chrome
-with nothing to choose — and `/admin/service` simply redirects to the register.
+`/admin/service` is the queue itself: it is what staff open the section to look
+at. Scopes across the top — Open, Mine, Gone quiet, Closed — are links rather
+than a filter dropdown, because they are the four questions actually asked.
 
 **Ticket detail** follows `docs/admin-detail-pages.md`: main column holds the
 timeline (notes + audit, merged, newest first) with the note composer at the
@@ -443,8 +444,10 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
 1. **Does service get billed?** The schema captures `billable` from day one, so
    this can be answered late — but it decides whether v2 leads with billing or
    with schedules.
-2. **Stale window default.** 7 days is a guess. Make it a settings field, ship
-   7, and look at real data.
+2. **Stale window default.** 7 days is a guess, and currently a constant
+   (`domain.DefaultStaleContactWindow`) rather than a settings row — nothing has
+   run long enough to argue with it. The sweep job in step 6 makes it
+   configurable.
 4. **Loaner machines and volume commitments.** If loaners are placed against a
    pounds-per-month commitment, tracking that commitment is a natural neighbour
    of this module — but it's a sales feature wearing a service costume. Keep it
@@ -460,7 +463,10 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
 3. **Done.** Equipment register: list with filters, detail page, add/edit form,
    and the Equipment card on the customer rail. The **Service** sidebar row
    arrived with it — module-gated, so it exists only where the module is on.
-4. Tickets: list, detail, timeline, status machine, notes.
+4. **Done.** Tickets: queue with scopes and the stale flag, detail page with the
+   merged notes-and-audit timeline, status machine, note composer, assignment,
+   and the repair history on the machine page. The section tab strip arrived
+   with it.
 5. Parts and time entries on the ticket detail.
 6. Stale-contact flagging + the daily sweep.
 7. Wholesale portal equipment list + report-a-problem + notification email.

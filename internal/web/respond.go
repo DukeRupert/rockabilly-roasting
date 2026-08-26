@@ -67,6 +67,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrInvoiceNotFound),
 		errors.Is(err, app.ErrAnnouncementNotFound),
 		errors.Is(err, app.ErrEquipmentNotFound),
+		errors.Is(err, app.ErrServiceTicketNotFound),
 		// Access denial is surfaced as 404 so we never confirm a restricted
 		// product/SKU exists to a viewer who may not see it.
 		errors.Is(err, app.ErrProductNotAccessible):
@@ -114,6 +115,15 @@ func mapError(err error) (int, string) {
 
 	case errors.Is(err, app.ErrInvalidCredentials):
 		return http.StatusUnauthorized, "invalid credentials"
+
+	// Service ticket validation. Same rule as equipment: say what to fix.
+	case errors.Is(err, app.ErrServiceTicketTitleRequired),
+		errors.Is(err, app.ErrInvalidServiceSeverity),
+		errors.Is(err, app.ErrInvalidServiceTicketStatus),
+		errors.Is(err, app.ErrInvalidServiceNoteKind),
+		errors.Is(err, app.ErrEmptyServiceNote),
+		errors.Is(err, app.ErrTicketEquipmentMismatch):
+		return http.StatusBadRequest, err.Error()
 
 	// Equipment validation. Each message is the correction to make, not a
 	// restatement of the rule.

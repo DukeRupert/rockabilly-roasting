@@ -49,9 +49,14 @@ func (d *Deps) handleAdminEquipmentList(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var rows []domain.EquipmentWithCustomer
+	var nav admin.ServiceNav
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		rows, txErr = d.EquipmentService.ListWithCustomer(ctx, tx, filter)
+		if txErr != nil {
+			return txErr
+		}
+		nav, txErr = d.serviceNav(ctx, tx)
 		return txErr
 	}); err != nil {
 		Error(w, r, err)
@@ -61,6 +66,7 @@ func (d *Deps) handleAdminEquipmentList(w http.ResponseWriter, r *http.Request) 
 	staffName, staffRole := staffNameRole(r)
 	props := admin.EquipmentListProps{
 		Equipment:      rows,
+		Nav:            nav,
 		Category:       string(filter.Category),
 		Ownership:      string(filter.Ownership),
 		Search:         filter.Search,
@@ -281,6 +287,7 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 	var equipment *domain.Equipment
 	var customerName, siteLabel string
 	var activity []domain.AuditEntry
+	var tickets []admin.ServiceTicketRow
 
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -309,7 +316,20 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 		}
 
 		activity, txErr = d.AuditQueryService.ListByResource(ctx, tx, "equipment", equipment.ID)
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+
+		// Every ticket against this machine, closed ones included — a repair
+		// history that hides finished work cannot make the case for replacing
+		// a machine.
+		machineID := equipment.ID
+		history, txErr := d.ServiceTicketService.List(ctx, tx, store.ServiceTicketFilter{EquipmentID: &machineID})
+		if txErr != nil {
+			return txErr
+		}
+		tickets = admin.ServiceTicketRowsFrom(history, nil, nil, nil, staleCutoff())
+		return nil
 	}); err != nil {
 		Error(w, r, err)
 		return
@@ -321,6 +341,7 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 		CustomerName: customerName,
 		SiteLabel:    siteLabel,
 		Activity:     activity,
+		Tickets:      tickets,
 		MerchantTZ:   d.MerchantTZ,
 		StaffName:    staffName,
 		StaffRole:    staffRole,

@@ -66,6 +66,7 @@ type Deps struct {
 	JobHealthService       *app.JobHealthService
 	ModuleService          *app.ModuleService
 	EquipmentService       *app.EquipmentService
+	ServiceTicketService   *app.ServiceTicketService
 	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
 	PaymentProvider        payments.Provider
 	RiverClient            *river.Client[pgx.Tx]
@@ -677,11 +678,18 @@ func NewRouter(deps *Deps) http.Handler {
 		adminMux.Handle(pattern, deps.requireModule(domain.ModuleEquipmentService,
 			deps.requirePermission(auth.PermWriteService, h)))
 	}
-	// The section's front door. Tickets take this slot in step 4; until then
-	// the register is the only thing behind it.
-	serviceRead("GET /admin/service", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/admin/service/equipment", http.StatusSeeOther)
-	})
+	// The queue is the section's front door — it is what staff open Service to
+	// look at.
+	serviceRead("GET /admin/service", deps.handleAdminServiceTicketList)
+	serviceWrite("GET /admin/service/tickets/new", deps.handleAdminServiceTicketNew)
+	// The machine picker fragment, refreshed when the customer select changes.
+	serviceWrite("GET /admin/service/tickets/machines", deps.handleAdminServiceTicketMachines)
+	serviceWrite("POST /admin/service/tickets", deps.handleAdminServiceTicketCreate)
+	serviceRead("GET /admin/service/tickets/{id}", deps.handleAdminServiceTicketShow)
+	serviceWrite("POST /admin/service/tickets/{id}/status", deps.handleAdminServiceTicketStatus)
+	serviceWrite("POST /admin/service/tickets/{id}/assign", deps.handleAdminServiceTicketAssign)
+	serviceWrite("POST /admin/service/tickets/{id}/notes", deps.handleAdminServiceTicketNote)
+
 	serviceRead("GET /admin/service/equipment", deps.handleAdminEquipmentList)
 	// Registered before the {id} pattern would shadow it — "new" is not a uuid,
 	// but Go's mux prefers the more specific literal either way, and stating it

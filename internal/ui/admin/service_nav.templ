@@ -1,0 +1,35 @@
+package admin
+
+// Section chrome for Service. Tickets is the section's front door — the queue
+// is what staff open the section to look at — and Equipment is the register
+// behind it.
+//
+// The strip only earns its place now that there are two tabs. While the
+// register was the only page here it was not drawn at all: a one-tab strip is
+// chrome offering no choice.
+
+const (
+	serviceTabTickets   = "/admin/service"
+	serviceTabEquipment = "/admin/service/equipment"
+)
+
+// ServiceNav is the per-request state the strip needs.
+type ServiceNav struct {
+	// StaleCount is the number of open tickets nobody has spoken to the
+	// customer about inside the contact window. It rides on the Tickets tab
+	// because that is where the fix is, and it renders on every page in the
+	// section so a ticket going quiet cannot hide behind a tab nobody clicked —
+	// the same rule the Settings attention list follows.
+	StaleCount int
+}
+
+func (n ServiceNav) tabs() []sectionTab {
+	return []sectionTab{
+		{Label: "Tickets", Href: serviceTabTickets, Count: n.StaleCount},
+		{Label: "Equipment", Href: serviceTabEquipment},
+	}
+}
+
+templ serviceSection(nav ServiceNav, activeHref string) {
+	@adminSectionTabs(nav.tabs(), activeHref)
+}

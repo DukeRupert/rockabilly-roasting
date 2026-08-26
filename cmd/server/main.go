@@ -364,6 +364,7 @@ func run() error {
 	announcementStore := store.NewAnnouncementStore()
 	moduleStore := store.NewModuleStore()
 	equipmentStore := store.NewEquipmentStore()
+	serviceTicketStore := store.NewServiceTicketStore()
 	customerUserInviteTokenStore := store.NewCustomerUserInviteTokenStore()
 	geocodeStore := store.NewGeocodeStore(metricsReg)
 	routeStore := store.NewRouteStore(metricsReg)
@@ -428,6 +429,7 @@ func run() error {
 		os.Exit(1)
 	}
 	equipmentSvc := app.NewEquipmentService(equipmentStore, auditWriter)
+	serviceTicketSvc := app.NewServiceTicketService(serviceTicketStore, equipmentStore, auditWriter)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, attributeStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -714,6 +716,7 @@ func run() error {
 		AnnouncementService:    announcementSvc,
 		ModuleService:          moduleSvc,
 		EquipmentService:       equipmentSvc,
+		ServiceTicketService:   serviceTicketSvc,
 		Enqueuer:               enqueuer,
 		R2Client:               r2Client,
 		MediaConfig:            mediaConfig,

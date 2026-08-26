@@ -292,6 +292,25 @@ var (
 	ErrInvalidEquipmentOwnership = errors.New("pick a valid ownership")
 	ErrInvalidEquipmentStatus    = errors.New("pick a valid equipment status")
 
+	// --- Service tickets ---
+
+	ErrServiceTicketNotFound = errors.New("service ticket not found")
+	// ErrServiceTicketTitleRequired guards the untitled ticket. The list view is
+	// a column of titles; a blank one is a row nobody can triage without
+	// opening it.
+	ErrServiceTicketTitleRequired = errors.New("what is wrong? give the ticket a one-line title")
+	ErrInvalidServiceSeverity     = errors.New("pick a valid severity")
+	ErrInvalidServiceTicketStatus = errors.New("pick a valid ticket status")
+	ErrInvalidServiceNoteKind     = errors.New("pick a valid note type")
+	// ErrEmptyServiceNote rejects the blank timeline entry. An empty note that
+	// counts as contact would reset the staleness clock while saying nothing —
+	// the precise failure the flag exists to catch.
+	ErrEmptyServiceNote = errors.New("write something before saving the note")
+	// ErrTicketEquipmentMismatch stops a ticket being filed against a machine
+	// belonging to somebody else, which would put one cafe's repair history on
+	// another's page.
+	ErrTicketEquipmentMismatch = errors.New("that machine belongs to a different customer")
+
 	// --- Optional feature modules ---
 
 	// ErrUnknownModule is returned when a toggle names a key this binary does

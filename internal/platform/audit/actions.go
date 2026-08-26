@@ -17,6 +17,19 @@ const (
 	AuditEquipmentReturnedToService = "equipment.returned_to_service"
 	AuditEquipmentRetired           = "equipment.retired"
 
+	// Service tickets. Status moves are one action carrying from/to in
+	// metadata, unlike equipment: a ticket has seven states and naming each
+	// transition would be twenty-odd constants for a timeline that reads the
+	// same either way. Resolved is split out because it is the one the marker
+	// colours differently.
+	AuditServiceTicketOpened    = "service_ticket.opened"
+	AuditServiceTicketAssigned  = "service_ticket.assigned"
+	AuditServiceTicketStatus    = "service_ticket.status_changed"
+	AuditServiceTicketResolved  = "service_ticket.resolved"
+	AuditServiceTicketReopened  = "service_ticket.reopened"
+	AuditServiceTicketCancelled = "service_ticket.cancelled"
+	AuditServiceTicketNoteAdded = "service_ticket.note_added"
+
 	// Optional feature modules — turning a whole section of the app on or off.
 	// Worth an audit entry because enabling one can start sending customer mail
 	// nobody was expecting, and "who did this" is the first question asked.

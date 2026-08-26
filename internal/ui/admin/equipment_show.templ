@@ -12,9 +12,9 @@ import (
 // to it, rail for what you can DO about it.
 //
 // The reason this page exists is the argument it lets staff make: "we have
-// replaced this pump twice in a year, the machine is the problem". Until the
-// ticket list arrives in step 4 the main column holds identity and the audit
-// timeline; the repair history slots in beneath them.
+// replaced this pump twice in a year, the machine is the problem". The main
+// column carries that argument — identity, then every ticket ever raised
+// against it, then the audit timeline.
 
 // EquipmentShowProps is the detail page's state.
 type EquipmentShowProps struct {
@@ -22,6 +22,10 @@ type EquipmentShowProps struct {
 	CustomerName string
 	SiteLabel    string
 	Activity     []domain.AuditEntry
+	// Tickets are every repair ever raised against this machine, newest first.
+	// This is the argument the page exists to let staff make: "we have replaced
+	// this pump twice in a year, the machine is the problem."
+	Tickets []ServiceTicketRow
 	MerchantTZ   *time.Location
 	StaffName    string
 	StaffRole    string
@@ -127,7 +131,7 @@ templ EquipmentShowContent(props EquipmentShowProps) {
 					</div>
 				</div>
 			</div>
-			<!-- Repair history lands here in step 4, above the audit timeline. -->
+			@equipmentRepairHistory(props)
 			@EquipmentActivity(props.Activity, props.MerchantTZ)
 		</div>
 		<!-- Rail -->
@@ -179,6 +183,47 @@ templ EquipmentShowContent(props EquipmentShowProps) {
 						</form>
 					</div>
 				</div>
+			}
+		</div>
+	</div>
+}
+
+// equipmentRepairHistory is every ticket ever raised against this machine.
+//
+// Main column, not rail: this is what happened to the machine, which is the
+// substance of the page. Closed tickets stay — a repair history with the
+// finished work hidden could not make the argument it exists to make.
+templ equipmentRepairHistory(props EquipmentShowProps) {
+	<div class="mt-4 border border-rr-border bg-rr-surface">
+		<div class="px-4 py-4">
+			<div class="flex items-center justify-between">
+				<h2 class="text-sm font-semibold text-rr-heading">Repair history</h2>
+				if props.CanWrite && props.Equipment.Status != domain.EquipmentStatusRetired {
+					<a
+						href={ templ.SafeURL("/admin/service/tickets/new?customer_id=" + props.Equipment.CustomerID.String() + "&equipment_id=" + props.Equipment.ID.String()) }
+						class="text-sm text-rr-muted underline"
+					>Open a ticket</a>
+				}
+			</div>
+			if len(props.Tickets) == 0 {
+				<p class="mt-2 text-sm text-rr-muted">Nothing has ever gone wrong with this one.</p>
+			} else {
+				<ul role="list" class="mt-3 divide-y divide-rr-border">
+					for _, row := range props.Tickets {
+						<li class="flex flex-wrap items-baseline justify-between gap-2 py-2 first:pt-0">
+							<div class="min-w-0">
+								<a href={ templ.SafeURL("/admin/service/tickets/" + row.Ticket.ID.String()) } class="text-sm font-medium text-rr-heading underline">
+									{ row.Ticket.Title }
+								</a>
+								<div class="flex flex-wrap items-center gap-1.5">
+									<span class="font-mono text-xs text-rr-muted">{ row.Ticket.Number }</span>
+									<span class="text-xs text-rr-muted">{ equipmentDateLabel(&row.Ticket.CreatedAt, props.MerchantTZ) }</span>
+								</div>
+							</div>
+							<span class={ serviceStatusBadge(row.Ticket.Status) }>{ row.Ticket.Status.Label() }</span>
+						</li>
+					}
+				</ul>
 			}
 		</div>
 	</div>

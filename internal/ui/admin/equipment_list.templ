@@ -15,6 +15,7 @@ import (
 // EquipmentListProps is the register's state.
 type EquipmentListProps struct {
 	Equipment []domain.EquipmentWithCustomer
+	Nav       ServiceNav
 	// Filters, echoed back so the controls show what is actually applied.
 	Category       string
 	Ownership      string
@@ -104,6 +105,7 @@ func equipmentFilterHref(category, ownership, search string, includeRetired bool
 
 templ EquipmentListContent(props EquipmentListProps) {
 	@ConfirmDialogHost()
+	@serviceSection(props.Nav, serviceTabEquipment)
 	<div class="sm:flex sm:items-center">
 		<div class="sm:flex-auto">
 			<h1 class="admin-page-title">Equipment</h1>

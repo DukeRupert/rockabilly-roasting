@@ -286,6 +286,15 @@ func (t ServiceTicket) StaleSince(cutoff time.Time) bool {
 	return t.LastContactAt.Before(cutoff)
 }
 
+// DefaultStaleContactWindow is how long an open ticket may go without anyone
+// talking to the customer before it is flagged.
+//
+// Seven days is a guess — a considered one, but a guess. It is a constant here
+// rather than a settings row because nothing has run long enough to argue with
+// it yet; the sweep job in step 6 makes it configurable, and until then one
+// place holds the number.
+const DefaultStaleContactWindow = 7 * 24 * time.Hour
+
 // ServiceTicketNote is one entry on a ticket's timeline.
 type ServiceTicketNote struct {
 	ID         uuid.UUID

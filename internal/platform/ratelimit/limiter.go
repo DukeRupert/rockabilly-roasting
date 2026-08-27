@@ -14,8 +14,8 @@ import (
 // Predefined limit configurations.
 var (
 	// Auth endpoints — tight sliding windows.
-	AuthIPLimit         = 10  // attempts per window per IP (across all auth endpoints)
-	AuthIdentifierLimit = 5   // attempts per window per identifier
+	AuthIPLimit         = 10 // attempts per window per IP (across all auth endpoints)
+	AuthIdentifierLimit = 5  // attempts per window per identifier
 	AuthWindow          = 15 * time.Minute
 
 	StaffIPLimit         = 5 // tighter for staff
@@ -62,6 +62,13 @@ var (
 	// plus retries. Still IP-capped since the endpoint is only token-gated.
 	WhiteLabelIPLimit = 10
 	WhiteLabelWindow  = time.Hour
+
+	// Equipment fault reports from the wholesale portal. Roomier than the apply
+	// form because a real bad morning legitimately produces several — two
+	// machines down and a follow-up on each is four — but capped so a stuck
+	// form cannot page the crew all day.
+	ServiceReportLimit  = 10
+	ServiceReportWindow = time.Hour
 
 	// Global per-IP.
 	GlobalIPLimit = 300
@@ -181,8 +188,13 @@ func CouponSessionKey(sessionID string) string   { return "coupon:sess:" + sessi
 func CouponIPKey(ip string) string               { return "coupon:ip:" + ip }
 func SubscribeIPKey(ip string) string            { return "subscribe:ip:" + ip }
 func CheckoutSessionKey(sessionID string) string { return "checkout:sess:" + sessionID }
-func ContactIPKey(ip string) string               { return "contact:ip:" + ip }
-func WholesaleApplyIPKey(ip string) string        { return "wholesale-apply:ip:" + ip }
-func NewsletterIPKey(ip string) string            { return "newsletter:ip:" + ip }
-func WhiteLabelIPKey(ip string) string            { return "white-label:ip:" + ip }
+func ContactIPKey(ip string) string              { return "contact:ip:" + ip }
+func WholesaleApplyIPKey(ip string) string       { return "wholesale-apply:ip:" + ip }
+func NewsletterIPKey(ip string) string           { return "newsletter:ip:" + ip }
+func WhiteLabelIPKey(ip string) string           { return "white-label:ip:" + ip }
 func GlobalIPKey(ip string) string               { return "global:ip:" + ip }
+
+// ServiceReportKey buckets equipment fault reports by wholesale account, not by
+// IP: a cafe is one account behind one router, and the barista reporting the
+// grinder must not be blocked by the manager who reported the espresso machine.
+func ServiceReportKey(customerID string) string { return "service-report:cust:" + customerID }

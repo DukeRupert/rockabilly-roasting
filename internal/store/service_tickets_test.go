@@ -337,3 +337,82 @@ func TestServiceTicketNumberIsUnique(t *testing.T) {
 	_, err = tickets.Create(ctx, tx, ticketParams(customer.ID, "SVC-DUPLICATE"))
 	require.Error(t, err)
 }
+
+// The portal answers "when did you last look at this" per machine, and it has to
+// mean somebody finished something. An open ticket is the complaint the customer
+// is already looking at, not a service visit.
+func TestLastServiceByEquipmentCountsOnlyResolvedWork(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	tickets := store.NewServiceTicketStore()
+	equip := store.NewEquipmentStore()
+	customer := testutil.CreateCustomer(t, tx)
+
+	machine, err := equip.Create(ctx, tx, equipmentParams(customer.ID))
+	require.NoError(t, err)
+
+	// Two resolved visits and one still open, all on the same machine.
+	for _, number := range []string{"SVC-LSVC0001", "SVC-LSVC0002"} {
+		p := ticketParams(customer.ID, number)
+		p.EquipmentID = &machine.ID
+		created, cErr := tickets.Create(ctx, tx, p)
+		require.NoError(t, cErr)
+		_, cErr = tickets.UpdateStatus(ctx, tx, created.ID, domain.ServiceTicketStatusResolved, "Seals replaced.")
+		require.NoError(t, cErr)
+	}
+	open := ticketParams(customer.ID, "SVC-LSVC0003")
+	open.EquipmentID = &machine.ID
+	_, err = tickets.Create(ctx, tx, open)
+	require.NoError(t, err)
+
+	dates, err := tickets.LastServiceByEquipment(ctx, tx, customer.ID)
+	require.NoError(t, err)
+
+	at, ok := dates[machine.ID]
+	require.True(t, ok, "a machine with resolved work has a last-serviced date")
+	assert.False(t, at.IsZero())
+}
+
+// A machine nobody has been called out to is simply absent from the map — the
+// caller decides how to say "not yet", and a zero time would read as 1 AD.
+func TestLastServiceByEquipmentOmitsUnservicedMachines(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	tickets := store.NewServiceTicketStore()
+	equip := store.NewEquipmentStore()
+	customer := testutil.CreateCustomer(t, tx)
+
+	machine, err := equip.Create(ctx, tx, equipmentParams(customer.ID))
+	require.NoError(t, err)
+
+	dates, err := tickets.LastServiceByEquipment(ctx, tx, customer.ID)
+	require.NoError(t, err)
+
+	_, ok := dates[machine.ID]
+	assert.False(t, ok)
+}
+
+// Customer scoping is the security boundary on this page, and this query is one
+// of the reads behind it.
+func TestLastServiceByEquipmentIsCustomerScoped(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	tickets := store.NewServiceTicketStore()
+	equip := store.NewEquipmentStore()
+
+	owner := testutil.CreateCustomer(t, tx, testutil.WithEmail("owner-lsvc@example.test"))
+	stranger := testutil.CreateCustomer(t, tx, testutil.WithEmail("stranger-lsvc@example.test"))
+
+	machine, err := equip.Create(ctx, tx, equipmentParams(owner.ID))
+	require.NoError(t, err)
+	p := ticketParams(owner.ID, "SVC-LSVC0004")
+	p.EquipmentID = &machine.ID
+	created, err := tickets.Create(ctx, tx, p)
+	require.NoError(t, err)
+	_, err = tickets.UpdateStatus(ctx, tx, created.ID, domain.ServiceTicketStatusResolved, "Done.")
+	require.NoError(t, err)
+
+	dates, err := tickets.LastServiceByEquipment(ctx, tx, stranger.ID)
+	require.NoError(t, err)
+	assert.Empty(t, dates, "another customer's repair history must not leak")
+}

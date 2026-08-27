@@ -27,4 +27,8 @@ type JobEnqueuer interface {
 	// A zero sendAt means immediately.
 	EnqueueAnnouncementDispatch(ctx context.Context, tx pgx.Tx, announcementID uuid.UUID, sendAt time.Time) error
 	EnqueueAnnouncementSend(ctx context.Context, tx pgx.Tx, announcementID, customerID uuid.UUID) error
+	// EnqueueServiceTicketOpened notifies staff that a wholesale customer
+	// reported a broken machine. urgent skips the quiet-hours deferral, which
+	// is what a machine that is down right now is for.
+	EnqueueServiceTicketOpened(ctx context.Context, tx pgx.Tx, ticketID uuid.UUID, urgent bool) error
 }

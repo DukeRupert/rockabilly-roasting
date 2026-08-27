@@ -54,9 +54,11 @@ func commitTicket(t *testing.T, ctx context.Context, customerID uuid.UUID, numbe
 	return id
 }
 
-// sweepService builds a ServiceTicketService wired the way main wires it, with
-// the equipment module forced to the requested state.
-func sweepService(t *testing.T, ctx context.Context, moduleOn bool) (*app.ServiceTicketService, *email.TestSender) {
+// notifyingService builds a ServiceTicketService wired the way main wires it —
+// mailer, customer names, module registry, metrics — with the equipment module
+// forced to the requested state. Shared by the sweep's tests and the
+// ticket-opened notice's, which need exactly the same wiring.
+func notifyingService(t *testing.T, ctx context.Context, moduleOn bool) (*app.ServiceTicketService, *email.TestSender) {
 	t.Helper()
 
 	renderer, err := emailtemplates.New()
@@ -85,7 +87,7 @@ func sweepService(t *testing.T, ctx context.Context, moduleOn bool) (*app.Servic
 	require.NoError(t, tx.Commit(ctx))
 
 	svc := app.NewServiceTicketService(store.NewServiceTicketStore(), store.NewEquipmentStore(), audit.NewAuditWriter()).
-		WithSweep(app.EmailEnv{
+		WithNotifications(app.EmailEnv{
 			Mailer:     sender,
 			Renderer:   renderer,
 			FromAddr:   "shop@example.test",
@@ -101,7 +103,7 @@ func sweepService(t *testing.T, ctx context.Context, moduleOn bool) (*app.Servic
 // staff without anyone thinking to go looking for it.
 func TestSweepStaleTickets_MailsTheQuietOnes(t *testing.T) {
 	ctx := t.Context()
-	svc, sender := sweepService(t, ctx, true)
+	svc, sender := notifyingService(t, ctx, true)
 	customer := commitCustomer(t, ctx)
 
 	number := "SVC-SWEEP" + uuid.New().String()[:6]
@@ -125,7 +127,7 @@ func TestSweepStaleTickets_MailsTheQuietOnes(t *testing.T) {
 // day is a digest people learn to filter.
 func TestSweepStaleTickets_SilentWhenNothingIsQuiet(t *testing.T) {
 	ctx := t.Context()
-	svc, sender := sweepService(t, ctx, true)
+	svc, sender := notifyingService(t, ctx, true)
 	customer := commitCustomer(t, ctx)
 
 	commitTicket(t, ctx, customer, "SVC-FRESH"+uuid.New().String()[:6],
@@ -140,7 +142,7 @@ func TestSweepStaleTickets_SilentWhenNothingIsQuiet(t *testing.T) {
 // thing stopping a shop that does not service machines from getting this mail.
 func TestSweepStaleTickets_ModuleOffSendsNothing(t *testing.T) {
 	ctx := t.Context()
-	svc, sender := sweepService(t, ctx, false)
+	svc, sender := notifyingService(t, ctx, false)
 	customer := commitCustomer(t, ctx)
 
 	commitTicket(t, ctx, customer, "SVC-OFF"+uuid.New().String()[:6],
@@ -155,7 +157,7 @@ func TestSweepStaleTickets_ModuleOffSendsNothing(t *testing.T) {
 // be shown to have been reported rather than missed.
 func TestSweepStaleTickets_AuditsTheSend(t *testing.T) {
 	ctx := t.Context()
-	svc, _ := sweepService(t, ctx, true)
+	svc, _ := notifyingService(t, ctx, true)
 	customer := commitCustomer(t, ctx)
 
 	number := "SVC-AUD" + uuid.New().String()[:6]

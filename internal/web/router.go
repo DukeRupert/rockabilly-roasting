@@ -376,20 +376,58 @@ func NewRouter(deps *Deps) http.Handler {
 	wholesaleMux.HandleFunc("GET /wholesale/account/security", deps.handleWholesaleAccountSecurity)
 	wholesaleMux.HandleFunc("POST /wholesale/account/security/set", deps.handleWholesaleAccountPasswordSet)
 	wholesaleMux.HandleFunc("POST /wholesale/account/security/change", deps.handleWholesaleAccountPasswordChange)
-	mux.Handle("GET /wholesale/reorder", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/portal", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/portal/", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("POST /wholesale/portal/{path...}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/checkout", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/checkout/", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/order-confirmed", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("POST /wholesale/checkout/{path...}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("POST /wholesale/cart/{path...}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/help", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/help/{slug}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/account", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/account/{path...}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("POST /wholesale/account/{path...}", deps.requireApprovedWholesale(wholesaleMux))
+
+	// Equipment service module, customer side. Rate-limited per account rather
+	// than per IP — a cafe is one account behind one router, so an IP bucket
+	// would let the manager's report lock out the barista's.
+	//
+	// Registered on the inner mux so the limiter runs after the auth check and
+	// can read the customer from the session, the same arrangement the account
+	// security routes use.
+	serviceReportLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.ServiceReportLimit, ratelimit.ServiceReportWindow, func(r *http.Request) string {
+		customer, ok := auth.CustomerFromContext(r.Context())
+		if !ok {
+			return ""
+		}
+		return ratelimit.ServiceReportKey(customer.ID.String())
+	})
+	wholesaleMux.HandleFunc("GET /wholesale/account/equipment", deps.handleWholesaleEquipment)
+	wholesaleMux.Handle("POST /wholesale/account/equipment/{id}/report",
+		serviceReportLimit(http.HandlerFunc(deps.handleWholesaleEquipmentReport)))
+
+	// withModules puts the instance's enabled set on the context so the portal
+	// nav can decide whether the Equipment row exists at all. It costs one read
+	// of the app-layer cache, and without it the row is hidden everywhere.
+	portal := deps.withModules(deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/reorder", portal)
+	mux.Handle("GET /wholesale/portal", portal)
+	mux.Handle("GET /wholesale/portal/", portal)
+	mux.Handle("POST /wholesale/portal/{path...}", portal)
+	mux.Handle("GET /wholesale/checkout", portal)
+	mux.Handle("GET /wholesale/checkout/", portal)
+	mux.Handle("GET /wholesale/order-confirmed", portal)
+	mux.Handle("POST /wholesale/checkout/{path...}", portal)
+	mux.Handle("POST /wholesale/cart/{path...}", portal)
+	mux.Handle("GET /wholesale/help", portal)
+	mux.Handle("GET /wholesale/help/{slug}", portal)
+	mux.Handle("GET /wholesale/account", portal)
+	mux.Handle("GET /wholesale/account/{path...}", portal)
+	mux.Handle("POST /wholesale/account/{path...}", portal)
+
+	// The equipment routes get their own mounts so requireModule can wrap them
+	// without touching the rest of the account area — the {path...} catch-all
+	// above is one handler for every account page, and gating that would take
+	// the whole portal down with the module. Both patterns beat the catch-all
+	// on specificity, so ServeMux routes here first.
+	//
+	// requireModule sits outside requireApprovedWholesale, matching the admin
+	// side: on a shop that does not run the module these URLs must look like
+	// URLs that were never built, to a signed-out visitor as much as to a
+	// signed-in one.
+	servicePortal := deps.withModules(deps.requireModule(domain.ModuleEquipmentService,
+		deps.requireApprovedWholesale(wholesaleMux)))
+	mux.Handle("GET /wholesale/account/equipment", servicePortal)
+	mux.Handle("POST /wholesale/account/equipment/{id}/report", servicePortal)
 
 	// Staff auth routes (no session required)
 	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {

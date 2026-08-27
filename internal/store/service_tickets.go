@@ -620,3 +620,40 @@ func (s *ServiceTicketStore) Totals(ctx context.Context, tx pgx.Tx, ticketID uui
 
 	return t, nil
 }
+
+// LastServiceByEquipment returns, for one customer's machines, when work on
+// each was last finished — keyed by equipment id, with machines that have never
+// been serviced simply absent.
+//
+// Resolved tickets only. "Last serviced" on a portal page has to mean somebody
+// finished something: counting an open ticket would answer the question with
+// the very complaint the customer is looking at.
+//
+// One grouped query rather than a per-machine lookup, because the portal draws
+// the whole list on one page and a cafe with six machines should not cost six
+// round trips.
+func (s *ServiceTicketStore) LastServiceByEquipment(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (map[uuid.UUID]time.Time, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT equipment_id, MAX(resolved_at)
+		 FROM service_tickets
+		 WHERE customer_id = $1 AND equipment_id IS NOT NULL AND resolved_at IS NOT NULL
+		 GROUP BY equipment_id`, customerID)
+	if err != nil {
+		return nil, fmt.Errorf("last service by equipment for customer %s: %w", customerID, err)
+	}
+	defer rows.Close()
+
+	out := make(map[uuid.UUID]time.Time)
+	for rows.Next() {
+		var id uuid.UUID
+		var at time.Time
+		if err := rows.Scan(&id, &at); err != nil {
+			return nil, fmt.Errorf("scan last service date: %w", err)
+		}
+		out[id] = at
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("last service by equipment for customer %s: %w", customerID, err)
+	}
+	return out, nil
+}

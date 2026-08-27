@@ -1,9 +1,9 @@
 # Equipment Service — an optional Hiri module
 
-Status: steps 1-5 built — module registry, schema, store layer, the equipment
-register, the ticket queue with its merged timeline, and parts and hours.
-The stale sweep and the customer portal are next.
-Written 2026-08-24, last updated 2026-08-25.
+Status: v1 built — module registry, schema, store layer, the equipment register,
+the ticket queue with its merged timeline, parts and hours, the daily stale
+sweep, and the wholesale portal. What is left is the v2 list at the end.
+Written 2026-08-24, last updated 2026-08-26.
 
 ## The job
 
@@ -354,6 +354,16 @@ report comes in structured, at 6am, without a phone call.
 - The ticket's `customer_visible` notes and its status show back on the same
   page, so "did they see my message" answers itself.
 
+Built: `web/wholesale_equipment.go`, `ui/storefront/wholesale_equipment.templ`,
+`app/service_ticket_opened.go`. Two things were easy to get wrong here and are
+worth stating. The routes need `requireModule` of their own — the portal's
+`/wholesale/account/{path...}` catch-all is one mount for the whole account
+area, so the equipment routes get their own more-specific mounts rather than
+gating the catch-all and taking the portal down with the module. And the nav row
+reads the enabled set from the request context (`withModules` now wraps the
+portal mount, as it already did the admin one) rather than from props, because
+the account nav renders on six pages that have nothing to do with this module.
+
 Retail storefront gets nothing. Retail customers don't own espresso machines the
 merchant maintains.
 
@@ -479,4 +489,12 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
    `service_tickets_stale_total` gauges, and the audit row recording the send.
    The queue-side stale flag arrived earlier, with step 4 — what was missing was
    anything that pushed. No customer mail; silent on a day with nothing quiet.
-7. Wholesale portal equipment list + report-a-problem + notification email.
+7. **Done.** The wholesale portal: `/wholesale/account/equipment` lists the
+   cafe's machines with the last date work on each was *finished*, every open
+   ticket's status, and the customer-visible half of its timeline — so "did
+   anyone see my message" is answered by the page. The report form opens a
+   ticket in `new` with `opened_by_customer_user_id`, copies the words into a
+   customer-visible `customer_report` note, and enqueues `service_ticket_opened`
+   to staff in the same transaction. `down` skips the quiet-hours deferral,
+   which is what `Enqueuer.notifyOpts` was built for. Rate-limited **per
+   account**, not per IP: a cafe is one account behind one router.

@@ -43,11 +43,13 @@ type Registry struct {
 	SubscriptionsCancelled prometheus.Gauge
 	SubscriptionRenewals   *prometheus.CounterVec
 
-	// Equipment service module. Both are set by the daily stale sweep, so they
-	// are only meaningful on an instance with the module switched on — on every
-	// other instance the sweep returns early and these stay at zero.
-	ServiceTicketsOpen  *prometheus.GaugeVec
-	ServiceTicketsStale prometheus.Gauge
+	// Equipment service module. The two gauges are set by the daily stale sweep
+	// and the counter by whoever opens a ticket, so all three are only
+	// meaningful on an instance with the module switched on — everywhere else
+	// the sweep returns early, nobody opens a ticket, and they stay at zero.
+	ServiceTicketsOpen   *prometheus.GaugeVec
+	ServiceTicketsStale  prometheus.Gauge
+	ServiceTicketsOpened *prometheus.CounterVec
 
 	// Stripe webhooks
 	StripeWebhooksReceived  *prometheus.CounterVec
@@ -217,6 +219,15 @@ func NewRegistry() *Registry {
 			Help: "Current count of open service tickets past the customer-contact window.",
 		}),
 
+		// Labelled by who raised it, which only became a question worth asking
+		// once wholesale customers could open tickets themselves: the ratio of
+		// customer-reported to staff-reported work is how a merchant finds out
+		// whether the portal is being used at all.
+		ServiceTicketsOpened: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "service_tickets_opened_total",
+			Help: "Total service tickets opened, by who raised them and how bad it was.",
+		}, []string{"source", "severity"}),
+
 		// --- Subscription health ---
 
 		SubscriptionsActive: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -325,6 +336,7 @@ func NewRegistry() *Registry {
 		// Equipment service
 		m.ServiceTicketsOpen,
 		m.ServiceTicketsStale,
+		m.ServiceTicketsOpened,
 		// Subscriptions
 		m.SubscriptionsActive,
 		m.SubscriptionsPaused,

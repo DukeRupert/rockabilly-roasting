@@ -42,6 +42,11 @@ const (
 	// per-ticket event — it names how many were quiet, so an unanswered ticket
 	// can later be shown to have been reported and ignored rather than missed.
 	AuditServiceStaleSwept = "service_ticket.stale_swept"
+	// AuditServiceTicketNotified records that the crew were mailed about a
+	// customer's report. It sits on the ticket's own timeline so "we were never
+	// told" can be answered with a time, which is the whole argument a shop has
+	// when a cafe is angry about a machine that stayed broken.
+	AuditServiceTicketNotified = "service_ticket.staff_notified"
 
 	// Optional feature modules — turning a whole section of the app on or off.
 	// Worth an audit entry because enabling one can start sending customer mail

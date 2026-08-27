@@ -219,6 +219,20 @@ type WholesaleApplicationNotifyArgs struct {
 // Kind returns the job kind identifier.
 func (WholesaleApplicationNotifyArgs) Kind() string { return "wholesale_application_notify" }
 
+// ServiceTicketOpenedArgs notifies staff that a wholesale customer reported a
+// broken machine from the portal.
+//
+// Only the ticket id travels: severity is on the ticket, and the worker reads
+// the row anyway. The enqueue side takes severity as an argument because it
+// decides whether the job may wait for the morning, which is a scheduling
+// question rather than a payload one — see Enqueuer.EnqueueServiceTicketOpened.
+type ServiceTicketOpenedArgs struct {
+	TicketID uuid.UUID `json:"ticket_id"`
+}
+
+// Kind returns the job kind identifier.
+func (ServiceTicketOpenedArgs) Kind() string { return "service_ticket_opened" }
+
 // WholesaleApprovedArgs sends a welcome email to an approved wholesale customer.
 type WholesaleApprovedArgs struct {
 	CustomerID uuid.UUID `json:"customer_id"`

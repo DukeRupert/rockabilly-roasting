@@ -15,6 +15,14 @@ import (
 // banner — wholesale accounts authenticate with a password from setup. The
 // class helpers (accountNavClass, mobileNavClass) and the accountPageHeading /
 // orderStatusBadge / addressForm templates are shared with the retail account.
+//
+// The Equipment row is module-gated. It reads the enabled set from the context
+// rather than from props for the same reason the admin sidebar does: the nav
+// renders on every account page, and threading a module set through six prop
+// structs would couple every wholesale handler to work it has nothing to do
+// with. The set is put there by withModules, which wraps the portal mount — an
+// unwrapped route reports every module off, which hides the row rather than
+// linking to a 404.
 
 templ wholesaleAccountNav(activePath string) {
 	<nav class="w-48 shrink-0" aria-label="Account sections">
@@ -36,6 +44,12 @@ templ wholesaleAccountNav(activePath string) {
 				<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"></path></svg>
 				Addresses
 			</a>
+			if domain.ModulesFrom(ctx).Enabled(domain.ModuleEquipmentService) {
+				<a href="/wholesale/account/equipment" class={ accountNavClass("/wholesale/account/equipment", activePath) } style="letter-spacing:0.04em;">
+					<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437 1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008Z"></path></svg>
+					Equipment
+				</a>
+			}
 			<a href="/wholesale/account/team" class={ accountNavClass("/wholesale/account/team", activePath) } style="letter-spacing:0.04em;">
 				<svg class="size-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"></path></svg>
 				Team
@@ -69,6 +83,9 @@ templ wholesaleAccountLayout(activePath, companyName string) {
 					<a href="/wholesale/account/orders" class={ mobileNavClass("/wholesale/account/orders", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Orders</a>
 					<a href="/wholesale/account/settings" class={ mobileNavClass("/wholesale/account/settings", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Settings</a>
 					<a href="/wholesale/account/addresses" class={ mobileNavClass("/wholesale/account/addresses", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Addresses</a>
+					if domain.ModulesFrom(ctx).Enabled(domain.ModuleEquipmentService) {
+						<a href="/wholesale/account/equipment" class={ mobileNavClass("/wholesale/account/equipment", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Equipment</a>
+					}
 					<a href="/wholesale/account/team" class={ mobileNavClass("/wholesale/account/team", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Team</a>
 					<a href="/wholesale/account/security" class={ mobileNavClass("/wholesale/account/security", activePath) } style="letter-spacing:0.14em; text-transform:uppercase;">Security</a>
 					<form method="POST" action="/wholesale/logout" class="ml-auto shrink-0">

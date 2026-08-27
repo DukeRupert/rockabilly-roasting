@@ -193,6 +193,33 @@ type ServiceStaleDigestData struct {
 	StoreName  string
 }
 
+// ServiceTicketOpenedData holds the staff notification sent when a wholesale
+// customer reports a broken machine from their account.
+//
+// Everything the crew needs to act without opening the admin is on the face of
+// it — what broke, whose it is, and a number to ring. The link is there for the
+// person who is going to work the ticket, not for the person deciding whether
+// to get in the van.
+type ServiceTicketOpenedData struct {
+	Number      string
+	Title       string
+	Description string // the customer's own words
+	Severity    string // down / degraded / routine
+	// SeverityLabel is the same value in the words a cafe would use.
+	SeverityLabel string
+	// Down leads the template and earns the shouted subject line: it is the
+	// difference between "go now" and "put it on the list".
+	Down          bool
+	Machine       string // make and model, blank if the machine row has gone
+	SerialNumber  string
+	Customer      string
+	CustomerEmail string
+	Phone         string
+	ReportedAt    time.Time
+	TicketURL     string // admin ticket detail page
+	StoreName     string
+}
+
 // QBTokenAlertData holds data for the staff warning that the QuickBooks// QBTokenAlertData holds data for the staff warning that the QuickBooks
 // connection (refresh token) is about to lapse or already has.
 type QBTokenAlertData struct {

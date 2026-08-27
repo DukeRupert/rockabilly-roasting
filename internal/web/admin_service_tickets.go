@@ -408,6 +408,11 @@ func (d *Deps) handleAdminServiceTicketCreate(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// After the commit, never inside it. Labelled by source so the ratio of
+	// staff-raised to customer-raised work is visible — that is the number that
+	// says whether the portal's report form is being used at all.
+	d.Metrics.ServiceTicketsOpened.WithLabelValues("staff", string(ticket.Severity)).Inc()
+
 	redirectFlash(w, r, "/admin/service/tickets/"+ticket.ID.String(), ticket.Number+" is open.")
 }
 

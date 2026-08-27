@@ -172,6 +172,25 @@ func (e *Enqueuer) EnqueueInvoicePastDue(ctx context.Context, tx pgx.Tx, orderID
 	return err
 }
 
+// EnqueueServiceTicketOpened enqueues the staff notice for a ticket a wholesale
+// customer just raised, in tx so it rides on the ticket's own commit.
+//
+// urgent is what quiet hours were built for. Every other notification this
+// Enqueuer holds until the morning is customer-facing mail from the pre-dawn
+// renewal batch, where waiting is a kindness. This one goes to the crew, and a
+// cafe reporting a dead espresso machine at 6am needs somebody reading it at
+// 6am — so a `down` report is scheduled immediately and everything else takes
+// the ordinary send-hour deferral, because "the grinder sounds odd" genuinely
+// can wait until the shop opens.
+func (e *Enqueuer) EnqueueServiceTicketOpened(ctx context.Context, tx pgx.Tx, ticketID uuid.UUID, urgent bool) error {
+	var opts *river.InsertOpts
+	if !urgent {
+		opts = e.notifyOpts()
+	}
+	_, err := e.client.InsertTx(ctx, tx, ServiceTicketOpenedArgs{TicketID: ticketID}, opts)
+	return err
+}
+
 // EnqueueAnnouncementDispatch schedules an announcement's fan-out for sendAt.
 //
 // Quiet hours deliberately do not apply: staff picked this time on purpose, and

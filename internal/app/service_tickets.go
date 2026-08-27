@@ -30,9 +30,10 @@ type ServiceTicketService struct {
 	equipment *store.EquipmentStore
 	audit     *audit.AuditWriter
 
-	// Set by WithSweep, and only used by the daily stale sweep. Nil on a
-	// service built for request handling, which is why SweepStaleTickets
-	// checks before it reaches for any of them.
+	// Set by WithNotifications, and used only by the jobs that send mail — the
+	// daily stale sweep and the ticket-opened notice. Nil on a service built
+	// for request handling, which is why both check before reaching for any of
+	// them.
 	email     EmailEnv
 	customers *store.CustomerStore
 	modules   *ModuleService
@@ -44,14 +45,15 @@ func NewServiceTicketService(tickets *store.ServiceTicketStore, equipment *store
 	return &ServiceTicketService{tickets: tickets, equipment: equipment, audit: auditWriter}
 }
 
-// WithSweep attaches what the daily stale sweep needs: somewhere to mail the
-// digest, customer names to put in it, the module registry to check whether
-// this instance runs the module at all, and the gauges to publish. Must be
-// called before SweepStaleTickets; safe to call at wiring time.
+// WithNotifications attaches what the module's background jobs need: somewhere
+// to send staff mail, customer names to put in it, the module registry to check
+// whether this instance runs the module at all, and the metrics to publish.
+// Must be called before SweepStaleTickets or SendTicketOpenedNotice; safe to
+// call at wiring time.
 //
-// Separate from the constructor because every request-path caller needs none
-// of it — the sweep is the only reader.
-func (s *ServiceTicketService) WithSweep(env EmailEnv, customers *store.CustomerStore, modules *ModuleService, m *metrics.Registry) *ServiceTicketService {
+// Separate from the constructor because every request-path caller needs none of
+// it — only the workers read any of these.
+func (s *ServiceTicketService) WithNotifications(env EmailEnv, customers *store.CustomerStore, modules *ModuleService, m *metrics.Registry) *ServiceTicketService {
 	s.email = env
 	s.customers = customers
 	s.modules = modules
@@ -349,6 +351,12 @@ func (s *ServiceTicketService) ListStale(ctx context.Context, tx pgx.Tx, cutoff 
 // the portal passes.
 func (s *ServiceTicketService) ListNotes(ctx context.Context, tx pgx.Tx, ticketID uuid.UUID, customerVisibleOnly bool) ([]domain.ServiceTicketNote, error) {
 	return s.tickets.ListNotes(ctx, tx, ticketID, customerVisibleOnly)
+}
+
+// LastServiceByEquipment returns when work on each of a customer's machines was
+// last finished, keyed by equipment id. Machines never serviced are absent.
+func (s *ServiceTicketService) LastServiceByEquipment(ctx context.Context, tx pgx.Tx, customerID uuid.UUID) (map[uuid.UUID]time.Time, error) {
+	return s.tickets.LastServiceByEquipment(ctx, tx, customerID)
 }
 
 // Totals rolls up a ticket's parts cost and logged hours.

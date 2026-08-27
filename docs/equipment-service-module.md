@@ -474,5 +474,9 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
    with it.
 5. **Done.** Parts and time entries on the ticket detail, with per-row status
    advance, removal, and the parts/hours roll-up in the rail.
-6. Stale-contact flagging + the daily sweep.
+6. **Done.** The daily sweep (`service_stale_sweep`): a staff digest of open
+   tickets past the contact window, the `service_tickets_open_total` /
+   `service_tickets_stale_total` gauges, and the audit row recording the send.
+   The queue-side stale flag arrived earlier, with step 4 — what was missing was
+   anything that pushed. No customer mail; silent on a day with nothing quiet.
 7. Wholesale portal equipment list + report-a-problem + notification email.

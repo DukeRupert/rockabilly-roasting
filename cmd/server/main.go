@@ -429,7 +429,8 @@ func run() error {
 		os.Exit(1)
 	}
 	equipmentSvc := app.NewEquipmentService(equipmentStore, auditWriter)
-	serviceTicketSvc := app.NewServiceTicketService(serviceTicketStore, equipmentStore, auditWriter)
+	serviceTicketSvc := app.NewServiceTicketService(serviceTicketStore, equipmentStore, auditWriter).
+		WithSweep(emailEnv, customerStore, moduleSvc, metricsReg)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, attributeStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -495,6 +496,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewWholesaleNoticeWorker(wholesaleSvc, pool))
 	river.AddWorker(workers, jobs.NewAnnouncementDispatchWorker(announcementSvc, pool))
 	river.AddWorker(workers, jobs.NewAnnouncementSendWorker(announcementSvc, pool))
+	river.AddWorker(workers, jobs.NewServiceStaleSweepWorker(serviceTicketSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)
 	// See below after riverClient creation.
@@ -532,6 +534,22 @@ func run() error {
 				}
 			},
 			&river.PeriodicJobOpts{RunOnStart: true},
+		),
+		// Digest the service tickets that have gone quiet. Daily, and no
+		// RunOnStart: a deploy must not mail staff an unscheduled digest, and
+		// the worker returns early anyway on instances without the equipment
+		// service module. ByPeriod matches the interval so a re-enqueue inside
+		// the same day is dropped rather than sending twice.
+		river.NewPeriodicJob(
+			river.PeriodicInterval(24*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.ServiceStaleSweepArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 24 * time.Hour,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
 		),
 	}
 	// Weekly wholesale order reminder. No RunOnStart — a deploy must never

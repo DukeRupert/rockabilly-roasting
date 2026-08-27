@@ -38,6 +38,10 @@ const (
 	AuditServicePartRemoved = "service_ticket.part_removed"
 	AuditServiceTimeLogged  = "service_ticket.time_logged"
 	AuditServiceTimeRemoved = "service_ticket.time_removed"
+	// AuditServiceStaleSwept records that the daily sweep sent a digest. Not a
+	// per-ticket event — it names how many were quiet, so an unanswered ticket
+	// can later be shown to have been reported and ignored rather than missed.
+	AuditServiceStaleSwept = "service_ticket.stale_swept"
 
 	// Optional feature modules — turning a whole section of the app on or off.
 	// Worth an audit entry because enabling one can start sending customer mail

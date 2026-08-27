@@ -203,7 +203,36 @@ func (s *ServiceTicketStore) List(ctx context.Context, tx pgx.Tx, f ServiceTicke
 	return out, nil
 }
 
-// UpdateStatus moves a ticket, recording the resolution when it lands on
+// CountOpenByStatus returns how many unfinished tickets sit in each status.
+//
+// One grouped query rather than a count per status: the daily sweep wants the
+// whole breakdown, and statuses with no tickets are simply absent from the map
+// — the caller decides whether an absent status means zero or means "don't
+// publish a series for it".
+func (s *ServiceTicketStore) CountOpenByStatus(ctx context.Context, tx pgx.Tx) (map[domain.ServiceTicketStatus]int, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT status, COUNT(*)::int
+		 FROM service_tickets
+		 WHERE status NOT IN ('resolved', 'cancelled')
+		 GROUP BY status`)
+	if err != nil {
+		return nil, fmt.Errorf("count open service tickets by status: %w", err)
+	}
+	defer rows.Close()
+
+	out := make(map[domain.ServiceTicketStatus]int)
+	for rows.Next() {
+		var status string
+		var n int
+		if err := rows.Scan(&status, &n); err != nil {
+			return nil, fmt.Errorf("scan open service ticket count: %w", err)
+		}
+		out[domain.ServiceTicketStatus(status)] = n
+	}
+	return out, rows.Err()
+}
+
+// UpdateStatus moves a ticket, recording the resolution when it lands on// UpdateStatus moves a ticket, recording the resolution when it lands on
 // resolved.
 //
 // resolved_at is set from the status rather than passed in, so the timestamp

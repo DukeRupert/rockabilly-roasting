@@ -163,7 +163,37 @@ type QBInvoiceAlertData struct {
 	StoreName   string
 }
 
-// QBTokenAlertData holds data for the staff warning that the QuickBooks
+// ServiceStaleDigestTicket is one line of the stale-ticket digest.
+//
+// QuietDays is precomputed rather than passed as a timestamp: the template
+// should not be doing date arithmetic, and "quiet for 11 days" is the phrase
+// that makes somebody pick up the phone.
+type ServiceStaleDigestTicket struct {
+	Number    string
+	Title     string
+	Customer  string
+	Severity  string // down / degraded / routine
+	Status    string
+	QuietDays int
+	URL       string // admin ticket detail page
+	Down      bool   // severity == down; the template leads with these
+}
+
+// ServiceStaleDigestData holds the daily digest of open service tickets nobody
+// has spoken to the customer about.
+//
+// Total is the full count and may exceed len(Tickets), which is capped — a
+// digest listing two hundred rows is a digest nobody reads. The template says
+// so rather than letting the list imply it is everything.
+type ServiceStaleDigestData struct {
+	Tickets    []ServiceStaleDigestTicket
+	Total      int
+	WindowDays int
+	QueueURL   string // admin service queue, stale scope
+	StoreName  string
+}
+
+// QBTokenAlertData holds data for the staff warning that the QuickBooks// QBTokenAlertData holds data for the staff warning that the QuickBooks
 // connection (refresh token) is about to lapse or already has.
 type QBTokenAlertData struct {
 	DaysLeft    int // days until the refresh token expires; <= 0 when expired

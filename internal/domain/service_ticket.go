@@ -76,7 +76,22 @@ func ServiceTicketStatuses() []ServiceTicketStatus {
 	}
 }
 
-// Label is the human name for a status.
+// OpenServiceTicketStatuses lists the statuses that count as unfinished work,
+// in workflow order. The inverse of the ('resolved', 'cancelled') exclusion the
+// store's open-ticket queries use — kept as one list so a status added later
+// cannot be open to the database and closed to the gauges.
+func OpenServiceTicketStatuses() []ServiceTicketStatus {
+	out := make([]ServiceTicketStatus, 0, len(ServiceTicketStatuses()))
+	for _, s := range ServiceTicketStatuses() {
+		if s == ServiceTicketStatusResolved || s == ServiceTicketStatusCancelled {
+			continue
+		}
+		out = append(out, s)
+	}
+	return out
+}
+
+// Label is the human name for a status.// Label is the human name for a status.
 func (s ServiceTicketStatus) Label() string {
 	switch s {
 	case ServiceTicketStatusNew:

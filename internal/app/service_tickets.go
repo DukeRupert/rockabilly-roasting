@@ -14,6 +14,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/platform/metrics"
 	"github.com/dukerupert/hiri/internal/store"
 )
 
@@ -28,11 +29,34 @@ type ServiceTicketService struct {
 	tickets   *store.ServiceTicketStore
 	equipment *store.EquipmentStore
 	audit     *audit.AuditWriter
+
+	// Set by WithSweep, and only used by the daily stale sweep. Nil on a
+	// service built for request handling, which is why SweepStaleTickets
+	// checks before it reaches for any of them.
+	email     EmailEnv
+	customers *store.CustomerStore
+	modules   *ModuleService
+	metrics   *metrics.Registry
 }
 
 // NewServiceTicketService creates a new ServiceTicketService.
 func NewServiceTicketService(tickets *store.ServiceTicketStore, equipment *store.EquipmentStore, auditWriter *audit.AuditWriter) *ServiceTicketService {
 	return &ServiceTicketService{tickets: tickets, equipment: equipment, audit: auditWriter}
+}
+
+// WithSweep attaches what the daily stale sweep needs: somewhere to mail the
+// digest, customer names to put in it, the module registry to check whether
+// this instance runs the module at all, and the gauges to publish. Must be
+// called before SweepStaleTickets; safe to call at wiring time.
+//
+// Separate from the constructor because every request-path caller needs none
+// of it — the sweep is the only reader.
+func (s *ServiceTicketService) WithSweep(env EmailEnv, customers *store.CustomerStore, modules *ModuleService, m *metrics.Registry) *ServiceTicketService {
+	s.email = env
+	s.customers = customers
+	s.modules = modules
+	s.metrics = m
+	return s
 }
 
 // OpenTicketParams is the input for raising a ticket.

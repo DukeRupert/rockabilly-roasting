@@ -1,0 +1,14 @@
+{{define "service_stale_digest.txt"}}Service tickets going quiet
+
+{{if eq .Total 1}}One open ticket has{{else}}{{.Total}} open tickets have{{end}} had no contact with the customer in over {{.WindowDays}} days.
+
+{{range .Tickets}}{{if .Down}}[DOWN] {{end}}{{.Number}} - {{.Title}}
+  {{.Customer}} | {{.Status}} | quiet for {{.QuietDays}} day{{if ne .QuietDays 1}}s{{end}}
+  {{.URL}}
+
+{{end}}{{if gt .Total (len .Tickets)}}Showing the {{len .Tickets}} quietest of {{.Total}}. The queue has the rest.
+
+{{end}}Open the queue: {{.QueueURL}}
+
+{{.StoreName}} - Staff notification
+{{end}}

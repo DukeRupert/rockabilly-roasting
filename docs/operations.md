@@ -131,7 +131,9 @@ else
   # stale green for a deploy that has not started.
   RUN=""
   for _ in $(seq 24); do
-    RUN=$(gh run list -w "Deploy Prod" -b "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId')
+    # grep is load-bearing: see below.
+    RUN=$(gh run list -w "Deploy Prod" -b "$TAG" --limit 1 --json databaseId --jq '.[0].databaseId' \
+          | grep -oE '^[0-9]+$' | head -1)
     [ -n "$RUN" ] && break
     sleep 5
   done
@@ -144,6 +146,8 @@ fi
 ```
 
 The `TAG` guard is not defensive padding. If you come back to this step in a fresh shell, `gh run list -b ""` does not match nothing — it ignores the filter and hands back the newest run, which is the *previous* release's. Watching that reports a green tick for a deploy that never started, which is the one thing this block exists to prevent.
+
+The `grep -oE '^[0-9]+$'` is there because `gh` is installed through `mise`, which prints a tools banner — `mise ~/.config/mise/config.toml tools: gh@2.97.0` — on **stdout**, not stderr. Command substitution swallows it whole, so `$RUN` comes back as the banner text rather than a run id and `gh run watch` fails with a 404 on a URL containing the config path. Redirecting stderr does not help; only filtering to a bare integer does. This bit the `v1.112.0` release. It is worth knowing generally: any `$(gh ...)` capture on this machine needs the same treatment, though step 1's `git` calls are unaffected because `git` is not managed by `mise`.
 
 ### 4. Confirm it is actually live
 

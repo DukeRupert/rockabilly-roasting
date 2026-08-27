@@ -36,10 +36,7 @@ func (d *Deps) handleAdminServicePartAdd(w http.ResponseWriter, r *http.Request)
 	if n, convErr := strconv.Atoi(strings.TrimSpace(r.FormValue("quantity"))); convErr == nil {
 		quantity = n
 	}
-	// A blank cost is zero, not a rejection: plenty of parts come off a shelf
-	// the shop already paid for, and refusing to record the part because
-	// nobody knows what it cost would lose the more useful fact.
-	cost, err := parseDollarsCents(r.FormValue("unit_cost"))
+	cost, err := parsePartCost(r.FormValue("unit_cost"))
 	if err != nil {
 		Error(w, r, app.ErrInvalidPartCost)
 		return
@@ -61,6 +58,31 @@ func (d *Deps) handleAdminServicePartAdd(w http.ResponseWriter, r *http.Request)
 	}
 
 	redirectFlash(w, r, ticketPath(ticketID), "Part added.")
+}
+
+// parsePartCost reads the optional per-unit cost off a part form, in cents.
+//
+// A blank cost is zero, not a rejection: plenty of parts come off a shelf the
+// shop already paid for, and refusing to record the part because nobody knows
+// what it cost would lose the more useful fact. The cost input is optional in
+// the form, so blank is the ordinary case and not an edge one.
+//
+// This exists because parseDollarsCents — shared with the settings screens,
+// where a missing amount genuinely is a mistake — returns an error for the
+// empty string. The handler used to call it directly under a comment promising
+// the opposite, so every part added without a price was dropped with the toast
+// "a part cannot cost less than nothing". Deciding the blank case here keeps
+// that helper right for its other callers, and makes the rule a named thing
+// that can be tested without a database.
+//
+// A non-empty value that is not a number, or is negative, is still an error:
+// somebody typing "abc" or "-5" into the price box has made a mistake worth
+// reporting.
+func parsePartCost(raw string) (int, error) {
+	if strings.TrimSpace(raw) == "" {
+		return 0, nil
+	}
+	return parseDollarsCents(raw)
 }
 
 // handleAdminServicePartStatus advances a part along ordered → arrived → fitted.

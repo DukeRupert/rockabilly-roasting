@@ -443,6 +443,7 @@ func NewRouter(deps *Deps) http.Handler {
 	adminMux := http.NewServeMux()
 	adminMux.HandleFunc("GET /admin/", deps.handleAdminDashboard)
 	adminMux.HandleFunc("GET /admin/dashboard/top-sellers", deps.handleAdminTopSellers)
+	adminMux.HandleFunc("GET /admin/dashboard/renewals", deps.handleAdminRenewalForecast)
 	adminMux.HandleFunc("GET /admin/dashboard/revenue", deps.handleAdminRevenue)
 	adminMux.HandleFunc("GET /admin/dashboard/subscriptions", deps.handleAdminSubscriptionsTrend)
 	adminMux.HandleFunc("GET /admin/dashboard/active-customers", deps.handleAdminActiveCustomers)

@@ -773,6 +773,31 @@ func (s *OrderService) RevertShipment(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return order, nil
 }
 
+// PickupStaleAfter is how long a bag may sit on the shelf before staff should
+// chase the customer. Three days is a coffee decision, not an arbitrary SLA:
+// past that the roast the customer paid for is no longer the roast they will
+// collect, and a reship costs less than a refund plus the goodwill.
+const PickupStaleAfter = 72 * time.Hour
+
+// CountWaitingPickups returns how many pickup orders have been sitting ready
+// longer than PickupStaleAfter.
+func (s *OrderService) CountWaitingPickups(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
+	n, err := s.orders.CountWaitingPickups(ctx, tx, now.Add(-PickupStaleAfter))
+	if err != nil {
+		return 0, fmt.Errorf("count waiting pickups: %w", err)
+	}
+	return n, nil
+}
+
+// ListWaitingPickups returns the longest-waiting uncollected pickup orders.
+func (s *OrderService) ListWaitingPickups(ctx context.Context, tx pgx.Tx, now time.Time, limit int) ([]store.WaitingPickup, error) {
+	out, err := s.orders.ListWaitingPickups(ctx, tx, now.Add(-PickupStaleAfter), limit)
+	if err != nil {
+		return nil, fmt.Errorf("list waiting pickups: %w", err)
+	}
+	return out, nil
+}
+
 // MarkReadyForPickup transitions a pickup order to the ready_for_pickup
 // state and enqueues the "ready" notification. Allowed only for orders whose
 // shipping_method is pickup; the previous fulfillment status must be

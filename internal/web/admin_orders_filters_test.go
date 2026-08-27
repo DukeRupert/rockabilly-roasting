@@ -28,6 +28,11 @@ func TestNormalizeOrderStatusParams(t *testing.T) {
 	assert.Equal(t, "", normalizeOrderPayment("not_a_status"))
 	assert.Equal(t, "delivered", normalizeOrderFulfillment("delivered"))
 	assert.Equal(t, "", normalizeOrderFulfillment("' OR 1=1"))
+	// ready_for_pickup was missing from the allowed set, so the filter the
+	// dashboard's uncollected-pickups row points at could not be reached at
+	// all: the normalizer dropped it and the list came back unfiltered. Every
+	// status the orders list offers as a pill has to survive this function.
+	assert.Equal(t, "ready_for_pickup", normalizeOrderFulfillment("ready_for_pickup"))
 	assert.Equal(t, "30d", normalizeOrderRange("30d"))
 	assert.Equal(t, "", normalizeOrderRange("last_century"))
 }

@@ -255,3 +255,167 @@ func TestDashboard_StaleFlagIsPerChannel(t *testing.T) {
 		"exactly one row (in both its layouts) should be flagged rust")
 	assert.Equal(t, 4, strings.Count(html, "3d ago"), "both rows show their age")
 }
+
+// A bag marked ready and never collected has nothing ageing it. The fulfillment
+// queue's needs-action tab does list ready_for_pickup — it has since b06ae7d —
+// but beside every other order awaiting action and with no sense of how long,
+// so one on the shelf a fortnight reads like one boxed this morning. This row
+// is the ageing, and the only thing that singles those out.
+func TestDashboard_UncollectedPickupsReachTheReviewBand(t *testing.T) {
+	now := time.Now()
+	props := DashboardProps{
+		Now:                 now,
+		WaitingPickupCount:  2,
+		OldestPickupReadyAt: now.Add(-11 * 24 * time.Hour),
+	}
+	html := renderDashboard(t, props)
+
+	assert.Equal(t, 2, props.reviewCount())
+	assert.Contains(t, html, "2 pickup orders waiting over 3 days")
+	assert.Contains(t, html, "Oldest was ready 11 days ago")
+
+	// The link has to carry the filter, on the "all" view because the count is
+	// not status-scoped the way the needs-action view is.
+	assert.Contains(t, html, "/admin/orders?view=all&amp;fulfillment=ready_for_pickup")
+	assert.Contains(t, html, `href="#band-review"`)
+}
+
+// Wait time is stated in days because that is what makes someone act. Under a
+// day there is no number worth quoting, and a zero value must not render as a
+// nonsense age.
+func TestPickupWaitDetail(t *testing.T) {
+	now := time.Now()
+
+	assert.Contains(t, pickupWaitDetail(now.Add(-11*24*time.Hour), now), "ready 11 days ago")
+	assert.Contains(t, pickupWaitDetail(now.Add(-25*time.Hour), now), "ready 1 day ago")
+
+	// No usable timestamp: say the thing that matters, skip the arithmetic.
+	assert.NotContains(t, pickupWaitDetail(time.Time{}, now), "ago")
+	assert.NotContains(t, pickupWaitDetail(now.Add(-3*time.Hour), now), "ago")
+}
+
+// The failure mode this row exists for: a worker discarding jobs makes the rest
+// of the dashboard look calmer, not busier. So it has to lead the Urgent band
+// and count toward the chip, even though no order row is involved.
+func TestDashboard_DeadJobsLeadTheUrgentBand(t *testing.T) {
+	props := DashboardProps{
+		DeadJobCount: 7,
+		DeadJobKinds: []domain.DeadJobKindCount{
+			{Kind: "renew_subscription", Count: 5},
+			{Kind: "email_order_confirm", Count: 2},
+		},
+	}
+	html := renderDashboard(t, props)
+
+	assert.Equal(t, 7, props.urgentCount())
+	assert.Contains(t, html, "7 background jobs failed")
+	assert.Contains(t, html, "renew_subscription ×5")
+	assert.Contains(t, html, `href="/admin/jobs"`)
+
+	// It precedes the order-shaped groups: the automation failure is usually
+	// the reason those queues look the way they do.
+	jobs := strings.Index(html, "background jobs failed")
+	band := strings.Index(html, "band-urgent")
+	assert.Greater(t, jobs, band)
+}
+
+// The kinds are the diagnosis, so they get named — but not unboundedly, and a
+// missing breakdown must still say something useful.
+func TestDeadJobDetail(t *testing.T) {
+	assert.Contains(t, deadJobDetail(nil), "nothing retries them")
+
+	five := []domain.DeadJobKindCount{
+		{Kind: "a", Count: 1}, {Kind: "b", Count: 2}, {Kind: "c", Count: 3},
+		{Kind: "d", Count: 4}, {Kind: "e", Count: 5},
+	}
+	got := deadJobDetail(five)
+	assert.Contains(t, got, "a ×1 · b ×2 · c ×3 · +2 more")
+	assert.NotContains(t, got, "d ×4")
+
+	// Exactly three fits with no overflow marker.
+	assert.NotContains(t, deadJobDetail(five[:3]), "more")
+}
+
+func renderForecast(t *testing.T, props RenewalForecastProps) string {
+	t.Helper()
+	var buf bytes.Buffer
+	require.NoError(t, RenewalForecastCard(props).Render(context.Background(), &buf))
+	return buf.String()
+}
+
+// The headline is pounds because that is what a roaster plans around; the
+// per-coffee split is what goes on the schedule.
+func TestRenewalForecastCard_TotalsAndBreakdown(t *testing.T) {
+	props := RenewalForecastProps{
+		Days: 7,
+		Lines: []domain.RenewalForecastLine{
+			// 4536g ≈ 10.0 lb, 2268g ≈ 5.0 lb
+			{Title: "Chop Top", Subscriptions: 6, Units: 8, WeightGrams: 4536},
+			{Title: "Hot Rod", Subscriptions: 3, Units: 4, WeightGrams: 2268},
+		},
+	}
+	html := renderForecast(t, props)
+
+	assert.Equal(t, 6804, props.totalGrams())
+	assert.Equal(t, 9, props.totalSubscriptions())
+
+	assert.Contains(t, html, "Roast forecast · next 7 days")
+	assert.Contains(t, html, "15.0") // total pounds
+	assert.Contains(t, html, "across 9 renewals")
+	assert.Contains(t, html, "Chop Top")
+	assert.Contains(t, html, "8 bags · 6 subscriptions")
+	assert.Contains(t, html, "10.0")
+
+	assert.Contains(t, html, `id="renewal-forecast-card"`)
+	assert.Contains(t, html, `hx-target="#renewal-forecast-card"`)
+	assert.Contains(t, html, "/admin/dashboard/renewals?days=30")
+
+	// The exclusion has to be stated or the number silently means something
+	// other than what a reader assumes.
+	assert.Contains(t, html, "Active subscriptions only")
+}
+
+// A weightless variant contributes units but no grams, so the poundage is an
+// undercount. Saying nothing would send someone to the roaster short.
+func TestRenewalForecastCard_FlagsMissingWeights(t *testing.T) {
+	withGap := RenewalForecastProps{
+		Days:  7,
+		Lines: []domain.RenewalForecastLine{{Title: "Mystery", Subscriptions: 2, Units: 3, WeightGrams: 0, UnitsMissingWeight: 3}},
+	}
+	assert.Equal(t, 3, withGap.missingWeightUnits())
+	assert.Contains(t, renderForecast(t, withGap), "3 bags have no weight set")
+
+	clean := RenewalForecastProps{
+		Days:  7,
+		Lines: []domain.RenewalForecastLine{{Title: "Chop Top", Subscriptions: 1, Units: 1, WeightGrams: 4536}},
+	}
+	assert.Equal(t, 0, clean.missingWeightUnits())
+	assert.NotContains(t, renderForecast(t, clean), "no weight set")
+}
+
+// An empty window says so rather than rendering a 0.0 lb headline, which reads
+// like a broken query.
+func TestRenewalForecastCard_EmptyWindow(t *testing.T) {
+	html := renderForecast(t, RenewalForecastProps{Days: 14})
+
+	assert.Contains(t, html, "No subscription renewals due in this window")
+	assert.NotContains(t, html, "across 0 renewals")
+	// The toggle stays usable so staff can widen the window.
+	assert.Contains(t, html, "/admin/dashboard/renewals?days=30")
+}
+
+// The forecast is a plan, so it sits above the trend charts but below the day's
+// triage queues.
+func TestDashboard_ForecastSitsAboveAnalytics(t *testing.T) {
+	html := renderDashboard(t, DashboardProps{
+		Renewals: RenewalForecastProps{
+			Days:  7,
+			Lines: []domain.RenewalForecastLine{{Title: "Chop Top", Subscriptions: 1, Units: 1, WeightGrams: 4536}},
+		},
+	})
+
+	comingUp := strings.Index(html, "Coming up")
+	analytics := strings.Index(html, ">Analytics<")
+	assert.Greater(t, comingUp, 0)
+	assert.Greater(t, analytics, comingUp)
+}

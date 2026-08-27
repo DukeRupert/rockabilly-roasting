@@ -1703,3 +1703,78 @@ func adjustmentFromRow(r sqlcgen.Adjustment) *domain.Adjustment {
 		SourceID:   r.SourceID,
 	}
 }
+
+// WaitingPickup is one order sitting on the shelf: the order itself plus when
+// staff marked it ready. ReadyAt is what makes the row actionable — how long a
+// customer has left their coffee uncollected is the whole signal.
+type WaitingPickup struct {
+	OrderID uuid.UUID
+	ReadyAt time.Time
+}
+
+// waitingPickupsCTE is the shared body behind CountWaitingPickups and
+// ListWaitingPickups: pickup orders still in ready_for_pickup that were marked
+// ready before the given cutoff.
+//
+// "Ready at" comes from the audit log rather than an orders column. The audit
+// entry is written in the same transaction as the status change, so its
+// timestamp is exactly when the order became ready, and it survives later edits
+// to the order — updated_at does not, and would reset the clock every time
+// someone added an internal note. Re-marking an order ready takes the newest
+// entry, which is the behavior staff expect: the shelf clock restarts.
+const waitingPickupsCTE = `
+	WITH ready_at AS (
+		SELECT resource_id AS order_id, MAX(created_at) AS at
+		FROM audit_log
+		WHERE resource_type = 'order' AND action = 'order.ready_for_pickup'
+		GROUP BY resource_id
+	)
+	SELECT %s
+	FROM orders o
+	JOIN ready_at ra ON ra.order_id = o.id
+	WHERE o.fulfillment_status = 'ready_for_pickup'
+	  AND o.status NOT IN ('cancelled', 'refunded')
+	  AND ra.at < $1`
+
+// CountWaitingPickups returns how many pickup orders have been sitting ready
+// since before `before`. A true count, independent of any display cap.
+func (s *OrderStore) CountWaitingPickups(ctx context.Context, tx pgx.Tx, before time.Time) (_ int, err error) {
+	defer trackQuery(s.metrics, "orders.count_waiting_pickups", time.Now(), &err)
+	query := fmt.Sprintf(waitingPickupsCTE, "COUNT(*)")
+	var count int
+	if err := tx.QueryRow(ctx, query, before).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count waiting pickups: %w", err)
+	}
+	return count, nil
+}
+
+// ListWaitingPickups returns the longest-waiting orders first — the bag that
+// has been on the shelf a fortnight is the one worth a phone call.
+//
+// The dashboard asks for one, and reads only its ReadyAt, to date the "waiting
+// N days" line. OrderID is scanned because it is the row's identity and a list
+// of bare timestamps would be a strange thing to return, not because anything
+// renders it yet.
+func (s *OrderStore) ListWaitingPickups(ctx context.Context, tx pgx.Tx, before time.Time, limit int) (_ []WaitingPickup, err error) {
+	defer trackQuery(s.metrics, "orders.list_waiting_pickups", time.Now(), &err)
+	if limit <= 0 {
+		return nil, nil
+	}
+	query := fmt.Sprintf(waitingPickupsCTE, "o.id, ra.at") + " ORDER BY ra.at ASC LIMIT $2"
+
+	rows, err := tx.Query(ctx, query, before, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list waiting pickups: %w", err)
+	}
+	defer rows.Close()
+
+	var out []WaitingPickup
+	for rows.Next() {
+		var w WaitingPickup
+		if err := rows.Scan(&w.OrderID, &w.ReadyAt); err != nil {
+			return nil, fmt.Errorf("scan waiting pickup: %w", err)
+		}
+		out = append(out, w)
+	}
+	return out, rows.Err()
+}

@@ -192,6 +192,62 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// Background jobs that exhausted their retries. Deliberately first in the
+		// Urgent band: broken automation often explains the rest of the page, and
+		// a quiet dashboard is exactly what a failing worker produces.
+		//
+		// Admin-only, because /admin/jobs is: the row is the only link on this
+		// page whose destination is permission-gated, and the same rule the
+		// maintenance chip follows above applies here — a row that 403s on
+		// click is worse than no row. It would also inflate the Urgent chip
+		// with work four of the five roles cannot act on.
+		if staffCan(r, auth.PermManageSystem) {
+			props.DeadJobCount, txErr = d.JobHealthService.CountDeadJobs(ctx, tx)
+			if txErr != nil {
+				return txErr
+			}
+			if props.DeadJobCount > 0 {
+				props.DeadJobKinds, txErr = d.JobHealthService.CountDeadJobsByKind(ctx, tx)
+				if txErr != nil {
+					return txErr
+				}
+			}
+		}
+
+		// Pickup orders nobody collected. The fulfillment queue does list
+		// ready_for_pickup in its needs-action tab, but it lists them beside
+		// every other order awaiting action and never ages them — so a bag that
+		// has sat behind the counter a fortnight looks exactly like one boxed
+		// this morning. This row is the ageing: only pickups past
+		// PickupStaleAfter, so the ones worth a phone call separate themselves.
+		props.WaitingPickupCount, txErr = d.OrderService.CountWaitingPickups(ctx, tx, now)
+		if txErr != nil {
+			return txErr
+		}
+		if props.WaitingPickupCount > 0 {
+			waiting, wErr := d.OrderService.ListWaitingPickups(ctx, tx, now, 1)
+			if wErr != nil {
+				return wErr
+			}
+			if len(waiting) > 0 {
+				props.OldestPickupReadyAt = waiting[0].ReadyAt
+			}
+		}
+
+		// Roast forecast — what upcoming renewals will need.
+		//
+		// Always the default window on the full page, never ?days=. Revenue and
+		// subscriptions below already own that key with a different vocabulary
+		// (7/30/90 against 7/14/30), so honouring it here would mean
+		// /admin/?days=90 silently resetting the forecast to 7 and /admin/?days=14
+		// resetting revenue to 30 — one number quietly wrong on a page nobody
+		// would think to distrust. The toggle swaps the card through
+		// /admin/dashboard/renewals, which reads ?days= on its own.
+		props.Renewals, txErr = d.buildRenewalForecast(ctx, tx, now, defaultRenewalForecastDays)
+		if txErr != nil {
+			return txErr
+		}
+
 		// Revenue trend — period from ?days= (7/30/90), defaults to 30
 		props.Revenue, txErr = d.buildRevenueProps(ctx, tx, revenueDays(r), todayStart)
 		if txErr != nil {
@@ -719,6 +775,55 @@ func (d *Deps) handleAdminTopSellers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.TopSellersCard(buildTopProducts(rows, by), by).Render(ctx, w) //nolint:errcheck
+}
+
+// defaultRenewalForecastDays is the roasting horizon: a week is what a roast
+// plan is actually built against. The longer windows are for green purchasing
+// and are reached through the toggle.
+const defaultRenewalForecastDays = 7
+
+// renewalForecastDays normalizes the roast forecast's ?days= to 7/14/30.
+//
+// Only the card's own fragment route reads this. The full dashboard passes the
+// default, because ?days= there belongs to the revenue and subscription cards
+// and means different numbers to them.
+func renewalForecastDays(r *http.Request) int {
+	switch r.URL.Query().Get("days") {
+	case "14":
+		return 14
+	case "30":
+		return 30
+	default:
+		return defaultRenewalForecastDays
+	}
+}
+
+// buildRenewalForecast assembles the roast-forecast card.
+func (d *Deps) buildRenewalForecast(ctx context.Context, tx pgx.Tx, now time.Time, days int) (admin.RenewalForecastProps, error) {
+	lines, err := d.SubscriptionService.ForecastRenewals(ctx, tx, now, days)
+	if err != nil {
+		return admin.RenewalForecastProps{}, err
+	}
+	return admin.RenewalForecastProps{Days: days, Lines: lines}, nil
+}
+
+// handleAdminRenewalForecast serves the roast-forecast card on its own for the
+// htmx window toggle.
+func (d *Deps) handleAdminRenewalForecast(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	now := time.Now().In(d.MerchantTZ)
+
+	var props admin.RenewalForecastProps
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		props, txErr = d.buildRenewalForecast(ctx, tx, now, renewalForecastDays(r))
+		return txErr
+	})
+	if err != nil {
+		Error(w, r, err)
+		return
+	}
+	admin.RenewalForecastCard(props).Render(ctx, w) //nolint:errcheck
 }
 
 // urgentGroupChannels is the order the Urgent band lists channels in. Retail

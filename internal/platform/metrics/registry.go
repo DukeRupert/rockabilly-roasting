@@ -38,10 +38,16 @@ type Registry struct {
 	CouponRejected    *prometheus.CounterVec
 
 	// Subscription health
-	SubscriptionsActive    prometheus.Gauge
-	SubscriptionsPaused    prometheus.Gauge
-	SubscriptionsCancelled prometheus.Gauge
-	SubscriptionRenewals   *prometheus.CounterVec
+	SubscriptionsActive prometheus.Gauge
+	// SubscriptionsRenewalBlocked counts subscriptions that look live but can
+	// never be selected for renewal — see domain.Subscription.RenewalBlocked.
+	// The one worth alerting on: unlike a failed charge, this state is silent
+	// on both sides, so nobody finds out until a customer asks where their
+	// coffee went.
+	SubscriptionsRenewalBlocked prometheus.Gauge
+	SubscriptionsPaused         prometheus.Gauge
+	SubscriptionsCancelled      prometheus.Gauge
+	SubscriptionRenewals        *prometheus.CounterVec
 
 	// Stripe webhooks
 	StripeWebhooksReceived  *prometheus.CounterVec
@@ -200,6 +206,11 @@ func NewRegistry() *Registry {
 			Help: "Current count of active subscriptions.",
 		}),
 
+		SubscriptionsRenewalBlocked: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "subscriptions_renewal_blocked_total",
+			Help: "Subscriptions in a live status carrying a past ends_at, so the renewal scheduler can never select them.",
+		}),
+
 		SubscriptionsPaused: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "subscriptions_paused_total",
 			Help: "Current count of paused subscriptions.",
@@ -300,6 +311,7 @@ func NewRegistry() *Registry {
 		m.CouponRejected,
 		// Subscriptions
 		m.SubscriptionsActive,
+		m.SubscriptionsRenewalBlocked,
 		m.SubscriptionsPaused,
 		m.SubscriptionsCancelled,
 		m.SubscriptionRenewals,

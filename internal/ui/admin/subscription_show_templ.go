@@ -274,11 +274,16 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<!-- An expired subscription said so in its badge but never said when it\n\t     ran out. EndsAt is set by the expiry sweep and was displayed nowhere. -->")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<!-- An expired subscription said so in its badge but never said when it\n\t     ran out. EndsAt is set by the expiry sweep and was displayed nowhere.\n\t     The quiet version below is right for a subscription whose status agrees\n\t     it has ended; when the status still says \"Active\" the same date means\n\t     something far worse, so that case gets its own banner. -->")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if props.Subscription.EndsAt != nil {
+		if props.Subscription.RenewalBlocked(time.Now()) {
+			templ_7745c5c3_Err = renewalBlockedBanner(props).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else if props.Subscription.EndsAt != nil {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<div class=\"mt-6 border border-rr-border bg-rr-raised p-4\"><p class=\"text-sm text-rr-heading\"><span class=\"font-semibold\">Ended</span> <span class=\"text-rr-muted\">on ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
@@ -286,7 +291,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subscription.EndsAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 172, Col: 120}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 177, Col: 120}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -305,7 +310,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subscription.PauseUntil.In(props.MerchantTZ).Format("January 2, 2006"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 179, Col: 130}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 184, Col: 130}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -337,7 +342,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var11 templ.SafeURL
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", props.Product.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 189, Col: 89}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 194, Col: 89}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -350,7 +355,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.ThumbnailURL)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 190, Col: 35}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 195, Col: 35}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 				if templ_7745c5c3_Err != nil {
@@ -363,7 +368,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Product.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 190, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 195, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 				if templ_7745c5c3_Err != nil {
@@ -386,7 +391,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var14 templ.SafeURL
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/catalog/%s", props.Product.ID.String())))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 196, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 201, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -399,7 +404,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(props.Product.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 197, Col: 27}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 202, Col: 27}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -417,7 +422,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(props.Variant.SKU)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 200, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 205, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -435,7 +440,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.Subscription.Quantity))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 203, Col: 134}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 208, Col: 134}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -453,7 +458,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.UnitPrice))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 205, Col: 126}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 210, Col: 126}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -466,7 +471,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(props.UnitPrice * props.Subscription.Quantity))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 206, Col: 164}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 211, Col: 164}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -489,7 +494,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var20 templ.SafeURL
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/variant", props.Subscription.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 214, Col: 110}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 219, Col: 110}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -508,7 +513,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 						var templ_7745c5c3_Var21 string
 						templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.ResolveAttributeValue(sv.ID.String())
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 225, Col: 41}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 230, Col: 41}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
 						if templ_7745c5c3_Err != nil {
@@ -521,7 +526,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 						var templ_7745c5c3_Var22 string
 						templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(sv.Label)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 225, Col: 63}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 230, Col: 63}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 						if templ_7745c5c3_Err != nil {
@@ -534,7 +539,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 						var templ_7745c5c3_Var23 string
 						templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(sv.Price))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 225, Col: 93}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 230, Col: 93}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 						if templ_7745c5c3_Err != nil {
@@ -552,7 +557,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 						var templ_7745c5c3_Var24 string
 						templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(sv.ID.String())
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 227, Col: 41}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 232, Col: 41}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 						if templ_7745c5c3_Err != nil {
@@ -565,7 +570,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 						var templ_7745c5c3_Var25 string
 						templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(sv.Label)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 227, Col: 54}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 232, Col: 54}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 						if templ_7745c5c3_Err != nil {
@@ -578,7 +583,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 						var templ_7745c5c3_Var26 string
 						templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(sv.Price))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 227, Col: 84}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 232, Col: 84}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 						if templ_7745c5c3_Err != nil {
@@ -646,7 +651,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 					var templ_7745c5c3_Var28 string
 					templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(props.VariantLabel)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 252, Col: 110}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 257, Col: 110}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 					if templ_7745c5c3_Err != nil {
@@ -680,7 +685,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var29 string
 		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(props.Plan.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 271, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 276, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
@@ -693,7 +698,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var30 string
 		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(planCadence(props.Plan))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 273, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 278, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
@@ -711,7 +716,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.Plan.DiscountPct))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 275, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 280, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
@@ -734,7 +739,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var32 templ.SafeURL
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/plan", props.Subscription.ID.String())))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 281, Col: 104}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 286, Col: 104}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 			if templ_7745c5c3_Err != nil {
@@ -753,7 +758,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 					var templ_7745c5c3_Var33 string
 					templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue(ap.ID.String())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 291, Col: 38}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 296, Col: 38}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 					if templ_7745c5c3_Err != nil {
@@ -766,7 +771,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 					var templ_7745c5c3_Var34 string
 					templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(planOptionLabel(ap))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 291, Col: 71}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 296, Col: 71}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 					if templ_7745c5c3_Err != nil {
@@ -784,7 +789,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 					var templ_7745c5c3_Var35 string
 					templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.ResolveAttributeValue(ap.ID.String())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 293, Col: 38}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 298, Col: 38}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 					if templ_7745c5c3_Err != nil {
@@ -797,7 +802,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 					var templ_7745c5c3_Var36 string
 					templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(planOptionLabel(ap))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 293, Col: 62}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 298, Col: 62}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 					if templ_7745c5c3_Err != nil {
@@ -863,7 +868,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 318, Col: 133}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 323, Col: 133}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -876,7 +881,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Monday"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 319, Col: 107}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 324, Col: 107}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -889,7 +894,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subscription.CurrentPeriodStart.In(props.MerchantTZ).Format("Jan 2"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 324, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 329, Col: 80}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -902,7 +907,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var41 string
 		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subscription.CurrentPeriodEnd.In(props.MerchantTZ).Format("Jan 2, 2006"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 324, Col: 171}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 329, Col: 171}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
 		if templ_7745c5c3_Err != nil {
@@ -920,7 +925,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var42 string
 			templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Subscription.StripePaymentMethodID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 331, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 336, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 			if templ_7745c5c3_Err != nil {
@@ -943,7 +948,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var43 templ.SafeURL
 		templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/customers/%s", props.Customer.ID.String())))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 343, Col: 91}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 348, Col: 91}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 		if templ_7745c5c3_Err != nil {
@@ -956,7 +961,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var44 string
 		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.FirstName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 344, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 349, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 		if templ_7745c5c3_Err != nil {
@@ -969,7 +974,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var45 string
 		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.LastName)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 344, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 349, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 		if templ_7745c5c3_Err != nil {
@@ -982,7 +987,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var46 string
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(props.Customer.Email)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 347, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 352, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
@@ -1000,7 +1005,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var47 string
 			templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(*props.Customer.Phone)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 349, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 354, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 			if templ_7745c5c3_Err != nil {
@@ -1023,7 +1028,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var48 string
 			templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.FirstName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 356, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 361, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 			if templ_7745c5c3_Err != nil {
@@ -1036,7 +1041,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var49 string
 			templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.LastName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 356, Col: 96}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 361, Col: 96}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 			if templ_7745c5c3_Err != nil {
@@ -1054,7 +1059,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var50 string
 				templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(*props.ShippingAddress.Company)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 358, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 363, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 				if templ_7745c5c3_Err != nil {
@@ -1072,7 +1077,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var51 string
 			templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.Line1)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 360, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 365, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 			if templ_7745c5c3_Err != nil {
@@ -1090,7 +1095,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var52 string
 				templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(*props.ShippingAddress.Line2)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 362, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 367, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 				if templ_7745c5c3_Err != nil {
@@ -1108,7 +1113,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var53 string
 			templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.City)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 364, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 369, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 			if templ_7745c5c3_Err != nil {
@@ -1121,7 +1126,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var54 string
 			templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.State)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 364, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 369, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 			if templ_7745c5c3_Err != nil {
@@ -1134,7 +1139,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var55 string
 			templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(props.ShippingAddress.PostalCode)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 364, Col: 128}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 369, Col: 128}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 			if templ_7745c5c3_Err != nil {
@@ -1172,7 +1177,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var56 templ.SafeURL
 				templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/orders/%s", so.OrderID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 392, Col: 84}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 397, Col: 84}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 				if templ_7745c5c3_Err != nil {
@@ -1186,7 +1191,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 					var templ_7745c5c3_Var57 string
 					templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(so.OrderNumber)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 396, Col: 27}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 401, Col: 27}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 					if templ_7745c5c3_Err != nil {
@@ -1196,7 +1201,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 					var templ_7745c5c3_Var58 string
 					templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(so.OrderID.String()[:8])
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 398, Col: 36}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 403, Col: 36}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 					if templ_7745c5c3_Err != nil {
@@ -1225,7 +1230,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var59 string
 				templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(so.PeriodStart.In(props.MerchantTZ).Format("Jan 2"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 410, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 415, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 				if templ_7745c5c3_Err != nil {
@@ -1238,7 +1243,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var60 string
 				templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(so.PeriodEnd.In(props.MerchantTZ).Format("Jan 2, 2006"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 410, Col: 130}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 415, Col: 130}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 				if templ_7745c5c3_Err != nil {
@@ -1252,7 +1257,7 @@ func SubscriptionShowContent(props SubscriptionShowProps) templ.Component {
 					var templ_7745c5c3_Var61 string
 					templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(so.OrderTotal))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 414, Col: 38}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 419, Col: 38}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 					if templ_7745c5c3_Err != nil {
@@ -1334,7 +1339,7 @@ func subscriptionActions(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var63 templ.SafeURL
 				templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/resume", props.Subscription.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 450, Col: 127}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 455, Col: 127}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
 				if templ_7745c5c3_Err != nil {
@@ -1353,7 +1358,7 @@ func subscriptionActions(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var64 templ.SafeURL
 				templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/pause", props.Subscription.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 455, Col: 126}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 460, Col: 126}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 				if templ_7745c5c3_Err != nil {
@@ -1372,7 +1377,7 @@ func subscriptionActions(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var65 templ.SafeURL
 				templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/retry", props.Subscription.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 460, Col: 126}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 465, Col: 126}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 				if templ_7745c5c3_Err != nil {
@@ -1391,7 +1396,7 @@ func subscriptionActions(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var66 templ.SafeURL
 				templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/cancel", props.Subscription.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 470, Col: 108}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 475, Col: 108}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var66))
 				if templ_7745c5c3_Err != nil {
@@ -1502,7 +1507,7 @@ func subscriptionActionRow(title, description string) templ.Component {
 		var templ_7745c5c3_Var69 string
 		templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 516, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 521, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 		if templ_7745c5c3_Err != nil {
@@ -1515,7 +1520,7 @@ func subscriptionActionRow(title, description string) templ.Component {
 		var templ_7745c5c3_Var70 string
 		templ_7745c5c3_Var70, templ_7745c5c3_Err = templ.JoinStringErrs(description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 517, Col: 57}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 522, Col: 57}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var70))
 		if templ_7745c5c3_Err != nil {
@@ -1567,7 +1572,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var72 templ.SafeURL
 		templ_7745c5c3_Var72, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/skip", props.Subscription.ID.String())))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 546, Col: 104}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 551, Col: 104}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var72))
 		if templ_7745c5c3_Err != nil {
@@ -1585,7 +1590,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var73 string
 			templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%d", n))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 558, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 563, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var73)
 			if templ_7745c5c3_Err != nil {
@@ -1598,7 +1603,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var74 string
 			templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(skipCountLabel(n))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 558, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 563, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 			if templ_7745c5c3_Err != nil {
@@ -1621,7 +1626,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var75 templ.SafeURL
 			templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/skip", props.Subscription.ID.String())))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 567, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 572, Col: 105}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var75))
 			if templ_7745c5c3_Err != nil {
@@ -1634,7 +1639,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var76 string
 			templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.ResolveAttributeValue(minDate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 578, Col: 21}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 583, Col: 21}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var76)
 			if templ_7745c5c3_Err != nil {
@@ -1647,7 +1652,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var77 string
 			templ_7745c5c3_Var77, templ_7745c5c3_Err = templ.ResolveAttributeValue(maxDate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 579, Col: 21}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 584, Col: 21}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var77)
 			if templ_7745c5c3_Err != nil {
@@ -1670,7 +1675,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var78 string
 			templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(minDate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 592, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 597, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 			if templ_7745c5c3_Err != nil {
@@ -1683,7 +1688,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var79 string
 			templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(maxDate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 592, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 597, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 			if templ_7745c5c3_Err != nil {
@@ -1696,7 +1701,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var80 string
 			templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 592, Col: 161}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 597, Col: 161}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 			if templ_7745c5c3_Err != nil {
@@ -1714,7 +1719,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var81 string
 			templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", domain.SubscriptionMaxSkipDays))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 596, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 601, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 			if templ_7745c5c3_Err != nil {
@@ -1733,7 +1738,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var82 templ.SafeURL
 			templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/undo-skip", props.Subscription.ID.String())))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 602, Col: 108}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 607, Col: 108}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 			if templ_7745c5c3_Err != nil {
@@ -1746,7 +1751,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var83 string
 			templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subscription.NextOrderAt.In(props.MerchantTZ).Format("Jan 2, 2006"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 606, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 611, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 			if templ_7745c5c3_Err != nil {
@@ -1759,7 +1764,7 @@ func subscriptionSkipRow(props SubscriptionShowProps) templ.Component {
 			var templ_7745c5c3_Var84 string
 			templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(restoreTo.In(props.MerchantTZ).Format("Jan 2, 2006"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 607, Col: 120}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 612, Col: 120}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 			if templ_7745c5c3_Err != nil {
@@ -1820,7 +1825,7 @@ func subscriptionShippingRow(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var87 templ.SafeURL
 				templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/grandfather-shipping", props.Subscription.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 620, Col: 138}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 625, Col: 138}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 				if templ_7745c5c3_Err != nil {
@@ -1856,7 +1861,7 @@ func subscriptionShippingRow(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var89 templ.SafeURL
 				templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(fmt.Sprintf("/admin/subscriptions/%s/grandfather-shipping", props.Subscription.ID.String())))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 628, Col: 138}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 633, Col: 138}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var89))
 				if templ_7745c5c3_Err != nil {
@@ -1964,7 +1969,7 @@ func dunningStatusPanel(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var93 string
 		templ_7745c5c3_Var93, templ_7745c5c3_Err = templ.JoinStringErrs(dunningAttemptLabel(props.Subscription))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 658, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 663, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var93))
 		if templ_7745c5c3_Err != nil {
@@ -1977,7 +1982,7 @@ func dunningStatusPanel(props SubscriptionShowProps) templ.Component {
 		var templ_7745c5c3_Var94 string
 		templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.JoinStringErrs(dunningStatusLine(props.Subscription, props.MerchantTZ))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 660, Col: 99}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 665, Col: 99}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var94))
 		if templ_7745c5c3_Err != nil {
@@ -1996,7 +2001,7 @@ func dunningStatusPanel(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var95 string
 				templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.JoinStringErrs(code)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 668, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 673, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var95))
 				if templ_7745c5c3_Err != nil {
@@ -2014,7 +2019,7 @@ func dunningStatusPanel(props SubscriptionShowProps) templ.Component {
 				var templ_7745c5c3_Var96 string
 				templ_7745c5c3_Var96, templ_7745c5c3_Err = templ.JoinStringErrs(code)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 670, Col: 63}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 675, Col: 63}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var96))
 				if templ_7745c5c3_Err != nil {
@@ -2095,6 +2100,69 @@ func dunningStatusLine(sub *domain.Subscription, tz *time.Location) string {
 			"The customer needs to put a different card on file. Nothing is sent on " + next + " — the next reminder comes after that."
 	}
 	return "Next charge attempt runs " + next + "."
+}
+
+// renewalBlockedBanner is shown when a subscription's status says it is live but
+// its ends_at says it is over.
+//
+// The renewal scheduler believes ends_at, so this customer is not being billed
+// and no error is raised anywhere — the failure is pure silence. Three accounts
+// sat like this for months while their pages showed an Active badge and an
+// unremarkable "Ended on" line, which is precisely why this says what the
+// consequence is rather than only what the data is.
+func renewalBlockedBanner(props SubscriptionShowProps) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var97 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var97 == nil {
+			templ_7745c5c3_Var97 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 166, "<div class=\"mt-6 badge-red rounded-sm p-4\"><p class=\"text-sm font-semibold\">Not renewing — this subscription will never be billed again</p><p class=\"mt-1 text-sm\">It is marked <span class=\"font-semibold\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var98 string
+		templ_7745c5c3_Var98, templ_7745c5c3_Err = templ.JoinStringErrs(string(props.Subscription.Status))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 759, Col: 79}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var98))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 167, "</span>, but it carries an end date of <span class=\"font-semibold\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var99 string
+		templ_7745c5c3_Var99, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subscription.EndsAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/subscription_show.templ`, Line: 760, Col: 116}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var99))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 168, "</span>. The renewal scheduler skips any subscription whose end date has passed, so no charge will be attempted and no error will be reported.</p><p class=\"mt-1 text-sm text-rr-muted\">Either the end date is wrong and needs clearing, or the status is wrong and this should be cancelled. It cannot be both.</p></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
 }
 
 var _ = templruntime.GeneratedTemplate

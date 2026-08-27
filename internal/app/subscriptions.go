@@ -614,6 +614,16 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 	}
 	sub.PauseUntil = nil
 
+	// A resumed subscription must not keep an end date. Resume already cleared
+	// pause_until and reset the period, so every other trace of the interruption
+	// was gone — but ends_at would have survived, and the renewal scheduler
+	// reads ends_at, not the badge. Clearing it here is cheap and unconditional:
+	// a subscription that is going to bill again cannot also have ended.
+	if err := s.subscriptions.ClearEndsAt(ctx, tx, id); err != nil {
+		return nil, fmt.Errorf("clear ends_at on resume: %w", err)
+	}
+	sub.EndsAt = nil
+
 	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
 		ActorType:    actor.Type,
 		ActorID:      actor.ID,

@@ -1,7 +1,7 @@
 -- +goose Up
 
 -- The equipment service module's tables. Gated behind the 'equipment_service'
--- module (migration 073) — this migration is additive and safe to run on every
+-- module (migration 076) — this migration is additive and safe to run on every
 -- instance, including the ones that will never switch the module on.
 --
 -- Shape follows how the work actually happens: a machine at a site accumulates

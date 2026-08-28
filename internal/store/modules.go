@@ -11,7 +11,7 @@ import (
 )
 
 // ModuleStore persists which optional feature modules this instance has
-// switched on. One row per module key; see db/migrations/073_modules.sql for
+// switched on. One row per module key; see db/migrations/076_modules.sql for
 // why the registry of valid keys lives in Go rather than in a CHECK.
 type ModuleStore struct{}
 

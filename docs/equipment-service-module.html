@@ -427,7 +427,7 @@ td code { font-size: 0.86em; }
       <p>There is no plugin mechanism today. Feature flags have been ad-hoc columns (<code>shipping_config.local_pickup_enabled</code>, <code>customers.announcements_enabled</code>). That&rsquo;s fine for a per-row preference and wrong for &ldquo;does this whole section of the app exist&rdquo;, so this design introduces the smallest general thing that works:</p>
 
       <div class="block">
-        <p class="block-label">Built &mdash; db/migrations/073_modules.sql</p>
+        <p class="block-label">Built &mdash; db/migrations/076_modules.sql</p>
 <pre><code>CREATE TABLE modules (
     key        text PRIMARY KEY,
     enabled    boolean NOT NULL DEFAULT false,
@@ -767,7 +767,7 @@ AuditServiceTimeLogged      = "service_ticket.time_logged"</code></pre>
     <section id="migration">
       <p class="eyebrow">Migration</p>
       <h2>One migration, fully reversible</h2>
-      <p>One migration, <code>074_equipment_service.sql</code>, with a real <code>-- +goose Down</code> that drops all six tables in dependency order. It is additive: nothing existing changes, so it is safe to ship before any UI exists and safe to roll back.</p>
+      <p>One migration, <code>077_equipment_service.sql</code>, with a real <code>-- +goose Down</code> that drops all six tables in dependency order. It is additive: nothing existing changes, so it is safe to ship before any UI exists and safe to roll back.</p>
     </section>
 
     <section id="v2">
@@ -806,8 +806,8 @@ AuditServiceTimeLogged      = "service_ticket.time_logged"</code></pre>
       <p>The only genuine sequence in this document &mdash; each step is shippable, and step 1 is testable with nothing behind it.</p>
       <div class="note"><span class="note-label">Status &mdash; 26 Aug 2026</span><p>Steps 1&ndash;5 are built and green through <code>mage check</code>, and driven end to end against a real server. The load-bearing rule holds through the real UI: an internal note leaves a ticket flagged as quiet, a logged call clears it. Driving step 5 turned up a real bug and fixed it &mdash; calendar dates were being timezone-converted, so a part ordered on the 25th displayed as the 24th, and warranties expired a day early. Steps 6&ndash;7 are open.</p></div>
       <ol>
-        <li><strong>Done.</strong> <code>modules</code> table (migration <code>073_modules.sql</code>), <code>domain/module.go</code>, <code>app.ModuleService</code>, the Settings &rarr; Modules tab, <code>requireModule</code> middleware, and <code>filterNavItems</code> in the admin layout. Shipped alone, as planned.</li>
-        <li><strong>Done.</strong> Migration <code>074_equipment_service.sql</code>, <code>domain/equipment.go</code> and <code>domain/service_ticket.go</code>, <code>store/equipment.go</code> and <code>store/service_tickets.go</code>.</li>
+        <li><strong>Done.</strong> <code>modules</code> table (migration <code>076_modules.sql</code>), <code>domain/module.go</code>, <code>app.ModuleService</code>, the Settings &rarr; Modules tab, <code>requireModule</code> middleware, and <code>filterNavItems</code> in the admin layout. Shipped alone, as planned.</li>
+        <li><strong>Done.</strong> Migration <code>077_equipment_service.sql</code>, <code>domain/equipment.go</code> and <code>domain/service_ticket.go</code>, <code>store/equipment.go</code> and <code>store/service_tickets.go</code>.</li>
         <li><strong>Done.</strong> Equipment register: list with filters, detail page, add/edit form, and the Equipment card on the customer rail. The <strong>Service</strong> sidebar row arrived with it &mdash; module-gated, so it exists only where the module is on.</li>
         <li><strong>Done.</strong> Tickets: queue with scopes and the stale flag, detail page with the merged notes-and-audit timeline, status machine, note composer, assignment, and the repair history on the machine page. The section tab strip arrived with it.</li>
         <li><strong>Done.</strong> Parts and time entries on the ticket detail, with per-row status advance, removal, and the parts/hours roll-up in the rail.</li>

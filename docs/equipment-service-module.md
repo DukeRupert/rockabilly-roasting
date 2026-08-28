@@ -40,7 +40,7 @@ That's fine for a per-row preference and wrong for "does this whole section of
 the app exist", so this design introduces the smallest general thing that works:
 
 ```sql
--- Built: db/migrations/073_modules.sql
+-- Built: db/migrations/076_modules.sql
 CREATE TABLE modules (
     key        text PRIMARY KEY,
     enabled    boolean NOT NULL DEFAULT false,
@@ -437,7 +437,7 @@ After commit, not inside the transaction:
 
 ## Migration
 
-One migration, `074_equipment_service.sql`, with a real `-- +goose Down` that
+One migration, `077_equipment_service.sql`, with a real `-- +goose Down` that
 drops all six tables in dependency order. It is additive: nothing existing
 changes, so it is safe to ship before any UI exists and safe to roll back.
 
@@ -470,10 +470,10 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
 
 ## Build order
 
-1. **Done.** `modules` table (migration `073_modules.sql`) + `domain/module.go`
+1. **Done.** `modules` table (migration `076_modules.sql`) + `domain/module.go`
    + `app.ModuleService` + Settings → Modules tab + `requireModule` middleware
    + `filterNavItems` in the admin layout. Shipped alone, as planned.
-2. **Done.** Migration `074_equipment_service.sql`, `domain/equipment.go` and
+2. **Done.** Migration `077_equipment_service.sql`, `domain/equipment.go` and
    `domain/service_ticket.go`, `store/equipment.go` and `store/service_tickets.go`.
 3. **Done.** Equipment register: list with filters, detail page, add/edit form,
    and the Equipment card on the customer rail. The **Service** sidebar row

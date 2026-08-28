@@ -36,7 +36,7 @@ func TestEquipmentUnderWarranty(t *testing.T) {
 }
 
 func TestEquipmentEnumsValidateAgainstTheirDatabaseCheck(t *testing.T) {
-	// Must match the CHECK constraints in migration 074.
+	// Must match the CHECK constraints in migration 077.
 	for _, c := range domain.EquipmentCategories() {
 		assert.True(t, c.Valid(), "%s", c)
 		assert.NotEmpty(t, c.Label())

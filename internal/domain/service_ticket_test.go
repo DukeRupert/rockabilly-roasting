@@ -75,7 +75,7 @@ func TestServiceTicketStaleSince(t *testing.T) {
 }
 
 func TestServiceEnumsValidateAgainstTheirDatabaseCheck(t *testing.T) {
-	// These lists have to match the CHECK constraints in migration 074. A value
+	// These lists have to match the CHECK constraints in migration 077. A value
 	// that passes here and fails there is a 500 in front of a staff member.
 	for _, s := range domain.ServiceTicketStatuses() {
 		assert.True(t, s.Valid(), "%s", s)

@@ -15,7 +15,7 @@ import (
 // section disappear.
 //
 // See docs/equipment-service-module.md for the design and
-// db/migrations/073_modules.sql for why the registry of keys lives in Go.
+// db/migrations/076_modules.sql for why the registry of keys lives in Go.
 
 // withModules attaches the instance's enabled modules to the request context so
 // the admin layout can decide which sidebar rows exist. It reads the app-layer

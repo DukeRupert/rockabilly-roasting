@@ -340,15 +340,15 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-				} else if row.AwaitingManualInvoice() && row.BillingObstacle() != "" {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "   <p class=\"mt-1 text-xs text-rr-muted\">If billed: ")
+				} else if props.Mode.IsLive() && row.BillingObstacle() != "" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "     <p class=\"mt-1 text-xs text-rr-muted\">If billed: ")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(row.BillingObstacle())
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 158, Col: 81}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 160, Col: 81}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 					if templ_7745c5c3_Err != nil {
@@ -386,7 +386,7 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(row.CustomerName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 171, Col: 26}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 173, Col: 26}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -404,7 +404,7 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 					var templ_7745c5c3_Var15 string
 					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(row.BillEmail)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 173, Col: 57}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 175, Col: 57}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 					if templ_7745c5c3_Err != nil {
@@ -422,7 +422,7 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 				var templ_7745c5c3_Var16 string
 				templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(domain.PaymentTermsLabel(row.TermsDays))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 177, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 179, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 				if templ_7745c5c3_Err != nil {
@@ -435,7 +435,7 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 				var templ_7745c5c3_Var17 string
 				templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(row.DueDate.Format("Jan 2, 2006"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 180, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 182, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 				if templ_7745c5c3_Err != nil {
@@ -448,7 +448,7 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(row.TotalCents))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 183, Col: 37}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 185, Col: 37}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -489,7 +489,7 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(len(props.Rows)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 197, Col: 47}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 199, Col: 47}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -502,7 +502,7 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(props.Count + props.AwaitingManual))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 197, Col: 115}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 199, Col: 115}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -537,14 +537,12 @@ func qbBillNowReason(row QBPreviewRow) string {
 // bill-to address created the invoice and then failed the send, with the page
 // having shown a clean row throughout.
 func qbBillNowPoints(row QBPreviewRow) []string {
-	points := []string{
-		"The customer receives an invoice for " + formatCents(row.TotalCents) +
-			", due " + row.DueDate.Format("Jan 2, 2006") + ".",
-	}
-	if obstacle := row.BillingObstacle(); obstacle != "" {
-		points = append(points, obstacle)
-	}
+	// Obstacles first, all of them. They are the reason to stop, and a reader
+	// who has already decided will skim past whatever precedes them.
+	points := append([]string{}, row.BillingObstacles()...)
 	points = append(points,
+		"The customer receives an invoice for "+formatCents(row.TotalCents)+
+			", due "+row.DueDate.Format("Jan 2, 2006")+".",
 		qbBillNowReason(row),
 		"If you have already invoiced it by hand, do not do this — it would bill them twice.",
 	)

@@ -139,25 +139,50 @@ func (p QBInvoicePreview) Problem() string {
 	return p.BillingObstacle()
 }
 
-// BillingObstacle states what would go wrong if this order were invoiced right
-// now, whether or not anything intends to invoice it. Empty means nothing
-// known would stop it.
+// BillingObstacles lists everything that would go wrong if this order were
+// invoiced right now, whether or not anything intends to invoice it. Empty
+// means nothing known would stop it.
 //
 // Separate from Problem because the two questions have different answers for a
 // manual account: nothing is wrong with leaving it alone, and something may
 // still be wrong with billing it. Bill now exists to bill exactly those rows,
-// so it is the caller that most needs this and the one that would previously
-// have been told nothing at all.
+// so it is the caller that most needs this.
+//
+// All of them, worst first — not the first match. Returning only one meant the
+// benign obstacle masked the destructive one whenever both applied, and both
+// applying is the ordinary case for a manual account new to QuickBooks: it has
+// no match (harmless, a customer gets created) and it may have no bill-to
+// address (the invoice is created and the send then fails permanently). The
+// operator was shown the harmless one and confirmed.
+func (p QBInvoicePreview) BillingObstacles() []string {
+	var out []string
+	// Worst first. A failed lookup outranks everything because it means the
+	// rest of this list is not trustworthy.
+	// LookupError carries anything discovered while preparing the preview that
+	// would stop or undermine an invoice — a failed QuickBooks lookup, or no
+	// item configured to bill lines against. Worded for both: "lookup failed"
+	// is untrue of the second, and this is the line an operator reads before
+	// committing.
+	if p.LookupError != nil {
+		out = append(out, "Not ready to bill: "+*p.LookupError)
+	}
+	if p.BillEmail == "" {
+		out = append(out, "No bill-to address, so QuickBooks would create the invoice and then fail to email it.")
+	}
+	if p.ExistingQBInvoiceID != nil {
+		out = append(out, "QuickBooks already has an invoice numbered "+p.DocNumber+" — it was probably billed by hand.")
+	}
+	if p.WouldCreateCustomer {
+		out = append(out, "No matching QuickBooks customer, so a new one would be created.")
+	}
+	return out
+}
+
+// BillingObstacle is the worst of BillingObstacles, for somewhere with room
+// for one line. Empty when there is none.
 func (p QBInvoicePreview) BillingObstacle() string {
-	switch {
-	case p.LookupError != nil:
-		return "QuickBooks lookup failed: " + *p.LookupError
-	case p.ExistingQBInvoiceID != nil:
-		return "QuickBooks already has an invoice numbered " + p.DocNumber + " — it was probably billed by hand."
-	case p.WouldCreateCustomer:
-		return "No matching QuickBooks customer, so a new one would be created."
-	case p.BillEmail == "":
-		return "No bill-to address, so QuickBooks would create the invoice and then fail to email it."
+	if obstacles := p.BillingObstacles(); len(obstacles) > 0 {
+		return obstacles[0]
 	}
 	return ""
 }

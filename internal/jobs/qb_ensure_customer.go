@@ -111,10 +111,6 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 		return fmt.Errorf("get customer: %w", err)
 	}
 
-	// Shadow mode: look the customer up so the proof can report whether they
-	// match, but write nothing — not to QBO, and not to our own customer row.
-	// Linking locally would decide a match that the whole point of the proof
-	// period is to have a human review first.
 	// Look, but write nothing. Two situations behave identically here and are
 	// deliberately one branch: a shadow-mode run, and an account nothing bills
 	// automatically. Both need to know whether this customer matches something

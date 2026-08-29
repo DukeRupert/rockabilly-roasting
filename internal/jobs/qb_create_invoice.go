@@ -387,7 +387,12 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 	// that would otherwise only surface as a failed invoice after go-live. The
 	// runbook sends staff here to check exactly this, so it has to be said
 	// here rather than only on the settings page.
-	if preview.AutoBilled && qbItems.SalesItemID == "" && w.envSalesItemID == "" {
+	// Not gated on AutoBilled, unlike an earlier version of this check. A
+	// manual account with no configured item is exactly the row somebody
+	// reaches for Bill now on, and CreateInvoice refuses without an item —
+	// permanently, since it is an ErrBadRequest. Suppressing it here would
+	// have left that click with no warning and no chance of succeeding.
+	if qbItems.SalesItemID == "" && w.envSalesItemID == "" {
 		lookupErrs = append(lookupErrs,
 			"no QuickBooks item is chosen for invoice lines — set one under Settings, Integrations, or invoices cannot be created")
 	}

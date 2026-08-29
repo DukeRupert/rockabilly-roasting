@@ -151,10 +151,12 @@ templ QBPreviewContent(props QBPreviewProps) {
 								</a>
 								if row.Problem() != "" {
 									<p class="mt-1 text-xs text-rr-muted">{ row.Problem() }</p>
-								} else if row.AwaitingManualInvoice() && row.BillingObstacle() != "" {
+								} else if props.Mode.IsLive() && row.BillingObstacle() != "" {
 									// Not a problem with leaving the row alone, which is why it
 									// carries no Check badge — but the operator reaching for Bill
-									// now should see it before they reach, not after.
+									// now should see it before they reach, not after. Only where
+									// that button exists: in test mode there is nothing to act on
+									// and this would be a line of warning about a hypothetical.
 									<p class="mt-1 text-xs text-rr-muted">If billed: { row.BillingObstacle() }</p>
 								}
 							</td>
@@ -220,14 +222,12 @@ func qbBillNowReason(row QBPreviewRow) string {
 // bill-to address created the invoice and then failed the send, with the page
 // having shown a clean row throughout.
 func qbBillNowPoints(row QBPreviewRow) []string {
-	points := []string{
-		"The customer receives an invoice for " + formatCents(row.TotalCents) +
-			", due " + row.DueDate.Format("Jan 2, 2006") + ".",
-	}
-	if obstacle := row.BillingObstacle(); obstacle != "" {
-		points = append(points, obstacle)
-	}
+	// Obstacles first, all of them. They are the reason to stop, and a reader
+	// who has already decided will skim past whatever precedes them.
+	points := append([]string{}, row.BillingObstacles()...)
 	points = append(points,
+		"The customer receives an invoice for "+formatCents(row.TotalCents)+
+			", due "+row.DueDate.Format("Jan 2, 2006")+".",
 		qbBillNowReason(row),
 		"If you have already invoiced it by hand, do not do this — it would bill them twice.",
 	)

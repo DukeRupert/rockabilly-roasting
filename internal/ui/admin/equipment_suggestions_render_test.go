@@ -88,8 +88,13 @@ func TestEquipmentFormMakeAndModelStayFreeText(t *testing.T) {
 
 func renderSitePicker(t *testing.T, addresses []EquipmentOption, selected string, chosen bool) string {
 	t.Helper()
+	return renderSitePickerValues(t, addresses, EquipmentFormValues{AddressID: selected}, chosen)
+}
+
+func renderSitePickerValues(t *testing.T, addresses []EquipmentOption, values EquipmentFormValues, chosen bool) string {
+	t.Helper()
 	var buf bytes.Buffer
-	require.NoError(t, EquipmentSitePicker(addresses, selected, chosen).Render(context.Background(), &buf))
+	require.NoError(t, EquipmentSitePicker(addresses, values, chosen).Render(context.Background(), &buf))
 	return buf.String()
 }
 
@@ -148,4 +153,40 @@ func TestEquipmentSitePickerContract(t *testing.T) {
 	} {
 		assert.Contains(t, html, `name="`+field+`"`, "create handler reads %q", field)
 	}
+}
+
+// A rejected save must hand the typed site back. Losing it is worse than an
+// ordinary dropped field: the operator is being told the site is incomplete, so
+// the values they need to correct are exactly the ones that vanish, and the
+// panel closes as though they had never typed anything.
+func TestEquipmentSitePickerReturnsATypedSite(t *testing.T) {
+	values := EquipmentFormValues{
+		NewSiteLine1:      "1120 Roastery Way",
+		NewSiteLine2:      "Unit B",
+		NewSiteCity:       "Kennewick",
+		NewSiteState:      "WA",
+		NewSitePostalCode: "99336",
+	}
+	html := renderSitePickerValues(t, nil, values, true)
+
+	assert.Contains(t, html, `value="1120 Roastery Way"`)
+	assert.Contains(t, html, `value="Unit B"`)
+	assert.Contains(t, html, `value="Kennewick"`)
+	assert.Contains(t, html, `value="WA"`)
+	assert.Contains(t, html, `value="99336"`)
+	// Open, or the values come back invisible.
+	assert.Contains(t, html, "{ adding: true }")
+}
+
+// Backing out has to empty the fields, not merely hide them: resolveEquipmentSite
+// gives a typed street precedence over the picked address, so a stale value left
+// in the DOM would create the new address anyway and ignore the one chosen —
+// the exact opposite of what the button says.
+func TestEquipmentSitePickerBackOutClearsTheTypedSite(t *testing.T) {
+	html := renderSitePickerValues(t, nil, EquipmentFormValues{}, true)
+
+	assert.Contains(t, html, "{ adding: false }")
+	assert.Contains(t, html, "Use one on file instead")
+	assert.Contains(t, html, "new_site_", "the back-out handler must clear the new-site inputs")
+	assert.Contains(t, html, "i.value = ''")
 }

@@ -55,6 +55,23 @@ type EquipmentFormValues struct {
 	InstalledOn       string
 	WarrantyExpiresOn string
 	Notes             string
+	// NewSite* hold a site typed into the "somewhere else" panel. They ride on
+	// the form values so a rejected save gives them back — without this, an
+	// operator told "a new site needs a street, city, state and ZIP" loses the
+	// street, city and state they had already typed and retypes them from
+	// memory, which is the opposite of what this struct exists for.
+	NewSiteLine1      string
+	NewSiteLine2      string
+	NewSiteCity       string
+	NewSiteState      string
+	NewSitePostalCode string
+}
+
+// HasNewSite reports whether a site was typed rather than picked. Drives the
+// panel open on a re-render so the values coming back are visible.
+func (v EquipmentFormValues) HasNewSite() bool {
+	return v.NewSiteLine1 != "" || v.NewSiteCity != "" ||
+		v.NewSiteState != "" || v.NewSitePostalCode != ""
 }
 
 // EquipmentFormValuesFrom fills the form from a stored machine.
@@ -143,7 +160,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.title())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 110, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 127, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -161,7 +178,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 118, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 135, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -179,7 +196,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		var templ_7745c5c3_Var4 templ.SafeURL
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(props.action()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 121, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 138, Col: 59}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -197,7 +214,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.CustomerID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 126, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 143, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 			if templ_7745c5c3_Err != nil {
@@ -210,7 +227,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(equipmentOptionLabel(props.Customers, props.Values.CustomerID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 127, Col: 106}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 144, Col: 106}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -233,7 +250,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 144, Col: 36}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 161, Col: 36}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 				if templ_7745c5c3_Err != nil {
@@ -256,7 +273,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 144, Col: 103}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 161, Col: 103}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -276,7 +293,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = EquipmentSitePicker(props.Addresses, props.Values.AddressID, props.Values.CustomerID != "").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = EquipmentSitePicker(props.Addresses, props.Values, props.Values.CustomerID != "").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -292,7 +309,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(c))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 154, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 171, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
 			if templ_7745c5c3_Err != nil {
@@ -315,7 +332,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 154, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 171, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -333,7 +350,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.Make)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 167, Col: 30}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 184, Col: 30}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 		if templ_7745c5c3_Err != nil {
@@ -346,7 +363,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.Model)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 180, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 197, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 		if templ_7745c5c3_Err != nil {
@@ -359,7 +376,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.SerialNumber)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 191, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 208, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 		if templ_7745c5c3_Err != nil {
@@ -377,7 +394,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(o))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 199, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 216, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 			if templ_7745c5c3_Err != nil {
@@ -400,7 +417,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(o.Label())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 199, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 216, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -418,7 +435,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.InstalledOn)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 210, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 227, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var16)
 		if templ_7745c5c3_Err != nil {
@@ -431,7 +448,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		var templ_7745c5c3_Var17 string
 		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.WarrantyExpiresOn)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 220, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 237, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var17)
 		if templ_7745c5c3_Err != nil {
@@ -444,7 +461,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(props.Values.Notes)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 232, Col: 25}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 249, Col: 25}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -472,7 +489,7 @@ func EquipmentFormContent(props EquipmentFormProps) templ.Component {
 		var templ_7745c5c3_Var19 templ.SafeURL
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(props.cancelHref()))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 243, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 260, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -597,7 +614,7 @@ func equipmentSuggestions() templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.ResolveAttributeValue(make)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 288, Col: 23}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 305, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 			if templ_7745c5c3_Err != nil {
@@ -620,7 +637,7 @@ func equipmentSuggestions() templ.Component {
 			var templ_7745c5c3_Var24 string
 			templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(model)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 293, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 310, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
 			if templ_7745c5c3_Err != nil {
@@ -652,7 +669,7 @@ func equipmentSuggestions() templ.Component {
 // customerChosen distinguishes "no customer picked yet" from "this customer has
 // no addresses on file". They look identical in an empty dropdown and need
 // completely different things from the person reading it.
-func EquipmentSitePicker(addresses []EquipmentOption, selected string, customerChosen bool) templ.Component {
+func EquipmentSitePicker(addresses []EquipmentOption, values EquipmentFormValues, customerChosen bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -673,83 +690,171 @@ func EquipmentSitePicker(addresses []EquipmentOption, selected string, customerC
 			templ_7745c5c3_Var25 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"sm:col-span-3\" id=\"site-picker\" x-data=\"{ adding: false }\"><label for=\"address_id\" class=\"block text-sm font-medium text-rr-heading\">Site</label> <select id=\"address_id\" name=\"address_id\" x-show=\"!adding\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><option value=\"\">Not recorded</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"sm:col-span-3\" id=\"site-picker\" x-data=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var26 string
+		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(sitePickerState(values))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 329, Col: 77}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\"><label for=\"address_id\" class=\"block text-sm font-medium text-rr-heading\">Site</label> <select id=\"address_id\" name=\"address_id\" x-show=\"!adding\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><option value=\"\">Not recorded</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, a := range addresses {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<option value=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var26 string
-			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID.String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 322, Col: 33}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var26)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if selected == a.ID.String() {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, " selected")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, ">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<option value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var27 string
-			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(a.Label)
+			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.ResolveAttributeValue(a.ID.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 322, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 339, Col: 33}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var27)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if values.AddressID == a.ID.String() {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var28 string
+			templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(a.Label)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 339, Col: 93}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</select><div x-show=\"!adding\"><p class=\"mt-1 text-xs text-rr-muted\">Which shop it sits at — the first thing a tech asks about a chain. ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</select><div x-show=\"!adding\"><p class=\"mt-1 text-xs text-rr-muted\">Which shop it sits at — the first thing a tech asks about a chain. ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if !customerChosen {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "Choose a customer first.")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "Choose a customer first.")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else if len(addresses) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "Nothing on file for this customer.")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "Nothing on file for this customer.")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if customerChosen {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "<button type=\"button\" x-on:click=\"adding = true; $nextTick(() => $refs.line1.focus())\" class=\"mt-1 text-xs font-semibold text-rr-red hover:text-rr-red-lt\">Somewhere else — add an address</button>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "<button type=\"button\" x-on:click=\"adding = true; $nextTick(() => $refs.line1.focus())\" class=\"mt-1 text-xs font-semibold text-rr-red hover:text-rr-red-lt\">Somewhere else — add an address</button>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "</div><!-- A machine does not always live at the address we deliver coffee to:\n\t\t     a chain's third shop, a roastery back room, a unit in for repair.\n\t\t     Filling this in creates a real address on the customer, so a tech can\n\t\t     be routed to it and it can go on a label — which also means it joins\n\t\t     their address book and shows up wherever they pick an address. --><div x-show=\"adding\" x-cloak class=\"mt-1 space-y-2 border border-rr-border bg-rr-raised p-3\"><p class=\"text-xs text-rr-muted\">Saved to this customer's addresses, so it is reusable and a tech can be routed to it.</p><input type=\"text\" name=\"new_site_line1\" x-ref=\"line1\" placeholder=\"Street address\" autocomplete=\"off\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"> <input type=\"text\" name=\"new_site_line2\" placeholder=\"Suite, unit, floor (optional)\" autocomplete=\"off\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><div class=\"grid grid-cols-6 gap-2\"><input type=\"text\" name=\"new_site_city\" placeholder=\"City\" autocomplete=\"off\" class=\"col-span-3 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"> <input type=\"text\" name=\"new_site_state\" placeholder=\"State\" autocomplete=\"off\" class=\"col-span-1 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"> <input type=\"text\" name=\"new_site_postal_code\" placeholder=\"ZIP\" autocomplete=\"off\" class=\"col-span-2 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><button type=\"button\" x-on:click=\"adding = false\" class=\"text-xs font-semibold text-rr-muted hover:text-rr-red\">Use one on file instead</button></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</div><!-- A machine does not always live at the address we deliver coffee to:\n\t\t     a chain's third shop, a roastery back room, a unit in for repair.\n\t\t     Filling this in creates a real address on the customer, so a tech can\n\t\t     be routed to it and it can go on a label — which also means it joins\n\t\t     their address book and shows up wherever they pick an address. --><div x-show=\"adding\" x-cloak class=\"mt-1 space-y-2 border border-rr-border bg-rr-raised p-3\"><p class=\"text-xs text-rr-muted\">Saved to this customer's addresses, so it is reusable and a tech can be routed to it.</p><input type=\"text\" name=\"new_site_line1\" x-ref=\"line1\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var29 string
+		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.ResolveAttributeValue(values.NewSiteLine1)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 368, Col: 85}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var29)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" placeholder=\"Street address\" autocomplete=\"off\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"> <input type=\"text\" name=\"new_site_line2\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var30 string
+		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.ResolveAttributeValue(values.NewSiteLine2)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 369, Col: 71}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var30)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\" placeholder=\"Suite, unit, floor (optional)\" autocomplete=\"off\" class=\"w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><div class=\"grid grid-cols-6 gap-2\"><input type=\"text\" name=\"new_site_city\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var31 string
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(values.NewSiteCity)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 371, Col: 70}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" placeholder=\"City\" autocomplete=\"off\" class=\"col-span-3 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"> <input type=\"text\" name=\"new_site_state\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var32 string
+		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.ResolveAttributeValue(values.NewSiteState)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 372, Col: 72}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var32)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "\" placeholder=\"State\" autocomplete=\"off\" class=\"col-span-1 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"> <input type=\"text\" name=\"new_site_postal_code\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var33 string
+		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue(values.NewSitePostalCode)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_form.templ`, Line: 373, Col: 83}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "\" placeholder=\"ZIP\" autocomplete=\"off\" class=\"col-span-2 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div><!-- Backing out has to empty the fields, not just hide them. x-show only\n\t\t\t     toggles display, so a typed street stays in the DOM and is still\n\t\t\t     submitted — and resolveEquipmentSite gives it precedence over the\n\t\t\t     picked address, so \"use one on file instead\" would have created the\n\t\t\t     new address anyway and ignored the one chosen. --><button type=\"button\" x-on:click=\"adding = false; $el.closest('#site-picker').querySelectorAll('input[name^=new_site_]').forEach(i => i.value = '')\" class=\"text-xs font-semibold text-rr-muted hover:text-rr-red\">Use one on file instead</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		return nil
 	})
+}
+
+// sitePickerState seeds the panel open when a typed-in site is coming back from
+// a rejected save, so the operator sees the values they are being handed back
+// rather than an apparently empty form.
+func sitePickerState(values EquipmentFormValues) string {
+	if values.HasNewSite() {
+		return "{ adding: true }"
+	}
+	return "{ adding: false }"
 }
 
 var _ = templruntime.GeneratedTemplate

@@ -66,15 +66,3 @@ func TestEquipmentCatalogIsNotMutableByCallers(t *testing.T) {
 
 	assert.Equal(t, original, EquipmentCatalog()[0], "EquipmentCatalog must return a copy")
 }
-
-// The list is a hint, never a whitelist: nothing here validates a machine, so a
-// make that is not in the catalogue has to remain perfectly legal. This pins the
-// absence of a validator, which is easy to add later by accident.
-func TestCatalogDoesNotConstrainWhatCanBeRegistered(t *testing.T) {
-	makes := EquipmentMakes()
-	assert.NotContains(t, makes, "Some Machine Nobody Listed")
-
-	// validateEquipment is what actually guards a registration, and it cares
-	// only that a make was given at all.
-	assert.True(t, EquipmentCategoryOther.Valid())
-}

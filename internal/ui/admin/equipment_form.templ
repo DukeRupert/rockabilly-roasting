@@ -47,6 +47,23 @@ type EquipmentFormValues struct {
 	InstalledOn       string
 	WarrantyExpiresOn string
 	Notes             string
+	// NewSite* hold a site typed into the "somewhere else" panel. They ride on
+	// the form values so a rejected save gives them back — without this, an
+	// operator told "a new site needs a street, city, state and ZIP" loses the
+	// street, city and state they had already typed and retypes them from
+	// memory, which is the opposite of what this struct exists for.
+	NewSiteLine1      string
+	NewSiteLine2      string
+	NewSiteCity       string
+	NewSiteState      string
+	NewSitePostalCode string
+}
+
+// HasNewSite reports whether a site was typed rather than picked. Drives the
+// panel open on a re-render so the values coming back are visible.
+func (v EquipmentFormValues) HasNewSite() bool {
+	return v.NewSiteLine1 != "" || v.NewSiteCity != "" ||
+		v.NewSiteState != "" || v.NewSitePostalCode != ""
 }
 
 // EquipmentFormValuesFrom fills the form from a stored machine.
@@ -146,7 +163,7 @@ templ EquipmentFormContent(props EquipmentFormProps) {
 					</select>
 				}
 			</div>
-			@EquipmentSitePicker(props.Addresses, props.Values.AddressID, props.Values.CustomerID != "")
+			@EquipmentSitePicker(props.Addresses, props.Values, props.Values.CustomerID != "")
 			<div class="sm:col-span-2">
 				<label for="category" class="block text-sm font-medium text-rr-heading">Category</label>
 				<select id="category" name="category" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
@@ -308,8 +325,8 @@ templ equipmentSuggestions() {
 // customerChosen distinguishes "no customer picked yet" from "this customer has
 // no addresses on file". They look identical in an empty dropdown and need
 // completely different things from the person reading it.
-templ EquipmentSitePicker(addresses []EquipmentOption, selected string, customerChosen bool) {
-	<div class="sm:col-span-3" id="site-picker" x-data="{ adding: false }">
+templ EquipmentSitePicker(addresses []EquipmentOption, values EquipmentFormValues, customerChosen bool) {
+	<div class="sm:col-span-3" id="site-picker" x-data={ sitePickerState(values) }>
 		<label for="address_id" class="block text-sm font-medium text-rr-heading">Site</label>
 		<select
 			id="address_id"
@@ -319,7 +336,7 @@ templ EquipmentSitePicker(addresses []EquipmentOption, selected string, customer
 		>
 			<option value="">Not recorded</option>
 			for _, a := range addresses {
-				<option value={ a.ID.String() } selected?={ selected == a.ID.String() }>{ a.Label }</option>
+				<option value={ a.ID.String() } selected?={ values.AddressID == a.ID.String() }>{ a.Label }</option>
 			}
 		</select>
 		<div x-show="!adding">
@@ -348,16 +365,35 @@ templ EquipmentSitePicker(addresses []EquipmentOption, selected string, customer
 		     their address book and shows up wherever they pick an address. -->
 		<div x-show="adding" x-cloak class="mt-1 space-y-2 border border-rr-border bg-rr-raised p-3">
 			<p class="text-xs text-rr-muted">Saved to this customer's addresses, so it is reusable and a tech can be routed to it.</p>
-			<input type="text" name="new_site_line1" x-ref="line1" placeholder="Street address" autocomplete="off" class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
-			<input type="text" name="new_site_line2" placeholder="Suite, unit, floor (optional)" autocomplete="off" class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
+			<input type="text" name="new_site_line1" x-ref="line1" value={ values.NewSiteLine1 } placeholder="Street address" autocomplete="off" class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
+			<input type="text" name="new_site_line2" value={ values.NewSiteLine2 } placeholder="Suite, unit, floor (optional)" autocomplete="off" class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
 			<div class="grid grid-cols-6 gap-2">
-				<input type="text" name="new_site_city" placeholder="City" autocomplete="off" class="col-span-3 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
-				<input type="text" name="new_site_state" placeholder="State" autocomplete="off" class="col-span-1 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
-				<input type="text" name="new_site_postal_code" placeholder="ZIP" autocomplete="off" class="col-span-2 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
+				<input type="text" name="new_site_city" value={ values.NewSiteCity } placeholder="City" autocomplete="off" class="col-span-3 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
+				<input type="text" name="new_site_state" value={ values.NewSiteState } placeholder="State" autocomplete="off" class="col-span-1 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
+				<input type="text" name="new_site_postal_code" value={ values.NewSitePostalCode } placeholder="ZIP" autocomplete="off" class="col-span-2 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"/>
 			</div>
-			<button type="button" x-on:click="adding = false" class="text-xs font-semibold text-rr-muted hover:text-rr-red">
+			<!-- Backing out has to empty the fields, not just hide them. x-show only
+			     toggles display, so a typed street stays in the DOM and is still
+			     submitted — and resolveEquipmentSite gives it precedence over the
+			     picked address, so "use one on file instead" would have created the
+			     new address anyway and ignored the one chosen. -->
+			<button
+				type="button"
+				x-on:click="adding = false; $el.closest('#site-picker').querySelectorAll('input[name^=new_site_]').forEach(i => i.value = '')"
+				class="text-xs font-semibold text-rr-muted hover:text-rr-red"
+			>
 				Use one on file instead
 			</button>
 		</div>
 	</div>
+}
+
+// sitePickerState seeds the panel open when a typed-in site is coming back from
+// a rejected save, so the operator sees the values they are being handed back
+// rather than an apparently empty form.
+func sitePickerState(values EquipmentFormValues) string {
+	if values.HasNewSite() {
+		return "{ adding: true }"
+	}
+	return "{ adding: false }"
 }

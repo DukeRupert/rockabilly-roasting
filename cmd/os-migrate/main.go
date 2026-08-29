@@ -905,10 +905,11 @@ func setWholesaleFields(ctx context.Context, tx pgx.Tx, id uuid.UUID, status dom
 			wholesale_status = $3,
 			company_name = COALESCE(company_name, NULLIF($4, '')),
 			price_list_id = $5,
-			payment_terms_days = 7,
+			payment_terms_days = $6,
 			approved_at = CASE WHEN $3 = 'approved' THEN COALESCE(approved_at, NOW()) ELSE approved_at END
 		WHERE id = $1`,
 		id, string(domain.AccountTypeWholesale), string(status), company, priceListID,
+		domain.DefaultPaymentTermsDays,
 	)
 	return err
 }

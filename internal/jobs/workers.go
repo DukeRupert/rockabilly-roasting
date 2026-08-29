@@ -394,6 +394,12 @@ func (EnsureQBCustomerArgs) Kind() string { return "qb_ensure_customer" }
 type CreateQBInvoiceArgs struct {
 	OrderID      uuid.UUID `json:"order_id"`
 	QBCustomerID string    `json:"qb_customer_id"`
+	// CustomerLookupError carries a shadow-mode QBO customer lookup that
+	// failed, so the preview can say so. Shadow must still produce a row: an
+	// order absent from the review list reads as nothing to bill, which is the
+	// one conclusion a proof period must never invite. Empty in live mode,
+	// where a failed lookup fails the job instead.
+	CustomerLookupError string `json:"customer_lookup_error,omitempty"`
 }
 
 // Kind returns the job kind identifier.

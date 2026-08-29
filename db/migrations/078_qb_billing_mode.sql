@@ -90,8 +90,11 @@ CREATE TABLE qb_invoice_previews (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- The digest and admin list both read newest-first over a date window.
+-- The admin list reads newest-first; the weekly digest windows on updated_at,
+-- because a preview is refreshed in place and an order re-previewed this week
+-- is news this week whenever it was first seen.
 CREATE INDEX idx_qb_invoice_previews_created ON qb_invoice_previews (created_at DESC);
+CREATE INDEX idx_qb_invoice_previews_updated ON qb_invoice_previews (updated_at);
 
 -- +goose Down
 

@@ -609,13 +609,19 @@ func run() error {
 			},
 			&river.PeriodicJobOpts{RunOnStart: false},
 		))
-		// Summarise what shadow billing would have done, weekly. The worker
-		// itself checks the mode, so this stays registered on a live shop and
-		// simply sends nothing — flipping back to shadow for another proof
-		// period does not need a redeploy. No RunOnStart: a restart must not
-		// mail an off-schedule digest.
+		// Summarise what shadow billing would have done, Monday mornings. The
+		// worker checks the mode itself, so this stays registered on a live
+		// shop and simply sends nothing — returning to shadow for another
+		// proof period does not need a redeploy.
+		//
+		// A calendar schedule, not PeriodicInterval(7*24h): an interval is
+		// measured from process start, so with RunOnStart off every deploy
+		// would reset the clock and a shop that ships more than weekly — this
+		// one — would never see a digest at all. That is precisely the window
+		// a proof period occupies. ByPeriod still guards against two instances
+		// both firing when the hour comes round.
 		periodicJobs = append(periodicJobs, river.NewPeriodicJob(
-			river.PeriodicInterval(7*24*time.Hour),
+			jobs.NewWeeklySchedule(time.Monday, 8, 0, merchantTZ),
 			func() (river.JobArgs, *river.InsertOpts) {
 				return jobs.QBShadowDigestArgs{}, &river.InsertOpts{
 					UniqueOpts: river.UniqueOpts{

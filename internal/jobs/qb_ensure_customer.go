@@ -117,21 +117,30 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 	// period is to have a human review first.
 	if !mode.IsLive() {
 		qbID := ""
+		lookupErr := ""
 		if customer.QBCustomerID != nil {
 			qbID = *customer.QBCustomerID
 		} else {
 			found, findErr := w.qb.FindCustomer(ctx, customerDisplayName(customer), customer.Email)
-			if findErr != nil {
-				return fmt.Errorf("qb find customer: %w", findErr)
-			}
-			if found != nil {
+			switch {
+			case findErr != nil:
+				// Carried forward rather than returned. Failing here would
+				// stop the chain, so no preview would be written and the order
+				// would simply be absent from the review page and the digest —
+				// indistinguishable from an order with nothing to bill. That
+				// is the conclusion a proof period must never invite, and this
+				// is the likeliest call to fail, being the one the proof period
+				// exists to exercise. The row says what went wrong instead.
+				lookupErr = findErr.Error()
+			case found != nil:
 				qbID = found.ID
 			}
 		}
 		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 			_, txErr := w.riverClient.InsertTx(ctx, tx, CreateQBInvoiceArgs{
-				OrderID:      job.Args.OrderID,
-				QBCustomerID: qbID,
+				OrderID:             job.Args.OrderID,
+				QBCustomerID:        qbID,
+				CustomerLookupError: lookupErr,
 			}, nil)
 			return txErr
 		})

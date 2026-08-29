@@ -175,6 +175,23 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		return w.recordPreview(ctx, job, order, customer, lines, docNumber, termsDays)
 	}
 
+	// A shadow run chains here with an empty QBCustomerID when nothing matched.
+	// If the mode is flipped to live between the two jobs, that empty value
+	// would reach QBO as a blank CustomerRef. Start the chain again instead:
+	// the live EnsureQBCustomer path establishes the customer properly, and
+	// the DocNumber probe below still guards against a duplicate invoice.
+	if job.Args.QBCustomerID == "" {
+		slog.Info("qb create invoice: no qb customer on a live run, restarting the chain",
+			"order_id", order.ID)
+		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
+			_, txErr := w.riverClient.InsertTx(ctx, tx, EnsureQBCustomerArgs{
+				CustomerID: *order.CustomerID,
+				OrderID:    order.ID,
+			}, nil)
+			return txErr
+		})
+	}
+
 	invoice, err := w.qb.FindInvoiceByDocNumber(ctx, docNumber)
 	if err != nil {
 		return fmt.Errorf("qb find invoice by doc number: %w", err)
@@ -236,6 +253,14 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	// re-create the invoice.
 	return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		if txErr := w.orders.SetQBInvoice(ctx, tx, order.ID, invoice.ID, invoice.DocNumber); txErr != nil {
+			return txErr
+		}
+		// The order is billed, so any shadow-mode preview of it has served its
+		// purpose. Clearing it in the same transaction keeps the review page
+		// meaning "recorded but not billed" — otherwise a billed order would
+		// sit there still offering a Bill now button and still counting toward
+		// the badge.
+		if txErr := w.previews.DeleteByOrder(ctx, tx, order.ID); txErr != nil {
 			return txErr
 		}
 		if _, txErr := w.riverClient.InsertTx(ctx, tx, SendQBInvoiceArgs{
@@ -307,6 +332,14 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 	}
 
 	var lookupErrs []string
+	if job.Args.CustomerLookupError != "" {
+		// Raised by EnsureQBCustomer, which carries it here rather than
+		// failing so this order still appears on the review page.
+		lookupErrs = append(lookupErrs, "customer lookup: "+job.Args.CustomerLookupError)
+		// A lookup that failed did not establish that no customer exists, so
+		// this must not read as "going live would create one".
+		preview.WouldCreateCustomer = false
+	}
 	if existing, err := w.qb.FindInvoiceByDocNumber(ctx, docNumber); err != nil {
 		lookupErrs = append(lookupErrs, "invoice lookup: "+err.Error())
 	} else if existing != nil {

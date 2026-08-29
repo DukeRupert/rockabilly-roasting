@@ -145,20 +145,15 @@ func (s *QBPreviewStore) ListSince(ctx context.Context, tx pgx.Tx, since time.Ti
 	return scanQBPreviewRows(rows)
 }
 
-// GetByOrder returns the preview for one order, or nil when there is none.
-func (s *QBPreviewStore) GetByOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) (*QBPreviewRow, error) {
-	rows, err := tx.Query(ctx, qbPreviewSelect+` WHERE p.order_id = $1`, orderID)
-	if err != nil {
-		return nil, fmt.Errorf("get qb invoice preview: %w", err)
+// DeleteByOrder removes an order's preview. Called when the order is actually
+// invoiced: from then on the invoice is the record, and a preview left behind
+// would keep the order on the review page still offering to bill it, under a
+// dialog insisting it had never been billed.
+func (s *QBPreviewStore) DeleteByOrder(ctx context.Context, tx pgx.Tx, orderID uuid.UUID) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM qb_invoice_previews WHERE order_id = $1`, orderID); err != nil {
+		return fmt.Errorf("delete qb invoice preview: %w", err)
 	}
-	found, err := scanQBPreviewRows(rows)
-	if err != nil {
-		return nil, err
-	}
-	if len(found) == 0 {
-		return nil, nil
-	}
-	return &found[0], nil
+	return nil
 }
 
 // Count returns how many previews exist, for the review badge.

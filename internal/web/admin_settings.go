@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
@@ -849,9 +850,14 @@ func (d *Deps) handleAdminQBBillOrder(w http.ResponseWriter, r *http.Request) {
 // enqueueQBChain starts the invoice chain inside the caller's transaction, so
 // the job cannot outlive a rolled-back decision to bill.
 func (d *Deps) enqueueQBChain(ctx context.Context, tx pgx.Tx, customerID, orderID uuid.UUID) error {
+	// Unique by args: two quick clicks on Bill now would otherwise enqueue two
+	// chains. The DocNumber probe keeps QBO to one invoice, but nothing
+	// downstream would stop two send jobs emailing the customer twice.
 	_, err := d.RiverClient.InsertTx(ctx, tx, jobs.EnsureQBCustomerArgs{
 		CustomerID: customerID,
 		OrderID:    orderID,
-	}, nil)
+	}, &river.InsertOpts{
+		UniqueOpts: river.UniqueOpts{ByArgs: true, ByPeriod: time.Hour},
+	})
 	return err
 }

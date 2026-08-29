@@ -286,6 +286,9 @@ func run() error {
 	// QuickBooks Online integration
 	qbCredStore := store.NewQBCredentialStore()
 	qbPreviewStore := store.NewQBPreviewStore()
+	// The environment's fallback invoice item, read here so both the client
+	// config and the worker registration below can see it.
+	qbEnvSalesItemID := os.Getenv("QB_SALES_ITEM_ID")
 	var qbClient quickbooks.Client
 	var qbOAuthManager *quickbooks.OAuthManager
 	qbWebhookVerifier := os.Getenv("QB_WEBHOOK_VERIFIER_TOKEN")
@@ -295,9 +298,17 @@ func run() error {
 		if qbWebhookVerifier == "" {
 			return fmt.Errorf("QB_WEBHOOK_VERIFIER_TOKEN is required when QB_CLIENT_ID is set")
 		}
-		qbSalesItemID := os.Getenv("QB_SALES_ITEM_ID")
+		// No longer fatal. The item invoices bill against is chosen in the
+		// admin now (migration 079), and it cannot be chosen before the shop
+		// has connected and we can list that company's items — so refusing to
+		// boot without it made the first deploy of a new connection
+		// impossible to do honestly: you had to invent an ID, connect, look up
+		// the real one, and redeploy. An unset item now fails the invoice job
+		// with a message naming the setting, which is visible in the admin
+		// instead of in a crash loop.
+		qbSalesItemID := qbEnvSalesItemID
 		if qbSalesItemID == "" {
-			return fmt.Errorf("QB_SALES_ITEM_ID is required when QB_CLIENT_ID is set (QBO rejects invoice lines without an ItemRef)")
+			logger.Warn("QB_SALES_ITEM_ID is not set; wholesale invoicing needs an item chosen under Settings > Integrations before it can bill")
 		}
 		qbEncKeyB64 := os.Getenv("QB_TOKEN_ENCRYPTION_KEY")
 		qbEncKey, decodeErr := base64DecodeKey(qbEncKeyB64)
@@ -688,7 +699,7 @@ func run() error {
 	// Register QB workers (need riverClient for job chaining)
 	if qbClient != nil {
 		river.AddWorker(workers, jobs.NewEnsureQBCustomerWorker(customerStore, settingsStore, qbClient, auditWriter, pool, riverClient, metricsReg))
-		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, customerStore, catalogStore, settingsStore, qbPreviewStore, qbClient, auditWriter, pool, riverClient, metricsReg))
+		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, customerStore, catalogStore, settingsStore, qbPreviewStore, qbEnvSalesItemID, qbClient, auditWriter, pool, riverClient, metricsReg))
 		river.AddWorker(workers, jobs.NewSendQBInvoiceWorker(qbClient, auditWriter, pool, riverClient, metricsReg))
 		river.AddWorker(workers, jobs.NewQBInvoiceAlertEmailWorker(orderSvc, pool))
 		river.AddWorker(workers, jobs.NewQBShadowDigestWorker(orderSvc, pool))

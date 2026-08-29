@@ -143,6 +143,20 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrInvalidEquipmentStatus):
 		return http.StatusBadRequest, err.Error()
 
+	// QuickBooks billing configuration. Bad input, not a server fault. The
+	// handlers reject most of these before the service is reached, so several
+	// are unreachable today; they are mapped because the alternative when one
+	// does escape is a 500 for what is plainly a bad request.
+	case errors.Is(err, app.ErrInvalidQBBillingMode),
+		errors.Is(err, app.ErrQBSalesItemRequired),
+		errors.Is(err, app.ErrQBItemNotFound),
+		errors.Is(err, app.ErrQBNotConnected),
+		errors.Is(err, app.ErrQBNoActiveItems),
+		errors.Is(err, app.ErrQBBillingNotLive),
+		errors.Is(err, app.ErrQBOrderAlreadyInvoiced),
+		errors.Is(err, app.ErrQBOrderNotBillable):
+		return http.StatusBadRequest, err.Error()
+
 	// A toggle naming a module this binary does not know about. 404 rather
 	// than 400: from the caller's side the module genuinely does not exist.
 	case errors.Is(err, app.ErrUnknownModule):

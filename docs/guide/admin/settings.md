@@ -49,6 +49,36 @@ The card displays:
 
 The OAuth flow uses CSRF protection via a signed state cookie. The authorization window is valid for 10 minutes.
 
+#### Invoice items
+
+Every QuickBooks invoice line has to name a product or service to bill against, and that choice decides which income account the money lands in. It is worth agreeing with whoever keeps the books rather than picking the first plausible entry.
+
+The **Invoice items** panel lists the connected company's active items, each shown with the account it posts to:
+
+- **Product lines** -- what every coffee line on the invoice bills against. Required; invoices cannot be created without it.
+- **Shipping line** -- optional. Left as *Same as product lines*, shipping bills against the same item.
+
+The panel is marked **Not set** when nothing is billing — neither a choice here nor a fallback configured on the server. Changing it affects new invoices only; invoices already in QuickBooks are untouched.
+
+#### Billing mode
+
+Wholesale billing ships switched off, and a deploy never switches it on.
+
+- **Test mode** (amber badge) -- Wholesale orders are costed exactly as they would be billed and recorded for review, but nothing reaches QuickBooks and no customer is emailed. This is where a new connection starts.
+- **Live** (green badge) -- Orders are invoiced in QuickBooks and emailed to the customer.
+
+**Review** opens the list of what would be billed: customer, terms, due date, bill-to address and total for each order. Rows needing attention carry a flag -- most importantly *"No matching QuickBooks customer"*, which means going live would create a duplicate customer in your books rather than billing the one already there. Fix those in QuickBooks (usually by putting the right email on the customer record) before going live.
+
+While in test mode, a weekly digest of the same information is emailed to the staff notification address.
+
+**Go live** asks for confirmation and records who did it. From then on new wholesale orders are billed for real.
+
+Going live does **not** bill orders recorded during test mode -- those were almost certainly invoiced by hand while the trial ran. To bill one deliberately, use **Bill now** on its row in the review list. Check first that it was not already invoiced by hand: the duplicate guard recognises invoices raised by this system, not ones typed into QuickBooks directly, so the customer could otherwise be billed twice.
+
+Switching back to test mode stops new billing immediately. Invoices already in QuickBooks are untouched.
+
+The full connection procedure, including production keys and the trial period, is in the [QuickBooks go-live runbook](../../quickbooks-go-live.md).
+
 #### Disconnecting
 
 1. Click **Disconnect** on the QuickBooks card.

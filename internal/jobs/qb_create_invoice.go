@@ -23,16 +23,20 @@ import (
 // chains to SendQBInvoice so QBO emails it to the customer.
 type CreateQBInvoiceWorker struct {
 	river.WorkerDefaults[CreateQBInvoiceArgs]
-	orders      *store.OrderStore
-	customers   *store.CustomerStore
-	catalog     *store.CatalogStore
-	settings    *store.SettingsStore
-	previews    *store.QBPreviewStore
-	qb          quickbooks.Client
-	audit       *audit.AuditWriter
-	pool        *pgxpool.Pool
-	riverClient *river.Client[pgx.Tx]
-	metrics     *metrics.Registry
+	orders    *store.OrderStore
+	customers *store.CustomerStore
+	catalog   *store.CatalogStore
+	settings  *store.SettingsStore
+	previews  *store.QBPreviewStore
+	// envSalesItemID is the fallback item the server was started with, if
+	// any. Held so a preview can tell "nothing is configured anywhere" from
+	// "nothing is chosen in the admin but the environment still supplies one".
+	envSalesItemID string
+	qb             quickbooks.Client
+	audit          *audit.AuditWriter
+	pool           *pgxpool.Pool
+	riverClient    *river.Client[pgx.Tx]
+	metrics        *metrics.Registry
 }
 
 // NewCreateQBInvoiceWorker creates a new CreateQBInvoiceWorker.
@@ -42,6 +46,7 @@ func NewCreateQBInvoiceWorker(
 	catalog *store.CatalogStore,
 	settings *store.SettingsStore,
 	previews *store.QBPreviewStore,
+	envSalesItemID string,
 	qb quickbooks.Client,
 	auditWriter *audit.AuditWriter,
 	pool *pgxpool.Pool,
@@ -49,16 +54,17 @@ func NewCreateQBInvoiceWorker(
 	m *metrics.Registry,
 ) *CreateQBInvoiceWorker {
 	return &CreateQBInvoiceWorker{
-		orders:      orders,
-		customers:   customers,
-		catalog:     catalog,
-		settings:    settings,
-		previews:    previews,
-		qb:          qb,
-		audit:       auditWriter,
-		pool:        pool,
-		riverClient: riverClient,
-		metrics:     m,
+		orders:         orders,
+		customers:      customers,
+		catalog:        catalog,
+		settings:       settings,
+		previews:       previews,
+		envSalesItemID: envSalesItemID,
+		qb:             qb,
+		audit:          auditWriter,
+		pool:           pool,
+		riverClient:    riverClient,
+		metrics:        m,
 	}
 }
 
@@ -99,9 +105,13 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	var items []domain.LineItem
 	var customer *domain.Customer
 	var mode domain.QBBillingMode
+	var qbItems store.QBItemConfig
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
 		if mode, txErr = w.settings.GetQBBillingMode(ctx, tx); txErr != nil {
+			return txErr
+		}
+		if qbItems, txErr = w.settings.GetQBItemConfig(ctx, tx); txErr != nil {
 			return txErr
 		}
 		order, txErr = w.orders.GetOrderByIDAsStaff(ctx, tx, job.Args.OrderID)
@@ -172,7 +182,7 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	// that silently fails to match a QBO customer is invisible until money is
 	// involved, and that is exactly what a proof period exists to surface.
 	if !mode.IsLive() {
-		return w.recordPreview(ctx, job, order, customer, lines, docNumber, termsDays)
+		return w.recordPreview(ctx, job, order, customer, lines, docNumber, termsDays, qbItems)
 	}
 
 	// A shadow run chains here with an empty QBCustomerID when nothing matched.
@@ -180,7 +190,14 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	// would reach QBO as a blank CustomerRef. Start the chain again instead:
 	// the live EnsureQBCustomer path establishes the customer properly, and
 	// the DocNumber probe below still guards against a duplicate invoice.
-	if job.Args.QBCustomerID == "" {
+	// Restart when local state does not know this customer, not merely when the
+	// job carries no id. A shadow run that *matched* a customer passes the id
+	// forward without persisting it — deliberately, since linking is what the
+	// proof period exists to have a human confirm. Flip to live between the two
+	// jobs and the invoice would bill correctly against a customer whose
+	// qb_customer_id is still null, after which SyncQBPayment finds nil and
+	// silently stops recording that account's payments.
+	if job.Args.QBCustomerID == "" || customer == nil || customer.QBCustomerID == nil {
 		if order.CustomerID == nil {
 			// Unreachable through either entry point — checkout and BillOrderNow
 			// both require a customer — but this is the one place that would
@@ -219,6 +236,8 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 			Lines:                 lines,
 			Shipping:              order.ShippingTotal,
 			AllowOnlineACHPayment: true,
+			SalesItemID:           qbItems.SalesItemID,
+			ShippingItemID:        qbItems.ShippingItemID,
 		}
 		if customer != nil {
 			params.AllowOnlineCreditCardPayment = customer.BillingMethod == domain.BillingMethodCreditCard
@@ -306,6 +325,7 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 	lines []quickbooks.InvoiceLine,
 	docNumber string,
 	termsDays int,
+	qbItems store.QBItemConfig,
 ) error {
 	preview := &domain.QBInvoicePreview{
 		OrderID:       order.ID,
@@ -338,6 +358,14 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 	}
 
 	var lookupErrs []string
+	// An unconfigured item is the one problem a proof period can see coming
+	// that would otherwise only surface as a failed invoice after go-live. The
+	// runbook sends staff here to check exactly this, so it has to be said
+	// here rather than only on the settings page.
+	if qbItems.SalesItemID == "" && w.envSalesItemID == "" {
+		lookupErrs = append(lookupErrs,
+			"no QuickBooks item is chosen for invoice lines — set one under Settings, Integrations, or invoices cannot be created")
+	}
 	if job.Args.CustomerLookupError != "" {
 		// Raised by EnsureQBCustomer, which carries it here rather than
 		// failing so this order still appears on the review page.

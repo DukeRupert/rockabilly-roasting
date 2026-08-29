@@ -176,6 +176,7 @@ Live docs in `docs/`:
 - `operations.md` — releasing to production (tag `v*`; check `git log <last-tag>..origin/main` first — merging is not releasing), one-shot tools (`cmd/support-reply`, `cmd/seed`, `cmd/sentrycheck`), and the runbook index
 - `backup-restore-runbook.md` — daily backup procedure and full restore steps
 - `stripe-setup.md` — Stripe wiring (keys, webhooks, tax)
+- `quickbooks-go-live.md` — connecting a real QuickBooks company and the test-mode proof period; wholesale billing ships **off** and is switched on in the admin, never by a deploy
 - `guide/` — end-user how-tos for admin, storefront, and wholesale
 
 The original `lean-commerce-*.md` design specs were retired post-launch — the code is the source of truth, with non-obvious "why" decisions extracted into the Design rationale section of `CLAUDE-backend.md`. Completed migration plans live under `docs/archive/migrations/`. Run `git log --all -- docs/<filename>` to recover any retired doc.

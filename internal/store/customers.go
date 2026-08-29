@@ -854,6 +854,15 @@ func customerFromRow(r sqlcgen.Customer) *domain.Customer {
 		Metadata:              metadataFromJSON(r.Metadata),
 		CreatedAt:             r.CreatedAt,
 		UpdatedAt:             r.UpdatedAt,
+		// The query has always selected these two; the mapper dropped them, so
+		// every customer read this way came back looking unlinked from
+		// QuickBooks no matter what the column said. That made
+		// EnsureQBCustomer take find-or-create on every run — its
+		// sync-if-changed branch was unreachable — and made SyncQBPayment
+		// return early every time, so payments recorded against a QB invoice
+		// were never sent back to QuickBooks at all.
+		QBCustomerID: r.QbCustomerID,
+		QBSyncedAt:   timestampFromPG(r.QbSyncedAt),
 	}
 	if r.PaymentTermsDays != nil {
 		v := int(*r.PaymentTermsDays)

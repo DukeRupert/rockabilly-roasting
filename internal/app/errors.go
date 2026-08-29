@@ -156,6 +156,16 @@ var (
 	// ErrQBOrderNotBillable covers an order with no customer or one that is
 	// not a wholesale order.
 	ErrQBOrderNotBillable = errors.New("order cannot be invoiced through quickbooks")
+	// ErrQBSalesItemRequired guards the one item every invoice line needs;
+	// QBO rejects a line without an ItemRef.
+	ErrQBSalesItemRequired = errors.New("a quickbooks item is required for invoice lines")
+	// ErrQBItemNotFound means the chosen item does not exist in the connected
+	// company — caught at save time, because the alternative is every invoice
+	// failing later.
+	ErrQBItemNotFound = errors.New("that item does not exist in the connected quickbooks company")
+	// ErrQBNoActiveItems means the company is connected but has nothing to
+	// bill against — a fact about their books, not about the connection.
+	ErrQBNoActiveItems = errors.New("the connected quickbooks company has no active items")
 
 	// Shipping errors
 	ErrShipmentNotFound      = errors.New("shipment not found")

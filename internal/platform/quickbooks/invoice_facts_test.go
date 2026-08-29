@@ -61,3 +61,51 @@ func TestInvoiceFromResponse_MissingDueDateIsZero(t *testing.T) {
 		t.Errorf("TotalCents = %d, want 0 (voided)", inv.TotalCents())
 	}
 }
+
+// The env fallback used to be applied per field, so a shop that chose its
+// sales item in the admin while an old QB_SHIPPING_ITEM_ID lingered in the
+// environment billed shipping against the stale one — silently, into the
+// wrong income account.
+func TestInvoiceItemsComeFromOneSourceOrTheOther(t *testing.T) {
+	config := ClientConfig{SalesItemID: "ENV_SALES", ShippingItemID: "ENV_SHIP"}
+
+	tests := []struct {
+		name         string
+		params       InvoiceParams
+		wantSales    string
+		wantShipping string
+	}{
+		{
+			name:         "nothing chosen falls back to the environment pair",
+			params:       InvoiceParams{},
+			wantSales:    "ENV_SALES",
+			wantShipping: "ENV_SHIP",
+		},
+		{
+			// The case that was wrong: an empty shipping item is an answer —
+			// "same as the products" — not a gap to fill from the environment.
+			name:         "a chosen sales item with no shipping item does not borrow one",
+			params:       InvoiceParams{SalesItemID: "PICKED"},
+			wantSales:    "PICKED",
+			wantShipping: "",
+		},
+		{
+			name:         "both chosen are both used",
+			params:       InvoiceParams{SalesItemID: "PICKED", ShippingItemID: "PICKED_SHIP"},
+			wantSales:    "PICKED",
+			wantShipping: "PICKED_SHIP",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sales, shipping := resolveInvoiceItems(tt.params, config)
+			if sales != tt.wantSales {
+				t.Errorf("sales: got %q, want %q", sales, tt.wantSales)
+			}
+			if shipping != tt.wantShipping {
+				t.Errorf("shipping: got %q, want %q", shipping, tt.wantShipping)
+			}
+		})
+	}
+}

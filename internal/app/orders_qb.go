@@ -457,8 +457,10 @@ func overdueReminderStageFor(daysPastDue int) int {
 // the past-due email).
 func EffectivePaymentTermsDays(c *domain.Customer) int {
 	// >= 0, not > 0: zero days is "due on receipt", a real selectable terms
-	// value, and must not be mistaken for "no terms set". Only a nil
-	// PaymentTermsDays falls back to the house default.
+	// value, and must not be mistaken for "no terms set". A nil customer, a
+	// nil PaymentTermsDays, or a negative value all fall back to the house
+	// default — negatives because nothing in the app can produce one, so a
+	// stored negative is corruption rather than an instruction.
 	if c != nil && c.PaymentTermsDays != nil && *c.PaymentTermsDays >= 0 {
 		return *c.PaymentTermsDays
 	}

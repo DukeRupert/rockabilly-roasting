@@ -27,6 +27,13 @@ type InvoiceParams struct {
 	// 2026-08-29.
 	BillEmail string
 
+	// SalesItemID / ShippingItemID are the QBO items this invoice's lines bill
+	// against. Empty falls back to the client's configured defaults, which is
+	// how a deployment still carrying QB_SALES_ITEM_ID keeps working — see
+	// db/migrations/079.
+	SalesItemID    string
+	ShippingItemID string
+
 	// TermID is the QBO Term ("Net 15") shown on the invoice and used by QBO's
 	// own reporting. DueDate above stays authoritative for when payment is
 	// due; the Term is what a human reads. Optional — an empty TermID leaves
@@ -131,6 +138,11 @@ type Client interface {
 	// Due on receipt and Net 10/15/30/60; the house net-7 default is created
 	// on demand.
 	FindOrCreateTerm(ctx context.Context, dueDays int) (string, error)
+
+	// ListItems returns the company's active items, so staff can choose which
+	// one invoices bill against rather than an ID being guessed into an
+	// environment variable. Read-only.
+	ListItems(ctx context.Context) ([]Item, error)
 
 	// FindTerm is FindOrCreateTerm without the create: it returns an empty
 	// string when the company has no matching Term. Shadow billing uses it so

@@ -10,6 +10,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
+	"github.com/dukerupert/hiri/internal/store"
 )
 
 // QBPreviewRow is one would-be invoice with the order and customer it belongs
@@ -180,3 +181,61 @@ func (s *OrderService) BillOrderNow(ctx context.Context, tx pgx.Tx, orderID uuid
 // function rather than a method on JobEnqueuer so the app layer does not have
 // to learn the job args, which live in jobs/.
 type QBChainEnqueuer func(ctx context.Context, tx pgx.Tx, customerID, orderID uuid.UUID) error
+
+// QBItemConfigFor returns which QuickBooks items invoices bill against.
+//
+// Only the stored mapping. Listing what the company *offers* is an Intuit
+// round trip and is made at the boundary, outside any transaction — see the
+// external-call rule in CLAUDE.md.
+func (s *OrderService) QBItemConfigFor(ctx context.Context, tx pgx.Tx) (store.QBItemConfig, error) {
+	if s.settings == nil {
+		return store.QBItemConfig{}, nil
+	}
+	return s.settings.GetQBItemConfig(ctx, tx)
+}
+
+// SetQBItems records which QuickBooks items wholesale invoices bill against.
+//
+// The caller has already resolved the choice against the connected company;
+// this writes it and records who changed it. Names are stored beside the IDs
+// so the settings page can name the current choice without calling
+// QuickBooks, and so an audit entry read months later says "Wholesale Coffee"
+// rather than "19".
+func (s *OrderService) SetQBItems(ctx context.Context, tx pgx.Tx, cfg store.QBItemConfig, actor Actor) error {
+	if s.settings == nil {
+		return fmt.Errorf("qb items: settings store not wired")
+	}
+	if cfg.SalesItemID == "" {
+		return ErrQBSalesItemRequired
+	}
+	// Read the outgoing mapping first: "which account did this used to post
+	// to" is the question asked when a month of revenue turns up in the wrong
+	// place, and it cannot be answered from the new value alone.
+	previous, err := s.settings.GetQBItemConfig(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if err := s.settings.UpdateQBItemConfig(ctx, tx, cfg); err != nil {
+		return err
+	}
+	return s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditQBItemsUpdated,
+		ResourceType: "store_settings",
+		ResourceID:   uuid.Nil,
+		After: map[string]any{
+			"qb_sales_item_id":      cfg.SalesItemID,
+			"qb_sales_item_name":    cfg.SalesItemName,
+			"qb_shipping_item_id":   cfg.ShippingItemID,
+			"qb_shipping_item_name": cfg.ShippingItemName,
+		},
+		Metadata: map[string]any{
+			"previous_sales_item_id":      previous.SalesItemID,
+			"previous_sales_item_name":    previous.SalesItemName,
+			"previous_shipping_item_id":   previous.ShippingItemID,
+			"previous_shipping_item_name": previous.ShippingItemName,
+		},
+	})
+}

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -98,6 +99,11 @@ func (s *SettingsStore) GetQBBillingMode(ctx context.Context, tx pgx.Tx) (domain
 	}
 	mode := domain.QBBillingMode(raw)
 	if !mode.Valid() {
+		// Loud, because the safe fallback is also the silent one: an
+		// unrecognised value stops the shop billing, and without a line here
+		// the only symptom is invoices quietly not happening.
+		slog.ErrorContext(ctx, "unknown qb billing mode in store_settings, treating as test mode",
+			"value", raw)
 		return domain.DefaultQBBillingMode, nil
 	}
 	return mode, nil
@@ -111,6 +117,48 @@ func (s *SettingsStore) UpdateQBBillingMode(ctx context.Context, tx pgx.Tx, mode
 		`UPDATE store_settings SET qb_billing_mode = $1, updated_at = now() WHERE id = true`, string(mode),
 	); err != nil {
 		return fmt.Errorf("update qb billing mode: %w", err)
+	}
+	return nil
+}
+
+// QBItemConfig is which QuickBooks items wholesale invoices bill against.
+// Names are cached alongside the IDs so the settings page can say what is
+// currently chosen without a live API call; only the IDs bill.
+type QBItemConfig struct {
+	SalesItemID      string
+	SalesItemName    string
+	ShippingItemID   string
+	ShippingItemName string
+}
+
+// GetQBItemConfig returns the configured invoice items. Empty IDs mean nothing
+// has been chosen, in which case the caller falls back to whatever the
+// environment supplied.
+func (s *SettingsStore) GetQBItemConfig(ctx context.Context, tx pgx.Tx) (QBItemConfig, error) {
+	var cfg QBItemConfig
+	err := tx.QueryRow(ctx, `
+		SELECT qb_sales_item_id, qb_sales_item_name, qb_shipping_item_id, qb_shipping_item_name
+		  FROM store_settings LIMIT 1`,
+	).Scan(&cfg.SalesItemID, &cfg.SalesItemName, &cfg.ShippingItemID, &cfg.ShippingItemName)
+	if err != nil {
+		return QBItemConfig{}, fmt.Errorf("get qb item config: %w", err)
+	}
+	return cfg, nil
+}
+
+// UpdateQBItemConfig sets which items invoices bill against.
+func (s *SettingsStore) UpdateQBItemConfig(ctx context.Context, tx pgx.Tx, cfg QBItemConfig) error {
+	if _, err := tx.Exec(ctx, `
+		UPDATE store_settings
+		   SET qb_sales_item_id      = $1,
+		       qb_sales_item_name    = $2,
+		       qb_shipping_item_id   = $3,
+		       qb_shipping_item_name = $4,
+		       updated_at            = now()
+		 WHERE id = true`,
+		cfg.SalesItemID, cfg.SalesItemName, cfg.ShippingItemID, cfg.ShippingItemName,
+	); err != nil {
+		return fmt.Errorf("update qb item config: %w", err)
 	}
 	return nil
 }

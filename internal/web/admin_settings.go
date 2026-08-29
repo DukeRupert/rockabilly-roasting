@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -294,6 +295,48 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 		}
 	}
 
+	// Which items invoices bill against, and what they could be. A live
+	// read-only call, safe in either billing mode.
+	// Two phases, deliberately. Listing a company's items is an Intuit round
+	// trip, and holding a pooled connection open across it would also nest a
+	// second acquisition inside the first — the token read opens its own
+	// transaction — which is how a busy shop runs the pool dry.
+	var itemPanel admin.QBItemPanel
+	if section.QB.Connected {
+		itemPanel.EnvFallback = os.Getenv("QB_SALES_ITEM_ID")
+
+		var cfg store.QBItemConfig
+		if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			var txErr error
+			cfg, txErr = d.OrderService.QBItemConfigFor(ctx, tx)
+			return txErr
+		}); err != nil {
+			slog.Error("admin settings: qb item config", "error", err)
+			itemPanel.ConfigUnreadable = true
+		}
+		itemPanel.SalesItemID = cfg.SalesItemID
+		itemPanel.SalesItemName = cfg.SalesItemName
+		itemPanel.ShippingItemID = cfg.ShippingItemID
+		itemPanel.ShippingItemName = cfg.ShippingItemName
+
+		if d.QBClient == nil {
+			// Cannot offer a choice, which is not the same as the company
+			// having nothing to choose from.
+			itemPanel.Unavailable = true
+		} else {
+			items, listErr := d.QBClient.ListItems(ctx)
+			if listErr != nil {
+				slog.Error("admin settings: qb list items", "error", listErr)
+				itemPanel.Unavailable = true
+			}
+			for _, item := range items {
+				itemPanel.Choices = append(itemPanel.Choices, admin.QBItemChoice{
+					ID: item.ID, Name: item.Name, IncomeAccount: item.IncomeAccount,
+				})
+			}
+		}
+	}
+
 	name, role := staffNameRole(r)
 	props := admin.SettingsIntegrationsProps{
 		Nav:            section.nav(role),
@@ -301,6 +344,7 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 		QBEnabled:      section.QBEnabled,
 		QBBillingMode:  mode,
 		QBPreviewCount: previewCount,
+		QBItems:        itemPanel,
 		Flash:          settingsFlash(r),
 		MerchantTZ:     d.MerchantTZ,
 		StaffName:      name,
@@ -726,6 +770,101 @@ const qbPreviewPageSize = 200
 
 // qbPreviewPath is where every shadow-billing action returns to.
 const qbPreviewPath = "/admin/settings/integrations/quickbooks/preview"
+
+// handleAdminQBItemsUpdate records which QuickBooks items invoices bill
+// against.
+func (d *Deps) handleAdminQBItemsUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	salesID := r.FormValue("qb_sales_item_id")
+
+	// The shipping select says "same as sales" explicitly. An empty value
+	// means its option was dropped — which is what a browser does with the
+	// disabled option a deactivated item renders as — and treating that as
+	// "same as sales" would silently rebind shipping revenue while reporting
+	// success.
+	shippingRaw := r.FormValue("qb_shipping_item_id")
+	if shippingRaw == "" {
+		redirectFlashError(w, r, "/admin/settings/integrations",
+			"The shipping item you had is no longer active in QuickBooks. Choose one, or pick \"Same as product lines\".")
+		return
+	}
+	shippingID := shippingRaw
+	if shippingRaw == admin.QBShippingSameAsSales {
+		shippingID = ""
+	}
+
+	// Resolve against the company before opening a transaction: the IDs have
+	// to exist in QuickBooks or every invoice fails, and this is the last
+	// cheap place to say so. Outside any tx, per the external-call rule.
+	cfg, err := d.resolveQBItems(ctx, salesID, shippingID)
+	if err == nil {
+		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			return d.OrderService.SetQBItems(ctx, tx, cfg, staffActor(r))
+		})
+	}
+	switch {
+	case errors.Is(err, app.ErrQBSalesItemRequired):
+		redirectFlashError(w, r, "/admin/settings/integrations", "Choose the item invoices should bill against.")
+	case errors.Is(err, app.ErrQBItemNotFound):
+		redirectFlashError(w, r, "/admin/settings/integrations", "That item no longer exists in QuickBooks. Reload and choose again.")
+	case errors.Is(err, app.ErrQBNotConnected):
+		redirectFlashError(w, r, "/admin/settings/integrations", "QuickBooks is not connected, so there are no items to choose from.")
+	case errors.Is(err, app.ErrQBNoActiveItems):
+		redirectFlashError(w, r, "/admin/settings/integrations", "This QuickBooks company has no active products or services. Add one in QuickBooks, then reload.")
+	case err != nil:
+		slog.Error("admin qb items: update", "error", err)
+		Error(w, r, err)
+	default:
+		redirectFlash(w, r, "/admin/settings/integrations", "Invoice items saved.")
+	}
+}
+
+// resolveQBItems turns the submitted item IDs into a stored mapping, checking
+// each against the connected company and picking up its name for display.
+//
+// Lives here rather than in the service because it is an external call, and
+// app may not reach into platform/quickbooks.
+func (d *Deps) resolveQBItems(ctx context.Context, salesID, shippingID string) (store.QBItemConfig, error) {
+	if salesID == "" {
+		return store.QBItemConfig{}, app.ErrQBSalesItemRequired
+	}
+	if d.QBClient == nil {
+		// A different fact from "that item is gone", and worth saying so: the
+		// form should not be reachable at all without a client.
+		return store.QBItemConfig{}, app.ErrQBNotConnected
+	}
+
+	items, err := d.QBClient.ListItems(ctx)
+	if err != nil {
+		return store.QBItemConfig{}, fmt.Errorf("qb list items: %w", err)
+	}
+	if len(items) == 0 {
+		// A connected company with nothing to sell. Saying "not connected"
+		// here would be the same guess-stated-as-fact this code keeps being
+		// corrected for, just pointing the other way.
+		return store.QBItemConfig{}, app.ErrQBNoActiveItems
+	}
+	byID := make(map[string]quickbooks.Item, len(items))
+	for _, item := range items {
+		byID[item.ID] = item
+	}
+
+	sales, ok := byID[salesID]
+	if !ok {
+		return store.QBItemConfig{}, fmt.Errorf("sales item %q: %w", salesID, app.ErrQBItemNotFound)
+	}
+	cfg := store.QBItemConfig{SalesItemID: sales.ID, SalesItemName: sales.Name}
+	if shippingID != "" {
+		shipping, found := byID[shippingID]
+		if !found {
+			return store.QBItemConfig{}, fmt.Errorf("shipping item %q: %w", shippingID, app.ErrQBItemNotFound)
+		}
+		cfg.ShippingItemID = shipping.ID
+		cfg.ShippingItemName = shipping.Name
+	}
+	return cfg, nil
+}
 
 // handleAdminQBPreview renders what QuickBooks billing would have done while
 // the shop is in shadow mode.

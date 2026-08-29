@@ -218,6 +218,9 @@ type SettingsIntegrationsProps struct {
 	QBBillingMode domain.QBBillingMode
 	// QBPreviewCount is how many would-be invoices are waiting to be reviewed.
 	QBPreviewCount int
+	// QBItems is which QuickBooks items invoices bill against, and what they
+	// could be changed to.
+	QBItems QBItemPanel
 	QBEnabled  bool // true if QB_CLIENT_ID is configured
 	Flash      Flash
 	MerchantTZ *time.Location
@@ -894,6 +897,7 @@ templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
 						}
 					</dl>
 				</div>
+				@qbItemPanel(props.QBItems)
 				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
 					<div class="sm:flex sm:items-start sm:justify-between sm:gap-4">
 						<div>
@@ -1052,4 +1056,208 @@ templ qbBillingModeForm(mode domain.QBBillingMode) {
 			>Go live</button>
 		</form>
 	}
+}
+
+// QBShippingSameAsSales is the shipping select's value for "bill shipping
+// against the same item as the products". Explicit rather than empty so the
+// handler can tell it apart from a stale, disabled option being dropped by the
+// browser.
+const QBShippingSameAsSales = "same-as-sales"
+
+// QBItemChoice is one selectable QuickBooks item.
+type QBItemChoice struct {
+	ID            string
+	Name          string
+	IncomeAccount string
+}
+
+// QBItemPanel backs the invoice-items picker.
+//
+// Unavailable and Choices being empty are different facts and are shown
+// differently: a company genuinely without items is a data problem the shop
+// can fix, while a failed listing says nothing about the company at all.
+type QBItemPanel struct {
+	SalesItemID      string
+	SalesItemName    string
+	ShippingItemID   string
+	ShippingItemName string
+	Choices          []QBItemChoice
+	// Unavailable is set when the items could not be listed from QuickBooks.
+	Unavailable bool
+	// ConfigUnreadable is set when the stored choice itself could not be read.
+	// Distinct from Unavailable: one means we cannot offer alternatives, the
+	// other means we cannot say what is billing right now — and only the
+	// second warrants telling staff that invoicing may be unconfigured.
+	ConfigUnreadable bool
+	// EnvFallback is an item id still coming from the environment. Shown only
+	// when nothing has been chosen here, to explain what is billing meanwhile.
+	EnvFallback string
+}
+
+// Configured reports whether invoices have an item to bill against, from
+// either source.
+func (p QBItemPanel) Configured() bool {
+	return p.SalesItemID != "" || p.EnvFallback != ""
+}
+
+// SalesItemMissing reports that the configured item is not among the choices —
+// deactivated in QuickBooks, most likely. Only meaningful once the choices
+// were actually listed; a failed listing says nothing about what exists.
+func (p QBItemPanel) SalesItemMissing() bool {
+	return p.itemMissing(p.SalesItemID)
+}
+
+// ShippingItemMissing is SalesItemMissing for the shipping line.
+func (p QBItemPanel) ShippingItemMissing() bool {
+	return p.itemMissing(p.ShippingItemID)
+}
+
+func (p QBItemPanel) itemMissing(id string) bool {
+	if id == "" || p.Unavailable || len(p.Choices) == 0 {
+		return false
+	}
+	for _, choice := range p.Choices {
+		if choice.ID == id {
+			return false
+		}
+	}
+	return true
+}
+
+// SalesItemLabel names the configured item, falling back to its id when the
+// cached name is empty.
+func (p QBItemPanel) SalesItemLabel() string {
+	if p.SalesItemName != "" {
+		return p.SalesItemName
+	}
+	return "Item " + p.SalesItemID
+}
+
+// ShippingItemLabel is SalesItemLabel for the shipping line.
+func (p QBItemPanel) ShippingItemLabel() string {
+	if p.ShippingItemName != "" {
+		return p.ShippingItemName
+	}
+	return "Item " + p.ShippingItemID
+}
+
+templ qbItemPanel(panel QBItemPanel) {
+	<div class="border-t border-rr-border px-4 py-4 sm:px-6">
+		<div class="sm:flex sm:items-start sm:justify-between sm:gap-4">
+			<div>
+				<p class="text-sm font-medium text-rr-heading">
+					Invoice items
+					if panel.ConfigUnreadable {
+						<span class="badge badge-slate ml-2">Unknown</span>
+					} else if !panel.Configured() {
+						<span class="badge badge-amber ml-2">Not set</span>
+					}
+				</p>
+				<p class="mt-1 text-sm text-rr-muted">
+					Which QuickBooks product or service wholesale invoices bill against. This
+					decides the income account the money lands in, so it is worth checking with
+					whoever keeps the books.
+				</p>
+				if panel.ConfigUnreadable {
+					<p class="mt-1 text-sm text-rr-muted">
+						Couldn't read the current setting just now. Reload in a moment — this says
+						nothing about whether an item is chosen.
+					</p>
+				} else if !panel.Configured() {
+					<p class="mt-1 text-sm text-rr-red">
+						Until one is chosen, wholesale invoices cannot be created.
+					</p>
+				} else if panel.SalesItemID == "" && panel.EnvFallback != "" {
+					<p class="mt-1 text-xs text-rr-muted">
+						Currently billing against the item set in the server environment
+						(<code class="rounded bg-rr-raised px-1 py-0.5 font-mono">{ panel.EnvFallback }</code>).
+						Choosing one here replaces it.
+					</p>
+				}
+			</div>
+		</div>
+
+		if panel.SalesItemName != "" {
+			// Stated outside every branch below. The selects cannot be trusted
+			// to show it — an item deactivated in QuickBooks is not among the
+			// choices, and a select with nothing selected falls back to its
+			// first option, which would name an item nobody chose.
+			<p class="mt-3 text-sm text-rr-heading">
+				Currently billing against <strong>{ panel.SalesItemName }</strong>
+				if panel.ShippingItemName != "" {
+					, shipping against <strong>{ panel.ShippingItemName }</strong>
+				}
+			</p>
+		}
+		if panel.Unavailable {
+			<p class="mt-1 text-sm text-rr-muted">
+				Couldn't read the item list from QuickBooks just now. Reload in a moment — this
+				says nothing about which items exist, and whatever is already chosen is still
+				billing.
+			</p>
+		} else if len(panel.Choices) == 0 {
+			<p class="mt-3 text-sm text-rr-muted">
+				This QuickBooks company has no active products or services to bill against. Add
+				one in QuickBooks, then reload.
+			</p>
+		} else {
+			<form method="post" action="/admin/settings/integrations/quickbooks/items" class="mt-3 grid gap-3 sm:grid-cols-2">
+				<div>
+					<label for="qb_sales_item_id" class="label-font text-rr-muted">Product lines</label>
+					<select id="qb_sales_item_id" name="qb_sales_item_id" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading">
+						<option value="" disabled?={ panel.SalesItemID != "" } selected?={ panel.SalesItemID == "" }>Choose an item…</option>
+						if panel.SalesItemMissing() {
+							<!-- The configured item is not among the choices, which happens when it
+							     is deactivated in QuickBooks. Shown so the page says what is actually
+							     billing, and disabled so it cannot be re-submitted: the save would
+							     reject an inactive id anyway, and a select with nothing selected
+							     silently rebinds billing to whichever item sorts first. -->
+							<option value={ panel.SalesItemID } selected disabled>
+								{ panel.SalesItemLabel() } (no longer active in QuickBooks)
+							</option>
+						}
+						for _, choice := range panel.Choices {
+							<option value={ choice.ID } selected?={ choice.ID == panel.SalesItemID }>
+								{ qbItemLabel(choice) }
+							</option>
+						}
+					</select>
+				</div>
+				<div>
+					<label for="qb_shipping_item_id" class="label-font text-rr-muted">Shipping line (optional)</label>
+					<select id="qb_shipping_item_id" name="qb_shipping_item_id" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading">
+						<!-- An explicit value, not "". A stale option below renders disabled,
+						     and browsers omit disabled options from submission — so an empty
+						     shipping field has to mean "the choice was dropped", not "the
+						     operator chose to reuse the product item". Without this the save
+						     would quietly unbind a deactivated shipping item and report success. -->
+						<option value={ QBShippingSameAsSales } selected?={ panel.ShippingItemID == "" }>Same as product lines</option>
+						if panel.ShippingItemMissing() {
+							<option value={ panel.ShippingItemID } selected disabled>
+								{ panel.ShippingItemLabel() } (no longer active in QuickBooks)
+							</option>
+						}
+						for _, choice := range panel.Choices {
+							<option value={ choice.ID } selected?={ choice.ID == panel.ShippingItemID }>
+								{ qbItemLabel(choice) }
+							</option>
+						}
+					</select>
+				</div>
+				<div class="sm:col-span-2">
+					<button type="submit" class="btn-confirm">Save items</button>
+				</div>
+			</form>
+		}
+	</div>
+}
+
+// qbItemLabel names an item the way a bookkeeper would recognise it: the item
+// first, then the account it posts to, because the account is the thing the
+// choice actually decides.
+func qbItemLabel(choice QBItemChoice) string {
+	if choice.IncomeAccount == "" {
+		return choice.Name
+	}
+	return choice.Name + " → " + choice.IncomeAccount
 }

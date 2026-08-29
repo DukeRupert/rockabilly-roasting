@@ -28,6 +28,19 @@ ALTER TABLE qb_invoice_previews
 -- first thing either of them counts.
 CREATE INDEX idx_qb_invoice_previews_auto_billed ON qb_invoice_previews (auto_billed);
 
+-- Backfill from the customer, because DEFAULT true is wrong for every row
+-- already here. Previews are written once per order and refreshed only when
+-- that order's job runs again, which for an order already placed never
+-- happens — so without this the existing backlog would show as Ready and be
+-- counted as money we expect to collect, which is the opposite of what this
+-- column was added to say. No billing depends on it: the gate is evaluated
+-- when the job runs, not from this column.
+UPDATE qb_invoice_previews p
+   SET auto_billed    = (c.billing_method IN ('ach', 'credit_card')),
+       billing_method = c.billing_method
+  FROM customers c
+ WHERE c.id = p.customer_id;
+
 -- +goose Down
 
 DROP INDEX IF EXISTS idx_qb_invoice_previews_auto_billed;

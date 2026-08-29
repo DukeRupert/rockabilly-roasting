@@ -745,7 +745,7 @@ func TestQBShadowDigestRenders(t *testing.T) {
 				Problem: "No matching QuickBooks customer."},
 		},
 		// Total exceeds the listed rows, exercising the truncation branch.
-		Total: 5, TotalAmtCents: 41800, Attention: 1, Days: 7,
+		Total: 5, TotalAmtCents: 41800, Attention: 1, Listed: 5, Days: 7,
 		ReviewURL: "https://x/admin/settings/integrations/quickbooks/preview",
 		StoreName: "Rockabilly Roasting Co.",
 	}
@@ -773,7 +773,7 @@ func TestQBShadowDigestSingularInvoice(t *testing.T) {
 			{OrderNumber: "WO-9", Customer: "One Shop", TotalCents: 500,
 				Terms: "Net 7", DueDate: time.Now(), URL: "https://x"},
 		},
-		Total: 1, TotalAmtCents: 500, Days: 7, ReviewURL: "https://x", StoreName: "Rockabilly",
+		Total: 1, TotalAmtCents: 500, Listed: 1, Days: 7, ReviewURL: "https://x", StoreName: "Rockabilly",
 	})
 	require.NoError(t, err)
 	for _, body := range []string{html, text} {
@@ -781,4 +781,32 @@ func TestQBShadowDigestSingularInvoice(t *testing.T) {
 		assert.Contains(t, body, "Nothing needs attention")
 		assert.NotContains(t, body, "Showing 1 of 1", "an untruncated list must not claim to be truncated")
 	}
+}
+
+func TestQBShadowDigestAllManualWeek(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	// The shape every shop starts in: nothing is billed automatically because
+	// no account has an agreement yet. The digest must still say what is
+	// waiting, and must not read as "nothing happened".
+	html, text, err := r.Render("qb_shadow_digest", QBShadowDigestData{
+		Invoices: []QBShadowDigestInvoice{
+			{OrderNumber: "WO-7", Customer: "Blue Heron Cafe", TotalCents: 7200,
+				Terms: "Net 7", DueDate: time.Now(), URL: "https://x", Manual: true},
+		},
+		Total: 0, TotalAmtCents: 0, AwaitingManual: 4, Listed: 4, Days: 7,
+		ReviewURL: "https://x", StoreName: "Rockabilly",
+	})
+	require.NoError(t, err)
+
+	for _, body := range []string{html, text} {
+		assert.Contains(t, body, "invoicing by hand",
+			"an all-manual week must say what is waiting, not report an empty week")
+		assert.Contains(t, body, "Blue Heron Cafe")
+		assert.Contains(t, body, "Showing 1 of 4",
+			"truncation counts every listed row, not just the billable ones")
+		assert.NotContains(t, body, "{{")
+	}
+	assert.Contains(t, text, "[MANUAL]", "a manual row is marked as such")
 }

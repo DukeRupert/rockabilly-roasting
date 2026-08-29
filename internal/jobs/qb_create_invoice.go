@@ -236,9 +236,9 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	if invoice == nil {
 		// Create QB invoice (external call outside transaction). Due date
 		// follows the customer's NET terms; net-7 when none are set. QBO
-		// emails the invoice (chained SendQBInvoice job below) with
-		// online-payment buttons: ACH always, card only when that's the
-		// customer's billing method (card fees are opt-in per account). The
+		// emails the invoice (chained SendQBInvoice job below) with whichever
+		// online-payment button matches the
+		// customer's own agreement — see BillingMethod. The
 		// bill-to email is set explicitly below — QBO does not fill it in
 		// from the linked customer, and the send step fails without it.
 		params := quickbooks.InvoiceParams{
@@ -365,9 +365,12 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 	if job.Args.QBCustomerID != "" {
 		qbID := job.Args.QBCustomerID
 		preview.QBCustomerID = &qbID
-	} else {
+	} else if preview.AutoBilled {
 		// EnsureQBCustomer looked and found nothing, so a live run would have
-		// created the customer. Worth a human's eye before it does.
+		// created the customer. Worth a human's eye before it does — but only
+		// where a live run would actually bill: saying "going live would
+		// create this customer" about an account nothing invoices is a claim
+		// about something that will not happen.
 		preview.WouldCreateCustomer = true
 	}
 	for _, line := range lines {

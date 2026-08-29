@@ -189,15 +189,25 @@ templ QBPreviewContent(props QBPreviewProps) {
 		</div>
 		if props.Truncated {
 			<p class="mt-2 text-xs text-rr-muted">
-				Showing the { strconv.Itoa(len(props.Rows)) } most recent of { strconv.Itoa(props.Count) }.
+				Showing the { strconv.Itoa(len(props.Rows)) } most recent of { strconv.Itoa(props.Count + props.AwaitingManual) }.
 				The totals above cover all of them.
 			</p>
 		}
 	}
 }
 
-// qbBillNowButton offers to bill an order that test mode recorded instead of
-// invoicing.
+// qbBillNowReason says why this order is sitting here unbilled, which is not
+// always the same answer: an account on manual billing is never invoiced
+// automatically, while everything else here simply predates going live.
+func qbBillNowReason(row QBPreviewRow) string {
+	if row.AwaitingManualInvoice() {
+		return "This account is on manual billing, so nothing invoices it automatically. Only do this if the customer expects a QuickBooks invoice."
+	}
+	return "This order was recorded in test mode and has not been billed yet."
+}
+
+// qbBillNowButton offers to bill an order nothing has invoiced — one recorded
+// before going live, or one on an account nothing bills automatically.
 //
 // Only rendered once billing is live, and only for an order that has no
 // invoice yet: going live deliberately does not bill the backlog, so this is
@@ -215,7 +225,7 @@ templ qbBillNowButton(row QBPreviewRow) {
 					Lead:  "Creates a real invoice in QuickBooks and emails it to " + row.CustomerName + ".",
 					Points: []string{
 						"The customer receives an invoice for " + formatCents(row.TotalCents) + ", due " + row.DueDate.Format("Jan 2, 2006") + ".",
-						"This order was recorded in test mode and has not been billed yet.",
+						qbBillNowReason(row),
 						"If you have already invoiced it by hand, do not do this — it would bill them twice.",
 					},
 					Confirm: "Bill this order",

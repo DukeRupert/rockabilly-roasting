@@ -19,6 +19,10 @@
     <p style="margin:0 0 16px;">
       {{if eq .Total 1}}One invoice{{else}}{{.Total}} invoices{{end}}
       totalling <strong>{{cents .TotalAmtCents}}</strong>.
+      {{if gt .AwaitingManual 0}}
+        {{.AwaitingManual}} more {{if eq .AwaitingManual 1}}order is{{else}}orders are{{end}}
+        on accounts nothing invoices automatically &mdash; those need invoicing by hand.
+      {{end}}
       {{if gt .Attention 0}}
         <span style="color:#C0271D;font-weight:bold;">
           {{.Attention}} need{{if eq .Attention 1}}s{{end}} attention before going live.
@@ -32,7 +36,7 @@
       {{range .Invoices}}
       <tr><td style="padding:10px 12px;border-bottom:1px solid #E5DDCC;">
         <div>
-          {{if .Problem}}<span style="color:#C0271D;font-weight:bold;">CHECK</span> &middot; {{end}}
+          {{if .Manual}}<span style="color:#666;font-weight:bold;">MANUAL</span> &middot; {{end}}{{if .Problem}}<span style="color:#C0271D;font-weight:bold;">CHECK</span> &middot; {{end}}
           <a href="{{.URL}}" style="color:#1A1612;font-weight:bold;text-decoration:none;">{{.OrderNumber}}</a>
           &mdash; {{.Customer}}
           <span style="float:right;font-weight:bold;">{{cents .TotalCents}}</span>
@@ -48,9 +52,9 @@
       {{end}}
     </table>
 
-    {{if gt .Total (len .Invoices)}}
+    {{if gt .Listed (len .Invoices)}}
     <p style="margin:0 0 16px;font-size:12px;color:#666;">
-      Showing {{len .Invoices}} of {{.Total}}. The review page has the rest.
+      Showing {{len .Invoices}} of {{.Listed}}. The review page has the rest.
     </p>
     {{end}}
 

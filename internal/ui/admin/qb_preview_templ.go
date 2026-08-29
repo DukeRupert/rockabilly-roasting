@@ -482,9 +482,9 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var19 string
-				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(props.Count))
+				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(props.Count + props.AwaitingManual))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 192, Col: 92}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 192, Col: 115}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -500,8 +500,18 @@ func QBPreviewContent(props QBPreviewProps) templ.Component {
 	})
 }
 
-// qbBillNowButton offers to bill an order that test mode recorded instead of
-// invoicing.
+// qbBillNowReason says why this order is sitting here unbilled, which is not
+// always the same answer: an account on manual billing is never invoiced
+// automatically, while everything else here simply predates going live.
+func qbBillNowReason(row QBPreviewRow) string {
+	if row.AwaitingManualInvoice() {
+		return "This account is on manual billing, so nothing invoices it automatically. Only do this if the customer expects a QuickBooks invoice."
+	}
+	return "This order was recorded in test mode and has not been billed yet."
+}
+
+// qbBillNowButton offers to bill an order nothing has invoiced — one recorded
+// before going live, or one on an account nothing bills automatically.
 //
 // Only rendered once billing is live, and only for an order that has no
 // invoice yet: going live deliberately does not bill the backlog, so this is
@@ -540,7 +550,7 @@ func qbBillNowButton(row QBPreviewRow) templ.Component {
 			var templ_7745c5c3_Var21 templ.SafeURL
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/settings/integrations/quickbooks/preview/" + row.OrderID.String() + "/bill"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 209, Col: 129}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/qb_preview.templ`, Line: 219, Col: 129}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -555,7 +565,7 @@ func qbBillNowButton(row QBPreviewRow) templ.Component {
 				Lead:  "Creates a real invoice in QuickBooks and emails it to " + row.CustomerName + ".",
 				Points: []string{
 					"The customer receives an invoice for " + formatCents(row.TotalCents) + ", due " + row.DueDate.Format("Jan 2, 2006") + ".",
-					"This order was recorded in test mode and has not been billed yet.",
+					qbBillNowReason(row),
 					"If you have already invoiced it by hand, do not do this — it would bill them twice.",
 				},
 				Confirm: "Bill this order",

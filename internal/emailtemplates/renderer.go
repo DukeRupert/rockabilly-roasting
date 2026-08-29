@@ -176,6 +176,9 @@ type QBShadowDigestInvoice struct {
 	DueDate     time.Time
 	BillEmail   string
 	URL         string // admin order detail page
+	// Manual marks an account nothing invoices automatically. Listed because
+	// the work is real even though the billing is not.
+	Manual bool
 	// Problem is empty on a clean row and otherwise says, in one phrase, what
 	// a human needs to resolve before going live.
 	Problem string
@@ -196,9 +199,17 @@ type QBShadowDigestData struct {
 	Total         int
 	TotalAmtCents int
 	Attention     int // how many rows need a human before going live
-	Days          int // length of the window this covers
-	ReviewURL     string
-	StoreName     string
+	// AwaitingManual is how many orders sit on accounts nothing invoices
+	// automatically. Counted apart from Total, which is money we expect to
+	// collect — folding them together would overstate it.
+	AwaitingManual int
+	// Listed is every row the digest covers, billable and manual together.
+	// The truncation notice compares against this, not against Total, or an
+	// all-manual week reads "showing 40 of 0".
+	Listed    int
+	Days      int // length of the window this covers
+	ReviewURL string
+	StoreName string
 }
 
 // ServiceStaleDigestTicket is one line of the stale-ticket digest.

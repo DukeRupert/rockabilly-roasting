@@ -30,6 +30,7 @@ func customerDisplayName(c *domain.Customer) string {
 type EnsureQBCustomerWorker struct {
 	river.WorkerDefaults[EnsureQBCustomerArgs]
 	customers   *store.CustomerStore
+	settings    *store.SettingsStore
 	qb          quickbooks.Client
 	audit       *audit.AuditWriter
 	pool        *pgxpool.Pool
@@ -40,6 +41,7 @@ type EnsureQBCustomerWorker struct {
 // NewEnsureQBCustomerWorker creates a new EnsureQBCustomerWorker.
 func NewEnsureQBCustomerWorker(
 	customers *store.CustomerStore,
+	settings *store.SettingsStore,
 	qb quickbooks.Client,
 	auditWriter *audit.AuditWriter,
 	pool *pgxpool.Pool,
@@ -48,6 +50,7 @@ func NewEnsureQBCustomerWorker(
 ) *EnsureQBCustomerWorker {
 	return &EnsureQBCustomerWorker{
 		customers:   customers,
+		settings:    settings,
 		qb:          qb,
 		audit:       auditWriter,
 		pool:        pool,
@@ -91,15 +94,56 @@ func (w *EnsureQBCustomerWorker) Work(ctx context.Context, job *river.Job[Ensure
 }
 
 func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[EnsureQBCustomerArgs]) error {
-	// Read customer
+	// Read customer and the billing mode together — both are needed before
+	// anything can be decided, and neither is worth its own round trip.
 	var customer *domain.Customer
+	var mode domain.QBBillingMode
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
 		customer, txErr = w.customers.GetByID(ctx, tx, job.Args.CustomerID)
+		if txErr != nil {
+			return txErr
+		}
+		mode, txErr = w.settings.GetQBBillingMode(ctx, tx)
 		return txErr
 	})
 	if err != nil {
 		return fmt.Errorf("get customer: %w", err)
+	}
+
+	// Shadow mode: look the customer up so the proof can report whether they
+	// match, but write nothing — not to QBO, and not to our own customer row.
+	// Linking locally would decide a match that the whole point of the proof
+	// period is to have a human review first.
+	if !mode.IsLive() {
+		qbID := ""
+		lookupErr := ""
+		if customer.QBCustomerID != nil {
+			qbID = *customer.QBCustomerID
+		} else {
+			found, findErr := w.qb.FindCustomer(ctx, customerDisplayName(customer), customer.Email)
+			switch {
+			case findErr != nil:
+				// Carried forward rather than returned. Failing here would
+				// stop the chain, so no preview would be written and the order
+				// would simply be absent from the review page and the digest —
+				// indistinguishable from an order with nothing to bill. That
+				// is the conclusion a proof period must never invite, and this
+				// is the likeliest call to fail, being the one the proof period
+				// exists to exercise. The row says what went wrong instead.
+				lookupErr = findErr.Error()
+			case found != nil:
+				qbID = found.ID
+			}
+		}
+		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
+			_, txErr := w.riverClient.InsertTx(ctx, tx, CreateQBInvoiceArgs{
+				OrderID:             job.Args.OrderID,
+				QBCustomerID:        qbID,
+				CustomerLookupError: lookupErr,
+			}, nil)
+			return txErr
+		})
 	}
 
 	if customer.QBCustomerID == nil {

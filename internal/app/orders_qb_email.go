@@ -330,3 +330,128 @@ func qbInvoiceLabel(o *domain.Order) string {
 	}
 	return o.Number
 }
+
+// qbShadowDigestListCap bounds how many would-be invoices the digest lists.
+// The count and the total are computed in SQL over the whole window, so a
+// capped list never understates what a proof period actually saw.
+const qbShadowDigestListCap = 40
+
+// SendQBShadowDigestEmail summarises what QuickBooks billing would have done
+// over the given window and mails it to staff.
+//
+// A proof period nobody looks at proves nothing, which is the whole reason
+// this exists. It is sent only while the shop is in shadow mode: once billing
+// is live the invoices themselves are the record, and a digest of them would
+// be noise.
+func (s *OrderService) SendQBShadowDigestEmail(ctx context.Context, pool *pgxpool.Pool, windowDays int) error {
+	if s.email.StaffEmail == "" {
+		slog.WarnContext(ctx, "qb shadow digest: STAFF_NOTIFICATION_EMAIL unset, digest not emailed")
+		return nil
+	}
+	if s.qbPreviews == nil || s.settings == nil {
+		slog.WarnContext(ctx, "qb shadow digest: preview store not wired, nothing to summarise")
+		return nil
+	}
+
+	since := time.Now().AddDate(0, 0, -windowDays)
+
+	var (
+		mode   domain.QBBillingMode
+		totals store.QBPreviewTotals
+		rows   []store.QBPreviewRow
+	)
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		var txErr error
+		if mode, txErr = s.settings.GetQBBillingMode(ctx, tx); txErr != nil {
+			return txErr
+		}
+		if mode.IsLive() {
+			return nil
+		}
+		if totals, txErr = s.qbPreviews.Totals(ctx, tx, since); txErr != nil {
+			return txErr
+		}
+		rows, txErr = s.qbPreviews.ListSince(ctx, tx, since)
+		return txErr
+	}); err != nil {
+		return err
+	}
+
+	// Live shops get no digest. Checked here rather than by the scheduler so
+	// that flipping to live silences it immediately, without a redeploy.
+	if mode.IsLive() {
+		return nil
+	}
+
+	// Nothing happened this week, so say nothing. Shadow is the default for
+	// every install with QuickBooks connected, and a shop that does not run
+	// wholesale through it would otherwise receive an empty report forever —
+	// which trains staff to ignore the one that eventually matters.
+	if totals.Count == 0 {
+		return nil
+	}
+
+	// Rows needing attention lead: the finding is an account that would fail,
+	// not the money. Within each group the original order is preserved.
+	sorted := make([]store.QBPreviewRow, 0, len(rows))
+	for _, r := range rows {
+		if r.NeedsAttention() {
+			sorted = append(sorted, r)
+		}
+	}
+	for _, r := range rows {
+		if !r.NeedsAttention() {
+			sorted = append(sorted, r)
+		}
+	}
+	if len(sorted) > qbShadowDigestListCap {
+		sorted = sorted[:qbShadowDigestListCap]
+	}
+
+	invoices := make([]emailtemplates.QBShadowDigestInvoice, 0, len(sorted))
+	for _, r := range sorted {
+		invoices = append(invoices, emailtemplates.QBShadowDigestInvoice{
+			OrderNumber: r.OrderNumber,
+			Customer:    r.CustomerName,
+			TotalCents:  r.TotalCents,
+			Terms:       domain.PaymentTermsLabel(r.TermsDays),
+			DueDate:     r.DueDate,
+			BillEmail:   r.BillEmail,
+			URL:         s.email.BaseURL + "/admin/orders/" + r.OrderID.String(),
+			Problem:     r.Problem(),
+		})
+	}
+
+	html, text, err := s.email.Renderer.Render("qb_shadow_digest", emailtemplates.QBShadowDigestData{
+		Invoices:      invoices,
+		Total:         totals.Count,
+		TotalAmtCents: totals.TotalCents,
+		Attention:     totals.NeedingAttention,
+		Days:          windowDays,
+		ReviewURL:     s.email.BaseURL + "/admin/settings/integrations/quickbooks/preview",
+		StoreName:     s.email.StoreName,
+	})
+	if err != nil {
+		s.metrics.EmailsSent.WithLabelValues("qb_shadow_digest", "failed").Inc()
+		return fmt.Errorf("render qb shadow digest template: %w", err)
+	}
+
+	subject := fmt.Sprintf("QuickBooks test mode: %d would-be invoice(s) this week", totals.Count)
+	if totals.NeedingAttention > 0 {
+		subject = fmt.Sprintf("QuickBooks test mode: %d of %d need attention", totals.NeedingAttention, totals.Count)
+	}
+
+	if _, err := s.email.Mailer.Send(ctx, email.Message{
+		From:    s.email.FromAddr,
+		To:      s.email.StaffEmail,
+		Subject: subject,
+		HTML:    html,
+		Text:    text,
+		Tag:     "qb-shadow-digest",
+	}); err != nil {
+		s.metrics.EmailsSent.WithLabelValues("qb_shadow_digest", "failed").Inc()
+		return fmt.Errorf("send qb shadow digest: %w", err)
+	}
+	s.metrics.EmailsSent.WithLabelValues("qb_shadow_digest", "sent").Inc()
+	return nil
+}

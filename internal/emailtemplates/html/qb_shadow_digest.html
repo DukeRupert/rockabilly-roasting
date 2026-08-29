@@ -1,0 +1,70 @@
+{{define "qb_shadow_digest.html"}}<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"></head>
+<body style="margin:0;padding:0;background-color:#F5F0E6;font-family:Arial,Helvetica,sans-serif;color:#1A1612;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F0E6;padding:24px 0;">
+<tr><td align="center">
+<table width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:8px;overflow:hidden;">
+  <tr><td style="background-color:#1A1612;padding:24px;text-align:center;">
+    <span style="color:#F5F0E6;font-size:20px;font-weight:bold;">{{.StoreName}}</span>
+  </td></tr>
+  <tr><td style="padding:32px 24px;">
+    <h1 style="margin:0 0 8px;font-size:24px;color:#C0271D;">QuickBooks billing &mdash; test mode</h1>
+    <p style="margin:0 0 16px;font-size:13px;color:#666;">
+      Nothing below was billed. No invoice was created in QuickBooks and no
+      customer was emailed. This is what would have happened over the last
+      {{.Days}} days if billing were live.
+    </p>
+
+    <p style="margin:0 0 16px;">
+      {{if eq .Total 1}}One invoice{{else}}{{.Total}} invoices{{end}}
+      totalling <strong>{{cents .TotalAmtCents}}</strong>.
+      {{if gt .Attention 0}}
+        <span style="color:#C0271D;font-weight:bold;">
+          {{.Attention}} need{{if eq .Attention 1}}s{{end}} attention before going live.
+        </span>
+      {{else}}
+        Nothing needs attention.
+      {{end}}
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;background-color:#F5F0E6;border-radius:6px;">
+      {{range .Invoices}}
+      <tr><td style="padding:10px 12px;border-bottom:1px solid #E5DDCC;">
+        <div>
+          {{if .Problem}}<span style="color:#C0271D;font-weight:bold;">CHECK</span> &middot; {{end}}
+          <a href="{{.URL}}" style="color:#1A1612;font-weight:bold;text-decoration:none;">{{.OrderNumber}}</a>
+          &mdash; {{.Customer}}
+          <span style="float:right;font-weight:bold;">{{cents .TotalCents}}</span>
+        </div>
+        <div style="font-size:12px;color:#666;padding-top:2px;">
+          {{.Terms}} &middot; due {{date .DueDate}}
+          {{if .BillEmail}}&middot; to {{.BillEmail}}{{end}}
+        </div>
+        {{if .Problem}}
+        <div style="font-size:12px;color:#C0271D;padding-top:2px;">{{.Problem}}</div>
+        {{end}}
+      </td></tr>
+      {{end}}
+    </table>
+
+    {{if gt .Total (len .Invoices)}}
+    <p style="margin:0 0 16px;font-size:12px;color:#666;">
+      Showing {{len .Invoices}} of {{.Total}}. The review page has the rest.
+    </p>
+    {{end}}
+
+    <table cellpadding="0" cellspacing="0" style="margin:0 auto 24px;">
+      <tr><td style="background-color:#C0271D;border-radius:6px;padding:12px 32px;text-align:center;">
+        <a href="{{.ReviewURL}}" style="color:#ffffff;text-decoration:none;font-weight:bold;font-size:16px;">Review what would be billed</a>
+      </td></tr>
+    </table>
+  </td></tr>
+  <tr><td style="background-color:#F5F0E6;padding:16px 24px;text-align:center;font-size:12px;color:#666;">
+    {{.StoreName}} &mdash; Staff notification
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>{{end}}

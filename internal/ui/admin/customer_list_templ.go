@@ -1278,9 +1278,9 @@ func wholesaleCustomerRow(props CustomerListProps, c domain.Customer) templ.Comp
 		}
 		if c.PaymentTermsDays != nil {
 			var templ_7745c5c3_Var50 string
-			templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Net %d", *c.PaymentTermsDays))
+			templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(domain.PaymentTermsLabel(*c.PaymentTermsDays))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 533, Col: 48}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/customer_list.templ`, Line: 533, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
 			if templ_7745c5c3_Err != nil {

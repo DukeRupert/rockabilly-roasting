@@ -35,6 +35,34 @@ type OrderService struct {
 	// orderActions signs the switch-to-pickup link in order confirmations.
 	// Optional: without it the email offers the switch by reply instead.
 	orderActions *auth.OrderActionSigner
+	// qbPreviews backs the shadow-billing digest. Populated via
+	// WithQBPreviews; without it the digest job has nothing to summarise and
+	// says so rather than sending an empty report.
+	qbPreviews *store.QBPreviewStore
+	// settings answers whether QuickBooks billing is live. Populated via
+	// WithQBPreviews alongside the previews, because the only reader of
+	// either is the shadow digest.
+	settings *store.SettingsStore
+	// merchantTZ is the shop's local timezone, used to decide when an invoice
+	// date has actually passed. Nil falls back to UTC.
+	merchantTZ *time.Location
+}
+
+// WithMerchantTZ wires the shop's local timezone. Without it, "the due date
+// has passed" is decided in UTC, which for a Pacific merchant makes an invoice
+// overdue at five in the afternoon on the day it falls due.
+func (s *OrderService) WithMerchantTZ(loc *time.Location) *OrderService {
+	s.merchantTZ = loc
+	return s
+}
+
+// WithQBPreviews wires the store of would-be invoices recorded while
+// QuickBooks billing is in shadow mode, plus the settings the digest reads to
+// decide whether a proof period is still running.
+func (s *OrderService) WithQBPreviews(previews *store.QBPreviewStore, settings *store.SettingsStore) *OrderService {
+	s.qbPreviews = previews
+	s.settings = settings
+	return s
 }
 
 // WithOrderActionSigner wires the signer used to mint one-click order links in

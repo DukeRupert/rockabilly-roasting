@@ -670,11 +670,11 @@ func NewRouter(deps *Deps) http.Handler {
 	//
 	// The QuickBooks OAuth callback is gated on the same permission as the rest.
 	// It is the staffer's own browser coming back from Intuit, and only someone
-	// who could reach the connect route could have started the flow — but note
-	// the return is a cross-site top-level navigation and the staff session
-	// cookie is SameSite=Strict (auth.go), so whether the session is sent at all
-	// is a pre-existing open question about this flow, not something this gate
-	// changes. The OAuth state cookie is deliberately Lax for that reason.
+	// who could reach the connect route could have started the flow. The return
+	// is a cross-site top-level navigation, which the staff session cookie has
+	// to survive or this route 303s to the login page before the handler runs —
+	// that is why the session cookie is SameSite=Lax rather than Strict
+	// (auth.go). The OAuth state cookie is Lax for the same reason.
 	settingsRoute := func(pattern string, h http.HandlerFunc) {
 		adminMux.Handle(pattern, deps.requirePermission(auth.PermManageSystem, h))
 	}
@@ -702,6 +702,16 @@ func NewRouter(deps *Deps) http.Handler {
 	settingsRoute("GET /admin/settings/integrations/quickbooks/connect", deps.handleAdminQBConnect)
 	settingsRoute("GET /admin/settings/integrations/quickbooks/callback", deps.handleAdminQBCallback)
 	settingsRoute("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)
+	// Shadow billing: the review list, and the switch that decides whether
+	// wholesale customers are actually invoiced. Same admin-only gate as the
+	// rest of settings — going live is the highest-blast-radius button in the
+	// product.
+	settingsRoute("GET /admin/settings/integrations/quickbooks/preview", deps.handleAdminQBPreview)
+	settingsRoute("POST /admin/settings/integrations/quickbooks/billing-mode", deps.handleAdminQBBillingModeUpdate)
+	// Bill an order that test mode recorded instead of invoicing. Without this
+	// the invoice chain is only ever started by wholesale checkout, and every
+	// order placed during a proof period would be stranded.
+	settingsRoute("POST /admin/settings/integrations/quickbooks/preview/{id}/bill", deps.handleAdminQBBillOrder)
 
 	// --- Equipment service module ---
 	//

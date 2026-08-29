@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -740,10 +741,22 @@ templ customerSettingsCard(props CustomerShowProps) {
 						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/payment-terms", props.Customer.ID)) }>
 							@customerSelect("payment_terms_days") {
 								<option value="" selected?={ props.Customer.PaymentTermsDays == nil }>Not set</option>
-								<option value="7" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 7 }>Net 7</option>
-								<option value="15" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 15 }>Net 15</option>
-								<option value="21" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 21 }>Net 21</option>
-								<option value="30" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 30 }>Net 30</option>
+								if props.Customer.PaymentTermsDays != nil && domain.IsLegacyPaymentTerms(*props.Customer.PaymentTermsDays) {
+									<!-- Terms that are no longer offered (Net 21, retired 2026-08-29) still
+									     have to show as what they are. Without this the select falls back to
+									     its first option and reads "Not set", and because it submits on change
+									     the next nudge would quietly rewrite a real account's terms. -->
+									<!-- disabled as well as selected: it has to show what the account is
+									     actually on, but the handler rejects a retired value, so letting it be
+									     chosen again would answer a click with a bare 400. Staff can move off
+									     it; they cannot move back onto it. -->
+									<option value={ strconv.Itoa(*props.Customer.PaymentTermsDays) } selected disabled>
+										{ domain.PaymentTermsLabel(*props.Customer.PaymentTermsDays) } (no longer offered)
+									</option>
+								}
+								for _, days := range domain.PaymentTermsOptions {
+									<option value={ strconv.Itoa(days) } selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == days }>{ domain.PaymentTermsLabel(days) }</option>
+								}
 							}
 						</form>
 					</dd>

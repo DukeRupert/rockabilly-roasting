@@ -8,17 +8,17 @@ import (
 
 // qbPaymentRequest is the JSON body for creating a QB payment.
 type qbPaymentRequest struct {
-	CustomerRef  qbRef            `json:"CustomerRef"`
-	TotalAmt     float64          `json:"TotalAmt"`
-	Line         []qbPaymentLine  `json:"Line"`
+	CustomerRef   qbRef           `json:"CustomerRef"`
+	TotalAmt      float64         `json:"TotalAmt"`
+	Line          []qbPaymentLine `json:"Line"`
 	PaymentRefNum string          `json:"PaymentRefNum,omitempty"`
 	PrivateNote   string          `json:"PrivateNote,omitempty"`
 }
 
 // qbPaymentLine links a payment to an invoice.
 type qbPaymentLine struct {
-	Amount    float64          `json:"Amount"`
-	LinkedTxn []qbLinkedTxn   `json:"LinkedTxn"`
+	Amount    float64       `json:"Amount"`
+	LinkedTxn []qbLinkedTxn `json:"LinkedTxn"`
 }
 
 // qbLinkedTxn references the invoice being paid.

@@ -61,6 +61,7 @@ type QBClient struct {
 	pool       *pgxpool.Pool
 	httpClient *http.Client
 	baseURL    string
+	terms      *termCache
 }
 
 // NewQBClient creates a new QuickBooks client.
@@ -70,14 +71,15 @@ func NewQBClient(config ClientConfig, tenantID uuid.UUID, credStore CredentialSt
 		baseURL = sandboxBaseURL
 	}
 	return &QBClient{
-		config:   config,
-		tenantID: tenantID,
+		config:    config,
+		tenantID:  tenantID,
 		credStore: credStore,
-		pool:     pool,
+		pool:      pool,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 		baseURL: baseURL,
+		terms:   newTermCache(),
 	}
 }
 

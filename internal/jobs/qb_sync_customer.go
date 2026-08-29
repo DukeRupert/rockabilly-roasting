@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -20,6 +21,7 @@ import (
 type SyncQBCustomerWorker struct {
 	river.WorkerDefaults[SyncQBCustomerArgs]
 	customers *store.CustomerStore
+	settings  *store.SettingsStore
 	qb        quickbooks.Client
 	audit     *audit.AuditWriter
 	pool      *pgxpool.Pool
@@ -29,6 +31,7 @@ type SyncQBCustomerWorker struct {
 // NewSyncQBCustomerWorker creates a new SyncQBCustomerWorker.
 func NewSyncQBCustomerWorker(
 	customers *store.CustomerStore,
+	settings *store.SettingsStore,
 	qb quickbooks.Client,
 	auditWriter *audit.AuditWriter,
 	pool *pgxpool.Pool,
@@ -36,6 +39,7 @@ func NewSyncQBCustomerWorker(
 ) *SyncQBCustomerWorker {
 	return &SyncQBCustomerWorker{
 		customers: customers,
+		settings:  settings,
 		qb:        qb,
 		audit:     auditWriter,
 		pool:      pool,
@@ -70,13 +74,32 @@ func (w *SyncQBCustomerWorker) Work(ctx context.Context, job *river.Job[SyncQBCu
 
 func (w *SyncQBCustomerWorker) work(ctx context.Context, job *river.Job[SyncQBCustomerArgs]) error {
 	var customer *domain.Customer
+	var mode domain.QBBillingMode
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
 		customer, txErr = w.customers.GetByID(ctx, tx, job.Args.CustomerID)
+		if txErr != nil {
+			return txErr
+		}
+		mode, txErr = w.settings.GetQBBillingMode(ctx, tx)
 		return txErr
 	})
 	if err != nil {
 		return fmt.Errorf("get customer: %w", err)
+	}
+
+	// Test mode writes nothing to QuickBooks, and this worker is the other way
+	// in: approving a wholesale account enqueues it to pre-create the customer
+	// before their first order. During a proof period that would create a
+	// customer in the merchant's real company and link it locally — and worse,
+	// it would corrupt the proof itself, because that account's preview would
+	// then report a match against a customer test mode had just made. Nothing
+	// is lost by waiting: the invoice chain does find-or-create at billing
+	// time, so going live picks this up on the first real order.
+	if !mode.IsLive() {
+		slog.InfoContext(ctx, "qb sync customer: skipped, billing is in test mode",
+			"customer_id", job.Args.CustomerID)
+		return nil
 	}
 
 	if customer.QBCustomerID == nil {

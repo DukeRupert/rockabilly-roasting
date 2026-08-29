@@ -3,6 +3,8 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -24,6 +26,8 @@ type CreateQBInvoiceWorker struct {
 	orders      *store.OrderStore
 	customers   *store.CustomerStore
 	catalog     *store.CatalogStore
+	settings    *store.SettingsStore
+	previews    *store.QBPreviewStore
 	qb          quickbooks.Client
 	audit       *audit.AuditWriter
 	pool        *pgxpool.Pool
@@ -36,6 +40,8 @@ func NewCreateQBInvoiceWorker(
 	orders *store.OrderStore,
 	customers *store.CustomerStore,
 	catalog *store.CatalogStore,
+	settings *store.SettingsStore,
+	previews *store.QBPreviewStore,
 	qb quickbooks.Client,
 	auditWriter *audit.AuditWriter,
 	pool *pgxpool.Pool,
@@ -46,6 +52,8 @@ func NewCreateQBInvoiceWorker(
 		orders:      orders,
 		customers:   customers,
 		catalog:     catalog,
+		settings:    settings,
+		previews:    previews,
 		qb:          qb,
 		audit:       auditWriter,
 		pool:        pool,
@@ -90,8 +98,12 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	var order *domain.Order
 	var items []domain.LineItem
 	var customer *domain.Customer
+	var mode domain.QBBillingMode
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
+		if mode, txErr = w.settings.GetQBBillingMode(ctx, tx); txErr != nil {
+			return txErr
+		}
 		order, txErr = w.orders.GetOrderByIDAsStaff(ctx, tx, job.Args.OrderID)
 		if txErr != nil {
 			return txErr
@@ -154,6 +166,38 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	// especially important now that every created invoice chains a send job
 	// that emails the customer.
 	docNumber := formatOrderRef(order.Number)
+
+	// Shadow mode stops here: record what would have been billed and return.
+	// The lookups it performs are read-only, which is the point — an account
+	// that silently fails to match a QBO customer is invisible until money is
+	// involved, and that is exactly what a proof period exists to surface.
+	if !mode.IsLive() {
+		return w.recordPreview(ctx, job, order, customer, lines, docNumber, termsDays)
+	}
+
+	// A shadow run chains here with an empty QBCustomerID when nothing matched.
+	// If the mode is flipped to live between the two jobs, that empty value
+	// would reach QBO as a blank CustomerRef. Start the chain again instead:
+	// the live EnsureQBCustomer path establishes the customer properly, and
+	// the DocNumber probe below still guards against a duplicate invoice.
+	if job.Args.QBCustomerID == "" {
+		if order.CustomerID == nil {
+			// Unreachable through either entry point — checkout and BillOrderNow
+			// both require a customer — but this is the one place that would
+			// otherwise dereference it blind.
+			return fmt.Errorf("%w: order %s has no customer to invoice", quickbooks.ErrBadRequest, order.ID)
+		}
+		slog.Info("qb create invoice: no qb customer on a live run, restarting the chain",
+			"order_id", order.ID)
+		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
+			_, txErr := w.riverClient.InsertTx(ctx, tx, EnsureQBCustomerArgs{
+				CustomerID: *order.CustomerID,
+				OrderID:    order.ID,
+			}, nil)
+			return txErr
+		})
+	}
+
 	invoice, err := w.qb.FindInvoiceByDocNumber(ctx, docNumber)
 	if err != nil {
 		return fmt.Errorf("qb find invoice by doc number: %w", err)
@@ -166,7 +210,8 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		// emails the invoice (chained SendQBInvoice job below) with
 		// online-payment buttons: ACH always, card only when that's the
 		// customer's billing method (card fees are opt-in per account). The
-		// bill-to email comes from the QB customer record.
+		// bill-to email is set explicitly below — QBO does not fill it in
+		// from the linked customer, and the send step fails without it.
 		params := quickbooks.InvoiceParams{
 			CustomerID:            job.Args.QBCustomerID,
 			DocNumber:             docNumber,
@@ -177,6 +222,31 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		}
 		if customer != nil {
 			params.AllowOnlineCreditCardPayment = customer.BillingMethod == domain.BillingMethodCreditCard
+			// EnsureQBCustomer syncs this same address onto the QB customer's
+			// PrimaryEmailAddr, so local and QB agree by construction.
+			params.BillEmail = customer.Email
+		}
+		if params.BillEmail == "" {
+			// The invoice is still worth creating — staff can add the address
+			// in QBO and resend — but the chained send will fail permanently
+			// and alert, so record why here rather than leaving that alert
+			// looking like a QBO problem.
+			slog.Warn("qb create invoice: no bill-to address, invoice will be created but cannot be emailed",
+				"order_id", order.ID, "customer_id", order.CustomerID)
+		}
+
+		// Stamp the invoice with a QBO Term so its Terms field reads "Net 15"
+		// rather than sitting blank, and so QBO's own reporting can group by
+		// terms. DueDate above remains authoritative for when payment is due,
+		// which is why a failure here is logged and not returned: the terms
+		// label is presentational, and refusing to bill a customer because a
+		// cosmetic lookup failed would be the worse outcome.
+		termID, termErr := w.qb.FindOrCreateTerm(ctx, termsDays)
+		if termErr != nil {
+			slog.Warn("qb create invoice: term lookup failed, invoicing without terms label",
+				"order_id", order.ID, "terms_days", termsDays, "error", termErr)
+		} else {
+			params.TermID = termID
 		}
 		invoice, err = w.qb.CreateInvoice(ctx, params)
 		if err != nil {
@@ -189,6 +259,14 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	// re-create the invoice.
 	return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		if txErr := w.orders.SetQBInvoice(ctx, tx, order.ID, invoice.ID, invoice.DocNumber); txErr != nil {
+			return txErr
+		}
+		// The order is billed, so any shadow-mode preview of it has served its
+		// purpose. Clearing it in the same transaction keeps the review page
+		// meaning "recorded but not billed" — otherwise a billed order would
+		// sit there still offering a Bill now button and still counting toward
+		// the badge.
+		if txErr := w.previews.DeleteByOrder(ctx, tx, order.ID); txErr != nil {
 			return txErr
 		}
 		if _, txErr := w.riverClient.InsertTx(ctx, tx, SendQBInvoiceArgs{
@@ -209,6 +287,100 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 				"net_terms_days": termsDays,
 				"adopted":        adopted,
 				"river_job_id":   job.ID,
+			},
+		})
+	})
+}
+
+// recordPreview writes what a live run would have billed for this order.
+//
+// Every QBO call here is read-only. Failures are recorded on the preview
+// rather than returned: a proof period whose list is missing an order reads as
+// "nothing to bill for that one", which is the single conclusion it must never
+// invite by accident. The row says what went wrong instead.
+func (w *CreateQBInvoiceWorker) recordPreview(
+	ctx context.Context,
+	job *river.Job[CreateQBInvoiceArgs],
+	order *domain.Order,
+	customer *domain.Customer,
+	lines []quickbooks.InvoiceLine,
+	docNumber string,
+	termsDays int,
+) error {
+	preview := &domain.QBInvoicePreview{
+		OrderID:       order.ID,
+		CustomerID:    order.CustomerID,
+		DocNumber:     docNumber,
+		TermsDays:     termsDays,
+		DueDate:       order.PlacedAt.Add(time.Duration(termsDays) * 24 * time.Hour),
+		SubtotalCents: order.Subtotal,
+		ShippingCents: order.ShippingTotal,
+		TotalCents:    order.Total,
+	}
+	if customer != nil {
+		preview.BillEmail = customer.Email
+	}
+	if job.Args.QBCustomerID != "" {
+		qbID := job.Args.QBCustomerID
+		preview.QBCustomerID = &qbID
+	} else {
+		// EnsureQBCustomer looked and found nothing, so a live run would have
+		// created the customer. Worth a human's eye before it does.
+		preview.WouldCreateCustomer = true
+	}
+	for _, line := range lines {
+		preview.Lines = append(preview.Lines, domain.QBInvoiceLinePreview{
+			Description: line.Description,
+			Quantity:    line.Quantity,
+			UnitCents:   line.UnitAmount,
+			AmountCents: line.Amount,
+		})
+	}
+
+	var lookupErrs []string
+	if job.Args.CustomerLookupError != "" {
+		// Raised by EnsureQBCustomer, which carries it here rather than
+		// failing so this order still appears on the review page.
+		lookupErrs = append(lookupErrs, "customer lookup: "+job.Args.CustomerLookupError)
+		// A lookup that failed did not establish that no customer exists, so
+		// this must not read as "going live would create one".
+		preview.WouldCreateCustomer = false
+	}
+	if existing, err := w.qb.FindInvoiceByDocNumber(ctx, docNumber); err != nil {
+		lookupErrs = append(lookupErrs, "invoice lookup: "+err.Error())
+	} else if existing != nil {
+		id := existing.ID
+		preview.ExistingQBInvoiceID = &id
+	}
+	// FindTerm, not FindOrCreateTerm — a shadow run must not write a Term into
+	// the merchant's books. An absent Term is reported as none rather than
+	// created, and going live creates it on the first real invoice.
+	if termID, err := w.qb.FindTerm(ctx, termsDays); err != nil {
+		lookupErrs = append(lookupErrs, "term lookup: "+err.Error())
+	} else if termID != "" {
+		preview.TermID = &termID
+	}
+	if len(lookupErrs) > 0 {
+		joined := strings.Join(lookupErrs, "; ")
+		preview.LookupError = &joined
+	}
+
+	return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
+		if txErr := w.previews.Upsert(ctx, tx, preview); txErr != nil {
+			return txErr
+		}
+		return w.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    domain.AuditActorTypeSystem,
+			ActorName:    "qb_create_invoice",
+			Action:       audit.AuditQBInvoicePreviewed,
+			ResourceType: "order",
+			ResourceID:   order.ID,
+			Metadata: map[string]any{
+				"qb_doc_number":         docNumber,
+				"net_terms_days":        termsDays,
+				"total_cents":           order.Total,
+				"would_create_customer": preview.WouldCreateCustomer,
+				"river_job_id":          job.ID,
 			},
 		})
 	})

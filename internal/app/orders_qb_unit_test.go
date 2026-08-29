@@ -2,8 +2,10 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dukerupert/hiri/internal/domain"
 )
@@ -18,7 +20,9 @@ func TestEffectivePaymentTermsDays(t *testing.T) {
 	}{
 		{"nil customer defaults to net-7", nil, 7},
 		{"unset terms default to net-7", &domain.Customer{}, 7},
-		{"zero terms default to net-7", &domain.Customer{PaymentTermsDays: days(0)}, 7},
+		// Zero is "due on receipt", a selectable terms value since 2026-08-29,
+		// and must survive rather than fall back to the house default.
+		{"zero terms mean due on receipt", &domain.Customer{PaymentTermsDays: days(0)}, 0},
 		{"negative terms default to net-7", &domain.Customer{PaymentTermsDays: days(-3)}, 7},
 		{"explicit net-14 wins", &domain.Customer{PaymentTermsDays: days(14)}, 14},
 		{"explicit net-30 wins", &domain.Customer{PaymentTermsDays: days(30)}, 30},
@@ -53,4 +57,51 @@ func TestOverdueReminderStageFor(t *testing.T) {
 			assert.Equal(t, tt.want, overdueReminderStageFor(tt.daysPastDue))
 		})
 	}
+}
+
+func TestInvoicePastDue(t *testing.T) {
+	// QB hands back a calendar date, which parses to midnight UTC.
+	due := time.Date(2026, 8, 29, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name string
+		now  time.Time
+		want bool
+	}{
+		{"day before", due.Add(-1 * time.Hour), false},
+		// The case that matters for due-on-receipt: the invoice is issued and
+		// reconciled on its own due date and must not be chased the same day.
+		{"first instant of the due date", due, false},
+		{"during the due date", due.Add(13 * time.Hour), false},
+		{"last instant of the due date", due.Add(24*time.Hour - time.Nanosecond), false},
+		{"start of the next day", due.AddDate(0, 0, 1), true},
+		{"a week later", due.AddDate(0, 0, 7), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, invoicePastDue(due, tt.now, time.UTC))
+		})
+	}
+}
+
+func TestInvoicePastDueUsesTheMerchantsDay(t *testing.T) {
+	la, err := time.LoadLocation("America/Los_Angeles")
+	require.NoError(t, err)
+	due := time.Date(2026, 8, 29, 0, 0, 0, 0, time.UTC)
+
+	// 17:00 UTC on the due date is 10:00 in Los Angeles — still the morning of
+	// the day the invoice falls due. Comparing against the next UTC day would
+	// call that overdue and fire the first past-due chase, which for
+	// due-on-receipt terms means billing and chasing on the same morning.
+	sameMorningLocal := time.Date(2026, 8, 29, 17, 0, 0, 0, time.UTC)
+	assert.False(t, invoicePastDue(due, sameMorningLocal, la),
+		"an invoice must not be overdue while it is still its due date where the shop is")
+
+	// Late evening local, still the due date.
+	assert.False(t, invoicePastDue(due, time.Date(2026, 8, 30, 6, 59, 0, 0, time.UTC), la))
+
+	// Midnight in Los Angeles is 07:00 UTC the following day.
+	assert.True(t, invoicePastDue(due, time.Date(2026, 8, 30, 7, 0, 0, 0, time.UTC), la),
+		"once the shop's day rolls over, the due date has passed")
 }

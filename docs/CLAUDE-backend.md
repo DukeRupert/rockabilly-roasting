@@ -331,6 +331,7 @@ Non-obvious decisions and constraints that aren't visible from the code alone. M
 - **Declined wholesale applications are not deleted** — status stays `pending` so admin can revisit.
 - **Product visibility has three levels: public / wholesale / restricted.** A restricted product with no group assignments is invisible to non-staff — useful for prepping items for a not-yet-onboarded wholesale client.
 - **Standing orders (B2B recurring) use the same Order+PaymentIntent pattern as retail subscriptions.** No separate billing engine.
+- **QuickBooks invoicing is per order, not a weekly consolidated invoice per customer** (decided 2026-08-29). A consolidated bill was the original description, and it is what a customer receiving four deliveries a week would rather open. It was rejected on reconciliation: per-order means the QB DocNumber *is* the Hiri order number, so an invoice, a payment and an order line up one-to-one, and anything that needs chasing in QuickBooks traces back to a single order rather than to a bundle somebody has to decompose first. It is also what makes the adopt-by-DocNumber idempotency probe possible at all. The weekly roll-up a customer wants is available without rebuilding any of this: QBO Statements group a customer's open invoices into one document. Revisit only if the volume of invoices per customer becomes the complaint — consolidation is a rework of the job chain, not a setting.
 
 ### Tax
 

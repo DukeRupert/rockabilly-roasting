@@ -3,7 +3,10 @@ package quickbooks
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -13,6 +16,12 @@ type qbInvoiceRequest struct {
 	DocNumber   string          `json:"DocNumber,omitempty"`
 	DueDate     string          `json:"DueDate"` // YYYY-MM-DD
 	Line        []qbInvoiceLine `json:"Line"`
+	// Omitted when empty so a customer with no email still yields a valid
+	// invoice; only the send step fails, and that already alerts staff.
+	BillEmail *qbEmailAddr `json:"BillEmail,omitempty"`
+	// Omitted when unset so an invoice is still created if the Term lookup
+	// could not be resolved.
+	SalesTermRef *qbRef `json:"SalesTermRef,omitempty"`
 	// Payment flags are always sent explicitly — an omitempty here would drop
 	// `false` and let the QBO company default re-enable the pay button the
 	// caller meant to turn off.
@@ -24,11 +33,15 @@ type qbRef struct {
 	Value string `json:"value"`
 }
 
+type qbEmailAddr struct {
+	Address string `json:"Address"`
+}
+
 type qbInvoiceLine struct {
-	DetailType          string               `json:"DetailType"`
-	Amount              float64              `json:"Amount"`
-	Description         string               `json:"Description,omitempty"`
-	SalesItemLineDetail *qbSalesItemDetail   `json:"SalesItemLineDetail,omitempty"`
+	DetailType          string             `json:"DetailType"`
+	Amount              float64            `json:"Amount"`
+	Description         string             `json:"Description,omitempty"`
+	SalesItemLineDetail *qbSalesItemDetail `json:"SalesItemLineDetail,omitempty"`
 }
 
 type qbSalesItemDetail struct {
@@ -126,8 +139,27 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 		AllowOnlineACHPayment:        p.AllowOnlineACHPayment,
 		AllowOnlineCreditCardPayment: p.AllowOnlineCreditCardPayment,
 	}
+	if p.BillEmail != "" {
+		body.BillEmail = &qbEmailAddr{Address: p.BillEmail}
+	}
+	if p.TermID != "" {
+		body.SalesTermRef = &qbRef{Value: p.TermID}
+	}
 
 	respBody, err := c.doAPI(ctx, "POST", "/invoice", body)
+	if err != nil && p.TermID != "" && isStaleTermRefError(err) {
+		// The Term reference is the one part of this request that can go stale
+		// without anything local changing: deleted or deactivated in QBO after
+		// we cached its ID. QBO answers 400, which IsRetryable calls permanent,
+		// so the invoice job would cancel and alert — turning a presentational
+		// label into a billing outage. Drop the cached ID and bill without the
+		// terms label rather than not billing at all. If the 400 was about
+		// something else the retry fails the same way and that error is
+		// returned.
+		c.terms.forget(p.TermID)
+		body.SalesTermRef = nil
+		respBody, err = c.doAPI(ctx, "POST", "/invoice", body)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("create QB invoice: %w", err)
 	}
@@ -139,6 +171,35 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 
 	return invoiceFromResponse(resp), nil
 }
+
+// isStaleTermRefError reports whether a rejected invoice looks like it was
+// rejected because of its Term reference.
+//
+// Narrower than "any 400" on purpose. QBO also answers 400 for unrelated
+// conditions — a duplicate DocNumber being the common one — and retrying those
+// without the Term evicts a perfectly good cached Term ID, repeats a request
+// that fails identically, and leaves every later invoice in the process paying
+// for an extra Term lookup.
+func isStaleTermRefError(err error) bool {
+	if !errors.Is(err, ErrBadRequest) {
+		return false
+	}
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	// Whole words only. A bare substring match also fires on "determined",
+	// which QBO uses in unrelated fault details — and a false positive here
+	// evicts a good cached Term and bills without the label this exists to
+	// add. In production the fault text arrives in Detail; Message is just
+	// http.StatusText(400).
+	haystack := strings.ToLower(apiErr.Message + " " + apiErr.Detail)
+	return termWordRe.MatchString(haystack)
+}
+
+// termWordRe matches a whole word "term" or "terms", or QBO's SalesTermRef
+// field name.
+var termWordRe = regexp.MustCompile(`\bterms?\b|salestermref`)
 
 // qbInvoiceQueryResponse is the response shape for invoice queries.
 type qbInvoiceQueryResponse struct {

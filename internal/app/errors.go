@@ -144,6 +144,18 @@ var (
 	// Tax errors
 	ErrTaxCalculationFailed = errors.New("tax calculation failed")
 	ErrInvalidTaxConfig     = errors.New("invalid tax configuration")
+	// ErrInvalidQBBillingMode guards the one setting that decides whether real
+	// customers get billed; an unrecognised value must be refused rather than
+	// coerced.
+	ErrInvalidQBBillingMode = errors.New("invalid quickbooks billing mode")
+	// ErrQBBillingNotLive refuses to bill while the shop is in test mode. Test
+	// mode's only promise is that nothing bills; an exception would void it.
+	ErrQBBillingNotLive = errors.New("quickbooks billing is in test mode")
+	// ErrQBOrderAlreadyInvoiced stops an order being billed twice.
+	ErrQBOrderAlreadyInvoiced = errors.New("order already has a quickbooks invoice")
+	// ErrQBOrderNotBillable covers an order with no customer or one that is
+	// not a wholesale order.
+	ErrQBOrderNotBillable = errors.New("order cannot be invoiced through quickbooks")
 
 	// Shipping errors
 	ErrShipmentNotFound      = errors.New("shipment not found")

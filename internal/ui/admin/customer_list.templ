@@ -530,7 +530,7 @@ templ wholesaleCustomerRow(props CustomerListProps, c domain.Customer) {
 		</td>
 		<td class="hidden whitespace-nowrap px-3 py-4 text-sm text-rr-muted xl:table-cell">
 			if c.PaymentTermsDays != nil {
-				{ fmt.Sprintf("Net %d", *c.PaymentTermsDays) }
+				{ domain.PaymentTermsLabel(*c.PaymentTermsDays) }
 			} else {
 				<span class="text-rr-border">&mdash;</span>
 			}

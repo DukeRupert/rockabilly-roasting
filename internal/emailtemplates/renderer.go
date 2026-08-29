@@ -163,6 +163,44 @@ type QBInvoiceAlertData struct {
 	StoreName   string
 }
 
+// QBShadowDigestInvoice is one would-be invoice in the shadow billing digest.
+//
+// Money stays in cents and dates stay as times: the templates have `cents` and
+// `date` for exactly this, and preformatting here would put currency and
+// locale decisions in the wrong layer.
+type QBShadowDigestInvoice struct {
+	OrderNumber string
+	Customer    string
+	TotalCents  int
+	Terms       string // "Net 7" / "Due on receipt"
+	DueDate     time.Time
+	BillEmail   string
+	URL         string // admin order detail page
+	// Problem is empty on a clean row and otherwise says, in one phrase, what
+	// a human needs to resolve before going live.
+	Problem string
+}
+
+// QBShadowDigestData is the weekly summary of what QuickBooks billing would
+// have done, sent while the shop is in shadow mode.
+//
+// The digest exists because a proof period nobody looks at proves nothing. It
+// leads with the rows needing attention rather than the total: an account that
+// would silently fail to match in QBO is the finding, and the money is the
+// context.
+//
+// Total is the full count and may exceed len(Invoices), which is capped. The
+// template says so rather than letting the list imply it is everything.
+type QBShadowDigestData struct {
+	Invoices      []QBShadowDigestInvoice
+	Total         int
+	TotalAmtCents int
+	Attention     int // how many rows need a human before going live
+	Days          int // length of the window this covers
+	ReviewURL     string
+	StoreName     string
+}
+
 // ServiceStaleDigestTicket is one line of the stale-ticket digest.
 //
 // QuietDays is precomputed rather than passed as a timestamp: the template

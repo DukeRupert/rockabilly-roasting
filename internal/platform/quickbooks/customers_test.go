@@ -45,12 +45,13 @@ func TestEscapeQBQuery(t *testing.T) {
 		want  string
 	}{
 		{"no special chars", "Acme Corp", "Acme Corp"},
-		{"single quote", "O'Brien", "O''Brien"},
-		{"multiple single quotes", "it's a 'test'", "it''s a ''test''"},
-		{"backslash unchanged", `back\slash`, `back\slash`},
+		{"single quote", "O'Brien", `O\'Brien`},
+		{"multiple single quotes", "it's a 'test'", `it\'s a \'test\'`},
+		{"backslash escaped", `back\slash`, `back\\slash`},
+		{"backslash before quote", `back\'s`, `back\\\'s`},
 		{"empty string", "", ""},
-		{"only quotes", "'''", "''''''"},
-		{"injection attempt", "' OR 1=1 --", "'' OR 1=1 --"},
+		{"only quotes", "'''", `\'\'\'`},
+		{"injection attempt", "' OR 1=1 --", `\' OR 1=1 --`},
 	}
 
 	for _, tt := range tests {

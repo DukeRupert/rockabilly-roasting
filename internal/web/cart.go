@@ -211,7 +211,7 @@ func (d *Deps) handleCartView(w http.ResponseWriter, r *http.Request) {
 		FreeShippingHint: freeShippingHint(shippingConfig, subtotal),
 	}
 	if IsHTMX(r) {
-		storefront.CartContent(props).Render(ctx, w) //nolint:errcheck
+		storefront.CartContent(props).Render(ctx, w)   //nolint:errcheck
 		storefront.CartBadge(cartCount).Render(ctx, w) //nolint:errcheck
 		return
 	}

@@ -87,11 +87,11 @@ type CustomerFilter struct {
 	EmailVerified   *bool
 	// PriceListID scopes the list to the customers assigned to one price list —
 	// the "who is on this list" question the price list detail page asks.
-	PriceListID     *uuid.UUID
-	Search          string // ILIKE on name, email, or company name
-	Sort            CustomerSort
-	Limit           int
-	Offset          int
+	PriceListID *uuid.UUID
+	Search      string // ILIKE on name, email, or company name
+	Sort        CustomerSort
+	Limit       int
+	Offset      int
 }
 
 // customerColumns is the select list shared by every query that scans into a

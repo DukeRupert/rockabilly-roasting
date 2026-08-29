@@ -34,11 +34,11 @@ const (
 type PaymentStatus string
 
 const (
-	PaymentStatusAwaiting   PaymentStatus = "awaiting"
-	PaymentStatusAuthorized PaymentStatus = "authorized"
-	PaymentStatusCaptured   PaymentStatus = "captured"
-	PaymentStatusPartial    PaymentStatus = "partial"
-	PaymentStatusRefunded   PaymentStatus = "refunded"
+	PaymentStatusAwaiting       PaymentStatus = "awaiting"
+	PaymentStatusAuthorized     PaymentStatus = "authorized"
+	PaymentStatusCaptured       PaymentStatus = "captured"
+	PaymentStatusPartial        PaymentStatus = "partial"
+	PaymentStatusRefunded       PaymentStatus = "refunded"
 	PaymentStatusFailed         PaymentStatus = "failed"
 	PaymentStatusVoided         PaymentStatus = "voided"
 	PaymentStatusPendingInvoice PaymentStatus = "pending_invoice"
@@ -102,32 +102,32 @@ type CartItem struct {
 
 // Order represents a placed order.
 type Order struct {
-	ID                uuid.UUID
-	Number            string
-	CustomerID        *uuid.UUID
-	Channel           OrderChannel
-	Status            OrderStatus
-	PaymentStatus     PaymentStatus
-	FulfillmentStatus FulfillmentStatus
-	CurrencyCode      string
-	Subtotal          int
-	DiscountTotal     int
-	ShippingTotal     int
-	TaxTotal          int
-	Total             int
-	ShippingAddressID uuid.UUID
-	BillingAddressID  uuid.UUID
-	SubscriptionID    *uuid.UUID
-	DraftByUserID     *uuid.UUID
-	TaxExempt         bool
-	TaxExemptReason   *string
-	StripeTaxID            *string
-	StripePaymentIntentID  *string
-	QBInvoiceID            *string
-	QBInvoiceNo            *string
-	QBSyncedAt             *time.Time
-	ShippingMethod         *ShippingMethod
-	RequestedDeliveryDate  *time.Time
+	ID                    uuid.UUID
+	Number                string
+	CustomerID            *uuid.UUID
+	Channel               OrderChannel
+	Status                OrderStatus
+	PaymentStatus         PaymentStatus
+	FulfillmentStatus     FulfillmentStatus
+	CurrencyCode          string
+	Subtotal              int
+	DiscountTotal         int
+	ShippingTotal         int
+	TaxTotal              int
+	Total                 int
+	ShippingAddressID     uuid.UUID
+	BillingAddressID      uuid.UUID
+	SubscriptionID        *uuid.UUID
+	DraftByUserID         *uuid.UUID
+	TaxExempt             bool
+	TaxExemptReason       *string
+	StripeTaxID           *string
+	StripePaymentIntentID *string
+	QBInvoiceID           *string
+	QBInvoiceNo           *string
+	QBSyncedAt            *time.Time
+	ShippingMethod        *ShippingMethod
+	RequestedDeliveryDate *time.Time
 	// ScheduledDeliveryDate is the local-delivery run this order was promised
 	// to when it was placed, resolved against the delivery weekdays and cutoff
 	// in ShippingConfig. Nil for every other fulfillment method, and for local
@@ -136,20 +136,20 @@ type Order struct {
 	// It is frozen at placement rather than recomputed on read: it is a promise
 	// already sent in the confirmation email, so changing the route in admin
 	// settings must not silently rewrite what a customer was told.
-	ScheduledDeliveryDate  *time.Time
-	CustomerPONumber       *string
-	InternalNote           *string
-	Notes                  *string
+	ScheduledDeliveryDate *time.Time
+	CustomerPONumber      *string
+	InternalNote          *string
+	Notes                 *string
 	// OverdueReminderStage is the highest past-due reminder milestone (in days
 	// since PlacedAt) already notified for this order's QB invoice. It is the
 	// dedup ledger for the reconciliation poll so each milestone (7/14/21/30)
 	// emails exactly once. Only populated by the QB-path order reads
 	// (GetOrderByQBInvoiceID*, ListWholesaleOpenInvoiceOrders); zero elsewhere.
-	OverdueReminderStage   int
-	Metadata               map[string]any
-	PlacedAt          time.Time
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	OverdueReminderStage int
+	Metadata             map[string]any
+	PlacedAt             time.Time
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
 }
 
 // LineItem represents a single line in an order.

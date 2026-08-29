@@ -730,3 +730,55 @@ func TestRender_ServiceStaleDigest_SingularDay(t *testing.T) {
 	assert.NotContains(t, html, "DOWN")
 	assert.NotContains(t, text, "[DOWN]")
 }
+
+func TestQBShadowDigestRenders(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	due := time.Date(2026, 9, 5, 0, 0, 0, 0, time.UTC)
+	data := QBShadowDigestData{
+		Invoices: []QBShadowDigestInvoice{
+			{OrderNumber: "WO-1", Customer: "Blue Heron Cafe", TotalCents: 7200,
+				Terms: "Net 7", DueDate: due, BillEmail: "buyer@example.test", URL: "https://x/admin/orders/1"},
+			{OrderNumber: "WO-2", Customer: "Roadside Diner", TotalCents: 19900,
+				Terms: "Due on receipt", DueDate: due, URL: "https://x/admin/orders/2",
+				Problem: "No matching QuickBooks customer."},
+		},
+		// Total exceeds the listed rows, exercising the truncation branch.
+		Total: 5, TotalAmtCents: 41800, Attention: 1, Days: 7,
+		ReviewURL: "https://x/admin/settings/integrations/quickbooks/preview",
+		StoreName: "Rockabilly Roasting Co.",
+	}
+
+	html, text, err := r.Render("qb_shadow_digest", data)
+	require.NoError(t, err)
+
+	for _, body := range []string{html, text} {
+		assert.Contains(t, body, "WO-1")
+		assert.Contains(t, body, "$72.00", "money is formatted by the cents helper")
+		assert.Contains(t, body, "No matching QuickBooks customer.")
+		assert.Contains(t, body, "Showing 2 of 5", "a capped list must say it is capped")
+		assert.NotContains(t, body, "{{", "no unrendered template directives")
+	}
+	// The digest must never read as if anything was billed.
+	assert.Contains(t, text, "Nothing below was billed")
+}
+
+func TestQBShadowDigestSingularInvoice(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	html, text, err := r.Render("qb_shadow_digest", QBShadowDigestData{
+		Invoices: []QBShadowDigestInvoice{
+			{OrderNumber: "WO-9", Customer: "One Shop", TotalCents: 500,
+				Terms: "Net 7", DueDate: time.Now(), URL: "https://x"},
+		},
+		Total: 1, TotalAmtCents: 500, Days: 7, ReviewURL: "https://x", StoreName: "Rockabilly",
+	})
+	require.NoError(t, err)
+	for _, body := range []string{html, text} {
+		assert.Contains(t, body, "One invoice")
+		assert.Contains(t, body, "Nothing needs attention")
+		assert.NotContains(t, body, "Showing 1 of 1", "an untruncated list must not claim to be truncated")
+	}
+}

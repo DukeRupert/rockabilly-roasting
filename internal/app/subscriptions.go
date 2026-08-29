@@ -596,6 +596,18 @@ func (s *SubscriptionService) ResumeSubscription(ctx context.Context, tx pgx.Tx,
 	now := time.Now()
 	periodEnd := nextPeriodEnd(now, plan.Interval, plan.IntervalCount)
 
+	// Clear the end date BEFORE the status flip, not after. A resumed
+	// subscription must not keep one — the renewal scheduler reads ends_at, not
+	// the badge, so a survivor here makes a subscription that looks perfectly
+	// healthy and can never bill. The ordering is load-bearing: migration 075
+	// forbids a live status alongside ends_at, and a CHECK constraint is
+	// evaluated per statement, so flipping to active first would violate it
+	// mid-transaction.
+	if err := s.subscriptions.ClearEndsAt(ctx, tx, id); err != nil {
+		return nil, fmt.Errorf("clear ends_at on resume: %w", err)
+	}
+	sub.EndsAt = nil
+
 	sub, err = s.subscriptions.UpdateStatus(ctx, tx, id, domain.SubscriptionStatusActive)
 	if err != nil {
 		return nil, fmt.Errorf("resume subscription status: %w", err)

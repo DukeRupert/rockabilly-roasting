@@ -164,8 +164,13 @@ templ SubscriptionShowContent(props SubscriptionShowProps) {
 		</div>
 	}
 	<!-- An expired subscription said so in its badge but never said when it
-	     ran out. EndsAt is set by the expiry sweep and was displayed nowhere. -->
-	if props.Subscription.EndsAt != nil {
+	     ran out. EndsAt is set by the expiry sweep and was displayed nowhere.
+	     The quiet version below is right for a subscription whose status agrees
+	     it has ended; when the status still says "Active" the same date means
+	     something far worse, so that case gets its own banner. -->
+	if props.Subscription.RenewalBlocked(time.Now()) {
+		@renewalBlockedBanner(props)
+	} else if props.Subscription.EndsAt != nil {
 		<div class="mt-6 border border-rr-border bg-rr-raised p-4">
 			<p class="text-sm text-rr-heading">
 				<span class="font-semibold">Ended</span>
@@ -737,4 +742,26 @@ func dunningStatusLine(sub *domain.Subscription, tz *time.Location) string {
 			"The customer needs to put a different card on file. Nothing is sent on " + next + " — the next reminder comes after that."
 	}
 	return "Next charge attempt runs " + next + "."
+}
+
+// renewalBlockedBanner is shown when a subscription's status says it is live but
+// its ends_at says it is over.
+//
+// The renewal scheduler believes ends_at, so this customer is not being billed
+// and no error is raised anywhere — the failure is pure silence. Three accounts
+// sat like this for months while their pages showed an Active badge and an
+// unremarkable "Ended on" line, which is precisely why this says what the
+// consequence is rather than only what the data is.
+templ renewalBlockedBanner(props SubscriptionShowProps) {
+	<div class="mt-6 badge-red rounded-sm p-4">
+		<p class="text-sm font-semibold">Not renewing — this subscription will never be billed again</p>
+		<p class="mt-1 text-sm">
+			It is marked <span class="font-semibold">{ string(props.Subscription.Status) }</span>, but it carries an end date of
+			<span class="font-semibold">{ props.Subscription.EndsAt.In(props.MerchantTZ).Format("January 2, 2006 at 3:04 PM") }</span>.
+			The renewal scheduler skips any subscription whose end date has passed, so no charge will be attempted and no error will be reported.
+		</p>
+		<p class="mt-1 text-sm text-rr-muted">
+			Either the end date is wrong and needs clearing, or the status is wrong and this should be cancelled. It cannot be both.
+		</p>
+	</div>
 }

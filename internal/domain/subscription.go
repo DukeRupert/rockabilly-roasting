@@ -43,23 +43,53 @@ type SubscriptionPlan struct {
 
 // Subscription represents an active customer subscription.
 type Subscription struct {
-	ID                 uuid.UUID
-	CustomerID         uuid.UUID
-	PlanID             uuid.UUID
-	VariantID          uuid.UUID
-	Quantity           int
-	Status             SubscriptionStatus
-	ShippingAddressID      uuid.UUID
-	StripePaymentMethodID  *string
-	CurrentPeriodStart time.Time
-	CurrentPeriodEnd   time.Time
-	NextOrderAt        time.Time
-	EndsAt             *time.Time
-	CancelledAt        *time.Time
-	PauseUntil         *time.Time
-	Metadata           map[string]any
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                    uuid.UUID
+	CustomerID            uuid.UUID
+	PlanID                uuid.UUID
+	VariantID             uuid.UUID
+	Quantity              int
+	Status                SubscriptionStatus
+	ShippingAddressID     uuid.UUID
+	StripePaymentMethodID *string
+	CurrentPeriodStart    time.Time
+	CurrentPeriodEnd      time.Time
+	NextOrderAt           time.Time
+	EndsAt                *time.Time
+	CancelledAt           *time.Time
+	PauseUntil            *time.Time
+	Metadata              map[string]any
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+// RenewalBlocked reports whether this subscription looks live but can never be
+// picked up by the renewal scheduler.
+//
+// The scheduler selects on three clauses (ListSubscriptionsDueForRenewal):
+// status, next_order_at, and `ends_at IS NULL OR ends_at > now()`. The first
+// two are visible everywhere — status is a badge, next_order_at is a date on
+// the page. The third is not, so a subscription carrying a past ends_at while
+// still active passes for healthy and silently stops billing. That is exactly
+// how three customers went unbilled for months: the admin page said "Active",
+// showed a date, and nothing anywhere said the two contradicted each other.
+//
+// This is the contradiction, named once so the admin banner and the alerting
+// gauge cannot disagree about what counts. It is deliberately not "ends_at is
+// set" — a fixed-term subscription with an end date still in the future is a
+// legitimate thing that renews until it gets there.
+func (s Subscription) RenewalBlocked(now time.Time) bool {
+	if !s.Status.CountsAsLive() {
+		return false
+	}
+	return s.EndsAt != nil && !s.EndsAt.After(now)
+}
+
+// CountsAsLive reports whether the renewal scheduler would consider this status
+// for billing at all. Mirrors the status clause of
+// ListSubscriptionsDueForRenewal — kept beside RenewalBlocked so the two read
+// against the same query.
+func (s SubscriptionStatus) CountsAsLive() bool {
+	return s == SubscriptionStatusActive || s == SubscriptionStatusPastDue
 }
 
 // SubscriptionMaxSkipIntervals caps how many upcoming shipments a subscriber

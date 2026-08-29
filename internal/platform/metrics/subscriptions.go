@@ -22,6 +22,7 @@ func CollectSubscriptionMetrics(ctx context.Context, reg *Registry, pool *pgxpoo
 				return
 			case <-ticker.C:
 				collectSubscriptionCounts(ctx, reg, pool)
+				collectRenewalBlocked(ctx, reg, pool)
 			}
 		}
 	}()
@@ -62,4 +63,33 @@ func collectSubscriptionCounts(ctx context.Context, reg *Registry, pool *pgxpool
 			reg.SubscriptionsCancelled.Set(float64(count))
 		}
 	}
+}
+
+// collectRenewalBlocked counts subscriptions that look live but carry a past
+// ends_at, so ListSubscriptionsDueForRenewal can never select them.
+//
+// The predicate is the scheduler's own third clause, inverted. It is repeated
+// here as SQL rather than filtered in Go because the whole point is to catch
+// rows the application never loads — a blocked subscription is, by definition,
+// one no code path is looking at.
+//
+// A non-zero value means somebody is being silently not-billed. It stayed at
+// three for months with nobody aware, which is why this is a gauge and not a
+// log line.
+func collectRenewalBlocked(ctx context.Context, reg *Registry, pool *pgxpool.Pool) {
+	var count int64
+	err := pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM subscriptions
+		WHERE status IN ('active', 'past_due')
+		  AND ends_at IS NOT NULL
+		  AND ends_at <= now()
+	`).Scan(&count)
+	if err != nil {
+		// Deliberately not zeroed on error: a gauge that drops to zero because
+		// the query failed reads as "all clear", which is the one wrong answer.
+		slog.Error("subscription metrics: query renewal-blocked", "error", err)
+		return
+	}
+	reg.SubscriptionsRenewalBlocked.Set(float64(count))
 }

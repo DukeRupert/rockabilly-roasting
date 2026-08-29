@@ -473,6 +473,26 @@ func (s *SubscriptionStore) UpdatePlan(ctx context.Context, tx pgx.Tx, id, planI
 	return subscriptionFromRow(row), nil
 }
 
+// ClearEndsAt removes a subscription's end date.
+//
+// The counterpart ExpireForDunning has existed since June; this did not, which
+// meant a subscription could be put beyond the renewal scheduler's reach by the
+// application but never brought back by it. The only way out was manual SQL,
+// and manual SQL is how three subscriptions ended up live-but-unbillable with
+// no audit trail. Anything that returns a subscription to a billing status must
+// call this.
+func (s *SubscriptionStore) ClearEndsAt(ctx context.Context, tx pgx.Tx, id uuid.UUID) (err error) {
+	defer trackQuery(s.metrics, "subscriptions.clear_ends_at", time.Now(), &err)
+	_, err = tx.Exec(ctx,
+		`UPDATE subscriptions SET ends_at = NULL, updated_at = now() WHERE id = $1`,
+		id,
+	)
+	if err != nil {
+		return fmt.Errorf("clear ends_at: %w", err)
+	}
+	return nil
+}
+
 // UpdatePauseUntil sets or clears the pause_until date.
 func (s *SubscriptionStore) UpdatePauseUntil(ctx context.Context, tx pgx.Tx, id uuid.UUID, pauseUntil *time.Time) (err error) {
 	defer trackQuery(s.metrics, "subscriptions.update_pause_until", time.Now(), &err)

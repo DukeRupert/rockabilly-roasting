@@ -141,6 +141,29 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 				OrderID:             job.Args.OrderID,
 				QBCustomerID:        qbID,
 				CustomerLookupError: lookupErr,
+				StaffRequested:      job.Args.StaffRequested,
+			}, nil)
+			return txErr
+		})
+	}
+
+	// An account nothing invoices automatically gets nothing written to
+	// QuickBooks either — not a customer record, not a sync. The commit that
+	// added the billing gate promised these accounts were left alone, and
+	// creating a customer for one is still a write to the merchant's books on
+	// behalf of an order that was never going to be billed. The chain
+	// continues so the invoice job records the order on the review page;
+	// Bill now, which sets StaffRequested, is how a person overrides this.
+	if !customer.BillingMethod.AutoInvoiced() && !job.Args.StaffRequested {
+		qbID := ""
+		if customer.QBCustomerID != nil {
+			qbID = *customer.QBCustomerID
+		}
+		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
+			_, txErr := w.riverClient.InsertTx(ctx, tx, CreateQBInvoiceArgs{
+				OrderID:        job.Args.OrderID,
+				QBCustomerID:   qbID,
+				StaffRequested: job.Args.StaffRequested,
 			}, nil)
 			return txErr
 		})
@@ -223,8 +246,9 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 	// Chain to invoice creation
 	return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		_, txErr := w.riverClient.InsertTx(ctx, tx, CreateQBInvoiceArgs{
-			OrderID:      job.Args.OrderID,
-			QBCustomerID: *customer.QBCustomerID,
+			OrderID:        job.Args.OrderID,
+			QBCustomerID:   *customer.QBCustomerID,
+			StaffRequested: job.Args.StaffRequested,
 		}, nil)
 		return txErr
 	})

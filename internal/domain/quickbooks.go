@@ -95,13 +95,29 @@ type QBInvoicePreview struct {
 	// to bill".
 	LookupError *string
 
+	// AutoBilled is false when the account is on manual billing and nothing
+	// would have invoiced this order without a human. Such orders are still
+	// recorded: absent from the list, they would read as nothing to bill.
+	AutoBilled bool
+	// BillingMethod as it stood when the order was previewed, because "why
+	// was this one not billed" gets asked after the customer has changed.
+	BillingMethod BillingMethod
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
 
 // NeedsAttention reports whether this preview is something a human should look
 // at before going live, rather than a clean row.
+//
+// A manual account is not a problem — it is a decision already taken, and
+// flagging every one of them would bury the rows that genuinely need someone.
 func (p QBInvoicePreview) NeedsAttention() bool { return p.Problem() != "" }
+
+// AwaitingManualInvoice reports that this order will not be billed by anything
+// unless a person does it. Distinct from NeedsAttention: nothing is wrong, but
+// the money does not arrive on its own.
+func (p QBInvoicePreview) AwaitingManualInvoice() bool { return !p.AutoBilled }
 
 // Problem states, in one phrase, what has to be resolved about this would-be
 // invoice before billing goes live. Empty means the row is clean.
@@ -111,6 +127,12 @@ func (p QBInvoicePreview) NeedsAttention() bool { return p.Problem() != "" }
 // them to look and the screen they look at.
 func (p QBInvoicePreview) Problem() string {
 	switch {
+	// Deliberately first and deliberately empty-handed: an account nobody
+	// bills automatically has no billing problem. The other checks below ask
+	// whether an invoice would succeed, which is not a question about an
+	// invoice that is never going to be attempted.
+	case !p.AutoBilled:
+		return ""
 	case p.LookupError != nil:
 		return "QuickBooks lookup failed: " + *p.LookupError
 	case p.ExistingQBInvoiceID != nil:

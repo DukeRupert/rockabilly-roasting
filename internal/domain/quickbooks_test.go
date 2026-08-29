@@ -25,7 +25,7 @@ func TestQBBillingMode(t *testing.T) {
 func TestQBInvoicePreviewProblem(t *testing.T) {
 	str := func(s string) *string { return &s }
 
-	clean := QBInvoicePreview{DocNumber: "WO-1", BillEmail: "a@b.test", QBCustomerID: str("42")}
+	clean := QBInvoicePreview{DocNumber: "WO-1", BillEmail: "a@b.test", QBCustomerID: str("42"), AutoBilled: true}
 	if clean.Problem() != "" || clean.NeedsAttention() {
 		t.Errorf("a matched, addressable preview should be clean, got %q", clean.Problem())
 	}
@@ -40,18 +40,46 @@ func TestQBInvoicePreviewProblem(t *testing.T) {
 		t.Errorf("lookup failure should win, got %q", got)
 	}
 
-	unmatched := QBInvoicePreview{DocNumber: "WO-2", BillEmail: "a@b.test", WouldCreateCustomer: true}
+	unmatched := QBInvoicePreview{DocNumber: "WO-2", BillEmail: "a@b.test", WouldCreateCustomer: true, AutoBilled: true}
 	if !unmatched.NeedsAttention() {
 		t.Error("an unmatched customer must need attention")
 	}
 
-	noEmail := QBInvoicePreview{DocNumber: "WO-3", QBCustomerID: str("42")}
+	noEmail := QBInvoicePreview{DocNumber: "WO-3", QBCustomerID: str("42"), AutoBilled: true}
 	if !noEmail.NeedsAttention() {
 		t.Error("a preview with no bill-to address must need attention")
 	}
 
-	existing := QBInvoicePreview{DocNumber: "WO-4", BillEmail: "a@b.test", QBCustomerID: str("42"), ExistingQBInvoiceID: str("9")}
+	existing := QBInvoicePreview{DocNumber: "WO-4", BillEmail: "a@b.test", QBCustomerID: str("42"), ExistingQBInvoiceID: str("9"), AutoBilled: true}
 	if !existing.NeedsAttention() {
 		t.Error("an order QuickBooks already has an invoice for must need attention")
+	}
+}
+
+func TestManualAccountIsNotAProblem(t *testing.T) {
+	// An account nobody bills automatically has no billing problem — flagging
+	// every one of them would bury the rows that genuinely need someone.
+	manual := QBInvoicePreview{DocNumber: "WO-5", BillingMethod: BillingMethodManual}
+	if manual.Problem() != "" {
+		t.Errorf("manual billing is a decision, not a fault: got %q", manual.Problem())
+	}
+	if manual.NeedsAttention() {
+		t.Error("a manual account must not be flagged as needing attention")
+	}
+	if !manual.AwaitingManualInvoice() {
+		t.Error("but it is waiting for a person to invoice it")
+	}
+
+	// And the checks that ask "would this invoice succeed" must stay quiet
+	// about an invoice nothing is going to attempt.
+	manual.WouldCreateCustomer = true
+	manual.BillEmail = ""
+	if manual.Problem() != "" {
+		t.Errorf("no question about a never-attempted invoice: got %q", manual.Problem())
+	}
+
+	billed := QBInvoicePreview{DocNumber: "WO-6", AutoBilled: true, BillEmail: "a@b.test", QBCustomerID: func() *string { s := "1"; return &s }()}
+	if billed.AwaitingManualInvoice() {
+		t.Error("an automatically billed order is not waiting for anyone")
 	}
 }

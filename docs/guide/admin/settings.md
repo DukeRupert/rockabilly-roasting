@@ -71,7 +71,9 @@ Wholesale billing ships switched off, and a deploy never switches it on.
 
 While in test mode, a weekly digest of the same information is emailed to the staff notification address.
 
-**Go live** asks for confirmation and records who did it. From then on new wholesale orders are billed for real.
+**Go live** asks for confirmation and records who did it. From then on new wholesale orders are billed for real — but only for accounts whose **billing method** is ACH or Credit card. An account left on **Manual** is never invoiced automatically, in either mode, because manual means you have no invoicing agreement with them and raise their invoices by hand. Every wholesale account starts on Manual, so going live bills nobody until you start moving accounts across one at a time.
+
+Orders on manual accounts still appear in the review list, badged **Manual** and counted under *Invoice by hand*. They are not something to fix; they are the orders waiting for a person. **Bill now** on such a row is the deliberate way to have QuickBooks invoice one anyway.
 
 Going live does **not** bill orders recorded during test mode -- those were almost certainly invoiced by hand while the trial ran. To bill one deliberately, use **Bill now** on its row in the review list. Check first that it was not already invoiced by hand: the duplicate guard recognises invoices raised by this system, not ones typed into QuickBooks directly, so the customer could otherwise be billed twice.
 

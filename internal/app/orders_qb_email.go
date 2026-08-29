@@ -387,7 +387,11 @@ func (s *OrderService) SendQBShadowDigestEmail(ctx context.Context, pool *pgxpoo
 	// every install with QuickBooks connected, and a shop that does not run
 	// wholesale through it would otherwise receive an empty report forever —
 	// which trains staff to ignore the one that eventually matters.
-	if totals.Count == 0 {
+	//
+	// Both counts, not just the billable one. Count excludes accounts on
+	// manual billing, and every wholesale account starts manual — so testing
+	// Count alone would have gone quiet exactly when there was most to report.
+	if totals.Count == 0 && totals.AwaitingManual == 0 {
 		return nil
 	}
 
@@ -419,17 +423,20 @@ func (s *OrderService) SendQBShadowDigestEmail(ctx context.Context, pool *pgxpoo
 			BillEmail:   r.BillEmail,
 			URL:         s.email.BaseURL + "/admin/orders/" + r.OrderID.String(),
 			Problem:     r.Problem(),
+			Manual:      r.AwaitingManualInvoice(),
 		})
 	}
 
 	html, text, err := s.email.Renderer.Render("qb_shadow_digest", emailtemplates.QBShadowDigestData{
-		Invoices:      invoices,
-		Total:         totals.Count,
-		TotalAmtCents: totals.TotalCents,
-		Attention:     totals.NeedingAttention,
-		Days:          windowDays,
-		ReviewURL:     s.email.BaseURL + "/admin/settings/integrations/quickbooks/preview",
-		StoreName:     s.email.StoreName,
+		Invoices:       invoices,
+		Total:          totals.Count,
+		TotalAmtCents:  totals.TotalCents,
+		Attention:      totals.NeedingAttention,
+		AwaitingManual: totals.AwaitingManual,
+		Listed:         totals.Count + totals.AwaitingManual,
+		Days:           windowDays,
+		ReviewURL:      s.email.BaseURL + "/admin/settings/integrations/quickbooks/preview",
+		StoreName:      s.email.StoreName,
 	})
 	if err != nil {
 		s.metrics.EmailsSent.WithLabelValues("qb_shadow_digest", "failed").Inc()
@@ -437,8 +444,13 @@ func (s *OrderService) SendQBShadowDigestEmail(ctx context.Context, pool *pgxpoo
 	}
 
 	subject := fmt.Sprintf("QuickBooks test mode: %d would-be invoice(s) this week", totals.Count)
-	if totals.NeedingAttention > 0 {
+	switch {
+	case totals.NeedingAttention > 0:
 		subject = fmt.Sprintf("QuickBooks test mode: %d of %d need attention", totals.NeedingAttention, totals.Count)
+	case totals.Count == 0 && totals.AwaitingManual > 0:
+		// The all-manual shop, which is where every shop starts. Saying "0
+		// invoices" would read as nothing happening.
+		subject = fmt.Sprintf("QuickBooks test mode: %d order(s) to invoice by hand", totals.AwaitingManual)
 	}
 
 	if _, err := s.email.Mailer.Send(ctx, email.Message{

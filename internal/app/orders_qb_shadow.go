@@ -22,11 +22,12 @@ type QBPreviewRow struct {
 	CustomerName string
 }
 
-// QBShadowSummary is the review page's header: what a proof period has seen so
-// far.
+// QBShadowSummary is the review page's header: the orders invoicing did not
+// bill. A proof period's worth while the shop is in test mode, and afterwards
+// the accounts on manual billing.
 //
 // Count, TotalCents and Attention come from SQL over every row, while Rows is
-// capped — so the figures describe the whole proof period even when the list
+// capped — so the figures describe everything recorded even when the list
 // below them does not. Truncated says so, because a total that disagrees with
 // a visibly shorter list reads as a bug rather than as a page limit.
 type QBShadowSummary struct {
@@ -48,15 +49,16 @@ func (s *OrderService) QBBillingMode(ctx context.Context, tx pgx.Tx) (domain.QBB
 	return s.settings.GetQBBillingMode(ctx, tx)
 }
 
-// ListQBPreviews returns what shadow billing has recorded, newest first, with
-// the totals for the whole set.
+// ListQBPreviews returns the orders invoicing did not bill, newest first, with
+// the totals for the whole set. Not shadow mode's alone: a live shop still
+// records the accounts on manual billing.
 func (s *OrderService) ListQBPreviews(ctx context.Context, tx pgx.Tx, limit int) (QBShadowSummary, error) {
 	var out QBShadowSummary
 	if s.qbPreviews == nil {
 		return out, nil
 	}
-	// The zero time means "every preview", not a window: the page shows the
-	// whole proof period, unlike the digest which shows one week of it.
+	// The zero time means "every preview", not a window: the page shows
+	// everything recorded, unlike the digest which shows one week of it.
 	totals, err := s.qbPreviews.Totals(ctx, tx, time.Time{})
 	if err != nil {
 		return out, err

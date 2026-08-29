@@ -13,8 +13,9 @@ import (
 	"github.com/dukerupert/hiri/internal/domain"
 )
 
-// QBPreviewStore persists what the QuickBooks chain would have billed while
-// the shop is in shadow mode. See db/migrations/078_qb_billing_mode.sql.
+// QBPreviewStore persists the orders the QuickBooks chain did not bill: all of
+// them while the shop is in shadow mode, and afterwards the accounts on manual
+// billing. See db/migrations/078_qb_billing_mode.sql and 080.
 type QBPreviewStore struct{}
 
 // NewQBPreviewStore creates a new QBPreviewStore.

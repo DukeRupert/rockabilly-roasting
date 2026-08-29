@@ -768,7 +768,7 @@ func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 // still refusing to render an unbounded table.
 const qbPreviewPageSize = 200
 
-// qbPreviewPath is where every shadow-billing action returns to.
+// qbPreviewPath is where every action on the review list returns to.
 const qbPreviewPath = "/admin/settings/integrations/quickbooks/preview"
 
 // handleAdminQBItemsUpdate records which QuickBooks items invoices bill
@@ -866,8 +866,9 @@ func (d *Deps) resolveQBItems(ctx context.Context, salesID, shippingID string) (
 	return cfg, nil
 }
 
-// handleAdminQBPreview renders what QuickBooks billing would have done while
-// the shop is in shadow mode.
+// handleAdminQBPreview renders the orders invoicing did not bill: all of them
+// while the shop is in test mode, and afterwards the accounts on manual
+// billing.
 func (d *Deps) handleAdminQBPreview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

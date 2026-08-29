@@ -35,13 +35,14 @@ type OrderService struct {
 	// orderActions signs the switch-to-pickup link in order confirmations.
 	// Optional: without it the email offers the switch by reply instead.
 	orderActions *auth.OrderActionSigner
-	// qbPreviews backs the shadow-billing digest. Populated via
-	// WithQBPreviews; without it the digest job has nothing to summarise and
-	// says so rather than sending an empty report.
+	// qbPreviews holds the orders invoicing did not bill, read by the weekly
+	// digest and by the admin review list. Populated via WithQBPreviews;
+	// without it the digest has nothing to summarise and says so rather than
+	// sending an empty report.
 	qbPreviews *store.QBPreviewStore
-	// settings answers whether QuickBooks billing is live. Populated via
-	// WithQBPreviews alongside the previews, because the only reader of
-	// either is the shadow digest.
+	// settings answers whether QuickBooks billing is live, and which items
+	// invoices bill against. Populated via WithQBPreviews alongside the
+	// previews, because the digest is what first needed both.
 	settings *store.SettingsStore
 	// merchantTZ is the shop's local timezone, used to decide when an invoice
 	// date has actually passed. Nil falls back to UTC.
@@ -56,9 +57,10 @@ func (s *OrderService) WithMerchantTZ(loc *time.Location) *OrderService {
 	return s
 }
 
-// WithQBPreviews wires the store of would-be invoices recorded while
-// QuickBooks billing is in shadow mode, plus the settings the digest reads to
-// decide whether a proof period is still running.
+// WithQBPreviews wires the store of orders invoicing did not bill — all of
+// them in test mode, and afterwards the accounts on manual billing — plus the
+// settings the digest reads to decide whether a proof period is still
+// running.
 func (s *OrderService) WithQBPreviews(previews *store.QBPreviewStore, settings *store.SettingsStore) *OrderService {
 	s.qbPreviews = previews
 	s.settings = settings

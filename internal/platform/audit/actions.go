@@ -220,8 +220,9 @@ const (
 	AuditQBCustomerLinked  = "qb.customer_linked"
 	AuditQBCustomerSynced  = "qb.customer_synced"
 	AuditQBInvoiceCreated  = "qb.invoice_created"
-	// AuditQBInvoicePreviewed records an invoice shadow billing would have
-	// created. Kept in the audit log as well as qb_invoice_previews because
+	// AuditQBInvoicePreviewed records an invoice that was costed but not
+	// created — in shadow mode, and on a live run for an account on manual
+	// billing. Kept in the audit log as well as qb_invoice_previews because
 	// the previews table holds one row per order, refreshed in place, while
 	// the question after a proof period is often "what did it decide, and
 	// when".

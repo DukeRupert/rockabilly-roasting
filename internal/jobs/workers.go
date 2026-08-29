@@ -399,11 +399,19 @@ func (EnsureQBCustomerArgs) Kind() string { return "qb_ensure_customer" }
 type CreateQBInvoiceArgs struct {
 	OrderID      uuid.UUID `json:"order_id"`
 	QBCustomerID string    `json:"qb_customer_id"`
-	// CustomerLookupError carries a shadow-mode QBO customer lookup that
-	// failed, so the preview can say so. Shadow must still produce a row: an
-	// order absent from the review list reads as nothing to bill, which is the
-	// one conclusion a proof period must never invite. Empty in live mode,
-	// where a failed lookup fails the job instead.
+	// CustomerLookupError carries a QBO customer lookup that failed, so the
+	// preview can say so rather than the order vanishing: an order absent from
+	// the review list reads as nothing to bill, which is the one conclusion a
+	// proof period must never invite.
+	//
+	// Set only when such a lookup actually ran and failed, which happens on a
+	// run that looks without writing — not the same as "not live": a shadow
+	// run, and a live run for an account on manual billing, but not a live
+	// Bill now on that same account, because a person asking for it moves the
+	// chain onto the write path. Empty wherever the chain is going to invoice,
+	// since there a failed lookup fails the job instead of being carried
+	// forward, and empty whenever the customer was already linked and no
+	// lookup was needed.
 	CustomerLookupError string `json:"customer_lookup_error,omitempty"`
 	// StaffRequested carries the Bill now override down the chain: it is what
 	// lets a person invoice an account that nothing invoices on its own.

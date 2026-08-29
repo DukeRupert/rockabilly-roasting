@@ -7,8 +7,9 @@ import (
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
 
-// QBPreviewProps backs the shadow-billing review page: everything QuickBooks
-// billing would have done, had it been live.
+// QBPreviewProps backs the review page: every order invoicing did not bill.
+// In test mode that is all of them; once live it is the accounts on manual
+// billing, which is why the page keeps earning its place after go-live.
 type QBPreviewProps struct {
 	Nav        SettingsNav
 	Rows       []QBPreviewRow
@@ -50,9 +51,19 @@ func qbRowState(row QBPreviewRow) string {
 	return "Ready"
 }
 
+// qbPreviewTitle names the page for the mode it is being read in. A live shop
+// was previously told, in its browser tab and its heading, that it was looking
+// at test mode.
+func qbPreviewTitle(mode domain.QBBillingMode) string {
+	if mode.IsLive() {
+		return "Orders not invoiced"
+	}
+	return "QuickBooks test mode"
+}
+
 templ QBPreview(props QBPreviewProps) {
 	@layouts.Admin(layouts.AdminProps{
-		Title:      "QuickBooks test mode",
+		Title:      qbPreviewTitle(props.Mode),
 		ActivePath: "/admin/settings",
 		StaffName:  props.StaffName,
 		StaffRole:  props.StaffRole,
@@ -67,15 +78,17 @@ templ QBPreviewContent(props QBPreviewProps) {
 	// it the button is inert and nothing is ever billed.
 	@ConfirmDialogHost()
 	@settingsSection(props.Nav, settingsTabIntegrations)
-	<h1 class="admin-page-title">QuickBooks test mode</h1>
+	<h1 class="admin-page-title">{ qbPreviewTitle(props.Mode) }</h1>
 	@adminFlash(props.Flash)
 
 	<div class="mt-2 max-w-3xl">
 		if props.Mode.IsLive() {
 			<p class="text-sm text-rr-body">
-				Billing is <span class="badge badge-green">Live</span> — these are what test mode
-				recorded before you switched over. They were never billed, and going live did not
-				bill them retrospectively.
+				Billing is <span class="badge badge-green">Live</span>. Everything below was costed
+				but not billed — orders recorded before you switched over, which going live did not
+				bill retrospectively, and orders on accounts with no invoicing agreement, which
+				nothing bills automatically. Hiri has invoiced none of them; a row will say so if
+				QuickBooks already holds an invoice somebody raised by hand.
 			</p>
 		} else {
 			<p class="text-sm text-rr-body">

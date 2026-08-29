@@ -170,7 +170,16 @@ func (d *Deps) handleAdminEquipmentCreate(w http.ResponseWriter, r *http.Request
 
 	var created *domain.Equipment
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		var txErr error
+		// A site typed into the "somewhere else" fields becomes a real address on
+		// the customer, in this same transaction — so a machine is never filed at
+		// an address that failed to save, and the address never outlives a
+		// machine that did not.
+		siteID, txErr := d.resolveEquipmentSite(ctx, tx, r, customerID, params.AddressID, staffActor(r))
+		if txErr != nil {
+			return txErr
+		}
+		params.AddressID = siteID
+
 		created, txErr = d.EquipmentService.Register(ctx, tx, params, staffActor(r))
 		return txErr
 	}); err != nil {
@@ -214,7 +223,18 @@ func (d *Deps) handleAdminEquipmentUpdate(w http.ResponseWriter, r *http.Request
 
 	var updated *domain.Equipment
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		var txErr error
+		// The edit form knows its customer, so the same site rules apply: a
+		// picked address must belong to them, and a typed one is created.
+		existing, txErr := d.EquipmentService.GetByID(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		siteID, txErr := d.resolveEquipmentSite(ctx, tx, r, existing.CustomerID, params.AddressID, staffActor(r))
+		if txErr != nil {
+			return txErr
+		}
+		params.AddressID = siteID
+
 		updated, txErr = d.EquipmentService.Edit(ctx, tx, id, params, staffActor(r))
 		return txErr
 	}); err != nil {
@@ -449,6 +469,10 @@ func equipmentFormValues(r *http.Request) admin.EquipmentFormValues {
 // database fell over". The first re-renders the form; the second is a 500.
 func equipmentValidationMessage(err error) (string, bool) {
 	switch {
+	case errors.Is(err, app.ErrEquipmentSiteNotOnAccount):
+		return "That site is not on this customer's account. Pick one of theirs, or add a new one.", true
+	case errors.Is(err, app.ErrEquipmentSiteIncomplete):
+		return "A new site needs a street, city, state and ZIP.", true
 	case errors.Is(err, app.ErrEquipmentMakeRequired),
 		errors.Is(err, app.ErrInvalidEquipmentCategory),
 		errors.Is(err, app.ErrInvalidEquipmentOwnership):
@@ -490,4 +514,132 @@ func addressOneLine(a domain.Address) string {
 	}
 	parts = append(parts, fmt.Sprintf("%s, %s %s", a.City, a.State, a.PostalCode))
 	return strings.Join(parts, ", ")
+}
+
+// --- Site resolution ---
+
+// resolveEquipmentSite decides which address a machine sits at.
+//
+// Three cases. A blank site stays blank — plenty of single-shop customers have
+// nowhere else it could be, and "not recorded" is honest. An address picked off
+// the dropdown is checked to belong to this customer before it is used. And a
+// site typed into the "somewhere else" fields is created as a real address on
+// the customer and returned.
+//
+// The ownership check is the part that matters. address_id is a plain foreign
+// key to addresses with no constraint tying it to the machine's customer, and
+// the value arrives from a form field that anybody can edit — so without this,
+// a hand-altered request could file one cafe's machine at another cafe's
+// address. The picker being scoped is not a control; it is a convenience.
+func (d *Deps) resolveEquipmentSite(
+	ctx context.Context, tx pgx.Tx, r *http.Request,
+	customerID uuid.UUID, picked *uuid.UUID, actor app.Actor,
+) (*uuid.UUID, error) {
+	line1 := strings.TrimSpace(r.FormValue("new_site_line1"))
+	if line1 != "" {
+		return d.createEquipmentSite(ctx, tx, r, customerID, line1, actor)
+	}
+
+	if picked == nil {
+		return nil, nil
+	}
+
+	addresses, err := d.CustomerService.ListAddresses(ctx, tx, customerID)
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range addresses {
+		if a.ID == *picked {
+			return picked, nil
+		}
+	}
+	return nil, app.ErrEquipmentSiteNotOnAccount
+}
+
+// createEquipmentSite saves a typed-in site as an address on the customer.
+//
+// The name on it is the customer's own company or contact name rather than
+// anything typed here: this is a place, not a person, and inventing a recipient
+// would put a stranger's name on a shipping label the first time somebody picks
+// this address at checkout.
+func (d *Deps) createEquipmentSite(
+	ctx context.Context, tx pgx.Tx, r *http.Request,
+	customerID uuid.UUID, line1 string, actor app.Actor,
+) (*uuid.UUID, error) {
+	customer, err := d.CustomerService.GetCustomer(ctx, tx, customerID)
+	if err != nil {
+		return nil, err
+	}
+
+	params := store.CreateAddressParams{
+		CustomerID:  &customerID,
+		FirstName:   customer.FirstName,
+		LastName:    customer.LastName,
+		Line1:       line1,
+		City:        strings.TrimSpace(r.FormValue("new_site_city")),
+		State:       strings.TrimSpace(r.FormValue("new_site_state")),
+		PostalCode:  strings.TrimSpace(r.FormValue("new_site_postal_code")),
+		CountryCode: "US",
+		// Never the default. A machine's location is the last address that
+		// should silently become where their coffee gets sent.
+		IsDefault: false,
+	}
+	if company := strings.TrimSpace(customerCompany(customer)); company != "" {
+		params.Company = &company
+	}
+	if line2 := strings.TrimSpace(r.FormValue("new_site_line2")); line2 != "" {
+		params.Line2 = &line2
+	}
+	if params.City == "" || params.State == "" || params.PostalCode == "" {
+		return nil, app.ErrEquipmentSiteIncomplete
+	}
+
+	addr, err := d.CustomerService.CreateAddress(ctx, tx, params, actor)
+	if err != nil {
+		return nil, err
+	}
+	return &addr.ID, nil
+}
+
+// customerCompany is the company on a customer record, blank when they are an
+// individual.
+func customerCompany(c *domain.Customer) string {
+	if c.CompanyName == nil {
+		return ""
+	}
+	return *c.CompanyName
+}
+
+// handleAdminEquipmentAddresses serves the Site picker for one customer.
+// Swapped in by htmx when the customer select changes, so the list can never
+// offer another cafe's address — and so the field is populated at all on the
+// standalone add form, where no customer is known until one is chosen.
+func (d *Deps) handleAdminEquipmentAddresses(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var (
+		options  []admin.EquipmentOption
+		chosen   bool
+		selected = r.URL.Query().Get("address_id")
+	)
+	if raw := r.URL.Query().Get("customer_id"); raw != "" {
+		if id, err := uuid.Parse(raw); err == nil {
+			chosen = true
+			var addresses []domain.Address
+			if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+				var txErr error
+				addresses, txErr = d.CustomerService.ListAddresses(ctx, tx, id)
+				return txErr
+			}); err != nil {
+				Error(w, r, err)
+				return
+			}
+			options = make([]admin.EquipmentOption, 0, len(addresses))
+			for _, a := range addresses {
+				options = append(options, admin.EquipmentOption{ID: a.ID, Label: addressOneLine(a)})
+			}
+		}
+	}
+
+	admin.EquipmentSitePicker(options, selected, chosen).Render(ctx, w) //nolint:errcheck
 }

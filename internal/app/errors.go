@@ -291,6 +291,14 @@ var (
 	ErrInvalidEquipmentCategory  = errors.New("pick a valid equipment category")
 	ErrInvalidEquipmentOwnership = errors.New("pick a valid ownership")
 	ErrInvalidEquipmentStatus    = errors.New("pick a valid equipment status")
+	// ErrEquipmentSiteNotOnAccount rejects a site that belongs to a different
+	// customer. address_id is a plain foreign key with nothing tying it to the
+	// machine's owner, and it arrives from an editable form field — the scoped
+	// picker is a convenience, this is the control.
+	ErrEquipmentSiteNotOnAccount = errors.New("that address is not on this customer's account")
+	// ErrEquipmentSiteIncomplete guards a half-typed new site. A street with no
+	// town is not somewhere a tech can be sent.
+	ErrEquipmentSiteIncomplete = errors.New("a new site needs a street, city, state and ZIP")
 
 	// --- Service tickets ---
 

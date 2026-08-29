@@ -740,6 +740,8 @@ func NewRouter(deps *Deps) http.Handler {
 	// but Go's mux prefers the more specific literal either way, and stating it
 	// here keeps the intent obvious.
 	serviceWrite("GET /admin/service/equipment/new", deps.handleAdminEquipmentNew)
+	// The site picker fragment, refreshed when the customer select changes.
+	serviceWrite("GET /admin/service/equipment/addresses", deps.handleAdminEquipmentAddresses)
 	serviceWrite("POST /admin/service/equipment", deps.handleAdminEquipmentCreate)
 	serviceRead("GET /admin/service/equipment/{id}", deps.handleAdminEquipmentShow)
 	serviceWrite("GET /admin/service/equipment/{id}/edit", deps.handleAdminEquipmentEdit)

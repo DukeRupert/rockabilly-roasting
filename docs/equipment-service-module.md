@@ -438,7 +438,7 @@ After commit, not inside the transaction:
 ## Migration
 
 One migration, `077_equipment_service.sql`, with a real `-- +goose Down` that
-drops all six tables in dependency order. It is additive: nothing existing
+drops all five tables in dependency order. It is additive: nothing existing
 changes, so it is safe to ship before any UI exists and safe to roll back.
 
 ## v2, briefly

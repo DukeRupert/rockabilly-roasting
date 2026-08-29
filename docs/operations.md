@@ -107,6 +107,22 @@ git diff --name-only --diff-filter=A "$LAST"..origin/main -- db/migrations/   # 
 
 This is not a formality. `v1.111.0` was cut believing it carried one PR's route fix; it carried two PRs and migration 072, because #11 had been merged an hour earlier and never tagged. Read the commit list before writing the tag message — the tag message should describe the release, not the last PR.
 
+#### Numbering a new migration
+
+**Always number above the highest file in `db/migrations/`. Never into a gap.**
+
+`goose ... up` refuses to apply a migration numbered below the version the database already reports, unless `-allow-missing` is passed — and `entrypoint.sh` does not pass it. So a migration that lands below production's current version does not merely arrive late: it fails, and under `set -e` the container dies before `exec ./server`. Per step 4, the workflow still goes green.
+
+This is not hypothetical. `073` and `074` were free when the equipment-service branch was cut. By the time it merged, `v1.112.0` had shipped `075` and production had applied it, so both would have arrived below the current version. They were renumbered to `076`/`077` before the merge; the branch would otherwise have taken production down on the next release.
+
+The directory now reads `072`, `075`, `076`, `077`. **That gap is permanent and it is not an invitation** — `073` and `074` are burned. goose records version ids rather than a dense range, so gaps are harmless to it, but a directory listing showing a hole is exactly what makes the next person reach for a number that is lower than production's.
+
+A branch that sits unmerged for any length of time should re-check this before it merges, not when it was cut. The check is one line:
+
+```bash
+ls db/migrations/ | tail -1   # your new migration must sort above this
+```
+
 ### 2. Cut the tag
 
 Annotated, with a subject line and a prose body describing the release; `git show v1.111.0` is the shape.
@@ -169,6 +185,18 @@ It has to report **your** `$TAG`. If it still names the previous release after a
 `/version` settles it because `entrypoint.sh` runs `goose ... up` and only then `exec ./server`, under `set -e`. A server answering with your `$TAG` is therefore proof that that build's migrations ran.
 
 Version by what the release contains, not by how much work it was: new user-visible capability is a minor bump, a fix to shipped behaviour is a patch.
+
+---
+
+## Hiri runs as exactly one process
+
+Not a deployment preference — a correctness constraint, and the only thing enforcing it is this paragraph.
+
+`app.ModuleService` caches the set of enabled feature modules in an `atomic.Value`, populated at boot and refreshed by whoever presses the toggle on Settings → Modules. That refresh happens *in the process that served the request*. Run two replicas and the one that did not serve the toggle keeps the stale set until it restarts — so a module a merchant just switched off stays on there, routes included, because `requireModule` reads the same cache. The failure is silent on both sides: no error, no log, just one replica serving a section that is supposed to have vanished.
+
+This is correct as built. Hiri is single-tenant — one container and one database per merchant — and the cache is documented as safe only at process count one (`internal/app/modules.go`). Nothing asserts it at startup and no test covers it.
+
+**If the fleet ever runs more than one app replica, delete the cache and read the single indexed `modules` row per request** before doing anything else. The same caution applies to `docker compose up --scale`, and to any future move to a load-balanced deployment.
 
 ---
 

@@ -767,7 +767,7 @@ AuditServiceTimeLogged      = "service_ticket.time_logged"</code></pre>
     <section id="migration">
       <p class="eyebrow">Migration</p>
       <h2>One migration, fully reversible</h2>
-      <p>One migration, <code>077_equipment_service.sql</code>, with a real <code>-- +goose Down</code> that drops all six tables in dependency order. It is additive: nothing existing changes, so it is safe to ship before any UI exists and safe to roll back.</p>
+      <p>One migration, <code>077_equipment_service.sql</code>, with a real <code>-- +goose Down</code> that drops all five tables in dependency order. It is additive: nothing existing changes, so it is safe to ship before any UI exists and safe to roll back.</p>
     </section>
 
     <section id="v2">

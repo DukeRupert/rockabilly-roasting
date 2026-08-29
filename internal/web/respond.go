@@ -151,6 +151,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrQBSalesItemRequired),
 		errors.Is(err, app.ErrQBItemNotFound),
 		errors.Is(err, app.ErrQBNotConnected),
+		errors.Is(err, app.ErrQBNoActiveItems),
 		errors.Is(err, app.ErrQBBillingNotLive),
 		errors.Is(err, app.ErrQBOrderAlreadyInvoiced),
 		errors.Is(err, app.ErrQBOrderNotBillable):

@@ -1058,6 +1058,12 @@ templ qbBillingModeForm(mode domain.QBBillingMode) {
 	}
 }
 
+// QBShippingSameAsSales is the shipping select's value for "bill shipping
+// against the same item as the products". Explicit rather than empty so the
+// handler can tell it apart from a stale, disabled option being dropped by the
+// browser.
+const QBShippingSameAsSales = "same-as-sales"
+
 // QBItemChoice is one selectable QuickBooks item.
 type QBItemChoice struct {
 	ID            string
@@ -1220,7 +1226,12 @@ templ qbItemPanel(panel QBItemPanel) {
 				<div>
 					<label for="qb_shipping_item_id" class="label-font text-rr-muted">Shipping line (optional)</label>
 					<select id="qb_shipping_item_id" name="qb_shipping_item_id" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading">
-						<option value="" selected?={ panel.ShippingItemID == "" }>Same as product lines</option>
+						<!-- An explicit value, not "". A stale option below renders disabled,
+						     and browsers omit disabled options from submission — so an empty
+						     shipping field has to mean "the choice was dropped", not "the
+						     operator chose to reuse the product item". Without this the save
+						     would quietly unbind a deactivated shipping item and report success. -->
+						<option value={ QBShippingSameAsSales } selected?={ panel.ShippingItemID == "" }>Same as product lines</option>
 						if panel.ShippingItemMissing() {
 							<option value={ panel.ShippingItemID } selected disabled>
 								{ panel.ShippingItemLabel() } (no longer active in QuickBooks)

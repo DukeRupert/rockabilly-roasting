@@ -777,7 +777,22 @@ func (d *Deps) handleAdminQBItemsUpdate(w http.ResponseWriter, r *http.Request) 
 	ctx := r.Context()
 
 	salesID := r.FormValue("qb_sales_item_id")
-	shippingID := r.FormValue("qb_shipping_item_id")
+
+	// The shipping select says "same as sales" explicitly. An empty value
+	// means its option was dropped — which is what a browser does with the
+	// disabled option a deactivated item renders as — and treating that as
+	// "same as sales" would silently rebind shipping revenue while reporting
+	// success.
+	shippingRaw := r.FormValue("qb_shipping_item_id")
+	if shippingRaw == "" {
+		redirectFlashError(w, r, "/admin/settings/integrations",
+			"The shipping item you had is no longer active in QuickBooks. Choose one, or pick \"Same as product lines\".")
+		return
+	}
+	shippingID := shippingRaw
+	if shippingRaw == admin.QBShippingSameAsSales {
+		shippingID = ""
+	}
 
 	// Resolve against the company before opening a transaction: the IDs have
 	// to exist in QuickBooks or every invoice fails, and this is the last
@@ -795,6 +810,8 @@ func (d *Deps) handleAdminQBItemsUpdate(w http.ResponseWriter, r *http.Request) 
 		redirectFlashError(w, r, "/admin/settings/integrations", "That item no longer exists in QuickBooks. Reload and choose again.")
 	case errors.Is(err, app.ErrQBNotConnected):
 		redirectFlashError(w, r, "/admin/settings/integrations", "QuickBooks is not connected, so there are no items to choose from.")
+	case errors.Is(err, app.ErrQBNoActiveItems):
+		redirectFlashError(w, r, "/admin/settings/integrations", "This QuickBooks company has no active products or services. Add one in QuickBooks, then reload.")
 	case err != nil:
 		slog.Error("admin qb items: update", "error", err)
 		Error(w, r, err)
@@ -823,9 +840,10 @@ func (d *Deps) resolveQBItems(ctx context.Context, salesID, shippingID string) (
 		return store.QBItemConfig{}, fmt.Errorf("qb list items: %w", err)
 	}
 	if len(items) == 0 {
-		// Nothing to validate against. Saying "that item is gone" here would
-		// blame the choice for a company-wide condition.
-		return store.QBItemConfig{}, app.ErrQBNotConnected
+		// A connected company with nothing to sell. Saying "not connected"
+		// here would be the same guess-stated-as-fact this code keeps being
+		// corrected for, just pointing the other way.
+		return store.QBItemConfig{}, app.ErrQBNoActiveItems
 	}
 	byID := make(map[string]quickbooks.Item, len(items))
 	for _, item := range items {

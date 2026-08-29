@@ -139,6 +139,14 @@ not one of QuickBooks' stock terms. Tell the bookkeeper to expect it.
   also emails `STAFF_NOTIFICATION_EMAIL`.
 - Check the first invoice in QuickBooks itself: right customer, right income
   account, terms and due date as expected.
+- **Expect a burst of customer updates on the first live run.** Until this
+  release the stored QuickBooks link was written but never read back, so the
+  "re-sync a customer whose details changed" path had never executed. It now
+  can, and because those customers have no recorded sync time, the first run
+  treats them all as changed — pushing each account's local details over its
+  QuickBooks record once. That is the intended behaviour finally happening,
+  not a fault, but it is a lot of writes at once and worth knowing before you
+  see them.
 
 ## Backing out
 

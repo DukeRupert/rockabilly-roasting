@@ -11,9 +11,21 @@ import (
 // qbTerm is a QBO Term entity — the named payment terms ("Net 15") shown on an
 // invoice and used by QBO's own reporting.
 type qbTerm struct {
-	ID      string `json:"Id"`
-	Name    string `json:"Name"`
-	DueDays int    `json:"DueDays"`
+	ID   string `json:"Id"`
+	Name string `json:"Name"`
+	Type string `json:"Type"` // STANDARD | DATE_DRIVEN
+	// DueDays is absent on a DATE_DRIVEN term ("Net 15 on the 5th"), which
+	// carries DayOfMonthDue instead. Both are read so such a term cannot
+	// unmarshal to DueDays 0 and be mistaken for "Due on receipt".
+	DueDays       int `json:"DueDays"`
+	DayOfMonthDue int `json:"DayOfMonthDue"`
+}
+
+// isStandard reports whether the term counts days from the invoice date, which
+// is the only kind that can represent NET terms. Verified against QBO that
+// Type is populated on stock terms.
+func (t qbTerm) isStandard() bool {
+	return t.DayOfMonthDue == 0 && (t.Type == "" || t.Type == "STANDARD")
 }
 
 type qbTermQueryResponse struct {
@@ -57,6 +69,20 @@ func (c *termCache) put(dueDays int, id string) {
 	c.id[dueDays] = id
 }
 
+// forget drops any entry pointing at the given Term ID. Called when QBO
+// rejects an invoice that referenced it — a Term deleted or deactivated in
+// QBO after being cached would otherwise poison every later invoice for the
+// life of the process.
+func (c *termCache) forget(id string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for days, cached := range c.id {
+		if cached == id {
+			delete(c.id, days)
+		}
+	}
+}
+
 // FindOrCreateTerm returns the QBO Term ID for the given NET terms in days,
 // creating the Term if the company does not already have one.
 //
@@ -89,7 +115,7 @@ func (c *QBClient) FindOrCreateTerm(ctx context.Context, dueDays int) (string, e
 		return "", fmt.Errorf("unmarshal QB term query: %w", err)
 	}
 	for _, term := range found.QueryResponse.Term {
-		if term.DueDays == dueDays {
+		if term.isStandard() && term.DueDays == dueDays {
 			c.terms.put(dueDays, term.ID)
 			return term.ID, nil
 		}

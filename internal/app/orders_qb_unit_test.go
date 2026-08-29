@@ -2,6 +2,7 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -53,6 +54,32 @@ func TestOverdueReminderStageFor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, overdueReminderStageFor(tt.daysPastDue))
+		})
+	}
+}
+
+func TestInvoicePastDue(t *testing.T) {
+	// QB hands back a calendar date, which parses to midnight UTC.
+	due := time.Date(2026, 8, 29, 0, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name string
+		now  time.Time
+		want bool
+	}{
+		{"day before", due.Add(-1 * time.Hour), false},
+		// The case that matters for due-on-receipt: the invoice is issued and
+		// reconciled on its own due date and must not be chased the same day.
+		{"first instant of the due date", due, false},
+		{"during the due date", due.Add(13 * time.Hour), false},
+		{"last instant of the due date", due.Add(24*time.Hour - time.Nanosecond), false},
+		{"start of the next day", due.AddDate(0, 0, 1), true},
+		{"a week later", due.AddDate(0, 0, 7), true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, invoicePastDue(due, tt.now))
 		})
 	}
 }

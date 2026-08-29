@@ -183,6 +183,14 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 			// PrimaryEmailAddr, so local and QB agree by construction.
 			params.BillEmail = customer.Email
 		}
+		if params.BillEmail == "" {
+			// The invoice is still worth creating — staff can add the address
+			// in QBO and resend — but the chained send will fail permanently
+			// and alert, so record why here rather than leaving that alert
+			// looking like a QBO problem.
+			slog.Warn("qb create invoice: no bill-to address, invoice will be created but cannot be emailed",
+				"order_id", order.ID, "customer_id", order.CustomerID)
+		}
 
 		// Stamp the invoice with a QBO Term so its Terms field reads "Net 15"
 		// rather than sitting blank, and so QBO's own reporting can group by

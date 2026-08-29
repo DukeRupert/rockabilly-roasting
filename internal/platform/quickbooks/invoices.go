@@ -3,6 +3,7 @@ package quickbooks
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -144,6 +145,19 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 	}
 
 	respBody, err := c.doAPI(ctx, "POST", "/invoice", body)
+	if err != nil && p.TermID != "" && errors.Is(err, ErrBadRequest) {
+		// The Term reference is the one part of this request that can go stale
+		// without anything local changing: deleted or deactivated in QBO after
+		// we cached its ID. QBO answers 400, which IsRetryable calls permanent,
+		// so the invoice job would cancel and alert — turning a presentational
+		// label into a billing outage. Drop the cached ID and bill without the
+		// terms label rather than not billing at all. If the 400 was about
+		// something else the retry fails the same way and that error is
+		// returned.
+		c.terms.forget(p.TermID)
+		body.SalesTermRef = nil
+		respBody, err = c.doAPI(ctx, "POST", "/invoice", body)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("create QB invoice: %w", err)
 	}

@@ -126,6 +126,8 @@ func TestSortVariantsByKey_TiebreaksOnSKU(t *testing.T) {
 	sortVariantsByKey(rows, keys, func(r struct {
 		id  uuid.UUID
 		sku string
-	}) (uuid.UUID, string) { return r.id, r.sku })
+	}) (uuid.UUID, string) {
+		return r.id, r.sku
+	})
 	assert.Equal(t, "AAA", rows[0].sku)
 }

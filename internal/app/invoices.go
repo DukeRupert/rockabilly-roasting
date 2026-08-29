@@ -77,14 +77,14 @@ func (s *InvoiceService) CreateFromOrder(
 	}
 
 	invoice, err := s.invoices.Create(ctx, tx, store.CreateInvoiceParams{
-		OrderID:  orderID,
-		Number:   number,
-		Subtotal: order.Subtotal,
-		Shipping: order.ShippingTotal,
-		TaxTotal: order.TaxTotal,
-		Total:    order.Total,
-		DueDate:  dueDate,
-		Notes:    notes,
+		OrderID:   orderID,
+		Number:    number,
+		Subtotal:  order.Subtotal,
+		Shipping:  order.ShippingTotal,
+		TaxTotal:  order.TaxTotal,
+		Total:     order.Total,
+		DueDate:   dueDate,
+		Notes:     notes,
 		CreatedBy: actor.ID,
 	})
 	if err != nil {

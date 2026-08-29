@@ -57,9 +57,9 @@ type CreateOrderParams struct {
 	// DeliveryRunDate is which run the order rides, as opposed to when that run
 	// goes out. The two differ only for a postponed run. See migration 072.
 	DeliveryRunDate *time.Time
-	Notes                 *string
-	Metadata              map[string]any
-	PlacedAt              time.Time
+	Notes           *string
+	Metadata        map[string]any
+	PlacedAt        time.Time
 }
 
 // CreateOrder inserts a new order and returns it.

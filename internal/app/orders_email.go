@@ -632,4 +632,3 @@ func (s *OrderService) SendOrderOutForDeliveryEmail(ctx context.Context, pool *p
 	s.metrics.EmailsSent.WithLabelValues("order_out_for_delivery", "sent").Inc()
 	return nil
 }
-

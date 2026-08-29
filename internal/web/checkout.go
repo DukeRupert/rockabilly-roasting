@@ -116,11 +116,11 @@ type checkoutApplyCouponRequest struct {
 }
 
 type checkoutApplyCouponResponse struct {
-	Valid          bool   `json:"valid"`
-	DiscountName   string `json:"discount_name,omitempty"`
-	DiscountType   string `json:"discount_type,omitempty"`
-	DiscountValue  int    `json:"discount_value,omitempty"`
-	ErrorMessage   string `json:"error_message,omitempty"`
+	Valid         bool   `json:"valid"`
+	DiscountName  string `json:"discount_name,omitempty"`
+	DiscountType  string `json:"discount_type,omitempty"`
+	DiscountValue int    `json:"discount_value,omitempty"`
+	ErrorMessage  string `json:"error_message,omitempty"`
 }
 
 type checkoutRemoveCouponRequest struct {
@@ -135,17 +135,17 @@ type checkoutPaymentIntentRequest struct {
 }
 
 type checkoutPaymentIntentResponse struct {
-	ClientSecret   string `json:"client_secret"`
-	Amount         int    `json:"amount"`
-	Currency       string `json:"currency"`
-	Subtotal       int    `json:"subtotal"`
-	DiscountTotal  int    `json:"discount_total"`
-	DiscountName   string `json:"discount_name,omitempty"`
-	CouponCode     string `json:"coupon_code,omitempty"`
-	TaxTotal       int    `json:"tax_total"`
-	TaxLabel       string `json:"tax_label,omitempty"`
-	ShippingTotal  int    `json:"shipping_total"`
-	ShippingLabel  string `json:"shipping_label,omitempty"`
+	ClientSecret  string `json:"client_secret"`
+	Amount        int    `json:"amount"`
+	Currency      string `json:"currency"`
+	Subtotal      int    `json:"subtotal"`
+	DiscountTotal int    `json:"discount_total"`
+	DiscountName  string `json:"discount_name,omitempty"`
+	CouponCode    string `json:"coupon_code,omitempty"`
+	TaxTotal      int    `json:"tax_total"`
+	TaxLabel      string `json:"tax_label,omitempty"`
+	ShippingTotal int    `json:"shipping_total"`
+	ShippingLabel string `json:"shipping_label,omitempty"`
 }
 
 type checkoutConfirmRequest struct {

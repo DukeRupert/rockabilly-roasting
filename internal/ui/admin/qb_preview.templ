@@ -151,6 +151,11 @@ templ QBPreviewContent(props QBPreviewProps) {
 								</a>
 								if row.Problem() != "" {
 									<p class="mt-1 text-xs text-rr-muted">{ row.Problem() }</p>
+								} else if row.AwaitingManualInvoice() && row.BillingObstacle() != "" {
+									// Not a problem with leaving the row alone, which is why it
+									// carries no Check badge — but the operator reaching for Bill
+									// now should see it before they reach, not after.
+									<p class="mt-1 text-xs text-rr-muted">If billed: { row.BillingObstacle() }</p>
 								}
 							</td>
 							<td class="px-4 py-3 text-sm">
@@ -206,6 +211,29 @@ func qbBillNowReason(row QBPreviewRow) string {
 	return "This order was recorded in test mode and has not been billed yet."
 }
 
+// qbBillNowPoints is what the operator is told before they commit.
+//
+// The obstacle comes first when there is one. A manual row is not flagged on
+// the page — correctly, since leaving it alone is fine — but this button is
+// how it stops being left alone, so anything that would go wrong has to be
+// said here or it is said nowhere. Without it, billing an account with no
+// bill-to address created the invoice and then failed the send, with the page
+// having shown a clean row throughout.
+func qbBillNowPoints(row QBPreviewRow) []string {
+	points := []string{
+		"The customer receives an invoice for " + formatCents(row.TotalCents) +
+			", due " + row.DueDate.Format("Jan 2, 2006") + ".",
+	}
+	if obstacle := row.BillingObstacle(); obstacle != "" {
+		points = append(points, obstacle)
+	}
+	points = append(points,
+		qbBillNowReason(row),
+		"If you have already invoiced it by hand, do not do this — it would bill them twice.",
+	)
+	return points
+}
+
 // qbBillNowButton offers to bill an order nothing has invoiced — one recorded
 // before going live, or one on an account nothing bills automatically.
 //
@@ -223,11 +251,7 @@ templ qbBillNowButton(row QBPreviewRow) {
 				{ ConfirmAttrs(ActionConfirm{
 					Title: "Bill " + row.OrderNumber + " now?",
 					Lead:  "Creates a real invoice in QuickBooks and emails it to " + row.CustomerName + ".",
-					Points: []string{
-						"The customer receives an invoice for " + formatCents(row.TotalCents) + ", due " + row.DueDate.Format("Jan 2, 2006") + ".",
-						qbBillNowReason(row),
-						"If you have already invoiced it by hand, do not do this — it would bill them twice.",
-					},
+					Points: qbBillNowPoints(row),
 					Confirm: "Bill this order",
 					Danger:  true,
 				})... }

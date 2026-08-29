@@ -115,7 +115,19 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 	// match, but write nothing — not to QBO, and not to our own customer row.
 	// Linking locally would decide a match that the whole point of the proof
 	// period is to have a human review first.
-	if !mode.IsLive() {
+	// Look, but write nothing. Two situations behave identically here and are
+	// deliberately one branch: a shadow-mode run, and an account nothing bills
+	// automatically. Both need to know whether this customer matches something
+	// in QuickBooks — the review page reports it, and Bill now needs it before
+	// a person commits to invoicing — and neither may write to the merchant's
+	// books to find out. FindCustomer is read-only, so asking is free.
+	//
+	// The earlier version skipped the lookup entirely for a manual account,
+	// which left the preview unable to say anything about a matching customer:
+	// not "no match" but "never asked", presented identically. Bill now on
+	// such a row then had nothing to warn with.
+	writesAllowed := mode.IsLive() && (customer.BillingMethod.AutoInvoiced() || job.Args.StaffRequested)
+	if !writesAllowed {
 		qbID := ""
 		lookupErr := ""
 		if customer.QBCustomerID != nil {
@@ -142,28 +154,6 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 				QBCustomerID:        qbID,
 				CustomerLookupError: lookupErr,
 				StaffRequested:      job.Args.StaffRequested,
-			}, nil)
-			return txErr
-		})
-	}
-
-	// An account nothing invoices automatically gets nothing written to
-	// QuickBooks either — not a customer record, not a sync. The commit that
-	// added the billing gate promised these accounts were left alone, and
-	// creating a customer for one is still a write to the merchant's books on
-	// behalf of an order that was never going to be billed. The chain
-	// continues so the invoice job records the order on the review page;
-	// Bill now, which sets StaffRequested, is how a person overrides this.
-	if !customer.BillingMethod.AutoInvoiced() && !job.Args.StaffRequested {
-		qbID := ""
-		if customer.QBCustomerID != nil {
-			qbID = *customer.QBCustomerID
-		}
-		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
-			_, txErr := w.riverClient.InsertTx(ctx, tx, CreateQBInvoiceArgs{
-				OrderID:        job.Args.OrderID,
-				QBCustomerID:   qbID,
-				StaffRequested: job.Args.StaffRequested,
 			}, nil)
 			return txErr
 		})

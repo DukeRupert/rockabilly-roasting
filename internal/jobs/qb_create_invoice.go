@@ -365,12 +365,12 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 	if job.Args.QBCustomerID != "" {
 		qbID := job.Args.QBCustomerID
 		preview.QBCustomerID = &qbID
-	} else if preview.AutoBilled {
-		// EnsureQBCustomer looked and found nothing, so a live run would have
-		// created the customer. Worth a human's eye before it does — but only
-		// where a live run would actually bill: saying "going live would
-		// create this customer" about an account nothing invoices is a claim
-		// about something that will not happen.
+	} else {
+		// EnsureQBCustomer looked and found nothing. Recorded for manual
+		// accounts too: the lookup really did run for them, and Bill now has
+		// to be able to say that invoicing this order would create a customer
+		// in the merchant's books. Problem() still keeps it off the review
+		// page's attention count, where it would be noise.
 		preview.WouldCreateCustomer = true
 	}
 	for _, line := range lines {

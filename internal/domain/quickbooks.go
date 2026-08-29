@@ -126,21 +126,38 @@ func (p QBInvoicePreview) AwaitingManualInvoice() bool { return !p.AutoBilled }
 // same thing: staff should not have to translate between the email that told
 // them to look and the screen they look at.
 func (p QBInvoicePreview) Problem() string {
-	switch {
-	// Deliberately first and deliberately empty-handed: an account nobody
-	// bills automatically has no billing problem. The other checks below ask
-	// whether an invoice would succeed, which is not a question about an
-	// invoice that is never going to be attempted.
-	case !p.AutoBilled:
+	// An account nobody bills automatically has no billing problem, so it is
+	// not flagged — flagging every manual account would bury the rows that
+	// genuinely need somebody.
+	//
+	// Note what this does NOT mean: that billing it would go smoothly. That is
+	// a different question, asked by BillingObstacle, and it has to be asked
+	// separately because Bill now targets precisely these rows.
+	if !p.AutoBilled {
 		return ""
+	}
+	return p.BillingObstacle()
+}
+
+// BillingObstacle states what would go wrong if this order were invoiced right
+// now, whether or not anything intends to invoice it. Empty means nothing
+// known would stop it.
+//
+// Separate from Problem because the two questions have different answers for a
+// manual account: nothing is wrong with leaving it alone, and something may
+// still be wrong with billing it. Bill now exists to bill exactly those rows,
+// so it is the caller that most needs this and the one that would previously
+// have been told nothing at all.
+func (p QBInvoicePreview) BillingObstacle() string {
+	switch {
 	case p.LookupError != nil:
 		return "QuickBooks lookup failed: " + *p.LookupError
 	case p.ExistingQBInvoiceID != nil:
 		return "QuickBooks already has an invoice numbered " + p.DocNumber + " — it was probably billed by hand."
 	case p.WouldCreateCustomer:
-		return "No matching QuickBooks customer. Going live would create a new one."
+		return "No matching QuickBooks customer, so a new one would be created."
 	case p.BillEmail == "":
-		return "No bill-to address, so QuickBooks could not email this invoice."
+		return "No bill-to address, so QuickBooks would create the invoice and then fail to email it."
 	}
 	return ""
 }

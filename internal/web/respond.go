@@ -143,8 +143,10 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrInvalidEquipmentStatus):
 		return http.StatusBadRequest, err.Error()
 
-	// QuickBooks billing configuration. Bad input, not a server fault — an
-	// unmapped sentinel here would have answered a mistyped mode with a 500.
+	// QuickBooks billing configuration. Bad input, not a server fault. The
+	// handlers reject most of these before the service is reached, so several
+	// are unreachable today; they are mapped because the alternative when one
+	// does escape is a 500 for what is plainly a bad request.
 	case errors.Is(err, app.ErrInvalidQBBillingMode),
 		errors.Is(err, app.ErrQBSalesItemRequired),
 		errors.Is(err, app.ErrQBItemNotFound),

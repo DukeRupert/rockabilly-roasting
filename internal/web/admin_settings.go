@@ -297,28 +297,38 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 
 	// Which items invoices bill against, and what they could be. A live
 	// read-only call, safe in either billing mode.
+	// Two phases, deliberately. Listing a company's items is an Intuit round
+	// trip, and holding a pooled connection open across it would also nest a
+	// second acquisition inside the first — the token read opens its own
+	// transaction — which is how a busy shop runs the pool dry.
 	var itemPanel admin.QBItemPanel
 	if section.QBEnabled {
 		itemPanel.EnvFallback = os.Getenv("QB_SALES_ITEM_ID")
+
+		var cfg store.QBItemConfig
 		if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-			settings, txErr := d.OrderService.QBItemSettingsFor(ctx, tx, d.QBClient, itemPanel.EnvFallback)
-			if txErr != nil {
-				return txErr
+			var txErr error
+			cfg, txErr = d.OrderService.QBItemConfigFor(ctx, tx)
+			return txErr
+		}); err != nil {
+			slog.Error("admin settings: qb item config", "error", err)
+			itemPanel.ConfigUnreadable = true
+		}
+		itemPanel.SalesItemID = cfg.SalesItemID
+		itemPanel.SalesItemName = cfg.SalesItemName
+		itemPanel.ShippingItemID = cfg.ShippingItemID
+
+		if d.QBClient != nil {
+			items, listErr := d.QBClient.ListItems(ctx)
+			if listErr != nil {
+				slog.Error("admin settings: qb list items", "error", listErr)
+				itemPanel.Unavailable = true
 			}
-			itemPanel.SalesItemID = settings.Current.SalesItemID
-			itemPanel.SalesItemName = settings.Current.SalesItemName
-			itemPanel.ShippingItemID = settings.Current.ShippingItemID
-			itemPanel.ShippingItemName = settings.Current.ShippingItemName
-			itemPanel.Unavailable = settings.ListErr != nil
-			for _, choice := range settings.Choices {
+			for _, item := range items {
 				itemPanel.Choices = append(itemPanel.Choices, admin.QBItemChoice{
-					ID: choice.ID, Name: choice.Name, Type: choice.Type, IncomeAccount: choice.IncomeAccount,
+					ID: item.ID, Name: item.Name, IncomeAccount: item.IncomeAccount,
 				})
 			}
-			return nil
-		}); err != nil {
-			slog.Error("admin settings: qb items", "error", err)
-			itemPanel.Unavailable = true
 		}
 	}
 
@@ -764,9 +774,15 @@ func (d *Deps) handleAdminQBItemsUpdate(w http.ResponseWriter, r *http.Request) 
 	salesID := r.FormValue("qb_sales_item_id")
 	shippingID := r.FormValue("qb_shipping_item_id")
 
-	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		return d.OrderService.SetQBItems(ctx, tx, d.QBClient, salesID, shippingID, staffActor(r))
-	})
+	// Resolve against the company before opening a transaction: the IDs have
+	// to exist in QuickBooks or every invoice fails, and this is the last
+	// cheap place to say so. Outside any tx, per the external-call rule.
+	cfg, err := d.resolveQBItems(ctx, salesID, shippingID)
+	if err == nil {
+		err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			return d.OrderService.SetQBItems(ctx, tx, cfg, staffActor(r))
+		})
+	}
 	switch {
 	case errors.Is(err, app.ErrQBSalesItemRequired):
 		redirectFlashError(w, r, "/admin/settings/integrations", "Choose the item invoices should bill against.")
@@ -778,6 +794,44 @@ func (d *Deps) handleAdminQBItemsUpdate(w http.ResponseWriter, r *http.Request) 
 	default:
 		redirectFlash(w, r, "/admin/settings/integrations", "Invoice items saved.")
 	}
+}
+
+// resolveQBItems turns the submitted item IDs into a stored mapping, checking
+// each against the connected company and picking up its name for display.
+//
+// Lives here rather than in the service because it is an external call, and
+// app may not reach into platform/quickbooks.
+func (d *Deps) resolveQBItems(ctx context.Context, salesID, shippingID string) (store.QBItemConfig, error) {
+	if salesID == "" {
+		return store.QBItemConfig{}, app.ErrQBSalesItemRequired
+	}
+	if d.QBClient == nil {
+		return store.QBItemConfig{}, app.ErrQBItemNotFound
+	}
+
+	items, err := d.QBClient.ListItems(ctx)
+	if err != nil {
+		return store.QBItemConfig{}, fmt.Errorf("qb list items: %w", err)
+	}
+	byID := make(map[string]quickbooks.Item, len(items))
+	for _, item := range items {
+		byID[item.ID] = item
+	}
+
+	sales, ok := byID[salesID]
+	if !ok {
+		return store.QBItemConfig{}, app.ErrQBItemNotFound
+	}
+	cfg := store.QBItemConfig{SalesItemID: sales.ID, SalesItemName: sales.Name}
+	if shippingID != "" {
+		shipping, found := byID[shippingID]
+		if !found {
+			return store.QBItemConfig{}, app.ErrQBItemNotFound
+		}
+		cfg.ShippingItemID = shipping.ID
+		cfg.ShippingItemName = shipping.Name
+	}
+	return cfg, nil
 }
 
 // handleAdminQBPreview renders what QuickBooks billing would have done while

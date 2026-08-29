@@ -10,7 +10,6 @@ import (
 
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
-	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/store"
 )
 
@@ -183,100 +182,31 @@ func (s *OrderService) BillOrderNow(ctx context.Context, tx pgx.Tx, orderID uuid
 // to learn the job args, which live in jobs/.
 type QBChainEnqueuer func(ctx context.Context, tx pgx.Tx, customerID, orderID uuid.UUID) error
 
-// QBItemChoice is one selectable QuickBooks item, for the settings picker.
-type QBItemChoice struct {
-	ID            string
-	Name          string
-	Type          string
-	IncomeAccount string
-}
-
-// QBItemSettings is the current invoice-item mapping plus what it could be
-// changed to. Choices is nil when the company's items could not be listed —
-// the page then says so rather than rendering an empty picker, which would
-// read as "this company has no items".
-type QBItemSettings struct {
-	Current    store.QBItemConfig
-	Choices    []QBItemChoice
-	ListErr    error
-	EnvSalesID string // fallback still supplied by the environment, if any
-}
-
-// QBItemSettingsFor reads the configured invoice items and lists what the
-// connected company offers.
+// QBItemConfigFor returns which QuickBooks items invoices bill against.
 //
-// The listing is a live read-only call, so it is safe during a proof period —
-// deciding which item to bill against is exactly the sort of thing a shop
-// should settle before going live.
-func (s *OrderService) QBItemSettingsFor(ctx context.Context, tx pgx.Tx, qb quickbooks.Client, envSalesID string) (QBItemSettings, error) {
-	out := QBItemSettings{EnvSalesID: envSalesID}
+// Only the stored mapping. Listing what the company *offers* is an Intuit
+// round trip and is made at the boundary, outside any transaction — see the
+// external-call rule in CLAUDE.md.
+func (s *OrderService) QBItemConfigFor(ctx context.Context, tx pgx.Tx) (store.QBItemConfig, error) {
 	if s.settings == nil {
-		return out, nil
+		return store.QBItemConfig{}, nil
 	}
-	cfg, err := s.settings.GetQBItemConfig(ctx, tx)
-	if err != nil {
-		return out, err
-	}
-	out.Current = cfg
-
-	if qb == nil {
-		return out, nil
-	}
-	items, listErr := qb.ListItems(ctx)
-	if listErr != nil {
-		// Not fatal: the page must still show what is currently chosen, and a
-		// failed listing is a different fact from "there is nothing to choose".
-		out.ListErr = listErr
-		return out, nil
-	}
-	for _, item := range items {
-		out.Choices = append(out.Choices, QBItemChoice{
-			ID: item.ID, Name: item.Name, Type: item.Type, IncomeAccount: item.IncomeAccount,
-		})
-	}
-	return out, nil
+	return s.settings.GetQBItemConfig(ctx, tx)
 }
 
 // SetQBItems records which QuickBooks items wholesale invoices bill against.
 //
-// The names are stored beside the IDs so the settings page can name the
-// current choice without calling QuickBooks, and so an audit entry read months
-// later says "Wholesale Coffee" rather than "19".
-func (s *OrderService) SetQBItems(ctx context.Context, tx pgx.Tx, qb quickbooks.Client, salesID, shippingID string, actor Actor) error {
+// The caller has already resolved the choice against the connected company;
+// this writes it and records who changed it. Names are stored beside the IDs
+// so the settings page can name the current choice without calling
+// QuickBooks, and so an audit entry read months later says "Wholesale Coffee"
+// rather than "19".
+func (s *OrderService) SetQBItems(ctx context.Context, tx pgx.Tx, cfg store.QBItemConfig, actor Actor) error {
 	if s.settings == nil {
 		return fmt.Errorf("qb items: settings store not wired")
 	}
-	if salesID == "" {
+	if cfg.SalesItemID == "" {
 		return ErrQBSalesItemRequired
-	}
-
-	// Resolve names from the company rather than trusting the form: the IDs
-	// have to exist in QuickBooks or every invoice fails, and this is the last
-	// point where saying so is cheap.
-	byID := map[string]quickbooks.Item{}
-	if qb != nil {
-		items, err := qb.ListItems(ctx)
-		if err != nil {
-			return fmt.Errorf("qb list items: %w", err)
-		}
-		for _, item := range items {
-			byID[item.ID] = item
-		}
-		if _, ok := byID[salesID]; !ok {
-			return ErrQBItemNotFound
-		}
-		if shippingID != "" {
-			if _, ok := byID[shippingID]; !ok {
-				return ErrQBItemNotFound
-			}
-		}
-	}
-
-	cfg := store.QBItemConfig{
-		SalesItemID:      salesID,
-		SalesItemName:    byID[salesID].Name,
-		ShippingItemID:   shippingID,
-		ShippingItemName: byID[shippingID].Name,
 	}
 	if err := s.settings.UpdateQBItemConfig(ctx, tx, cfg); err != nil {
 		return err

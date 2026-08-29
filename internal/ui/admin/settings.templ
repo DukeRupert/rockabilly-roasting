@@ -1062,7 +1062,6 @@ templ qbBillingModeForm(mode domain.QBBillingMode) {
 type QBItemChoice struct {
 	ID            string
 	Name          string
-	Type          string
 	IncomeAccount string
 }
 
@@ -1072,13 +1071,17 @@ type QBItemChoice struct {
 // differently: a company genuinely without items is a data problem the shop
 // can fix, while a failed listing says nothing about the company at all.
 type QBItemPanel struct {
-	SalesItemID      string
-	SalesItemName    string
-	ShippingItemID   string
-	ShippingItemName string
-	Choices          []QBItemChoice
+	SalesItemID    string
+	SalesItemName  string
+	ShippingItemID string
+	Choices        []QBItemChoice
 	// Unavailable is set when the items could not be listed from QuickBooks.
 	Unavailable bool
+	// ConfigUnreadable is set when the stored choice itself could not be read.
+	// Distinct from Unavailable: one means we cannot offer alternatives, the
+	// other means we cannot say what is billing right now — and only the
+	// second warrants telling staff that invoicing may be unconfigured.
+	ConfigUnreadable bool
 	// EnvFallback is an item id still coming from the environment. Shown only
 	// when nothing has been chosen here, to explain what is billing meanwhile.
 	EnvFallback string
@@ -1105,7 +1108,12 @@ templ qbItemPanel(panel QBItemPanel) {
 					decides the income account the money lands in, so it is worth checking with
 					whoever keeps the books.
 				</p>
-				if !panel.Configured() {
+				if panel.ConfigUnreadable {
+					<p class="mt-1 text-sm text-rr-muted">
+						Couldn't read the current setting just now. Reload in a moment — this says
+						nothing about whether an item is chosen.
+					</p>
+				} else if !panel.Configured() {
 					<p class="mt-1 text-sm text-rr-red">
 						Until one is chosen, wholesale invoices cannot be created.
 					</p>

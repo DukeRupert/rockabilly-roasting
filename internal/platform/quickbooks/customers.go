@@ -12,13 +12,13 @@ import (
 
 // qbCustomerRequest is the JSON body for creating/updating a QB customer.
 type qbCustomerRequest struct {
-	DisplayName     string       `json:"DisplayName"`
-	GivenName       string       `json:"GivenName,omitempty"`
-	FamilyName      string       `json:"FamilyName,omitempty"`
-	PrimaryEmailAddr *qbEmail    `json:"PrimaryEmailAddr,omitempty"`
-	PrimaryPhone     *qbPhone    `json:"PrimaryPhone,omitempty"`
-	SyncToken        string      `json:"SyncToken,omitempty"` // required for updates
-	ID               string      `json:"Id,omitempty"`        // required for updates
+	DisplayName      string   `json:"DisplayName"`
+	GivenName        string   `json:"GivenName,omitempty"`
+	FamilyName       string   `json:"FamilyName,omitempty"`
+	PrimaryEmailAddr *qbEmail `json:"PrimaryEmailAddr,omitempty"`
+	PrimaryPhone     *qbPhone `json:"PrimaryPhone,omitempty"`
+	SyncToken        string   `json:"SyncToken,omitempty"` // required for updates
+	ID               string   `json:"Id,omitempty"`        // required for updates
 }
 
 type qbEmail struct {
@@ -41,8 +41,8 @@ type qbCustomerResponse struct {
 type qbQueryResponse struct {
 	QueryResponse struct {
 		Customer []struct {
-			ID               string  `json:"Id"`
-			DisplayName      string  `json:"DisplayName"`
+			ID               string   `json:"Id"`
+			DisplayName      string   `json:"DisplayName"`
 			PrimaryEmailAddr *qbEmail `json:"PrimaryEmailAddr"`
 		} `json:"Customer"`
 		TotalCount int `json:"totalCount"`
@@ -115,7 +115,8 @@ func (c *QBClient) queryCustomers(ctx context.Context, field, value string) ([]Q
 		return nil, fmt.Errorf("qb customer query: unsupported field %q", field)
 	}
 
-	// QB query language uses doubled single quotes to escape (like SQL), not backslashes.
+	// QB's query language escapes with a backslash, not by doubling the quote
+	// — see escapeQBQuery.
 	escaped := escapeQBQuery(value)
 	query := fmt.Sprintf("SELECT * FROM Customer WHERE %s = '%s'", field, escaped)
 
@@ -143,16 +144,20 @@ func (c *QBClient) queryCustomers(ctx context.Context, field, value string) ([]Q
 	return customers, nil
 }
 
-// escapeQBQuery escapes single quotes for QB's query language.
-// QB uses doubled single quotes ('') as the escape sequence, like SQL.
+// escapeQBQuery escapes a string literal for QB's query language.
+//
+// QBO is not SQL here: doubling the quote (”) is a parse error (fault 4000),
+// and the escape sequence is a backslash. Verified against the sandbox on
+// 2026-08-29 — an "O'Brien" customer is found by \' and by nothing else.
+// Backslashes are escaped first so an input that already contains one does not
+// turn its successor into an escape.
 func escapeQBQuery(s string) string {
 	result := make([]byte, 0, len(s))
 	for i := 0; i < len(s); i++ {
-		if s[i] == '\'' {
-			result = append(result, '\'', '\'')
-		} else {
-			result = append(result, s[i])
+		if s[i] == '\\' || s[i] == '\'' {
+			result = append(result, '\\')
 		}
+		result = append(result, s[i])
 	}
 	return string(result)
 }
@@ -168,9 +173,9 @@ func (c *QBClient) CreateCustomer(ctx context.Context, cust *domain.Customer) (s
 	displayName := customerDisplayName(cust)
 
 	body := qbCustomerRequest{
-		DisplayName: displayName,
-		GivenName:   cust.FirstName,
-		FamilyName:  cust.LastName,
+		DisplayName:      displayName,
+		GivenName:        cust.FirstName,
+		FamilyName:       cust.LastName,
 		PrimaryEmailAddr: &qbEmail{Address: cust.Email},
 	}
 	if cust.Phone != nil {
@@ -206,11 +211,11 @@ func (c *QBClient) UpdateCustomer(ctx context.Context, qbID string, cust *domain
 	displayName := customerDisplayName(cust)
 
 	body := qbCustomerRequest{
-		ID:          qbID,
-		SyncToken:   current.Customer.SyncToken,
-		DisplayName: displayName,
-		GivenName:   cust.FirstName,
-		FamilyName:  cust.LastName,
+		ID:               qbID,
+		SyncToken:        current.Customer.SyncToken,
+		DisplayName:      displayName,
+		GivenName:        cust.FirstName,
+		FamilyName:       cust.LastName,
 		PrimaryEmailAddr: &qbEmail{Address: cust.Email},
 	}
 	if cust.Phone != nil {

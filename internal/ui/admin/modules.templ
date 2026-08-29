@@ -1,0 +1,203 @@
+package admin
+
+import (
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// Settings → Modules: the optional sections of the app, switched on and off per
+// shop. See docs/equipment-service-module.md for the design.
+//
+// The screen is deliberately plain. It is opened rarely, by one person, and the
+// only thing that matters is that the consequence of each switch is legible
+// before it is thrown — hence the "what changes" line under every module and
+// the confirmation on the way out.
+
+// ModuleRow is one module as the settings page draws it: its registry copy
+// joined to its stored state.
+type ModuleRow struct {
+	Key           string
+	Name          string
+	Summary       string
+	Detail        string
+	Enabled       bool
+	ChangedAt     *time.Time
+	ChangedByName string
+}
+
+// ModuleRowsFrom joins the stored states to the registry copy that describes
+// them. States arrive in registry order; a key with no row yet reads as off.
+func ModuleRowsFrom(states []domain.ModuleState) []ModuleRow {
+	rows := make([]ModuleRow, 0, len(states))
+	for _, st := range states {
+		info, ok := domain.LookupModule(string(st.Key))
+		if !ok {
+			// A stored key this binary does not know about. The store already
+			// filters these out; skip defensively rather than drawing a
+			// nameless switch.
+			continue
+		}
+		rows = append(rows, ModuleRow{
+			Key:           string(st.Key),
+			Name:          info.Name,
+			Summary:       info.Summary,
+			Detail:        info.Detail,
+			Enabled:       st.Enabled,
+			ChangedAt:     st.ChangedAt,
+			ChangedByName: st.ChangedByName,
+		})
+	}
+	return rows
+}
+
+// changedNote is the "last changed" line, or blank when nobody has touched it.
+func (r ModuleRow) changedNote() string {
+	if r.ChangedAt == nil {
+		return ""
+	}
+	state := "Turned off"
+	if r.Enabled {
+		state = "Turned on"
+	}
+	note := state + " " + r.ChangedAt.Format("2 Jan 2006")
+	if r.ChangedByName != "" {
+		note += " by " + r.ChangedByName
+	}
+	return note
+}
+
+func (r ModuleRow) statusBadgeClass() string {
+	if r.Enabled {
+		return "badge badge-green"
+	}
+	return "badge badge-grey"
+}
+
+func (r ModuleRow) statusLabel() string {
+	if r.Enabled {
+		return "On"
+	}
+	return "Off"
+}
+
+// toggleConfirm is the dialog copy for throwing the switch.
+//
+// Turning one off is the one that needs the words: staff reasonably assume a
+// disable is a delete, and the honest answer — the records stay, the section
+// just goes away — is the difference between someone trying it and someone
+// never touching it again. Turning one on gets a lighter confirmation for the
+// opposite reason: it puts a new row in everyone's sidebar and, for equipment
+// service, a new form in front of customers.
+func (r ModuleRow) toggleConfirm() ActionConfirm {
+	if r.Enabled {
+		return ActionConfirm{
+			Title: "Turn off " + r.Name + "?",
+			Lead:  "The section disappears from the sidebar and its pages stop answering.",
+			Points: []string{
+				"Nothing is deleted — every record stays exactly as it is.",
+				"Turning it back on restores the section unchanged.",
+			},
+			Confirm: "Turn it off",
+			Danger:  true,
+		}
+	}
+	return ActionConfirm{
+		Title: "Turn on " + r.Name + "?",
+		Lead:  r.Detail,
+		Points: []string{
+			"Everyone on the team sees the new section straight away.",
+		},
+		Confirm: "Turn it on",
+	}
+}
+
+func (r ModuleRow) toggleLabel() string {
+	if r.Enabled {
+		return "Turn off"
+	}
+	return "Turn on"
+}
+
+func (r ModuleRow) toggleValue() string {
+	if r.Enabled {
+		return "false"
+	}
+	return "true"
+}
+
+func (r ModuleRow) toggleClass() string {
+	if r.Enabled {
+		return "btn-secondary whitespace-nowrap"
+	}
+	return "btn-primary whitespace-nowrap"
+}
+
+// SettingsModulesProps is the Modules tab's state.
+type SettingsModulesProps struct {
+	StaffName string
+	StaffRole string
+	Nav       SettingsNav
+	Modules   []ModuleRow
+	Flash     Flash
+}
+
+templ SettingsModulesContent(props SettingsModulesProps) {
+	@ConfirmDialogHost()
+	@settingsSection(props.Nav, settingsTabModules)
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Modules</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				Optional parts of Hiri. Switch on only what this shop actually does — anything switched off stays out of the way entirely.
+			</p>
+		</div>
+	</div>
+	@adminFlash(props.Flash)
+	@settingsAttention(props.Nav.Issues)
+	<div class="mt-6 space-y-4">
+		for _, m := range props.Modules {
+			<div class="overflow-hidden border border-rr-border bg-rr-surface">
+				<div class="px-4 py-5 sm:px-6">
+					<div class="flex flex-wrap items-start justify-between gap-4">
+						<div class="min-w-0 flex-1">
+							<div class="flex items-center gap-2">
+								<h2 class="text-sm font-semibold text-rr-heading">{ m.Name }</h2>
+								<span class={ m.statusBadgeClass() }>{ m.statusLabel() }</span>
+							</div>
+							<p class="mt-1 text-sm text-rr-muted">{ m.Summary }</p>
+							<p class="mt-2 text-xs text-rr-muted">{ m.Detail }</p>
+							if note := m.changedNote(); note != "" {
+								<p class="mt-2 font-mono text-xs text-rr-muted">{ note }</p>
+							}
+						</div>
+						<form method="post" action="/admin/settings/modules" class="shrink-0">
+							<input type="hidden" name="module" value={ m.Key }/>
+							<input type="hidden" name="enabled" value={ m.toggleValue() }/>
+							<button type="submit" class={ m.toggleClass() } { ConfirmAttrs(m.toggleConfirm())... }>
+								{ m.toggleLabel() }
+							</button>
+						</form>
+					</div>
+				</div>
+			</div>
+		}
+		if len(props.Modules) == 0 {
+			<div class="border border-rr-border bg-rr-surface px-4 py-8 text-center text-sm text-rr-muted">
+				This build has no optional modules.
+			</div>
+		}
+	</div>
+}
+
+templ SettingsModules(props SettingsModulesProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Modules",
+		ActivePath: "/admin/settings",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@SettingsModulesContent(props)
+	}
+}

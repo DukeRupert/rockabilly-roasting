@@ -71,6 +71,9 @@ func (f *fakeEnqueuer) EnqueueAnnouncementDispatch(context.Context, pgx.Tx, uuid
 func (f *fakeEnqueuer) EnqueueAnnouncementSend(context.Context, pgx.Tx, uuid.UUID, uuid.UUID) error {
 	return nil
 }
+func (f *fakeEnqueuer) EnqueueServiceTicketOpened(context.Context, pgx.Tx, uuid.UUID, bool) error {
+	return nil
+}
 
 func newReconcileService(enq app.JobEnqueuer) (*app.OrderService, *store.OrderStore) {
 	orderStore := store.NewOrderStore(nil)

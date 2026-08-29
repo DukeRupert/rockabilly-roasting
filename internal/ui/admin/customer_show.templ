@@ -40,6 +40,13 @@ type CustomerShowProps struct {
 	// application, resolved from Customer.ApprovedBy. Empty when the account
 	// was never approved, or when that staff record no longer exists.
 	ApprovedByName string
+	// Equipment is the machines this customer has on the register. Only
+	// populated when the equipment service module is switched on — the card
+	// does not render at all otherwise, so a shop that does not service
+	// machines never sees the word.
+	Equipment       []domain.Equipment
+	ServiceEnabled  bool
+	CanWriteService bool
 	// CanEditEmail gates the inline email editor. The route is gated
 	// independently on customers:write; this only keeps the form from showing
 	// to staff whose submit would bounce.
@@ -182,6 +189,9 @@ templ CustomerShowContent(props CustomerShowProps) {
 			@customerContactCard(props)
 			@customerSettingsCard(props)
 			@customerAddressesCard(props)
+			if props.ServiceEnabled {
+				@customerEquipmentCard(props)
+			}
 			if len(props.TeamMembers) > 0 {
 				@customerTeamCard(props)
 			}
@@ -887,4 +897,51 @@ templ CustomerShow(props CustomerShowProps) {
 	}) {
 		@CustomerShowContent(props)
 	}
+}
+
+// customerEquipmentCard lists the machines this cafe has on the register.
+//
+// Rail, not main column: on a customer page the machines are configuration —
+// what they have and where — rather than something that happened. The work
+// done to them lives on the tickets.
+//
+// Rendered only when the equipment service module is on. Retired machines are
+// left out; this answers "what is on their counter", and the full history is a
+// click away on the register.
+templ customerEquipmentCard(props CustomerShowProps) {
+	<div class="border border-rr-border bg-rr-surface">
+		<div class="px-4 py-4">
+			<div class="flex items-center justify-between">
+				<h2 class="text-sm font-semibold text-rr-heading">Equipment</h2>
+				if props.CanWriteService {
+					<a
+						href={ templ.SafeURL("/admin/service/equipment/new?customer_id=" + props.Customer.ID.String()) }
+						class="text-sm text-rr-muted underline"
+					>Add</a>
+				}
+			</div>
+			if len(props.Equipment) == 0 {
+				<p class="mt-2 text-sm text-rr-muted">No machines on the register for this customer.</p>
+			} else {
+				<ul role="list" class="mt-2 space-y-2">
+					for _, e := range props.Equipment {
+						<li class="text-sm">
+							<a href={ templ.SafeURL("/admin/service/equipment/" + e.ID.String()) } class="font-medium text-rr-heading underline">
+								{ e.Description() }
+							</a>
+							<div class="flex flex-wrap items-center gap-1.5 text-rr-muted">
+								<span>{ e.Category.Label() }</span>
+								if e.Status != domain.EquipmentStatusActive {
+									<span class={ equipmentStatusBadge(e.Status) }>{ e.Status.Label() }</span>
+								}
+								if badge := equipmentOwnershipBadge(e.Ownership); badge != "" {
+									<span class={ badge }>{ e.Ownership.Label() }</span>
+								}
+							</div>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	</div>
 }

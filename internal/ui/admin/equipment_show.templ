@@ -1,0 +1,241 @@
+package admin
+
+import (
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// The machine's life story. Structure follows docs/admin-detail-pages.md:
+// header with every status axis, main column for what it IS and what happened
+// to it, rail for what you can DO about it.
+//
+// The reason this page exists is the argument it lets staff make: "we have
+// replaced this pump twice in a year, the machine is the problem". The main
+// column carries that argument — identity, then every ticket ever raised
+// against it, then the audit timeline.
+
+// EquipmentShowProps is the detail page's state.
+type EquipmentShowProps struct {
+	Equipment    domain.Equipment
+	CustomerName string
+	SiteLabel    string
+	Activity     []domain.AuditEntry
+	// Tickets are every repair ever raised against this machine, newest first.
+	// This is the argument the page exists to let staff make: "we have replaced
+	// this pump twice in a year, the machine is the problem."
+	Tickets []ServiceTicketRow
+	MerchantTZ   *time.Location
+	StaffName    string
+	StaffRole    string
+	CanWrite     bool
+	Flash        Flash
+}
+
+func (p EquipmentShowProps) siteLine() string {
+	if p.SiteLabel == "" {
+		return "No site recorded"
+	}
+	return p.SiteLabel
+}
+
+func (p EquipmentShowProps) notesOrNone() string {
+	if p.Equipment.Notes == "" {
+		return "No notes."
+	}
+	return p.Equipment.Notes
+}
+
+// statusActionReason explains an empty action area rather than rendering
+// nothing — rule 4 in docs/admin-detail-pages.md. A staff member who cannot act
+// has to be able to tell a finished record from a broken page.
+func (p EquipmentShowProps) statusActionReason() string {
+	if !p.CanWrite {
+		return "You have read-only access to service records."
+	}
+	return ""
+}
+
+func equipmentRetireConfirm(e domain.Equipment) ActionConfirm {
+	return ActionConfirm{
+		Title: "Retire this " + e.Category.Label() + "?",
+		Lead:  "It comes off the register and stops appearing in the machine lists.",
+		Points: []string{
+			"Nothing is deleted — every ticket against it stays readable.",
+			"You can put it back in service later if it was retired by mistake.",
+		},
+		Confirm: "Retire it",
+		Danger:  true,
+	}
+}
+
+templ EquipmentShowContent(props EquipmentShowProps) {
+	@ConfirmDialogHost()
+	<!-- Header -->
+	<div class="sm:flex sm:items-start sm:justify-between">
+		<div class="min-w-0">
+			<a href="/admin/service/equipment" class="text-sm text-rr-muted underline">&larr; Equipment</a>
+			<h1 class="admin-page-title mt-1">{ props.Equipment.Description() }</h1>
+			<div class="mt-2 flex flex-wrap items-center gap-2">
+				<span class={ equipmentStatusBadge(props.Equipment.Status) }>{ props.Equipment.Status.Label() }</span>
+				<span class="badge badge-neutral">{ props.Equipment.Category.Label() }</span>
+				<span class="badge badge-slate">{ props.Equipment.Ownership.Label() }</span>
+				if props.Equipment.UnderWarranty(time.Now()) {
+					<span class="badge badge-teal">Under warranty</span>
+				}
+			</div>
+		</div>
+		if props.CanWrite {
+			<div class="mt-4 shrink-0 sm:mt-0">
+				<a href={ templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/edit") } class="btn-secondary">
+					Edit details
+				</a>
+			</div>
+		}
+	</div>
+	@adminFlash(props.Flash)
+	<div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+		<!-- Main column -->
+		<div class="min-w-0">
+			<div class="border border-rr-border bg-rr-surface">
+				<div class="px-4 py-4">
+					<h2 class="text-sm font-semibold text-rr-heading">The machine</h2>
+					<dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+						<div>
+							<dt class="label-font text-rr-muted">Make and model</dt>
+							<dd class="mt-0.5 text-sm text-rr-body">{ props.Equipment.Description() }</dd>
+						</div>
+						<div>
+							<dt class="label-font text-rr-muted">Serial number</dt>
+							<dd class="mt-0.5 font-mono text-sm text-rr-body">{ equipmentSerialLabel(props.Equipment) }</dd>
+						</div>
+						<div>
+							<dt class="label-font text-rr-muted">Installed</dt>
+							<dd class="mt-0.5 text-sm text-rr-body">{ dayLabel(props.Equipment.InstalledOn) }</dd>
+						</div>
+						<div>
+							<dt class="label-font text-rr-muted">Warranty</dt>
+							<dd class="mt-0.5 text-sm text-rr-body">
+								if note := equipmentWarrantyNote(props.Equipment, props.MerchantTZ); note != "" {
+									{ note }
+								} else {
+									Not recorded
+								}
+							</dd>
+						</div>
+					</dl>
+					<div class="mt-4 border-t border-rr-border pt-3">
+						<dt class="label-font text-rr-muted">Notes</dt>
+						<dd class="mt-0.5 text-sm whitespace-pre-line text-rr-body">{ props.notesOrNone() }</dd>
+					</div>
+				</div>
+			</div>
+			@equipmentRepairHistory(props)
+			@EquipmentActivity(props.Activity, props.MerchantTZ)
+		</div>
+		<!-- Rail -->
+		<div class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+			<div class="border border-rr-border bg-rr-surface">
+				<div class="px-4 py-4">
+					<h2 class="text-sm font-semibold text-rr-heading">Belongs to</h2>
+					<p class="mt-2 text-sm text-rr-body">{ props.CustomerName }</p>
+					<p class="mt-0.5 text-sm text-rr-muted">{ props.siteLine() }</p>
+					<a href={ templ.SafeURL("/admin/customers/" + props.Equipment.CustomerID.String()) } class="mt-2 inline-block text-sm font-medium text-rr-heading underline">
+						Open the customer
+					</a>
+				</div>
+			</div>
+			<div class="border border-rr-border bg-rr-surface">
+				<div class="px-4 py-4">
+					<h2 class="text-sm font-semibold text-rr-heading">Where it is</h2>
+					if reason := props.statusActionReason(); reason != "" {
+						<p class="mt-2 text-sm text-rr-muted">{ reason }</p>
+					} else {
+						<p class="mt-1 text-sm text-rr-muted">Moving a machine here is a record, not a repair — the work itself belongs on a ticket.</p>
+						<div class="mt-3 space-y-2">
+							if props.Equipment.Status != domain.EquipmentStatusActive {
+								<form method="post" action={ templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/status") }>
+									<input type="hidden" name="status" value="active"/>
+									<button type="submit" class="btn-secondary w-full">Back in service</button>
+								</form>
+							}
+							if props.Equipment.Status != domain.EquipmentStatusInShop && props.Equipment.Status != domain.EquipmentStatusRetired {
+								<form method="post" action={ templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/status") }>
+									<input type="hidden" name="status" value="in_shop"/>
+									<button type="submit" class="btn-secondary w-full">Took it to the shop</button>
+								</form>
+							}
+						</div>
+					}
+				</div>
+			</div>
+			if props.CanWrite && props.Equipment.Status != domain.EquipmentStatusRetired {
+				<div class="border border-rr-border bg-rr-surface">
+					<div class="px-4 py-4">
+						<h2 class="text-sm font-semibold text-rr-red">Danger zone</h2>
+						<p class="mt-1 text-sm text-rr-muted">Retiring takes it off the register for good — or until someone puts it back.</p>
+						<form method="post" action={ templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/status") } class="mt-3">
+							<input type="hidden" name="status" value="retired"/>
+							<button type="submit" class="btn-danger w-full" { ConfirmAttrs(equipmentRetireConfirm(props.Equipment))... }>
+								Retire this machine
+							</button>
+						</form>
+					</div>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// equipmentRepairHistory is every ticket ever raised against this machine.
+//
+// Main column, not rail: this is what happened to the machine, which is the
+// substance of the page. Closed tickets stay — a repair history with the
+// finished work hidden could not make the argument it exists to make.
+templ equipmentRepairHistory(props EquipmentShowProps) {
+	<div class="mt-4 border border-rr-border bg-rr-surface">
+		<div class="px-4 py-4">
+			<div class="flex items-center justify-between">
+				<h2 class="text-sm font-semibold text-rr-heading">Repair history</h2>
+				if props.CanWrite && props.Equipment.Status != domain.EquipmentStatusRetired {
+					<a
+						href={ templ.SafeURL("/admin/service/tickets/new?customer_id=" + props.Equipment.CustomerID.String() + "&equipment_id=" + props.Equipment.ID.String()) }
+						class="text-sm text-rr-muted underline"
+					>Open a ticket</a>
+				}
+			</div>
+			if len(props.Tickets) == 0 {
+				<p class="mt-2 text-sm text-rr-muted">Nothing has ever gone wrong with this one.</p>
+			} else {
+				<ul role="list" class="mt-3 divide-y divide-rr-border">
+					for _, row := range props.Tickets {
+						<li class="flex flex-wrap items-baseline justify-between gap-2 py-2 first:pt-0">
+							<div class="min-w-0">
+								<a href={ templ.SafeURL("/admin/service/tickets/" + row.Ticket.ID.String()) } class="text-sm font-medium text-rr-heading underline">
+									{ row.Ticket.Title }
+								</a>
+								<div class="flex flex-wrap items-center gap-1.5">
+									<span class="font-mono text-xs text-rr-muted">{ row.Ticket.Number }</span>
+									<span class="text-xs text-rr-muted">{ equipmentDateLabel(&row.Ticket.CreatedAt, props.MerchantTZ) }</span>
+								</div>
+							</div>
+							<span class={ serviceStatusBadge(row.Ticket.Status) }>{ row.Ticket.Status.Label() }</span>
+						</li>
+					}
+				</ul>
+			}
+		</div>
+	</div>
+}
+
+templ EquipmentShow(props EquipmentShowProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      props.Equipment.Description(),
+		ActivePath: "/admin/service",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@EquipmentShowContent(props)
+	}
+}

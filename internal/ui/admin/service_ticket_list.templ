@@ -1,0 +1,287 @@
+package admin
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// The ticket queue. Part of the equipment service module; see
+// docs/equipment-service-module.md.
+//
+// The list exists to answer one question staff cannot answer any other way:
+// which of these is going wrong. Two things carry that — the status column,
+// which says why an old ticket is still open, and the stale flag, which says
+// nobody has spoken to the customer in a week.
+
+// ServiceTicketRow is one queue line, with the names its ids resolve to.
+type ServiceTicketRow struct {
+	Ticket       domain.ServiceTicket
+	CustomerName string
+	MachineName  string
+	AssigneeName string
+	// Stale is computed against the contact window by the handler, so the
+	// template does not have to know today's date.
+	Stale bool
+}
+
+// ServiceTicketListProps is the queue's state.
+type ServiceTicketListProps struct {
+	Rows []ServiceTicketRow
+	Nav  ServiceNav
+	// Filters, echoed back so the controls show what is applied.
+	Status     string
+	Severity   string
+	Scope      string // "" all open, "mine", "stale", "closed"
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
+	CanWrite   bool
+	Flash      Flash
+}
+
+func serviceStatusBadge(s domain.ServiceTicketStatus) string {
+	switch s {
+	case domain.ServiceTicketStatusNew:
+		return "badge badge-red"
+	case domain.ServiceTicketStatusScheduled, domain.ServiceTicketStatusInProgress:
+		return "badge badge-blue"
+	case domain.ServiceTicketStatusWaitingParts, domain.ServiceTicketStatusWaitingCustomer:
+		return "badge badge-amber"
+	case domain.ServiceTicketStatusResolved:
+		return "badge badge-green"
+	case domain.ServiceTicketStatusCancelled:
+		return "badge badge-grey"
+	}
+	return "badge badge-neutral"
+}
+
+// serviceSeverityBadge marks only the two that mean something is wrong.
+// Routine is the common case and gets nothing — a badge on every row is a badge
+// nobody reads.
+func serviceSeverityBadge(s domain.ServiceSeverity) string {
+	switch s {
+	case domain.ServiceSeverityDown:
+		return "badge badge-red"
+	case domain.ServiceSeverityDegraded:
+		return "badge badge-amber"
+	}
+	return ""
+}
+
+// serviceRowClass gives a quiet ticket the same persistent rust flag the order
+// and fulfillment lists use for stuck work — one visual language across the
+// admin for "this one is waiting on you".
+func serviceRowClass(stale bool) string {
+	if stale {
+		return "row-link row-link-stale"
+	}
+	return "row-link"
+}
+
+func (r ServiceTicketRow) machineLabel() string {
+	if r.MachineName == "" {
+		return "No machine named"
+	}
+	return r.MachineName
+}
+
+func (r ServiceTicketRow) assigneeLabel() string {
+	if r.AssigneeName == "" {
+		return "Unassigned"
+	}
+	return r.AssigneeName
+}
+
+// contactLabel is the column the whole feature turns on: how long since anybody
+// spoke to this customer about this ticket.
+func (r ServiceTicketRow) contactLabel() string {
+	return timelineRelative(r.Ticket.LastContactAt)
+}
+
+func serviceScopeTab(current, scope, label string) templ.Attributes {
+	href := "/admin/service"
+	if scope != "" {
+		href = "/admin/service?scope=" + scope
+	}
+	class := "text-sm text-rr-muted underline"
+	if current == scope {
+		class = "text-sm font-semibold text-rr-heading"
+	}
+	return templ.Attributes{"href": href, "class": class, "data-scope": label}
+}
+
+templ ServiceTicketListContent(props ServiceTicketListProps) {
+	@ConfirmDialogHost()
+	@serviceSection(props.Nav, serviceTabTickets)
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Service</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				Everything currently wrong with a customer's machine, and everything we said we would do about it.
+			</p>
+		</div>
+		if props.CanWrite {
+			<div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+				<a href="/admin/service/tickets/new" class="inline-flex items-center bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90">
+					Open a ticket
+				</a>
+			</div>
+		}
+	</div>
+	@adminFlash(props.Flash)
+	<!-- Scope + filters -->
+	<div class="mt-6 flex flex-wrap items-end gap-4 border border-rr-border bg-rr-surface p-4">
+		<div class="flex items-center gap-4">
+			<a { serviceScopeTab(props.Scope, "", "open")... }>Open</a>
+			<a { serviceScopeTab(props.Scope, "mine", "mine")... }>Mine</a>
+			<a { serviceScopeTab(props.Scope, "stale", "stale")... }>Gone quiet</a>
+			<a { serviceScopeTab(props.Scope, "closed", "closed")... }>Closed</a>
+		</div>
+		<form method="get" action="/admin/service" class="flex flex-wrap items-end gap-3">
+			if props.Scope != "" {
+				<input type="hidden" name="scope" value={ props.Scope }/>
+			}
+			<div>
+				<label for="ticket-status" class="label-font block text-rr-muted">Status</label>
+				<select id="ticket-status" name="status" class="mt-1 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+					<option value="" selected?={ props.Status == "" }>Any</option>
+					for _, st := range domain.ServiceTicketStatuses() {
+						<option value={ string(st) } selected?={ props.Status == string(st) }>{ st.Label() }</option>
+					}
+				</select>
+			</div>
+			<div>
+				<label for="ticket-severity" class="label-font block text-rr-muted">Severity</label>
+				<select id="ticket-severity" name="severity" class="mt-1 rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+					<option value="" selected?={ props.Severity == "" }>Any</option>
+					for _, sv := range domain.ServiceSeverities() {
+						<option value={ string(sv) } selected?={ props.Severity == string(sv) }>{ sv.Label() }</option>
+					}
+				</select>
+			</div>
+			<button type="submit" class="btn-secondary">Apply</button>
+		</form>
+	</div>
+	<!-- Queue -->
+	<div class="mt-6 overflow-hidden border border-rr-border bg-rr-surface">
+		if len(props.Rows) == 0 {
+			<div class="px-4 py-12 text-center">
+				<p class="text-sm text-rr-muted">
+					if props.Scope == "stale" {
+						Nothing has gone quiet. Every open ticket has been talked about inside the last week.
+					} else if props.Scope == "mine" {
+						Nothing is assigned to you.
+					} else if props.Scope == "closed" {
+						No closed tickets yet.
+					} else {
+						No open tickets. Nothing is broken right now.
+					}
+				</p>
+			</div>
+		} else {
+			<div class="overflow-x-auto">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead>
+						<tr>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Ticket</th>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Customer</th>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Machine</th>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Status</th>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Assigned</th>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Last spoke</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border">
+						for _, row := range props.Rows {
+							<tr class={ serviceRowClass(row.Stale) }>
+								<td class="px-4 py-3 text-sm">
+									<a href={ templ.SafeURL("/admin/service/tickets/" + row.Ticket.ID.String()) } class="row-link-target font-medium text-rr-heading">
+										{ row.Ticket.Title }
+									</a>
+									<div class="flex flex-wrap items-center gap-1.5">
+										<span class="font-mono text-xs text-rr-muted">{ row.Ticket.Number }</span>
+										if badge := serviceSeverityBadge(row.Ticket.Severity); badge != "" {
+											<span class={ badge }>{ row.Ticket.Severity.Label() }</span>
+										}
+									</div>
+								</td>
+								<td class="px-4 py-3 text-sm text-rr-body">{ row.CustomerName }</td>
+								<td class="px-4 py-3 text-sm text-rr-muted">{ row.machineLabel() }</td>
+								<td class="px-4 py-3 text-sm">
+									<span class={ serviceStatusBadge(row.Ticket.Status) }>{ row.Ticket.Status.Label() }</span>
+								</td>
+								<td class="px-4 py-3 text-sm text-rr-body">{ row.assigneeLabel() }</td>
+								<td class="px-4 py-3 text-sm">
+									<span class={ templ.KV("text-rr-red font-medium", row.Stale), templ.KV("text-rr-muted", !row.Stale) }>
+										{ row.contactLabel() }
+									</span>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+	if props.Nav.StaleCount > 0 && props.Scope != "stale" {
+		<p class="mt-3 text-sm text-rr-red">
+			{ fmt.Sprintf("%d open ticket%s ha%s gone a week without a word to the customer.", props.Nav.StaleCount, pluralS(props.Nav.StaleCount), staleVerb(props.Nav.StaleCount)) }
+			<a href="/admin/service?scope=stale" class="ml-1 underline">Show them</a>
+		</p>
+	}
+}
+
+// staleVerb keeps the sentence grammatical for one ticket as well as five.
+func staleVerb(n int) string {
+	if n == 1 {
+		return "s"
+	}
+	return "ve"
+}
+
+// ServiceTicketRowsFrom assembles queue lines, resolving each ticket's ids to
+// the names the table shows.
+//
+// It takes lookup maps rather than doing the reads itself so the handler can
+// fetch customers, machines and staff once for the whole page instead of once
+// per row.
+func ServiceTicketRowsFrom(
+	tickets []domain.ServiceTicket,
+	customers map[uuid.UUID]string,
+	machines map[uuid.UUID]string,
+	staff map[uuid.UUID]string,
+	staleBefore time.Time,
+) []ServiceTicketRow {
+	rows := make([]ServiceTicketRow, 0, len(tickets))
+	for _, t := range tickets {
+		row := ServiceTicketRow{
+			Ticket:       t,
+			CustomerName: customers[t.CustomerID],
+			Stale:        t.StaleSince(staleBefore),
+		}
+		if t.EquipmentID != nil {
+			row.MachineName = machines[*t.EquipmentID]
+		}
+		if t.AssignedStaffID != nil {
+			row.AssigneeName = staff[*t.AssignedStaffID]
+		}
+		rows = append(rows, row)
+	}
+	return rows
+}
+
+templ ServiceTicketList(props ServiceTicketListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Service",
+		ActivePath: "/admin/service",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@ServiceTicketListContent(props)
+	}
+}

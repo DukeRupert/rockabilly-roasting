@@ -29,6 +29,10 @@ type navItem struct {
 	Label  string
 	Href   string
 	IconFn func(...icon.Props) templ.Component
+	// Module, when set, makes this row conditional on an optional feature
+	// module being switched on for this shop. Rows with no Module are always
+	// shown. See domain/module.go and docs/equipment-service-module.md.
+	Module domain.Module
 }
 
 // adminNavItems is the flat primary sidebar — seven daily-use destinations.
@@ -45,6 +49,9 @@ func adminNavItems() []navItem {
 		{Label: "Customers", Href: "/admin/customers", IconFn: icon.Users},
 		{Label: "Subscriptions", Href: "/admin/subscriptions", IconFn: icon.Repeat},
 		{Label: "Discounts", Href: "/admin/discounts", IconFn: icon.Tag},
+		// Optional. Only present on a shop that has switched the equipment
+		// service module on — filterNavItems drops it otherwise.
+		{Label: "Service", Href: "/admin/service", IconFn: icon.Wrench, Module: domain.ModuleEquipmentService},
 	}
 }
 
@@ -78,6 +85,8 @@ func resolveActiveNav(path string) string {
 		return "/admin/subscriptions"
 	case strings.HasPrefix(path, "/admin/discounts"):
 		return "/admin/discounts"
+	case strings.HasPrefix(path, "/admin/service"):
+		return "/admin/service"
 	}
 	return path
 }
@@ -152,11 +161,34 @@ templ CatalogNavBadge(count int) {
 	</span>
 }
 
+// visibleNavItems drops the rows belonging to modules this shop has switched
+// off. A disabled module is not a greyed-out row or a row that 404s — it is
+// nothing at all, which is the whole point of making a section optional.
+//
+// The module set rides on the context (see domain.WithModules); outside the
+// admin middleware it is empty, so module rows simply do not render.
+func visibleNavItems(modules domain.ModuleSet) []navItem {
+	return filterNavItems(adminNavItems(), modules)
+}
+
+// filterNavItems is visibleNavItems' rule, split out so it can be tested
+// against a list containing a gated row before any module section exists.
+func filterNavItems(items []navItem, modules domain.ModuleSet) []navItem {
+	out := make([]navItem, 0, len(items))
+	for _, item := range items {
+		if item.Module != "" && !modules.Enabled(item.Module) {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
 templ adminNav(activePath string) {
 	{{ badges := domain.AdminBadgesFrom(ctx) }}
 	<nav data-admin-sidebar-nav class="flex flex-1 flex-col">
 		<ul role="list" class="-mx-2 flex flex-1 flex-col gap-y-1">
-			for _, item := range adminNavItems() {
+			for _, item := range visibleNavItems(domain.ModulesFrom(ctx)) {
 				<li>
 					<a href={ templ.SafeURL(item.Href) } title={ item.Label } class={ navItemClasses(resolveActiveNav(activePath) == item.Href) }>
 						@item.IconFn(icon.Props{Class: navIconColor(resolveActiveNav(activePath) == item.Href)})

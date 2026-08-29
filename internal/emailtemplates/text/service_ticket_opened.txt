@@ -1,0 +1,17 @@
+{{define "service_ticket_opened.txt"}}{{if .Down}}*** MACHINE DOWN ***
+
+{{end}}{{.Title}}
+{{.Number}} | {{.SeverityLabel}} | reported {{date .ReportedAt}}
+{{if .Description}}
+In their words:
+{{.Description}}
+{{end}}
+{{if .Customer}}Customer: {{.Customer}}
+{{end}}{{if .Phone}}Phone:    {{.Phone}}
+{{end}}{{if .CustomerEmail}}Email:    {{.CustomerEmail}}
+{{end}}{{if .Machine}}Machine:  {{.Machine}}{{if .SerialNumber}} (s/n {{.SerialNumber}}){{end}}
+{{end}}
+Open the ticket: {{.TicketURL}}
+
+{{.StoreName}} - Staff notification
+{{end}}

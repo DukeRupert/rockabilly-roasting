@@ -6,6 +6,54 @@ const (
 	// Background jobs — an operator handing a discarded job back to River.
 	AuditJobRetried = "job.retried"
 
+	// Equipment service — the machines a shop maintains for its customers.
+	// Retiring and returning to service get their own actions rather than one
+	// status_changed: the timeline's label and marker are chosen from the
+	// action string alone, so a generic verb could not colour a retirement
+	// differently from a machine coming back.
+	AuditEquipmentCreated           = "equipment.created"
+	AuditEquipmentUpdated           = "equipment.updated"
+	AuditEquipmentSentToShop        = "equipment.sent_to_shop"
+	AuditEquipmentReturnedToService = "equipment.returned_to_service"
+	AuditEquipmentRetired           = "equipment.retired"
+
+	// Service tickets. Status moves are one action carrying from/to in
+	// metadata, unlike equipment: a ticket has seven states and naming each
+	// transition would be twenty-odd constants for a timeline that reads the
+	// same either way. Resolved is split out because it is the one the marker
+	// colours differently.
+	AuditServiceTicketOpened    = "service_ticket.opened"
+	AuditServiceTicketAssigned  = "service_ticket.assigned"
+	AuditServiceTicketStatus    = "service_ticket.status_changed"
+	AuditServiceTicketResolved  = "service_ticket.resolved"
+	AuditServiceTicketReopened  = "service_ticket.reopened"
+	AuditServiceTicketCancelled = "service_ticket.cancelled"
+	AuditServiceTicketNoteAdded = "service_ticket.note_added"
+	// Parts and hours. Removals are audited as loudly as additions: a part
+	// line or a stint deleted after the fact changes what a repair appears to
+	// have cost, and that is exactly the kind of edit somebody will later want
+	// to attribute.
+	AuditServicePartAdded   = "service_ticket.part_added"
+	AuditServicePartStatus  = "service_ticket.part_status_changed"
+	AuditServicePartRemoved = "service_ticket.part_removed"
+	AuditServiceTimeLogged  = "service_ticket.time_logged"
+	AuditServiceTimeRemoved = "service_ticket.time_removed"
+	// AuditServiceStaleSwept records that the daily sweep sent a digest. Not a
+	// per-ticket event — it names how many were quiet, so an unanswered ticket
+	// can later be shown to have been reported and ignored rather than missed.
+	AuditServiceStaleSwept = "service_ticket.stale_swept"
+	// AuditServiceTicketNotified records that the crew were mailed about a
+	// customer's report. It sits on the ticket's own timeline so "we were never
+	// told" can be answered with a time, which is the whole argument a shop has
+	// when a cafe is angry about a machine that stayed broken.
+	AuditServiceTicketNotified = "service_ticket.staff_notified"
+
+	// Optional feature modules — turning a whole section of the app on or off.
+	// Worth an audit entry because enabling one can start sending customer mail
+	// nobody was expecting, and "who did this" is the first question asked.
+	AuditModuleEnabled  = "module.enabled"
+	AuditModuleDisabled = "module.disabled"
+
 	AuditOrderCreated                = "order.created"
 	AuditOrderStatusChanged          = "order.status_changed"
 	AuditOrderRefunded               = "order.refunded"

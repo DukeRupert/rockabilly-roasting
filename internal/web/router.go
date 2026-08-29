@@ -64,6 +64,9 @@ type Deps struct {
 	AuditQueryService      *app.AuditQueryService
 	WebhookService         *app.WebhookService
 	JobHealthService       *app.JobHealthService
+	ModuleService          *app.ModuleService
+	EquipmentService       *app.EquipmentService
+	ServiceTicketService   *app.ServiceTicketService
 	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
 	PaymentProvider        payments.Provider
 	RiverClient            *river.Client[pgx.Tx]
@@ -373,20 +376,58 @@ func NewRouter(deps *Deps) http.Handler {
 	wholesaleMux.HandleFunc("GET /wholesale/account/security", deps.handleWholesaleAccountSecurity)
 	wholesaleMux.HandleFunc("POST /wholesale/account/security/set", deps.handleWholesaleAccountPasswordSet)
 	wholesaleMux.HandleFunc("POST /wholesale/account/security/change", deps.handleWholesaleAccountPasswordChange)
-	mux.Handle("GET /wholesale/reorder", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/portal", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/portal/", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("POST /wholesale/portal/{path...}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/checkout", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/checkout/", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/order-confirmed", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("POST /wholesale/checkout/{path...}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("POST /wholesale/cart/{path...}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/help", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/help/{slug}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/account", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("GET /wholesale/account/{path...}", deps.requireApprovedWholesale(wholesaleMux))
-	mux.Handle("POST /wholesale/account/{path...}", deps.requireApprovedWholesale(wholesaleMux))
+
+	// Equipment service module, customer side. Rate-limited per account rather
+	// than per IP — a cafe is one account behind one router, so an IP bucket
+	// would let the manager's report lock out the barista's.
+	//
+	// Registered on the inner mux so the limiter runs after the auth check and
+	// can read the customer from the session, the same arrangement the account
+	// security routes use.
+	serviceReportLimit := ratelimit.EndpointLimit(deps.RateLimiter, ratelimit.ServiceReportLimit, ratelimit.ServiceReportWindow, func(r *http.Request) string {
+		customer, ok := auth.CustomerFromContext(r.Context())
+		if !ok {
+			return ""
+		}
+		return ratelimit.ServiceReportKey(customer.ID.String())
+	})
+	wholesaleMux.HandleFunc("GET /wholesale/account/equipment", deps.handleWholesaleEquipment)
+	wholesaleMux.Handle("POST /wholesale/account/equipment/{id}/report",
+		serviceReportLimit(http.HandlerFunc(deps.handleWholesaleEquipmentReport)))
+
+	// withModules puts the instance's enabled set on the context so the portal
+	// nav can decide whether the Equipment row exists at all. It costs one read
+	// of the app-layer cache, and without it the row is hidden everywhere.
+	portal := deps.withModules(deps.requireApprovedWholesale(wholesaleMux))
+	mux.Handle("GET /wholesale/reorder", portal)
+	mux.Handle("GET /wholesale/portal", portal)
+	mux.Handle("GET /wholesale/portal/", portal)
+	mux.Handle("POST /wholesale/portal/{path...}", portal)
+	mux.Handle("GET /wholesale/checkout", portal)
+	mux.Handle("GET /wholesale/checkout/", portal)
+	mux.Handle("GET /wholesale/order-confirmed", portal)
+	mux.Handle("POST /wholesale/checkout/{path...}", portal)
+	mux.Handle("POST /wholesale/cart/{path...}", portal)
+	mux.Handle("GET /wholesale/help", portal)
+	mux.Handle("GET /wholesale/help/{slug}", portal)
+	mux.Handle("GET /wholesale/account", portal)
+	mux.Handle("GET /wholesale/account/{path...}", portal)
+	mux.Handle("POST /wholesale/account/{path...}", portal)
+
+	// The equipment routes get their own mounts so requireModule can wrap them
+	// without touching the rest of the account area — the {path...} catch-all
+	// above is one handler for every account page, and gating that would take
+	// the whole portal down with the module. Both patterns beat the catch-all
+	// on specificity, so ServeMux routes here first.
+	//
+	// requireModule sits outside requireApprovedWholesale, matching the admin
+	// side: on a shop that does not run the module these URLs must look like
+	// URLs that were never built, to a signed-out visitor as much as to a
+	// signed-in one.
+	servicePortal := deps.withModules(deps.requireModule(domain.ModuleEquipmentService,
+		deps.requireApprovedWholesale(wholesaleMux)))
+	mux.Handle("GET /wholesale/account/equipment", servicePortal)
+	mux.Handle("POST /wholesale/account/equipment/{id}/report", servicePortal)
 
 	// Staff auth routes (no session required)
 	staffAuthLimit := ratelimit.AuthLimit(deps.RateLimiter, ratelimit.StaffIPLimit, ratelimit.StaffIdentifierLimit, ratelimit.StaffWindow, func(r *http.Request) string {
@@ -652,6 +693,8 @@ func NewRouter(deps *Deps) http.Handler {
 	settingsRoute("GET /admin/settings/wholesale", deps.handleAdminSettingsWholesale)
 	settingsRoute("GET /admin/settings/integrations", deps.handleAdminSettingsIntegrations)
 	settingsRoute("POST /admin/settings/default-price-list", deps.handleAdminDefaultPriceListUpdate)
+	settingsRoute("GET /admin/settings/modules", deps.handleAdminSettingsModules)
+	settingsRoute("POST /admin/settings/modules", deps.handleAdminModuleToggle)
 	settingsRoute("GET /admin/settings/box-presets", deps.handleAdminBoxPresets)
 	settingsRoute("POST /admin/settings/box-presets", deps.handleAdminBoxPresetCreate)
 	settingsRoute("POST /admin/settings/box-presets/{id}", deps.handleAdminBoxPresetUpdate)
@@ -659,6 +702,49 @@ func NewRouter(deps *Deps) http.Handler {
 	settingsRoute("GET /admin/settings/integrations/quickbooks/connect", deps.handleAdminQBConnect)
 	settingsRoute("GET /admin/settings/integrations/quickbooks/callback", deps.handleAdminQBCallback)
 	settingsRoute("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)
+
+	// --- Equipment service module ---
+	//
+	// requireModule wraps requirePermission, not the other way round: on a shop
+	// that has not switched the module on these URLs must 404 for everyone,
+	// including admins, rather than 403 for some roles and 404 for others.
+	serviceRead := func(pattern string, h http.HandlerFunc) {
+		adminMux.Handle(pattern, deps.requireModule(domain.ModuleEquipmentService,
+			deps.requirePermission(auth.PermViewService, h)))
+	}
+	serviceWrite := func(pattern string, h http.HandlerFunc) {
+		adminMux.Handle(pattern, deps.requireModule(domain.ModuleEquipmentService,
+			deps.requirePermission(auth.PermWriteService, h)))
+	}
+	// The queue is the section's front door — it is what staff open Service to
+	// look at.
+	serviceRead("GET /admin/service", deps.handleAdminServiceTicketList)
+	serviceWrite("GET /admin/service/tickets/new", deps.handleAdminServiceTicketNew)
+	// The machine picker fragment, refreshed when the customer select changes.
+	serviceWrite("GET /admin/service/tickets/machines", deps.handleAdminServiceTicketMachines)
+	serviceWrite("POST /admin/service/tickets", deps.handleAdminServiceTicketCreate)
+	serviceRead("GET /admin/service/tickets/{id}", deps.handleAdminServiceTicketShow)
+	serviceWrite("POST /admin/service/tickets/{id}/status", deps.handleAdminServiceTicketStatus)
+	serviceWrite("POST /admin/service/tickets/{id}/assign", deps.handleAdminServiceTicketAssign)
+	serviceWrite("POST /admin/service/tickets/{id}/notes", deps.handleAdminServiceTicketNote)
+	// Parts and hours are sub-records of a ticket: every one of these posts
+	// from the ticket page and redirects straight back to it.
+	serviceWrite("POST /admin/service/tickets/{id}/parts", deps.handleAdminServicePartAdd)
+	serviceWrite("POST /admin/service/tickets/{id}/parts/{childID}/status", deps.handleAdminServicePartStatus)
+	serviceWrite("POST /admin/service/tickets/{id}/parts/{childID}/delete", deps.handleAdminServicePartDelete)
+	serviceWrite("POST /admin/service/tickets/{id}/time", deps.handleAdminServiceTimeLog)
+	serviceWrite("POST /admin/service/tickets/{id}/time/{childID}/delete", deps.handleAdminServiceTimeDelete)
+
+	serviceRead("GET /admin/service/equipment", deps.handleAdminEquipmentList)
+	// Registered before the {id} pattern would shadow it — "new" is not a uuid,
+	// but Go's mux prefers the more specific literal either way, and stating it
+	// here keeps the intent obvious.
+	serviceWrite("GET /admin/service/equipment/new", deps.handleAdminEquipmentNew)
+	serviceWrite("POST /admin/service/equipment", deps.handleAdminEquipmentCreate)
+	serviceRead("GET /admin/service/equipment/{id}", deps.handleAdminEquipmentShow)
+	serviceWrite("GET /admin/service/equipment/{id}/edit", deps.handleAdminEquipmentEdit)
+	serviceWrite("POST /admin/service/equipment/{id}", deps.handleAdminEquipmentUpdate)
+	serviceWrite("POST /admin/service/equipment/{id}/status", deps.handleAdminEquipmentStatus)
 
 	// Admin audit log
 	// Background job health. Admin-only: retrying a job re-runs real work,
@@ -681,12 +767,12 @@ func NewRouter(deps *Deps) http.Handler {
 	})
 
 	// Mount admin mux behind session middleware
-	mux.Handle("GET /admin/", deps.requireStaffSession(deps.withAdminBadges(adminMux)))
-	mux.Handle("POST /admin/{path...}", deps.requireStaffSession(deps.withAdminBadges(adminMux)))
+	mux.Handle("GET /admin/", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(adminMux))))
+	mux.Handle("POST /admin/{path...}", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(adminMux))))
 	mux.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
-	mux.Handle("POST /auth/staff/logout", deps.requireStaffSession(deps.withAdminBadges(adminMux)))
+	mux.Handle("POST /auth/staff/logout", deps.requireStaffSession(deps.withModules(deps.withAdminBadges(adminMux))))
 
 	// Webhooks
 	mux.HandleFunc("POST /webhooks/stripe", deps.handleStripeWebhook)

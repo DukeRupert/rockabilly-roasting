@@ -281,6 +281,60 @@ var (
 	// not something to do from a phone in a van.
 	ErrStopAlreadyDelivered = errors.New("this stop is already marked delivered")
 
+	// --- Equipment service ---
+
+	ErrEquipmentNotFound = errors.New("equipment not found")
+	// ErrEquipmentMakeRequired guards the nameless machine. A register row with
+	// no make is unsearchable and unrecognisable — it is the one field that has
+	// to be there, since model and serial are genuinely often unknown.
+	ErrEquipmentMakeRequired     = errors.New("what make is the machine?")
+	ErrInvalidEquipmentCategory  = errors.New("pick a valid equipment category")
+	ErrInvalidEquipmentOwnership = errors.New("pick a valid ownership")
+	ErrInvalidEquipmentStatus    = errors.New("pick a valid equipment status")
+
+	// --- Service tickets ---
+
+	ErrServiceTicketNotFound = errors.New("service ticket not found")
+	// ErrServiceTicketTitleRequired guards the untitled ticket. The list view is
+	// a column of titles; a blank one is a row nobody can triage without
+	// opening it.
+	ErrServiceTicketTitleRequired = errors.New("what is wrong? give the ticket a one-line title")
+	ErrInvalidServiceSeverity     = errors.New("pick a valid severity")
+	ErrInvalidServiceTicketStatus = errors.New("pick a valid ticket status")
+	ErrInvalidServiceNoteKind     = errors.New("pick a valid note type")
+	// ErrEmptyServiceNote rejects the blank timeline entry. An empty note that
+	// counts as contact would reset the staleness clock while saying nothing —
+	// the precise failure the flag exists to catch.
+	ErrEmptyServiceNote = errors.New("write something before saving the note")
+	// ErrTicketEquipmentMismatch stops a ticket being filed against a machine
+	// belonging to somebody else, which would put one cafe's repair history on
+	// another's page.
+	ErrTicketEquipmentMismatch = errors.New("that machine belongs to a different customer")
+
+	// --- Service parts and time ---
+
+	ErrServicePartNotFound = errors.New("that part is not on this ticket")
+	// ErrPartNameRequired guards the nameless line. "1 × £4.25" on a repair
+	// record six months later is worse than no line at all.
+	ErrPartNameRequired    = errors.New("what part is it?")
+	ErrInvalidPartQuantity = errors.New("quantity has to be at least one")
+	ErrInvalidPartCost     = errors.New("a part cannot cost less than nothing")
+	ErrInvalidPartStatus   = errors.New("pick a valid part status")
+
+	ErrServiceTimeEntryNotFound = errors.New("that time entry is not on this ticket")
+	// ErrInvalidTimeMinutes rejects zero and negative stints. Zero minutes is
+	// someone tabbing past the field, and it would quietly dilute every
+	// hours-per-account number computed later.
+	ErrInvalidTimeMinutes     = errors.New("how long did it take? minutes, at least one")
+	ErrInvalidServiceTimeKind = errors.New("pick labour or travel")
+
+	// --- Optional feature modules ---
+
+	// ErrUnknownModule is returned when a toggle names a key this binary does
+	// not have in its registry. Not a module to create on the fly — either the
+	// request was hand-made, or the caller is a deploy behind.
+	ErrUnknownModule = errors.New("unknown module")
+
 	// --- Announcements ---
 
 	ErrAnnouncementNotFound = errors.New("announcement not found")

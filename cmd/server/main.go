@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/riverqueue/river"
@@ -361,6 +362,9 @@ func run() error {
 	staffInviteTokenStore := store.NewStaffInviteTokenStore()
 	customerUserStore := store.NewCustomerUserStore()
 	announcementStore := store.NewAnnouncementStore()
+	moduleStore := store.NewModuleStore()
+	equipmentStore := store.NewEquipmentStore()
+	serviceTicketStore := store.NewServiceTicketStore()
 	customerUserInviteTokenStore := store.NewCustomerUserInviteTokenStore()
 	geocodeStore := store.NewGeocodeStore(metricsReg)
 	routeStore := store.NewRouteStore(metricsReg)
@@ -414,6 +418,19 @@ func run() error {
 	announcementSvc := app.NewAnnouncementService(announcementStore, customerStore, customerUserStore, auditWriter, metricsReg).
 		WithEmail(emailEnv).
 		WithUnsubscribeSigner(unsubscribeSigner)
+	// Optional feature modules. The enabled set is cached in memory, so it has
+	// to be loaded before anything serves — an unloaded cache reads as "every
+	// module off", which would hide a section the merchant switched on.
+	moduleSvc := app.NewModuleService(moduleStore, auditWriter)
+	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
+		return moduleSvc.Refresh(ctx, tx)
+	}); err != nil {
+		logger.Error("load feature modules", "error", err)
+		os.Exit(1)
+	}
+	equipmentSvc := app.NewEquipmentService(equipmentStore, auditWriter)
+	serviceTicketSvc := app.NewServiceTicketService(serviceTicketStore, equipmentStore, auditWriter).
+		WithNotifications(emailEnv, customerStore, moduleSvc, metricsReg)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, attributeStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -479,6 +496,8 @@ func run() error {
 	river.AddWorker(workers, jobs.NewWholesaleNoticeWorker(wholesaleSvc, pool))
 	river.AddWorker(workers, jobs.NewAnnouncementDispatchWorker(announcementSvc, pool))
 	river.AddWorker(workers, jobs.NewAnnouncementSendWorker(announcementSvc, pool))
+	river.AddWorker(workers, jobs.NewServiceStaleSweepWorker(serviceTicketSvc, pool))
+	river.AddWorker(workers, jobs.NewServiceTicketOpenedWorker(serviceTicketSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)
 	// See below after riverClient creation.
@@ -516,6 +535,22 @@ func run() error {
 				}
 			},
 			&river.PeriodicJobOpts{RunOnStart: true},
+		),
+		// Digest the service tickets that have gone quiet. Daily, and no
+		// RunOnStart: a deploy must not mail staff an unscheduled digest, and
+		// the worker returns early anyway on instances without the equipment
+		// service module. ByPeriod matches the interval so a re-enqueue inside
+		// the same day is dropped rather than sending twice.
+		river.NewPeriodicJob(
+			river.PeriodicInterval(24*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.ServiceStaleSweepArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 24 * time.Hour,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
 		),
 	}
 	// Weekly wholesale order reminder. No RunOnStart — a deploy must never
@@ -698,6 +733,9 @@ func run() error {
 		PaymentProvider:        paymentProvider,
 		RiverClient:            riverClient,
 		AnnouncementService:    announcementSvc,
+		ModuleService:          moduleSvc,
+		EquipmentService:       equipmentSvc,
+		ServiceTicketService:   serviceTicketSvc,
 		Enqueuer:               enqueuer,
 		R2Client:               r2Client,
 		MediaConfig:            mediaConfig,

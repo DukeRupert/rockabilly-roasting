@@ -1,0 +1,265 @@
+package storefront
+
+import (
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// --- Equipment (wholesale portal) ---
+//
+// The customer-facing half of the equipment service module. Two jobs, in this
+// order: tell a cafe what we look after for them and when we last touched it,
+// and let them report a fault without picking up the phone.
+//
+// The reply half matters as much as the report. Every open ticket carries its
+// status and its customer-visible notes right here, so "did anyone see my
+// message" is answered by the page rather than by ringing the shop.
+
+type WholesaleEquipmentProps struct {
+	Customer    *domain.Customer
+	CompanyName string
+	Machines    []WholesaleMachineView
+	// OtherTickets are open tickets that name no machine we can show a card for
+	// — raised by staff against the account, or against a machine since retired.
+	OtherTickets []WholesaleTicketView
+	CartCount    int
+	Success      string
+	Error        string
+	// ReportingID holds the report form open on one machine after a failed
+	// submit, with ReportDown / ReportTime carrying back what they had already
+	// filled in. Empty on a normal load: every form starts closed.
+	ReportingID string
+	ReportDown  bool
+	ReportTime  string
+}
+
+// WholesaleMachineView is one machine plus everything the card shows about it.
+type WholesaleMachineView struct {
+	Equipment domain.Equipment
+	// LastServiced is when work on it was last finished. Nil means never — a
+	// new install, or one we have not been called out to yet.
+	LastServiced *time.Time
+	OpenTickets  []WholesaleTicketView
+}
+
+// WholesaleTicketView is one live ticket and the part of its timeline the
+// customer is allowed to read.
+type WholesaleTicketView struct {
+	Ticket domain.ServiceTicket
+	Notes  []domain.ServiceTicketNote
+}
+
+templ WholesaleEquipmentContent(props WholesaleEquipmentProps) {
+	@wholesaleAccountLayout("/wholesale/account/equipment", props.CompanyName) {
+		<div class="max-w-3xl">
+			@accountPageHeading("The Crew · Wholesale", "Your machines")
+			if props.Success != "" {
+				<div class="mb-6 border-2 border-ink bg-candle/20 px-4 py-3">
+					<p class="font-oswald text-ink text-sm" style="letter-spacing:0.04em;">{ props.Success }</p>
+				</div>
+			}
+			if props.Error != "" {
+				<div class="mb-6 border-2 border-rust bg-cream-hi px-4 py-3">
+					<p class="font-oswald font-bold text-rust text-sm" style="letter-spacing:0.04em;">{ props.Error }</p>
+				</div>
+			}
+			if len(props.Machines) == 0 && len(props.OtherTickets) == 0 {
+				<div class="border-2 border-ink bg-cream-hi py-14 px-6 text-center shadow-stamp">
+					<p class="font-slab text-ink text-lg uppercase" style="letter-spacing:0.02em;">Nothing on the books</p>
+					<p class="font-oswald text-ink-soft text-sm mt-1 max-w-md mx-auto" style="letter-spacing:0.04em; line-height:1.6;">
+						We don't have any of your equipment on file. If we look after a machine of yours, tell the crew and we'll get it logged.
+					</p>
+					<a href="/wholesale/help" class="btn-stamp inline-flex items-center gap-2 mt-6 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.14em; text-transform:uppercase;">
+						Get in touch
+					</a>
+				</div>
+			} else {
+				<p class="font-oswald text-ink-soft text-sm mb-8" style="letter-spacing:0.04em; line-height:1.6;">
+					Everything we service for { props.CompanyName }, and where any live repair has got to. Something playing up? Tell us on the machine itself — it reaches the crew straight away.
+				</p>
+				<div class="space-y-6">
+					for _, m := range props.Machines {
+						@machineCard(m, props)
+					}
+				</div>
+				if len(props.OtherTickets) > 0 {
+					<div class="mt-10">
+						<p class="font-oswald font-bold text-candle text-[11px] mb-4 pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">Other open jobs</p>
+						<div class="space-y-3">
+							for _, t := range props.OtherTickets {
+								@ticketBlock(t)
+							}
+						</div>
+					</div>
+				}
+			}
+		</div>
+	}
+}
+
+// machineCard is one machine: what it is, when we last worked on it, anything
+// live against it, and the way to tell us it has stopped behaving.
+templ machineCard(m WholesaleMachineView, props WholesaleEquipmentProps) {
+	<div class="border-2 border-ink bg-cream-hi shadow-stamp" x-data={ machineCardState(m, props) }>
+		<div class="flex flex-wrap items-start gap-x-4 gap-y-2 px-5 py-4 border-b-2 border-ink/20">
+			<div class="min-w-0 flex-1">
+				<p class="font-slab text-ink uppercase text-base" style="letter-spacing:-0.005em;">{ m.Equipment.Description() }</p>
+				<p class="font-special text-chrome-deep text-xs mt-1">
+					{ m.Equipment.Category.Label() }
+					if m.Equipment.SerialNumber != "" {
+						{ " · s/n " + m.Equipment.SerialNumber }
+					}
+				</p>
+			</div>
+			if m.Equipment.Status != domain.EquipmentStatusActive {
+				<span class="shrink-0 border-2 border-ink bg-paper px-2.5 py-1 font-oswald font-bold text-ink text-[10px]" style="letter-spacing:0.16em; text-transform:uppercase;">{ m.Equipment.Status.Label() }</span>
+			}
+		</div>
+		<div class="flex flex-wrap gap-x-8 gap-y-2 px-5 py-3 border-b-2 border-ink/20">
+			@machineFact("Last serviced", lastServicedLabel(m.LastServiced))
+			if m.Equipment.InstalledOn != nil {
+				@machineFact("Installed", formatDate(*m.Equipment.InstalledOn))
+			}
+			if m.Equipment.UnderWarranty(time.Now()) {
+				@machineFact("Under warranty", "until "+formatDate(*m.Equipment.WarrantyExpiresOn))
+			}
+		</div>
+		if len(m.OpenTickets) > 0 {
+			<div class="px-5 py-4 border-b-2 border-ink/20 space-y-3">
+				for _, t := range m.OpenTickets {
+					@ticketBlock(t)
+				}
+			</div>
+		}
+		<!-- Report a problem. Closed by default: the common visit is a look, not a fault. -->
+		<div class="px-5 py-4">
+			<button type="button" x-show="!open" x-on:click="open = true"
+				class="font-oswald font-bold text-[11px] text-rust hover:text-ink transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">
+				Report a problem
+			</button>
+			<form method="POST" action={ templ.SafeURL("/wholesale/account/equipment/" + m.Equipment.ID.String() + "/report") }
+				x-show="open" x-cloak class="space-y-5">
+				<p class="font-oswald font-bold text-candle text-[11px] pb-2 border-b-2 border-ink" style="letter-spacing:0.24em; text-transform:uppercase;">What's it doing?</p>
+				<label class="flex items-start gap-3 cursor-pointer">
+					<input type="checkbox" name="down" value="1" checked?={ props.ReportingID == m.Equipment.ID.String() && props.ReportDown } class="mt-0.5 size-4 shrink-0 border-2 border-ink accent-rust"/>
+					<span class="font-oswald text-ink text-sm" style="letter-spacing:0.04em;">
+						It's down right now — we can't use it
+						<span class="block font-oswald text-chrome-deep text-xs mt-0.5">Tick this and we'll treat it as urgent, whatever time it is.</span>
+					</span>
+				</label>
+				<div>
+					<label for={ "report_description_" + m.Equipment.ID.String() } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">What's happening</label>
+					<textarea id={ "report_description_" + m.Equipment.ID.String() } name="description" rows="4" required
+						placeholder="Group head is dripping between shots and the pressure gauge is sitting low."
+						class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none" style="letter-spacing:0.04em; line-height:1.6;"></textarea>
+				</div>
+				<div>
+					<label for={ "report_time_" + m.Equipment.ID.String() } class="font-oswald font-bold text-ink text-[11px] mb-2 block" style="letter-spacing:0.2em; text-transform:uppercase;">Best time to reach you (optional)</label>
+					<input type="text" id={ "report_time_" + m.Equipment.ID.String() } name="best_time" value={ reportTimeValue(m, props) } autocomplete="off" placeholder="Before 10am, or after the lunch rush"
+						class="paper-input w-full border-2 border-ink bg-paper px-3.5 py-2.5 font-oswald text-sm text-ink placeholder:text-chrome-deep focus:outline-none" style="letter-spacing:0.04em;"/>
+				</div>
+				<div class="flex flex-wrap items-center gap-4 pt-1">
+					<button type="submit" class="btn-stamp inline-flex items-center gap-2 bg-rust text-paper border-2 border-ink px-6 py-3 font-oswald font-bold text-sm" style="letter-spacing:0.16em; text-transform:uppercase;">
+						Send it to the crew
+					</button>
+					<button type="button" x-on:click="open = false" class="font-oswald font-bold text-[10px] text-chrome-deep hover:text-rust transition-colors" style="letter-spacing:0.16em; text-transform:uppercase;">
+						Never mind
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+// machineFact is one labelled value in the strip under a machine's name.
+templ machineFact(label, value string) {
+	<div>
+		<p class="font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.18em; text-transform:uppercase;">{ label }</p>
+		<p class="font-special text-ink text-sm mt-0.5">{ value }</p>
+	</div>
+}
+
+// ticketBlock is one live repair: where it has got to, and everything we have
+// said to them about it.
+templ ticketBlock(t WholesaleTicketView) {
+	<div class="border-2 border-ink/30 bg-paper px-4 py-3">
+		<div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+			<span class="font-special text-chrome-deep text-xs">{ t.Ticket.Number }</span>
+			<span class="font-oswald font-bold text-ink text-sm min-w-0 flex-1" style="letter-spacing:0.04em;">{ t.Ticket.Title }</span>
+			<span class={ ticketStatusClass(t.Ticket) } style="letter-spacing:0.16em; text-transform:uppercase;">{ t.Ticket.Status.Label() }</span>
+		</div>
+		<p class="font-special text-chrome-deep text-xs mt-1">Reported { formatDate(t.Ticket.CreatedAt) }</p>
+		if len(t.Notes) > 0 {
+			<div class="mt-3 pt-3 border-t-2 border-ink/15 space-y-3">
+				for _, n := range t.Notes {
+					<div>
+						<p class="font-oswald font-bold text-chrome-deep text-[10px]" style="letter-spacing:0.18em; text-transform:uppercase;">
+							{ noteAttribution(n) } · { formatDate(n.OccurredAt) }
+						</p>
+						<p class="font-oswald text-ink text-sm mt-1 whitespace-pre-line" style="letter-spacing:0.04em; line-height:1.6;">{ n.Body }</p>
+					</div>
+				}
+			</div>
+		}
+	</div>
+}
+
+// lastServicedLabel says when we last finished work on a machine. "Not yet" is
+// deliberately not "Never": a machine we have never been called out to is a
+// machine behaving itself, and this page should not read as a reproach.
+func lastServicedLabel(at *time.Time) string {
+	if at == nil {
+		return "Not yet"
+	}
+	return formatDate(*at)
+}
+
+// noteAttribution labels a timeline entry with who it came from. The customer's
+// own report is named as theirs — seeing their words echoed back under their
+// own name is the receipt that the message landed.
+func noteAttribution(n domain.ServiceTicketNote) string {
+	if n.Kind == domain.ServiceNoteKindCustomerReport {
+		return "You told us"
+	}
+	return "The crew"
+}
+
+// ticketStatusClass colours the status chip. Only the two waiting states are
+// picked out: they are the ones where the answer to "what happens next" is not
+// "we're on it", and a cafe reading "waiting on customer" needs to notice.
+func ticketStatusClass(t domain.ServiceTicket) string {
+	base := "shrink-0 border-2 px-2.5 py-1 font-oswald font-bold text-[10px] "
+	switch t.Status {
+	case domain.ServiceTicketStatusWaitingParts, domain.ServiceTicketStatusWaitingCustomer:
+		return base + "border-candle bg-candle/20 text-ink"
+	default:
+		return base + "border-ink bg-ink text-paper"
+	}
+}
+
+// machineCardState seeds the Alpine state for one card's report form: open only
+// when a failed submit sent the customer back to this machine, so the page does
+// not reopen every form on every load.
+func machineCardState(m WholesaleMachineView, props WholesaleEquipmentProps) string {
+	if props.ReportingID == m.Equipment.ID.String() {
+		return "{ open: true }"
+	}
+	return "{ open: false }"
+}
+
+// reportTimeValue carries the best-time field back after a failed submit, and
+// only for the machine that was being reported.
+func reportTimeValue(m WholesaleMachineView, props WholesaleEquipmentProps) string {
+	if props.ReportingID == m.Equipment.ID.String() {
+		return props.ReportTime
+	}
+	return ""
+}
+
+templ WholesaleEquipmentPage(props WholesaleEquipmentProps) {
+	@layouts.Storefront(layouts.StorefrontProps{Title: "Equipment", CartURL: "/wholesale/checkout", CartCount: props.CartCount}) {
+		@WholesaleEquipmentContent(props)
+	}
+}

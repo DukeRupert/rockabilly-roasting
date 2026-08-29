@@ -28,6 +28,7 @@ const (
 	settingsTabBoxPresets   = "/admin/settings/box-presets"
 	settingsTabWholesale    = "/admin/settings/wholesale"
 	settingsTabIntegrations = "/admin/settings/integrations"
+	settingsTabModules      = "/admin/settings/modules"
 	settingsTabTeam         = "/admin/staff"
 )
 
@@ -94,6 +95,10 @@ func (n SettingsNav) tabs() []sectionTab {
 		{Label: "Box presets", Href: settingsTabBoxPresets},
 		{Label: "Wholesale", Href: settingsTabWholesale},
 		{Label: "Integrations", Href: settingsTabIntegrations},
+		// Modules sits last: it is the tab a shop touches once, at setup, and
+		// then never again — unlike the four before it, which hold settings
+		// that get revised.
+		{Label: "Modules", Href: settingsTabModules},
 	}
 	// The team roster lives at /admin/staff and was reachable only from the
 	// user menu. It is settings — it belongs in the strip, for the staff who

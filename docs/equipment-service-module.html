@@ -1,0 +1,847 @@
+<title>Equipment Service Module</title>
+
+<style>
+/* ============================================================
+   Equipment Service Module — design doc
+   Palette and type taken from the Rockabilly Roasting Design
+   System, in the quieter "admin" treatment: same paper and ink,
+   ornament dialled down, density over drama. One bold element
+   (the title stamp); everything else is hairline and quiet.
+
+   Deliberate deviation: Special Elite carries eyebrows, labels
+   and inline code, but multi-line SQL uses a real monospace —
+   a typewriter face makes a thirty-line block hard to scan, and
+   scanning is what this document is for.
+   ============================================================ */
+
+:root {
+  /* paper & ink */
+  --paper:       #F6EFE1;
+  --paper-warm:  #ECE0C6;
+  --cream-hi:    #FFFBF1;
+  --ink:         #0E0D0C;
+  --fg-body:     #3A332B;
+  --fg-muted:    #7C756A;
+
+  /* accents */
+  --rust:        #B4351D;
+  --rust-deep:   #8A240F;
+  --amber:       #C9731A;
+  --amber-mark:  #F2A03D;
+
+  /* rules */
+  --rule:        #0E0D0C;
+  --rule-soft:   rgba(14,13,12,0.16);
+  --rule-hair:   rgba(14,13,12,0.09);
+
+  --stamp:       4px 4px 0 0 var(--ink);
+
+  --measure:     68ch;
+
+  --font-display: 'Alfa Slab One', Rockwell, Georgia, serif;
+  --font-sans:    'Oswald', 'Arial Narrow', system-ui, sans-serif;
+  --font-type:    'Special Elite', 'Courier Prime', ui-monospace, monospace;
+  --font-code:    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:      #161411;
+    --paper-warm: #201C18;
+    --cream-hi:   #201C18;
+    --ink:        #EFE6D4;
+    --fg-body:    #D6CBB6;
+    --fg-muted:   #968D7E;
+    --rust:       #E07051;
+    --rust-deep:  #F08A6B;
+    --amber:      #E8A44E;
+    --amber-mark: #F2A03D;
+    --rule:       #6E655A;
+    --rule-soft:  rgba(239,230,212,0.20);
+    --rule-hair:  rgba(239,230,212,0.11);
+    --stamp:      4px 4px 0 0 #6E655A;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper:      #161411;
+  --paper-warm: #201C18;
+  --cream-hi:   #201C18;
+  --ink:        #EFE6D4;
+  --fg-body:    #D6CBB6;
+  --fg-muted:   #968D7E;
+  --rust:       #E07051;
+  --rust-deep:  #F08A6B;
+  --amber:      #E8A44E;
+  --amber-mark: #F2A03D;
+  --rule:       #6E655A;
+  --rule-soft:  rgba(239,230,212,0.20);
+  --rule-hair:  rgba(239,230,212,0.11);
+  --stamp:      4px 4px 0 0 #6E655A;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--fg-body);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- shell ---------- */
+
+.shell {
+  display: grid;
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+  gap: 3.5rem;
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 3rem 2rem 7rem;
+  align-items: start;
+}
+
+@media (max-width: 62rem) {
+  .shell { grid-template-columns: minmax(0, 1fr); gap: 2rem; padding: 2rem 1.25rem 4rem; }
+}
+
+/* ---------- rail ---------- */
+
+.rail { position: sticky; top: 2rem; display: flex; flex-direction: column; gap: 1.75rem; }
+@media (max-width: 62rem) { .rail { position: static; } }
+
+.rail-heading {
+  font-family: var(--font-type);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin: 0 0 0.6rem;
+}
+
+.toc { display: flex; flex-direction: column; gap: 0.1rem; border-left: 2px solid var(--rule-soft); }
+.toc a {
+  display: block;
+  padding: 0.22rem 0 0.22rem 0.85rem;
+  margin-left: -2px;
+  border-left: 2px solid transparent;
+  color: var(--fg-body);
+  text-decoration: none;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  transition: color 150ms linear, border-color 150ms linear;
+}
+.toc a:hover { color: var(--rust); border-left-color: var(--rule-soft); }
+.toc a.is-current { color: var(--ink); font-weight: 600; border-left-color: var(--rust); }
+.toc a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+.legend { display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.82rem; line-height: 1.4; }
+.legend div { padding-left: 0.7rem; border-left: 3px solid var(--rule); color: var(--fg-muted); }
+.legend .lg-open { border-left-color: var(--amber-mark); }
+.legend .lg-never { border-left: 3px dashed var(--fg-muted); }
+
+/* ---------- title block ---------- */
+
+.masthead {
+  background: var(--cream-hi);
+  border: 3px solid var(--rule);
+  box-shadow: var(--stamp);
+  padding: 1.75rem 1.75rem 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.masthead .kicker {
+  font-family: var(--font-type);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rust);
+  margin: 0 0 0.75rem;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(1.9rem, 4.6vw, 3rem);
+  line-height: 1.08;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-wrap: balance;
+  color: var(--ink);
+  margin: 0 0 1rem;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chip {
+  font-family: var(--font-type);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border: 2px solid var(--rule);
+  border-radius: 2px;
+  color: var(--ink);
+  background: transparent;
+}
+.chip-alert { border-color: var(--rust); color: var(--rust); }
+.chip-done { border-color: var(--rust); color: var(--rust); }
+
+/* ---------- document ---------- */
+
+.doc { max-width: var(--measure); }
+.doc > * { max-width: var(--measure); }
+
+section { padding-top: 2.75rem; margin-top: 2.75rem; border-top: 2px solid var(--rule); }
+section:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+section { scroll-margin-top: 1.5rem; }
+
+.eyebrow {
+  font-family: var(--font-type);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rust);
+  margin: 0 0 0.4rem;
+}
+
+h2 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.6rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+  color: var(--ink);
+  margin: 0 0 1.1rem;
+}
+
+h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 1.12rem;
+  line-height: 1.3;
+  color: var(--ink);
+  margin: 2.25rem 0 0.75rem;
+}
+
+h3 code { font-size: 1em; background: none; padding: 0; border: none; color: var(--rust); }
+
+p { margin: 0 0 1.05rem; }
+p:last-child { margin-bottom: 0; }
+
+strong { font-weight: 600; color: var(--ink); }
+
+a { color: var(--rust); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { color: var(--rust-deep); }
+a:focus-visible { outline: 2px solid var(--rust); outline-offset: 2px; }
+
+ul { margin: 0 0 1.05rem; padding-left: 1.15rem; }
+ol { margin: 0 0 1.05rem; padding-left: 1.4rem; }
+li { margin-bottom: 0.45rem; }
+li:last-child { margin-bottom: 0; }
+li::marker { color: var(--fg-muted); }
+
+code {
+  font-family: var(--font-type);
+  font-size: 0.92em;
+  background: var(--paper-warm);
+  padding: 0.05em 0.3em;
+  border-radius: 2px;
+  color: var(--ink);
+}
+
+/* ---------- code blocks ---------- */
+
+.block { margin: 0 0 1.4rem; max-width: none; }
+.block-label {
+  font-family: var(--font-type);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  margin-bottom: 0.35rem;
+}
+pre {
+  margin: 0;
+  background: var(--cream-hi);
+  border: 2px solid var(--rule-soft);
+  border-left: 4px solid var(--rule);
+  padding: 1rem 1.1rem;
+  overflow-x: auto;
+}
+pre code {
+  font-family: var(--font-code);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  background: none;
+  padding: 0;
+  color: var(--fg-body);
+  white-space: pre;
+}
+
+/* ---------- tables ---------- */
+
+.table-wrap { overflow-x: auto; margin: 0 0 1.4rem; max-width: none; }
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 34rem;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+th {
+  font-family: var(--font-type);
+  font-weight: 400;
+  font-size: 0.72rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  text-align: left;
+  padding: 0 0.9rem 0.5rem 0;
+  border-bottom: 2px solid var(--rule);
+  vertical-align: bottom;
+}
+td {
+  padding: 0.6rem 0.9rem 0.6rem 0;
+  border-bottom: 1px solid var(--rule-hair);
+  vertical-align: top;
+  line-height: 1.5;
+}
+th:last-child, td:last-child { padding-right: 0; }
+tr:last-child td { border-bottom: none; }
+td code { font-size: 0.86em; }
+.col-tight { white-space: nowrap; color: var(--ink); font-weight: 500; }
+
+/* ---------- callouts ---------- */
+
+.note {
+  border-left: 3px solid var(--rule);
+  background: var(--cream-hi);
+  padding: 0.9rem 1.1rem;
+  margin: 0 0 1.4rem;
+}
+.note .note-label {
+  font-family: var(--font-type);
+  font-size: 0.7rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  display: block;
+  margin-bottom: 0.35rem;
+}
+.note-open { border-left-color: var(--amber-mark); }
+.note-open .note-label { color: var(--amber); }
+.note-never { border-left: 3px dashed var(--fg-muted); background: transparent; }
+
+/* ---------- footer ---------- */
+
+.colophon {
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 2px solid var(--rule);
+  font-family: var(--font-type);
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  max-width: var(--measure);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; }
+}
+</style>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Oswald:wght@400;500;600&family=Special+Elite&display=swap">
+
+<div class="shell">
+
+  <aside class="rail">
+    <nav aria-label="Contents">
+      <p class="rail-heading">Contents</p>
+      <div class="toc">
+        <a href="#job">The job</a>
+        <a href="#plugin">What &ldquo;plugin&rdquo; means</a>
+        <a href="#scope">Scope</a>
+        <a href="#model">Domain model</a>
+        <a href="#layers">Layers</a>
+        <a href="#admin-ui">Admin UI</a>
+        <a href="#portal">Wholesale portal</a>
+        <a href="#permissions">Permissions</a>
+        <a href="#jobs">Jobs and email</a>
+        <a href="#audit">Audit actions</a>
+        <a href="#metrics">Metrics</a>
+        <a href="#migration">Migration</a>
+        <a href="#v2">v2, briefly</a>
+        <a href="#open">Open decisions</a>
+        <a href="#build">Build order</a>
+      </div>
+    </nav>
+    <div>
+      <p class="rail-heading">Marks</p>
+      <div class="legend">
+        <div>Decision made</div>
+        <div class="lg-open">Open question</div>
+        <div class="lg-never">Deliberately not built</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="doc">
+
+    <header class="masthead">
+      <p class="kicker">Hiri &middot; optional module</p>
+      <h1>Equipment Service</h1>
+      <div class="chips">
+        <span class="chip chip-done">Steps 1&ndash;5 built</span>
+        <span class="chip">Updated 2026-08-25</span>
+        <span class="chip">Source: docs/equipment-service-module.md</span>
+      </div>
+    </header>
+
+    <section id="job">
+      <p class="eyebrow">Context</p>
+      <h2>The job</h2>
+      <p>A roaster sells a cafe coffee, and then &mdash; because nobody else will &mdash; ends up maintaining the espresso machine and the grinders that coffee goes through. That work is real: parts get ordered, a tech drives out and spends two hours, the shop calls at 6am because the group head is leaking. Today it lives in a notebook, a text thread, and somebody&rsquo;s memory.</p>
+      <p>Hiri already knows the customer, their addresses, their order history, and how to bill them. The service module adds the missing half: <strong>the machines, the tickets, the parts, the hours, and the conversation.</strong></p>
+      <p>Concretely it has to answer, for any machine or any account:</p>
+      <ul>
+        <li>What is installed at this shop, and how old is it?</li>
+        <li>What did we last do to it, and when?</li>
+        <li>What parts went in &mdash; ordered when, received when, installed when, what did they cost?</li>
+        <li>How many hours have we put into this account this quarter?</li>
+        <li><strong>When did we last talk to them?</strong> (the question that actually causes churn)</li>
+        <li>What is broken right now, and who told us?</li>
+      </ul>
+    </section>
+
+    <section id="plugin">
+      <p class="eyebrow">Mechanism</p>
+      <h2>Decision: what &ldquo;plugin&rdquo; means here</h2>
+      <p>Hiri is single-tenant &mdash; one container and one database per merchant (<code>saas-readiness-hiri.md</code>). So a module is <strong>per-instance</strong>, not per-user and not per-role. A merchant who doesn&rsquo;t fix espresso machines never sees the word &ldquo;service&rdquo; anywhere in the product; a merchant who does flips one switch.</p>
+      <p>There is no plugin mechanism today. Feature flags have been ad-hoc columns (<code>shipping_config.local_pickup_enabled</code>, <code>customers.announcements_enabled</code>). That&rsquo;s fine for a per-row preference and wrong for &ldquo;does this whole section of the app exist&rdquo;, so this design introduces the smallest general thing that works:</p>
+
+      <div class="block">
+        <p class="block-label">Built &mdash; db/migrations/076_modules.sql</p>
+<pre><code>CREATE TABLE modules (
+    key        text PRIMARY KEY,
+    enabled    boolean NOT NULL DEFAULT false,
+    enabled_at timestamptz,
+    enabled_by uuid REFERENCES staff(id) ON DELETE SET NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO modules (key) VALUES ('equipment_service');</code></pre>
+      </div>
+
+      <ul>
+        <li><code>domain/module.go</code> holds the known keys and their display metadata. A key in the table that the binary doesn&rsquo;t know about is ignored; a known key with no row reads as disabled. Both directions are safe across a rolling deploy.</li>
+        <li><code>app.ModuleService</code> owns reads and the toggle. Because Hiri is one process (server + River workers in one binary), it can cache the enabled set in an <code>atomic.Value</code> and invalidate on toggle. <strong>That&rsquo;s only safe while the process count is one</strong> &mdash; write the comment saying so, and if the fleet ever runs two replicas, drop to reading the single indexed row per request.</li>
+        <li>Toggling is <code>PermManageSystem</code>, lives on a <strong>Settings &rarr; Modules</strong> tab, and writes an audit record. Turning a module off <strong>never deletes data</strong> &mdash; the routes 404 and the nav rows vanish, the tables stay. Say that on the toggle itself, because &ldquo;will this nuke my service history&rdquo; is the first question.</li>
+      </ul>
+
+      <p>Enforcement, three places, all cheap:</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Surface</th><th>Mechanism</th></tr></thead>
+          <tbody>
+            <tr><td class="col-tight">Routes</td><td><code>deps.requireModule(domain.ModuleEquipmentService)</code> middleware wrapping the service mux &mdash; returns 404, not 403. A disabled module should look like it was never built.</td></tr>
+            <tr><td class="col-tight">Nav</td><td><code>navItem</code> gains an optional <code>Module</code> field; <code>adminNav</code> filters rows whose module is off. Same for the wholesale portal nav.</td></tr>
+            <tr><td class="col-tight">Jobs</td><td>Every service worker re-checks enablement and returns nil (not an error) if the module is off. A job enqueued before a toggle must not fail forever in River.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="note-label">Note for later</span>
+        <p>Module keys are exactly the shape a pricing tier wants to set at provision time. Don&rsquo;t build that now, but don&rsquo;t design the key space so it can&rsquo;t.</p>
+      </div>
+    </section>
+
+    <section id="scope">
+      <p class="eyebrow">Scope</p>
+      <h2>What ships, and what doesn&rsquo;t</h2>
+
+      <div class="note">
+        <span class="note-label">v1 &mdash; the notebook, replaced</span>
+        <p>Equipment register, tickets, parts, time, notes, customer-reported problems, and the &ldquo;we haven&rsquo;t talked to them&rdquo; flag.</p>
+      </div>
+
+      <div class="note note-open">
+        <span class="note-label">v2 &mdash; needs v1 in the wild first</span>
+        <p>Preventive maintenance schedules (interval- or volume-based), billing a ticket out as a draft order, per-account service reporting.</p>
+      </div>
+
+      <div class="note note-never">
+        <span class="note-label">Not building</span>
+        <p>A second invoicing engine (tickets bill through the existing draft-order &rarr; invoice &rarr; QuickBooks path or not at all), a tech scheduling calendar, parts inventory as its own system, mobile-native anything.</p>
+      </div>
+    </section>
+
+    <section id="model">
+      <p class="eyebrow">Schema</p>
+      <h2>Domain model</h2>
+      <p>Five tables. The shape follows how the work actually happens: a <strong>machine</strong> at a site accumulates <strong>tickets</strong>; each ticket accumulates <strong>notes</strong>, <strong>parts</strong>, and <strong>time</strong>.</p>
+
+      <h3><code>equipment</code></h3>
+      <div class="block">
+<pre><code>CREATE TABLE equipment (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    customer_id        uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    address_id         uuid REFERENCES addresses(id) ON DELETE SET NULL,
+    category           text NOT NULL,             -- espresso_machine | grinder | brewer | water | other
+    make               text NOT NULL,
+    model              text NOT NULL DEFAULT '',
+    serial_number      text NOT NULL DEFAULT '',
+    ownership          text NOT NULL DEFAULT 'customer',  -- customer | loaner | leased
+    status             text NOT NULL DEFAULT 'active',    -- active | in_shop | retired
+    installed_on       date,
+    warranty_expires_on date,
+    notes              text NOT NULL DEFAULT '',
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    updated_at         timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX equipment_customer_idx ON equipment (customer_id) WHERE status &lt;&gt; 'retired';
+CREATE INDEX equipment_serial_idx   ON equipment (serial_number) WHERE serial_number &lt;&gt; '';</code></pre>
+      </div>
+      <p><code>address_id</code> because a customer can be a small chain with three locations and &ldquo;which shop is the machine at&rdquo; is the first thing a tech asks. Nullable and <code>ON DELETE SET NULL</code> &mdash; the machine outlives the address record.</p>
+      <p><code>ownership</code> earns its column: a roaster-owned <strong>loaner</strong> placed against a volume commitment is an asset the merchant needs a list of, and it changes who pays for the repair. Retired machines stay in the table forever &mdash; history hangs off them.</p>
+      <p>Serial is indexed but <strong>not unique</strong>. Serials collide across manufacturers and get typed in wrong; a unique constraint would reject real data at the worst moment.</p>
+
+      <h3><code>service_tickets</code></h3>
+      <div class="block">
+<pre><code>CREATE TABLE service_tickets (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    number         text NOT NULL UNIQUE,          -- e.g. SVC-3A9F2C1B04
+    customer_id    uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    equipment_id   uuid REFERENCES equipment(id) ON DELETE SET NULL,
+    address_id     uuid REFERENCES addresses(id) ON DELETE SET NULL,
+    title          text NOT NULL,
+    description    text NOT NULL DEFAULT '',
+    severity       text NOT NULL DEFAULT 'routine',  -- down | degraded | routine
+    status         text NOT NULL DEFAULT 'new',
+    opened_by_staff_id         uuid REFERENCES staff(id),
+    opened_by_customer_user_id uuid REFERENCES customer_users(id),
+    assigned_staff_id          uuid REFERENCES staff(id),
+    scheduled_for   timestamptz,
+    resolved_at     timestamptz,
+    resolution      text NOT NULL DEFAULT '',
+    billable        boolean NOT NULL DEFAULT false,
+    last_contact_at timestamptz NOT NULL DEFAULT now(),
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now()
+);</code></pre>
+      </div>
+      <p><strong><code>severity</code>, not <code>priority</code>.</strong> A cafe doesn&rsquo;t report &ldquo;P1&rdquo;, it reports &ldquo;the machine is down and we&rsquo;re pulling shots on the backup&rdquo;. <code>down | degraded | routine</code> is the same information without asking anyone to translate, and it maps straight onto the customer-facing form (&ldquo;Is the machine unusable right now?&rdquo;).</p>
+      <p><code>equipment_id</code> is nullable and singular. A visit sometimes touches three machines &mdash; model that as three tickets sharing a <code>scheduled_for</code>, not as a join table. One ticket, one machine, one repair history is worth more than modelling the truck route.</p>
+      <p><strong>Status:</strong> <code>new &rarr; scheduled &rarr; in_progress &rarr; waiting_parts &rarr; waiting_customer &rarr; resolved</code>, plus <code>cancelled</code>. Each of the waiting states exists because it answers &ldquo;why is this old ticket still open&rdquo;, which is the whole point of the list view. Badge mapping uses the existing admin palette: <code>badge-red</code> (down / new), <code>badge-amber</code> (waiting_*), <code>badge-blue</code> (scheduled / in_progress), <code>badge-green</code> (resolved), <code>badge-grey</code> (cancelled).</p>
+
+      <div class="note">
+        <span class="note-label">The load-bearing column</span>
+        <p><code>last_contact_at</code> is <code>NOT NULL</code>, defaulting to creation time — the clock starts when the ticket opens, so every staleness query is a plain comparison with no <code>COALESCE</code> onto <code>created_at</code> and no null case to get wrong. It then moves only on communication events &mdash; a note of kind <code>call</code>/<code>email</code>/<code>visit</code>, an outbound status email, or a customer reply &mdash; never by an internal edit. An open ticket whose <code>last_contact_at</code> is older than the configured window (default 7 days) renders with the persistent inset rust bar the admin already uses for stale rows, and gets counted on the Service tab badge. That single rule is what turns this from a filing cabinet into something that prevents a lost account.</p>
+      </div>
+
+      <p><code>number</code> mirrors <code>orders.number</code> exactly &mdash; <code>SVC-</code> plus ten random hex characters, generated in the app layer, <code>UNIQUE</code> so re-runs and imports are duplicate-safe. Random rather than sequential: it leaks no volume and needs no counter. It is not sayable down a phone, which was the original hope, but a second numbering scheme in one codebase costs more than staff ever gain from reading a ticket number aloud &mdash; they click the row.</p>
+
+      <h3><code>service_ticket_notes</code></h3>
+      <div class="block">
+<pre><code>CREATE TABLE service_ticket_notes (
+    id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_id        uuid NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+    kind             text NOT NULL,   -- note | call | email | visit | customer_report
+    body             text NOT NULL,
+    occurred_at      timestamptz NOT NULL DEFAULT now(),
+    staff_id         uuid REFERENCES staff(id),
+    customer_user_id uuid REFERENCES customer_users(id),
+    customer_visible boolean NOT NULL DEFAULT false,
+    created_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX service_ticket_notes_ticket_idx ON service_ticket_notes (ticket_id, occurred_at DESC);</code></pre>
+      </div>
+      <p>Notes are content, not audit &mdash; they&rsquo;re written by humans, they have an <code>occurred_at</code> that differs from <code>created_at</code> (you log Tuesday&rsquo;s call on Thursday), and some are shown to the customer. Status changes stay in the audit log; the detail page renders <strong>both</strong> merged into one timeline, the way order and customer detail pages already do (<code>ListByResource</code> on resource type <code>service_ticket</code>).</p>
+      <p><code>customer_visible</code> is the switch that lets the portal show progress without exposing &ldquo;owner is being difficult about the bill&rdquo;.</p>
+
+      <h3><code>service_parts</code></h3>
+      <div class="block">
+<pre><code>CREATE TABLE service_parts (
+    id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_id       uuid NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+    variant_id      uuid REFERENCES variants(id) ON DELETE SET NULL,
+    name            text NOT NULL,
+    part_number     text NOT NULL DEFAULT '',
+    supplier        text NOT NULL DEFAULT '',
+    quantity        integer NOT NULL DEFAULT 1 CHECK (quantity &gt; 0),
+    unit_cost_cents integer NOT NULL DEFAULT 0,
+    status          text NOT NULL DEFAULT 'needed',  -- needed | ordered | received | installed
+    ordered_on      date,
+    received_on     date,
+    installed_on    date,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now()
+);</code></pre>
+      </div>
+      <p><strong>Free text first, catalog reference optional.</strong> Most parts are ordered ad hoc from a distributor and will never be a Hiri product; forcing a catalog entry before you can write down &ldquo;group head gasket, $4&rdquo; guarantees nobody writes it down. <code>variant_id</code> is there for the minority of merchants who stock common parts &mdash; when set, install decrements inventory through the existing catalog path. When null, nothing else happens. Costs are stored in cents, like everywhere else.</p>
+      <p>The four statuses plus three dates are the &ldquo;what was ordered and replaced&rdquo; question the whole feature was asked for. <code>waiting_parts</code> on a ticket should be derivable from &mdash; and cross-checked against &mdash; parts in <code>ordered</code> status.</p>
+
+      <h3><code>service_time_entries</code></h3>
+      <div class="block">
+<pre><code>CREATE TABLE service_time_entries (
+    id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_id    uuid NOT NULL REFERENCES service_tickets(id) ON DELETE CASCADE,
+    staff_id     uuid NOT NULL REFERENCES staff(id),
+    kind         text NOT NULL DEFAULT 'labor',   -- labor | travel
+    minutes      integer NOT NULL CHECK (minutes &gt; 0),
+    performed_on date NOT NULL,
+    billable     boolean NOT NULL DEFAULT false,
+    note         text NOT NULL DEFAULT '',
+    created_at   timestamptz NOT NULL DEFAULT now()
+);</code></pre>
+      </div>
+      <p>Minutes, not a start/stop timer &mdash; nobody remembers to hit stop, and every field tech records &ldquo;about an hour and a half&rdquo; after the fact. <code>travel</code> is split from <code>labor</code> because it&rsquo;s billed differently (or not at all) and because &ldquo;we drove 90 minutes for a $4 gasket&rdquo; is a fact worth being able to total.</p>
+      <p><code>billable</code> is captured in v1 even though nothing bills off it yet. It costs a boolean now and is unrecoverable later &mdash; you cannot retroactively remember which of last year&rsquo;s hours were billable.</p>
+    </section>
+
+    <section id="layers">
+      <p class="eyebrow">Architecture</p>
+      <h2>Layers</h2>
+      <p>Standard Hiri layering; nothing here needs an exception.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Layer</th><th>Files</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="col-tight"><code>domain/</code></td>
+              <td><code>module.go</code><br><code>equipment.go</code><br><code>service_ticket.go</code></td>
+              <td>Typed string enums + constants for every status above. No logic.</td>
+            </tr>
+            <tr>
+              <td class="col-tight"><code>store/</code></td>
+              <td><code>modules.go</code><br><code>equipment.go</code><br><code>service_tickets.go</code></td>
+              <td>All SQL. Customer-scoped reads take <code>customerID</code> (<code>Get(ctx, tx, id, customerID)</code>) for the portal; staff reads use <code>GetByID</code>.</td>
+            </tr>
+            <tr>
+              <td class="col-tight"><code>app/</code></td>
+              <td><code>modules.go</code><br><code>equipment.go</code><br><code>service.go</code></td>
+              <td>State machine for ticket status, <code>last_contact_at</code> maintenance, stale-window policy, part/time roll-ups. Sentinel errors in <code>errors.go</code>: <code>ErrModuleDisabled</code>, <code>ErrTicketNotEditable</code>, <code>ErrEquipmentRetired</code>.</td>
+            </tr>
+            <tr>
+              <td class="col-tight"><code>web/</code></td>
+              <td><code>admin_service.go</code><br><code>wholesale_equipment.go</code><br><code>admin_modules.go</code></td>
+              <td>Thin handlers, htmx <code>Content</code> split per the admin partial convention.</td>
+            </tr>
+            <tr>
+              <td class="col-tight"><code>ui/admin/</code></td>
+              <td><code>service_ticket_list.templ</code><br><code>service_ticket_show.templ</code><br><code>service_ticket_activity.templ</code><br><code>equipment_list.templ</code><br><code>equipment_show.templ</code><br><code>modules.templ</code></td>
+              <td>Read <code>docs/admin-ui.md</code> and <code>docs/admin-detail-pages.md</code> first &mdash; <code>mage checkAdminUI</code> will fail the build otherwise.</td>
+            </tr>
+            <tr>
+              <td class="col-tight"><code>ui/storefront/</code></td>
+              <td>portal equipment list + report form</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td class="col-tight"><code>jobs/</code></td>
+              <td><code>email_service_ticket_opened.go</code><br><code>email_service_ticket_update.go</code><br><code>service_stale_sweep.go</code></td>
+              <td>Idempotent, <code>domain.SystemActor</code>, module check first.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Every mutating service method takes <code>pgx.Tx</code>, writes its audit record in the same transaction, enqueues its email job in the same transaction, and bumps metrics after commit. No external calls inside a transaction (there are none in v1 beyond email, which is a queued job).</p>
+    </section>
+
+    <section id="admin-ui">
+      <p class="eyebrow">Interface</p>
+      <h2>Admin UI</h2>
+      <p>The sidebar is a flat seven-item list by deliberate design. The module adds an <strong>eighth row, &ldquo;Service&rdquo;</strong>, rendered only when enabled &mdash; and that is exactly the &ldquo;don&rsquo;t clutter the app&rdquo; requirement, honoured at the nav level rather than by burying the feature.</p>
+      <p><code>resolveActiveNav</code> gains <code>/admin/service*</code> &rarr; <code>/admin/service</code>. Keep the JS twin in the page script in sync.</p>
+      <p>Section tabs under Service (<code>section_nav.templ</code>, not sidebar rows):</p>
+      <ul>
+        <li><strong>Tickets</strong> &mdash; default. Filters: open / mine / waiting on parts / stale. Rows show number, customer, machine, severity badge, status badge, assignee, age, and last contact. Stale rows carry the persistent rust bar.</li>
+        <li><strong>Equipment</strong> &mdash; the register. Filter by customer, category, ownership. A loaner-only view is worth a saved filter.</li>
+        <li><strong>Schedules</strong> &mdash; v2, hidden until then.</li>
+      </ul>
+      <p><code>/admin/service</code> is the queue itself: it is what staff open the section to look at. Scopes across the top &mdash; Open, Mine, Gone quiet, Closed &mdash; are links rather than a filter dropdown, because they are the four questions actually asked.</p>
+      <p><strong>Ticket detail</strong> follows <code>docs/admin-detail-pages.md</code>: main column holds the parts table, the hours table, and the timeline (notes + audit, merged, newest first) with the note composer above it; the rail holds the next action, the assignee, the machine card, customer card with a link back to their account, and the cost roll-up. Parts and hours went to the main column rather than the rail as first sketched &mdash; rule 2 puts a control that acts on a sub-record next to that sub-record, and a 22rem rail wraps every line of a table with per-row buttons. The rail keeps the summary, which is what a rail is for. Destructive or outward-facing actions (email the customer, cancel the ticket) use the existing tooltip + Alpine confirm pattern &mdash; and remember the confirm hook binds to the <strong>button click</strong>, never form submit, because of <code>hx-boost</code>.</p>
+      <p><strong>Equipment detail</strong> is the machine&rsquo;s life story: identity block, warranty countdown, and every ticket against it in date order. This is the screen that answers &ldquo;we&rsquo;ve replaced this pump twice in a year, the machine is the problem&rdquo;, which is the argument a merchant needs when a shop is angry.</p>
+      <p>Entry points from existing pages, all module-gated: an <strong>Equipment</strong> card on the admin customer detail rail, and a &ldquo;Log service&rdquo; action on it.</p>
+    </section>
+
+    <section id="portal">
+      <p class="eyebrow">Interface</p>
+      <h2>Wholesale portal</h2>
+      <p>This is what makes the module worth more than a spreadsheet: the malfunction report comes in structured, at 6am, without a phone call.</p>
+      <ul>
+        <li><code>GET /wholesale/account/equipment</code> &mdash; their machines, with the last service date on each.</li>
+        <li><code>POST /wholesale/account/equipment/{id}/report</code> &mdash; &ldquo;Report a problem&rdquo;: is it down right now, what&rsquo;s happening, best time to reach you. Creates a ticket in <code>new</code>, <code>opened_by_customer_user_id</code> set, the description copied into a <code>customer_report</code> note, and enqueues staff notification email. Rate-limited per customer, the same way <code>/wholesale/apply</code> is.</li>
+        <li>The ticket&rsquo;s <code>customer_visible</code> notes and its status show back on the same page, so &ldquo;did they see my message&rdquo; answers itself.</li>
+      </ul>
+      <p>Retail storefront gets nothing. Retail customers don&rsquo;t own espresso machines the merchant maintains.</p>
+    </section>
+
+    <section id="permissions">
+      <p class="eyebrow">Access</p>
+      <h2>Permissions</h2>
+      <p>Two new constants in <code>platform/auth/permissions.go</code>:</p>
+      <div class="block">
+        <p class="block-label">permissions.go</p>
+<pre><code>PermViewService  = "service:view"
+PermWriteService = "service:write"</code></pre>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Role</th><th>Grant</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td class="col-tight">admin</td><td class="col-tight">view + write</td><td></td></tr>
+            <tr><td class="col-tight">fulfillment</td><td class="col-tight">view + write</td><td>The tech is nearly always the person already driving the van.</td></tr>
+            <tr><td class="col-tight">support</td><td class="col-tight">view + write</td><td>They take the 6am call; a support person who can read a ticket but not log the call is useless.</td></tr>
+            <tr><td class="col-tight">finance</td><td class="col-tight">view</td><td>Needs the hours and part costs; shouldn&rsquo;t be changing repair records.</td></tr>
+            <tr><td class="col-tight">catalog</td><td class="col-tight">&mdash;</td><td>No overlap.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>Do <strong>not</strong> add a sixth staff role for technicians. Five coarse roles is a deliberate choice; revisit only if a merchant actually asks for a login that sees service and nothing else.</p>
+      <p>Checks go in middleware in <code>web/router.go</code>, stacked after <code>requireModule</code> &mdash; module check first, so a disabled module 404s for everyone including admins, rather than 403ing for some.</p>
+    </section>
+
+    <section id="jobs">
+      <p class="eyebrow">Operations</p>
+      <h2>Jobs and email</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Job</th><th>Trigger</th><th>Content</th></tr></thead>
+          <tbody>
+            <tr><td class="col-tight"><code>service_ticket_opened</code></td><td>Customer reports a problem from the portal</td><td>Staff notification. <code>down</code> severity bypasses quiet hours &mdash; that&rsquo;s the whole reason to build it.</td></tr>
+            <tr><td class="col-tight"><code>service_ticket_update</code></td><td>Status change with a customer-visible note, or manual &ldquo;send update&rdquo;</td><td>Customer-facing: what&rsquo;s happening, what&rsquo;s next.</td></tr>
+            <tr><td class="col-tight"><code>service_stale_sweep</code></td><td>Daily cron, alongside the existing scheduler jobs</td><td>Digest of open tickets past the contact window, to staff. No customer mail.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>All three: check module enablement first and return nil when off. All idempotent &mdash; key the sweep on the day, the update on the note id.</p>
+    </section>
+
+    <section id="audit">
+      <p class="eyebrow">Operations</p>
+      <h2>Audit actions</h2>
+      <p>In <code>platform/audit/actions.go</code>, resource types <code>equipment</code> and <code>service_ticket</code>:</p>
+      <div class="block">
+        <p class="block-label">actions.go</p>
+<pre><code>AuditModuleEnabled          = "module.enabled"
+AuditModuleDisabled         = "module.disabled"
+AuditEquipmentCreated       = "equipment.created"
+AuditEquipmentUpdated       = "equipment.updated"
+AuditEquipmentRetired       = "equipment.retired"
+AuditServiceTicketOpened    = "service_ticket.opened"
+AuditServiceTicketAssigned  = "service_ticket.assigned"
+AuditServiceTicketStatus    = "service_ticket.status_changed"
+AuditServiceTicketResolved  = "service_ticket.resolved"
+AuditServiceTicketNoteAdded = "service_ticket.note_added"
+AuditServicePartAdded       = "service_ticket.part_added"
+AuditServicePartStatus      = "service_ticket.part_status_changed"
+AuditServiceTimeLogged      = "service_ticket.time_logged"</code></pre>
+      </div>
+      <p>These double as the detail-page timeline, so write useful metadata &mdash; old and new status, part name, minutes &mdash; not just the verb.</p>
+    </section>
+
+    <section id="metrics">
+      <p class="eyebrow">Operations</p>
+      <h2>Metrics</h2>
+      <p>After commit, not inside the transaction:</p>
+      <ul>
+        <li><code>hiri_service_tickets_opened_total{source="staff|customer",severity=""}</code></li>
+        <li><code>hiri_service_tickets_resolved_total</code></li>
+        <li><code>hiri_service_ticket_open_count{status=""}</code> &mdash; gauge, set by the sweep</li>
+        <li><code>hiri_service_stale_tickets</code> &mdash; gauge, the one worth alerting on</li>
+      </ul>
+    </section>
+
+    <section id="migration">
+      <p class="eyebrow">Migration</p>
+      <h2>One migration, fully reversible</h2>
+      <p>One migration, <code>077_equipment_service.sql</code>, with a real <code>-- +goose Down</code> that drops all six tables in dependency order. It is additive: nothing existing changes, so it is safe to ship before any UI exists and safe to roll back.</p>
+    </section>
+
+    <section id="v2">
+      <p class="eyebrow">Roadmap</p>
+      <h2>v2, briefly</h2>
+      <ul>
+        <li><strong>Preventive maintenance schedules.</strong> <code>service_schedules</code> on an equipment row: every N days, or every N pounds of coffee &mdash; Hiri already knows the pounds. A daily job opens a <code>routine</code> ticket when one comes due. The volume-based trigger is the differentiated one; nobody else can compute it.</li>
+        <li><strong>Billing a ticket out.</strong> &ldquo;Create draft order&rdquo; from a resolved billable ticket: parts as line items, billable minutes against a labor variant at a configured rate. Reuses the draft order &rarr; invoice &rarr; QuickBooks path that already exists. Do not build a second money path.</li>
+        <li><strong>Per-account service report.</strong> Hours and part spend by customer over a period &mdash; the number that tells a merchant which account is unprofitable.</li>
+      </ul>
+    </section>
+
+    <section id="open">
+      <p class="eyebrow">Open</p>
+      <h2>Open decisions</h2>
+
+      <div class="note note-open">
+        <span class="note-label">Does service get billed?</span>
+        <p>The schema captures <code>billable</code> from day one, so this can be answered late &mdash; but it decides whether v2 leads with billing or with schedules.</p>
+      </div>
+
+      <div class="note note-open">
+        <span class="note-label">Stale window default</span>
+        <p>7 days is a guess, and currently a constant (<code>domain.DefaultStaleContactWindow</code>) rather than a settings row &mdash; nothing has run long enough to argue with it. The sweep job in step 6 makes it configurable.</p>
+      </div>
+
+      <div class="note note-open">
+        <span class="note-label">Loaner machines and volume commitments</span>
+        <p>If loaners are placed against a pounds-per-month commitment, tracking that commitment is a natural neighbour of this module &mdash; but it&rsquo;s a sales feature wearing a service costume. Keep it out of v1.</p>
+      </div>
+    </section>
+
+    <section id="build">
+      <p class="eyebrow">Plan</p>
+      <h2>Build order</h2>
+      <p>The only genuine sequence in this document &mdash; each step is shippable, and step 1 is testable with nothing behind it.</p>
+      <div class="note"><span class="note-label">Status &mdash; 26 Aug 2026</span><p>Steps 1&ndash;5 are built and green through <code>mage check</code>, and driven end to end against a real server. The load-bearing rule holds through the real UI: an internal note leaves a ticket flagged as quiet, a logged call clears it. Driving step 5 turned up a real bug and fixed it &mdash; calendar dates were being timezone-converted, so a part ordered on the 25th displayed as the 24th, and warranties expired a day early. Steps 6&ndash;7 are open.</p></div>
+      <ol>
+        <li><strong>Done.</strong> <code>modules</code> table (migration <code>076_modules.sql</code>), <code>domain/module.go</code>, <code>app.ModuleService</code>, the Settings &rarr; Modules tab, <code>requireModule</code> middleware, and <code>filterNavItems</code> in the admin layout. Shipped alone, as planned.</li>
+        <li><strong>Done.</strong> Migration <code>077_equipment_service.sql</code>, <code>domain/equipment.go</code> and <code>domain/service_ticket.go</code>, <code>store/equipment.go</code> and <code>store/service_tickets.go</code>.</li>
+        <li><strong>Done.</strong> Equipment register: list with filters, detail page, add/edit form, and the Equipment card on the customer rail. The <strong>Service</strong> sidebar row arrived with it &mdash; module-gated, so it exists only where the module is on.</li>
+        <li><strong>Done.</strong> Tickets: queue with scopes and the stale flag, detail page with the merged notes-and-audit timeline, status machine, note composer, assignment, and the repair history on the machine page. The section tab strip arrived with it.</li>
+        <li><strong>Done.</strong> Parts and time entries on the ticket detail, with per-row status advance, removal, and the parts/hours roll-up in the rail.</li>
+        <li>Stale-contact flagging + the daily sweep.</li>
+        <li>Wholesale portal equipment list + report-a-problem + notification email.</li>
+      </ol>
+    </section>
+
+    <p class="colophon">Hiri platform &middot; design document &middot; source of truth is <code>docs/equipment-service-module.md</code> in the repo</p>
+
+  </main>
+</div>
+
+<script>
+// Light the contents entry for whichever section is currently in view.
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.toc a'));
+  var byId = {};
+  links.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+  if (!('IntersectionObserver' in window) || !sections.length) return;
+
+  var visible = {};
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) { visible[e.target.id] = e.isIntersecting; });
+    var current = null;
+    for (var i = 0; i < sections.length; i++) {
+      if (visible[sections[i].id]) { current = sections[i].id; break; }
+    }
+    links.forEach(function (a) { a.classList.remove('is-current'); });
+    if (current && byId[current]) byId[current].classList.add('is-current');
+  }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+
+  sections.forEach(function (s) { observer.observe(s); });
+})();
+</script>

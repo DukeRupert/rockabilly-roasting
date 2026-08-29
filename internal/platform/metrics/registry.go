@@ -49,6 +49,14 @@ type Registry struct {
 	SubscriptionsCancelled      prometheus.Gauge
 	SubscriptionRenewals        *prometheus.CounterVec
 
+	// Equipment service module. The two gauges are set by the daily stale sweep
+	// and the counter by whoever opens a ticket, so all three are only
+	// meaningful on an instance with the module switched on — everywhere else
+	// the sweep returns early, nobody opens a ticket, and they stay at zero.
+	ServiceTicketsOpen   *prometheus.GaugeVec
+	ServiceTicketsStale  prometheus.Gauge
+	ServiceTicketsOpened *prometheus.CounterVec
+
 	// Stripe webhooks
 	StripeWebhooksReceived  *prometheus.CounterVec
 	StripeWebhooksProcessed *prometheus.CounterVec
@@ -199,6 +207,33 @@ func NewRegistry() *Registry {
 			Help: "Total coupons rejected.",
 		}, []string{"rejection_reason"}),
 
+		// --- Equipment service module ---
+
+		// Labelled by status so the breakdown shows where work is piling up —
+		// a queue of thirty "waiting_parts" is a supplier problem, thirty "new"
+		// is a staffing one.
+		ServiceTicketsOpen: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "service_tickets_open_total",
+			Help: "Current count of service tickets that are not resolved or cancelled, by status.",
+		}, []string{"status"}),
+
+		// The one worth alerting on: an open ticket nobody has spoken to the
+		// customer about inside the contact window is how an account is lost
+		// quietly.
+		ServiceTicketsStale: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "service_tickets_stale_total",
+			Help: "Current count of open service tickets past the customer-contact window.",
+		}),
+
+		// Labelled by who raised it, which only became a question worth asking
+		// once wholesale customers could open tickets themselves: the ratio of
+		// customer-reported to staff-reported work is how a merchant finds out
+		// whether the portal is being used at all.
+		ServiceTicketsOpened: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Name: "service_tickets_opened_total",
+			Help: "Total service tickets opened, by who raised them and how bad it was.",
+		}, []string{"source", "severity"}),
+
 		// --- Subscription health ---
 
 		SubscriptionsActive: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -309,6 +344,10 @@ func NewRegistry() *Registry {
 		m.CheckoutDuration,
 		m.CouponApplied,
 		m.CouponRejected,
+		// Equipment service
+		m.ServiceTicketsOpen,
+		m.ServiceTicketsStale,
+		m.ServiceTicketsOpened,
 		// Subscriptions
 		m.SubscriptionsActive,
 		m.SubscriptionsRenewalBlocked,

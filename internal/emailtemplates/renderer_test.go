@@ -632,3 +632,101 @@ func TestRender_SubscriptionSkipUndone(t *testing.T) {
 		assert.Contains(t, body, "September 1, 2026")
 	}
 }
+
+func staleDigestTicket(number string, quietDays int, down bool) ServiceStaleDigestTicket {
+	sev := "routine"
+	if down {
+		sev = "down"
+	}
+	return ServiceStaleDigestTicket{
+		Number:    number,
+		Title:     "Grinder throwing a burr error",
+		Customer:  "Blue Heron Cafe",
+		Severity:  sev,
+		Status:    "Waiting on parts",
+		QuietDays: quietDays,
+		URL:       "https://rockabillyroasting.com/admin/service/tickets/abc",
+		Down:      down,
+	}
+}
+
+func TestRender_ServiceStaleDigest(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	html, text, err := r.Render("service_stale_digest", ServiceStaleDigestData{
+		Tickets:    []ServiceStaleDigestTicket{staleDigestTicket("SVC-A1B2C3D4E5", 11, true)},
+		Total:      1,
+		WindowDays: 7,
+		QueueURL:   "https://rockabillyroasting.com/admin/service?scope=stale",
+		StoreName:  "Rockabilly Roasting",
+	})
+	require.NoError(t, err)
+
+	for _, want := range []string{"SVC-A1B2C3D4E5", "Blue Heron Cafe", "Waiting on parts", "DOWN"} {
+		assert.Contains(t, html, want)
+		assert.Contains(t, text, want)
+	}
+
+	// A single stale ticket must not read "1 open tickets have".
+	assert.Contains(t, html, "One open ticket has")
+	assert.Contains(t, text, "One open ticket has")
+	assert.Contains(t, html, "quiet for 11 days")
+
+	// Nothing to truncate, so no "showing N of M" line.
+	assert.NotContains(t, html, "quietest of")
+	assert.NotContains(t, text, "quietest of")
+}
+
+// The digest is capped, and a capped list that implied it was the whole set
+// would be worse than no digest — staff would work the list and stop.
+func TestRender_ServiceStaleDigest_SaysWhatItLeftOut(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	listed := []ServiceStaleDigestTicket{
+		staleDigestTicket("SVC-0000000001", 9, false),
+		staleDigestTicket("SVC-0000000002", 8, false),
+	}
+	html, text, err := r.Render("service_stale_digest", ServiceStaleDigestData{
+		Tickets:    listed,
+		Total:      31,
+		WindowDays: 7,
+		QueueURL:   "https://example.com/admin/service?scope=stale",
+		StoreName:  "Rockabilly Roasting",
+	})
+	require.NoError(t, err)
+
+	assert.Contains(t, html, "31 open tickets have")
+	assert.Contains(t, html, "Showing the 2 quietest of 31")
+	assert.Contains(t, text, "Showing the 2 quietest of 31")
+
+	// Plural agreement on the per-row day count.
+	assert.Contains(t, html, "quiet for 9 days")
+}
+
+// One day is singular; the row must not say "quiet for 1 days".
+func TestRender_ServiceStaleDigest_SingularDay(t *testing.T) {
+	r, err := New()
+	require.NoError(t, err)
+
+	html, text, err := r.Render("service_stale_digest", ServiceStaleDigestData{
+		Tickets:    []ServiceStaleDigestTicket{staleDigestTicket("SVC-0000000003", 1, false)},
+		Total:      1,
+		WindowDays: 7,
+		QueueURL:   "https://example.com/admin/service?scope=stale",
+		StoreName:  "Rockabilly Roasting",
+	})
+	require.NoError(t, err)
+
+	// The point is the missing "s", so assert on its absence rather than on
+	// whatever markup happens to follow the phrase.
+	assert.Contains(t, html, "quiet for 1 day")
+	assert.NotContains(t, html, "quiet for 1 days")
+	assert.Contains(t, text, "quiet for 1 day")
+	assert.NotContains(t, text, "quiet for 1 days")
+
+	// A routine ticket carries no DOWN flag.
+	assert.NotContains(t, html, "DOWN")
+	assert.NotContains(t, text, "[DOWN]")
+}

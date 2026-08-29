@@ -59,10 +59,17 @@ type EquipmentFormValues struct {
 	NewSitePostalCode string
 }
 
-// HasNewSite reports whether a site was typed rather than picked. Drives the
-// panel open on a re-render so the values coming back are visible.
+// HasNewSite reports whether a site was typed rather than picked.
+//
+// Any one field counts, including a suite number on its own. That is
+// deliberately generous: this predicate decides both whether the panel reopens
+// on a re-render and — via resolveEquipmentSite — whether the typed site is
+// acted on at all. If the two ever disagree about what "typed" means, whatever
+// falls in the gap is discarded with no error, which is the failure this is
+// shaped to avoid. Anything incomplete is rejected loudly by
+// createEquipmentSite, never dropped.
 func (v EquipmentFormValues) HasNewSite() bool {
-	return v.NewSiteLine1 != "" || v.NewSiteCity != "" ||
+	return v.NewSiteLine1 != "" || v.NewSiteLine2 != "" || v.NewSiteCity != "" ||
 		v.NewSiteState != "" || v.NewSitePostalCode != ""
 }
 
@@ -163,7 +170,11 @@ templ EquipmentFormContent(props EquipmentFormProps) {
 					</select>
 				}
 			</div>
-			@EquipmentSitePicker(props.Addresses, props.Values, props.Values.CustomerID != "")
+			<!-- customerChosen comes from the parsed id, not the raw posted string:
+			     props.Addresses is only ever loaded when that id parses, so deriving
+			     the flag from anything else lets the two disagree and the picker
+			     announce "nothing on file" for a customer it simply never looked up. -->
+			@EquipmentSitePicker(props.Addresses, props.Values, props.CustomerID != uuid.Nil)
 			<div class="sm:col-span-2">
 				<label for="category" class="block text-sm font-medium text-rr-heading">Category</label>
 				<select id="category" name="category" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">

@@ -547,7 +547,12 @@ func (d *Deps) resolveEquipmentSite(
 	ctx context.Context, tx pgx.Tx, values admin.EquipmentFormValues,
 	customerID uuid.UUID, picked *uuid.UUID, actor app.Actor,
 ) (*uuid.UUID, error) {
-	if values.NewSiteLine1 != "" {
+	// HasNewSite, not a bare line1 check. Anything typed into the panel routes
+	// here, so a site missing its street is rejected with the same message as one
+	// missing its ZIP rather than falling through to the picked address — which,
+	// with the panel open and the picker empty, meant the machine was filed with
+	// no site at all and the typed values vanished without a word.
+	if values.HasNewSite() {
 		return d.createEquipmentSite(ctx, tx, values, customerID, actor)
 	}
 
@@ -596,7 +601,8 @@ func (d *Deps) createEquipmentSite(
 ) (*uuid.UUID, error) {
 	// Checked before the customer read: a half-typed site is rejected without
 	// costing a query.
-	if values.NewSiteCity == "" || values.NewSiteState == "" || values.NewSitePostalCode == "" {
+	if values.NewSiteLine1 == "" || values.NewSiteCity == "" ||
+		values.NewSiteState == "" || values.NewSitePostalCode == "" {
 		return nil, app.ErrEquipmentSiteIncomplete
 	}
 

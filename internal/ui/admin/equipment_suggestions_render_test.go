@@ -190,3 +190,23 @@ func TestEquipmentSitePickerBackOutClearsTheTypedSite(t *testing.T) {
 	assert.Contains(t, html, "new_site_", "the back-out handler must clear the new-site inputs")
 	assert.Contains(t, html, "i.value = ''")
 }
+
+// HasNewSite decides two things at once — whether the panel reopens, and
+// (through resolveEquipmentSite) whether the typed site is acted on at all.
+// Any field it fails to notice is a field the operator can fill in and have
+// silently discarded, so it has to see every one of them.
+func TestHasNewSiteSeesEveryField(t *testing.T) {
+	assert.False(t, EquipmentFormValues{}.HasNewSite(), "nothing typed is not a new site")
+
+	for name, values := range map[string]EquipmentFormValues{
+		"street only": {NewSiteLine1: "1120 Roastery Way"},
+		"suite only":  {NewSiteLine2: "Unit B"},
+		"city only":   {NewSiteCity: "Kennewick"},
+		"state only":  {NewSiteState: "WA"},
+		"zip only":    {NewSitePostalCode: "99336"},
+		// The case that used to fall through: everything but the street.
+		"no street": {NewSiteCity: "Kennewick", NewSiteState: "WA", NewSitePostalCode: "99336"},
+	} {
+		assert.True(t, values.HasNewSite(), "%s must count as a typed site", name)
+	}
+}

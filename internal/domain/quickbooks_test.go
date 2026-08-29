@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestQBBillingMode(t *testing.T) {
 	if !QBBillingModeLive.IsLive() {
@@ -36,7 +39,7 @@ func TestQBInvoicePreviewProblem(t *testing.T) {
 	failed := clean
 	failed.LookupError = str("boom")
 	failed.WouldCreateCustomer = true
-	if got := failed.Problem(); got != "QuickBooks lookup failed: boom" {
+	if got := failed.Problem(); !strings.Contains(got, "Not ready to bill") {
 		t.Errorf("lookup failure should win, got %q", got)
 	}
 
@@ -81,5 +84,93 @@ func TestManualAccountIsNotAProblem(t *testing.T) {
 	billed := QBInvoicePreview{DocNumber: "WO-6", AutoBilled: true, BillEmail: "a@b.test", QBCustomerID: func() *string { s := "1"; return &s }()}
 	if billed.AwaitingManualInvoice() {
 		t.Error("an automatically billed order is not waiting for anyone")
+	}
+}
+
+func TestBillingObstacleAnswersADifferentQuestionFromProblem(t *testing.T) {
+	str := func(s string) *string { return &s }
+
+	// A manual account with no bill-to address. Leaving it alone is fine, so
+	// it is not a problem — but Bill now targets exactly this row, and
+	// invoicing it would create the invoice and then fail the send. Before
+	// these were separate methods, the operator was told nothing.
+	manual := QBInvoicePreview{
+		DocNumber:     "WO-1",
+		BillingMethod: BillingMethodManual,
+		AutoBilled:    false,
+	}
+	if manual.Problem() != "" {
+		t.Errorf("leaving a manual account alone is not a problem: got %q", manual.Problem())
+	}
+	if manual.NeedsAttention() {
+		t.Error("a manual account must not be counted as needing attention")
+	}
+	obstacle := manual.BillingObstacle()
+	if obstacle == "" {
+		t.Fatal("but billing it would fail, and the operator has to be told")
+	}
+	if !strings.Contains(obstacle, "bill-to address") {
+		t.Errorf("the obstacle should name the missing address: got %q", obstacle)
+	}
+
+	// The customer-match fact is recorded for manual rows too, because
+	// invoicing one really would create a customer in the merchant's books.
+	unmatched := QBInvoicePreview{DocNumber: "WO-2", BillEmail: "a@b.test", WouldCreateCustomer: true}
+	if unmatched.Problem() != "" {
+		t.Error("still not flagged on the page")
+	}
+	if !strings.Contains(unmatched.BillingObstacle(), "new one would be created") {
+		t.Errorf("but billing it creates a customer: got %q", unmatched.BillingObstacle())
+	}
+
+	// On an automatically billed row the two agree — the obstacle IS the
+	// problem, and suppressing one must not have changed the other.
+	billed := QBInvoicePreview{DocNumber: "WO-3", AutoBilled: true, QBCustomerID: str("42")}
+	if billed.Problem() != billed.BillingObstacle() {
+		t.Errorf("on a billed row they must agree: %q vs %q", billed.Problem(), billed.BillingObstacle())
+	}
+
+	// A clean row obstructs nothing.
+	clean := QBInvoicePreview{DocNumber: "WO-4", AutoBilled: true, BillEmail: "a@b.test", QBCustomerID: str("42")}
+	if clean.BillingObstacle() != "" || clean.Problem() != "" {
+		t.Error("a clean row has neither")
+	}
+}
+
+func TestBillingObstaclesReportAllOfThemWorstFirst(t *testing.T) {
+	// The ordinary state of a manual account new to QuickBooks: no matching
+	// customer (harmless — one gets created) and no bill-to address (the
+	// invoice is created and the send then fails permanently). Reporting only
+	// the first match showed the harmless one and hid the other.
+	both := QBInvoicePreview{
+		DocNumber:           "WO-1",
+		WouldCreateCustomer: true,
+		BillEmail:           "",
+	}
+	obstacles := both.BillingObstacles()
+	if len(obstacles) != 2 {
+		t.Fatalf("both obstacles must be reported, got %d: %v", len(obstacles), obstacles)
+	}
+	if !strings.Contains(obstacles[0], "fail to email it") {
+		t.Errorf("the destructive one must lead: got %q", obstacles[0])
+	}
+	if !strings.Contains(both.BillingObstacle(), "fail to email it") {
+		t.Errorf("and the one-line form must be the worst one: got %q", both.BillingObstacle())
+	}
+
+	// A failed lookup outranks everything, because it makes the rest unsure.
+	unsure := both
+	unsure.LookupError = func() *string { s := "timeout"; return &s }()
+	if !strings.Contains(unsure.BillingObstacles()[0], "Not ready to bill") {
+		t.Errorf("a failed lookup leads: got %q", unsure.BillingObstacles()[0])
+	}
+	if len(unsure.BillingObstacles()) != 3 {
+		t.Errorf("and does not hide the others: %v", unsure.BillingObstacles())
+	}
+
+	clean := QBInvoicePreview{DocNumber: "WO-2", BillEmail: "a@b.test",
+		QBCustomerID: func() *string { s := "1"; return &s }()}
+	if len(clean.BillingObstacles()) != 0 || clean.BillingObstacle() != "" {
+		t.Errorf("a clean row obstructs nothing: %v", clean.BillingObstacles())
 	}
 }

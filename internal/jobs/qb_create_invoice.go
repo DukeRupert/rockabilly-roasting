@@ -365,12 +365,12 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 	if job.Args.QBCustomerID != "" {
 		qbID := job.Args.QBCustomerID
 		preview.QBCustomerID = &qbID
-	} else if preview.AutoBilled {
-		// EnsureQBCustomer looked and found nothing, so a live run would have
-		// created the customer. Worth a human's eye before it does — but only
-		// where a live run would actually bill: saying "going live would
-		// create this customer" about an account nothing invoices is a claim
-		// about something that will not happen.
+	} else {
+		// EnsureQBCustomer looked and found nothing. Recorded for manual
+		// accounts too: the lookup really did run for them, and Bill now has
+		// to be able to say that invoicing this order would create a customer
+		// in the merchant's books. Problem() still keeps it off the review
+		// page's attention count, where it would be noise.
 		preview.WouldCreateCustomer = true
 	}
 	for _, line := range lines {
@@ -387,7 +387,12 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 	// that would otherwise only surface as a failed invoice after go-live. The
 	// runbook sends staff here to check exactly this, so it has to be said
 	// here rather than only on the settings page.
-	if preview.AutoBilled && qbItems.SalesItemID == "" && w.envSalesItemID == "" {
+	// Not gated on AutoBilled, unlike an earlier version of this check. A
+	// manual account with no configured item is exactly the row somebody
+	// reaches for Bill now on, and CreateInvoice refuses without an item —
+	// permanently, since it is an ErrBadRequest. Suppressing it here would
+	// have left that click with no warning and no chance of succeeding.
+	if qbItems.SalesItemID == "" && w.envSalesItemID == "" {
 		lookupErrs = append(lookupErrs,
 			"no QuickBooks item is chosen for invoice lines — set one under Settings, Integrations, or invoices cannot be created")
 	}

@@ -177,7 +177,7 @@ func (s *OrderService) ReconcileWholesalePayment(ctx context.Context, tx pgx.Tx,
 		return s.captureInvoicePayment(ctx, tx, order)
 
 	// 3. Past due — balance still owed and QB gave us a due date that has passed.
-	case !f.DueDate.IsZero() && invoicePastDue(f.DueDate, now):
+	case !f.DueDate.IsZero() && invoicePastDue(f.DueDate, now, s.merchantTZ):
 		return s.markInvoiceOverdue(ctx, tx, order, f.DueDate, now)
 
 	// 4. Partial payment within terms.
@@ -408,18 +408,31 @@ func (s *OrderService) recordQBAudit(ctx context.Context, tx pgx.Tx, order *doma
 	return nil
 }
 
-// invoicePastDue reports whether an invoice due on dueDate is past due at now.
+// invoicePastDue reports whether an invoice due on dueDate is past due at now,
+// in the merchant's own timezone.
 //
 // QB's DueDate is a calendar date with no time, parsed to midnight UTC, so a
 // naive now.After(dueDate) makes an invoice overdue from the first instant of
 // the day it falls due rather than once that day has passed. That was a
 // harmless few hours' head start on net terms, but it made "due on receipt"
-// (zero days) overdue the moment it was issued: the next reconcile poll would
-// flip the order to overdue and fire the first past-due chase on the same day
-// the invoice email went out. An invoice is past due once its due date is
-// behind us, so the comparison is against the start of the following day.
-func invoicePastDue(dueDate, now time.Time) bool {
-	return !now.Before(dueDate.AddDate(0, 0, 1))
+// (zero days) overdue the moment it was issued — billed and chased in one
+// morning.
+//
+// Comparing against the next UTC day fixes the bulk of that but not the tail:
+// for a Pacific merchant the next UTC day begins at five in the afternoon
+// local, still on the due date itself. The date is therefore reassembled in
+// the merchant's timezone, so an invoice becomes overdue when their day rolls
+// over, which is the only reading of "the due date has passed" a shop would
+// recognise. A nil location means UTC.
+func invoicePastDue(dueDate, now time.Time, loc *time.Location) bool {
+	if loc == nil {
+		loc = time.UTC
+	}
+	// DueDate carries no time, so read its calendar date as QB stated it and
+	// find the start of the following day where the shop is.
+	y, m, d := dueDate.UTC().Date()
+	dayAfterDue := time.Date(y, m, d+1, 0, 0, 0, 0, loc)
+	return !now.Before(dayAfterDue)
 }
 
 // overdueReminderStageFor returns which reminder (1..maxOverdueReminders) an

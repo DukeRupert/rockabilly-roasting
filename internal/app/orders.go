@@ -43,6 +43,17 @@ type OrderService struct {
 	// WithQBPreviews alongside the previews, because the only reader of
 	// either is the shadow digest.
 	settings *store.SettingsStore
+	// merchantTZ is the shop's local timezone, used to decide when an invoice
+	// date has actually passed. Nil falls back to UTC.
+	merchantTZ *time.Location
+}
+
+// WithMerchantTZ wires the shop's local timezone. Without it, "the due date
+// has passed" is decided in UTC, which for a Pacific merchant makes an invoice
+// overdue at five in the afternoon on the day it falls due.
+func (s *OrderService) WithMerchantTZ(loc *time.Location) *OrderService {
+	s.merchantTZ = loc
+	return s
 }
 
 // WithQBPreviews wires the store of would-be invoices recorded while

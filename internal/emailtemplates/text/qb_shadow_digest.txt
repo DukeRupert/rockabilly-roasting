@@ -2,8 +2,7 @@
 
 Nothing below was billed. No invoice was created in QuickBooks and no customer was emailed. This is what would have happened over the last {{.Days}} days if billing were live.
 
-{{if eq .Total 0}}No wholesale orders were invoiced in this period.
-{{else}}{{if eq .Total 1}}One invoice{{else}}{{.Total}} invoices{{end}} totalling {{cents .TotalAmtCents}}. {{if gt .Attention 0}}{{.Attention}} need{{if eq .Attention 1}}s{{end}} attention before going live.{{else}}Nothing needs attention.{{end}}
+{{if eq .Total 1}}One invoice{{else}}{{.Total}} invoices{{end}} totalling {{cents .TotalAmtCents}}. {{if gt .Attention 0}}{{.Attention}} need{{if eq .Attention 1}}s{{end}} attention before going live.{{else}}Nothing needs attention.{{end}}
 
 {{range .Invoices}}{{if .Problem}}[CHECK] {{end}}{{.OrderNumber}} - {{.Customer}} - {{cents .TotalCents}}
   {{.Terms}} | due {{date .DueDate}}{{if .BillEmail}} | to {{.BillEmail}}{{end}}
@@ -12,7 +11,7 @@ Nothing below was billed. No invoice was created in QuickBooks and no customer w
 
 {{end}}{{if gt .Total (len .Invoices)}}Showing {{len .Invoices}} of {{.Total}}. The review page has the rest.
 
-{{end}}{{end}}Review what would be billed: {{.ReviewURL}}
+{{end}}Review what would be billed: {{.ReviewURL}}
 
 {{.StoreName}} - Staff notification
 {{end}}

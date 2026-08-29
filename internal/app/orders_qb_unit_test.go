@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/dukerupert/hiri/internal/domain"
 )
@@ -79,7 +80,28 @@ func TestInvoicePastDue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, invoicePastDue(due, tt.now))
+			assert.Equal(t, tt.want, invoicePastDue(due, tt.now, time.UTC))
 		})
 	}
+}
+
+func TestInvoicePastDueUsesTheMerchantsDay(t *testing.T) {
+	la, err := time.LoadLocation("America/Los_Angeles")
+	require.NoError(t, err)
+	due := time.Date(2026, 8, 29, 0, 0, 0, 0, time.UTC)
+
+	// 17:00 UTC on the due date is 10:00 in Los Angeles — still the morning of
+	// the day the invoice falls due. Comparing against the next UTC day would
+	// call that overdue and fire the first past-due chase, which for
+	// due-on-receipt terms means billing and chasing on the same morning.
+	sameMorningLocal := time.Date(2026, 8, 29, 17, 0, 0, 0, time.UTC)
+	assert.False(t, invoicePastDue(due, sameMorningLocal, la),
+		"an invoice must not be overdue while it is still its due date where the shop is")
+
+	// Late evening local, still the due date.
+	assert.False(t, invoicePastDue(due, time.Date(2026, 8, 30, 6, 59, 0, 0, time.UTC), la))
+
+	// Midnight in Los Angeles is 07:00 UTC the following day.
+	assert.True(t, invoicePastDue(due, time.Date(2026, 8, 30, 7, 0, 0, 0, time.UTC), la),
+		"once the shop's day rolls over, the due date has passed")
 }

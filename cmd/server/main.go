@@ -388,7 +388,8 @@ func run() error {
 		WithDiscounts(discountStore).
 		WithPricing(pricingStore).
 		WithOrderActionSigner(orderActionSigner).
-		WithQBPreviews(qbPreviewStore, settingsStore)
+		WithQBPreviews(qbPreviewStore, settingsStore).
+		WithMerchantTZ(merchantTZ)
 	customerSvc := app.NewCustomerService(customerStore, auditWriter, metricsReg)
 	subscriptionSvc := app.NewSubscriptionService(subscriptionStore, orderStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, customerStore, catalogStore).

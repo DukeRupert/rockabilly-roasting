@@ -48,6 +48,10 @@ templ QBPreview(props QBPreviewProps) {
 }
 
 templ QBPreviewContent(props QBPreviewProps) {
+	// Required by the Bill now buttons below. ConfirmAttrs cancels the click
+	// and dispatches admin-confirm, which only this host listens for — without
+	// it the button is inert and nothing is ever billed.
+	@ConfirmDialogHost()
 	@settingsSection(props.Nav, settingsTabIntegrations)
 	<h1 class="admin-page-title">QuickBooks test mode</h1>
 	@adminFlash(props.Flash)

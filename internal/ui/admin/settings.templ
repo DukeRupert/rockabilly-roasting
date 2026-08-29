@@ -1036,7 +1036,7 @@ templ qbBillingModeForm(mode domain.QBBillingMode) {
 			<input type="hidden" name="mode" value="live"/>
 			<button
 				type="submit"
-				class="bg-rr-red text-white rounded px-3 py-2 text-sm font-medium"
+				class="rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red"
 				{ ConfirmAttrs(ActionConfirm{
 					Title: "Start billing customers for real?",
 					Lead:  "From now on, wholesale orders are invoiced in QuickBooks and emailed to the customer.",

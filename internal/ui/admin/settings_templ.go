@@ -1772,7 +1772,7 @@ func qbBillingModeForm(mode domain.QBBillingMode) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "<form method=\"post\" action=\"/admin/settings/integrations/quickbooks/billing-mode\"><input type=\"hidden\" name=\"mode\" value=\"live\"> <button type=\"submit\" class=\"bg-rr-red text-white rounded px-3 py-2 text-sm font-medium\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "<form method=\"post\" action=\"/admin/settings/integrations/quickbooks/billing-mode\"><input type=\"hidden\" name=\"mode\" value=\"live\"> <button type=\"submit\" class=\"rounded-sm bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-rr-red-lt focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rr-red\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

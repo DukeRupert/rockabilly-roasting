@@ -37,7 +37,7 @@ type TokenResponse struct {
 	AccessToken      string `json:"access_token"`
 	RefreshToken     string `json:"refresh_token"`
 	TokenType        string `json:"token_type"`
-	ExpiresIn        int    `json:"expires_in"`         // seconds (typically 3600)
+	ExpiresIn        int    `json:"expires_in"`                 // seconds (typically 3600)
 	RefreshExpiresIn int    `json:"x_refresh_token_expires_in"` // seconds (typically 8726400 = 100 days)
 }
 

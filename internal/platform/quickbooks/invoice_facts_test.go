@@ -11,7 +11,7 @@ func TestDollarsToCents_Rounds(t *testing.T) {
 		want    int
 	}{
 		{0, 0},
-		{0.33, 33},      // 0.33*100 = 32.999... must round to 33, not truncate to 32
+		{0.33, 33}, // 0.33*100 = 32.999... must round to 33, not truncate to 32
 		{0.01, 1},
 		{99.99, 9999},
 		{100.00, 10000},

@@ -702,6 +702,12 @@ func NewRouter(deps *Deps) http.Handler {
 	settingsRoute("GET /admin/settings/integrations/quickbooks/connect", deps.handleAdminQBConnect)
 	settingsRoute("GET /admin/settings/integrations/quickbooks/callback", deps.handleAdminQBCallback)
 	settingsRoute("POST /admin/settings/integrations/quickbooks/disconnect", deps.handleAdminQBDisconnect)
+	// Shadow billing: the review list, and the switch that decides whether
+	// wholesale customers are actually invoiced. Same admin-only gate as the
+	// rest of settings — going live is the highest-blast-radius button in the
+	// product.
+	settingsRoute("GET /admin/settings/integrations/quickbooks/preview", deps.handleAdminQBPreview)
+	settingsRoute("POST /admin/settings/integrations/quickbooks/billing-mode", deps.handleAdminQBBillingModeUpdate)
 
 	// --- Equipment service module ---
 	//

@@ -35,6 +35,23 @@ type OrderService struct {
 	// orderActions signs the switch-to-pickup link in order confirmations.
 	// Optional: without it the email offers the switch by reply instead.
 	orderActions *auth.OrderActionSigner
+	// qbPreviews backs the shadow-billing digest. Populated via
+	// WithQBPreviews; without it the digest job has nothing to summarise and
+	// says so rather than sending an empty report.
+	qbPreviews *store.QBPreviewStore
+	// settings answers whether QuickBooks billing is live. Populated via
+	// WithQBPreviews alongside the previews, because the only reader of
+	// either is the shadow digest.
+	settings *store.SettingsStore
+}
+
+// WithQBPreviews wires the store of would-be invoices recorded while
+// QuickBooks billing is in shadow mode, plus the settings the digest reads to
+// decide whether a proof period is still running.
+func (s *OrderService) WithQBPreviews(previews *store.QBPreviewStore, settings *store.SettingsStore) *OrderService {
+	s.qbPreviews = previews
+	s.settings = settings
+	return s
 }
 
 // WithOrderActionSigner wires the signer used to mint one-click order links in

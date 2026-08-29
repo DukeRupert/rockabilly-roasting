@@ -132,6 +132,12 @@ type Client interface {
 	// on demand.
 	FindOrCreateTerm(ctx context.Context, dueDays int) (string, error)
 
+	// FindTerm is FindOrCreateTerm without the create: it returns an empty
+	// string when the company has no matching Term. Shadow billing uses it so
+	// a proof run can report the Term an invoice would carry without writing
+	// one into the merchant's books.
+	FindTerm(ctx context.Context, dueDays int) (string, error)
+
 	// CreatePayment records a payment against a QB invoice.
 	CreatePayment(ctx context.Context, p PaymentParams) (*Payment, error)
 }

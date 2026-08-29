@@ -86,3 +86,31 @@ func ptrToStr(s *string) string {
 	}
 	return *s
 }
+
+// GetQBBillingMode returns whether the QuickBooks chain may create and send
+// real invoices. A value this binary does not recognise reads as shadow: the
+// column decides whether real customers get billed, and the safe direction on
+// an unknown value is not to bill.
+func (s *SettingsStore) GetQBBillingMode(ctx context.Context, tx pgx.Tx) (domain.QBBillingMode, error) {
+	var raw string
+	if err := tx.QueryRow(ctx, `SELECT qb_billing_mode FROM store_settings`).Scan(&raw); err != nil {
+		return domain.DefaultQBBillingMode, fmt.Errorf("get qb billing mode: %w", err)
+	}
+	mode := domain.QBBillingMode(raw)
+	if !mode.Valid() {
+		return domain.DefaultQBBillingMode, nil
+	}
+	return mode, nil
+}
+
+// UpdateQBBillingMode sets the QuickBooks billing mode. Callers are
+// responsible for rejecting an invalid mode before reaching here; the CHECK
+// constraint is the backstop.
+func (s *SettingsStore) UpdateQBBillingMode(ctx context.Context, tx pgx.Tx, mode domain.QBBillingMode) error {
+	if _, err := tx.Exec(ctx,
+		`UPDATE store_settings SET qb_billing_mode = $1, updated_at = now()`, string(mode),
+	); err != nil {
+		return fmt.Errorf("update qb billing mode: %w", err)
+	}
+	return nil
+}

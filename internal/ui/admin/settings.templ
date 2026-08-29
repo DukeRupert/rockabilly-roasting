@@ -212,6 +212,12 @@ type SettingsWholesaleProps struct {
 type SettingsIntegrationsProps struct {
 	Nav        SettingsNav
 	QB         QBConnectionStatus
+	// QBBillingMode is shadow or live. Shadow is the default and means the
+	// invoice chain runs and records what it would have billed without
+	// writing to QuickBooks or emailing anyone.
+	QBBillingMode domain.QBBillingMode
+	// QBPreviewCount is how many would-be invoices are waiting to be reviewed.
+	QBPreviewCount int
 	QBEnabled  bool // true if QB_CLIENT_ID is configured
 	Flash      Flash
 	MerchantTZ *time.Location
@@ -889,6 +895,39 @@ templ SettingsIntegrationsContent(props SettingsIntegrationsProps) {
 					</dl>
 				</div>
 				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
+					<div class="sm:flex sm:items-start sm:justify-between sm:gap-4">
+						<div>
+							<p class="text-sm font-medium text-rr-heading">
+								Billing mode
+								if props.QBBillingMode.IsLive() {
+									<span class="badge badge-green ml-2">Live</span>
+								} else {
+									<span class="badge badge-amber ml-2">Test mode</span>
+								}
+							</p>
+							if props.QBBillingMode.IsLive() {
+								<p class="mt-1 text-sm text-rr-muted">
+									Wholesale orders are invoiced in QuickBooks and emailed to the customer.
+								</p>
+							} else {
+								<p class="mt-1 text-sm text-rr-muted">
+									Nothing is billed. Wholesale orders are costed and recorded so you can
+									check them, but no invoice reaches QuickBooks and no customer is emailed.
+								</p>
+							}
+						</div>
+						<div class="mt-3 flex items-center gap-3 sm:mt-0 sm:shrink-0">
+							<a href="/admin/settings/integrations/quickbooks/preview" class="btn-secondary">
+								Review
+								if props.QBPreviewCount > 0 {
+									<span class="ml-1 text-rr-muted">({ strconv.Itoa(props.QBPreviewCount) })</span>
+								}
+							</a>
+							@qbBillingModeForm(props.QBBillingMode)
+						</div>
+					</div>
+				</div>
+				<div class="border-t border-rr-border px-4 py-4 sm:px-6">
 					<div class="flex items-center gap-3">
 						<!-- hx-boost="false" on both OAuth entry points: the route 302s to
 						     intuit.com, and a boosted link fetches it by XHR, where a
@@ -964,4 +1003,53 @@ type PostponementRow struct {
 	// Restore button, because restoring into the past would rewrite the promised
 	// date on orders that have already been delivered.
 	Restorable bool
+}
+
+// qbBillingModeForm renders the one control that decides whether real
+// customers get billed.
+//
+// Going live is the consequential direction, so it is the one that has to be
+// confirmed and the one whose button carries the weight. Going back to test
+// mode is the safe direction and stays a plain secondary action — a mistake
+// there costs a proof period, not an invoice sent to a customer.
+templ qbBillingModeForm(mode domain.QBBillingMode) {
+	if mode.IsLive() {
+		<form method="post" action="/admin/settings/integrations/quickbooks/billing-mode">
+			<input type="hidden" name="mode" value="shadow"/>
+			<button
+				type="submit"
+				class="btn-secondary"
+				{ ConfirmAttrs(ActionConfirm{
+					Title: "Switch billing back to test mode?",
+					Lead:  "Stops Hiri billing wholesale customers through QuickBooks.",
+					Points: []string{
+						"New wholesale orders will be recorded for review instead of invoiced.",
+						"Invoices already in QuickBooks are untouched — nothing is voided or recalled.",
+						"Reconciliation of existing invoices carries on as normal.",
+					},
+					Confirm: "Switch to test mode",
+				})... }
+			>Switch to test mode</button>
+		</form>
+	} else {
+		<form method="post" action="/admin/settings/integrations/quickbooks/billing-mode">
+			<input type="hidden" name="mode" value="live"/>
+			<button
+				type="submit"
+				class="bg-rr-red text-white rounded px-3 py-2 text-sm font-medium"
+				{ ConfirmAttrs(ActionConfirm{
+					Title: "Start billing customers for real?",
+					Lead:  "From now on, wholesale orders are invoiced in QuickBooks and emailed to the customer.",
+					Points: []string{
+						"Real invoices appear in your QuickBooks company and count as money owed.",
+						"Customers receive them by email from QuickBooks, with payment terms and a due date.",
+						"Orders already recorded in test mode are not billed retrospectively — this applies to new orders.",
+						"Review what test mode recorded before you do this.",
+					},
+					Confirm: "Start billing",
+					Danger:  true,
+				})... }
+			>Go live</button>
+		</form>
+	}
 }

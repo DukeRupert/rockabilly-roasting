@@ -216,10 +216,21 @@ const (
 	AuditInvoicePaymentRecorded = "invoice.payment_recorded"
 
 	// QuickBooks integration actions
-	AuditQBCustomerCreated         = "qb.customer_created"
-	AuditQBCustomerLinked          = "qb.customer_linked"
-	AuditQBCustomerSynced          = "qb.customer_synced"
-	AuditQBInvoiceCreated          = "qb.invoice_created"
+	AuditQBCustomerCreated = "qb.customer_created"
+	AuditQBCustomerLinked  = "qb.customer_linked"
+	AuditQBCustomerSynced  = "qb.customer_synced"
+	AuditQBInvoiceCreated  = "qb.invoice_created"
+	// AuditQBInvoicePreviewed records an invoice shadow billing would have
+	// created. Kept in the audit log as well as qb_invoice_previews because
+	// the previews table holds one row per order, refreshed in place, while
+	// the question after a proof period is often "what did it decide, and
+	// when".
+	AuditQBInvoicePreviewed = "qb.invoice_previewed"
+	// The two directions of the billing switch are separate actions rather
+	// than one with a payload: "when did we start billing customers" is a
+	// question worth being able to ask of the action column alone.
+	AuditQBBillingModeLive         = "qb.billing_mode_live"
+	AuditQBBillingModeShadowed     = "qb.billing_mode_shadowed"
 	AuditQBInvoiceEmailed          = "qb.invoice_emailed"
 	AuditQBPaymentSynced           = "qb.payment_synced"
 	AuditQBConnected               = "qb.connected"

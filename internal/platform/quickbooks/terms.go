@@ -102,6 +102,43 @@ func (c *QBClient) FindOrCreateTerm(ctx context.Context, dueDays int) (string, e
 		return id, nil
 	}
 
+	id, err := c.FindTerm(ctx, dueDays)
+	if err != nil {
+		return "", err
+	}
+	if id != "" {
+		return id, nil
+	}
+
+	body := qbTermRequest{
+		Name:    termName(dueDays),
+		DueDays: dueDays,
+		Type:    "STANDARD",
+	}
+	created, err := c.doAPI(ctx, "POST", "/term", body)
+	if err != nil {
+		return "", fmt.Errorf("create QB term: %w", err)
+	}
+	var resp qbTermResponse
+	if err := json.Unmarshal(created, &resp); err != nil {
+		return "", fmt.Errorf("unmarshal QB term response: %w", err)
+	}
+	c.terms.put(dueDays, resp.Term.ID)
+	return resp.Term.ID, nil
+}
+
+// FindTerm returns the QBO Term ID for NET terms of the given number of days,
+// or an empty string when the company has none. It never writes, which is what
+// shadow billing needs: a proof run must be able to report which Term an
+// invoice would carry without creating one in the merchant's books.
+func (c *QBClient) FindTerm(ctx context.Context, dueDays int) (string, error) {
+	if dueDays < 0 {
+		return "", fmt.Errorf("%w: negative payment terms (%d days)", ErrBadRequest, dueDays)
+	}
+	if id, ok := c.terms.get(dueDays); ok {
+		return id, nil
+	}
+
 	// Every Term is fetched and matched here rather than filtered with a
 	// WHERE clause: QBO's query language rejects an integer comparison on
 	// DueDays ("Error parsing query ... was expecting true/false"). The list
@@ -120,22 +157,7 @@ func (c *QBClient) FindOrCreateTerm(ctx context.Context, dueDays int) (string, e
 			return term.ID, nil
 		}
 	}
-
-	body := qbTermRequest{
-		Name:    termName(dueDays),
-		DueDays: dueDays,
-		Type:    "STANDARD",
-	}
-	created, err := c.doAPI(ctx, "POST", "/term", body)
-	if err != nil {
-		return "", fmt.Errorf("create QB term: %w", err)
-	}
-	var resp qbTermResponse
-	if err := json.Unmarshal(created, &resp); err != nil {
-		return "", fmt.Errorf("unmarshal QB term response: %w", err)
-	}
-	c.terms.put(dueDays, resp.Term.ID)
-	return resp.Term.ID, nil
+	return "", nil
 }
 
 // termName is the Term name to create when the company has none for these

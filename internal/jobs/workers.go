@@ -445,6 +445,14 @@ type ReconcileQBInvoicesArgs struct{}
 // Kind returns the job kind identifier.
 func (ReconcileQBInvoicesArgs) Kind() string { return "qb_reconcile_invoices" }
 
+// QBShadowDigestArgs asks for the weekly summary of what QuickBooks billing
+// would have done while the shop is in shadow mode. Periodic job; carries no
+// payload.
+type QBShadowDigestArgs struct{}
+
+// Kind returns the job kind identifier.
+func (QBShadowDigestArgs) Kind() string { return "qb_shadow_digest" }
+
 // SyncQBCustomerArgs syncs customer details to QB (triggered by profile updates).
 type SyncQBCustomerArgs struct {
 	CustomerID uuid.UUID `json:"customer_id"`

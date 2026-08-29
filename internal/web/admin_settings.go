@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
@@ -35,8 +36,8 @@ type settingsSection struct {
 	// alongside the shipping config because they are edited on the same page
 	// and are meaningless without the schedule they amend.
 	Postponements []domain.DeliveryPostponement
-	QB        admin.QBConnectionStatus
-	QBEnabled bool
+	QB            admin.QBConnectionStatus
+	QBEnabled     bool
 	// BoxPresets is the full list, not a count: the attention list needs to
 	// know whether any exist and the box-presets page needs to draw them, and
 	// reading it twice would let the "No box presets" warning render above a
@@ -269,15 +270,39 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	// Billing mode and the review count are read here rather than in
+	// loadSettingsSection: they are only meaningful on this tab, and the
+	// section loader is shared by every settings page.
+	var mode domain.QBBillingMode
+	var previewCount int
+	if section.QBEnabled {
+		if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			var txErr error
+			if mode, txErr = d.OrderService.QBBillingMode(ctx, tx); txErr != nil {
+				return txErr
+			}
+			previewCount, txErr = d.OrderService.CountQBPreviews(ctx, tx)
+			return txErr
+		}); err != nil {
+			// A failed read here must not take the page down — the connection
+			// panel above it is the reason staff came. Fall back to shadow,
+			// which is the safe thing to claim when we cannot tell.
+			slog.Error("admin settings: qb billing mode", "error", err)
+			mode = domain.DefaultQBBillingMode
+		}
+	}
+
 	name, role := staffNameRole(r)
 	props := admin.SettingsIntegrationsProps{
-		Nav:        section.nav(role),
-		QB:         section.QB,
-		QBEnabled:  section.QBEnabled,
-		Flash:      settingsFlash(r),
-		MerchantTZ: d.MerchantTZ,
-		StaffName:  name,
-		StaffRole:  role,
+		Nav:            section.nav(role),
+		QB:             section.QB,
+		QBEnabled:      section.QBEnabled,
+		QBBillingMode:  mode,
+		QBPreviewCount: previewCount,
+		Flash:          settingsFlash(r),
+		MerchantTZ:     d.MerchantTZ,
+		StaffName:      name,
+		StaffRole:      role,
 	}
 	if IsHTMX(r) {
 		admin.SettingsIntegrationsContent(props).Render(ctx, w) //nolint:errcheck
@@ -690,4 +715,93 @@ func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("qb: disconnected")
 	redirectFlash(w, r, "/admin/settings/integrations", "QuickBooks disconnected")
+}
+
+// qbPreviewPageSize bounds the review list. A proof period is meant to run for
+// a week or two, so this is generous enough to hold one without paging while
+// still refusing to render an unbounded table.
+const qbPreviewPageSize = 200
+
+// handleAdminQBPreview renders what QuickBooks billing would have done while
+// the shop is in shadow mode.
+func (d *Deps) handleAdminQBPreview(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	section, err := d.loadSettingsSection(ctx)
+	if err != nil {
+		slog.Error("admin qb preview: load settings", "error", err)
+		Error(w, r, err)
+		return
+	}
+
+	var summary app.QBShadowSummary
+	var mode domain.QBBillingMode
+	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		if mode, txErr = d.OrderService.QBBillingMode(ctx, tx); txErr != nil {
+			return txErr
+		}
+		summary, txErr = d.OrderService.ListQBPreviews(ctx, tx, qbPreviewPageSize)
+		return txErr
+	}); err != nil {
+		slog.Error("admin qb preview: list", "error", err)
+		Error(w, r, err)
+		return
+	}
+
+	rows := make([]admin.QBPreviewRow, 0, len(summary.Rows))
+	for _, row := range summary.Rows {
+		rows = append(rows, admin.QBPreviewRow{
+			QBInvoicePreview: row.QBInvoicePreview,
+			OrderNumber:      row.OrderNumber,
+			CustomerName:     row.CustomerName,
+		})
+	}
+
+	name, role := staffNameRole(r)
+	props := admin.QBPreviewProps{
+		Nav:        section.nav(role),
+		Rows:       rows,
+		Mode:       mode,
+		Attention:  summary.Attention,
+		TotalCents: summary.TotalCents,
+		Flash:      settingsFlash(r),
+		StaffName:  name,
+		StaffRole:  role,
+	}
+	if IsHTMX(r) {
+		admin.QBPreviewContent(props).Render(ctx, w) //nolint:errcheck
+		return
+	}
+	admin.QBPreview(props).Render(ctx, w) //nolint:errcheck
+}
+
+// handleAdminQBBillingModeUpdate switches QuickBooks billing between shadow
+// and live.
+//
+// The mode arrives as an explicit value rather than as a toggle of whatever is
+// stored: two staff on the page at once must not be able to flip each other
+// into billing customers by both pressing the button they were looking at.
+func (d *Deps) handleAdminQBBillingModeUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	mode := domain.QBBillingMode(r.FormValue("mode"))
+	if !mode.Valid() {
+		redirectFlashError(w, r, "/admin/settings/integrations", "That is not a billing mode.")
+		return
+	}
+
+	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.OrderService.SetQBBillingMode(ctx, tx, mode, staffActor(r))
+	}); err != nil {
+		slog.Error("admin qb billing mode: update", "error", err, "mode", mode)
+		Error(w, r, err)
+		return
+	}
+
+	msg := "QuickBooks billing is in test mode. Nothing will be billed."
+	if mode.IsLive() {
+		msg = "QuickBooks billing is live. New wholesale orders will be invoiced and emailed."
+	}
+	redirectFlash(w, r, "/admin/settings/integrations", msg)
 }

@@ -144,6 +144,10 @@ var (
 	// Tax errors
 	ErrTaxCalculationFailed = errors.New("tax calculation failed")
 	ErrInvalidTaxConfig     = errors.New("invalid tax configuration")
+	// ErrInvalidQBBillingMode guards the one setting that decides whether real
+	// customers get billed; an unrecognised value must be refused rather than
+	// coerced.
+	ErrInvalidQBBillingMode = errors.New("invalid quickbooks billing mode")
 
 	// Shipping errors
 	ErrShipmentNotFound      = errors.New("shipment not found")

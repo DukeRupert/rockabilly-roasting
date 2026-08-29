@@ -49,8 +49,15 @@ const qbItemPageSize = 1000
 // somebody was looking for would simply not be there.
 func (c *QBClient) ListItems(ctx context.Context) ([]Item, error) {
 	var items []Item
+	// Bounded, not merely terminating on a short page. The loop's exit depends
+	// on QBO honouring STARTPOSITION; a server that ignored it would return a
+	// full page forever, and each turn of that loop is an HTTP call with a
+	// thirty second timeout on a request-scoped context. Ten pages is far more
+	// items than any coffee roaster has and still a finite promise.
+	const maxPages = 10
 	// QBO's STARTPOSITION is 1-based.
-	for start := 1; ; start += qbItemPageSize {
+	for page := 0; page < maxPages; page++ {
+		start := 1 + page*qbItemPageSize
 		// SELECT * rather than a field list: Intuit's query language documents
 		// * as the supported select clause, and a field list is not reliably
 		// honoured — a silently ignored one would look like a company with no
@@ -67,15 +74,15 @@ func (c *QBClient) ListItems(ctx context.Context) ([]Item, error) {
 			return nil, fmt.Errorf("unmarshal QB item query: %w", err)
 		}
 
-		page := resp.QueryResponse.Item
-		for _, raw := range page {
+		got := resp.QueryResponse.Item
+		for _, raw := range got {
 			item := Item{ID: raw.ID, Name: raw.Name, Type: raw.Type}
 			if raw.IncomeAccountRef != nil {
 				item.IncomeAccount = raw.IncomeAccountRef.Name
 			}
 			items = append(items, item)
 		}
-		if len(page) < qbItemPageSize {
+		if len(got) < qbItemPageSize {
 			break
 		}
 	}

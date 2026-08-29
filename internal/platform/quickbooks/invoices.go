@@ -121,21 +121,28 @@ func buildInvoiceLines(p InvoiceParams, salesItemID, shippingItemID string) []qb
 	return lines
 }
 
+// resolveInvoiceItems decides which items an invoice's lines bill against:
+// the caller's choice, or the client's configured fallback.
+//
+// One source or the other, never a field from each. Chosen whole because an
+// empty shipping item is a real answer — "bill shipping against the same item
+// as the products" — and not an absence to be filled in from somewhere else.
+// Mixing per field meant a shop that picked its sales item in the admin while
+// an old QB_SHIPPING_ITEM_ID lingered in the environment billed shipping
+// against the stale one, with nothing visibly wrong and the revenue landing in
+// the wrong income account.
+func resolveInvoiceItems(p InvoiceParams, config ClientConfig) (salesItemID, shippingItemID string) {
+	if p.SalesItemID != "" {
+		return p.SalesItemID, p.ShippingItemID
+	}
+	return config.SalesItemID, config.ShippingItemID
+}
+
 // CreateInvoice creates an invoice in QBO.
 func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice, error) {
 	// Wrapped in ErrBadRequest so IsRetryable classifies it permanent — a
 	// missing item mapping never fixes itself on retry.
-	// Per-invoice items win over the client's configured defaults: the choice
-	// belongs to the shop's settings, and the config values are the fallback
-	// for a deployment still supplying them through the environment.
-	salesItemID := p.SalesItemID
-	if salesItemID == "" {
-		salesItemID = c.config.SalesItemID
-	}
-	shippingItemID := p.ShippingItemID
-	if shippingItemID == "" {
-		shippingItemID = c.config.ShippingItemID
-	}
+	salesItemID, shippingItemID := resolveInvoiceItems(p, c.config)
 	if salesItemID == "" {
 		return nil, fmt.Errorf("%w: no QuickBooks item is configured for invoice lines — choose one under Settings, Integrations", ErrBadRequest)
 	}

@@ -1099,7 +1099,9 @@ templ qbItemPanel(panel QBItemPanel) {
 			<div>
 				<p class="text-sm font-medium text-rr-heading">
 					Invoice items
-					if !panel.Configured() {
+					if panel.ConfigUnreadable {
+						<span class="badge badge-slate ml-2">Unknown</span>
+					} else if !panel.Configured() {
 						<span class="badge badge-amber ml-2">Not set</span>
 					}
 				</p>

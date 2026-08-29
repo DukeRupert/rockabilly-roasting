@@ -318,7 +318,11 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 		itemPanel.SalesItemName = cfg.SalesItemName
 		itemPanel.ShippingItemID = cfg.ShippingItemID
 
-		if d.QBClient != nil {
+		if d.QBClient == nil {
+			// Cannot offer a choice, which is not the same as the company
+			// having nothing to choose from.
+			itemPanel.Unavailable = true
+		} else {
 			items, listErr := d.QBClient.ListItems(ctx)
 			if listErr != nil {
 				slog.Error("admin settings: qb list items", "error", listErr)
@@ -788,6 +792,8 @@ func (d *Deps) handleAdminQBItemsUpdate(w http.ResponseWriter, r *http.Request) 
 		redirectFlashError(w, r, "/admin/settings/integrations", "Choose the item invoices should bill against.")
 	case errors.Is(err, app.ErrQBItemNotFound):
 		redirectFlashError(w, r, "/admin/settings/integrations", "That item no longer exists in QuickBooks. Reload and choose again.")
+	case errors.Is(err, app.ErrQBNotConnected):
+		redirectFlashError(w, r, "/admin/settings/integrations", "QuickBooks is not connected, so there are no items to choose from.")
 	case err != nil:
 		slog.Error("admin qb items: update", "error", err)
 		Error(w, r, err)
@@ -806,7 +812,9 @@ func (d *Deps) resolveQBItems(ctx context.Context, salesID, shippingID string) (
 		return store.QBItemConfig{}, app.ErrQBSalesItemRequired
 	}
 	if d.QBClient == nil {
-		return store.QBItemConfig{}, app.ErrQBItemNotFound
+		// A different fact from "that item is gone", and worth saying so: the
+		// form should not be reachable at all without a client.
+		return store.QBItemConfig{}, app.ErrQBNotConnected
 	}
 
 	items, err := d.QBClient.ListItems(ctx)

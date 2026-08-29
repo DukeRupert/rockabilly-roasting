@@ -208,6 +208,13 @@ func (s *OrderService) SetQBItems(ctx context.Context, tx pgx.Tx, cfg store.QBIt
 	if cfg.SalesItemID == "" {
 		return ErrQBSalesItemRequired
 	}
+	// Read the outgoing mapping first: "which account did this used to post
+	// to" is the question asked when a month of revenue turns up in the wrong
+	// place, and it cannot be answered from the new value alone.
+	previous, err := s.settings.GetQBItemConfig(ctx, tx)
+	if err != nil {
+		return err
+	}
 	if err := s.settings.UpdateQBItemConfig(ctx, tx, cfg); err != nil {
 		return err
 	}
@@ -219,9 +226,15 @@ func (s *OrderService) SetQBItems(ctx context.Context, tx pgx.Tx, cfg store.QBIt
 		ResourceType: "store_settings",
 		ResourceID:   uuid.Nil,
 		After: map[string]any{
-			"qb_sales_item_id":    cfg.SalesItemID,
-			"qb_sales_item_name":  cfg.SalesItemName,
-			"qb_shipping_item_id": cfg.ShippingItemID,
+			"qb_sales_item_id":      cfg.SalesItemID,
+			"qb_sales_item_name":    cfg.SalesItemName,
+			"qb_shipping_item_id":   cfg.ShippingItemID,
+			"qb_shipping_item_name": cfg.ShippingItemName,
+		},
+		Metadata: map[string]any{
+			"previous_sales_item_id":    previous.SalesItemID,
+			"previous_sales_item_name":  previous.SalesItemName,
+			"previous_shipping_item_id": previous.ShippingItemID,
 		},
 	})
 }

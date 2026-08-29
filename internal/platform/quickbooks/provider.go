@@ -16,10 +16,19 @@ type InvoiceParams struct {
 	Lines      []InvoiceLine
 	Shipping   int // shipping amount in cents
 
+	// BillEmail is the address QBO emails the invoice to. It must be set:
+	// contrary to a long-standing assumption in this package, QBO does NOT
+	// default it from the customer record's PrimaryEmailAddr on an
+	// API-created invoice, and the send endpoint reads BillEmail rather than
+	// the customer. Leaving it empty creates the invoice fine and then fails
+	// the send with "Email Address is required to send email" — an
+	// ErrBadRequest, which IsRetryable treats as permanent, so the invoice
+	// silently never reaches the customer. Verified against the sandbox
+	// 2026-08-29.
+	BillEmail string
+
 	// AllowOnlineACHPayment / AllowOnlineCreditCardPayment put the matching
-	// pay buttons on the emailed invoice. The invoice's BillEmail is
-	// deliberately NOT set here — QB defaults it from the customer record's
-	// email, which is the curated billing contact for linked customers.
+	// pay buttons on the emailed invoice.
 	AllowOnlineACHPayment        bool
 	AllowOnlineCreditCardPayment bool
 }

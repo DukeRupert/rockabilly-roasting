@@ -166,7 +166,8 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		// emails the invoice (chained SendQBInvoice job below) with
 		// online-payment buttons: ACH always, card only when that's the
 		// customer's billing method (card fees are opt-in per account). The
-		// bill-to email comes from the QB customer record.
+		// bill-to email is set explicitly below — QBO does not fill it in
+		// from the linked customer, and the send step fails without it.
 		params := quickbooks.InvoiceParams{
 			CustomerID:            job.Args.QBCustomerID,
 			DocNumber:             docNumber,
@@ -177,6 +178,9 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		}
 		if customer != nil {
 			params.AllowOnlineCreditCardPayment = customer.BillingMethod == domain.BillingMethodCreditCard
+			// EnsureQBCustomer syncs this same address onto the QB customer's
+			// PrimaryEmailAddr, so local and QB agree by construction.
+			params.BillEmail = customer.Email
 		}
 		invoice, err = w.qb.CreateInvoice(ctx, params)
 		if err != nil {

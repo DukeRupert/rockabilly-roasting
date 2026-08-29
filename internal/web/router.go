@@ -708,6 +708,9 @@ func NewRouter(deps *Deps) http.Handler {
 	// product.
 	settingsRoute("GET /admin/settings/integrations/quickbooks/preview", deps.handleAdminQBPreview)
 	settingsRoute("POST /admin/settings/integrations/quickbooks/billing-mode", deps.handleAdminQBBillingModeUpdate)
+	// Which QB items invoices bill against — the income-account mapping, which
+	// belongs to the bookkeeper rather than to a redeploy.
+	settingsRoute("POST /admin/settings/integrations/quickbooks/items", deps.handleAdminQBItemsUpdate)
 	// Bill an order that test mode recorded instead of invoicing. Without this
 	// the invoice chain is only ever started by wholesale checkout, and every
 	// order placed during a proof period would be stranded.

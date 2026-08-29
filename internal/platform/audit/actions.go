@@ -234,7 +234,11 @@ const (
 	// AuditQBOrderBilledManually records a staffer starting the invoice chain
 	// for an order checkout did not bill — in practice, one placed while the
 	// shop was in test mode.
-	AuditQBOrderBilledManually     = "qb.order_billed_manually"
+	AuditQBOrderBilledManually = "qb.order_billed_manually"
+	// AuditQBItemsUpdated records a change to which QuickBooks items invoices
+	// bill against — in effect, which income account the shop's wholesale
+	// revenue lands in.
+	AuditQBItemsUpdated            = "qb.items_updated"
 	AuditQBInvoiceEmailed          = "qb.invoice_emailed"
 	AuditQBPaymentSynced           = "qb.payment_synced"
 	AuditQBConnected               = "qb.connected"

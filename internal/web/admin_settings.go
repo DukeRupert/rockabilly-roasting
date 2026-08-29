@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -294,6 +295,33 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 		}
 	}
 
+	// Which items invoices bill against, and what they could be. A live
+	// read-only call, safe in either billing mode.
+	var itemPanel admin.QBItemPanel
+	if section.QBEnabled {
+		itemPanel.EnvFallback = os.Getenv("QB_SALES_ITEM_ID")
+		if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+			settings, txErr := d.OrderService.QBItemSettingsFor(ctx, tx, d.QBClient, itemPanel.EnvFallback)
+			if txErr != nil {
+				return txErr
+			}
+			itemPanel.SalesItemID = settings.Current.SalesItemID
+			itemPanel.SalesItemName = settings.Current.SalesItemName
+			itemPanel.ShippingItemID = settings.Current.ShippingItemID
+			itemPanel.ShippingItemName = settings.Current.ShippingItemName
+			itemPanel.Unavailable = settings.ListErr != nil
+			for _, choice := range settings.Choices {
+				itemPanel.Choices = append(itemPanel.Choices, admin.QBItemChoice{
+					ID: choice.ID, Name: choice.Name, Type: choice.Type, IncomeAccount: choice.IncomeAccount,
+				})
+			}
+			return nil
+		}); err != nil {
+			slog.Error("admin settings: qb items", "error", err)
+			itemPanel.Unavailable = true
+		}
+	}
+
 	name, role := staffNameRole(r)
 	props := admin.SettingsIntegrationsProps{
 		Nav:            section.nav(role),
@@ -301,6 +329,7 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 		QBEnabled:      section.QBEnabled,
 		QBBillingMode:  mode,
 		QBPreviewCount: previewCount,
+		QBItems:        itemPanel,
 		Flash:          settingsFlash(r),
 		MerchantTZ:     d.MerchantTZ,
 		StaffName:      name,
@@ -726,6 +755,30 @@ const qbPreviewPageSize = 200
 
 // qbPreviewPath is where every shadow-billing action returns to.
 const qbPreviewPath = "/admin/settings/integrations/quickbooks/preview"
+
+// handleAdminQBItemsUpdate records which QuickBooks items invoices bill
+// against.
+func (d *Deps) handleAdminQBItemsUpdate(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	salesID := r.FormValue("qb_sales_item_id")
+	shippingID := r.FormValue("qb_shipping_item_id")
+
+	err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.OrderService.SetQBItems(ctx, tx, d.QBClient, salesID, shippingID, staffActor(r))
+	})
+	switch {
+	case errors.Is(err, app.ErrQBSalesItemRequired):
+		redirectFlashError(w, r, "/admin/settings/integrations", "Choose the item invoices should bill against.")
+	case errors.Is(err, app.ErrQBItemNotFound):
+		redirectFlashError(w, r, "/admin/settings/integrations", "That item no longer exists in QuickBooks. Reload and choose again.")
+	case err != nil:
+		slog.Error("admin qb items: update", "error", err)
+		Error(w, r, err)
+	default:
+		redirectFlash(w, r, "/admin/settings/integrations", "Invoice items saved.")
+	}
+}
 
 // handleAdminQBPreview renders what QuickBooks billing would have done while
 // the shop is in shadow mode.

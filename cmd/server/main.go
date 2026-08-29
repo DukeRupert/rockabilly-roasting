@@ -295,9 +295,17 @@ func run() error {
 		if qbWebhookVerifier == "" {
 			return fmt.Errorf("QB_WEBHOOK_VERIFIER_TOKEN is required when QB_CLIENT_ID is set")
 		}
+		// No longer fatal. The item invoices bill against is chosen in the
+		// admin now (migration 079), and it cannot be chosen before the shop
+		// has connected and we can list that company's items — so refusing to
+		// boot without it made the first deploy of a new connection
+		// impossible to do honestly: you had to invent an ID, connect, look up
+		// the real one, and redeploy. An unset item now fails the invoice job
+		// with a message naming the setting, which is visible in the admin
+		// instead of in a crash loop.
 		qbSalesItemID := os.Getenv("QB_SALES_ITEM_ID")
 		if qbSalesItemID == "" {
-			return fmt.Errorf("QB_SALES_ITEM_ID is required when QB_CLIENT_ID is set (QBO rejects invoice lines without an ItemRef)")
+			logger.Warn("QB_SALES_ITEM_ID is not set; wholesale invoicing needs an item chosen under Settings > Integrations before it can bill")
 		}
 		qbEncKeyB64 := os.Getenv("QB_TOKEN_ENCRYPTION_KEY")
 		qbEncKey, decodeErr := base64DecodeKey(qbEncKeyB64)

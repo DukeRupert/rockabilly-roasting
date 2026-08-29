@@ -99,9 +99,13 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	var items []domain.LineItem
 	var customer *domain.Customer
 	var mode domain.QBBillingMode
+	var qbItems store.QBItemConfig
 	err := store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		var txErr error
 		if mode, txErr = w.settings.GetQBBillingMode(ctx, tx); txErr != nil {
+			return txErr
+		}
+		if qbItems, txErr = w.settings.GetQBItemConfig(ctx, tx); txErr != nil {
 			return txErr
 		}
 		order, txErr = w.orders.GetOrderByIDAsStaff(ctx, tx, job.Args.OrderID)
@@ -180,7 +184,14 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	// would reach QBO as a blank CustomerRef. Start the chain again instead:
 	// the live EnsureQBCustomer path establishes the customer properly, and
 	// the DocNumber probe below still guards against a duplicate invoice.
-	if job.Args.QBCustomerID == "" {
+	// Restart when local state does not know this customer, not merely when the
+	// job carries no id. A shadow run that *matched* a customer passes the id
+	// forward without persisting it — deliberately, since linking is what the
+	// proof period exists to have a human confirm. Flip to live between the two
+	// jobs and the invoice would bill correctly against a customer whose
+	// qb_customer_id is still null, after which SyncQBPayment finds nil and
+	// silently stops recording that account's payments.
+	if job.Args.QBCustomerID == "" || customer == nil || customer.QBCustomerID == nil {
 		if order.CustomerID == nil {
 			// Unreachable through either entry point — checkout and BillOrderNow
 			// both require a customer — but this is the one place that would
@@ -219,6 +230,8 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 			Lines:                 lines,
 			Shipping:              order.ShippingTotal,
 			AllowOnlineACHPayment: true,
+			SalesItemID:           qbItems.SalesItemID,
+			ShippingItemID:        qbItems.ShippingItemID,
 		}
 		if customer != nil {
 			params.AllowOnlineCreditCardPayment = customer.BillingMethod == domain.BillingMethodCreditCard

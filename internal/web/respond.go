@@ -143,6 +143,16 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrInvalidEquipmentStatus):
 		return http.StatusBadRequest, err.Error()
 
+	// QuickBooks billing configuration. Bad input, not a server fault — an
+	// unmapped sentinel here would have answered a mistyped mode with a 500.
+	case errors.Is(err, app.ErrInvalidQBBillingMode),
+		errors.Is(err, app.ErrQBSalesItemRequired),
+		errors.Is(err, app.ErrQBItemNotFound),
+		errors.Is(err, app.ErrQBBillingNotLive),
+		errors.Is(err, app.ErrQBOrderAlreadyInvoiced),
+		errors.Is(err, app.ErrQBOrderNotBillable):
+		return http.StatusBadRequest, err.Error()
+
 	// A toggle naming a module this binary does not know about. 404 rather
 	// than 400: from the caller's side the module genuinely does not exist.
 	case errors.Is(err, app.ErrUnknownModule):

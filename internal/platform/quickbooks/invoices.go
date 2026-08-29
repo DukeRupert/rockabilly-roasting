@@ -125,11 +125,22 @@ func buildInvoiceLines(p InvoiceParams, salesItemID, shippingItemID string) []qb
 func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice, error) {
 	// Wrapped in ErrBadRequest so IsRetryable classifies it permanent — a
 	// missing item mapping never fixes itself on retry.
-	if c.config.SalesItemID == "" {
-		return nil, fmt.Errorf("%w: QB sales item not configured (QB_SALES_ITEM_ID)", ErrBadRequest)
+	// Per-invoice items win over the client's configured defaults: the choice
+	// belongs to the shop's settings, and the config values are the fallback
+	// for a deployment still supplying them through the environment.
+	salesItemID := p.SalesItemID
+	if salesItemID == "" {
+		salesItemID = c.config.SalesItemID
+	}
+	shippingItemID := p.ShippingItemID
+	if shippingItemID == "" {
+		shippingItemID = c.config.ShippingItemID
+	}
+	if salesItemID == "" {
+		return nil, fmt.Errorf("%w: no QuickBooks item is configured for invoice lines — choose one under Settings, Integrations", ErrBadRequest)
 	}
 
-	lines := buildInvoiceLines(p, c.config.SalesItemID, c.config.ShippingItemID)
+	lines := buildInvoiceLines(p, salesItemID, shippingItemID)
 
 	body := qbInvoiceRequest{
 		CustomerRef:                  qbRef{Value: p.CustomerID},

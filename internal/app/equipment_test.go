@@ -225,3 +225,37 @@ func TestEquipmentListWithCustomerNamesTheCafe(t *testing.T) {
 	// A cafe is known by the name on the sign, not by whoever signed up.
 	assert.Equal(t, company, rows[0].CustomerName)
 }
+
+// The catalogue behind the add-machine form's type-ahead is a hint, never a
+// whitelist. This is the pin for that, and it has to live here: the property
+// belongs to validateEquipment, which is unexported and in this package, so a
+// test in internal/domain cannot reach it and would stay green if somebody
+// added a membership check tomorrow.
+//
+// The failure it guards against is not hypothetical in shape — a suggestion
+// list quietly becoming a constraint would reject the first machine nobody
+// anticipated, on a register whose whole value is that it holds whatever is
+// actually out there.
+func TestRegisterAcceptsAMakeAndModelOutsideTheCatalogue(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := app.NewEquipmentService(store.NewEquipmentStore(), audit.NewAuditWriter())
+	customer := testutil.CreateCustomer(t, tx)
+
+	// Deliberately absent from domain.EquipmentCatalog.
+	unlisted := "Wollenhaupt & Sons"
+	require.NotContains(t, domain.EquipmentMakes(), unlisted,
+		"precondition: this make must not be in the catalogue, or the test proves nothing")
+
+	machine, err := svc.Register(ctx, tx, app.RegisterEquipmentParams{
+		CustomerID: customer.ID,
+		Category:   domain.EquipmentCategoryOther,
+		Make:       unlisted,
+		Model:      "Mark IV Hand-Cranked",
+		Ownership:  domain.EquipmentOwnershipCustomer,
+	}, testutil.TestActor())
+
+	require.NoError(t, err, "an unlisted make must register exactly as any other")
+	assert.Equal(t, unlisted, machine.Make)
+	assert.Equal(t, "Mark IV Hand-Cranked", machine.Model)
+}

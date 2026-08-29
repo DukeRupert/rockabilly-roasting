@@ -58,7 +58,7 @@ The **Invoice items** panel lists the connected company's active items, each sho
 - **Product lines** -- what every coffee line on the invoice bills against. Required; invoices cannot be created without it.
 - **Shipping line** -- optional. Left as *Same as product lines*, shipping bills against the same item.
 
-The panel is marked **Not set** until an item is chosen. Changing it affects new invoices only; invoices already in QuickBooks are untouched.
+The panel is marked **Not set** when nothing is billing — neither a choice here nor a fallback configured on the server. Changing it affects new invoices only; invoices already in QuickBooks are untouched.
 
 #### Billing mode
 

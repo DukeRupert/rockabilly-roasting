@@ -286,6 +286,9 @@ func run() error {
 	// QuickBooks Online integration
 	qbCredStore := store.NewQBCredentialStore()
 	qbPreviewStore := store.NewQBPreviewStore()
+	// The environment's fallback invoice item, read here so both the client
+	// config and the worker registration below can see it.
+	qbEnvSalesItemID := os.Getenv("QB_SALES_ITEM_ID")
 	var qbClient quickbooks.Client
 	var qbOAuthManager *quickbooks.OAuthManager
 	qbWebhookVerifier := os.Getenv("QB_WEBHOOK_VERIFIER_TOKEN")
@@ -303,7 +306,7 @@ func run() error {
 		// the real one, and redeploy. An unset item now fails the invoice job
 		// with a message naming the setting, which is visible in the admin
 		// instead of in a crash loop.
-		qbSalesItemID := os.Getenv("QB_SALES_ITEM_ID")
+		qbSalesItemID := qbEnvSalesItemID
 		if qbSalesItemID == "" {
 			logger.Warn("QB_SALES_ITEM_ID is not set; wholesale invoicing needs an item chosen under Settings > Integrations before it can bill")
 		}
@@ -696,7 +699,7 @@ func run() error {
 	// Register QB workers (need riverClient for job chaining)
 	if qbClient != nil {
 		river.AddWorker(workers, jobs.NewEnsureQBCustomerWorker(customerStore, settingsStore, qbClient, auditWriter, pool, riverClient, metricsReg))
-		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, customerStore, catalogStore, settingsStore, qbPreviewStore, qbClient, auditWriter, pool, riverClient, metricsReg))
+		river.AddWorker(workers, jobs.NewCreateQBInvoiceWorker(orderStore, customerStore, catalogStore, settingsStore, qbPreviewStore, qbEnvSalesItemID, qbClient, auditWriter, pool, riverClient, metricsReg))
 		river.AddWorker(workers, jobs.NewSendQBInvoiceWorker(qbClient, auditWriter, pool, riverClient, metricsReg))
 		river.AddWorker(workers, jobs.NewQBInvoiceAlertEmailWorker(orderSvc, pool))
 		river.AddWorker(workers, jobs.NewQBShadowDigestWorker(orderSvc, pool))

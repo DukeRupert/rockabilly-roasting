@@ -232,9 +232,10 @@ func (s *OrderService) SetQBItems(ctx context.Context, tx pgx.Tx, cfg store.QBIt
 			"qb_shipping_item_name": cfg.ShippingItemName,
 		},
 		Metadata: map[string]any{
-			"previous_sales_item_id":    previous.SalesItemID,
-			"previous_sales_item_name":  previous.SalesItemName,
-			"previous_shipping_item_id": previous.ShippingItemID,
+			"previous_sales_item_id":      previous.SalesItemID,
+			"previous_sales_item_name":    previous.SalesItemName,
+			"previous_shipping_item_id":   previous.ShippingItemID,
+			"previous_shipping_item_name": previous.ShippingItemName,
 		},
 	})
 }

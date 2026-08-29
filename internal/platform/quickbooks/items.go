@@ -62,7 +62,10 @@ func (c *QBClient) ListItems(ctx context.Context) ([]Item, error) {
 		// * as the supported select clause, and a field list is not reliably
 		// honoured — a silently ignored one would look like a company with no
 		// items. Every other query in this package does the same.
-		query := fmt.Sprintf("SELECT * FROM Item WHERE Active = true STARTPOSITION %d MAXRESULTS %d",
+		// ORDERBY Id: QBO does not promise a stable order across
+		// STARTPOSITION windows without one, and an unstable order pages by
+		// duplicating some items and skipping others.
+		query := fmt.Sprintf("SELECT * FROM Item WHERE Active = true ORDERBY Id STARTPOSITION %d MAXRESULTS %d",
 			start, qbItemPageSize)
 		respBody, err := c.doAPI(ctx, "GET", "/query?query="+urlEncode(query), nil)
 		if err != nil {

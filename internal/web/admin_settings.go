@@ -302,7 +302,7 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 	// second acquisition inside the first — the token read opens its own
 	// transaction — which is how a busy shop runs the pool dry.
 	var itemPanel admin.QBItemPanel
-	if section.QBEnabled {
+	if section.QB.Connected {
 		itemPanel.EnvFallback = os.Getenv("QB_SALES_ITEM_ID")
 
 		var cfg store.QBItemConfig
@@ -317,6 +317,7 @@ func (d *Deps) handleAdminSettingsIntegrations(w http.ResponseWriter, r *http.Re
 		itemPanel.SalesItemID = cfg.SalesItemID
 		itemPanel.SalesItemName = cfg.SalesItemName
 		itemPanel.ShippingItemID = cfg.ShippingItemID
+		itemPanel.ShippingItemName = cfg.ShippingItemName
 
 		if d.QBClient == nil {
 			// Cannot offer a choice, which is not the same as the company
@@ -821,6 +822,11 @@ func (d *Deps) resolveQBItems(ctx context.Context, salesID, shippingID string) (
 	if err != nil {
 		return store.QBItemConfig{}, fmt.Errorf("qb list items: %w", err)
 	}
+	if len(items) == 0 {
+		// Nothing to validate against. Saying "that item is gone" here would
+		// blame the choice for a company-wide condition.
+		return store.QBItemConfig{}, app.ErrQBNotConnected
+	}
 	byID := make(map[string]quickbooks.Item, len(items))
 	for _, item := range items {
 		byID[item.ID] = item
@@ -828,13 +834,13 @@ func (d *Deps) resolveQBItems(ctx context.Context, salesID, shippingID string) (
 
 	sales, ok := byID[salesID]
 	if !ok {
-		return store.QBItemConfig{}, app.ErrQBItemNotFound
+		return store.QBItemConfig{}, fmt.Errorf("sales item %q: %w", salesID, app.ErrQBItemNotFound)
 	}
 	cfg := store.QBItemConfig{SalesItemID: sales.ID, SalesItemName: sales.Name}
 	if shippingID != "" {
 		shipping, found := byID[shippingID]
 		if !found {
-			return store.QBItemConfig{}, app.ErrQBItemNotFound
+			return store.QBItemConfig{}, fmt.Errorf("shipping item %q: %w", shippingID, app.ErrQBItemNotFound)
 		}
 		cfg.ShippingItemID = shipping.ID
 		cfg.ShippingItemName = shipping.Name

@@ -1071,10 +1071,11 @@ type QBItemChoice struct {
 // differently: a company genuinely without items is a data problem the shop
 // can fix, while a failed listing says nothing about the company at all.
 type QBItemPanel struct {
-	SalesItemID    string
-	SalesItemName  string
-	ShippingItemID string
-	Choices        []QBItemChoice
+	SalesItemID      string
+	SalesItemName    string
+	ShippingItemID   string
+	ShippingItemName string
+	Choices          []QBItemChoice
 	// Unavailable is set when the items could not be listed from QuickBooks.
 	Unavailable bool
 	// ConfigUnreadable is set when the stored choice itself could not be read.
@@ -1091,6 +1092,47 @@ type QBItemPanel struct {
 // either source.
 func (p QBItemPanel) Configured() bool {
 	return p.SalesItemID != "" || p.EnvFallback != ""
+}
+
+// SalesItemMissing reports that the configured item is not among the choices —
+// deactivated in QuickBooks, most likely. Only meaningful once the choices
+// were actually listed; a failed listing says nothing about what exists.
+func (p QBItemPanel) SalesItemMissing() bool {
+	return p.itemMissing(p.SalesItemID)
+}
+
+// ShippingItemMissing is SalesItemMissing for the shipping line.
+func (p QBItemPanel) ShippingItemMissing() bool {
+	return p.itemMissing(p.ShippingItemID)
+}
+
+func (p QBItemPanel) itemMissing(id string) bool {
+	if id == "" || p.Unavailable || len(p.Choices) == 0 {
+		return false
+	}
+	for _, choice := range p.Choices {
+		if choice.ID == id {
+			return false
+		}
+	}
+	return true
+}
+
+// SalesItemLabel names the configured item, falling back to its id when the
+// cached name is empty.
+func (p QBItemPanel) SalesItemLabel() string {
+	if p.SalesItemName != "" {
+		return p.SalesItemName
+	}
+	return "Item " + p.SalesItemID
+}
+
+// ShippingItemLabel is SalesItemLabel for the shipping line.
+func (p QBItemPanel) ShippingItemLabel() string {
+	if p.ShippingItemName != "" {
+		return p.ShippingItemName
+	}
+	return "Item " + p.ShippingItemID
 }
 
 templ qbItemPanel(panel QBItemPanel) {
@@ -1129,15 +1171,24 @@ templ qbItemPanel(panel QBItemPanel) {
 			</div>
 		</div>
 
+		if panel.SalesItemName != "" {
+			// Stated outside every branch below. The selects cannot be trusted
+			// to show it — an item deactivated in QuickBooks is not among the
+			// choices, and a select with nothing selected falls back to its
+			// first option, which would name an item nobody chose.
+			<p class="mt-3 text-sm text-rr-heading">
+				Currently billing against <strong>{ panel.SalesItemName }</strong>
+				if panel.ShippingItemName != "" {
+					, shipping against <strong>{ panel.ShippingItemName }</strong>
+				}
+			</p>
+		}
 		if panel.Unavailable {
-			<p class="mt-3 text-sm text-rr-muted">
+			<p class="mt-1 text-sm text-rr-muted">
 				Couldn't read the item list from QuickBooks just now. Reload in a moment — this
 				says nothing about which items exist, and whatever is already chosen is still
 				billing.
 			</p>
-			if panel.SalesItemName != "" {
-				<p class="mt-1 text-sm text-rr-heading">Currently: { panel.SalesItemName }</p>
-			}
 		} else if len(panel.Choices) == 0 {
 			<p class="mt-3 text-sm text-rr-muted">
 				This QuickBooks company has no active products or services to bill against. Add
@@ -1149,6 +1200,16 @@ templ qbItemPanel(panel QBItemPanel) {
 					<label for="qb_sales_item_id" class="label-font text-rr-muted">Product lines</label>
 					<select id="qb_sales_item_id" name="qb_sales_item_id" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading">
 						<option value="" disabled?={ panel.SalesItemID != "" } selected?={ panel.SalesItemID == "" }>Choose an item…</option>
+						if panel.SalesItemMissing() {
+							<!-- The configured item is not among the choices, which happens when it
+							     is deactivated in QuickBooks. Shown so the page says what is actually
+							     billing, and disabled so it cannot be re-submitted: the save would
+							     reject an inactive id anyway, and a select with nothing selected
+							     silently rebinds billing to whichever item sorts first. -->
+							<option value={ panel.SalesItemID } selected disabled>
+								{ panel.SalesItemLabel() } (no longer active in QuickBooks)
+							</option>
+						}
 						for _, choice := range panel.Choices {
 							<option value={ choice.ID } selected?={ choice.ID == panel.SalesItemID }>
 								{ qbItemLabel(choice) }
@@ -1160,6 +1221,11 @@ templ qbItemPanel(panel QBItemPanel) {
 					<label for="qb_shipping_item_id" class="label-font text-rr-muted">Shipping line (optional)</label>
 					<select id="qb_shipping_item_id" name="qb_shipping_item_id" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm text-rr-heading">
 						<option value="" selected?={ panel.ShippingItemID == "" }>Same as product lines</option>
+						if panel.ShippingItemMissing() {
+							<option value={ panel.ShippingItemID } selected disabled>
+								{ panel.ShippingItemLabel() } (no longer active in QuickBooks)
+							</option>
+						}
 						for _, choice := range panel.Choices {
 							<option value={ choice.ID } selected?={ choice.ID == panel.ShippingItemID }>
 								{ qbItemLabel(choice) }

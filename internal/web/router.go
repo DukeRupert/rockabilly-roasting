@@ -708,6 +708,10 @@ func NewRouter(deps *Deps) http.Handler {
 	// product.
 	settingsRoute("GET /admin/settings/integrations/quickbooks/preview", deps.handleAdminQBPreview)
 	settingsRoute("POST /admin/settings/integrations/quickbooks/billing-mode", deps.handleAdminQBBillingModeUpdate)
+	// Bill an order that test mode recorded instead of invoicing. Without this
+	// the invoice chain is only ever started by wholesale checkout, and every
+	// order placed during a proof period would be stranded.
+	settingsRoute("POST /admin/settings/integrations/quickbooks/preview/{id}/bill", deps.handleAdminQBBillOrder)
 
 	// --- Equipment service module ---
 	//

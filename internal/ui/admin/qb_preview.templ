@@ -15,6 +15,12 @@ type QBPreviewProps struct {
 	Mode       domain.QBBillingMode
 	Attention  int
 	TotalCents int
+	// Truncated is set when the list shows fewer rows than the totals count,
+	// so the page can say so rather than letting the two disagree in silence.
+	Truncated bool
+	// Count is every preview, which is what the totals describe. len(Rows) may
+	// be smaller.
+	Count int
 	Flash      Flash
 	StaffName  string
 	StaffRole  string
@@ -76,7 +82,7 @@ templ QBPreviewContent(props QBPreviewProps) {
 			</div>
 			<div>
 				<span class="label-font text-rr-muted">Orders</span>
-				<span class="ml-2 text-rr-heading">{ strconv.Itoa(len(props.Rows)) }</span>
+				<span class="ml-2 text-rr-heading">{ strconv.Itoa(props.Count) }</span>
 			</div>
 			<div>
 				<span class="label-font text-rr-muted">Need attention</span>
@@ -97,6 +103,9 @@ templ QBPreviewContent(props QBPreviewProps) {
 						<th class="label-font px-4 py-2 text-left text-rr-muted">Terms</th>
 						<th class="label-font px-4 py-2 text-left text-rr-muted">Due</th>
 						<th class="label-font px-4 py-2 text-right text-rr-muted">Total</th>
+						if props.Mode.IsLive() {
+							<th class="label-font px-4 py-2 text-right text-rr-muted">Bill</th>
+						}
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-rr-border">
@@ -127,10 +136,51 @@ templ QBPreviewContent(props QBPreviewProps) {
 							<td class="px-4 py-3 text-right text-sm text-rr-heading">
 								{ formatCents(row.TotalCents) }
 							</td>
+							if props.Mode.IsLive() {
+								<td class="px-4 py-3 text-right">
+									@qbBillNowButton(row)
+								</td>
+							}
 						</tr>
 					}
 				</tbody>
 			</table>
 		</div>
+		if props.Truncated {
+			<p class="mt-2 text-xs text-rr-muted">
+				Showing the { strconv.Itoa(len(props.Rows)) } most recent of { strconv.Itoa(props.Count) }.
+				The totals above cover all of them.
+			</p>
+		}
+	}
+}
+
+// qbBillNowButton offers to bill an order that test mode recorded instead of
+// invoicing.
+//
+// Only rendered once billing is live, and only for an order that has no
+// invoice yet: going live deliberately does not bill the backlog, so this is
+// how a human decides, order by order, which of it to charge for.
+templ qbBillNowButton(row QBPreviewRow) {
+	if row.ExistingQBInvoiceID != nil {
+		<span class="text-xs text-rr-muted">Already in QuickBooks</span>
+	} else {
+		<form method="post" action={ templ.SafeURL("/admin/settings/integrations/quickbooks/preview/" + row.OrderID.String() + "/bill") }>
+			<button
+				type="submit"
+				class="btn-secondary"
+				{ ConfirmAttrs(ActionConfirm{
+					Title: "Bill " + row.OrderNumber + " now?",
+					Lead:  "Creates a real invoice in QuickBooks and emails it to " + row.CustomerName + ".",
+					Points: []string{
+						"The customer receives an invoice for " + formatCents(row.TotalCents) + ", due " + row.DueDate.Format("Jan 2, 2006") + ".",
+						"This order was recorded in test mode and has not been billed yet.",
+						"If you have already invoiced it by hand, do not do this — it would bill them twice.",
+					},
+					Confirm: "Bill this order",
+					Danger:  true,
+				})... }
+			>Bill now</button>
+		</form>
 	}
 }

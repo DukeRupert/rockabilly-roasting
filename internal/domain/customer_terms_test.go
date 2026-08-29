@@ -33,3 +33,25 @@ func TestPaymentTermsLabel(t *testing.T) {
 		t.Errorf("15 days: got %q, want %q", got, "Net 15")
 	}
 }
+
+func TestIsLegacyPaymentTerms(t *testing.T) {
+	// Net 21 was offered until 2026-08-29: still stored on customers, no
+	// longer selectable, and the one value the UI must offer back.
+	if !IsLegacyPaymentTerms(21) {
+		t.Error("net-21 should read as legacy")
+	}
+	// Currently-offered values are not legacy.
+	for _, d := range PaymentTermsOptions {
+		if IsLegacyPaymentTerms(d) {
+			t.Errorf("%d is offered and must not read as legacy", d)
+		}
+	}
+	// A negative is corrupt, not legacy: offering it back would produce a
+	// select option the handler rejects with a bare 400.
+	if IsLegacyPaymentTerms(-3) {
+		t.Error("negative terms must not be offered back as legacy")
+	}
+	if got := PaymentTermsLabel(-3); got != "Invalid terms" {
+		t.Errorf("negative label: got %q, want %q", got, "Invalid terms")
+	}
+}

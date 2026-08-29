@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -21,13 +22,18 @@ type QBPreviewRow struct {
 }
 
 // QBShadowSummary is the review page's header: what a proof period has seen so
-// far. Counts come from SQL over every row, not from the capped list, so the
-// figures do not quietly shrink when a proof period outgrows a page.
+// far.
+//
+// Count, TotalCents and Attention come from SQL over every row, while Rows is
+// capped — so the figures describe the whole proof period even when the list
+// below them does not. Truncated says so, because a total that disagrees with
+// a visibly shorter list reads as a bug rather than as a page limit.
 type QBShadowSummary struct {
 	Rows       []QBPreviewRow
 	Count      int
 	TotalCents int
 	Attention  int
+	Truncated  bool
 }
 
 // QBBillingMode reports whether QuickBooks billing is allowed to move money.
@@ -45,6 +51,16 @@ func (s *OrderService) ListQBPreviews(ctx context.Context, tx pgx.Tx, limit int)
 	if s.qbPreviews == nil {
 		return out, nil
 	}
+	// The zero time means "every preview", not a window: the page shows the
+	// whole proof period, unlike the digest which shows one week of it.
+	totals, err := s.qbPreviews.Totals(ctx, tx, time.Time{})
+	if err != nil {
+		return out, err
+	}
+	out.Count = totals.Count
+	out.TotalCents = totals.TotalCents
+	out.Attention = totals.NeedingAttention
+
 	rows, err := s.qbPreviews.List(ctx, tx, limit)
 	if err != nil {
 		return out, err
@@ -55,12 +71,8 @@ func (s *OrderService) ListQBPreviews(ctx context.Context, tx pgx.Tx, limit int)
 			OrderNumber:      r.OrderNumber,
 			CustomerName:     r.CustomerName,
 		})
-		out.TotalCents += r.TotalCents
-		if r.NeedsAttention() {
-			out.Attention++
-		}
 	}
-	out.Count = len(out.Rows)
+	out.Truncated = out.Count > len(out.Rows)
 	return out, nil
 }
 
@@ -70,11 +82,7 @@ func (s *OrderService) CountQBPreviews(ctx context.Context, tx pgx.Tx) (int, err
 	if s.qbPreviews == nil {
 		return 0, nil
 	}
-	var n int
-	if err := tx.QueryRow(ctx, `SELECT count(*) FROM qb_invoice_previews`).Scan(&n); err != nil {
-		return 0, fmt.Errorf("count qb invoice previews: %w", err)
-	}
-	return n, nil
+	return s.qbPreviews.Count(ctx, tx)
 }
 
 // SetQBBillingMode switches QuickBooks billing between shadow and live and
@@ -115,3 +123,60 @@ func (s *OrderService) SetQBBillingMode(ctx context.Context, tx pgx.Tx, mode dom
 		Metadata:     map[string]any{"previous": string(previous)},
 	})
 }
+
+// BillOrderNow enqueues the QuickBooks invoice chain for an order that has not
+// been invoiced yet.
+//
+// This exists because the chain is otherwise only ever started by wholesale
+// checkout. Orders placed while the shop is in test mode are recorded rather
+// than billed, and without this there would be no way to bill them afterwards
+// short of invoicing by hand in QuickBooks — the proof period would quietly
+// cost the shop every order it covered.
+//
+// Refuses while in test mode: the point of test mode is that nothing bills, and
+// a button that silently made an exception would undermine the only guarantee
+// it offers.
+func (s *OrderService) BillOrderNow(ctx context.Context, tx pgx.Tx, orderID uuid.UUID, enqueue QBChainEnqueuer, actor Actor) error {
+	mode, err := s.QBBillingMode(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if !mode.IsLive() {
+		return ErrQBBillingNotLive
+	}
+
+	order, err := s.orders.GetOrderByIDAsStaff(ctx, tx, orderID)
+	if err != nil {
+		return fmt.Errorf("get order %s: %w", orderID, err)
+	}
+	if order.QBInvoiceID != nil {
+		// Already billed. Returning an error rather than re-enqueueing keeps
+		// the double-billing guard at the top of the chain rather than relying
+		// on the adopt-by-DocNumber probe further down.
+		return ErrQBOrderAlreadyInvoiced
+	}
+	if order.CustomerID == nil {
+		return ErrQBOrderNotBillable
+	}
+	if order.Channel != domain.OrderChannelWholesale {
+		return ErrQBOrderNotBillable
+	}
+
+	if err := enqueue(ctx, tx, *order.CustomerID, order.ID); err != nil {
+		return fmt.Errorf("enqueue qb chain: %w", err)
+	}
+	return s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditQBOrderBilledManually,
+		ResourceType: "order",
+		ResourceID:   order.ID,
+		Metadata:     map[string]any{"order_number": order.Number},
+	})
+}
+
+// QBChainEnqueuer starts the QuickBooks invoice chain for one order. It is a
+// function rather than a method on JobEnqueuer so the app layer does not have
+// to learn the job args, which live in jobs/.
+type QBChainEnqueuer func(ctx context.Context, tx pgx.Tx, customerID, orderID uuid.UUID) error

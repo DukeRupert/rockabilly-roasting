@@ -1915,7 +1915,7 @@ func customerSettingsCard(props CustomerShowProps) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if props.Customer.PaymentTermsDays != nil && !domain.ValidPaymentTermsDays(*props.Customer.PaymentTermsDays) {
+				if props.Customer.PaymentTermsDays != nil && domain.IsLegacyPaymentTerms(*props.Customer.PaymentTermsDays) {
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, "<!-- Terms that are no longer offered (Net 21, retired 2026-08-29) still\n\t\t\t\t\t\t\t\t\t     have to show as what they are. Without this the select falls back to\n\t\t\t\t\t\t\t\t\t     its first option and reads \"Not set\", and because it submits on change\n\t\t\t\t\t\t\t\t\t     the next nudge would quietly rewrite a real account's terms. --> <option value=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err

@@ -74,12 +74,26 @@ func ValidPaymentTermsDays(d int) bool {
 }
 
 // PaymentTermsLabel renders terms for display. Zero days is "Due on receipt",
-// not "Net 0".
+// not "Net 0", and a negative value — which nothing in the app can set but the
+// column does not forbid — is named as the nonsense it is rather than rendered
+// as "Net -3".
 func PaymentTermsLabel(days int) string {
-	if days == PaymentTermsDueOnReceipt {
+	switch {
+	case days == PaymentTermsDueOnReceipt:
 		return "Due on receipt"
+	case days < 0:
+		return "Invalid terms"
 	}
 	return "Net " + strconv.Itoa(days)
+}
+
+// IsLegacyPaymentTerms reports whether days is a terms value the shop no
+// longer offers but a customer may still be stored on — Net 21, retired
+// 2026-08-29. It is deliberately not just !ValidPaymentTermsDays: a negative
+// value is corrupt rather than legacy, and offering it back in a select the
+// handler would reject makes a dead end out of the page's own suggestion.
+func IsLegacyPaymentTerms(days int) bool {
+	return days > 0 && !ValidPaymentTermsDays(days)
 }
 
 // Customer represents a registered or guest customer.

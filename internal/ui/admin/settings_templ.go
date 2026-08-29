@@ -1782,7 +1782,7 @@ func qbBillingModeForm(mode domain.QBBillingMode) templ.Component {
 				Points: []string{
 					"Real invoices appear in your QuickBooks company and count as money owed.",
 					"Customers receive them by email from QuickBooks, with payment terms and a due date.",
-					"Orders already recorded in test mode are not billed retrospectively — this applies to new orders.",
+					"Orders already recorded in test mode are not billed automatically — bill any of them you want charged from the review page.",
 					"Review what test mode recorded before you do this.",
 				},
 				Confirm: "Start billing",

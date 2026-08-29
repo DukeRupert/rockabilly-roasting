@@ -129,10 +129,16 @@ func (s *QBPreviewStore) List(ctx context.Context, tx pgx.Tx, limit int) ([]QBPr
 	return scanQBPreviewRows(rows)
 }
 
-// ListSince returns previews created at or after the given time, oldest first,
+// ListSince returns previews touched at or after the given time, oldest first,
 // which is the order the weekly digest reads them in.
+//
+// The window is on updated_at rather than created_at because Upsert refreshes a
+// preview in place. An order first previewed weeks ago and re-previewed this
+// week — a retry, an edited order, a QBO lookup that has only just started
+// failing — is news now, and windowing on creation would hide exactly the rows
+// the digest exists to raise.
 func (s *QBPreviewStore) ListSince(ctx context.Context, tx pgx.Tx, since time.Time) ([]QBPreviewRow, error) {
-	rows, err := tx.Query(ctx, qbPreviewSelect+` WHERE p.created_at >= $1 ORDER BY p.created_at`, since)
+	rows, err := tx.Query(ctx, qbPreviewSelect+` WHERE p.updated_at >= $1 ORDER BY p.updated_at`, since)
 	if err != nil {
 		return nil, fmt.Errorf("list qb invoice previews since: %w", err)
 	}
@@ -155,6 +161,15 @@ func (s *QBPreviewStore) GetByOrder(ctx context.Context, tx pgx.Tx, orderID uuid
 	return &found[0], nil
 }
 
+// Count returns how many previews exist, for the review badge.
+func (s *QBPreviewStore) Count(ctx context.Context, tx pgx.Tx) (int, error) {
+	var n int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM qb_invoice_previews`).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count qb invoice previews: %w", err)
+	}
+	return n, nil
+}
+
 // QBPreviewTotals summarises a proof period.
 type QBPreviewTotals struct {
 	Count            int
@@ -162,8 +177,9 @@ type QBPreviewTotals struct {
 	NeedingAttention int
 }
 
-// Totals summarises previews created at or after the given time. Counting in
-// SQL rather than over a fetched slice keeps the digest honest when a proof
+// Totals summarises previews touched at or after the given time — updated_at,
+// for the reason ListSince gives. Pass the zero time for every row. Counting in
+// SQL rather than over a fetched slice keeps the figures honest when a proof
 // period has run long enough to outgrow a page.
 func (s *QBPreviewStore) Totals(ctx context.Context, tx pgx.Tx, since time.Time) (QBPreviewTotals, error) {
 	var t QBPreviewTotals
@@ -177,7 +193,7 @@ func (s *QBPreviewStore) Totals(ctx context.Context, tx pgx.Tx, since time.Time)
 		              OR bill_email = ''
 		       )
 		  FROM qb_invoice_previews
-		 WHERE created_at >= $1`, since,
+		 WHERE updated_at >= $1`, since,
 	).Scan(&t.Count, &t.TotalCents, &t.NeedingAttention)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return QBPreviewTotals{}, fmt.Errorf("qb invoice preview totals: %w", err)

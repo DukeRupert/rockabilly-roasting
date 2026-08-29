@@ -24,6 +24,22 @@ ALTER TABLE store_settings
     ADD CONSTRAINT store_settings_qb_billing_mode_check
     CHECK (qb_billing_mode IN ('shadow', 'live'));
 
+-- A shop that is already invoicing through QuickBooks must not be switched off
+-- by a deploy. Defaulting the column to 'shadow' is right for a new install and
+-- wrong for a running one: the chain would start recording previews instead of
+-- billing, and nothing re-enqueues the chain for an order once it has been
+-- placed, so those orders would be silently uninvoiced with no way to bill them
+-- from the admin.
+--
+-- Whether a shop is already live is a question its own data answers: an order
+-- carrying a QuickBooks invoice means real invoicing has happened here. On
+-- Rockabilly this matches no rows (the OAuth callback could never complete
+-- until this release, so nothing was ever invoiced) and the shop correctly
+-- starts in shadow.
+UPDATE store_settings
+   SET qb_billing_mode = 'live'
+ WHERE EXISTS (SELECT 1 FROM orders WHERE qb_invoice_id IS NOT NULL);
+
 -- What the shop would have billed, had the mode been live.
 --
 -- One row per order, refreshed rather than appended when the job runs again:

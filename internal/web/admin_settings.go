@@ -16,6 +16,7 @@ import (
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/jobs"
 	"github.com/dukerupert/hiri/internal/platform/audit"
 	"github.com/dukerupert/hiri/internal/platform/quickbooks"
 	"github.com/dukerupert/hiri/internal/store"
@@ -722,6 +723,9 @@ func (d *Deps) handleAdminQBDisconnect(w http.ResponseWriter, r *http.Request) {
 // still refusing to render an unbounded table.
 const qbPreviewPageSize = 200
 
+// qbPreviewPath is where every shadow-billing action returns to.
+const qbPreviewPath = "/admin/settings/integrations/quickbooks/preview"
+
 // handleAdminQBPreview renders what QuickBooks billing would have done while
 // the shop is in shadow mode.
 func (d *Deps) handleAdminQBPreview(w http.ResponseWriter, r *http.Request) {
@@ -765,6 +769,8 @@ func (d *Deps) handleAdminQBPreview(w http.ResponseWriter, r *http.Request) {
 		Mode:       mode,
 		Attention:  summary.Attention,
 		TotalCents: summary.TotalCents,
+		Count:      summary.Count,
+		Truncated:  summary.Truncated,
 		Flash:      settingsFlash(r),
 		StaffName:  name,
 		StaffRole:  role,
@@ -804,4 +810,48 @@ func (d *Deps) handleAdminQBBillingModeUpdate(w http.ResponseWriter, r *http.Req
 		msg = "QuickBooks billing is live. New wholesale orders will be invoiced and emailed."
 	}
 	redirectFlash(w, r, "/admin/settings/integrations", msg)
+}
+
+// handleAdminQBBillOrder starts the QuickBooks invoice chain for an order that
+// was recorded in test mode rather than billed.
+//
+// Going live does not bill retrospectively — an order placed during a proof
+// period is not silently invoiced weeks later just because someone flipped a
+// switch. This is the deliberate alternative: staff choose which of those
+// orders to bill, one at a time, having read what would go out.
+func (d *Deps) handleAdminQBBillOrder(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	orderID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		redirectFlashError(w, r, qbPreviewPath, "That is not an order.")
+		return
+	}
+
+	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		return d.OrderService.BillOrderNow(ctx, tx, orderID, d.enqueueQBChain, staffActor(r))
+	})
+	switch {
+	case errors.Is(err, app.ErrQBBillingNotLive):
+		redirectFlashError(w, r, qbPreviewPath, "Billing is still in test mode. Go live first, then bill this order.")
+	case errors.Is(err, app.ErrQBOrderAlreadyInvoiced):
+		redirectFlashError(w, r, qbPreviewPath, "That order already has a QuickBooks invoice.")
+	case errors.Is(err, app.ErrQBOrderNotBillable):
+		redirectFlashError(w, r, qbPreviewPath, "That order cannot be invoiced through QuickBooks.")
+	case err != nil:
+		slog.Error("admin qb bill order", "error", err, "order_id", orderID)
+		Error(w, r, err)
+	default:
+		redirectFlash(w, r, qbPreviewPath, "Invoicing started. It appears in QuickBooks shortly.")
+	}
+}
+
+// enqueueQBChain starts the invoice chain inside the caller's transaction, so
+// the job cannot outlive a rolled-back decision to bill.
+func (d *Deps) enqueueQBChain(ctx context.Context, tx pgx.Tx, customerID, orderID uuid.UUID) error {
+	_, err := d.RiverClient.InsertTx(ctx, tx, jobs.EnsureQBCustomerArgs{
+		CustomerID: customerID,
+		OrderID:    orderID,
+	}, nil)
+	return err
 }

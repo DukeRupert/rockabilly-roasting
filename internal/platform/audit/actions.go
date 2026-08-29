@@ -229,8 +229,12 @@ const (
 	// The two directions of the billing switch are separate actions rather
 	// than one with a payload: "when did we start billing customers" is a
 	// question worth being able to ask of the action column alone.
-	AuditQBBillingModeLive         = "qb.billing_mode_live"
-	AuditQBBillingModeShadowed     = "qb.billing_mode_shadowed"
+	AuditQBBillingModeLive     = "qb.billing_mode_live"
+	AuditQBBillingModeShadowed = "qb.billing_mode_shadowed"
+	// AuditQBOrderBilledManually records a staffer starting the invoice chain
+	// for an order checkout did not bill — in practice, one placed while the
+	// shop was in test mode.
+	AuditQBOrderBilledManually     = "qb.order_billed_manually"
 	AuditQBInvoiceEmailed          = "qb.invoice_emailed"
 	AuditQBPaymentSynced           = "qb.payment_synced"
 	AuditQBConnected               = "qb.connected"

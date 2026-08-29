@@ -117,6 +117,15 @@ func (c *QBClient) FindOrCreateTerm(ctx context.Context, dueDays int) (string, e
 	}
 	created, err := c.doAPI(ctx, "POST", "/term", body)
 	if err != nil {
+		// Check-then-create is not atomic and River runs these workers
+		// concurrently: on a company with no matching Term, two invoice jobs
+		// can both look, both miss, and both post. QBO rejects the second for
+		// duplicate name, and without this that invoice would be billed with
+		// no Terms label at all — the one thing this function exists to add.
+		// A second lookup answers whether the rival attempt succeeded.
+		if id, findErr := c.FindTerm(ctx, dueDays); findErr == nil && id != "" {
+			return id, nil
+		}
 		return "", fmt.Errorf("create QB term: %w", err)
 	}
 	var resp qbTermResponse

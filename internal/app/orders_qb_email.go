@@ -383,6 +383,14 @@ func (s *OrderService) SendQBShadowDigestEmail(ctx context.Context, pool *pgxpoo
 		return nil
 	}
 
+	// Nothing happened this week, so say nothing. Shadow is the default for
+	// every install with QuickBooks connected, and a shop that does not run
+	// wholesale through it would otherwise receive an empty report forever —
+	// which trains staff to ignore the one that eventually matters.
+	if totals.Count == 0 {
+		return nil
+	}
+
 	// Rows needing attention lead: the finding is an account that would fail,
 	// not the money. Within each group the original order is preserved.
 	sorted := make([]store.QBPreviewRow, 0, len(rows))

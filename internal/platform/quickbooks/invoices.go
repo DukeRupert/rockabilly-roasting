@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -145,7 +146,7 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 	}
 
 	respBody, err := c.doAPI(ctx, "POST", "/invoice", body)
-	if err != nil && p.TermID != "" && errors.Is(err, ErrBadRequest) {
+	if err != nil && p.TermID != "" && isStaleTermRefError(err) {
 		// The Term reference is the one part of this request that can go stale
 		// without anything local changing: deleted or deactivated in QBO after
 		// we cached its ID. QBO answers 400, which IsRetryable calls permanent,
@@ -168,6 +169,26 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 	}
 
 	return invoiceFromResponse(resp), nil
+}
+
+// isStaleTermRefError reports whether a rejected invoice looks like it was
+// rejected because of its Term reference.
+//
+// Narrower than "any 400" on purpose. QBO also answers 400 for unrelated
+// conditions — a duplicate DocNumber being the common one — and retrying those
+// without the Term evicts a perfectly good cached Term ID, repeats a request
+// that fails identically, and leaves every later invoice in the process paying
+// for an extra Term lookup.
+func isStaleTermRefError(err error) bool {
+	if !errors.Is(err, ErrBadRequest) {
+		return false
+	}
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	haystack := strings.ToLower(apiErr.Message + " " + apiErr.Detail)
+	return strings.Contains(haystack, "term")
 }
 
 // qbInvoiceQueryResponse is the response shape for invoice queries.

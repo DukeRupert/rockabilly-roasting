@@ -10,11 +10,11 @@ import (
 type InvoiceStatus string
 
 const (
-	InvoiceStatusDraft        InvoiceStatus = "draft"
-	InvoiceStatusSent         InvoiceStatus = "sent"
+	InvoiceStatusDraft         InvoiceStatus = "draft"
+	InvoiceStatusSent          InvoiceStatus = "sent"
 	InvoiceStatusPartiallyPaid InvoiceStatus = "partially_paid"
-	InvoiceStatusPaid         InvoiceStatus = "paid"
-	InvoiceStatusVoid         InvoiceStatus = "void"
+	InvoiceStatusPaid          InvoiceStatus = "paid"
+	InvoiceStatusVoid          InvoiceStatus = "void"
 )
 
 // PaymentMethod represents how an invoice payment was made.

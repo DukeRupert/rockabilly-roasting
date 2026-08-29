@@ -26,7 +26,7 @@ func TestSelectBoxForWeight_SmallestThatFits(t *testing.T) {
 		wantOK   bool
 	}{
 		{1, "small", true},
-		{8, "small", true},   // exact boundary fits
+		{8, "small", true}, // exact boundary fits
 		{8.01, "medium", true},
 		{32, "medium", true},
 		{50, "large", true},

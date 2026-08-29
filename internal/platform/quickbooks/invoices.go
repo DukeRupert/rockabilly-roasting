@@ -16,6 +16,9 @@ type qbInvoiceRequest struct {
 	// Omitted when empty so a customer with no email still yields a valid
 	// invoice; only the send step fails, and that already alerts staff.
 	BillEmail *qbEmailAddr `json:"BillEmail,omitempty"`
+	// Omitted when unset so an invoice is still created if the Term lookup
+	// could not be resolved.
+	SalesTermRef *qbRef `json:"SalesTermRef,omitempty"`
 	// Payment flags are always sent explicitly — an omitempty here would drop
 	// `false` and let the QBO company default re-enable the pay button the
 	// caller meant to turn off.
@@ -32,10 +35,10 @@ type qbEmailAddr struct {
 }
 
 type qbInvoiceLine struct {
-	DetailType          string               `json:"DetailType"`
-	Amount              float64              `json:"Amount"`
-	Description         string               `json:"Description,omitempty"`
-	SalesItemLineDetail *qbSalesItemDetail   `json:"SalesItemLineDetail,omitempty"`
+	DetailType          string             `json:"DetailType"`
+	Amount              float64            `json:"Amount"`
+	Description         string             `json:"Description,omitempty"`
+	SalesItemLineDetail *qbSalesItemDetail `json:"SalesItemLineDetail,omitempty"`
 }
 
 type qbSalesItemDetail struct {
@@ -135,6 +138,9 @@ func (c *QBClient) CreateInvoice(ctx context.Context, p InvoiceParams) (*Invoice
 	}
 	if p.BillEmail != "" {
 		body.BillEmail = &qbEmailAddr{Address: p.BillEmail}
+	}
+	if p.TermID != "" {
+		body.SalesTermRef = &qbRef{Value: p.TermID}
 	}
 
 	respBody, err := c.doAPI(ctx, "POST", "/invoice", body)

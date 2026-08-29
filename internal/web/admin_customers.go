@@ -383,7 +383,7 @@ func (d *Deps) handleAdminCustomerPaymentTerms(w http.ResponseWriter, r *http.Re
 	var days *int
 	if v := r.FormValue("payment_terms_days"); v != "" {
 		d, err := strconv.Atoi(v)
-		if err != nil || (d != 7 && d != 15 && d != 21 && d != 30) {
+		if err != nil || !domain.ValidPaymentTermsDays(d) {
 			http.Error(w, "Invalid payment terms", http.StatusBadRequest)
 			return
 		}

@@ -429,7 +429,10 @@ func overdueReminderStageFor(daysPastDue int) int {
 // authoritative (the reconcile poll reads it back and threads it through to
 // the past-due email).
 func EffectivePaymentTermsDays(c *domain.Customer) int {
-	if c != nil && c.PaymentTermsDays != nil && *c.PaymentTermsDays > 0 {
+	// >= 0, not > 0: zero days is "due on receipt", a real selectable terms
+	// value, and must not be mistaken for "no terms set". Only a nil
+	// PaymentTermsDays falls back to the house default.
+	if c != nil && c.PaymentTermsDays != nil && *c.PaymentTermsDays >= 0 {
 		return *c.PaymentTermsDays
 	}
 	return domain.DefaultPaymentTermsDays

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"strconv"
 	"strings"
 	"time"
 
@@ -37,6 +38,49 @@ const (
 // DefaultPaymentTermsDays is the NET terms applied to wholesale invoicing when
 // a customer has no explicit PaymentTermsDays set (net-7 is the house default).
 const DefaultPaymentTermsDays = 7
+
+// PaymentTermsDueOnReceipt is terms of zero days — payable immediately. It is
+// a real selectable value, distinct from "no terms set" (a nil
+// PaymentTermsDays), which falls back to DefaultPaymentTermsDays.
+const PaymentTermsDueOnReceipt = 0
+
+// PaymentTermsOptions are the NET terms a wholesale account may be put on, in
+// days. The set mirrors QuickBooks Online's stock Terms — Due on receipt, Net
+// 10, Net 15, Net 30, Net 60 — plus Net 7, which is the house default and what
+// every account migrated from Orderspace runs on. Net 7 has no QBO stock
+// equivalent and is created there as a custom Term.
+//
+// Net 21 was offered until 2026-08-29 and retired when nothing used it: it
+// matched no QBO stock Term and so bought a second custom Term for nothing.
+var PaymentTermsOptions = []int{
+	PaymentTermsDueOnReceipt,
+	7,
+	10,
+	15,
+	30,
+	60,
+}
+
+// ValidPaymentTermsDays reports whether d is a terms value an account may be
+// set to. Callers that accept terms from outside (admin forms, importers)
+// should gate on this rather than keeping their own list.
+func ValidPaymentTermsDays(d int) bool {
+	for _, opt := range PaymentTermsOptions {
+		if d == opt {
+			return true
+		}
+	}
+	return false
+}
+
+// PaymentTermsLabel renders terms for display. Zero days is "Due on receipt",
+// not "Net 0".
+func PaymentTermsLabel(days int) string {
+	if days == PaymentTermsDueOnReceipt {
+		return "Due on receipt"
+	}
+	return "Net " + strconv.Itoa(days)
+}
 
 // Customer represents a registered or guest customer.
 type Customer struct {

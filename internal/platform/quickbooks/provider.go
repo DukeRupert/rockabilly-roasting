@@ -27,6 +27,13 @@ type InvoiceParams struct {
 	// 2026-08-29.
 	BillEmail string
 
+	// TermID is the QBO Term ("Net 15") shown on the invoice and used by QBO's
+	// own reporting. DueDate above stays authoritative for when payment is
+	// due; the Term is what a human reads. Optional — an empty TermID leaves
+	// the invoice's Terms field blank, which is how every invoice looked
+	// before 2026-08-29.
+	TermID string
+
 	// AllowOnlineACHPayment / AllowOnlineCreditCardPayment put the matching
 	// pay buttons on the emailed invoice.
 	AllowOnlineACHPayment        bool
@@ -79,11 +86,11 @@ type QBCustomer struct {
 
 // PaymentParams holds the data needed to record a payment in QBO.
 type PaymentParams struct {
-	CustomerID  string  // QB customer ID
-	InvoiceID   string  // QB invoice ID to apply payment against
-	Amount      int     // payment amount in cents
-	Method      string  // payment method (check, cash, etc.)
-	Reference   string  // optional reference (check number, etc.)
+	CustomerID string // QB customer ID
+	InvoiceID  string // QB invoice ID to apply payment against
+	Amount     int    // payment amount in cents
+	Method     string // payment method (check, cash, etc.)
+	Reference  string // optional reference (check number, etc.)
 }
 
 // Payment represents a recorded payment in QBO.
@@ -118,6 +125,12 @@ type Client interface {
 
 	// SendInvoice has QBO email the invoice to its BillEmail address.
 	SendInvoice(ctx context.Context, qbInvoiceID string) error
+
+	// FindOrCreateTerm returns the QBO Term ID for NET terms of the given
+	// number of days, creating the Term if the company has none. QBO ships
+	// Due on receipt and Net 10/15/30/60; the house net-7 default is created
+	// on demand.
+	FindOrCreateTerm(ctx context.Context, dueDays int) (string, error)
 
 	// CreatePayment records a payment against a QB invoice.
 	CreatePayment(ctx context.Context, p PaymentParams) (*Payment, error)

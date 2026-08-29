@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -740,10 +741,9 @@ templ customerSettingsCard(props CustomerShowProps) {
 						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/payment-terms", props.Customer.ID)) }>
 							@customerSelect("payment_terms_days") {
 								<option value="" selected?={ props.Customer.PaymentTermsDays == nil }>Not set</option>
-								<option value="7" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 7 }>Net 7</option>
-								<option value="15" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 15 }>Net 15</option>
-								<option value="21" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 21 }>Net 21</option>
-								<option value="30" selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == 30 }>Net 30</option>
+								for _, days := range domain.PaymentTermsOptions {
+									<option value={ strconv.Itoa(days) } selected?={ props.Customer.PaymentTermsDays != nil && *props.Customer.PaymentTermsDays == days }>{ domain.PaymentTermsLabel(days) }</option>
+								}
 							}
 						</form>
 					</dd>

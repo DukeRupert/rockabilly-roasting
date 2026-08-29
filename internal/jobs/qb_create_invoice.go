@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -181,6 +182,20 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 			// EnsureQBCustomer syncs this same address onto the QB customer's
 			// PrimaryEmailAddr, so local and QB agree by construction.
 			params.BillEmail = customer.Email
+		}
+
+		// Stamp the invoice with a QBO Term so its Terms field reads "Net 15"
+		// rather than sitting blank, and so QBO's own reporting can group by
+		// terms. DueDate above remains authoritative for when payment is due,
+		// which is why a failure here is logged and not returned: the terms
+		// label is presentational, and refusing to bill a customer because a
+		// cosmetic lookup failed would be the worse outcome.
+		termID, termErr := w.qb.FindOrCreateTerm(ctx, termsDays)
+		if termErr != nil {
+			slog.Warn("qb create invoice: term lookup failed, invoicing without terms label",
+				"order_id", order.ID, "terms_days", termsDays, "error", termErr)
+		} else {
+			params.TermID = termID
 		}
 		invoice, err = w.qb.CreateInvoice(ctx, params)
 		if err != nil {

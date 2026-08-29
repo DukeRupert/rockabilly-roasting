@@ -177,6 +177,17 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	// that emails the customer.
 	docNumber := formatOrderRef(order.Number)
 
+	// A manual account is invoiced by hand, so nothing here bills it — in
+	// either mode. The preview is still written, and is what the review page
+	// lists as waiting for a person: an order that simply vanished would read
+	// as nothing to bill, which is the reading this project keeps having to
+	// correct. Bill now on that row is the deliberate way to invoice one.
+	if customer != nil && !customer.BillingMethod.AutoInvoiced() && !job.Args.StaffRequested {
+		slog.Info("qb create invoice: account is on manual billing, not invoicing automatically",
+			"order_id", order.ID, "billing_method", customer.BillingMethod)
+		return w.recordPreview(ctx, job, order, customer, lines, docNumber, termsDays, qbItems)
+	}
+
 	// Shadow mode stops here: record what would have been billed and return.
 	// The lookups it performs are read-only, which is the point — an account
 	// that silently fails to match a QBO customer is invisible until money is
@@ -208,8 +219,9 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 			"order_id", order.ID)
 		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 			_, txErr := w.riverClient.InsertTx(ctx, tx, EnsureQBCustomerArgs{
-				CustomerID: *order.CustomerID,
-				OrderID:    order.ID,
+				CustomerID:     *order.CustomerID,
+				OrderID:        order.ID,
+				StaffRequested: job.Args.StaffRequested,
 			}, nil)
 			return txErr
 		})
@@ -230,17 +242,21 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		// bill-to email is set explicitly below — QBO does not fill it in
 		// from the linked customer, and the send step fails without it.
 		params := quickbooks.InvoiceParams{
-			CustomerID:            job.Args.QBCustomerID,
-			DocNumber:             docNumber,
-			DueDate:               order.PlacedAt.Add(time.Duration(termsDays) * 24 * time.Hour),
-			Lines:                 lines,
-			Shipping:              order.ShippingTotal,
-			AllowOnlineACHPayment: true,
-			SalesItemID:           qbItems.SalesItemID,
-			ShippingItemID:        qbItems.ShippingItemID,
+			CustomerID:     job.Args.QBCustomerID,
+			DocNumber:      docNumber,
+			DueDate:        order.PlacedAt.Add(time.Duration(termsDays) * 24 * time.Hour),
+			Lines:          lines,
+			Shipping:       order.ShippingTotal,
+			SalesItemID:    qbItems.SalesItemID,
+			ShippingItemID: qbItems.ShippingItemID,
 		}
 		if customer != nil {
-			params.AllowOnlineCreditCardPayment = customer.BillingMethod == domain.BillingMethodCreditCard
+			// Both buttons follow the account's agreement. ACH used to be sent
+			// unconditionally, which would have put a pay-now button on the
+			// invoice of every account that had never agreed to one — and
+			// every wholesale account was manual at the time.
+			params.AllowOnlineACHPayment = customer.BillingMethod.OnlineACHAllowed()
+			params.AllowOnlineCreditCardPayment = customer.BillingMethod.OnlineCardAllowed()
 			// EnsureQBCustomer syncs this same address onto the QB customer's
 			// PrimaryEmailAddr, so local and QB agree by construction.
 			params.BillEmail = customer.Email
@@ -337,8 +353,14 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 		ShippingCents: order.ShippingTotal,
 		TotalCents:    order.Total,
 	}
+	// Default true so an order with no customer row — which cannot happen
+	// through either entry point — is not quietly filed as "someone will
+	// invoice this by hand".
+	preview.AutoBilled = true
 	if customer != nil {
 		preview.BillEmail = customer.Email
+		preview.BillingMethod = customer.BillingMethod
+		preview.AutoBilled = customer.BillingMethod.AutoInvoiced()
 	}
 	if job.Args.QBCustomerID != "" {
 		qbID := job.Args.QBCustomerID
@@ -362,7 +384,7 @@ func (w *CreateQBInvoiceWorker) recordPreview(
 	// that would otherwise only surface as a failed invoice after go-live. The
 	// runbook sends staff here to check exactly this, so it has to be said
 	// here rather than only on the settings page.
-	if qbItems.SalesItemID == "" && w.envSalesItemID == "" {
+	if preview.AutoBilled && qbItems.SalesItemID == "" && w.envSalesItemID == "" {
 		lookupErrs = append(lookupErrs,
 			"no QuickBooks item is chosen for invoice lines — set one under Settings, Integrations, or invoices cannot be created")
 	}

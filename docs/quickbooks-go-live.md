@@ -111,6 +111,29 @@ Also worth checking during this period:
   QuickBooks invoices — the total is lines plus shipping only, so a discounted
   order would be over-billed.
 
+## 5a. Decide who is actually billed
+
+Automated billing follows the customer's **billing method**, not the billing
+mode. Only accounts set to **ACH** or **Credit card** are invoiced
+automatically; an account on **Manual** is left alone in both test mode and
+live, because manual means nobody has an invoicing and payment agreement with
+them and their invoices are raised by hand.
+
+That is deliberate and it is load-bearing: **every wholesale account starts on
+Manual.** Going live therefore bills nobody until you begin moving accounts
+over, which is the point — an automated invoice with a pay-now button is a
+change to a commercial relationship, not a feature to switch on for sixty
+businesses at once.
+
+The order of operations for each account is: agree it with the customer, then
+set their billing method on the customer page, and from their next order they
+are invoiced automatically.
+
+Orders on manual accounts still appear on the review page, badged **Manual**
+and counted under "Invoice by hand". They are not a problem to fix — they are
+the list of orders somebody has to invoice, and **Bill now** on such a row is
+the deliberate way to have QuickBooks do it once.
+
 ## 6. Go live
 
 Admin → Settings → Integrations → Billing mode → **Go live**. It asks for
@@ -129,6 +152,10 @@ invisible to it and the customer would be billed twice.
 
 The first invoice will create a **"Net 7"** term in the company, because it is
 not one of QuickBooks' stock terms. Tell the bookkeeper to expect it.
+
+If nothing at all is invoiced after going live, that is almost certainly step
+5a: every account is still on Manual. Check a customer's billing method before
+assuming the integration is broken.
 
 ## 7. Watch the first day
 

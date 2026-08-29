@@ -904,16 +904,17 @@ func (d *Deps) handleAdminQBPreview(w http.ResponseWriter, r *http.Request) {
 
 	name, role := staffNameRole(r)
 	props := admin.QBPreviewProps{
-		Nav:        section.nav(role),
-		Rows:       rows,
-		Mode:       mode,
-		Attention:  summary.Attention,
-		TotalCents: summary.TotalCents,
-		Count:      summary.Count,
-		Truncated:  summary.Truncated,
-		Flash:      settingsFlash(r),
-		StaffName:  name,
-		StaffRole:  role,
+		Nav:            section.nav(role),
+		Rows:           rows,
+		Mode:           mode,
+		Attention:      summary.Attention,
+		TotalCents:     summary.TotalCents,
+		Count:          summary.Count,
+		Truncated:      summary.Truncated,
+		AwaitingManual: summary.AwaitingManual,
+		Flash:          settingsFlash(r),
+		StaffName:      name,
+		StaffRole:      role,
 	}
 	if IsHTMX(r) {
 		admin.QBPreviewContent(props).Render(ctx, w) //nolint:errcheck
@@ -988,7 +989,7 @@ func (d *Deps) handleAdminQBBillOrder(w http.ResponseWriter, r *http.Request) {
 
 // enqueueQBChain starts the invoice chain inside the caller's transaction, so
 // the job cannot outlive a rolled-back decision to bill.
-func (d *Deps) enqueueQBChain(ctx context.Context, tx pgx.Tx, customerID, orderID uuid.UUID) error {
+func (d *Deps) enqueueQBChain(ctx context.Context, tx pgx.Tx, customerID, orderID uuid.UUID, staffRequested bool) error {
 	// Unique by args: two quick clicks on Bill now would otherwise enqueue two
 	// chains. The DocNumber probe keeps QBO to one invoice, but nothing
 	// downstream would stop two send jobs emailing the customer twice.
@@ -997,8 +998,9 @@ func (d *Deps) enqueueQBChain(ctx context.Context, tx pgx.Tx, customerID, orderI
 	// click, short enough that a staffer retrying after a visible failure is
 	// not silently ignored while the page tells them invoicing has started.
 	_, err := d.RiverClient.InsertTx(ctx, tx, jobs.EnsureQBCustomerArgs{
-		CustomerID: customerID,
-		OrderID:    orderID,
+		CustomerID:     customerID,
+		OrderID:        orderID,
+		StaffRequested: staffRequested,
 	}, &river.InsertOpts{
 		UniqueOpts: river.UniqueOpts{ByArgs: true, ByPeriod: time.Minute},
 	})

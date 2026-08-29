@@ -385,6 +385,11 @@ func (PollLabelRefundArgs) Kind() string { return "poll_label_refund" }
 type EnsureQBCustomerArgs struct {
 	CustomerID uuid.UUID `json:"customer_id"`
 	OrderID    uuid.UUID `json:"order_id"`
+	// StaffRequested marks a chain a person deliberately started from the
+	// admin. It overrides the manual-billing gate — the whole point of Bill
+	// now is to invoice an account that nothing invoices on its own — and it
+	// overrides nothing else.
+	StaffRequested bool `json:"staff_requested,omitempty"`
 }
 
 // Kind returns the job kind identifier.
@@ -400,6 +405,9 @@ type CreateQBInvoiceArgs struct {
 	// one conclusion a proof period must never invite. Empty in live mode,
 	// where a failed lookup fails the job instead.
 	CustomerLookupError string `json:"customer_lookup_error,omitempty"`
+	// StaffRequested carries the Bill now override down the chain: it is what
+	// lets a person invoice an account that nothing invoices on its own.
+	StaffRequested bool `json:"staff_requested,omitempty"`
 }
 
 // Kind returns the job kind identifier.

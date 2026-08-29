@@ -15,6 +15,9 @@ type QBPreviewProps struct {
 	Mode       domain.QBBillingMode
 	Attention  int
 	TotalCents int
+	// AwaitingManual is how many rows are on manual billing and will not be
+	// invoiced by anything unless a person does it.
+	AwaitingManual int
 	// Truncated is set when the list shows fewer rows than the totals count,
 	// so the page can say so rather than letting the two disagree in silence.
 	Truncated bool
@@ -34,6 +37,17 @@ type QBPreviewRow struct {
 	domain.QBInvoicePreview
 	OrderNumber  string
 	CustomerName string
+}
+
+// qbRowState is what a row is, in one word, for the status column.
+func qbRowState(row QBPreviewRow) string {
+	switch {
+	case row.AwaitingManualInvoice():
+		return "Manual"
+	case row.Problem() != "":
+		return "Check"
+	}
+	return "Ready"
 }
 
 templ QBPreview(props QBPreviewProps) {
@@ -72,6 +86,13 @@ templ QBPreviewContent(props QBPreviewProps) {
 		}
 	</div>
 
+	if props.AwaitingManual > 0 {
+		<p class="mt-2 max-w-3xl text-sm text-rr-muted">
+			Orders marked <span class="badge badge-slate">Manual</span> are on accounts with no
+			invoicing agreement, so nothing bills them automatically — in test mode or live.
+			Invoice those by hand, or use Bill now once you have agreed it with the customer.
+		</p>
+	}
 	if len(props.Rows) == 0 {
 		<div class="mt-6 rounded border border-rr-border bg-rr-surface px-4 py-6">
 			<p class="text-sm text-rr-muted">
@@ -88,6 +109,12 @@ templ QBPreviewContent(props QBPreviewProps) {
 				<span class="label-font text-rr-muted">Orders</span>
 				<span class="ml-2 text-rr-heading">{ strconv.Itoa(props.Count) }</span>
 			</div>
+			if props.AwaitingManual > 0 {
+				<div>
+					<span class="label-font text-rr-muted">Invoice by hand</span>
+					<span class="badge badge-slate ml-2">{ strconv.Itoa(props.AwaitingManual) }</span>
+				</div>
+			}
 			<div>
 				<span class="label-font text-rr-muted">Need attention</span>
 				if props.Attention > 0 {
@@ -103,6 +130,7 @@ templ QBPreviewContent(props QBPreviewProps) {
 				<thead>
 					<tr>
 						<th class="label-font px-4 py-2 text-left text-rr-muted">Order</th>
+						<th class="label-font px-4 py-2 text-left text-rr-muted">Billing</th>
 						<th class="label-font px-4 py-2 text-left text-rr-muted">Customer</th>
 						<th class="label-font px-4 py-2 text-left text-rr-muted">Terms</th>
 						<th class="label-font px-4 py-2 text-left text-rr-muted">Due</th>
@@ -123,6 +151,15 @@ templ QBPreviewContent(props QBPreviewProps) {
 								</a>
 								if row.Problem() != "" {
 									<p class="mt-1 text-xs text-rr-muted">{ row.Problem() }</p>
+								}
+							</td>
+							<td class="px-4 py-3 text-sm">
+								if qbRowState(row) == "Manual" {
+									<span class="badge badge-slate">Manual</span>
+								} else if qbRowState(row) == "Check" {
+									<span class="badge badge-amber">Check</span>
+								} else {
+									<span class="badge badge-green">Ready</span>
 								}
 							</td>
 							<td class="px-4 py-3 text-sm text-rr-body">

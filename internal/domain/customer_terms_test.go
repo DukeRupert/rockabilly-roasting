@@ -55,3 +55,31 @@ func TestIsLegacyPaymentTerms(t *testing.T) {
 		t.Errorf("negative label: got %q, want %q", got, "Invalid terms")
 	}
 }
+
+func TestBillingMethodDecidesWhoIsBilled(t *testing.T) {
+	// Manual is the default and the honest answer for an account nobody has
+	// an agreement with. Billing them automatically is not recoverable.
+	if BillingMethodManual.AutoInvoiced() {
+		t.Error("a manual account must not be billed automatically")
+	}
+	if BillingMethodManual.OnlineACHAllowed() || BillingMethodManual.OnlineCardAllowed() {
+		t.Error("a manual account gets no online payment button")
+	}
+
+	if !BillingMethodACH.AutoInvoiced() || !BillingMethodCreditCard.AutoInvoiced() {
+		t.Error("an account with an agreement is billed automatically")
+	}
+	// The two agreed methods differ only in which button appears.
+	if !BillingMethodACH.OnlineACHAllowed() || BillingMethodACH.OnlineCardAllowed() {
+		t.Error("an ACH account gets the ACH button and not the card one")
+	}
+	if !BillingMethodCreditCard.OnlineCardAllowed() || BillingMethodCreditCard.OnlineACHAllowed() {
+		t.Error("a card account gets the card button and not ACH")
+	}
+
+	// An unrecognised value must fall to the safe side.
+	unknown := BillingMethod("wire_transfer")
+	if unknown.AutoInvoiced() || unknown.OnlineACHAllowed() || unknown.OnlineCardAllowed() {
+		t.Error("an unknown billing method must not authorise billing anybody")
+	}
+}

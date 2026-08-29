@@ -30,10 +30,39 @@ const (
 type BillingMethod string
 
 const (
-	BillingMethodManual     BillingMethod = "manual"
+	// BillingMethodManual is an account nobody has an invoicing and payment
+	// agreement with. They are invoiced by hand, so automated QuickBooks
+	// billing leaves them alone.
+	BillingMethodManual BillingMethod = "manual"
+	// BillingMethodACH and BillingMethodCreditCard are accounts that have
+	// agreed to be invoiced and to pay online. Both are billed automatically;
+	// they differ only in which pay button the invoice carries.
 	BillingMethodACH        BillingMethod = "ach"
 	BillingMethodCreditCard BillingMethod = "credit_card"
 )
+
+// AutoInvoiced reports whether QuickBooks should bill this account without
+// anybody asking.
+//
+// Only an account with an agreement is billed automatically. Manual is the
+// default and the honest answer for a customer who has never been told their
+// invoices would start arriving from QuickBooks with a pay-now button on them
+// — sending one is a change to a commercial relationship, not a feature.
+//
+// A value this binary does not recognise reads as manual, which is the safe
+// direction: not billing someone is recoverable, billing them is not.
+func (m BillingMethod) AutoInvoiced() bool {
+	return m == BillingMethodACH || m == BillingMethodCreditCard
+}
+
+// OnlineACHAllowed reports whether an invoice for this account may carry an
+// ACH pay button. Card accounts get the card button instead; a manual account
+// gets neither, and is not invoiced automatically at all.
+func (m BillingMethod) OnlineACHAllowed() bool { return m == BillingMethodACH }
+
+// OnlineCardAllowed reports whether an invoice may carry a card pay button.
+// Card fees are opt-in per account, so this is never on by default.
+func (m BillingMethod) OnlineCardAllowed() bool { return m == BillingMethodCreditCard }
 
 // DefaultPaymentTermsDays is the NET terms applied to wholesale invoicing when
 // a customer has no explicit PaymentTermsDays set (net-7 is the house default).

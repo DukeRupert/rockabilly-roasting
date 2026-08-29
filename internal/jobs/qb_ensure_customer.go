@@ -141,6 +141,7 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 				OrderID:             job.Args.OrderID,
 				QBCustomerID:        qbID,
 				CustomerLookupError: lookupErr,
+				StaffRequested:      job.Args.StaffRequested,
 			}, nil)
 			return txErr
 		})
@@ -223,8 +224,9 @@ func (w *EnsureQBCustomerWorker) work(ctx context.Context, job *river.Job[Ensure
 	// Chain to invoice creation
 	return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {
 		_, txErr := w.riverClient.InsertTx(ctx, tx, CreateQBInvoiceArgs{
-			OrderID:      job.Args.OrderID,
-			QBCustomerID: *customer.QBCustomerID,
+			OrderID:        job.Args.OrderID,
+			QBCustomerID:   *customer.QBCustomerID,
+			StaffRequested: job.Args.StaffRequested,
 		}, nil)
 		return txErr
 	})

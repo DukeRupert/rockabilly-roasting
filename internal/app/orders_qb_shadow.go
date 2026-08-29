@@ -35,6 +35,9 @@ type QBShadowSummary struct {
 	TotalCents int
 	Attention  int
 	Truncated  bool
+	// AwaitingManual is how many listed orders will not be billed by anything
+	// unless a person invoices them — accounts on manual billing.
+	AwaitingManual int
 }
 
 // QBBillingMode reports whether QuickBooks billing is allowed to move money.
@@ -61,6 +64,7 @@ func (s *OrderService) ListQBPreviews(ctx context.Context, tx pgx.Tx, limit int)
 	out.Count = totals.Count
 	out.TotalCents = totals.TotalCents
 	out.Attention = totals.NeedingAttention
+	out.AwaitingManual = totals.AwaitingManual
 
 	rows, err := s.qbPreviews.List(ctx, tx, limit)
 	if err != nil {
@@ -73,7 +77,9 @@ func (s *OrderService) ListQBPreviews(ctx context.Context, tx pgx.Tx, limit int)
 			CustomerName:     r.CustomerName,
 		})
 	}
-	out.Truncated = out.Count > len(out.Rows)
+	// Count covers only the automatically billed orders, while the list holds
+	// those plus the manual ones — so compare against the whole set.
+	out.Truncated = out.Count+out.AwaitingManual > len(out.Rows)
 	return out, nil
 }
 
@@ -163,7 +169,9 @@ func (s *OrderService) BillOrderNow(ctx context.Context, tx pgx.Tx, orderID uuid
 		return ErrQBOrderNotBillable
 	}
 
-	if err := enqueue(ctx, tx, *order.CustomerID, order.ID); err != nil {
+	// staffRequested: a person is asking, which is the only thing that bills
+	// an account nothing bills automatically.
+	if err := enqueue(ctx, tx, *order.CustomerID, order.ID, true); err != nil {
 		return fmt.Errorf("enqueue qb chain: %w", err)
 	}
 	return s.audit.Record(ctx, tx, audit.AuditEntry{
@@ -180,7 +188,7 @@ func (s *OrderService) BillOrderNow(ctx context.Context, tx pgx.Tx, orderID uuid
 // QBChainEnqueuer starts the QuickBooks invoice chain for one order. It is a
 // function rather than a method on JobEnqueuer so the app layer does not have
 // to learn the job args, which live in jobs/.
-type QBChainEnqueuer func(ctx context.Context, tx pgx.Tx, customerID, orderID uuid.UUID) error
+type QBChainEnqueuer func(ctx context.Context, tx pgx.Tx, customerID, orderID uuid.UUID, staffRequested bool) error
 
 // QBItemConfigFor returns which QuickBooks items invoices bill against.
 //

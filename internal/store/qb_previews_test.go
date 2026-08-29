@@ -31,6 +31,8 @@ func previewFor(order *domain.Order) *domain.QBInvoicePreview {
 		DueDate:       time.Now().AddDate(0, 0, 7),
 		SubtotalCents: 7200,
 		TotalCents:    7200,
+		AutoBilled:    true,
+		BillingMethod: domain.BillingMethodACH,
 		Lines: []domain.QBInvoiceLinePreview{
 			{Description: "Coffee", Quantity: 4, UnitCents: 1800, AmountCents: 7200},
 		},
@@ -135,4 +137,34 @@ func TestQBPreviewDeletedOnceTheOrderIsBilled(t *testing.T) {
 	require.NoError(t, err)
 	assert.Zero(t, n,
 		"once billed, the invoice is the record — a leftover preview would keep offering to bill it again")
+}
+
+func TestQBPreviewTotalsSeparateManualFromBilled(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	previews := store.NewQBPreviewStore()
+
+	billed := previewFor(newPreviewOrder(t, tx))
+	require.NoError(t, previews.Upsert(ctx, tx, billed))
+
+	// An account nobody invoices automatically. Its money must not be counted
+	// as "would be billed" — nothing is going to collect it.
+	manual := previewFor(newPreviewOrder(t, tx))
+	manual.AutoBilled = false
+	manual.BillingMethod = domain.BillingMethodManual
+	manual.TotalCents = 50000
+	require.NoError(t, previews.Upsert(ctx, tx, manual))
+
+	totals, err := previews.Totals(ctx, tx, time.Time{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, totals.Count, "only the automatically billed order counts")
+	assert.Equal(t, 7200, totals.TotalCents, "the manual order's money is not money we will collect")
+	assert.Equal(t, 1, totals.AwaitingManual, "but it is counted as waiting for a person")
+	assert.Zero(t, totals.NeedingAttention, "manual is a decision, not a fault")
+
+	// It still appears in the list — an order missing from the review page
+	// reads as nothing to bill.
+	rows, err := previews.List(ctx, tx, 50)
+	require.NoError(t, err)
+	assert.Len(t, rows, 2)
 }

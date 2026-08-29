@@ -37,8 +37,8 @@ func (s *QBPreviewStore) Upsert(ctx context.Context, tx pgx.Tx, p *domain.QBInvo
 			order_id, customer_id, qb_customer_id, would_create_customer,
 			doc_number, bill_email, terms_days, due_date,
 			subtotal_cents, shipping_cents, total_cents, term_id, lines,
-			existing_qb_invoice_id, lookup_error
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+			existing_qb_invoice_id, lookup_error, auto_billed, billing_method
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
 		ON CONFLICT (order_id) DO UPDATE SET
 			customer_id            = EXCLUDED.customer_id,
 			qb_customer_id         = EXCLUDED.qb_customer_id,
@@ -54,11 +54,13 @@ func (s *QBPreviewStore) Upsert(ctx context.Context, tx pgx.Tx, p *domain.QBInvo
 			lines                  = EXCLUDED.lines,
 			existing_qb_invoice_id = EXCLUDED.existing_qb_invoice_id,
 			lookup_error           = EXCLUDED.lookup_error,
+			auto_billed            = EXCLUDED.auto_billed,
+			billing_method         = EXCLUDED.billing_method,
 			updated_at             = now()`,
 		p.OrderID, p.CustomerID, p.QBCustomerID, p.WouldCreateCustomer,
 		p.DocNumber, p.BillEmail, p.TermsDays, p.DueDate,
 		p.SubtotalCents, p.ShippingCents, p.TotalCents, p.TermID, lines,
-		p.ExistingQBInvoiceID, p.LookupError,
+		p.ExistingQBInvoiceID, p.LookupError, p.AutoBilled, string(p.BillingMethod),
 	)
 	if err != nil {
 		return fmt.Errorf("upsert qb invoice preview: %w", err)
@@ -79,7 +81,8 @@ const qbPreviewSelect = `
 	SELECT p.id, p.order_id, p.customer_id, p.qb_customer_id, p.would_create_customer,
 	       p.doc_number, p.bill_email, p.terms_days, p.due_date,
 	       p.subtotal_cents, p.shipping_cents, p.total_cents, p.term_id, p.lines,
-	       p.existing_qb_invoice_id, p.lookup_error, p.created_at, p.updated_at,
+	       p.existing_qb_invoice_id, p.lookup_error, p.auto_billed, p.billing_method,
+	       p.created_at, p.updated_at,
 	       o.number,
 	       COALESCE(NULLIF(c.company_name, ''), TRIM(c.first_name || ' ' || c.last_name), '')
 	  FROM qb_invoice_previews p
@@ -94,11 +97,13 @@ func scanQBPreviewRows(rows pgx.Rows) ([]QBPreviewRow, error) {
 		var r QBPreviewRow
 		var lines []byte
 		var companyOrName *string
+		var billingMethod string
 		if err := rows.Scan(
 			&r.ID, &r.OrderID, &r.CustomerID, &r.QBCustomerID, &r.WouldCreateCustomer,
 			&r.DocNumber, &r.BillEmail, &r.TermsDays, &r.DueDate,
 			&r.SubtotalCents, &r.ShippingCents, &r.TotalCents, &r.TermID, &lines,
-			&r.ExistingQBInvoiceID, &r.LookupError, &r.CreatedAt, &r.UpdatedAt,
+			&r.ExistingQBInvoiceID, &r.LookupError, &r.AutoBilled, &billingMethod,
+			&r.CreatedAt, &r.UpdatedAt,
 			&r.OrderNumber, &companyOrName,
 		); err != nil {
 			return nil, fmt.Errorf("scan qb invoice preview: %w", err)
@@ -108,6 +113,7 @@ func scanQBPreviewRows(rows pgx.Rows) ([]QBPreviewRow, error) {
 				return nil, fmt.Errorf("unmarshal preview lines: %w", err)
 			}
 		}
+		r.BillingMethod = domain.BillingMethod(billingMethod)
 		r.CustomerName = ptrToStr(companyOrName)
 		out = append(out, r)
 	}
@@ -167,9 +173,16 @@ func (s *QBPreviewStore) Count(ctx context.Context, tx pgx.Tx) (int, error) {
 
 // QBPreviewTotals summarises a proof period.
 type QBPreviewTotals struct {
+	// Count and TotalCents cover the orders that would actually be billed.
+	// Orders on manual billing are counted separately rather than folded in:
+	// adding money nothing is going to collect into a "would be billed" total
+	// would misstate the one number the page exists to show.
 	Count            int
 	TotalCents       int
 	NeedingAttention int
+	// AwaitingManual is how many orders will not be billed by anything unless
+	// a person invoices them.
+	AwaitingManual int
 }
 
 // Totals summarises previews touched at or after the given time — updated_at,
@@ -179,17 +192,20 @@ type QBPreviewTotals struct {
 func (s *QBPreviewStore) Totals(ctx context.Context, tx pgx.Tx, since time.Time) (QBPreviewTotals, error) {
 	var t QBPreviewTotals
 	err := tx.QueryRow(ctx, `
-		SELECT count(*),
-		       COALESCE(sum(total_cents), 0),
+		SELECT count(*) FILTER (WHERE auto_billed),
+		       COALESCE(sum(total_cents) FILTER (WHERE auto_billed), 0),
 		       count(*) FILTER (
-		           WHERE would_create_customer
-		              OR lookup_error IS NOT NULL
-		              OR existing_qb_invoice_id IS NOT NULL
-		              OR bill_email = ''
-		       )
+		           WHERE auto_billed AND (
+		                    would_create_customer
+		                 OR lookup_error IS NOT NULL
+		                 OR existing_qb_invoice_id IS NOT NULL
+		                 OR bill_email = ''
+		           )
+		       ),
+		       count(*) FILTER (WHERE NOT auto_billed)
 		  FROM qb_invoice_previews
 		 WHERE updated_at >= $1`, since,
-	).Scan(&t.Count, &t.TotalCents, &t.NeedingAttention)
+	).Scan(&t.Count, &t.TotalCents, &t.NeedingAttention, &t.AwaitingManual)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return QBPreviewTotals{}, fmt.Errorf("qb invoice preview totals: %w", err)
 	}

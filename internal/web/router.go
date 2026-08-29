@@ -670,11 +670,11 @@ func NewRouter(deps *Deps) http.Handler {
 	//
 	// The QuickBooks OAuth callback is gated on the same permission as the rest.
 	// It is the staffer's own browser coming back from Intuit, and only someone
-	// who could reach the connect route could have started the flow — but note
-	// the return is a cross-site top-level navigation and the staff session
-	// cookie is SameSite=Strict (auth.go), so whether the session is sent at all
-	// is a pre-existing open question about this flow, not something this gate
-	// changes. The OAuth state cookie is deliberately Lax for that reason.
+	// who could reach the connect route could have started the flow. The return
+	// is a cross-site top-level navigation, which the staff session cookie has
+	// to survive or this route 303s to the login page before the handler runs —
+	// that is why the session cookie is SameSite=Lax rather than Strict
+	// (auth.go). The OAuth state cookie is Lax for the same reason.
 	settingsRoute := func(pattern string, h http.HandlerFunc) {
 		adminMux.Handle(pattern, deps.requirePermission(auth.PermManageSystem, h))
 	}

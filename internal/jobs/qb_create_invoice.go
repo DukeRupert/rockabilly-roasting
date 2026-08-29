@@ -181,6 +181,12 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	// the live EnsureQBCustomer path establishes the customer properly, and
 	// the DocNumber probe below still guards against a duplicate invoice.
 	if job.Args.QBCustomerID == "" {
+		if order.CustomerID == nil {
+			// Unreachable through either entry point — checkout and BillOrderNow
+			// both require a customer — but this is the one place that would
+			// otherwise dereference it blind.
+			return fmt.Errorf("%w: order %s has no customer to invoice", quickbooks.ErrBadRequest, order.ID)
+		}
 		slog.Info("qb create invoice: no qb customer on a live run, restarting the chain",
 			"order_id", order.ID)
 		return store.Tx(ctx, w.pool, func(tx pgx.Tx) error {

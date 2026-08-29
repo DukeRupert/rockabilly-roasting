@@ -93,7 +93,7 @@ func ptrToStr(s *string) string {
 // an unknown value is not to bill.
 func (s *SettingsStore) GetQBBillingMode(ctx context.Context, tx pgx.Tx) (domain.QBBillingMode, error) {
 	var raw string
-	if err := tx.QueryRow(ctx, `SELECT qb_billing_mode FROM store_settings`).Scan(&raw); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT qb_billing_mode FROM store_settings LIMIT 1`).Scan(&raw); err != nil {
 		return domain.DefaultQBBillingMode, fmt.Errorf("get qb billing mode: %w", err)
 	}
 	mode := domain.QBBillingMode(raw)
@@ -108,7 +108,7 @@ func (s *SettingsStore) GetQBBillingMode(ctx context.Context, tx pgx.Tx) (domain
 // constraint is the backstop.
 func (s *SettingsStore) UpdateQBBillingMode(ctx context.Context, tx pgx.Tx, mode domain.QBBillingMode) error {
 	if _, err := tx.Exec(ctx,
-		`UPDATE store_settings SET qb_billing_mode = $1, updated_at = now()`, string(mode),
+		`UPDATE store_settings SET qb_billing_mode = $1, updated_at = now() WHERE id = true`, string(mode),
 	); err != nil {
 		return fmt.Errorf("update qb billing mode: %w", err)
 	}

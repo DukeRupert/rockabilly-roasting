@@ -853,11 +853,15 @@ func (d *Deps) enqueueQBChain(ctx context.Context, tx pgx.Tx, customerID, orderI
 	// Unique by args: two quick clicks on Bill now would otherwise enqueue two
 	// chains. The DocNumber probe keeps QBO to one invoice, but nothing
 	// downstream would stop two send jobs emailing the customer twice.
+	//
+	// The window is a minute, not an hour: long enough to swallow a double
+	// click, short enough that a staffer retrying after a visible failure is
+	// not silently ignored while the page tells them invoicing has started.
 	_, err := d.RiverClient.InsertTx(ctx, tx, jobs.EnsureQBCustomerArgs{
 		CustomerID: customerID,
 		OrderID:    orderID,
 	}, &river.InsertOpts{
-		UniqueOpts: river.UniqueOpts{ByArgs: true, ByPeriod: time.Hour},
+		UniqueOpts: river.UniqueOpts{ByArgs: true, ByPeriod: time.Minute},
 	})
 	return err
 }

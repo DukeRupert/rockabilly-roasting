@@ -171,12 +171,14 @@ func (d *Deps) handleStaffLogin(w http.ResponseWriter, r *http.Request) {
 		// callback bounced to the login page before the handler ran, so the
 		// integration could never be connected (verified 2026-08-29).
 		// Lax still withholds the cookie on cross-site POST, so form CSRF
-		// protection is unchanged, and admin has no state-changing GET route
-		// for it to expose: every mutation is a POST. The GET routes that read
-		// as verbs were each checked and none writes local state — shipment
-		// label download and box-preset list only read, order rates only calls
-		// Shippo, and the QuickBooks connect route mints a state cookie and
-		// redirects, which is the flow this change exists to make work.
+		// protection is unchanged. Admin's mutations are all POSTs bar one:
+		// the QuickBooks OAuth callback is a GET that writes credentials, and
+		// it is the very request this change exists to let through. That one
+		// is defended by its own signed state cookie, checked before the code
+		// is exchanged, so a cross-site GET cannot forge it. The other GETs
+		// that read as verbs were each checked and none writes local state —
+		// shipment label download and box-preset list only read, order rates
+		// only calls Shippo, and the connect route mints state and redirects.
 		SameSite: http.SameSiteLaxMode,
 		Secure:   d.SecureCookies,
 	})

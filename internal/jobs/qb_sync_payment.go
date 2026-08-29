@@ -18,6 +18,13 @@ import (
 )
 
 // SyncQBPaymentWorker records a manual payment in QBO against the linked invoice.
+//
+// Deliberately not gated on the billing mode, unlike SyncQBCustomerWorker.
+// It only ever acts on an invoice that already exists in QuickBooks, which
+// test mode cannot produce — so reaching it means a real invoice is owed and
+// a real payment has been recorded against it. Refusing that write because the
+// shop happens to be in test mode would strand money that has actually
+// changed hands, which is a worse failure than the guarantee is worth here.
 type SyncQBPaymentWorker struct {
 	river.WorkerDefaults[SyncQBPaymentArgs]
 	orders    *store.OrderStore

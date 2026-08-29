@@ -32,8 +32,14 @@ func TestQBTermIsStandard(t *testing.T) {
 }
 
 func TestIsStaleTermRefError(t *testing.T) {
-	termFault := &APIError{StatusCode: 400, Message: "Invalid Reference Id", Detail: "SalesTermRef id 42 not found"}
-	dupFault := &APIError{StatusCode: 400, Message: "Duplicate Document Number Exists", Detail: "DocNumber=WO-1"}
+	// Message is http.StatusText(400) in production; only Detail carries the
+	// QBO fault, so the fixtures put the distinguishing text there.
+	termFault := &APIError{StatusCode: 400, Message: "Bad Request", Detail: "Invalid Reference Id: SalesTermRef id 42 not found"}
+	dupFault := &APIError{StatusCode: 400, Message: "Bad Request", Detail: "Duplicate Document Number Exists: DocNumber=WO-1"}
+	// The reason the match is on whole words: QBO says "determined" in
+	// unrelated faults, and treating that as a term problem would evict a good
+	// cached Term and bill without the label.
+	determinedFault := &APIError{StatusCode: 400, Message: "Bad Request", Detail: "The transaction amount could not be determined"}
 
 	tests := []struct {
 		name string
@@ -47,6 +53,8 @@ func TestIsStaleTermRefError(t *testing.T) {
 		{"duplicate doc number is not a term problem", fmt.Errorf("%w: %w", ErrBadRequest, dupFault), false},
 		{"non-bad-request error", fmt.Errorf("network unreachable"), false},
 		{"bad request with no api error", ErrBadRequest, false},
+		{"'determined' is not a term fault", fmt.Errorf("%w: %w", ErrBadRequest, determinedFault), false},
+		{"plural terms", fmt.Errorf("%w: %w", ErrBadRequest, &APIError{StatusCode: 400, Message: "Bad Request", Detail: "Payment terms are invalid"}), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -187,9 +188,18 @@ func isStaleTermRefError(err error) bool {
 	if !errors.As(err, &apiErr) {
 		return false
 	}
+	// Whole words only. A bare substring match also fires on "determined",
+	// which QBO uses in unrelated fault details — and a false positive here
+	// evicts a good cached Term and bills without the label this exists to
+	// add. In production the fault text arrives in Detail; Message is just
+	// http.StatusText(400).
 	haystack := strings.ToLower(apiErr.Message + " " + apiErr.Detail)
-	return strings.Contains(haystack, "term")
+	return termWordRe.MatchString(haystack)
 }
+
+// termWordRe matches a whole word "term" or "terms", or QBO's SalesTermRef
+// field name.
+var termWordRe = regexp.MustCompile(`\bterms?\b|salestermref`)
 
 // qbInvoiceQueryResponse is the response shape for invoice queries.
 type qbInvoiceQueryResponse struct {

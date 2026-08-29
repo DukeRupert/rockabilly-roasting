@@ -746,7 +746,11 @@ templ customerSettingsCard(props CustomerShowProps) {
 									     have to show as what they are. Without this the select falls back to
 									     its first option and reads "Not set", and because it submits on change
 									     the next nudge would quietly rewrite a real account's terms. -->
-									<option value={ strconv.Itoa(*props.Customer.PaymentTermsDays) } selected>
+									<!-- disabled as well as selected: it has to show what the account is
+									     actually on, but the handler rejects a retired value, so letting it be
+									     chosen again would answer a click with a bare 400. Staff can move off
+									     it; they cannot move back onto it. -->
+									<option value={ strconv.Itoa(*props.Customer.PaymentTermsDays) } selected disabled>
 										{ domain.PaymentTermsLabel(*props.Customer.PaymentTermsDays) } (no longer offered)
 									</option>
 								}

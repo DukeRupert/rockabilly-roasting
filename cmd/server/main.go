@@ -694,7 +694,7 @@ func run() error {
 		river.AddWorker(workers, jobs.NewCheckQBTokenWorker(qbCredStore, tenantIDFromEnv(), orderSvc, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewProcessQBInvoiceUpdateWorker(orderSvc, qbClient, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewReconcileQBInvoicesWorker(orderSvc, qbClient, pool, metricsReg))
-		river.AddWorker(workers, jobs.NewSyncQBCustomerWorker(customerStore, qbClient, auditWriter, pool, metricsReg))
+		river.AddWorker(workers, jobs.NewSyncQBCustomerWorker(customerStore, settingsStore, qbClient, auditWriter, pool, metricsReg))
 		river.AddWorker(workers, jobs.NewSyncQBPaymentWorker(orderStore, customerStore, qbClient, auditWriter, pool, metricsReg))
 		logger.Info("quickbooks workers registered")
 	}

@@ -405,6 +405,20 @@ func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, planID, 
 		return ErrPlanTaskNotFound
 	}
 
+	// service_maintenance_due.task_id cascades, so deleting the task would take
+	// its occurrences with it — including ones the sweep has already opened a
+	// customer ticket for. EndAssignment was rewritten to stop exactly that;
+	// two write paths reaching the same rows should not hold opposite policies.
+	// There is no way to keep the row (task_id is NOT NULL), so the delete is
+	// refused until somebody deals with the ticket.
+	booked, err := s.plans.CountBookedForTask(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	if booked > 0 {
+		return ErrPlanTaskBooked
+	}
+
 	if err := s.plans.DeleteTask(ctx, tx, id); err != nil {
 		return err
 	}
@@ -450,12 +464,23 @@ type AssignServicePlanParams = store.AssignPlanParams
 // The occurrences are written here rather than left to the sweep because the
 // staffer who just assigned a plan expects to see the schedule it produced —
 // finding out tomorrow whether the anchor date was right is not a workflow.
-func (s *ServicePlanService) AssignPlan(ctx context.Context, tx pgx.Tx, p AssignServicePlanParams, actor Actor) (*domain.EquipmentServicePlan, error) {
+func (s *ServicePlanService) AssignPlan(ctx context.Context, tx pgx.Tx, p AssignServicePlanParams, now time.Time, actor Actor) (*domain.EquipmentServicePlan, error) {
 	if p.StartsOn.IsZero() {
 		return nil, ErrPlanStartRequired
 	}
 	if p.ContractEndsOn != nil && p.ContractEndsOn.Before(p.StartsOn) {
 		return nil, ErrPlanContractEndsBeforeStart
+	}
+	// Both dates may legitimately be ahead of today — a machine installed next
+	// week, a contract that runs to next year — so only the ten-year bound
+	// applies.
+	if err := validateMaintenanceDay(p.StartsOn, now, true); err != nil {
+		return nil, err
+	}
+	if p.ContractEndsOn != nil {
+		if err := validateMaintenanceDay(*p.ContractEndsOn, now, true); err != nil {
+			return nil, err
+		}
 	}
 	p.Notes = strings.TrimSpace(p.Notes)
 
@@ -539,12 +564,20 @@ type EditPlanAssignmentParams = store.UpdateAssignmentParams
 // The anchor's job is to seed the schedule; once a task has been done, the
 // schedule is anchored to that instead, and rewriting history from a corrected
 // start date would move dates the shop has already told a customer about.
-func (s *ServicePlanService) EditAssignment(ctx context.Context, tx pgx.Tx, id uuid.UUID, p EditPlanAssignmentParams, actor Actor) (*domain.EquipmentServicePlan, error) {
+func (s *ServicePlanService) EditAssignment(ctx context.Context, tx pgx.Tx, id uuid.UUID, p EditPlanAssignmentParams, now time.Time, actor Actor) (*domain.EquipmentServicePlan, error) {
 	if p.StartsOn.IsZero() {
 		return nil, ErrPlanStartRequired
 	}
 	if p.ContractEndsOn != nil && p.ContractEndsOn.Before(p.StartsOn) {
 		return nil, ErrPlanContractEndsBeforeStart
+	}
+	if err := validateMaintenanceDay(p.StartsOn, now, true); err != nil {
+		return nil, err
+	}
+	if p.ContractEndsOn != nil {
+		if err := validateMaintenanceDay(*p.ContractEndsOn, now, true); err != nil {
+			return nil, err
+		}
 	}
 	p.Notes = strings.TrimSpace(p.Notes)
 
@@ -655,9 +688,12 @@ type CompleteDueParams struct {
 // transaction. The pairing is the invariant the schedule rests on: a completion
 // that did not produce a successor is a machine that silently falls off the
 // schedule at the moment it was last serviced.
-func (s *ServicePlanService) CompleteDue(ctx context.Context, tx pgx.Tx, id uuid.UUID, p CompleteDueParams, actor Actor) (*domain.MaintenanceDue, error) {
+func (s *ServicePlanService) CompleteDue(ctx context.Context, tx pgx.Tx, id uuid.UUID, p CompleteDueParams, now time.Time, actor Actor) (*domain.MaintenanceDue, error) {
 	if p.CompletedOn.IsZero() {
 		return nil, ErrMaintenanceDateRequired
+	}
+	if err := validateMaintenanceDay(p.CompletedOn, now, false); err != nil {
+		return nil, err
 	}
 
 	return s.closeDue(ctx, tx, id, domain.MaintenanceStatusCompleted, p.CompletedOn,
@@ -666,11 +702,43 @@ func (s *ServicePlanService) CompleteDue(ctx context.Context, tx pgx.Tx, id uuid
 
 // SkipDue marks an occurrence deliberately not done and writes the next one on
 // the original cadence — a skipped backflush does not move next month's.
-func (s *ServicePlanService) SkipDue(ctx context.Context, tx pgx.Tx, id uuid.UUID, on time.Time, notes string, actor Actor) (*domain.MaintenanceDue, error) {
+func (s *ServicePlanService) SkipDue(ctx context.Context, tx pgx.Tx, id uuid.UUID, on time.Time, now time.Time, notes string, actor Actor) (*domain.MaintenanceDue, error) {
 	if on.IsZero() {
 		return nil, ErrMaintenanceDateRequired
 	}
+	if err := validateMaintenanceDay(on, now, false); err != nil {
+		return nil, err
+	}
 	return s.closeDue(ctx, tx, id, domain.MaintenanceStatusSkipped, on, strings.TrimSpace(notes), actor)
+}
+
+// maintenanceDayYears bounds a date somebody typed, either side of today.
+//
+// Not a business rule — a guard against a slipped year. The day a completion is
+// logged on anchors the next occurrence, and the day a skip is taken on decides
+// where NextDueAfterSkip lands, so a date a decade out takes the machine off
+// the due list for a decade with nothing on the page saying why.
+const maintenanceDayYears = 10
+
+// validateMaintenanceDay bounds a date and, unless allowFuture, refuses one
+// ahead of today.
+//
+// Here rather than in the handler. The handler had the same checks and guarded
+// the future one with `!skip`, so a hand-crafted POST to the skip route walked
+// straight past it — which is what validation living outside the service buys
+// you: one route remembers and the other does not.
+func validateMaintenanceDay(on, now time.Time, allowFuture bool) error {
+	today := now.UTC().Truncate(24 * time.Hour)
+	day := on.UTC().Truncate(24 * time.Hour)
+
+	if day.Before(today.AddDate(-maintenanceDayYears, 0, 0)) ||
+		day.After(today.AddDate(maintenanceDayYears, 0, 0)) {
+		return ErrMaintenanceDateOutOfRange
+	}
+	if !allowFuture && day.After(today) {
+		return ErrMaintenanceDateInFuture
+	}
+	return nil
 }
 
 // closeDue is the shared body of CompleteDue and SkipDue: close this

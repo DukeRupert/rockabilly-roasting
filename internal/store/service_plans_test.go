@@ -379,3 +379,59 @@ func TestMissingDueAnchorSurvivesReassignment(t *testing.T) {
 	assert.Equal(t, planTestDay(2026, time.June, 1).UTC(), found.Anchor.UTC(),
 		"the June service still counts — the machine was serviced, whatever the paperwork said")
 }
+
+// Deleting a plan task must not orphan a visit somebody has been sent out for.
+//
+// service_maintenance_due.task_id cascades, so the delete takes the occurrence
+// with it — ticket and all. EndAssignment was rewritten to stop exactly this;
+// two write paths reaching the same rows should not hold opposite policies.
+func TestCountBookedForTaskSeesTheTicket(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newPlanFixture(t, tx, 90, 14, true)
+	due := f.due(t, tx, planTestDay(2026, time.April, 1))
+
+	n, err := f.plans.CountBookedForTask(ctx, tx, f.task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, n, "nothing booked yet")
+
+	ticket, err := store.NewServiceTicketStore().Create(ctx, tx, store.CreateServiceTicketParams{
+		Number:     "SVC-DEL-" + uuid.NewString()[:8],
+		CustomerID: f.equipment.CustomerID,
+		Title:      "Booked visit",
+		Severity:   domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+	require.NoError(t, f.plans.AttachTicket(ctx, tx, due.ID, ticket.ID))
+
+	n, err = f.plans.CountBookedForTask(ctx, tx, f.task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n, "and now the delete has something to refuse")
+}
+
+// Same account is not the same machine. A chain is one customer, so the account
+// check alone would let one machine's occurrence attach to another's ticket.
+func TestAttachTicketRefusesAnotherMachinesTicket(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newPlanFixture(t, tx, 90, 14, false)
+	due := f.due(t, tx, planTestDay(2026, time.April, 1))
+
+	// A second machine on the same account.
+	other, err := store.NewEquipmentStore().Create(ctx, tx, equipmentParams(f.equipment.CustomerID))
+	require.NoError(t, err)
+	otherID := other.ID
+
+	ticket, err := store.NewServiceTicketStore().Create(ctx, tx, store.CreateServiceTicketParams{
+		Number:      "SVC-XMACH-" + uuid.NewString()[:8],
+		CustomerID:  f.equipment.CustomerID,
+		EquipmentID: &otherID,
+		Title:       "About the other machine",
+		Severity:    domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+
+	err = f.plans.AttachTicket(ctx, tx, due.ID, ticket.ID)
+	assert.ErrorIs(t, err, pgx.ErrNoRows,
+		"one cafe, two machines — the pairing still has to be right")
+}

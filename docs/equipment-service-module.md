@@ -662,10 +662,13 @@ rate of the day, and that is a fact about the past.
   adds the rate columns as NULL in the same release, so the backfill finds
   nothing. It earns its place only for an instance that ran 082 long enough for
   somebody to set a rate.
-- **Migration 084 drops an index 083 added.** It served no query — every
-  `rate_cents IS NULL` read is an aggregate `FILTER` inside a `SUM`, and the one
-  per-render check tests the complement — so it cost a write on every logged
-  hour and was never read.
+- **Neither 081 nor 083 ships an index nobody reads.** 083 originally added one
+  on `rate_cents`, and 081 one on `service_maintenance_due.ticket_id`. Every
+  read of `rate_cents` is an aggregate `FILTER` inside a `SUM`, the one
+  existence check tests the complement, and nothing looks an occurrence up by
+  its ticket — so both cost a write on every row and were never read. Removed
+  from the migrations themselves rather than dropped by a later one, since
+  neither had run anywhere but a dev box.
 - **NULL means uncosted, not free.** `UncostedMinutes` rides alongside the cost
   on every summary, and each surface says how many hours are unpriced rather
   than letting a total read as complete. `FullyCosted()` is the check.

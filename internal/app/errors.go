@@ -413,8 +413,12 @@ var (
 	// ErrPlanHasNoTasks rejects assigning an empty plan. It would generate no
 	// maintenance at all while looking on the machine's page exactly like one
 	// that does — the worst kind of wrong.
-	ErrPlanHasNoTasks       = errors.New("add at least one task to the plan before assigning it")
-	ErrPlanTaskNotFound     = errors.New("that task is not on this plan")
+	ErrPlanHasNoTasks   = errors.New("add at least one task to the plan before assigning it")
+	ErrPlanTaskNotFound = errors.New("that task is not on this plan")
+	// ErrPlanTaskBooked blocks deleting a job somebody has already been sent
+	// out for. Its occurrences cascade with it, so the delete would leave an
+	// open customer ticket pointing at nothing.
+	ErrPlanTaskBooked       = errors.New("a visit is already booked for this job — close or cancel that ticket first")
 	ErrPlanTaskNameRequired = errors.New("what gets done? name the task")
 	// ErrPlanIntervalInvalid guards the interval. Zero would come due forever;
 	// ten years is past the point where anything would ever surface it again,

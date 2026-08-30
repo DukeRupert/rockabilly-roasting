@@ -78,7 +78,7 @@ func TestAssignPlanGeneratesTheSchedule(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    anchor,
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	machineID := machine.ID
@@ -110,7 +110,7 @@ func TestAssignEmptyPlanIsRefused(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2026, time.June, 1),
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 
 	assert.ErrorIs(t, err, app.ErrPlanHasNoTasks)
 }
@@ -128,12 +128,12 @@ func TestAssignPlanTwiceIsRefused(t *testing.T) {
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2026, time.June, 1),
 	}
-	_, err := svc.AssignPlan(ctx, tx, params, testutil.TestActor())
+	_, err := svc.AssignPlan(ctx, tx, params, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	// The unique violation aborts the transaction, so this assertion has to be
 	// the last thing the test does with it.
-	_, err = svc.AssignPlan(ctx, tx, params, testutil.TestActor())
+	_, err = svc.AssignPlan(ctx, tx, params, testDay(), testutil.TestActor())
 	assert.ErrorIs(t, err, app.ErrPlanAlreadyAssigned,
 		"the same plan twice would double every due item on the machine")
 }
@@ -152,7 +152,7 @@ func TestCompleteDueWritesTheNextOne(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2026, time.March, 1),
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	machineID := machine.ID
@@ -170,7 +170,7 @@ func TestCompleteDueWritesTheNextOne(t *testing.T) {
 
 	// Done a fortnight late, and written up later still.
 	doneOn := planDay(2026, time.June, 13)
-	_, err = svc.CompleteDue(ctx, tx, first[0].ID, app.CompleteDueParams{CompletedOn: doneOn}, staffActorFor(t, tx))
+	_, err = svc.CompleteDue(ctx, tx, first[0].ID, app.CompleteDueParams{CompletedOn: doneOn}, testDay(), staffActorFor(t, tx))
 	require.NoError(t, err)
 
 	next := pending()
@@ -201,7 +201,7 @@ func TestSkipDueKeepsTheCadence(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2026, time.August, 1),
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	machineID := machine.ID
@@ -210,7 +210,7 @@ func TestSkipDueKeepsTheCadence(t *testing.T) {
 	require.Len(t, rows, 1)
 	require.Equal(t, planDay(2026, time.August, 31).UTC(), rows[0].DueOn.UTC())
 
-	_, err = svc.SkipDue(ctx, tx, rows[0].ID, planDay(2026, time.September, 5), "cafe was shut", staffActorFor(t, tx))
+	_, err = svc.SkipDue(ctx, tx, rows[0].ID, planDay(2026, time.September, 5), planDay(2026, time.September, 5), "cafe was shut", staffActorFor(t, tx))
 	require.NoError(t, err)
 
 	rows, err = svc.ListDue(ctx, tx, store.MaintenanceFilter{EquipmentID: &machineID, Now: planDay(2026, time.September, 5)})
@@ -233,7 +233,7 @@ func TestCompleteDueTwiceIsRefused(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2026, time.March, 1),
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	machineID := machine.ID
@@ -243,10 +243,10 @@ func TestCompleteDueTwiceIsRefused(t *testing.T) {
 
 	done := app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}
 	actor := staffActorFor(t, tx)
-	_, err = svc.CompleteDue(ctx, tx, rows[0].ID, done, actor)
+	_, err = svc.CompleteDue(ctx, tx, rows[0].ID, done, testDay(), actor)
 	require.NoError(t, err)
 
-	_, err = svc.CompleteDue(ctx, tx, rows[0].ID, done, actor)
+	_, err = svc.CompleteDue(ctx, tx, rows[0].ID, done, testDay(), actor)
 	assert.ErrorIs(t, err, app.ErrMaintenanceAlreadyClosed)
 
 	still, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{EquipmentID: &machineID, Now: planDay(2026, time.June, 1)})
@@ -268,7 +268,7 @@ func TestEditTaskIntervalReschedulesLiveMachines(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2026, time.June, 1),
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	_, err = svc.EditTask(ctx, tx, task.ID, app.EditPlanTaskParams{
@@ -299,7 +299,7 @@ func TestEndAssignmentClearsPendingKeepsHistory(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2026, time.March, 1),
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	machineID := machine.ID
@@ -307,7 +307,7 @@ func TestEndAssignmentClearsPendingKeepsHistory(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 
-	_, err = svc.CompleteDue(ctx, tx, rows[0].ID, app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, staffActorFor(t, tx))
+	_, err = svc.CompleteDue(ctx, tx, rows[0].ID, app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, testDay(), staffActorFor(t, tx))
 	require.NoError(t, err)
 
 	require.NoError(t, svc.EndAssignment(ctx, tx, machine.ID, assignment.ID, time.Now(), testutil.TestActor()))
@@ -339,7 +339,7 @@ func TestCompleteAfterEndDoesNotResurrect(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2026, time.March, 1),
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	machineID := machine.ID
@@ -352,7 +352,7 @@ func TestCompleteAfterEndDoesNotResurrect(t *testing.T) {
 	// id somebody still had on a stale page.
 	require.NoError(t, svc.EndAssignment(ctx, tx, machine.ID, assignment.ID, time.Now(), testutil.TestActor()))
 
-	_, err = svc.CompleteDue(ctx, tx, dueID, app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, staffActorFor(t, tx))
+	_, err = svc.CompleteDue(ctx, tx, dueID, app.CompleteDueParams{CompletedOn: planDay(2026, time.June, 1)}, testDay(), staffActorFor(t, tx))
 	assert.ErrorIs(t, err, app.ErrMaintenanceNotFound)
 }
 
@@ -403,7 +403,7 @@ func TestAssignPlanToRetiredMachineIsRefused(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2026, time.June, 1),
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 
 	assert.ErrorIs(t, err, app.ErrEquipmentRetired)
 }
@@ -431,7 +431,7 @@ func TestEditTaskIntervalNeverBooksASkippedVisit(t *testing.T) {
 		PlanID:        plan.ID,
 		StartsOn:      planDay(2025, time.October, 3),
 		UnderContract: true,
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	machineID := machine.ID
@@ -448,12 +448,12 @@ func TestEditTaskIntervalNeverBooksASkippedVisit(t *testing.T) {
 	first := pending(today)
 	_, err = svc.CompleteDue(ctx, tx, first.ID, app.CompleteDueParams{
 		CompletedOn: planDay(2026, time.January, 1),
-	}, staffActorFor(t, tx))
+	}, testDay(), staffActorFor(t, tx))
 	require.NoError(t, err)
 
 	second := pending(today)
 	require.Equal(t, planDay(2026, time.April, 1).UTC(), second.DueOn.UTC())
-	_, err = svc.SkipDue(ctx, tx, second.ID, planDay(2026, time.April, 2), "customer declined", staffActorFor(t, tx))
+	_, err = svc.SkipDue(ctx, tx, second.ID, planDay(2026, time.April, 2), today, "customer declined", staffActorFor(t, tx))
 	require.NoError(t, err)
 
 	afterSkip := pending(today)
@@ -497,7 +497,7 @@ func TestEditTaskIntervalKeepsOverdueWorkOverdue(t *testing.T) {
 		EquipmentID: machine.ID,
 		PlanID:      plan.ID,
 		StartsOn:    planDay(2025, time.January, 1),
-	}, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	today := planDay(2026, time.September, 1)
@@ -511,7 +511,7 @@ func TestEditTaskIntervalKeepsOverdueWorkOverdue(t *testing.T) {
 		Name:         "Overdue regression",
 		IntervalDays: 100,
 		LeadDays:     14,
-	}, today, testutil.TestActor())
+	}, testDay(), testutil.TestActor())
 	require.NoError(t, err)
 
 	rows, err = svc.ListDue(ctx, tx, store.MaintenanceFilter{EquipmentID: &machineID, Now: today})
@@ -519,4 +519,59 @@ func TestEditTaskIntervalKeepsOverdueWorkOverdue(t *testing.T) {
 	assert.Equal(t, planDay(2025, time.April, 1).UTC(), rows[0].DueOn.UTC(),
 		"left exactly where it was — the work is owed today, and a longer interval must not clear it")
 	assert.True(t, rows[0].DueOn.Before(today), "still on the overdue list")
+}
+
+// testDay is a fixed "today" for the service calls that now take one. Dates in
+// these tests are chosen relative to it.
+func testDay() time.Time { return planDay(2026, time.September, 1) }
+
+// The bounds live in the service, so both routes get them.
+//
+// They used to live in the handler, where the future-date check was guarded by
+// `!skip` — so a hand-crafted POST to the skip route walked straight past it and
+// NextDueAfterSkip took the machine off the due list for a decade. That is what
+// validation outside the service buys: one route remembers and the other does
+// not.
+func TestBothCloseRoutesBoundTheirDates(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newServicePlanService()
+	customer := testutil.CreateCustomer(t, tx)
+	machine := registerMachine(t, tx, customer.ID)
+	plan, _ := planWithTask(t, tx, svc, "Bounds", 90)
+
+	_, err := svc.AssignPlan(ctx, tx, app.AssignServicePlanParams{
+		EquipmentID: machine.ID, PlanID: plan.ID, StartsOn: planDay(2026, time.March, 1),
+	}, testDay(), testutil.TestActor())
+	require.NoError(t, err)
+
+	machineID := machine.ID
+	rows, err := svc.ListDue(ctx, tx, store.MaintenanceFilter{EquipmentID: &machineID, Now: testDay()})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	id := rows[0].ID
+	now := testDay()
+
+	t.Run("completing in the future", func(t *testing.T) {
+		_, err := svc.CompleteDue(ctx, tx, id, app.CompleteDueParams{
+			CompletedOn: now.AddDate(0, 0, 1),
+		}, now, staffActorFor(t, tx))
+		assert.ErrorIs(t, err, app.ErrMaintenanceDateInFuture)
+	})
+
+	t.Run("skipping in the future", func(t *testing.T) {
+		_, err := svc.SkipDue(ctx, tx, id, now.AddDate(0, 0, 1), now, "", staffActorFor(t, tx))
+		assert.ErrorIs(t, err, app.ErrMaintenanceDateInFuture,
+			"the route with no date field on its form is the one somebody would post by hand")
+	})
+
+	t.Run("a slipped year, either route", func(t *testing.T) {
+		_, err := svc.CompleteDue(ctx, tx, id, app.CompleteDueParams{
+			CompletedOn: now.AddDate(-11, 0, 0),
+		}, now, staffActorFor(t, tx))
+		assert.ErrorIs(t, err, app.ErrMaintenanceDateOutOfRange)
+
+		_, err = svc.SkipDue(ctx, tx, id, now.AddDate(-11, 0, 0), now, "", staffActorFor(t, tx))
+		assert.ErrorIs(t, err, app.ErrMaintenanceDateOutOfRange)
+	})
 }

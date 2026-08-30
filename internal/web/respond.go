@@ -158,6 +158,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrPlanInactive),
 		errors.Is(err, app.ErrPlanHasNoTasks),
 		errors.Is(err, app.ErrPlanTaskNameRequired),
+		errors.Is(err, app.ErrPlanTaskBooked),
 		errors.Is(err, app.ErrPlanIntervalInvalid),
 		errors.Is(err, app.ErrPlanLeadInvalid),
 		errors.Is(err, app.ErrPlanStartRequired),

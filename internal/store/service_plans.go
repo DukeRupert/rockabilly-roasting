@@ -296,6 +296,19 @@ func (s *ServicePlanStore) UpdateTask(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return scanServicePlanTask(row)
 }
 
+// CountBookedForTask is how many of a task's pending occurrences already carry
+// a ticket. Deleting the task would cascade those away and orphan the tickets.
+func (s *ServicePlanStore) CountBookedForTask(ctx context.Context, tx pgx.Tx, taskID uuid.UUID) (int, error) {
+	var n int
+	if err := tx.QueryRow(ctx,
+		`SELECT count(*) FROM service_maintenance_due
+		  WHERE task_id = $1 AND status = 'pending' AND ticket_id IS NOT NULL`,
+		taskID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count booked for task: %w", err)
+	}
+	return n, nil
+}
+
 // DeleteTask removes a task from a plan. The occurrences cascade with it: an
 // item that is no longer part of the schedule should not still be due, and the
 // completed ones described work under a task that no longer exists.
@@ -606,7 +619,14 @@ func (s *ServicePlanStore) AttachTicket(ctx context.Context, tx pgx.Tx, id, tick
 		   AND d.ticket_id IS NULL
 		   AND e.id = d.equipment_id
 		   AND t.id = $2
-		   AND t.customer_id = e.customer_id`, id, ticketID)
+		   AND t.customer_id = e.customer_id
+		   -- And the same machine, where the ticket names one. A chain with
+		   -- three cafes is one customer, so the account check alone would let
+		   -- an occurrence for the Linea PB attach to a ticket about the
+		   -- grinder — no leak, but the due list then stops nagging about the
+		   -- wrong machine. A ticket with no machine on it is a general
+		   -- call-out and may cover any of them.
+		   AND (t.equipment_id IS NULL OR t.equipment_id = d.equipment_id)`, id, ticketID)
 	if err != nil {
 		return fmt.Errorf("attach maintenance ticket: %w", err)
 	}

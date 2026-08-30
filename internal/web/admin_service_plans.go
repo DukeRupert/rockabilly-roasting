@@ -207,28 +207,19 @@ func (d *Deps) closeMaintenance(w http.ResponseWriter, r *http.Request, skip boo
 		redirectFlashError(w, r, back, app.ErrMaintenanceDateRequired.Error())
 		return
 	}
-	if err := checkMaintenanceDay(on, d.merchantToday()); err != nil {
-		redirectFlashError(w, r, back, err.Error())
-		return
-	}
-	// And a completion cannot be in the future. "Done on" is a record of
-	// something that happened; a date ahead of today anchors the next
-	// occurrence from a day nobody worked.
-	if !skip && on.After(d.merchantToday()) {
-		redirectFlashError(w, r, back, app.ErrMaintenanceDateInFuture.Error())
-		return
-	}
+	// The bounds live in the service now — CompleteDue and SkipDue both apply
+	// them, which is what stops one route remembering and the other forgetting.
 
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		if skip {
-			_, txErr = d.ServicePlanService.SkipDue(ctx, tx, id, on, r.FormValue("notes"), staffActor(r))
+			_, txErr = d.ServicePlanService.SkipDue(ctx, tx, id, on, d.merchantToday(), r.FormValue("notes"), staffActor(r))
 			return txErr
 		}
 		_, txErr = d.ServicePlanService.CompleteDue(ctx, tx, id, app.CompleteDueParams{
 			CompletedOn: on,
 			Notes:       r.FormValue("notes"),
-		}, staffActor(r))
+		}, d.merchantToday(), staffActor(r))
 		return txErr
 	}); err != nil {
 		// The double submit is the common failure and it is not really one:
@@ -268,26 +259,6 @@ func parseMaintenanceDay(raw string, fallback time.Time) (time.Time, error) {
 		return fallback, nil
 	}
 	return time.Parse("2006-01-02", raw)
-}
-
-// maintenanceDayWindow bounds a date somebody typed.
-//
-// The field is a plain <input type="date">, and a slipped year is silent and
-// expensive: the day a completion is logged on anchors the next occurrence, so
-// "2036-08-25" takes the machine off the due list for a decade and nothing on
-// the page says why. Ten years either side leaves room for genuinely old
-// records without leaving room for a typo.
-func maintenanceDayWindow(today time.Time) (earliest, latest time.Time) {
-	return today.AddDate(-10, 0, 0), today.AddDate(10, 0, 0)
-}
-
-// checkMaintenanceDay rejects a date outside that window.
-func checkMaintenanceDay(on, today time.Time) error {
-	earliest, latest := maintenanceDayWindow(today)
-	if on.Before(earliest) || on.After(latest) {
-		return app.ErrMaintenanceDateOutOfRange
-	}
-	return nil
 }
 
 // --- The calendar ---
@@ -794,22 +765,11 @@ func (d *Deps) handleAdminEquipmentPlanAssign(w http.ResponseWriter, r *http.Req
 		redirectFlashError(w, r, back, app.ErrPlanStartRequired.Error())
 		return
 	}
-	if err := checkMaintenanceDay(startsOn, d.merchantToday()); err != nil {
-		redirectFlashError(w, r, back, err.Error())
-		return
-	}
 	var contractEnds *time.Time
 	if raw := strings.TrimSpace(r.FormValue("contract_ends_on")); raw != "" {
 		end, parseErr := time.Parse("2006-01-02", raw)
 		if parseErr != nil {
 			redirectFlashError(w, r, back, "That contract end date is not a date.")
-			return
-		}
-		// Bounded like the others. A slipped year here decides whether covered
-		// work books itself for the next decade, which is a quieter mistake
-		// than a wrong anchor and a more expensive one.
-		if err := checkMaintenanceDay(end, d.merchantToday()); err != nil {
-			redirectFlashError(w, r, back, err.Error())
 			return
 		}
 		contractEnds = &end
@@ -823,7 +783,7 @@ func (d *Deps) handleAdminEquipmentPlanAssign(w http.ResponseWriter, r *http.Req
 			UnderContract:  r.FormValue("under_contract") == "1",
 			ContractEndsOn: contractEnds,
 			Notes:          r.FormValue("notes"),
-		}, staffActor(r))
+		}, d.merchantToday(), staffActor(r))
 		return txErr
 	}); err != nil {
 		d.redirectOrFail(w, r, back, err)
@@ -1118,22 +1078,11 @@ func (d *Deps) handleAdminEquipmentPlanUpdate(w http.ResponseWriter, r *http.Req
 		redirectFlashError(w, r, back, app.ErrPlanStartRequired.Error())
 		return
 	}
-	if err := checkMaintenanceDay(startsOn, d.merchantToday()); err != nil {
-		redirectFlashError(w, r, back, err.Error())
-		return
-	}
 	var contractEnds *time.Time
 	if raw := strings.TrimSpace(r.FormValue("contract_ends_on")); raw != "" {
 		end, parseErr := time.Parse("2006-01-02", raw)
 		if parseErr != nil {
 			redirectFlashError(w, r, back, "That contract end date is not a date.")
-			return
-		}
-		// Bounded like the others. A slipped year here decides whether covered
-		// work books itself for the next decade, which is a quieter mistake
-		// than a wrong anchor and a more expensive one.
-		if err := checkMaintenanceDay(end, d.merchantToday()); err != nil {
-			redirectFlashError(w, r, back, err.Error())
 			return
 		}
 		contractEnds = &end
@@ -1153,7 +1102,7 @@ func (d *Deps) handleAdminEquipmentPlanUpdate(w http.ResponseWriter, r *http.Req
 			UnderContract:  r.FormValue("under_contract") == "1",
 			ContractEndsOn: contractEnds,
 			Notes:          r.FormValue("notes"),
-		}, staffActor(r))
+		}, d.merchantToday(), staffActor(r))
 		return txErr
 	}); err != nil {
 		d.redirectOrFail(w, r, back, err)

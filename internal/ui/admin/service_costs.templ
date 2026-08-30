@@ -107,7 +107,9 @@ func serviceCostsPeriodLabel(days int) string {
 }
 
 // serviceToggleClass stamps the selected option in the period and rank
-// controls. Same treatment as the dashboard's period toggles: filled ink for
+// controls. Paired with aria-current at the call sites: the fill is the only
+// visual difference, and a control whose state is carried by colour alone is
+// one a screen reader cannot report — the same rule the calendar chips follow. Same treatment as the dashboard's period toggles: filled ink for
 // what is applied, outlined for what is not.
 func serviceToggleClass(selected bool) string {
 	base := "rounded-sm px-2 py-1 text-xs font-semibold uppercase tracking-wide"
@@ -142,6 +144,7 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 			for _, p := range servicePeriods() {
 				<a
 					href={ templ.SafeURL(serviceCostsHref(p.Days, string(props.Report.Sort))) }
+					aria-current={ ariaCurrent(p.Days == props.Days) }
 					class={ serviceToggleClass(p.Days == props.Days) }
 				>{ p.Label }</a>
 			}
@@ -151,6 +154,7 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 			for _, s := range serviceSorts(props.Report.ShowCost()) {
 				<a
 					href={ templ.SafeURL(serviceCostsHref(props.Days, s.Value)) }
+					aria-current={ ariaCurrent(s.Value == string(props.Report.Sort)) }
 					class={ serviceToggleClass(s.Value == string(props.Report.Sort)) }
 				>{ s.Label }</a>
 			}
@@ -263,7 +267,12 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 	}
 	if props.Report.Rates.Set() {
 		<p class="mt-3 text-xs text-rr-muted">
-			Each hour is costed at the rate it was booked at, so changing the rate never re-prices past work. New hours go on at { formatCents(props.Report.Rates.LaborRate()) }, travel at { formatCents(props.Report.Rates.TravelRate()) } — change them in <a href="/admin/settings/service" class="underline">Settings &rarr; Service</a>.
+			Each hour is costed at the rate it was booked at, so changing the rate never re-prices past work. New hours go on at { formatCents(props.Report.Rates.LaborRate()) }, travel at { formatCents(props.Report.Rates.TravelRate()) }
+			if props.CanManageSettings {
+				— change them in <a href="/admin/settings/service" class="underline">Settings &rarr; Service</a>.
+			} else {
+				— an admin can change them in Settings.
+			}
 		</p>
 	} else {
 		<p class="mt-3 text-xs text-rr-muted">

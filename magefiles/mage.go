@@ -187,22 +187,10 @@ func CheckAdminUI() error {
 		if err != nil {
 			return err
 		}
-		inStyle := false
-		for lineNum, line := range strings.Split(string(data), "\n") {
-			// The admin shell carries an inline stylesheet that *redefines*
-			// these tokens — it names `font-oswald` in order to redirect it.
-			// Inside a <style> block a banned name is a definition, not a class
-			// somebody reached for, and flagging it would make the shell
-			// unlintable for the usages that do matter.
-			if strings.Contains(line, "<style") {
-				inStyle = true
-			}
-			if inStyle {
-				if strings.Contains(line, "</style>") {
-					inStyle = false
-				}
-				continue
-			}
+		// <style> blocks are blanked, not scanned: the admin shell names these
+		// tokens in order to override them, which is a definition rather than a
+		// class somebody reached for.
+		for lineNum, line := range strings.Split(blankStyleBlocks(string(data)), "\n") {
 			matches := re.FindAllStringSubmatch(line, -1)
 			for _, m := range matches {
 				violations = append(violations, fmt.Sprintf(
@@ -233,6 +221,30 @@ func CheckAdminUI() error {
 		return fmt.Errorf("%d admin UI lint violation(s) — see docs/admin-ui.md", len(violations))
 	}
 	return nil
+}
+
+// blankStyleBlocks replaces the contents of <style> blocks with empty lines.
+//
+// Inside one, a token name is a definition rather than a class somebody reached
+// for — the admin shell names the tokens in order to override them. Blanking
+// rather than skipping keeps the line numbering honest, and unlike a running
+// in-a-style-block flag it cannot swallow the rest of a file that mentions
+// "<style" without ever closing it.
+func blankStyleBlocks(src string) string {
+	lines := strings.Split(src, "\n")
+	depth := 0
+	for i, line := range lines {
+		opens := strings.Count(line, "<style")
+		closes := strings.Count(line, "</style>")
+		if depth > 0 || opens > 0 {
+			lines[i] = ""
+		}
+		depth += opens - closes
+		if depth < 0 {
+			depth = 0
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // emitsCSS reports whether Tailwind produced a rule for a utility.
@@ -307,20 +319,8 @@ func deadTokenClasses(excluded map[string]bool) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		inStyle := false
-		for lineNum, line := range strings.Split(string(data), "\n") {
-			// Same rule as the blocklist half: inside a <style> block a token
-			// name is a definition, not a class somebody reached for. Without
-			// this the shell's own override stylesheet reads as usage.
-			if strings.Contains(line, "<style") {
-				inStyle = true
-			}
-			if inStyle {
-				if strings.Contains(line, "</style>") {
-					inStyle = false
-				}
-				continue
-			}
+		// Same rule as the blocklist half.
+		for lineNum, line := range strings.Split(blankStyleBlocks(string(data)), "\n") {
 			for _, m := range use.FindAllStringSubmatch(line, -1) {
 				class := strings.TrimRight(m[1], "-")
 				key := path + class

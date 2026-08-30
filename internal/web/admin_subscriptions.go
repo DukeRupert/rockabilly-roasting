@@ -340,6 +340,12 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 			return txErr
 		}
 		plan, txErr = d.SubscriptionService.GetPlan(ctx, tx, sub.PlanID)
+		if errors.Is(txErr, app.ErrSubscriptionPlanNotFound) {
+			// Same as the storefront list: the plan ID comes off the
+			// subscription, so a miss is broken data and wants a 500, not the
+			// 404 that ErrSubscriptionPlanNotFound now maps to.
+			return brokenReference("subscription", sub.ID, "plan", sub.PlanID)
+		}
 		if txErr != nil {
 			return txErr
 		}

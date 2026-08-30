@@ -449,6 +449,7 @@ service_plan.deleted
 service_plan.task_added
 service_plan.task_updated
 service_plan.task_removed
+service_plan.task_retired
 
 equipment.plan_assigned
 equipment.plan_assignment_updated
@@ -508,7 +509,7 @@ What is per-machine is the *anchor date* and *whether the customer pays*.
 | Table | What it holds |
 |---|---|
 | `service_plans` | A named series — "Linea PB — warranty schedule". Case-insensitively unique name; `active` retires one from the picker without disturbing machines on it. |
-| `service_plan_tasks` | One job in the series: `interval_days`, `lead_days` (how far ahead it starts asking), `warranty_required`. |
+| `service_plan_tasks` | One job in the series: `interval_days`, `lead_days` (how far ahead it starts asking), `warranty_required`. `retired_at` stops it generating work without deleting its history. |
 | `equipment_service_plans` | A plan on a machine from `starts_on`, with `under_contract` / `contract_ends_on`. `ended_at` stops it generating work. |
 | `service_maintenance_due` | One dated occurrence. Exactly one `pending` row per (assignment, task), enforced by a partial unique index. |
 
@@ -534,6 +535,15 @@ original cadence, and a pure function of the anchor could express neither.
   skipping a badly overdue item still clears the row.
 - **The first occurrence is never pushed forward.** Assigning a plan with an
   anchor two years back is how a shop *discovers* a machine is overdue.
+- **A task leaves a plan two ways, and the system picks.** `service_maintenance_due.task_id`
+  cascades on delete, so deleting a task that has been used would
+  take its completed visits with it. `RemoveTask` counts the task's history:
+  none, and it is deleted outright; any, and `retired_at` is set instead — no new
+  occurrences, every past one untouched, and any visit already booked goes ahead.
+  Either way the pending unbooked occurrences go, because nobody is attending
+  those now. Retired tasks stay visible on the plan page behind a count, since a
+  job that silently vanished is what staff would file a bug about. A plan whose
+  whole series is retired cannot be assigned — same rule as an empty one.
 - **The contract decides what "due" does.** Covered work inside its lead window
   opens itself a `routine` ticket overnight — 03:00 merchant time, on a
   wall-clock schedule (`jobs.DailySchedule`) so "overnight" does not drift to

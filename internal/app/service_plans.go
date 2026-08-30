@@ -202,14 +202,29 @@ func (s *ServicePlanService) GetPlan(ctx context.Context, tx pgx.Tx, id uuid.UUI
 	return plan, nil
 }
 
-// GetPlanWithTasks returns a plan and its series — what the plan page renders
-// and what the assignment path needs to generate the first occurrences.
+// GetPlanWithTasks returns a plan and its whole series, retired items included.
+// What the plan page renders: a retired task is still part of why a machine's
+// record reads the way it does.
 func (s *ServicePlanService) GetPlanWithTasks(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.ServicePlan, error) {
+	return s.planWithTasks(ctx, tx, id, s.plans.ListTasks)
+}
+
+// GetPlanWithLiveTasks returns a plan and only the tasks still generating work
+// — what the assignment path needs, since a retired task must not put a new
+// occurrence on a machine that never had it.
+func (s *ServicePlanService) GetPlanWithLiveTasks(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.ServicePlan, error) {
+	return s.planWithTasks(ctx, tx, id, s.plans.ListLiveTasks)
+}
+
+func (s *ServicePlanService) planWithTasks(
+	ctx context.Context, tx pgx.Tx, id uuid.UUID,
+	list func(context.Context, pgx.Tx, uuid.UUID) ([]domain.ServicePlanTask, error),
+) (*domain.ServicePlan, error) {
 	plan, err := s.GetPlan(ctx, tx, id)
 	if err != nil {
 		return nil, err
 	}
-	tasks, err := s.plans.ListTasks(ctx, tx, id)
+	tasks, err := list(ctx, tx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -412,7 +427,7 @@ func (s *ServicePlanService) rescheduleTask(ctx context.Context, tx pgx.Tx, task
 // Refused while any of those occurrences carries a ticket. The cascade would
 // take an open customer visit, or the record of one that happened, with it and
 // leave the ticket pointing at nothing.
-func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, planID, id uuid.UUID, actor Actor) error {
+func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, planID, id uuid.UUID, now time.Time, actor Actor) error {
 	task, err := s.plans.GetTask(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -427,25 +442,45 @@ func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, planID, 
 		return ErrPlanTaskNotFound
 	}
 
-	// service_maintenance_due.task_id cascades, so deleting the task would take
-	// every occurrence of it with it — the pending ones, which is the intent,
-	// but also everything that already happened, which is not.
+	// Two ways off a plan, and the system picks — asking staff to classify a
+	// task's history before clicking is work it can do itself.
 	//
-	// EndAssignment keeps all completed history and every booked row; two write
-	// paths reaching the same rows must not hold opposite policies. This guard
-	// used to count only the ticketed occurrences, which honoured that for
-	// contract accounts and broke it for everyone else: uncovered maintenance
-	// is sold on the phone and ticked off by hand, so its history is completed
-	// rows with no ticket — exactly the kind that fell through.
+	// service_maintenance_due.task_id cascades, so deleting a task takes every
+	// occurrence of it: the pending ones, which is the intent, but also
+	// everything that already happened, which is not. Where there is history,
+	// the row is retired instead — no new occurrences, every past one left
+	// exactly where it is. EndAssignment keeps completed history and every
+	// booked row, and two write paths reaching the same rows must not hold
+	// opposite policies.
 	//
-	// There is nowhere to put a surviving occurrence (task_id is NOT NULL), so
-	// the delete is refused rather than made lossy.
+	// Either way the pending unbooked occurrences go: nobody is going to those
+	// visits now. A booked one is left alone — somebody is going to that visit,
+	// or already did.
 	history, err := s.plans.CountTaskHistory(ctx, tx, id)
 	if err != nil {
 		return err
 	}
+	if _, err := s.plans.DeletePendingUnbookedDue(ctx, tx, id); err != nil {
+		return err
+	}
+
 	if history > 0 {
-		return ErrPlanTaskHasHistory
+		if _, err := s.plans.RetireTask(ctx, tx, id, now); err != nil {
+			return err
+		}
+		return s.audit.Record(ctx, tx, audit.AuditEntry{
+			ActorType:    actor.Type,
+			ActorID:      actor.ID,
+			ActorName:    actor.Name,
+			Action:       audit.AuditServicePlanTaskRetired,
+			ResourceType: "service_plan",
+			ResourceID:   task.PlanID,
+			Metadata: map[string]any{
+				"task":        task.Name,
+				"task_id":     task.ID.String(),
+				"occurrences": history,
+			},
+		})
 	}
 
 	if err := s.plans.DeleteTask(ctx, tx, id); err != nil {
@@ -527,15 +562,17 @@ func (s *ServicePlanService) AssignPlan(ctx context.Context, tx pgx.Tx, p Assign
 		return nil, ErrEquipmentRetired
 	}
 
-	plan, err := s.GetPlanWithTasks(ctx, tx, p.PlanID)
+	plan, err := s.GetPlanWithLiveTasks(ctx, tx, p.PlanID)
 	if err != nil {
 		return nil, err
 	}
 	if !plan.Active {
 		return nil, ErrPlanInactive
 	}
-	// A plan with no tasks generates nothing. Silently assigning it would leave
-	// staff believing a machine was covered when it was not.
+	// A plan with no live tasks generates nothing. Silently assigning it would
+	// leave staff believing a machine was covered when it was not — and a plan
+	// whose whole series has been retired looks exactly as covered from the
+	// machine page as one that never had a task at all.
 	if len(plan.Tasks) == 0 {
 		return nil, ErrPlanHasNoTasks
 	}

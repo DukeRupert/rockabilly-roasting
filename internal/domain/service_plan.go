@@ -61,9 +61,19 @@ type ServicePlanTask struct {
 	// loudest row on the due list.
 	WarrantyRequired bool
 	SortOrder        int
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	// RetiredAt is when the task stopped generating work, or nil while it is
+	// live. A task that has been used on a machine cannot be deleted — that
+	// would cascade away the visits it records — so this is how it comes off a
+	// plan: no new occurrences, every past one untouched.
+	RetiredAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
+
+// Retired reports whether this task has been taken off its plan. Retired tasks
+// generate no new occurrences and are not offered when a plan is assigned; the
+// occurrences they already produced stay on their machines' records.
+func (t ServicePlanTask) Retired() bool { return t.RetiredAt != nil }
 
 // IntervalLabel is the interval in the words a person would use — "every 30
 // days" reads worse than "every month" for the common values, and worse than

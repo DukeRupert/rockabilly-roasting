@@ -2,6 +2,7 @@ package web
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -106,6 +107,12 @@ func (d *Deps) handleWholesaleAccountOrderShow(w http.ResponseWriter, r *http.Re
 		}
 		// scoping: address ID is drawn from the already-ownership-checked order.
 		shippingAddr, txErr = d.CustomerService.GetAddressByIDAsStaff(ctx, tx, order.ShippingAddressID)
+		if errors.Is(txErr, app.ErrAddressNotFound) {
+			// Every order carries a shipping address row, so a miss here is
+			// broken data rather than a bad request. ErrAddressNotFound maps to
+			// 404, which would quietly hide that; keep it a 500 so it pages.
+			return fmt.Errorf("order %s references missing address %s", id, order.ShippingAddressID)
+		}
 		if txErr != nil {
 			return txErr
 		}

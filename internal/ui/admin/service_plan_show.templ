@@ -41,7 +41,8 @@ type ServicePlanShowProps struct {
 	// TaskHistory is how many recorded occurrences each task has — done,
 	// skipped, or with a visit booked. It decides which of the two outcomes the
 	// remove dialog describes: none and the task is deleted, any and it is
-	// retired with its record intact.
+	// retired with its record intact. Tasks with none are absent from the map,
+	// so reading it for a missing key gives the right answer.
 	TaskHistory map[uuid.UUID]int
 	// Values and Error echo back a rejected task form.
 	Values    PlanTaskFormValues

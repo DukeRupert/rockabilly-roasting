@@ -3,7 +3,10 @@ package web
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+
+	"github.com/google/uuid"
 
 	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/platform/logging"
@@ -65,6 +68,20 @@ func Error(w http.ResponseWriter, r *http.Request, err error) {
 func expectedFailure(err error) bool {
 	status, _ := mapError(err)
 	return status < http.StatusInternalServerError && status != http.StatusNotFound
+}
+
+// brokenReference reports a stored ID that no longer resolves — an order whose
+// shipping address row is gone, a subscription whose plan is gone.
+//
+// The sentinel those lookups return maps to 404, which is right when the ID
+// came off a URL and wrong here: nobody asked for this address, it is simply
+// missing, and a 404 would hide broken data and silence the alert. So the
+// sentinel is deliberately NOT wrapped with %w. That is the whole point of
+// this function, and the reason it exists rather than being four fmt.Errorf
+// calls: errors.Is must not reach the sentinel, or mapError will 404 a fault
+// that ought to page.
+func brokenReference(ownerKind string, ownerID uuid.UUID, targetKind string, targetID uuid.UUID) error {
+	return fmt.Errorf("%s %s references missing %s %s", ownerKind, ownerID, targetKind, targetID)
 }
 
 // mapError converts sentinel errors to HTTP status codes and messages.
@@ -247,6 +264,14 @@ func mapError(err error) (int, string) {
 	// sentence because the difference between them is what the operator does
 	// next — buy no second label, use the QuickBooks flow, leave the stop alone.
 	case errors.Is(err, app.ErrInvalidOrderStatus):
+		// Each producer wraps this with the phrase naming the actual blocker
+		// ("order is not ready for pickup: %w"), and that prefix is the only
+		// place the information exists — the sentinel alone says nothing an
+		// operator can act on. The batch-result UI already pulls it out; there
+		// was no reason for the single-order path to be vaguer than the batch.
+		if reason := app.InvalidStatusReason(err); reason != "" {
+			return http.StatusConflict, reason
+		}
 		return http.StatusConflict, "this order is not in a state where that step can be taken — reload the page to see where it stands"
 	case errors.Is(err, app.ErrOrderHasActiveLabel),
 		errors.Is(err, app.ErrOrderQBManaged),

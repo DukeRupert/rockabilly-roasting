@@ -3,7 +3,6 @@ package web
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -257,7 +256,7 @@ func (d *Deps) handleAccountOrderShow(w http.ResponseWriter, r *http.Request) {
 			// Every order carries a shipping address row, so a miss here is
 			// broken data rather than a bad request. ErrAddressNotFound maps to
 			// 404, which would quietly hide that; keep it a 500 so it pages.
-			return fmt.Errorf("order %s references missing address %s", id, order.ShippingAddressID)
+			return brokenReference("order", id, "address", order.ShippingAddressID)
 		}
 		if txErr != nil {
 			return txErr
@@ -316,7 +315,7 @@ func (d *Deps) handleAccountSubscriptions(w http.ResponseWriter, r *http.Request
 					// The plan ID comes off a live subscription, so a miss is
 					// broken data, not a bad URL. Do not let the 404 mapping
 					// swallow it.
-					return fmt.Errorf("subscription %s references missing plan %s", sub.ID, sub.PlanID)
+					return brokenReference("subscription", sub.ID, "plan", sub.PlanID)
 				}
 				if pErr != nil {
 					return pErr

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -246,12 +248,52 @@ func TestPreviouslyUnmappedSentinels(t *testing.T) {
 	}
 }
 
-// A missing address or plan reached through an ID stored on an order or
-// subscription is broken data, not a bad request. The 404 mappings above must
-// not quietly absorb it — the handlers wrap those misses so they stay 500s, and
-// this pins the wrapping's one load-bearing property: it breaks errors.Is.
-func TestBrokenReferenceStaysInternal(t *testing.T) {
-	// fmt.Errorf without %w is deliberate at those call sites.
-	status, _ := mapError(fmt.Errorf("order X references missing address Y"))
-	assert.Equal(t, http.StatusInternalServerError, status)
+// ErrInvalidOrderStatus is the one sentinel whose useful sentence lives in the
+// wrap rather than the sentinel. Producers name the blocker there by
+// convention, and both the batch UI and mapError read it back out.
+func TestInvalidOrderStatusKeepsTheProducersPhrase(t *testing.T) {
+	wrapped := fmt.Errorf("order is not ready for pickup: %w", app.ErrInvalidOrderStatus)
+
+	status, msg := mapError(wrapped)
+	assert.Equal(t, http.StatusConflict, status)
+	assert.Equal(t, "order is not ready for pickup", msg,
+		"the prefix is the only place the actual blocker is named")
+
+	// Bare, or wrapped by something that is not a phrase, falls back to copy
+	// that at least tells the operator what to do next.
+	_, bare := mapError(app.ErrInvalidOrderStatus)
+	assert.Contains(t, bare, "reload the page")
+}
+
+// brokenReference exists to defeat errors.Is, and this is the test that says
+// so. A stored ID that no longer resolves is broken data: it has to stay a 500
+// and page, not become the 404 that ErrAddressNotFound and
+// ErrSubscriptionPlanNotFound now map to.
+//
+// Switching brokenReference to %w — the reflex when wrapping an error — would
+// pass a build, a vet and every other test in this package. It would fail here.
+func TestBrokenReferenceDoesNotCarryTheSentinel(t *testing.T) {
+	order, address := uuid.New(), uuid.New()
+
+	err := brokenReference("order", order, "address", address)
+
+	assert.False(t, errors.Is(err, app.ErrAddressNotFound),
+		"brokenReference must not wrap the sentinel with %%w — errors.Is reaching it would turn broken data into a 404")
+
+	status, _ := mapError(err)
+	assert.Equal(t, http.StatusInternalServerError, status,
+		"a dangling reference has to page, not 404")
+
+	// Both IDs belong in the message: without them the Sentry event names no
+	// row to go look at.
+	assert.Contains(t, err.Error(), order.String())
+	assert.Contains(t, err.Error(), address.String())
+}
+
+// The counterpart: the same sentinel, reached the ordinary way, still maps to
+// 404. Together these pin both halves of the split — the URL-supplied ID gets
+// its 404, the stored one does not.
+func TestSentinelStillMapsWhenWrappedNormally(t *testing.T) {
+	status, _ := mapError(fmt.Errorf("load address: %w", app.ErrAddressNotFound))
+	assert.Equal(t, http.StatusNotFound, status)
 }

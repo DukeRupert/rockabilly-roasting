@@ -76,7 +76,11 @@ templ equipmentMaintenanceCard(props EquipmentShowProps) {
 				<h2 class="text-sm font-semibold text-rr-heading">Maintenance</h2>
 				<a href="/admin/service/maintenance" class="text-sm text-rr-muted underline">The whole due list</a>
 			</div>
-			if !props.Maintenance.Any() {
+			if !props.Maintenance.Any() && props.Equipment.Status == domain.EquipmentStatusRetired {
+				<p class="mt-2 text-sm text-rr-muted">
+					Retired machines are not put on plans — there is no work left to schedule for one.
+				</p>
+			} else if !props.Maintenance.Any() {
 				<p class="mt-2 text-sm text-rr-muted">
 					This machine is not on a maintenance plan. Put it on one and its preventive work shows up here and on the due list.
 				</p>
@@ -101,13 +105,12 @@ templ equipmentMaintenancePlans(props EquipmentShowProps) {
 						<a href={ templ.SafeURL("/admin/service/plans/" + a.PlanID.String()) } class="text-sm font-medium text-rr-heading underline">
 							{ a.PlanName }
 						</a>
-						if a.Live() {
-							<span class={ assignmentCoverageBadge(a, props.Maintenance.Today) }>
-								{ assignmentCoverageLabel(a, props.Maintenance.Today) }
-							</span>
-						} else {
-							<span class="badge badge-grey">Ended</span>
-						}
+						<!-- Live by construction: ListAssignments is called with
+						     includeEnded=false, so an ended arrangement never
+						     reaches this list. -->
+						<span class={ assignmentCoverageBadge(a, props.Maintenance.Today) }>
+							{ assignmentCoverageLabel(a, props.Maintenance.Today) }
+						</span>
 					</div>
 					<div class="mt-0.5 text-xs text-rr-muted">
 						Schedule anchored to { dayLabel(&a.StartsOn) }

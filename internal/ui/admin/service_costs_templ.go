@@ -623,7 +623,7 @@ func ServiceCostsContent(props ServiceCostsProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		if !props.Report.Total.FullyCosted() {
+		if props.Report.ShowCost() && !props.Report.Total.FullyCosted() {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<p class=\"mt-3 text-sm text-rr-red\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

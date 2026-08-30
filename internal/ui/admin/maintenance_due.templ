@@ -159,7 +159,7 @@ templ MaintenanceDueContent(props MaintenanceDueProps) {
 		</div>
 	</div>
 	@adminFlash(props.Flash)
-	@adminSectionTabs(maintenanceScopeTabs(props), maintenanceScopeHref(props.Scope))
+	@adminSectionTabsLabelled(maintenanceScopeTabs(props), maintenanceScopeHref(props.Scope), "Maintenance scope")
 	<div class="mt-4 overflow-hidden border border-rr-border bg-rr-surface">
 		if len(props.Rows) == 0 {
 			<div class="px-4 py-12 text-center">
@@ -211,6 +211,12 @@ templ maintenanceRow(row domain.MaintenanceDueRow, props MaintenanceDueProps) {
 						{ row.CustomerName }
 					</a>
 				</div>
+				if row.Notes != "" {
+					<!-- The whole reason the forms ask for it: "replaced the screens
+					     while I was in there", "cafe was shut". Captured and stored
+					     since the forms landed, and until now rendered nowhere. -->
+					<p class="mt-1 text-sm text-rr-body">{ row.Notes }</p>
+				}
 				<div class="mt-0.5 text-xs text-rr-muted">
 					{ row.PlanName } · { row.IntervalLabel() } · due { dayLabel(&row.DueOn) }
 					if row.EquipmentSerial != "" {

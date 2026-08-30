@@ -788,6 +788,12 @@ func NewRouter(deps *Deps) http.Handler {
 	serviceWrite("POST /admin/service/plans/{id}/retire", deps.handleAdminServicePlanRetire)
 	serviceWrite("POST /admin/service/plans/{id}/reactivate", deps.handleAdminServicePlanReactivate)
 	serviceWrite("POST /admin/service/plans/{id}/delete", deps.handleAdminServicePlanDelete)
+	// Both task POSTs re-render in place on rejection rather than redirecting,
+	// so their URLs are pushed into history by hx-boost and have to answer GET —
+	// the same rule the shipping form follows. Neither is a page in its own
+	// right, so GET sends you back to the plan.
+	serviceRead("GET /admin/service/plans/{id}/tasks", deps.handleAdminServicePlanTaskGET)
+	serviceRead("GET /admin/service/plans/{id}/tasks/{childID}", deps.handleAdminServicePlanTaskGET)
 	serviceWrite("POST /admin/service/plans/{id}/tasks", deps.handleAdminServicePlanTaskAdd)
 	serviceWrite("POST /admin/service/plans/{id}/tasks/{childID}", deps.handleAdminServicePlanTaskUpdate)
 	serviceWrite("POST /admin/service/plans/{id}/tasks/{childID}/delete", deps.handleAdminServicePlanTaskDelete)

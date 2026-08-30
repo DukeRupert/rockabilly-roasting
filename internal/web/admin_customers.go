@@ -325,7 +325,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			// Scoped to the customer rather than to their machines, so the
 			// call-outs that never named one still count — those hours went
 			// into the account just the same.
-			serviceCost, txErr = d.ServiceTicketService.CostForCustomer(ctx, tx, id, time.Now())
+			serviceCost, txErr = d.ServiceTicketService.CostForCustomer(ctx, tx, id, d.merchantToday())
 			if txErr != nil {
 				return txErr
 			}

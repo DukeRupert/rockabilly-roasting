@@ -884,7 +884,7 @@ func (d *Deps) handleAdminServiceCosts(w http.ResponseWriter, r *http.Request) {
 		if !explicit {
 			sort = domain.ServiceAccountCostByCost
 		}
-		report, txErr = d.ServiceTicketService.CostByAccount(ctx, tx, days, sort, time.Now())
+		report, txErr = d.ServiceTicketService.CostByAccount(ctx, tx, days, sort, d.merchantToday())
 		if txErr != nil {
 			return txErr
 		}
@@ -973,16 +973,27 @@ func (d *Deps) handleAdminServicePlanTaskUpdate(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	interval, err := strconv.Atoi(strings.TrimSpace(r.FormValue("interval_days")))
+	values := admin.PlanTaskFormValues{
+		Name:             r.FormValue("name"),
+		Instructions:     r.FormValue("instructions"),
+		IntervalDays:     strings.TrimSpace(r.FormValue("interval_days")),
+		LeadDays:         strings.TrimSpace(r.FormValue("lead_days")),
+		WarrantyRequired: r.FormValue("warranty_required") == "1",
+	}
+
+	// Rejections re-render rather than redirect, for the reason the add path
+	// gives: instructions are several lines of procedure, and losing them to a
+	// mistyped interval teaches people not to write them.
+	interval, err := strconv.Atoi(values.IntervalDays)
 	if err != nil {
-		redirectFlashError(w, r, planPath(planID), app.ErrPlanIntervalInvalid.Error())
+		d.renderPlanShow(w, r, planID, values, app.ErrPlanIntervalInvalid.Error())
 		return
 	}
 	lead := 0
-	if raw := strings.TrimSpace(r.FormValue("lead_days")); raw != "" {
-		lead, err = strconv.Atoi(raw)
+	if values.LeadDays != "" {
+		lead, err = strconv.Atoi(values.LeadDays)
 		if err != nil {
-			redirectFlashError(w, r, planPath(planID), app.ErrPlanLeadInvalid.Error())
+			d.renderPlanShow(w, r, planID, values, app.ErrPlanLeadInvalid.Error())
 			return
 		}
 	}
@@ -995,16 +1006,20 @@ func (d *Deps) handleAdminServicePlanTaskUpdate(w http.ResponseWriter, r *http.R
 			return txErr
 		}
 		_, txErr = d.ServicePlanService.EditTask(ctx, tx, taskID, app.EditPlanTaskParams{
-			Name:             r.FormValue("name"),
-			Instructions:     r.FormValue("instructions"),
+			Name:             values.Name,
+			Instructions:     values.Instructions,
 			IntervalDays:     interval,
 			LeadDays:         lead,
-			WarrantyRequired: r.FormValue("warranty_required") == "1",
+			WarrantyRequired: values.WarrantyRequired,
 			SortOrder:        task.SortOrder,
 		}, d.merchantToday(), staffActor(r))
 		return txErr
 	}); err != nil {
-		d.redirectOrFail(w, r, planPath(planID), err)
+		if !expectedFailure(err) {
+			Error(w, r, err)
+			return
+		}
+		d.renderPlanShow(w, r, planID, values, err.Error())
 		return
 	}
 
@@ -1071,4 +1086,19 @@ func (d *Deps) handleAdminEquipmentPlanUpdate(w http.ResponseWriter, r *http.Req
 	}
 
 	redirectFlash(w, r, back, "Terms updated.")
+}
+
+// handleAdminServicePlanTaskGET answers the task form URLs.
+//
+// They exist because both task POSTs re-render in place when they reject
+// something — keeping the instructions somebody just typed — which leaves the
+// action URL in the browser's history. A refresh there would otherwise 405.
+// Neither is a page, so this sends you back to the plan the task belongs to.
+func (d *Deps) handleAdminServicePlanTaskGET(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		Error(w, r, app.ErrPlanNotFound)
+		return
+	}
+	http.Redirect(w, r, planPath(id), http.StatusSeeOther)
 }

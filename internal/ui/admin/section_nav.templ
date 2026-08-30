@@ -73,7 +73,15 @@ func sectionTabClass(active bool) string {
 // adminSectionTabs renders the underline tab bar. activeHref is the current
 // page's own base path (e.g. "/admin/categories"); the matching tab is stamped.
 templ adminSectionTabs(tabs []sectionTab, activeHref string) {
-	<nav class="mb-6 flex items-center gap-5 border-b border-rr-border" aria-label="Section">
+	@adminSectionTabsLabelled(tabs, activeHref, "Section")
+}
+
+// adminSectionTabsLabelled is the same strip under a caller-chosen landmark
+// name. A page that draws two of these — the Service section strip and the due
+// list's own scope strip — would otherwise stack two navs called "Section",
+// which is two landmarks a screen-reader user cannot tell apart.
+templ adminSectionTabsLabelled(tabs []sectionTab, activeHref, label string) {
+	<nav class="mb-6 flex items-center gap-5 border-b border-rr-border" aria-label={ label }>
 		for _, t := range tabs {
 			<a href={ templ.SafeURL(t.Href) } aria-current={ ariaCurrent(t.Href == activeHref) } class={ sectionTabClass(t.Href == activeHref) }>
 				{ t.Label }

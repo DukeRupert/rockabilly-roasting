@@ -361,7 +361,7 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 		// What the machine has taken in parts and hours. Every entry counts,
 		// billable or not — this is what the machine cost the shop, which is
 		// the number the replace-it argument rests on.
-		cost, txErr = d.ServiceTicketService.CostForEquipment(ctx, tx, equipment.ID, time.Now())
+		cost, txErr = d.ServiceTicketService.CostForEquipment(ctx, tx, equipment.ID, d.merchantToday())
 		if txErr != nil {
 			return txErr
 		}

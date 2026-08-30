@@ -72,15 +72,37 @@ func calendarCellClass(day MaintenanceCalendarDay, today time.Time) string {
 	switch {
 	case !day.InMonth:
 		return base + " bg-rr-surface/50 text-rr-muted"
+	// Warranty risk first, and deliberately ahead of today. AtRisk is the
+	// loudest thing on the grid; ordering today above it hid the red ring on
+	// the single likeliest day for a warranty-critical job to land.
+	case day.AtRisk(today):
+		return base + " bg-rr-surface ring-1 ring-inset ring-rr-red"
 	case sameDay(day.Date, today):
 		// Outlined, not filled. The raised fill already means "no contract" on
 		// the chips inside these cells, and one colour carrying two meanings is
 		// a legend nobody can trust.
 		return base + " bg-rr-surface ring-1 ring-inset ring-rr-heading"
-	case day.AtRisk(today):
-		return base + " bg-rr-surface ring-1 ring-inset ring-rr-red"
 	}
 	return base + " bg-rr-surface"
+}
+
+// calendarChipState is the word a chip's colour stands for.
+//
+// WCAG 2.1 AA, 1.4.1: the grid distinguished overdue from at-risk from
+// uncovered by background colour alone, so a screen reader — or anyone who
+// cannot separate the two ambers — got no urgency at all. The due list already
+// puts the state in badge text; this gives the calendar the same thing, spoken
+// rather than drawn.
+func calendarChipState(row domain.MaintenanceDueRow, today time.Time) string {
+	switch {
+	case row.WarrantyAtRisk(today):
+		return "warranty at risk"
+	case row.Urgency(today) == domain.MaintenanceOverdue:
+		return "overdue"
+	case !row.Covered(today):
+		return "no contract"
+	}
+	return "on contract"
 }
 
 // sameDay compares two calendar days. Both sides are already normalised to a
@@ -166,7 +188,7 @@ templ MaintenanceCalendarContent(props MaintenanceCalendarProps) {
 											class={ calendarChipClass(row, props.Today) }
 											title={ row.CustomerName + " · " + row.MachineDescription() + " · " + row.TaskName }
 										>
-											<span class="sr-only">{ day.Date.Format("2 January") }: </span>
+											<span class="sr-only">{ day.Date.Format("2 January") }, { calendarChipState(row, props.Today) }: </span>
 											{ row.CustomerName } — { row.TaskName }
 										</a>
 									}

@@ -448,14 +448,14 @@ var (
 	// somebody typing cents into a dollars field would put a six-figure number
 	// against every account in the cost report.
 	ErrLaborRateInvalid = errors.New("give an hourly rate between $0 and $10,000")
+	// ErrLaborRateZero keeps "unset" to one spelling. A saved 0.00 reads as
+	// unset to ServiceLaborRates.Set(), so it would stamp every hour uncosted
+	// while the settings page showed a figure somebody had typed.
+	ErrLaborRateZero = errors.New("leave the labour rate blank rather than zero — zero would silently price nothing")
 	// ErrTravelRateWithoutLabor rejects a travel rate with no labour rate
 	// behind it. Travel falls back to the labour rate, and with none set there
 	// is no money column for it to appear in — the setting would do nothing,
 	// silently.
-	// ErrLaborRateZero keeps "unset" to one spelling. A saved 0.00 reads as
-	// unset to ServiceLaborRates.Set(), so it would stamp every hour uncosted
-	// while the settings page showed a figure somebody had typed.
-	ErrLaborRateZero          = errors.New("leave the labour rate blank rather than zero — zero would silently price nothing")
 	ErrTravelRateWithoutLabor = errors.New("set the labour rate first — a travel rate on its own has nothing to appear in")
 )
 

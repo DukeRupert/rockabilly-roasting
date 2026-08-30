@@ -2,7 +2,6 @@ package web
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -345,7 +344,7 @@ func (d *Deps) handleAdminSubscriptionShow(w http.ResponseWriter, r *http.Reques
 			// Same as the storefront list: the plan ID comes off the
 			// subscription, so a miss is broken data and wants a 500, not the
 			// 404 that ErrSubscriptionPlanNotFound now maps to.
-			return fmt.Errorf("subscription %s references missing plan %s", sub.ID, sub.PlanID)
+			return brokenReference("subscription", sub.ID, "plan", sub.PlanID)
 		}
 		if txErr != nil {
 			return txErr

@@ -1297,6 +1297,26 @@ func (s *OrderService) runBulkOrderVerb(
 	return out, nil
 }
 
+// InvalidStatusReason returns the phrase a producer wrapped around
+// ErrInvalidOrderStatus — "order is not ready for pickup" out of "order is not
+// ready for pickup: invalid order status transition". Producers name the actual
+// blocker in that prefix, and it is the only place that information exists;
+// the sentinel itself says nothing an operator can act on.
+//
+// Returns "" when there is no such prefix, rather than a fallback of its own:
+// a batch-result table cell and a toast do not want the same sentence, so each
+// caller supplies its own.
+func InvalidStatusReason(err error) string {
+	if !errors.Is(err, ErrInvalidOrderStatus) {
+		return ""
+	}
+	msg := err.Error()
+	if i := strings.Index(msg, ": "); i > 0 {
+		return msg[:i]
+	}
+	return ""
+}
+
 // failureReasonFor translates a service-layer error into a short, staff-
 // friendly phrase suitable for the batch-result UI. Known sentinels get
 // canonical phrases; wrapped ErrInvalidOrderStatus messages take their
@@ -1311,9 +1331,8 @@ func failureReasonFor(err error) string {
 		return "order not found"
 	}
 	if errors.Is(err, ErrInvalidOrderStatus) {
-		msg := err.Error()
-		if i := strings.Index(msg, ": "); i > 0 {
-			return msg[:i]
+		if reason := InvalidStatusReason(err); reason != "" {
+			return reason
 		}
 		return "invalid status"
 	}

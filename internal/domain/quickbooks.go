@@ -61,9 +61,15 @@ type QBInvoiceLinePreview struct {
 	AmountCents int    `json:"amount_cents"`
 }
 
-// QBInvoicePreview is what a live run would have billed for one order. It is
-// written by the invoice job while in shadow mode and read by the admin list
-// and the weekly digest.
+// QBInvoicePreview is what invoicing would have done for one order. It is
+// written by the invoice job whenever the order is not going to be billed —
+// a shadow run, or a live run for an account on manual billing that nobody
+// asked to bill — and read by the admin review list and the weekly digest.
+//
+// Not "while in shadow mode": that was true when previews existed only to
+// prove a proof period, and stopped being true when manual accounts started
+// producing rows on live runs too. And not "any run for a manual account"
+// either: Bill now is a person asking, so it invoices and writes no preview.
 type QBInvoicePreview struct {
 	ID         uuid.UUID
 	OrderID    uuid.UUID
@@ -90,9 +96,10 @@ type QBInvoicePreview struct {
 	// order by hand.
 	ExistingQBInvoiceID *string
 
-	// LookupError records a failed read-only QBO call. The preview is still
-	// written, because an order missing from the list would read as "nothing
-	// to bill".
+	// LookupError records anything found while preparing the preview that
+	// would stop or undermine an invoice — a failed read-only QBO call, or no
+	// item configured for invoice lines. The preview is still written, because
+	// an order missing from the list would read as "nothing to bill".
 	LookupError *string
 
 	// AutoBilled is false when the account is on manual billing and nothing

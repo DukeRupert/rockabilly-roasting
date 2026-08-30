@@ -296,8 +296,9 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 		if txErr := w.orders.SetQBInvoice(ctx, tx, order.ID, invoice.ID, invoice.DocNumber); txErr != nil {
 			return txErr
 		}
-		// The order is billed, so any shadow-mode preview of it has served its
-		// purpose. Clearing it in the same transaction keeps the review page
+		// The order is billed, so its preview has served its purpose — whether
+		// it was recorded in test mode or, on a live shop, because the account
+		// is on manual billing and this is Bill now. Clearing it in the same transaction keeps the review page
 		// meaning "recorded but not billed" — otherwise a billed order would
 		// sit there still offering a Bill now button and still counting toward
 		// the badge.
@@ -327,7 +328,9 @@ func (w *CreateQBInvoiceWorker) work(ctx context.Context, job *river.Job[CreateQ
 	})
 }
 
-// recordPreview writes what a live run would have billed for this order.
+// recordPreview writes what invoicing would have done for this order, on the
+// runs that are not going to do it: a shadow run, or a live run for an account
+// on manual billing that nobody asked to bill.
 //
 // Every QBO call here is read-only. Failures are recorded on the preview
 // rather than returned: a proof period whose list is missing an order reads as

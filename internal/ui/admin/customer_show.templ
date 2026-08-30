@@ -46,6 +46,15 @@ type CustomerShowProps struct {
 	// does not render at all otherwise, so a shop that does not service
 	// machines never sees the word.
 	Equipment       []domain.Equipment
+	// ServiceCost is what this account has taken in parts and hours, including
+	// the call-outs that never named a machine.
+	ServiceCost []domain.ServiceCostWindow
+	// ServiceLaborRates cost those hours; unset hides the money.
+	ServiceLaborRates domain.ServiceLaborRates
+	// CanViewServiceCost gates the money card. The machines are configuration
+	// and anyone who can open the customer sees them; what servicing them cost
+	// is service data, and follows service:view like the dashboard chip does.
+	CanViewServiceCost bool
 	ServiceEnabled  bool
 	CanWriteService bool
 	// CanEditEmail gates the inline email editor. The route is gated
@@ -192,6 +201,9 @@ templ CustomerShowContent(props CustomerShowProps) {
 			@customerAddressesCard(props)
 			if props.ServiceEnabled {
 				@customerEquipmentCard(props)
+				if props.CanViewServiceCost {
+					@serviceCostRailCard(props.ServiceCost, props.showServiceCost())
+				}
 			}
 			if len(props.TeamMembers) > 0 {
 				@customerTeamCard(props)
@@ -995,6 +1007,20 @@ templ CustomerShow(props CustomerShowProps) {
 	}) {
 		@CustomerShowContent(props)
 	}
+}
+
+// showServiceCost decides whether the rail card carries a money figure: as soon
+// as either an hour has been priced or the shop has set a rate.
+func (p CustomerShowProps) showServiceCost() bool {
+	if p.ServiceLaborRates.Set() {
+		return true
+	}
+	for _, w := range p.ServiceCost {
+		if w.Summary.AnyCost() {
+			return true
+		}
+	}
+	return false
 }
 
 // customerEquipmentCard lists the machines this cafe has on the register.

@@ -86,7 +86,7 @@ Use 1px hairlines on cards (`border border-rr-border`) and `shadow-sm` if you ne
 
 ## Don't use these in admin
 
-These classes exist for the storefront/marketing surfaces. Reaching for them in admin breaks the warm-professional treatment — and the lint will fail your build.
+These classes exist for the storefront/marketing surfaces. Reaching for them in admin breaks the warm-professional treatment — and `mage check` will refuse it.
 
 ### Banned colors (direct paper-and-ink utilities)
 
@@ -118,7 +118,16 @@ These classes exist for the storefront/marketing surfaces. Reaching for them in 
 
 ## Lint enforcement
 
-`mage lintAdmin` (and `mage check` which calls it) greps `internal/ui/admin/**/*.templ` for the deny-list above and fails the build if any matches are found. `staff_login.templ` is excluded.
+`mage checkAdminUI` (and `mage check` which calls it) greps
+`internal/ui/admin/**/*.templ` **and `internal/ui/layouts/**/*.templ`** — the
+admin shell is admin UI too — for the deny-list above, and fails if any matches
+are found. `staff_login.templ`, `staff_setup.templ` and `layouts/storefront.templ`
+are excluded; the last of those is *meant* to use the paper-and-ink classes.
+`<style>` blocks are skipped, because a token named inside the shell's own
+override stylesheet is a definition rather than a class somebody reached for.
+
+That is one half of the check. The other is described under *The lint has two
+halves* below.
 
 To add a new admin-allowed token or update the deny-list, edit the lint target in `magefiles/mage.go`.
 
@@ -137,3 +146,34 @@ You probably don't. If you think you do, ask first — there's almost always an 
 | `font-slab` for a heading | `admin-page-title` (Alfa Slab One, page-level only) or just `font-semibold text-rr-heading` |
 
 If you're building something genuinely new (e.g., an admin onboarding splash), open a discussion before reaching for storefront classes — we may want to expand the admin palette explicitly.
+
+## The lint has two halves
+
+`mage checkAdminUI` (wired into `mage check`) fails on two things:
+
+1. **A banned class** — the storefront paper-and-ink utilities, brand fonts,
+   stamp shadows and heavy borders listed above. A class that is *wrong*.
+2. **A class that emits no CSS** — an `rr-*` utility Tailwind never produced a
+   rule for. A class that does not *exist*.
+
+   Scope is `internal/ui/admin` plus `internal/ui/layouts` (the admin shell),
+   and it matches `rr-*` utilities written literally in the templates. Known
+   gaps, deliberately: a class assembled by string concatenation, a *non*-`rr`
+   typo like `bg-surface`, and `rr-*` classes written in Go or JS rather than a
+   `.templ`. This closes the hole that shipped, not every hole.
+
+The second half was added after `bg-rr-paper-warm` shipped. The token is
+`--color-paper-warm`: un-prefixed, and storefront-only. Tailwind v4 drops an
+unknown utility silently, so it compiled, passed the blocklist, passed the
+render tests — and produced no CSS at all. Today was simply not marked on the
+maintenance calendar, and nothing short of opening a browser could have said so.
+
+If you add a token, add it to `input.css`; if the lint calls a class dead, the
+name is wrong rather than the check.
+
+**It is a local gate, not a CI one.** Nothing in `.github/workflows` runs `mage
+check` — the deploy workflows build and ship. So the lint only catches what
+somebody runs it against before pushing, which is how `bg-rr-paper-warm` reached
+`main`'s doorstep in the first place. Wiring `mage check` into CI is the obvious
+follow-up and is deliberately not done here, because it belongs to the repo's
+build setup rather than to a feature branch.

@@ -1,0 +1,177 @@
+package admin
+
+import (
+	"strconv"
+
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+// What servicing has actually cost — parts spend and hours, rolled up over
+// three windows, for one machine or one account.
+//
+// The per-ticket roll-up in the rail of a ticket answers "what did this repair
+// cost". This answers the two questions that only appear once there are a lot
+// of repairs: is this machine getting worse, and is this account worth keeping.
+// Both are comparisons, which is why all three windows are drawn at once rather
+// than behind a selector.
+//
+// Everything recorded counts, billable or not. What the work cost the shop and
+// what the customer was charged are different questions; billable hours are
+// shown alongside as a second number, never instead of the first.
+//
+// Part of the equipment service module; see docs/equipment-service-module.md.
+
+// serviceCostVisits renders the visit count with its noun.
+func serviceCostVisits(n int) string {
+	if n == 1 {
+		return "1 visit"
+	}
+	return strconv.Itoa(n) + " visits"
+}
+
+// serviceCostParts renders the part count with its noun.
+func serviceCostParts(n int) string {
+	if n == 1 {
+		return "1 part"
+	}
+	return strconv.Itoa(n) + " parts"
+}
+
+// serviceCostBillableNote is the billable line under the table. Silent when
+// nothing was marked billable, because "0m billable" on a shop that never bills
+// service is a column of zeros telling nobody anything.
+func serviceCostBillableNote(windows []domain.ServiceCostWindow) string {
+	// The widest window only. Looping to decide and then printing all-time was
+	// right by accident — all-time is last and a superset of the others — and
+	// would have started lying the moment somebody reordered them.
+	allTime := allTimeSummary(windows).Summary
+	if allTime.BillableMinutes == 0 {
+		return ""
+	}
+	return "Of all time, " + formatMinutes(allTime.BillableMinutes) + " was marked billable."
+}
+
+// allTimeSummary picks the widest window. It is the last one by construction;
+// falling back to a zero summary keeps a caller that reorders them from
+// panicking on an empty slice.
+func allTimeSummary(windows []domain.ServiceCostWindow) domain.ServiceCostWindow {
+	if len(windows) == 0 {
+		return domain.ServiceCostWindow{}
+	}
+	return windows[len(windows)-1]
+}
+
+// ServiceCostCard is the full roll-up: a row per window, for the main column of
+// a machine's page.
+templ ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLine string) {
+	<div class="mt-4 border border-rr-border bg-rr-surface">
+		<div class="px-4 py-4">
+			<h2 class="text-sm font-semibold text-rr-heading">What it has cost</h2>
+			if !domain.AnyServiceCost(windows) {
+				<p class="mt-2 text-sm text-rr-muted">{ emptyLine }</p>
+			} else {
+				<div class="mt-3 overflow-x-auto">
+					<table class="min-w-full">
+						<caption class="sr-only">Parts and hours by period</caption>
+						<thead>
+							<tr>
+								<th scope="col" class="label-font py-2 pr-4 text-left text-rr-muted">Period</th>
+								<th scope="col" class="label-font py-2 pr-4 text-right text-rr-muted">Parts</th>
+								<th scope="col" class="label-font py-2 pr-4 text-right text-rr-muted">Hours</th>
+								<th scope="col" class="label-font py-2 pr-4 text-right text-rr-muted">Visits</th>
+								if showCost {
+									<th scope="col" class="label-font py-2 text-right text-rr-muted">Cost</th>
+								}
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-rr-border">
+							for _, w := range windows {
+								<tr>
+									<td class="py-2 pr-4 text-sm text-rr-body">{ w.Label }</td>
+									<td class="py-2 pr-4 text-right text-sm tabular-nums text-rr-heading">
+										{ formatCents(w.Summary.PartsCostCents) }
+										if w.Summary.PartCount > 0 {
+											<span class="block text-xs text-rr-muted">{ serviceCostParts(w.Summary.PartCount) }</span>
+										}
+									</td>
+									<td class="py-2 pr-4 text-right text-sm tabular-nums text-rr-heading">
+										{ formatMinutes(w.Summary.TotalMinutes()) }
+										if w.Summary.TravelMinutes > 0 {
+											<span class="block text-xs text-rr-muted">{ formatMinutes(w.Summary.TravelMinutes) } travel</span>
+										}
+									</td>
+									<td class="py-2 pr-4 text-right text-sm tabular-nums text-rr-heading">
+										{ strconv.Itoa(w.Summary.Visits) }
+										if w.Summary.Visits > 0 {
+											<span class="block text-xs text-rr-muted">{ formatMinutes(w.Summary.MinutesPerVisit()) } each</span>
+										}
+									</td>
+									if showCost {
+										<td class="py-2 text-right text-sm font-semibold tabular-nums text-rr-heading">
+											{ formatCents(w.Summary.TotalCostCents()) }
+											if !w.Summary.FullyCosted() {
+												<span class="block text-xs font-normal text-rr-red">{ formatMinutes(w.Summary.UncostedMinutes) } unpriced</span>
+											}
+										</td>
+									}
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+				if note := serviceCostBillableNote(windows); note != "" {
+					<p class="mt-3 border-t border-rr-border pt-3 text-xs text-rr-muted">{ note }</p>
+				}
+			}
+		</div>
+	</div>
+}
+
+// serviceCostRailCard is the compact version for a customer page's rail: one
+// line per window, no table.
+//
+// The rail is narrow and this is not the page's argument — it is a fact about
+// the account, sitting beside the machines it was spent on. Somebody who wants
+// the breakdown opens a machine.
+templ serviceCostRailCard(windows []domain.ServiceCostWindow, showCost bool) {
+	<div class="border border-rr-border bg-rr-surface">
+		<div class="px-4 py-4">
+			<h2 class="text-sm font-semibold text-rr-heading">Service cost</h2>
+			if !domain.AnyServiceCost(windows) {
+				<p class="mt-2 text-sm text-rr-muted">No parts or hours recorded against this account yet.</p>
+			} else {
+				<p class="mt-1 text-xs text-rr-muted">Everything spent on their machines, billed or not.</p>
+				<dl class="mt-2 space-y-2">
+					for _, w := range windows {
+						<div>
+							<dt class="label-font text-rr-muted">{ w.Label }</dt>
+							<dd class="text-sm text-rr-body">
+								if w.Summary.Any() {
+									<span class="tabular-nums text-rr-heading">{ formatCents(w.Summary.PartsCostCents) }</span>
+									<span class="text-rr-muted"> · </span>
+									<span class="tabular-nums">{ formatMinutes(w.Summary.TotalMinutes()) }</span>
+									<span class="text-rr-muted"> · { serviceCostVisits(w.Summary.Visits) }</span>
+									if showCost {
+										<span class="block font-semibold text-rr-heading">
+											{ formatCents(w.Summary.TotalCostCents()) }
+											if w.Summary.FullyCosted() {
+												all in
+											} else {
+												so far
+											}
+										</span>
+										if !w.Summary.FullyCosted() {
+											<span class="block text-xs font-normal text-rr-red">{ formatMinutes(w.Summary.UncostedMinutes) } not priced</span>
+										}
+									}
+								} else {
+									<span class="text-rr-muted">Nothing</span>
+								}
+							</dd>
+						</div>
+					}
+				</dl>
+			}
+		</div>
+	</div>
+}

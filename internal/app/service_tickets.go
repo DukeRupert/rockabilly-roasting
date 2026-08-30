@@ -38,6 +38,11 @@ type ServiceTicketService struct {
 	customers *store.CustomerStore
 	modules   *ModuleService
 	metrics   *metrics.Registry
+
+	// Set by WithSettings. Holds the labour rates the cost reports cost hours
+	// at; nil-safe, and a service without it reports hours and parts with no
+	// money column — which is also what happens when the rate is simply unset.
+	settings *store.SettingsStore
 }
 
 // NewServiceTicketService creates a new ServiceTicketService.
@@ -59,6 +64,109 @@ func (s *ServiceTicketService) WithNotifications(env EmailEnv, customers *store.
 	s.modules = modules
 	s.metrics = m
 	return s
+}
+
+// WithSettings attaches the store-wide settings the cost reports read their
+// labour rates from.
+//
+// Separate from WithNotifications because the two have nothing to do with each
+// other: one is what the background jobs need, this is what a report needs, and
+// a caller wiring only one should not have to supply the other's collaborators.
+func (s *ServiceTicketService) WithSettings(settings *store.SettingsStore) *ServiceTicketService {
+	s.settings = settings
+	return s
+}
+
+// LaborRates is what an hour of the crew's time costs the shop.
+//
+// Unset rates are not an error — they are the ordinary state of a shop that has
+// not decided, and every surface that would show money hides it instead.
+func (s *ServiceTicketService) LaborRates(ctx context.Context, tx pgx.Tx) (domain.ServiceLaborRates, error) {
+	if s.settings == nil {
+		return domain.ServiceLaborRates{}, nil
+	}
+	return s.settings.GetServiceLaborRates(ctx, tx)
+}
+
+// SetLaborRates records what the crew's time costs.
+//
+// The outgoing rates go into the audit metadata. Since migration 083 stamped
+// the rate onto each entry this no longer explains a moved cost figure —
+// nothing moves — it explains the opposite: why two hours logged a week apart
+// cost different amounts, and who decided the new number.
+func (s *ServiceTicketService) SetLaborRates(ctx context.Context, tx pgx.Tx, rates domain.ServiceLaborRates, actor Actor) error {
+	if s.settings == nil {
+		return fmt.Errorf("service labor rates: settings store not wired")
+	}
+	if err := validateLaborRates(rates); err != nil {
+		return err
+	}
+
+	previous, err := s.settings.GetServiceLaborRates(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if err := s.settings.UpdateServiceLaborRates(ctx, tx, rates); err != nil {
+		return err
+	}
+
+	return s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditServiceLaborRatesUpdated,
+		ResourceType: "store_settings",
+		Metadata: map[string]any{
+			"labor_rate_cents":      rateForAudit(rates.LaborCentsPerHour),
+			"travel_rate_cents":     rateForAudit(rates.TravelCentsPerHour),
+			"was_labor_rate_cents":  rateForAudit(previous.LaborCentsPerHour),
+			"was_travel_rate_cents": rateForAudit(previous.TravelCentsPerHour),
+		},
+	})
+}
+
+// maxLaborRateCents caps an hourly rate at $10,000. Not a business rule — a
+// guard against somebody typing cents into a dollars field and putting a
+// six-figure number on every account in the report.
+const maxLaborRateCents = 1_000_000
+
+// validateLaborRates guards the two fields.
+func validateLaborRates(rates domain.ServiceLaborRates) error {
+	for _, r := range []*int{rates.LaborCentsPerHour, rates.TravelCentsPerHour} {
+		if r == nil {
+			continue
+		}
+		if *r < 0 || *r > maxLaborRateCents {
+			return ErrLaborRateInvalid
+		}
+	}
+	// One way to mean "unset", and it is blank. A zero labour rate would be a
+	// second: ServiceLaborRates.Set() reads it as unset, so it would stamp
+	// every hour uncosted while the settings page showed a saved figure. Travel
+	// keeps its zero — there it means something, namely that the shop absorbs
+	// the drive.
+	if rates.LaborCentsPerHour != nil && *rates.LaborCentsPerHour == 0 {
+		return ErrLaborRateZero
+	}
+	// A travel rate on its own costs nothing: travel falls back to the labour
+	// rate, and with no labour rate there is no money column for it to appear
+	// in. Saying so beats silently accepting a setting that does nothing.
+	//
+	// Checked through Set() rather than against nil so this cannot drift from
+	// the definition every other surface uses.
+	if !rates.Set() && rates.TravelCentsPerHour != nil {
+		return ErrTravelRateWithoutLabor
+	}
+	return nil
+}
+
+// rateForAudit renders a nullable rate for an audit record, where "unset" and
+// "zero" have to stay distinguishable.
+func rateForAudit(cents *int) any {
+	if cents == nil {
+		return nil
+	}
+	return *cents
 }
 
 // OpenTicketParams is the input for raising a ticket.
@@ -378,4 +486,132 @@ func generateTicketNumber() string {
 		return fmt.Sprintf("SVC-%d", time.Now().UnixMilli())
 	}
 	return "SVC-" + strings.ToUpper(hex.EncodeToString(b))
+}
+
+// serviceCostWindows are the three periods every roll-up reports.
+//
+// Three at once rather than a period selector. The question is never "what did
+// the last quarter cost" on its own — it is whether this machine is getting
+// worse, and that is a comparison. A toggle would make somebody click three
+// times and hold the numbers in their head to answer it.
+//
+// 90 days is the quarter the merchant actually asks about, 12 months absorbs
+// the seasonality of a cafe, and all-time is the argument for replacing a
+// machine.
+var serviceCostWindows = []struct {
+	label string
+	days  int
+}{
+	{"Last 90 days", 90},
+	{"Last 12 months", 365},
+	{"All time", 0},
+}
+
+// CostForEquipment rolls up what one machine has cost, over each window.
+func (s *ServiceTicketService) CostForEquipment(ctx context.Context, tx pgx.Tx, equipmentID uuid.UUID, now time.Time) ([]domain.ServiceCostWindow, error) {
+	return s.costWindows(ctx, tx, store.ServiceCostFilter{EquipmentID: &equipmentID}, now)
+}
+
+// CostForCustomer rolls up what one account has cost, over each window. It
+// includes work on tickets that never named a machine — those hours went into
+// the account just the same.
+func (s *ServiceTicketService) CostForCustomer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, now time.Time) ([]domain.ServiceCostWindow, error) {
+	return s.costWindows(ctx, tx, store.ServiceCostFilter{CustomerID: &customerID}, now)
+}
+
+// costWindows runs the roll-up once per window.
+//
+// The windows are measured from a calendar day rather than an instant, so the
+// numbers on a card do not shift between two refreshes of the same page — and
+// so a test can ask what the card said on a given morning.
+func (s *ServiceTicketService) costWindows(ctx context.Context, tx pgx.Tx, f store.ServiceCostFilter, now time.Time) ([]domain.ServiceCostWindow, error) {
+	today := now.UTC().Truncate(24 * time.Hour)
+
+	out := make([]domain.ServiceCostWindow, 0, len(serviceCostWindows))
+	for _, w := range serviceCostWindows {
+		scoped := f
+		if w.days > 0 {
+			scoped.Since = today.AddDate(0, 0, -w.days)
+		}
+		summary, err := s.tickets.CostSummary(ctx, tx, scoped)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, domain.ServiceCostWindow{Label: w.label, Since: scoped.Since, Summary: summary})
+	}
+	return out, nil
+}
+
+// accountCostLimit caps the cross-account table. Rows only exist for accounts
+// that had work in the window, so this is far above any real result — it is a
+// guard against a page rendering ten thousand rows, not a business rule. When
+// it bites, the caller is told rather than shown a silently short table.
+const accountCostLimit = 200
+
+// CostByAccount ranks accounts by what servicing them has taken over a window.
+//
+// sinceDays of zero means all time. The window is measured from a calendar day
+// so the table does not shift between two refreshes of the same page.
+func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sinceDays int, sort domain.ServiceAccountCostSort, now time.Time) (domain.ServiceAccountReport, error) {
+	rates, err := s.LaborRates(ctx, tx)
+	if err != nil {
+		return domain.ServiceAccountReport{}, err
+	}
+	// Is there any money to rank on? Either an hour already carries a rate, or
+	// the shop has set one for the next. Both halves matter: the first keeps
+	// the column after a rate is cleared, the second makes a shop's first rate
+	// visibly do something before anybody has logged an hour at it.
+	report := domain.ServiceAccountReport{Rates: rates, Limit: accountCostLimit}
+	if sinceDays > 0 {
+		report.Since = now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -sinceDays)
+	}
+
+	// The window has to be known first: asked globally this said yes on the
+	// strength of an hour costed last year, and kept the Cost column over a
+	// quarter with nothing costed in it.
+	costed, err := s.tickets.AnyCostedTime(ctx, tx, report.Since)
+	if err != nil {
+		return domain.ServiceAccountReport{}, err
+	}
+	canCost := rates.Set() || costed
+
+	// A cost ranking with nothing to rank orders by parts spend alone. Fall
+	// back rather than print that under a Cost heading — and echo back the sort
+	// that actually ran, so the strip highlights the tab the reader is looking
+	// at rather than the one they asked for.
+	if sort == domain.ServiceAccountCostByCost && !canCost {
+		sort = domain.ServiceAccountCostByHours
+	}
+	report.Sort = sort
+	report.CanCost = canCost
+
+	rows, err := s.tickets.CostByCustomer(ctx, tx, store.ServiceAccountCostFilter{
+		Since: report.Since,
+		Sort:  sort,
+		// One over the cap, so a full page can be told from an overflowing one
+		// without a second counting query.
+		Limit: accountCostLimit + 1,
+	})
+	if err != nil {
+		return domain.ServiceAccountReport{}, err
+	}
+
+	if len(rows) > accountCostLimit {
+		rows = rows[:accountCostLimit]
+		report.Truncated = true
+	}
+	report.Rows = rows
+
+	for _, r := range rows {
+		report.Total.PartsCostCents += r.Summary.PartsCostCents
+		report.Total.PartCount += r.Summary.PartCount
+		report.Total.LaborMinutes += r.Summary.LaborMinutes
+		report.Total.TravelMinutes += r.Summary.TravelMinutes
+		report.Total.BillableMinutes += r.Summary.BillableMinutes
+		report.Total.LaborCostCents += r.Summary.LaborCostCents
+		report.Total.UncostedMinutes += r.Summary.UncostedMinutes
+		report.Total.Visits += r.Summary.Visits
+	}
+
+	return report, nil
 }

@@ -37,7 +37,18 @@ func (d *Deps) serviceNav(ctx context.Context, tx pgx.Tx) (admin.ServiceNav, err
 	if err != nil {
 		return admin.ServiceNav{}, err
 	}
-	return admin.ServiceNav{StaleCount: len(stale)}, nil
+	// Overdue preventive maintenance rides on the Maintenance tab, so a machine
+	// falling behind is visible from anywhere in the section rather than only
+	// to whoever thought to click through. Due-soon work is deliberately left
+	// out: a badge that is never zero is a badge nobody reads.
+	overdue, err := d.ServicePlanService.CountDue(ctx, tx, store.MaintenanceFilter{
+		Scope: store.MaintenanceScopeOverdue,
+		Now:   d.merchantToday(),
+	})
+	if err != nil {
+		return admin.ServiceNav{}, err
+	}
+	return admin.ServiceNav{StaleCount: len(stale), OverdueMaintenance: overdue}, nil
 }
 
 // handleAdminServiceTicketList renders the queue.
@@ -321,6 +332,11 @@ func (d *Deps) handleAdminServiceTicketNew(w http.ResponseWriter, r *http.Reques
 	if raw := r.URL.Query().Get("equipment_id"); raw != "" {
 		props.Values.EquipmentID = raw
 	}
+	// Started from a due maintenance row: carry the occurrence through so the
+	// finished ticket can be attached to it.
+	if raw := r.URL.Query().Get("maintenance_id"); raw != "" {
+		props.Values.MaintenanceID = raw
+	}
 
 	if err := d.fillTicketFormOptions(ctx, &props); err != nil {
 		Error(w, r, err)
@@ -365,13 +381,14 @@ func (d *Deps) handleAdminServiceTicketCreate(w http.ResponseWriter, r *http.Req
 	}
 
 	values := admin.ServiceTicketFormValues{
-		CustomerID:  r.FormValue("customer_id"),
-		EquipmentID: r.FormValue("equipment_id"),
-		Title:       r.FormValue("title"),
-		Description: r.FormValue("description"),
-		Severity:    r.FormValue("severity"),
-		AssignedTo:  r.FormValue("assigned_staff_id"),
-		Billable:    r.FormValue("billable"),
+		CustomerID:    r.FormValue("customer_id"),
+		EquipmentID:   r.FormValue("equipment_id"),
+		Title:         r.FormValue("title"),
+		Description:   r.FormValue("description"),
+		Severity:      r.FormValue("severity"),
+		AssignedTo:    r.FormValue("assigned_staff_id"),
+		Billable:      r.FormValue("billable"),
+		MaintenanceID: r.FormValue("maintenance_id"),
 	}
 
 	customerID, err := uuid.Parse(values.CustomerID)
@@ -398,7 +415,24 @@ func (d *Deps) handleAdminServiceTicketCreate(w http.ResponseWriter, r *http.Req
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
 		ticket, txErr = d.ServiceTicketService.Open(ctx, tx, params, staffActor(r))
-		return txErr
+		if txErr != nil {
+			return txErr
+		}
+		// Attaching in the same transaction as the ticket: a ticket that opened
+		// but did not attach would leave the maintenance still nagging, and the
+		// staffer would have no way to tell it had been booked.
+		if raw := strings.TrimSpace(values.MaintenanceID); raw != "" {
+			// Parsed strictly. parseOptionalUUID answers nil for blank *and*
+			// for garbage, so a mangled id took the "no maintenance" branch and
+			// the ticket committed unattached with nobody told — the outcome
+			// the comment above forbids.
+			dueID, parseErr := uuid.Parse(raw)
+			if parseErr != nil {
+				return app.ErrMaintenanceNotFound
+			}
+			return d.ServicePlanService.AttachTicket(ctx, tx, dueID, ticket.ID)
+		}
+		return nil
 	}); err != nil {
 		if msg, ok := ticketValidationMessage(err); ok {
 			d.rejectTicketForm(w, r, values, msg)
@@ -613,6 +647,13 @@ func (d *Deps) fillTicketFormOptions(ctx context.Context, props *admin.ServiceTi
 }
 
 func ticketValidationMessage(err error) (string, bool) {
+	// A stale or already-booked occurrence arrives here because the attach runs
+	// inside the ticket's own transaction — the whole thing rolls back, so this
+	// has to read as a form rejection rather than a bare JSON 404 with the
+	// staffer's typed ticket gone and nothing saying why.
+	if errors.Is(err, app.ErrMaintenanceNotFound) {
+		return "That scheduled maintenance is no longer waiting to be booked — open the ticket without it.", true
+	}
 	switch {
 	case errors.Is(err, app.ErrServiceTicketTitleRequired),
 		errors.Is(err, app.ErrInvalidServiceSeverity),

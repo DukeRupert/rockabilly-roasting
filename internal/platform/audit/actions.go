@@ -38,6 +38,10 @@ const (
 	AuditServicePartRemoved = "service_ticket.part_removed"
 	AuditServiceTimeLogged  = "service_ticket.time_logged"
 	AuditServiceTimeRemoved = "service_ticket.time_removed"
+	// AuditServiceTimeRepriced records one hour being priced by hand. Rates are
+	// snapshotted onto the entry, so this is the only way a past hour's cost
+	// changes — and the record of who decided it.
+	AuditServiceTimeRepriced = "service_ticket.time_repriced"
 	// AuditServiceStaleSwept records that the daily sweep sent a digest. Not a
 	// per-ticket event — it names how many were quiet, so an unanswered ticket
 	// can later be shown to have been reported and ignored rather than missed.
@@ -47,6 +51,42 @@ const (
 	// told" can be answered with a time, which is the whole argument a shop has
 	// when a cafe is angry about a machine that stayed broken.
 	AuditServiceTicketNotified = "service_ticket.staff_notified"
+
+	// Preventive maintenance. Plans are shop-wide templates, so plan and task
+	// edits are recorded against the plan; everything that happens to a
+	// particular machine is recorded against the equipment, which is where
+	// somebody looking into "why was this serviced late" will actually be.
+	AuditServicePlanCreated     = "service_plan.created"
+	AuditServicePlanUpdated     = "service_plan.updated"
+	AuditServicePlanDeleted     = "service_plan.deleted"
+	AuditServicePlanTaskAdded   = "service_plan.task_added"
+	AuditServicePlanTaskUpdated = "service_plan.task_updated"
+	AuditServicePlanTaskRemoved = "service_plan.task_removed"
+
+	AuditServicePlanAssigned          = "equipment.plan_assigned"
+	AuditServicePlanAssignmentUpdated = "equipment.plan_assignment_updated"
+	AuditServicePlanUnassigned        = "equipment.plan_unassigned"
+	AuditMaintenanceCompleted         = "equipment.maintenance_completed"
+	AuditMaintenanceSkipped           = "equipment.maintenance_skipped"
+	// AuditMaintenanceBooked records the sweep opening a routine ticket for a
+	// contract customer's due maintenance. Recorded because a ticket appearing
+	// with no human behind it needs something, somewhere, saying why — and it
+	// goes on the machine, with the rest of that machine's story, rather than
+	// on the ticket it created.
+	AuditMaintenanceBooked = "equipment.maintenance_booked"
+	// AuditMaintenanceSwept records that the daily sweep ran and what it did.
+	// Not a per-machine event: one row a day, so a quiet due list can be told
+	// apart from a job that stopped running.
+	AuditMaintenanceSwept = "equipment.maintenance_swept"
+
+	// AuditServiceLaborRatesUpdated records a change to what an hour of the
+	// crew's time costs.
+	//
+	// Since migration 083 the rate is snapshotted onto each time entry, so this
+	// no longer explains a moved cost figure — nothing moves. It explains the
+	// opposite: why two hours logged a week apart cost different amounts, and
+	// who decided the new number.
+	AuditServiceLaborRatesUpdated = "service.labor_rates_updated"
 
 	// Optional feature modules — turning a whole section of the app on or off.
 	// Worth an audit entry because enabling one can start sending customer mail

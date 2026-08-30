@@ -513,14 +513,14 @@ func (s *ServiceTicketStore) ListParts(ctx context.Context, tx pgx.Tx, ticketID 
 // --- Time entries ---
 
 const serviceTimeColumns = `id, ticket_id, staff_id, kind, minutes, performed_on, billable,
-	                    note, created_at`
+	                    note, created_at, rate_cents`
 
 func scanServiceTimeEntry(row rowScanner) (*domain.ServiceTimeEntry, error) {
 	var e domain.ServiceTimeEntry
 	var kind string
 	if err := row.Scan(
 		&e.ID, &e.TicketID, &e.StaffID, &kind, &e.Minutes, &e.PerformedOn, &e.Billable,
-		&e.Note, &e.CreatedAt,
+		&e.Note, &e.CreatedAt, &e.RateCents,
 	); err != nil {
 		return nil, err
 	}
@@ -538,6 +538,11 @@ type CreateTimeEntryParams struct {
 	PerformedOn time.Time
 	Billable    bool
 	Note        string
+	// RateCents is the hourly cost to stamp on the entry. Nil leaves it
+	// uncosted, which is what a shop with no rate set gets. The caller resolves
+	// which rate applies — labour or travel — because that is a policy question
+	// and this layer does not answer those.
+	RateCents *int
 }
 
 // CreateTimeEntry logs minutes against a ticket.
@@ -548,16 +553,26 @@ func (s *ServiceTicketStore) CreateTimeEntry(ctx context.Context, tx pgx.Tx, p C
 	}
 	row := tx.QueryRow(ctx,
 		`INSERT INTO service_time_entries (ticket_id, staff_id, kind, minutes, performed_on,
-		                                   billable, note)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		                                   billable, note, rate_cents)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 RETURNING `+serviceTimeColumns,
-		p.TicketID, p.StaffID, string(p.Kind), p.Minutes, on, p.Billable, p.Note)
+		p.TicketID, p.StaffID, string(p.Kind), p.Minutes, on, p.Billable, p.Note, p.RateCents)
 
 	e, err := scanServiceTimeEntry(row)
 	if err != nil {
 		return nil, fmt.Errorf("create service time entry: %w", err)
 	}
 	return e, nil
+}
+
+// UpdateTimeEntryRate sets what one recorded hour cost. Nil returns it to
+// uncosted, which takes it back out of the money figures without touching the
+// hours themselves.
+func (s *ServiceTicketStore) UpdateTimeEntryRate(ctx context.Context, tx pgx.Tx, id uuid.UUID, rateCents *int) (*domain.ServiceTimeEntry, error) {
+	row := tx.QueryRow(ctx,
+		`UPDATE service_time_entries SET rate_cents = $2 WHERE id = $1
+		 RETURNING `+serviceTimeColumns, id, rateCents)
+	return scanServiceTimeEntry(row)
 }
 
 // DeleteTimeEntry removes a logged stint. For correcting a fat-fingered entry;
@@ -604,7 +619,7 @@ func (s *ServiceTicketStore) Totals(ctx context.Context, tx pgx.Tx, ticketID uui
 	var t domain.ServiceTotals
 
 	if err := tx.QueryRow(ctx,
-		`SELECT COALESCE(SUM(unit_cost_cents * quantity), 0) FROM service_parts WHERE ticket_id = $1`,
+		`SELECT COALESCE(SUM(unit_cost_cents::bigint * quantity), 0) FROM service_parts WHERE ticket_id = $1`,
 		ticketID).Scan(&t.PartsCostCents); err != nil {
 		return domain.ServiceTotals{}, fmt.Errorf("sum service parts for ticket %s: %w", ticketID, err)
 	}
@@ -612,9 +627,13 @@ func (s *ServiceTicketStore) Totals(ctx context.Context, tx pgx.Tx, ticketID uui
 	if err := tx.QueryRow(ctx,
 		`SELECT COALESCE(SUM(minutes) FILTER (WHERE kind = 'labor'), 0),
 		        COALESCE(SUM(minutes) FILTER (WHERE kind = 'travel'), 0),
-		        COALESCE(SUM(minutes) FILTER (WHERE billable), 0)
+		        COALESCE(SUM(minutes) FILTER (WHERE billable), 0),
+		        COALESCE(SUM(round(minutes::bigint * rate_cents / 60.0))
+		                 FILTER (WHERE rate_cents IS NOT NULL), 0),
+		        COALESCE(SUM(minutes) FILTER (WHERE rate_cents IS NULL), 0)
 		 FROM service_time_entries WHERE ticket_id = $1`,
-		ticketID).Scan(&t.LaborMinutes, &t.TravelMinutes, &t.BillableMinutes); err != nil {
+		ticketID).Scan(&t.LaborMinutes, &t.TravelMinutes, &t.BillableMinutes,
+		&t.LaborCostCents, &t.UncostedMinutes); err != nil {
 		return domain.ServiceTotals{}, fmt.Errorf("sum service time for ticket %s: %w", ticketID, err)
 	}
 
@@ -654,6 +673,273 @@ func (s *ServiceTicketStore) LastServiceByEquipment(ctx context.Context, tx pgx.
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("last service by equipment for customer %s: %w", customerID, err)
+	}
+	return out, nil
+}
+
+// ServiceCostFilter scopes a cost roll-up: one machine, or one account, over an
+// optional window. Exactly one of the two ids is expected to be set.
+type ServiceCostFilter struct {
+	// EquipmentID scopes to one machine — "what has this cost us".
+	EquipmentID *uuid.UUID
+	// CustomerID scopes to a whole account, including the call-outs that were
+	// never tied to a particular machine. Those are real hours spent on the
+	// customer, and dropping them would understate exactly the account the
+	// merchant is trying to judge.
+	CustomerID *uuid.UUID
+	// Since bounds the window. Zero means all time.
+	Since time.Time
+}
+
+// The date a part counts against.
+//
+// Parts have no single "we spent this" date. installed_on is the truest one,
+// but a part sitting at 'needed' or 'ordered' has cost committed and no install
+// date yet, and dropping it out of the window would make a repair in progress
+// look free. Falling back through received → ordered → the day the line was
+// written keeps every part in exactly one window.
+//
+// The created_at fallback is pinned to UTC rather than cast bare. The other
+// three terms are date columns and carry no zone; a bare created_at::date
+// resolves against the session TimeZone, so the same part could fall either
+// side of a window boundary depending on how the connection was configured.
+// The windows themselves are UTC calendar days (see CostByAccount), so UTC is
+// the one that makes the comparison mean something.
+const servicePartCostDate = `COALESCE(p.installed_on, p.received_on, p.ordered_on, (p.created_at AT TIME ZONE 'UTC')::date)`
+
+// CostSummary rolls up parts spend and hours for a machine or an account.
+//
+// Every part on a scoped ticket counts, whatever its status and whoever ends up
+// paying — the same rule Totals follows for one ticket, and the reason this is
+// a widening of that query rather than a second opinion about what a repair
+// cost. Billable minutes come back alongside the total rather than instead of
+// it: what the work cost and what was charged for it are different questions,
+// and this answers the first.
+//
+// One round trip. A machine page draws three of these windows and an account
+// page three more; nine queries to render two cards would be silly.
+func (s *ServiceTicketStore) CostSummary(ctx context.Context, tx pgx.Tx, f ServiceCostFilter) (domain.ServiceCostSummary, error) {
+	var where []string
+	var args []any
+
+	add := func(clause string, arg any) {
+		args = append(args, arg)
+		where = append(where, fmt.Sprintf(clause, len(args)))
+	}
+	if f.EquipmentID != nil {
+		add("equipment_id = $%d", *f.EquipmentID)
+	}
+	if f.CustomerID != nil {
+		add("customer_id = $%d", *f.CustomerID)
+	}
+	// No scope means every ticket in the shop, which is never what a caller
+	// meant to ask for. Refuse rather than quietly return the whole business.
+	if len(where) == 0 {
+		return domain.ServiceCostSummary{}, fmt.Errorf("service cost summary: no scope given")
+	}
+
+	// The window is applied per sub-record, against the day the work actually
+	// happened, not against the ticket. A ticket opened in January and worked
+	// in April belongs to April's numbers.
+	partWindow, entryWindow := "", ""
+	if !f.Since.IsZero() {
+		args = append(args, f.Since)
+		partWindow = fmt.Sprintf(" AND %s >= $%d::date", servicePartCostDate, len(args))
+		entryWindow = fmt.Sprintf(" AND e.performed_on >= $%d::date", len(args))
+	}
+
+	query := `
+	WITH scoped AS (
+	    SELECT id FROM service_tickets WHERE ` + strings.Join(where, " AND ") + `
+	), parts AS (
+	    SELECT p.ticket_id, p.unit_cost_cents::bigint * p.quantity AS cents
+	    FROM service_parts p JOIN scoped s ON s.id = p.ticket_id
+	    WHERE true` + partWindow + `
+	), entries AS (
+	    SELECT e.ticket_id, e.minutes, e.kind, e.billable, e.rate_cents
+	    FROM service_time_entries e JOIN scoped s ON s.id = e.ticket_id
+	    WHERE true` + entryWindow + `
+	)
+	SELECT
+	    (SELECT COALESCE(SUM(cents), 0) FROM parts),
+	    (SELECT count(*) FROM parts),
+	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE kind = 'labor'), 0) FROM entries),
+	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE kind = 'travel'), 0) FROM entries),
+	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE billable), 0) FROM entries),
+	    -- Each hour at the rate it was booked at, rounded per entry so the
+	    -- figure matches the per-entry ones a staffer can read off the ticket.
+	    (SELECT COALESCE(SUM(round(minutes::bigint * rate_cents / 60.0)), 0) FROM entries
+	      WHERE rate_cents IS NOT NULL),
+	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE rate_cents IS NULL), 0) FROM entries),
+	    (SELECT count(DISTINCT ticket_id) FROM (
+	        SELECT ticket_id FROM parts UNION ALL SELECT ticket_id FROM entries
+	     ) touched)`
+
+	var out domain.ServiceCostSummary
+	if err := tx.QueryRow(ctx, query, args...).Scan(
+		&out.PartsCostCents, &out.PartCount,
+		&out.LaborMinutes, &out.TravelMinutes, &out.BillableMinutes,
+		&out.LaborCostCents, &out.UncostedMinutes,
+		&out.Visits,
+	); err != nil {
+		return domain.ServiceCostSummary{}, fmt.Errorf("service cost summary: %w", err)
+	}
+	return out, nil
+}
+
+// ServiceAccountCostFilter scopes the cross-account table.
+type ServiceAccountCostFilter struct {
+	// Since bounds the window. Zero means all time.
+	Since time.Time
+	Sort  domain.ServiceAccountCostSort
+	Limit int
+}
+
+// AnyCostedTime reports whether a logged hour inside the window carries a rate.
+//
+// Asked before a cost ranking, because with no costed hour the cost ordering
+// degenerates into ordering by parts spend — the same rows in the same order,
+// under a column heading that claims to mean something else.
+//
+// Windowed on the same performed_on the ranking itself uses, and a zero since
+// means all time, exactly as in ServiceAccountCostFilter. Asked globally it
+// answered a different question from the one the caller has: a rate set and
+// used last year would keep the Cost column alive over a quarter whose every
+// hour is uncosted, which is the degenerate ranking this guard exists to catch.
+func (s *ServiceTicketStore) AnyCostedTime(ctx context.Context, tx pgx.Tx, since time.Time) (bool, error) {
+	var args []any
+	window := ""
+	if !since.IsZero() {
+		args = append(args, since)
+		window = fmt.Sprintf(" AND performed_on >= $%d::date", len(args))
+	}
+	var exists bool
+	if err := tx.QueryRow(ctx,
+		`SELECT EXISTS (SELECT 1 FROM service_time_entries WHERE rate_cents IS NOT NULL`+window+`)`,
+		args...,
+	).Scan(&exists); err != nil {
+		return false, fmt.Errorf("any costed time: %w", err)
+	}
+	return exists, nil
+}
+
+// CostByCustomer ranks every account by what servicing it has taken.
+//
+// Driven by work recorded, not by the customer list: an account nobody has
+// touched in the window has no row, because a table padded with zeros buries
+// the handful of rows worth reading. That also means the result is naturally
+// small — it is bounded by "customers we did service work for this quarter".
+//
+// Parts and time entries are normalised into one shape and aggregated together
+// rather than joined as two per-customer aggregates. Joining is the obvious
+// way, and an *inner* join is the one that quietly drops the customer who had
+// parts but no hours logged, or the reverse — the UNION keeps both sides
+// without anybody having to remember which join type does that.
+func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f ServiceAccountCostFilter) ([]domain.ServiceAccountCost, error) {
+	var args []any
+
+	partWindow, entryWindow := "", ""
+	if !f.Since.IsZero() {
+		args = append(args, f.Since)
+		partWindow = fmt.Sprintf(" AND %s >= $%d::date", servicePartCostDate, len(args))
+		entryWindow = fmt.Sprintf(" AND e.performed_on >= $%d::date", len(args))
+	}
+
+	orderBy := "total_minutes DESC, parts_cents DESC"
+	switch f.Sort {
+	case domain.ServiceAccountCostByParts:
+		orderBy = "parts_cents DESC, total_minutes DESC"
+	case domain.ServiceAccountCostByVisits:
+		orderBy = "visits DESC, total_minutes DESC"
+	case domain.ServiceAccountCostByCost:
+		// Ranked on the costs the entries actually carry, which is the same
+		// number the Cost column prints. Nothing is passed in: since the rate
+		// moved onto the entry there is no "current rate" for a report to
+		// apply, which is the whole point of the snapshot.
+		orderBy = "(parts_cents + labor_cents) DESC, total_minutes DESC"
+	}
+
+	limit := ""
+	if f.Limit > 0 {
+		args = append(args, f.Limit)
+		limit = fmt.Sprintf(" LIMIT $%d", len(args))
+	}
+
+	query := `
+	WITH combined AS (
+	    SELECT t.customer_id, p.ticket_id, p.unit_cost_cents::bigint * p.quantity AS cents,
+	           0 AS minutes, NULL::text AS kind, false AS billable, true AS is_part,
+	           NULL::integer AS rate_cents,
+	           ` + servicePartCostDate + ` AS on_day
+	    FROM service_parts p
+	    JOIN service_tickets t ON t.id = p.ticket_id
+	    WHERE true` + partWindow + `
+	    UNION ALL
+	    SELECT t.customer_id, e.ticket_id, 0, e.minutes, e.kind, e.billable, false,
+	           e.rate_cents, e.performed_on
+	    FROM service_time_entries e
+	    JOIN service_tickets t ON t.id = e.ticket_id
+	    WHERE true` + entryWindow + `
+	), agg AS (
+	    SELECT customer_id,
+	           COALESCE(SUM(cents), 0)                                  AS parts_cents,
+	           count(*) FILTER (WHERE is_part)                          AS part_count,
+	           COALESCE(SUM(minutes) FILTER (WHERE kind = 'labor'), 0)  AS labor_minutes,
+	           COALESCE(SUM(minutes) FILTER (WHERE kind = 'travel'), 0) AS travel_minutes,
+	           COALESCE(SUM(minutes) FILTER (WHERE billable), 0)        AS billable_minutes,
+	           COALESCE(SUM(minutes), 0)                                AS total_minutes,
+	           -- Hours at the rate each was booked at. is_part rows carry a
+	           -- NULL rate and are excluded by the same filter that excludes a
+	           -- genuinely uncosted hour, which is why the parts side had to be
+	           -- given the column at all.
+	           -- bigint: minutes * cents overflows int32 near 358k minutes, and
+	           -- this sum spans every account — one long-lived machine would
+	           -- take the whole report down rather than just its own row.
+	           COALESCE(SUM(round(minutes::bigint * rate_cents / 60.0))
+	                    FILTER (WHERE NOT is_part AND rate_cents IS NOT NULL), 0)
+	                                                                    AS labor_cents,
+	           COALESCE(SUM(minutes) FILTER (WHERE NOT is_part AND rate_cents IS NULL), 0)
+	                                                                    AS uncosted_minutes,
+	           count(DISTINCT ticket_id)                                AS visits,
+	           max(on_day)                                              AS last_work_on
+	    FROM combined
+	    GROUP BY customer_id
+	)
+	SELECT a.customer_id,
+	       COALESCE(NULLIF(c.company_name, ''), TRIM(c.first_name || ' ' || c.last_name), c.email),
+	       COALESCE(m.machines, 0),
+	       a.parts_cents, a.part_count, a.labor_minutes, a.travel_minutes,
+	       a.billable_minutes, a.labor_cents, a.uncosted_minutes, a.visits, a.last_work_on
+	FROM agg a
+	JOIN customers c ON c.id = a.customer_id
+	LEFT JOIN (
+	    SELECT customer_id, count(*) AS machines FROM equipment
+	    WHERE status <> 'retired' GROUP BY customer_id
+	) m ON m.customer_id = a.customer_id
+	ORDER BY ` + orderBy + `, c.company_name, c.last_name` + limit
+
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("service cost by customer: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.ServiceAccountCost
+	for rows.Next() {
+		var r domain.ServiceAccountCost
+		if err := rows.Scan(
+			&r.CustomerID, &r.CustomerName, &r.MachineCount,
+			&r.Summary.PartsCostCents, &r.Summary.PartCount,
+			&r.Summary.LaborMinutes, &r.Summary.TravelMinutes,
+			&r.Summary.BillableMinutes, &r.Summary.LaborCostCents,
+			&r.Summary.UncostedMinutes, &r.Summary.Visits, &r.LastWorkOn,
+		); err != nil {
+			return nil, fmt.Errorf("scan service cost by customer: %w", err)
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("service cost by customer: %w", err)
 	}
 	return out, nil
 }

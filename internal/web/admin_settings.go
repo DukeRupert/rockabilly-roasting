@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,13 +47,18 @@ type settingsSection struct {
 	// reading it twice would let the "No box presets" warning render above a
 	// table that has one.
 	BoxPresets []domain.BoxPreset
+	// ServiceEnabled draws the Service tab. Read here rather than per-page so
+	// every tab in the section agrees about whether the strip has six entries
+	// or five.
+	ServiceEnabled bool
 }
 
 // nav derives the tab strip + attention list for a staffer.
 func (s settingsSection) nav(role string) admin.SettingsNav {
 	return admin.SettingsNav{
-		StaffRole: role,
-		Issues:    admin.SettingsIssuesFor(s.Shipping, s.QB, s.QBEnabled, len(s.BoxPresets)),
+		StaffRole:      role,
+		Issues:         admin.SettingsIssuesFor(s.Shipping, s.QB, s.QBEnabled, len(s.BoxPresets)),
+		ServiceEnabled: s.ServiceEnabled,
 	}
 }
 
@@ -64,7 +70,10 @@ func (s settingsSection) nav(role string) admin.SettingsNav {
 // on its own so a failure there stays a failure there. See the comment at that
 // read.
 func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error) {
-	out := settingsSection{QBEnabled: d.QBOAuthManager != nil}
+	out := settingsSection{
+		QBEnabled:      d.QBOAuthManager != nil,
+		ServiceEnabled: d.ModuleService.Enabled(domain.ModuleEquipmentService),
+	}
 
 	// The QuickBooks status gets its own transaction, deliberately. A failed
 	// status read must not take the settings page down — the shipping form
@@ -146,15 +155,33 @@ func settingsFlash(r *http.Request) admin.Flash {
 	return admin.Flash{Message: r.URL.Query().Get("flash")}
 }
 
-// redirectFlash and redirectFlashError send the staffer back to a settings page
-// with a message. Values are query-escaped here so callers can write the
-// sentence rather than its encoding.
+// redirectFlash and redirectFlashError send the staffer back to a page with a
+// message. Values are query-escaped here so callers can write the sentence
+// rather than its encoding.
+//
+// The separator is chosen, not assumed. These originally appended "?flash=" to
+// whatever they were given, which is right for a bare path and silently wrong
+// for one that already carries a query: the maintenance due list redirects back
+// to "…/maintenance?scope=overdue", and the result was
+// "?scope=overdue?flash=…" — one parameter whose value is the rest of the URL.
+// The scope came back as garbage and fell to the default, bouncing the staffer
+// off the tab they were working, and the message was never read at all, so a
+// rejected save looked exactly like a successful one.
 func redirectFlash(w http.ResponseWriter, r *http.Request, path, msg string) {
-	http.Redirect(w, r, path+"?flash="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, withQuery(path, "flash", msg), http.StatusSeeOther)
 }
 
 func redirectFlashError(w http.ResponseWriter, r *http.Request, path, msg string) {
-	http.Redirect(w, r, path+"?flash_error="+url.QueryEscape(msg), http.StatusSeeOther)
+	http.Redirect(w, r, withQuery(path, "flash_error", msg), http.StatusSeeOther)
+}
+
+// withQuery appends one query parameter to a path that may already have some.
+func withQuery(path, key, value string) string {
+	sep := "?"
+	if strings.Contains(path, "?") {
+		sep = "&"
+	}
+	return path + sep + key + "=" + url.QueryEscape(value)
 }
 
 // handleAdminSettings renders the Shipping tab — the section's landing page.
@@ -543,8 +570,23 @@ func parseDollarsCents(raw string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	// ParseFloat accepts "Inf", "+Inf" and "NaN" as valid float64s. Neither is
+	// caught by the negative check below — NaN compares false against
+	// everything, and +Inf is cheerfully positive — and converting either to an
+	// int is undefined behaviour that lands on a large negative number in
+	// practice. A settings field that turns "NaN" into a negative rate is worse
+	// than one that refuses it.
+	if math.IsNaN(dollars) || math.IsInf(dollars, 0) {
+		return 0, fmt.Errorf("not an amount")
+	}
 	if dollars < 0 {
 		return 0, fmt.Errorf("negative amount")
+	}
+	// Bounded so the conversion cannot overflow. The ceiling is far above any
+	// figure a shop setting holds — the point is that it exists, not where it
+	// sits.
+	if cents := dollars*100 + 0.5; cents > math.MaxInt32 {
+		return 0, fmt.Errorf("amount too large")
 	}
 	return int(dollars*100 + 0.5), nil
 }

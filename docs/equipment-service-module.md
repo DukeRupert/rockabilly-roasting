@@ -2,8 +2,10 @@
 
 Status: v1 built — module registry, schema, store layer, the equipment register,
 the ticket queue with its merged timeline, parts and hours, the daily stale
-sweep, and the wholesale portal. What is left is the v2 list at the end.
-Written 2026-08-24, last updated 2026-08-26.
+sweep, and the wholesale portal. Preventive maintenance and the cost roll-ups
+(the first two thirds of v2) plus labour rates built 2026-08-29 — see *Preventive maintenance* and
+*Cost roll-ups* below. What is left is the rest of the v2 list at the end.
+Written 2026-08-24, last updated 2026-08-29.
 
 ## The job
 
@@ -83,8 +85,9 @@ Equipment register, tickets, parts, time, notes, customer-reported problems,
 and the "we haven't talked to them" flag.
 
 **v2 — the parts that need v1 in the wild first.**
-Preventive maintenance schedules (interval- or volume-based), billing a ticket
-out as a draft order, per-account service reporting.
+Preventive maintenance schedules (**built** — interval-based; volume-based
+still open), service cost reporting (**built** — per machine, per account, and
+across accounts), billing a ticket out as a draft order.
 
 **Not building.** A second invoicing engine (tickets bill through the existing
 draft-order → invoice → QuickBooks path or not at all), a tech scheduling
@@ -443,22 +446,282 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
 
 ## v2, briefly
 
-- **Preventive maintenance schedules.** `service_schedules` on an equipment row:
-  every N days, or every N pounds of coffee — Hiri already knows the pounds.
-  A daily job opens a `routine` ticket when one comes due. The volume-based
-  trigger is the differentiated one; nobody else can compute it.
+- **Preventive maintenance schedules — built.** See *Preventive maintenance*
+  below. Interval-based only; the volume-based trigger (every N pounds of
+  coffee, which Hiri already knows) is still the differentiated one and is
+  still unbuilt.
 - **Billing a ticket out.** "Create draft order" from a resolved billable
   ticket: parts as line items, billable minutes against a labor variant at a
   configured rate. Reuses the draft order → invoice → QuickBooks path that
   already exists. Do not build a second money path.
-- **Per-account service report.** Hours and part spend by customer over a
-  period — the number that tells a merchant which account is unprofitable.
+- **Per-account service report — built.** Hours and part spend appear on a
+  machine's page, on a customer's rail, and ranked across every account at
+  `/admin/service/costs`. See *Cost roll-ups*.
+
+## Preventive maintenance
+
+Migration `081_service_plans.sql`. Four tables, in two pairs: a **template**
+(`service_plans` + `service_plan_tasks`) and its **instances**
+(`equipment_service_plans` + `service_maintenance_due`).
+
+A shop services a dozen Linea PBs and the manufacturer's schedule is the same on
+every one, so the series is written once as a plan and assigned to machines.
+What is per-machine is the *anchor date* and *whether the customer pays*.
+
+### The tables
+
+| Table | What it holds |
+|---|---|
+| `service_plans` | A named series — "Linea PB — warranty schedule". Case-insensitively unique name; `active` retires one from the picker without disturbing machines on it. |
+| `service_plan_tasks` | One job in the series: `interval_days`, `lead_days` (how far ahead it starts asking), `warranty_required`. |
+| `equipment_service_plans` | A plan on a machine from `starts_on`, with `under_contract` / `contract_ends_on`. `ended_at` stops it generating work. |
+| `service_maintenance_due` | One dated occurrence. Exactly one `pending` row per (assignment, task), enforced by a partial unique index. |
+
+Occurrences are **materialised**, not computed from `anchor + n × interval`. The
+schedule has to survive contact with reality: a task done two weeks late
+re-anchors the next one to when it was *actually* done, a task skipped keeps the
+original cadence, and a pure function of the anchor could express neither.
+
+### The rules
+
+- **Closing writes the successor, in the same transaction** — for a live
+  assignment. A completion that produced no next occurrence is a machine that
+  silently falls off the schedule at the moment it was last serviced. Ending an
+  assignment clears the pending rows nothing has been booked against — ones
+  already carrying a ticket survive, so the ticket is not orphaned — and closing
+  one out afterwards from a stale page must not resurrect the schedule, so that
+  case deliberately writes no successor. `ServicePlanService.closeDue` is the only
+  path, and `CloseDue` is scoped to `status = 'pending'` so a double submit
+  closes it once.
+- **Completion re-anchors; a skip does not.** `NextDueAfterCompletion` counts
+  from the day the work happened. `NextDueAfterSkip` counts from the day it was
+  *due*, then steps forward whole intervals until it is in the future — so
+  skipping a badly overdue item still clears the row.
+- **The first occurrence is never pushed forward.** Assigning a plan with an
+  anchor two years back is how a shop *discovers* a machine is overdue.
+- **The contract decides what "due" does.** Covered work inside its lead window
+  opens itself a `routine` ticket overnight — 03:00 merchant time, on a
+  wall-clock schedule (`jobs.DailySchedule`) so "overnight" does not drift to
+  whenever the last deploy happened — and attaches it. Uncovered work is
+  never booked — that would commit the shop to a visit nobody agreed to pay for
+  — and lands on the **call list** instead, which is a human's job.
+
+### Admin UI
+
+Three new tabs in the Service section — `Maintenance`, `Plans` and `Costs`.
+
+- `/admin/service/maintenance` — the due list, scoped: everything due, overdue,
+  **warranty at risk**, the **call list**, and history. Each pending row carries
+  an inline "done on `<date>`" form (back-dating is the common case), Skip, and
+  "Book a visit", which passes `maintenance_id` through the ticket form so the
+  finished ticket attaches to the occurrence.
+- `/admin/service/maintenance/calendar` — a six-week month grid, Monday-first.
+- `/admin/service/plans` and `/admin/service/plans/{id}` — write a plan, add
+  jobs to the series. Editing a task's interval shifts every pending occurrence
+  that is not yet owed — overdue and due-today work stays put — which is the
+  point of a plan being a template.
+- The machine's page grows a **Maintenance** card: which plans it is on, what is
+  coming up, and the form for putting it on another.
+- The dashboard command bar gets an overdue-maintenance chip, asked for only
+  where the module is on.
+
+### The daily job
+
+`service_maintenance_sweep` (River, daily, no `RunOnStart` — the booking half
+opens real tickets, and a deploy is not a reason for a machine to acquire a
+visit). It backfills missing occurrences from `ListMissingDue`, books the
+covered work, and publishes `service_maintenance_due_total{scope}` and increments
+`service_maintenance_booked_total` once per visit it opens.
+
+Backfill is the fan-out path for *existing* machines: `AddTask` deliberately
+does not reach the forty already on a plan, because one job that finds every gap is easier
+to trust than several paths that each find some. Booking is capped at
+`bookingLimit` a day.
+
+## Cost roll-ups
+
+`ServiceTicketStore.CostSummary` widens the per-ticket `Totals` query to a whole
+machine or a whole account, over an optional window. It is deliberately a
+*widening* — `domain.ServiceCostSummary` embeds `ServiceTotals` rather than
+restating its fields, so a machine page and the ticket beside it can never
+disagree about what a repair cost.
+
+**Everything recorded counts, billable or not.** What the work cost the shop and
+what the customer was charged are different questions; billable minutes come
+back alongside the total, never instead of it. Parts count from the moment the
+line is written, whatever their status — a part sitting at `needed` has cost
+committed, and dropping it would make a repair in progress look free.
+
+Two decisions worth knowing:
+
+- **The window is measured against the day work happened**, not the day the
+  ticket was raised. A ticket opened in January and worked in April is April's
+  cost. Time entries use `performed_on`; parts have no single spend date, so
+  they fall through `installed_on → received_on → ordered_on → created_at`,
+  which puts every part in exactly one window.
+- **Visits are tickets that carried work**, not tickets that exist. A ticket
+  that was only ever a phone call is not a visit, and counting it would flatter
+  the hours-per-visit figure the number exists to expose.
+
+Three windows are drawn at once — 90 days, 12 months, all time — rather than
+behind a period selector. The question is never "what did last quarter cost" on
+its own; it is whether this machine is getting worse, and that is a comparison a
+toggle makes you hold in your head.
+
+Surfaces: the **What it has cost** card in the main column of a machine's page
+(the quantified form of the repair history under it), and a compact **Service
+cost** card on the customer page's rail, scoped to the customer so the
+call-outs that never named a machine still count.
+
+An unscoped `CostSummary` is an error rather than the whole shop's numbers.
+
+### The cross-account table
+
+`/admin/service/costs` — the Costs tab. Every account that took service work in
+a period, ranked, with the machines it has beside the hours it took. The row
+worth finding is large hours over few machines, which is why the machine count
+is in the table rather than left to memory.
+
+`CostByCustomer` normalises parts and time entries into one shape and aggregates
+them together. Joining two per-customer aggregates is the obvious
+implementation, and an *inner* join is the one that quietly drops the account
+with parts but no hours logged — the UNION keeps both sides without anybody
+having to remember which join type does that. There is a test for exactly that.
+
+**The money figure exists only once the shop supplies a rate.** Parts are in
+cents and work is in minutes; blending them needs an hourly cost, and inventing
+one would put a made-up number at the top of a report meant to settle arguments.
+Set a rate in Settings → Service and a Cost column appears on all three
+surfaces, and Cost becomes the default ranking. With nothing to cost — no rate
+set and no hour carrying one — the Cost option is not offered at all and a cost
+ranking asked for by URL falls back to hours, because ordering by
+`parts_cents + 0` under a Cost heading would be the misleading label this report
+was built to avoid.
+
+`ServiceAccountCostByCost` ranks on `parts_cents + labor_cents` — the same
+figure the Cost column prints, ordered in SQL because it has to precede the
+LIMIT. `ServiceAccountReport.CanCost` decides both whether that ranking is
+offered and whether the column is drawn, from one signal so the two cannot
+disagree: true as soon as either an hour carries a rate or the shop has set one.
+
+Every link in the control strip names its ranking, including Hours. A link that
+omitted the parameter would read to the handler as "no preference", which is the
+request for the default — so the Hours tab would come back ranked by cost.
+
+Rows are driven by work recorded, not by the customer list: an account nobody
+touched in the window has no row, so the table stays as short as the finding is.
+The footer totals only what is shown, and a truncated table says so in red
+rather than looking complete.
+
+## Labour rates
+
+Migration `082_service_labor_rates.sql` adds two nullable columns to
+`store_settings`, edited on **Settings → Service** (module-gated, so the tab
+does not exist on a shop that only sells coffee).
+
+**These are cost rates, not prices.** The reports they feed say plainly that
+they measure what work cost the shop rather than what it earned, and a
+charge-out rate dropped into that column would quietly turn a cost report into a
+revenue one. Billing a ticket out — still unbuilt — will want its own charge
+rate when it lands; it is deliberately not this column.
+
+- **Nullable, not defaulted to zero.** There is no rate a shop can be assumed to
+  have, and a zero would render as "$0.00 of labour" — a number that looks
+  measured. Unset is the shipped state and every money surface hides itself.
+  `Set()` is false for a nil *or* zero labour rate, so the two cannot diverge.
+- **Travel has its own rate, falling back to labour.** `service_time_entries`
+  splits travel from labour because it bills differently or not at all; a second
+  rate honours that split. Nil means "cost it as labour", and an explicit `0.00`
+  means the shop absorbs the drive — which is why the form takes strings and
+  blank is not zero.
+- **A travel rate with no labour rate is refused**, and so is a labour rate of
+  zero. There is one spelling of "unset" and it is blank: `Set()` reads a zero
+  as unset, so saving one would stamp every hour uncosted while the settings
+  page showed a figure somebody had typed. Travel keeps its zero, where it
+  means the shop absorbs the drive.
+- **Costing rounds to the nearest cent**, not truncated. These figures are
+  summed across hundreds of entries; a fraction lost on each would drift away
+  from the same numbers computed any other way.
+- **Rates are snapshotted per time entry** (migration `083`). See below.
+
+### The snapshot
+
+`service_time_entries.rate_cents` holds what the hour was booked at, stamped
+when the entry is written and never touched by a settings change. The reports
+sum `minutes × rate_cents` per entry; there is no "current rate" for them to
+apply, which is the point.
+
+Before this, raising the rate in March silently made last August more expensive.
+That is the opposite of what a cost record is for: the hour was bought at the
+rate of the day, and that is a fact about the past.
+
+- **The travel fallback resolves at stamp time.** A travel entry logged while
+  only a labour rate existed records the labour rate, so a shop that later adds
+  a travel rate does not retrospectively re-price drives it already made.
+- **Migration 083 backfills at the rate the reports were already using**, so it
+  changes no number anybody can see. A shop with no rate set gets NULL, which is
+  what its reports already showed. On a fresh deploy that is *every* shop: 082
+  adds the rate columns as NULL in the same release, so the backfill finds
+  nothing. It earns its place only for an instance that ran 082 long enough for
+  somebody to set a rate.
+- **Neither 081 nor 083 ships an index nobody reads.** 083 originally added one
+  on `rate_cents`, and 081 one on `service_maintenance_due.ticket_id`. Every
+  read of `rate_cents` is an aggregate `FILTER` inside a `SUM`, the one
+  existence check tests the complement, and nothing looks an occurrence up by
+  its ticket — so both cost a write on every row and were never read. Removed
+  from the migrations themselves rather than dropped by a later one, since
+  neither had run anywhere but a dev box.
+- **NULL means uncosted, not free.** `UncostedMinutes` rides alongside the cost
+  on every summary, and each surface says how many hours are unpriced rather
+  than letting a total read as complete. `FullyCosted()` is the check.
+- **An explicit `0.00` is a decision** — the shop absorbs the hour — and stays
+  distinguishable from never having priced it. That is why the forms take
+  strings: blank is not zero.
+- **Repricing is by hand, one row at a time**, on the ticket the hour was logged
+  on (`POST /admin/service/tickets/{id}/time/{childID}/rate`, audited as
+  `service_ticket.time_repriced`). Blank returns an hour to unpriced without
+  touching the minutes. This is the deliberate counterpart to the snapshot: a
+  correction is a decision somebody makes and signs for, not a side effect of a
+  settings save.
+
+### Rescheduling on an interval change
+
+`domain.RescheduledDue` shifts a pending occurrence by the difference between
+the old and new intervals, rather than recomputing it from an anchor.
+
+Recomputing was wrong in a way that took a review to find. The anchor came from
+`max(completed_on)`, and a **skip leaves no completion** — so a skipped
+occurrence jumped back to one interval after the last time the task was actually
+done, months into the past. Past-due covered work is inside the sweep's booking
+window, so the next night's run opened a real customer ticket for the visit the
+customer had just declined.
+
+Shifting needs no anchor: the occurrence's date was produced by adding the old
+interval to *something*, so subtracting it and adding the new one keeps the same
+cadence whatever that something was.
+
+Two rules on top of the shift, both about not letting an interval edit rewrite
+what is owed now:
+
+- **Work already owed does not move at all** — overdue, *or due today*. The
+  test is "is this owed now", not "is this late": due-today is `DueSoon` and
+  `BookableOn` is true for it, so the sweep would book it tonight. Lengthening
+  an interval must not clear it — a task due today going from weekly to yearly
+  would jump a year out, taking a warranty-critical job off the list nobody
+  would then think to look for. The new interval governs the *next* occurrence,
+  measured from whenever this one is finally done.
+- **Future work is shifted**, then stepped forward whole intervals if that lands
+  it in the past, for the booking reason above.
+
+
 
 ## Open decisions
 
-1. **Does service get billed?** The schema captures `billable` from day one, so
-   this can be answered late — but it decides whether v2 leads with billing or
-   with schedules.
+1. **Does service get billed?** The schema captures `billable` from day one.
+   Schedules landed first; billing a ticket out as a draft order is still
+   unbuilt. Auto-booked maintenance is opened `billable = false` on the grounds
+   that a contract has already been paid for — revisit if service starts
+   invoicing.
 2. **Stale window default.** 7 days is a guess, and currently a constant
    (`domain.DefaultStaleContactWindow`) rather than a settings row — nothing has
    run long enough to argue with it. The sweep job in step 6 makes it
@@ -498,3 +761,44 @@ changes, so it is safe to ship before any UI exists and safe to roll back.
    to staff in the same transaction. `down` skips the quiet-hours deferral,
    which is what `Enqueuer.notifyOpts` was built for. Rate-limited **per
    account**, not per IP: a cafe is one account behind one router.
+8. **Done.** Preventive maintenance (migration `081_service_plans.sql`): plans
+   and their task series, assignment onto a machine from an anchor date with a
+   contract flag, materialised occurrences that complete and re-anchor, the due
+   list with its warranty-at-risk and call-list scopes, the month calendar, the
+   Maintenance card on a machine's page, the dashboard chip, and the daily
+   `service_maintenance_sweep` that backfills and books covered work. Details in
+   *Preventive maintenance* above.
+9. **Done.** Cost roll-ups: `CostSummary` widening `Totals` to a machine or an
+   account over a window, the three-window card on the machine page, and the
+   compact one on the customer rail. Details in *Cost roll-ups* above.
+10. **Done.** The cross-account cost table at `/admin/service/costs`, ranked by
+    hours, parts spend, or visits over 90 days / 12 months / all time. Read-only,
+    so finance can open it. Details in *Cost roll-ups → The cross-account table*.
+11. **Done.** Labour rates (migration `082_service_labor_rates.sql`) on a
+    module-gated Settings → Service tab, and the Cost column and cost ranking
+    they unlock across the three cost surfaces. Details in *Labour rates* above.
+12. **Done.** Rate snapshots (migration `083_time_entry_rate_snapshot.sql`):
+    `service_time_entries.rate_cents`, stamped at write time and backfilled at
+    the rate then in force, plus the per-entry repricing form. Changing the
+    shop's rate no longer re-costs the past. Details in *Labour rates → The
+    snapshot*.
+13. **Done.** Fifteen rounds of independent review, every one of which failed
+    the branch.
+
+    The defects that mattered: an interval edit that could book a visit the
+    customer had declined; `AttachTicket` silently no-opping and crossing
+    accounts; nineteen validation sentinels answering 500 instead of 400;
+    `bg-rr-paper-warm`, which is not a token, leaving today unmarked on the
+    calendar; Skip rejecting every attempt because the handler demanded a date
+    its form never sent; and a helper a careless regex rewrote into a call to
+    itself, fatal to the process.
+
+    Separately from those, **ten fixes were asserted in a commit message and
+    were not in the tree** — including one where the "fix" rewrote a doc to
+    ratify the bug it was meant to correct.
+
+    That is the failure mode worth carrying forward. None of it was visible to
+    the compiler, the linter, or the test suite, so a green `mage check` was
+    never evidence against any of it. What caught it was opening the pages,
+    posting what the forms actually post, and grepping each claimed fix back out
+    of the tree before writing it down.

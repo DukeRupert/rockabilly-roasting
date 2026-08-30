@@ -17,8 +17,11 @@ import templruntime "github.com/a-h/templ/runtime"
 // chrome offering no choice.
 
 const (
-	serviceTabTickets   = "/admin/service"
-	serviceTabEquipment = "/admin/service/equipment"
+	serviceTabTickets     = "/admin/service"
+	serviceTabEquipment   = "/admin/service/equipment"
+	serviceTabMaintenance = "/admin/service/maintenance"
+	serviceTabPlans       = "/admin/service/plans"
+	serviceTabCosts       = "/admin/service/costs"
 )
 
 // ServiceNav is the per-request state the strip needs.
@@ -29,12 +32,21 @@ type ServiceNav struct {
 	// section so a ticket going quiet cannot hide behind a tab nobody clicked —
 	// the same rule the Settings attention list follows.
 	StaleCount int
+	// OverdueMaintenance is preventive work past its due date. It rides on the
+	// Maintenance tab for the same reason StaleCount rides on Tickets: the
+	// number is only useful if it is visible from the page you happen to be on.
+	// Due-soon work is deliberately not counted here — a badge that is never
+	// zero is a badge nobody reads.
+	OverdueMaintenance int
 }
 
 func (n ServiceNav) tabs() []sectionTab {
 	return []sectionTab{
 		{Label: "Tickets", Href: serviceTabTickets, Count: n.StaleCount},
 		{Label: "Equipment", Href: serviceTabEquipment},
+		{Label: "Maintenance", Href: serviceTabMaintenance, Count: n.OverdueMaintenance},
+		{Label: "Plans", Href: serviceTabPlans},
+		{Label: "Costs", Href: serviceTabCosts},
 	}
 }
 

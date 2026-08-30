@@ -19,6 +19,10 @@ type ServiceTicketFormValues struct {
 	Severity    string
 	AssignedTo  string
 	Billable    string
+	// MaintenanceID rides through the form when the ticket was started from a
+	// due maintenance row. On submit the ticket is attached to that occurrence,
+	// so the due list stops asking about work that is now booked.
+	MaintenanceID string
 }
 
 // ServiceTicketNewProps is the state of the open-a-ticket form.
@@ -64,6 +68,9 @@ templ ServiceTicketNewContent(props ServiceTicketNewProps) {
 		</div>
 	}
 	<form method="post" action="/admin/service/tickets" class="mt-6 border border-rr-border bg-rr-surface p-6">
+		if props.Values.MaintenanceID != "" {
+			<input type="hidden" name="maintenance_id" value={ props.Values.MaintenanceID }/>
+		}
 		<div class="grid grid-cols-1 gap-4 sm:grid-cols-6">
 			<div class="sm:col-span-3">
 				<label for="customer_id" class="block text-sm font-medium text-rr-heading">Customer</label>

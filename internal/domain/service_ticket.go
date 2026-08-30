@@ -360,7 +360,26 @@ type ServiceTimeEntry struct {
 	Billable    bool
 	Note        string
 	CreatedAt   time.Time
+	// RateCents is the hourly cost this entry was booked at, captured when it
+	// was written. Nil means uncosted: the hour was logged before the shop had
+	// a rate, and the reports count its minutes and none of its money.
+	//
+	// A settings change never touches this. The hour was bought at the rate of
+	// the day, and that is a fact about the past — see migration 083.
+	RateCents *int
 }
+
+// CostCents is what this entry cost, rounded to the nearest cent. Zero for an
+// uncosted entry, which is honest: nobody has said what that hour was worth.
+func (e ServiceTimeEntry) CostCents() int {
+	if e.RateCents == nil {
+		return 0
+	}
+	return costMinutes(e.Minutes, *e.RateCents)
+}
+
+// Costed reports whether this entry carries a rate.
+func (e ServiceTimeEntry) Costed() bool { return e.RateCents != nil }
 
 // ServiceTotals is the roll-up a ticket page and an account report both need:
 // what the parts cost and where the hours went.
@@ -371,7 +390,278 @@ type ServiceTotals struct {
 	// BillableMinutes counts both kinds, since a shop that bills travel bills
 	// it by the minute like anything else.
 	BillableMinutes int
+	// LaborCostCents is what the hours cost, summed from the rate stamped on
+	// each entry rather than computed from whatever the shop charges today.
+	// That is the point of the snapshot: this number does not move when
+	// somebody edits the rate in Settings.
+	LaborCostCents int
+	// UncostedMinutes are minutes on entries carrying no rate — logged before
+	// the shop set one. Carried so a surface can say "and 4h we never priced"
+	// instead of quietly counting those hours as free.
+	UncostedMinutes int
 }
 
 // TotalMinutes is every minute recorded against the ticket, billable or not.
 func (t ServiceTotals) TotalMinutes() int { return t.LaborMinutes + t.TravelMinutes }
+
+// ServiceCostSummary is what a machine or an account has cost over a window:
+// the same roll-up as a single ticket, widened.
+//
+// It embeds ServiceTotals rather than restating its fields so the two can never
+// disagree. A machine page reporting $40 while the ticket beside it says $58
+// would read as a bug in the money, which is the worst kind to have.
+type ServiceCostSummary struct {
+	ServiceTotals
+	// PartCount is how many part lines went into the cost, so "$340" can be
+	// read as "$340 across twelve parts" rather than left as a bare number.
+	PartCount int
+	// Visits is the number of distinct tickets that carried any of this work.
+	// Not the number of tickets raised: a ticket that was only ever a phone
+	// call is not a visit, and counting it would flatter the hours-per-visit
+	// figure this exists to expose.
+	Visits int
+}
+
+// Any reports whether anything at all was recorded in the window. Used to tell
+// "nothing has been spent on this" from "we have not started tracking yet",
+// which are the same zero and different sentences.
+func (s ServiceCostSummary) Any() bool {
+	return s.PartsCostCents > 0 || s.TotalMinutes() > 0 || s.Visits > 0
+}
+
+// MinutesPerVisit is the average length of a visit, in minutes, or zero when
+// there have been none. The number that says whether a machine is a quick
+// call-out or an afternoon every time.
+func (s ServiceCostSummary) MinutesPerVisit() int {
+	if s.Visits == 0 {
+		return 0
+	}
+	return s.TotalMinutes() / s.Visits
+}
+
+// ServiceLaborRates is what an hour of the crew's time costs the shop.
+//
+// Cost, not price. These feed reports that say they measure what work cost
+// rather than what it earned; a charge-out rate here would quietly turn a cost
+// report into a revenue one. Billing a ticket out will want its own charge rate
+// when it is built.
+//
+// Both are nil until somebody sets them, and nil is a real state the reports
+// respect — there is no rate a shop can be assumed to have, and a zero would
+// render as "$0.00 of labour", which looks measured.
+type ServiceLaborRates struct {
+	// LaborCentsPerHour is the loaded cost of a technician's hour.
+	LaborCentsPerHour *int
+	// TravelCentsPerHour is the cost of an hour on the road. Nil falls back to
+	// the labour rate: travel counted at the tech's rate overstates nothing
+	// that was not genuinely somebody's hour.
+	TravelCentsPerHour *int
+}
+
+// Set reports whether a labour rate has been configured. Without one there is
+// no money figure to compute, and every surface that would show one hides it
+// instead of printing a zero.
+//
+// Zero counts as unset here, and *does not* on the travel field. The asymmetry
+// is deliberate and worth stating on the type, because reading only one of
+// these two methods gives the wrong impression of the other:
+//
+//   - A zero labour rate is meaningless. Nobody's hour costs nothing, so the
+//     only thing it can be is a half-finished edit, and treating it as a real
+//     rate would stamp every entry at zero and print "$0.00 of labour" — which
+//     reads as a measurement rather than an absence.
+//   - A zero travel rate means something specific: the shop absorbs the drive.
+//     That is a real policy a shop can hold, so TravelRate returns the zero
+//     rather than falling back to labour, and travel is costed at nothing on
+//     purpose.
+//
+// app.validateLaborRates is what stops the meaningless one being saved
+// (ErrLaborRateZero); this comment is what stops the next reader assuming the
+// two fields are spelled the same way.
+func (r ServiceLaborRates) Set() bool {
+	return r.LaborCentsPerHour != nil && *r.LaborCentsPerHour > 0
+}
+
+// TravelRate is the rate to cost travel at, falling back to labour when unset.
+// A present zero is honoured, not treated as absent — see Set.
+func (r ServiceLaborRates) TravelRate() int {
+	if r.TravelCentsPerHour != nil {
+		return *r.TravelCentsPerHour
+	}
+	if r.LaborCentsPerHour != nil {
+		return *r.LaborCentsPerHour
+	}
+	return 0
+}
+
+// LaborRate is the rate to cost labour at.
+func (r ServiceLaborRates) LaborRate() int {
+	if r.LaborCentsPerHour != nil {
+		return *r.LaborCentsPerHour
+	}
+	return 0
+}
+
+// costMinutes converts minutes at an hourly rate into cents, rounded to the
+// nearest cent.
+//
+// Rounded rather than truncated because these figures are summed: a report over
+// two hundred time entries that lost a fraction of a cent on each would drift
+// visibly away from the same numbers computed any other way, and the first
+// person to notice would be checking the arithmetic by hand.
+func costMinutes(minutes, centsPerHour int) int {
+	if minutes <= 0 || centsPerHour <= 0 {
+		return 0
+	}
+	return (minutes*centsPerHour + 30) / 60
+}
+
+// TotalCostCents is the whole cost of the work — parts plus the hours as they
+// were booked.
+//
+// No rate argument: every hour carries the rate it was bought at, so this is a
+// sum of recorded facts rather than a calculation against today's settings.
+func (s ServiceTotals) TotalCostCents() int {
+	return s.PartsCostCents + s.LaborCostCents
+}
+
+// AnyCost reports whether there is a money figure worth showing. False on a
+// shop that has never set a rate, where every hour is uncosted and the parts
+// column already says everything the money column would.
+func (s ServiceTotals) AnyCost() bool {
+	return s.LaborCostCents > 0
+}
+
+// FullyCosted reports whether every hour in this summary carries a rate. When
+// false the money figure is a floor, not a total, and the surfaces showing it
+// say so rather than letting it read as complete.
+func (s ServiceTotals) FullyCosted() bool {
+	return s.UncostedMinutes == 0
+}
+
+// ServiceCostWindow is one period of a cost roll-up, ready to render.
+type ServiceCostWindow struct {
+	// Label is the period in the words the card prints — "Last 90 days".
+	Label string
+	// Since is the start of the window, zero for all time. Carried so a caller
+	// can say what was measured without re-deriving it.
+	Since   time.Time
+	Summary ServiceCostSummary
+}
+
+// ServiceAccountCost is one row of the cross-account table: what servicing one
+// customer has taken over a period.
+//
+// The row the whole report exists for is the one where the hours are large and
+// the machines are few — an account absorbing a tech's week for two grinders is
+// unprofitable in a way no single ticket ever looks.
+type ServiceAccountCost struct {
+	CustomerID   uuid.UUID
+	CustomerName string
+	// MachineCount is how many machines the account has on the register, so a
+	// big number can be read against how much there is to look after. A chain
+	// with nine machines costing more than a single-site cafe is not a finding.
+	MachineCount int
+	// LastWorkOn is the most recent day anything was recorded — the difference
+	// between an account that is expensive and one that was expensive.
+	LastWorkOn *time.Time
+	Summary    ServiceCostSummary
+}
+
+// ServiceAccountCostSort is how the cross-account table is ranked.
+//
+// Parts are in cents and work is in minutes, so blending them needs an hourly
+// cost. Until a shop records one there is no single money figure to sort by,
+// and inventing a rate would put a made-up number at the top of a report meant
+// to settle arguments — so the reader picks which of the two scarce things to
+// rank by. Once hours carry a rate, ServiceAccountCostByCost blends them and
+// leads; both numbers stay in the table either way.
+type ServiceAccountCostSort string
+
+const (
+	// ServiceAccountCostByHours ranks by time spent. The fallback ranking, and
+	// the default on a shop with no costs to rank by: for a crew of two, hours
+	// are the thing there is least of.
+	//
+	// It carries a real value rather than the empty string. An empty one cannot
+	// be told apart from an absent query parameter, and a link that omits the
+	// parameter reads as "give me the default" — which is how the Hours tab
+	// came to return the cost ranking.
+	ServiceAccountCostByHours ServiceAccountCostSort = "hours"
+	// ServiceAccountCostByParts ranks by parts spend — the money that actually
+	// left the building.
+	ServiceAccountCostByParts ServiceAccountCostSort = "parts"
+	// ServiceAccountCostByVisits ranks by how often somebody had to go out,
+	// which catches the account that is death by a thousand twenty-minute
+	// call-outs.
+	ServiceAccountCostByVisits ServiceAccountCostSort = "visits"
+	// ServiceAccountCostByCost ranks by parts plus costed hours — the single
+	// figure the other three exist to approximate. Only available once a labour
+	// rate is set; without one it falls back to hours, because a ranking by a
+	// number nobody supplied would be a ranking by parts spend wearing a
+	// misleading label.
+	ServiceAccountCostByCost ServiceAccountCostSort = "cost"
+)
+
+// Valid reports whether s is a known sort. The empty string is deliberately
+// not valid: it means "no sort was asked for", which is a different question
+// with a different answer.
+func (s ServiceAccountCostSort) Valid() bool {
+	switch s {
+	case ServiceAccountCostByHours, ServiceAccountCostByParts,
+		ServiceAccountCostByVisits, ServiceAccountCostByCost:
+		return true
+	}
+	return false
+}
+
+// ServiceAccountReport is the cross-account view: every account that took
+// service work in a period, ranked, with the shop's own total beside it.
+type ServiceAccountReport struct {
+	Rows []ServiceAccountCost
+	// Total is the sum of the rows shown. Summed over the returned rows rather
+	// than asked for separately, so the footer can never disagree with the
+	// column above it.
+	Total ServiceCostSummary
+	// Truncated says the limit bit and the table is not the whole picture. A
+	// bounded list that does not say it is bounded reads as complete.
+	Truncated bool
+	// Limit is the cap that bit, so the page names the real number rather than
+	// repeating it as a literal that can drift from the constant.
+	Limit int
+	// Since is the start of the window, zero for all time.
+	Since time.Time
+	Sort  ServiceAccountCostSort
+	// CanCost says there is money to rank and report on: either an hour
+	// somewhere carries a rate, or the shop has set one for the next. Decided
+	// before the query, because a cost ranking with nothing to rank collapses
+	// to ordering by parts spend alone — which is exactly the misleading label
+	// this report was built to avoid.
+	CanCost bool
+	// Rates are what the *next* hour will cost. Since the snapshot moved the
+	// rate onto each entry these no longer price anything in this report; they
+	// are carried so the page can name the current rate in its footnote, and so
+	// a shop that has just set one sees the money column appear before any hour
+	// has been logged at it.
+	Rates ServiceLaborRates
+}
+
+// ShowCost reports whether the money column belongs on the table.
+//
+// The same question as CanCost, and deliberately the same answer: a table that
+// offered a Cost ranking without a Cost column, or the reverse, would be
+// describing two different reports.
+func (r ServiceAccountReport) ShowCost() bool { return r.CanCost }
+
+// AnyServiceCost reports whether any window in a roll-up holds anything, which
+// is how a card tells "nothing has been spent here" from "there is nothing to
+// show". Reading that off the widest window is a thing a caller could get
+// wrong, so it is done once here.
+func AnyServiceCost(windows []ServiceCostWindow) bool {
+	for _, w := range windows {
+		if w.Summary.Any() {
+			return true
+		}
+	}
+	return false
+}

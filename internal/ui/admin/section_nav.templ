@@ -73,7 +73,15 @@ func sectionTabClass(active bool) string {
 // adminSectionTabs renders the underline tab bar. activeHref is the current
 // page's own base path (e.g. "/admin/categories"); the matching tab is stamped.
 templ adminSectionTabs(tabs []sectionTab, activeHref string) {
-	<nav class="mb-6 flex items-center gap-5 border-b border-rr-border" aria-label="Section">
+	@adminSectionTabsLabelled(tabs, activeHref, "Section")
+}
+
+// adminSectionTabsLabelled is the same strip under a caller-chosen landmark
+// name. A page that draws two of these — the Service section strip and the due
+// list's own scope strip — would otherwise stack two navs called "Section",
+// which is two landmarks a screen-reader user cannot tell apart.
+templ adminSectionTabsLabelled(tabs []sectionTab, activeHref, label string) {
+	<nav class="mb-6 flex items-center gap-5 border-b border-rr-border" aria-label={ label }>
 		for _, t := range tabs {
 			<a href={ templ.SafeURL(t.Href) } aria-current={ ariaCurrent(t.Href == activeHref) } class={ sectionTabClass(t.Href == activeHref) }>
 				{ t.Label }
@@ -124,9 +132,25 @@ templ adminChannelToggleCount(retailHref, wholesaleHref, activeHref string, whol
 	</div>
 }
 
+// ariaCurrent marks the tab for the page being shown. "page" is specifically a
+// claim about navigation, so it belongs on links that go somewhere else — the
+// section tabs, and nothing that merely re-filters the page you are on.
 func ariaCurrent(b bool) string {
 	if b {
 		return "page"
+	}
+	return "false"
+}
+
+// ariaCurrentOption marks the selected one of a set of filter controls.
+//
+// The generic "true" rather than "page": a cost window or a sort order is not a
+// page, and telling a screen reader that switching from "90 days" to "12
+// months" is a navigation event describes the wrong thing happening. Same
+// visual treatment, different claim.
+func ariaCurrentOption(b bool) string {
+	if b {
+		return "true"
 	}
 	return "false"
 }

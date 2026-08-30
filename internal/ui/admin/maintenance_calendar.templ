@@ -1,0 +1,248 @@
+package admin
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// The maintenance calendar — /admin/service/maintenance/calendar.
+//
+// The due list answers "what is late"; the calendar answers "what is my
+// September like", which is the question somebody asks before promising a cafe
+// a date. Same data, laid out by day.
+//
+// Part of the equipment service module; see docs/equipment-service-module.md.
+
+// MaintenanceCalendarProps is the calendar's state.
+type MaintenanceCalendarProps struct {
+	// Month is any day inside the month being shown, normalised to the first.
+	Month time.Time
+	// Days is the grid, six weeks of it, starting on the Monday on or before
+	// the first of the month. Built in the handler: a template that computed
+	// its own grid could not be tested without rendering HTML.
+	Days []MaintenanceCalendarDay
+	Nav  ServiceNav
+	// Today is the day to highlight, in merchant time.
+	Today     time.Time
+	StaffName string
+	StaffRole string
+	Flash     Flash
+}
+
+// MaintenanceCalendarDay is one cell.
+type MaintenanceCalendarDay struct {
+	Date time.Time
+	// InMonth is false for the leading and trailing days that fill the grid.
+	// They still show their work — maintenance due on the 31st of last month
+	// does not stop mattering because you paged forward.
+	InMonth bool
+	Rows    []domain.MaintenanceDueRow
+}
+
+// Overdue reports whether anything in the cell is past due as of the given day.
+func (d MaintenanceCalendarDay) Overdue(today time.Time) bool {
+	for _, row := range d.Rows {
+		if row.Urgency(today) == domain.MaintenanceOverdue {
+			return true
+		}
+	}
+	return false
+}
+
+// AtRisk reports whether the cell holds a warranty-critical overdue item. The
+// loudest thing on the grid, and the only one that gets a colour of its own.
+func (d MaintenanceCalendarDay) AtRisk(today time.Time) bool {
+	for _, row := range d.Rows {
+		if row.WarrantyAtRisk(today) {
+			return true
+		}
+	}
+	return false
+}
+
+// calendarCellClass shades a cell: out-of-month days recede, today is marked,
+// and a day carrying warranty risk is called out. Everything else is plain
+// paper — a calendar where every cell is coloured is a calendar that says
+// nothing.
+func calendarCellClass(day MaintenanceCalendarDay, today time.Time) string {
+	base := "min-h-24 border-b border-r border-rr-border p-1.5 align-top"
+	switch {
+	case !day.InMonth:
+		return base + " bg-rr-surface/50 text-rr-muted"
+	// Warranty risk first, and deliberately ahead of today. AtRisk is the
+	// loudest thing on the grid; ordering today above it hid the red ring on
+	// the single likeliest day for a warranty-critical job to land.
+	case day.AtRisk(today):
+		return base + " bg-rr-surface ring-1 ring-inset ring-rr-red"
+	case sameDay(day.Date, today):
+		// Outlined, not filled. The raised fill already means "no contract" on
+		// the chips inside these cells, and one colour carrying two meanings is
+		// a legend nobody can trust.
+		return base + " bg-rr-surface ring-1 ring-inset ring-rr-heading"
+	}
+	return base + " bg-rr-surface"
+}
+
+// calendarCellAttrs marks today's cell for anything that is not looking at the
+// ring around it.
+//
+// aria-current="date" is the one attribute that means "this is today" in a
+// grid of dates, and without it the marker was colour alone — the same WCAG
+// 1.4.1 failure calendarChipState exists to fix, left standing on the cell
+// while the chips inside it were corrected. The visible ring stays; this is
+// what the ring means, said out loud.
+func calendarCellAttrs(day MaintenanceCalendarDay, today time.Time) templ.Attributes {
+	if !sameDay(day.Date, today) {
+		return templ.Attributes{}
+	}
+	return templ.Attributes{"aria-current": "date"}
+}
+
+// calendarChipState is the word a chip's colour stands for.
+//
+// WCAG 2.1 AA, 1.4.1: the grid distinguished overdue from at-risk from
+// uncovered by background colour alone, so a screen reader — or anyone who
+// cannot separate the two ambers — got no urgency at all. The due list already
+// puts the state in badge text; this gives the calendar the same thing, spoken
+// rather than drawn.
+func calendarChipState(row domain.MaintenanceDueRow, today time.Time) string {
+	switch {
+	case row.WarrantyAtRisk(today):
+		return "warranty at risk"
+	case row.Urgency(today) == domain.MaintenanceOverdue:
+		return "overdue"
+	case !row.Covered():
+		return "no contract"
+	}
+	return "on contract"
+}
+
+// sameDay compares two calendar days. Both sides are already normalised to a
+// UTC midnight by the handler; this exists so the template does not have to
+// think about it.
+func sameDay(a, b time.Time) bool {
+	ay, am, ad := a.UTC().Date()
+	by, bm, bd := b.UTC().Date()
+	return ay == by && am == bm && ad == bd
+}
+
+// calendarMonthHref is the previous/next month link.
+func calendarMonthHref(month time.Time, delta int) string {
+	target := month.AddDate(0, delta, 0)
+	return "/admin/service/maintenance/calendar?month=" + target.Format("2006-01")
+}
+
+// calendarWeekdays runs Monday to Sunday. A work calendar starts on the day the
+// shop opens, not on Sunday.
+func calendarWeekdays() []string {
+	return []string{"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"}
+}
+
+// calendarChipClass colours one item in a cell by whether it is late and who is
+// paying — the two things somebody scanning a month actually needs.
+func calendarChipClass(row domain.MaintenanceDueRow, today time.Time) string {
+	base := "block w-full truncate rounded-sm px-1 py-0.5 text-left text-xs"
+	switch {
+	case row.WarrantyAtRisk(today):
+		return base + " bg-rr-red/10 text-rr-red"
+	case row.Urgency(today) == domain.MaintenanceOverdue:
+		return base + " bg-rr-amber/20 text-rr-heading"
+	case !row.Covered():
+		return base + " bg-rr-raised text-rr-heading"
+	}
+	return base + " bg-rr-raised/60 text-rr-body"
+}
+
+templ MaintenanceCalendarContent(props MaintenanceCalendarProps) {
+	@serviceSection(props.Nav, serviceTabMaintenance)
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Maintenance calendar</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				What the month looks like before you promise anyone a date.
+			</p>
+		</div>
+		<div class="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+			<a href="/admin/service/maintenance" class="btn-secondary">Back to the list</a>
+		</div>
+	</div>
+	@adminFlash(props.Flash)
+	<div class="mt-6 flex items-center justify-between border border-rr-border bg-rr-surface px-4 py-3">
+		<a href={ templ.SafeURL(calendarMonthHref(props.Month, -1)) } class="btn-secondary">&larr; { props.Month.AddDate(0, -1, 0).Format("Jan") }</a>
+		<h2 class="text-sm font-semibold text-rr-heading">{ props.Month.Format("January 2006") }</h2>
+		<a href={ templ.SafeURL(calendarMonthHref(props.Month, 1)) } class="btn-secondary">{ props.Month.AddDate(0, 1, 0).Format("Jan") } &rarr;</a>
+	</div>
+	<div class="mt-4 overflow-x-auto border-t border-l border-rr-border">
+		<table class="w-full min-w-3xl table-fixed">
+			<caption class="sr-only">Preventive maintenance due in { props.Month.Format("January 2006") }, by day</caption>
+			<thead>
+				<tr>
+					for _, d := range calendarWeekdays() {
+						<th scope="col" class="label-font border-r border-b border-rr-border bg-rr-surface px-2 py-2 text-left text-rr-muted">{ d }</th>
+					}
+				</tr>
+			</thead>
+			<tbody>
+				for week := 0; week*7 < len(props.Days); week++ {
+					<tr>
+						for _, day := range props.Days[week*7 : min(week*7+7, len(props.Days))] {
+							<td class={ calendarCellClass(day, props.Today) } { calendarCellAttrs(day, props.Today)... }>
+								<!-- The day number is the cell's own heading, not decoration:
+								     without it a screen reader reads a chip with no date on it. -->
+								<div class="text-xs font-medium">
+									<!-- The year is here because a maintenance calendar is routinely
+									     read months either side of now, and a spoken date with no year
+									     in it is ambiguous exactly when somebody is checking a warranty
+									     deadline. -->
+									<span class="sr-only">
+										{ day.Date.Format("Monday 2 January 2006") }
+										if sameDay(day.Date, props.Today) {
+											, today
+										}
+									</span>
+									<span aria-hidden="true">{ strconv.Itoa(day.Date.Day()) }</span>
+								</div>
+								<div class="mt-1 space-y-0.5">
+									for _, row := range day.Rows {
+										<a
+											href={ templ.SafeURL("/admin/service/equipment/" + row.EquipmentID.String()) }
+											class={ calendarChipClass(row, props.Today) }
+											title={ row.CustomerName + " · " + row.MachineDescription() + " · " + row.TaskName }
+										>
+											<span class="sr-only">{ day.Date.Format("2 January 2006") }, { calendarChipState(row, props.Today) }: </span>
+											{ row.CustomerName } — { row.TaskName }
+										</a>
+									}
+								</div>
+							</td>
+						}
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+	<!-- The first three swatches carry the chips' own values; the last carries
+	     today's cell outline. A day holding warranty risk is outlined in red as
+	     well, but the chip is what this names — a legend that approximates its
+	     own key is one somebody has to second-guess. -->
+	<div class="mt-3 flex flex-wrap gap-4 text-xs text-rr-muted">
+		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-red/10"></span>Warranty at risk</span>
+		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-amber/20"></span>Overdue</span>
+		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-raised"></span>No contract</span>
+		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-surface ring-1 ring-rr-heading"></span>Today</span>
+	</div>
+}
+
+templ MaintenanceCalendar(props MaintenanceCalendarProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Maintenance calendar",
+		ActivePath: "/admin/service",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@MaintenanceCalendarContent(props)
+	}
+}

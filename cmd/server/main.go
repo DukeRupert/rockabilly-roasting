@@ -377,6 +377,7 @@ func run() error {
 	moduleStore := store.NewModuleStore()
 	equipmentStore := store.NewEquipmentStore()
 	serviceTicketStore := store.NewServiceTicketStore()
+	servicePlanStore := store.NewServicePlanStore()
 	customerUserInviteTokenStore := store.NewCustomerUserInviteTokenStore()
 	geocodeStore := store.NewGeocodeStore(metricsReg)
 	routeStore := store.NewRouteStore(metricsReg)
@@ -444,7 +445,10 @@ func run() error {
 	}
 	equipmentSvc := app.NewEquipmentService(equipmentStore, auditWriter)
 	serviceTicketSvc := app.NewServiceTicketService(serviceTicketStore, equipmentStore, auditWriter).
-		WithNotifications(emailEnv, customerStore, moduleSvc, metricsReg)
+		WithNotifications(emailEnv, customerStore, moduleSvc, metricsReg).
+		WithSettings(settingsStore)
+	servicePlanSvc := app.NewServicePlanService(servicePlanStore, equipmentStore, auditWriter).
+		WithScheduling(serviceTicketSvc, moduleSvc, metricsReg)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, attributeStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -511,6 +515,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewAnnouncementDispatchWorker(announcementSvc, pool))
 	river.AddWorker(workers, jobs.NewAnnouncementSendWorker(announcementSvc, pool))
 	river.AddWorker(workers, jobs.NewServiceStaleSweepWorker(serviceTicketSvc, pool))
+	river.AddWorker(workers, jobs.NewServiceMaintenanceSweepWorker(servicePlanSvc, pool, merchantTZ))
 	river.AddWorker(workers, jobs.NewServiceTicketOpenedWorker(serviceTicketSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)
@@ -559,6 +564,33 @@ func run() error {
 			river.PeriodicInterval(24*time.Hour),
 			func() (river.JobArgs, *river.InsertOpts) {
 				return jobs.ServiceStaleSweepArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 24 * time.Hour,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
+		),
+
+		// Sweep the preventive maintenance schedule: backfill occurrences, book
+		// the covered work that has come due, publish the gauges. No RunOnStart
+		// — the booking half opens real tickets, and a deploy is not a reason
+		// for a customer's machine to acquire a scheduled visit.
+		//
+		// 03:00 merchant time, on a wall-clock schedule rather than a 24h
+		// interval. The docs promise covered work books itself overnight, and
+		// PeriodicInterval anchors to process start — it would have made
+		// "overnight" mean "whenever we last deployed", which for a job that
+		// opens customer tickets is a promise the wiring could not keep.
+		//
+		// 03:00 rather than the more obvious 02:00 because 02:00 is the hour US
+		// DST deletes each spring: it does not exist on the changeover day, and
+		// asking for it yields whatever the library normalises a non-existent
+		// local time to. 03:00 occurs exactly once on both changeover days.
+		river.NewPeriodicJob(
+			jobs.NewDailySchedule(3, 0, merchantTZ),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.ServiceMaintenanceSweepArgs{}, &river.InsertOpts{
 					UniqueOpts: river.UniqueOpts{
 						ByPeriod: 24 * time.Hour,
 					},
@@ -773,6 +805,7 @@ func run() error {
 		ModuleService:          moduleSvc,
 		EquipmentService:       equipmentSvc,
 		ServiceTicketService:   serviceTicketSvc,
+		ServicePlanService:     servicePlanSvc,
 		Enqueuer:               enqueuer,
 		R2Client:               r2Client,
 		MediaConfig:            mediaConfig,

@@ -50,6 +50,26 @@ func Error(w http.ResponseWriter, r *http.Request, err error) {
 	JSON(w, status, map[string]string{"error": msg})
 }
 
+// expectedFailure reports whether an error is one the application named on
+// purpose *and* that a redirect can sensibly carry — a validation rule, a state
+// machine refusing a move — as opposed to something that went wrong.
+//
+// The distinction is what separates "tell the operator, in the words the
+// sentinel carries" from "log it, alert on it, and say nothing useful". A
+// redirect-with-flash path that skips the question turns a dead database into a
+// cheerful 303 and a sentence about maintenance schedules, and Sentry never
+// hears about it.
+//
+// Not-found is excluded, though it is every bit as deliberate as the rest. The
+// callers are redirect-back helpers, and the thing they redirect back *to* is
+// usually the resource that was not found: flashing "no such plan" onto a 303
+// aimed at that plan's page just produces a 404 with the message lost on the
+// way. A missing resource wants the 404 rendered directly.
+func expectedFailure(err error) bool {
+	status, _ := mapError(err)
+	return status < http.StatusInternalServerError && status != http.StatusNotFound
+}
+
 // brokenReference reports a stored ID that no longer resolves — an order whose
 // shipping address row is gone, a subscription whose plan is gone.
 //
@@ -87,6 +107,10 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrServiceTicketNotFound),
 		errors.Is(err, app.ErrServicePartNotFound),
 		errors.Is(err, app.ErrServiceTimeEntryNotFound),
+		errors.Is(err, app.ErrPlanNotFound),
+		errors.Is(err, app.ErrPlanTaskNotFound),
+		errors.Is(err, app.ErrPlanAssignmentNotFound),
+		errors.Is(err, app.ErrMaintenanceNotFound),
 		errors.Is(err, app.ErrSubscriptionPlanNotFound),
 		errors.Is(err, app.ErrPriceListNotFound),
 		errors.Is(err, app.ErrAttributeSetNotFound),
@@ -147,7 +171,34 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrInvalidPartCost),
 		errors.Is(err, app.ErrInvalidPartStatus),
 		errors.Is(err, app.ErrInvalidTimeMinutes),
-		errors.Is(err, app.ErrInvalidServiceTimeKind):
+		errors.Is(err, app.ErrInvalidServiceTimeKind),
+		// Preventive maintenance. Every one of these carries a sentence
+		// written for the staff member who typed the thing; falling through to
+		// the default would answer them with "internal server error" and page
+		// somebody. ErrLaborRateInvalid is the one that reached a handler
+		// calling Error() directly, so it was a 500 in practice rather than in
+		// theory.
+		errors.Is(err, app.ErrLaborRateInvalid),
+		errors.Is(err, app.ErrTravelRateWithoutLabor),
+		errors.Is(err, app.ErrLaborRateZero),
+		errors.Is(err, app.ErrPlanNameRequired),
+		errors.Is(err, app.ErrPlanNameTaken),
+		errors.Is(err, app.ErrPlanInUse),
+		errors.Is(err, app.ErrPlanInactive),
+		errors.Is(err, app.ErrPlanHasNoTasks),
+		errors.Is(err, app.ErrPlanTaskNameRequired),
+		errors.Is(err, app.ErrPlanTaskHasHistory),
+		errors.Is(err, app.ErrPlanIntervalInvalid),
+		errors.Is(err, app.ErrPlanLeadInvalid),
+		errors.Is(err, app.ErrPlanStartRequired),
+		errors.Is(err, app.ErrPlanContractEndsBeforeStart),
+		errors.Is(err, app.ErrPlanAlreadyAssigned),
+		errors.Is(err, app.ErrPlanAssignmentEnded),
+		errors.Is(err, app.ErrMaintenanceAlreadyClosed),
+		errors.Is(err, app.ErrMaintenanceDateRequired),
+		errors.Is(err, app.ErrMaintenanceDateOutOfRange),
+		errors.Is(err, app.ErrMaintenanceDateInFuture),
+		errors.Is(err, app.ErrEquipmentRetired):
 		return http.StatusBadRequest, err.Error()
 
 	case errors.Is(err, app.ErrServiceTicketTitleRequired),

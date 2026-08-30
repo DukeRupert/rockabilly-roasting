@@ -235,6 +235,15 @@ func (s *ServiceTicketService) LogTime(ctx context.Context, tx pgx.Tx, p LogTime
 		return nil, err
 	}
 
+	// Stamp the hour with what it costs today. From here the entry carries its
+	// own rate: changing the shop's rate later prices the next hour, not this
+	// one. A shop with no rate set logs the hour uncosted, and the reports say
+	// so rather than counting it as free.
+	rate, err := s.rateFor(ctx, tx, p.Kind)
+	if err != nil {
+		return nil, err
+	}
+
 	entry, err := s.tickets.CreateTimeEntry(ctx, tx, store.CreateTimeEntryParams{
 		TicketID:    p.TicketID,
 		StaffID:     p.StaffID,
@@ -243,6 +252,7 @@ func (s *ServiceTicketService) LogTime(ctx context.Context, tx pgx.Tx, p LogTime
 		PerformedOn: p.PerformedOn,
 		Billable:    p.Billable,
 		Note:        strings.TrimSpace(p.Note),
+		RateCents:   rate,
 	})
 	if err != nil {
 		return nil, err
@@ -256,10 +266,11 @@ func (s *ServiceTicketService) LogTime(ctx context.Context, tx pgx.Tx, p LogTime
 		ResourceType: "service_ticket",
 		ResourceID:   ticket.ID,
 		Metadata: map[string]any{
-			"number":   ticket.Number,
-			"minutes":  entry.Minutes,
-			"kind":     string(entry.Kind),
-			"billable": entry.Billable,
+			"number":     ticket.Number,
+			"minutes":    entry.Minutes,
+			"kind":       string(entry.Kind),
+			"billable":   entry.Billable,
+			"rate_cents": rateForAudit(entry.RateCents),
 		},
 	}); err != nil {
 		return nil, fmt.Errorf("audit service time logged: %w", err)
@@ -319,4 +330,92 @@ func (s *ServiceTicketService) timeEntryOnTicket(ctx context.Context, tx pgx.Tx,
 		}
 	}
 	return nil, ErrServiceTimeEntryNotFound
+}
+
+// rateFor resolves the hourly cost to stamp on a new time entry.
+//
+// Travel takes the travel rate where one is set and the labour rate otherwise;
+// resolving the fallback here rather than at read time means the entry records
+// what was actually decided, so a shop that later sets a travel rate does not
+// retrospectively re-price the drives it already made at the labour rate.
+//
+// Nil when no labour rate is set — the hour is logged uncosted, and stays that
+// way until somebody prices it deliberately.
+func (s *ServiceTicketService) rateFor(ctx context.Context, tx pgx.Tx, kind domain.ServiceTimeKind) (*int, error) {
+	rates, err := s.LaborRates(ctx, tx)
+	if err != nil {
+		return nil, err
+	}
+	if !rates.Set() {
+		return nil, nil
+	}
+	cents := rates.LaborRate()
+	if kind == domain.ServiceTimeKindTravel {
+		cents = rates.TravelRate()
+	}
+	return &cents, nil
+}
+
+// RepriceTimeEntry sets what one recorded hour cost.
+//
+// The deliberate counterpart to the snapshot: rates stop cascading backwards,
+// so an hour logged before the shop had a rate — or logged at one somebody has
+// since decided was wrong — needs a way to be corrected. One row at a time, by
+// hand, and audited, because that is the difference between a correction and a
+// settings change quietly rewriting history.
+//
+// A nil rate returns the entry to uncosted, which is how a wrongly-priced hour
+// is taken back out of the money figures without deleting the hours themselves.
+//
+// Zero is accepted, and is a different thing from nil. At settings level a zero
+// *labour* rate is refused, because Set() reads it as unset — but per entry,
+// zero means the shop absorbed that hour, which is exactly what the settings
+// page offers for travel ("set it to 0.00 if you absorb the drive") and what
+// rateFor already stamps. Refusing it here would leave the manual path unable
+// to express a state the automatic one creates every day.
+func (s *ServiceTicketService) RepriceTimeEntry(ctx context.Context, tx pgx.Tx, ticketID, entryID uuid.UUID, rateCents *int, actor Actor) (*domain.ServiceTimeEntry, error) {
+	if rateCents != nil && (*rateCents < 0 || *rateCents > maxLaborRateCents) {
+		return nil, ErrLaborRateInvalid
+	}
+
+	ticket, err := s.GetByID(ctx, tx, ticketID)
+	if err != nil {
+		return nil, err
+	}
+	// Scoped to the ticket in the path, the same way removing one is. The id
+	// arrives from an editable URL, and an entry belonging to another ticket
+	// must not be repriced through this one.
+	before, err := s.timeEntryOnTicket(ctx, tx, ticketID, entryID)
+	if err != nil {
+		return nil, err
+	}
+
+	entry, err := s.tickets.UpdateTimeEntryRate(ctx, tx, entryID, rateCents)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrServiceTimeEntryNotFound
+		}
+		return nil, err
+	}
+
+	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditServiceTimeRepriced,
+		ResourceType: "service_ticket",
+		ResourceID:   ticket.ID,
+		Metadata: map[string]any{
+			"number":         ticket.Number,
+			"time_entry_id":  entry.ID.String(),
+			"minutes":        entry.Minutes,
+			"kind":           string(entry.Kind),
+			"rate_cents":     rateForAudit(entry.RateCents),
+			"was_rate_cents": rateForAudit(before.RateCents),
+		},
+	}); err != nil {
+		return nil, fmt.Errorf("audit service time repriced: %w", err)
+	}
+
+	return entry, nil
 }

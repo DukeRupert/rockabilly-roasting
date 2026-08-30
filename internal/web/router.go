@@ -67,6 +67,7 @@ type Deps struct {
 	ModuleService          *app.ModuleService
 	EquipmentService       *app.EquipmentService
 	ServiceTicketService   *app.ServiceTicketService
+	ServicePlanService     *app.ServicePlanService
 	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
 	PaymentProvider        payments.Provider
 	RiverClient            *river.Client[pgx.Tx]
@@ -695,6 +696,16 @@ func NewRouter(deps *Deps) http.Handler {
 	settingsRoute("POST /admin/settings/default-price-list", deps.handleAdminDefaultPriceListUpdate)
 	settingsRoute("GET /admin/settings/modules", deps.handleAdminSettingsModules)
 	settingsRoute("POST /admin/settings/modules", deps.handleAdminModuleToggle)
+
+	// Service settings — the crew's hourly cost. Module-gated as well as
+	// permission-gated: on a shop that does not service machines the rate means
+	// nothing, and the tab is not drawn either.
+	settingsServiceRoute := func(pattern string, h http.HandlerFunc) {
+		adminMux.Handle(pattern, deps.requireModule(domain.ModuleEquipmentService,
+			deps.requirePermission(auth.PermManageSystem, h)))
+	}
+	settingsServiceRoute("GET /admin/settings/service", deps.handleAdminSettingsService)
+	settingsServiceRoute("POST /admin/settings/service", deps.handleAdminServiceLaborRatesUpdate)
 	settingsRoute("GET /admin/settings/box-presets", deps.handleAdminBoxPresets)
 	settingsRoute("POST /admin/settings/box-presets", deps.handleAdminBoxPresetCreate)
 	settingsRoute("POST /admin/settings/box-presets/{id}", deps.handleAdminBoxPresetUpdate)
@@ -747,6 +758,7 @@ func NewRouter(deps *Deps) http.Handler {
 	serviceWrite("POST /admin/service/tickets/{id}/parts/{childID}/delete", deps.handleAdminServicePartDelete)
 	serviceWrite("POST /admin/service/tickets/{id}/time", deps.handleAdminServiceTimeLog)
 	serviceWrite("POST /admin/service/tickets/{id}/time/{childID}/delete", deps.handleAdminServiceTimeDelete)
+	serviceWrite("POST /admin/service/tickets/{id}/time/{childID}/rate", deps.handleAdminServiceTimeReprice)
 
 	serviceRead("GET /admin/service/equipment", deps.handleAdminEquipmentList)
 	// Registered before the {id} pattern would shadow it — "new" is not a uuid,
@@ -760,6 +772,39 @@ func NewRouter(deps *Deps) http.Handler {
 	serviceWrite("GET /admin/service/equipment/{id}/edit", deps.handleAdminEquipmentEdit)
 	serviceWrite("POST /admin/service/equipment/{id}", deps.handleAdminEquipmentUpdate)
 	serviceWrite("POST /admin/service/equipment/{id}/status", deps.handleAdminEquipmentStatus)
+
+	// Preventive maintenance. The plan pages are shop-wide templates; the
+	// assignment routes hang off a machine, which is where staff actually put
+	// one on.
+	serviceRead("GET /admin/service/maintenance", deps.handleAdminMaintenanceList)
+	serviceRead("GET /admin/service/maintenance/calendar", deps.handleAdminMaintenanceCalendar)
+	serviceWrite("POST /admin/service/maintenance/{id}/complete", deps.handleAdminMaintenanceComplete)
+	serviceWrite("POST /admin/service/maintenance/{id}/skip", deps.handleAdminMaintenanceSkip)
+
+	serviceRead("GET /admin/service/plans", deps.handleAdminServicePlanList)
+	serviceWrite("POST /admin/service/plans", deps.handleAdminServicePlanCreate)
+	serviceRead("GET /admin/service/plans/{id}", deps.handleAdminServicePlanShow)
+	serviceWrite("POST /admin/service/plans/{id}", deps.handleAdminServicePlanUpdate)
+	serviceWrite("POST /admin/service/plans/{id}/retire", deps.handleAdminServicePlanRetire)
+	serviceWrite("POST /admin/service/plans/{id}/reactivate", deps.handleAdminServicePlanReactivate)
+	serviceWrite("POST /admin/service/plans/{id}/delete", deps.handleAdminServicePlanDelete)
+	// Both task POSTs re-render in place on rejection rather than redirecting,
+	// so their URLs are pushed into history by hx-boost and have to answer GET —
+	// the same rule the shipping form follows. Neither is a page in its own
+	// right, so GET sends you back to the plan.
+	serviceRead("GET /admin/service/plans/{id}/tasks", deps.handleAdminServicePlanTaskGET)
+	serviceRead("GET /admin/service/plans/{id}/tasks/{childID}", deps.handleAdminServicePlanTaskGET)
+	serviceWrite("POST /admin/service/plans/{id}/tasks", deps.handleAdminServicePlanTaskAdd)
+	serviceWrite("POST /admin/service/plans/{id}/tasks/{childID}", deps.handleAdminServicePlanTaskUpdate)
+	serviceWrite("POST /admin/service/plans/{id}/tasks/{childID}/delete", deps.handleAdminServicePlanTaskDelete)
+
+	serviceWrite("POST /admin/service/equipment/{id}/plans", deps.handleAdminEquipmentPlanAssign)
+	serviceWrite("POST /admin/service/equipment/{id}/plans/{childID}", deps.handleAdminEquipmentPlanUpdate)
+	serviceWrite("POST /admin/service/equipment/{id}/plans/{childID}/end", deps.handleAdminEquipmentPlanEnd)
+
+	// The cross-account cost report. Read-only, so finance — which holds
+	// service:view and nothing else — can open the numbers it is meant to read.
+	serviceRead("GET /admin/service/costs", deps.handleAdminServiceCosts)
 
 	// Admin audit log
 	// Background job health. Admin-only: retrying a job re-runs real work,

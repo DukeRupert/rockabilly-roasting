@@ -249,7 +249,15 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	// Only read when the equipment service module is on. A shop that does not
 	// service machines pays nothing for a card it will never see.
 	serviceEnabled := d.ModuleService.Enabled(domain.ModuleEquipmentService)
+	// The equipment list is configuration — what the cafe has on its counter —
+	// and anyone who can open the customer may see it. What servicing them cost
+	// is not: the same reasoning that keeps the dashboard chip behind
+	// service:view keeps this behind it too. /admin/customers/{id} carries no
+	// service permission of its own, so the card asks here.
+	canViewService := staffCan(r, auth.PermViewService)
 	var equipment []domain.Equipment
+	var serviceCost []domain.ServiceCostWindow
+	var serviceLaborRates domain.ServiceLaborRates
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -314,6 +322,23 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			if txErr != nil {
 				return txErr
 			}
+			// Scoped to the customer rather than to their machines, so the
+			// call-outs that never named one still count — those hours went
+			// into the account just the same.
+			// Behind the permission, not just hidden by it. The card is gated
+			// on CanViewServiceCost; running the queries anyway would leave the
+			// authorization decision living in the template, one edit away from
+			// being a disclosure rather than waste.
+			if canViewService {
+				serviceCost, txErr = d.ServiceTicketService.CostForCustomer(ctx, tx, id, d.merchantToday())
+				if txErr != nil {
+					return txErr
+				}
+				serviceLaborRates, txErr = d.ServiceTicketService.LaborRates(ctx, tx)
+			}
+			if txErr != nil {
+				return txErr
+			}
 		}
 
 		// Who approved the wholesale application. A staff record that has since
@@ -358,6 +383,9 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		StaffRole:            role,
 		CanEditEmail:         staffCan(r, auth.PermEditCustomers),
 		Equipment:            equipment,
+		ServiceCost:          serviceCost,
+		CanViewServiceCost:   canViewService,
+		ServiceLaborRates:    serviceLaborRates,
 		ServiceEnabled:       serviceEnabled,
 		CanWriteService:      staffCan(r, auth.PermWriteService),
 		ApprovedByName:       approvedByName,

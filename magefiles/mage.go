@@ -3,10 +3,12 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/magefile/mage/mg"
@@ -98,8 +100,83 @@ func Clean() error {
 }
 
 // Check runs lint, scoping check, admin UI lint, and tests together (CI-style gate).
+//
+// CheckTemplSync goes first and alone. It is the one target here that *writes*
+// — it runs `templ generate` and compares the result — while Lint and Test both
+// compile the files it is rewriting. Under mg.Deps they run concurrently, so a
+// tree with real drift would have had the generator racing the compiler: the
+// failure mode arms itself in exactly the case the target exists to catch, and
+// stays invisible the rest of the time because a clean tree rewrites every file
+// with identical bytes.
 func Check() {
+	mg.SerialDeps(CheckTemplSync)
 	mg.Deps(Lint, CheckScoping, CheckAdminUI, Test)
+}
+
+// CheckTemplSync fails if any *_templ.go on disk differs from what templ
+// generates for its source.
+//
+// This has shipped twice. Both times the cause was the same: `templ generate`
+// failed or was never re-run, and nothing downstream noticed — `go build`,
+// `go vet`, the tests and the admin-UI lint all read the stale artifact quite
+// happily, so a green check said nothing about it. The second time, an
+// accessibility fix lived in the source and not in the file the repo ships.
+//
+// Compared by content across a regeneration rather than against git, so it says
+// "this artifact does not match its source" and not "you have uncommitted
+// work" — the latter would fire through every ordinary edit. Regenerating
+// leaves the corrected files in place, which is the state you wanted anyway.
+func CheckTemplSync() error {
+	before, err := templArtifactHashes()
+	if err != nil {
+		return err
+	}
+	if err := Templ(); err != nil {
+		return err
+	}
+	after, err := templArtifactHashes()
+	if err != nil {
+		return err
+	}
+
+	var stale []string
+	for path, sum := range after {
+		if before[path] != sum {
+			stale = append(stale, path)
+		}
+	}
+	if len(stale) > 0 {
+		sort.Strings(stale)
+		fmt.Fprintln(os.Stderr, "generated templ files did not match their source:")
+		for _, path := range stale {
+			fmt.Fprintln(os.Stderr, "  "+path)
+		}
+		return fmt.Errorf("regenerated %d file(s) — commit the result", len(stale))
+	}
+	return nil
+}
+
+// templArtifactHashes fingerprints every generated templ file.
+func templArtifactHashes() (map[string]string, error) {
+	sums := map[string]string{}
+	err := filepath.Walk("internal/ui", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || !strings.HasSuffix(path, "_templ.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		sums[path] = fmt.Sprintf("%x", sha256.Sum256(data))
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("hash templ artifacts: %w", err)
+	}
+	return sums, nil
 }
 
 // CheckAdminUI fails if any admin .templ file reaches for storefront/marketing
@@ -154,6 +231,9 @@ func CheckAdminUI() error {
 	excluded := map[string]bool{
 		filepath.FromSlash("internal/ui/admin/staff_login.templ"): true,
 		filepath.FromSlash("internal/ui/admin/staff_setup.templ"): true,
+		// The storefront layout is *meant* to use paper-and-ink directly; it
+		// only shares a directory with the admin shell.
+		filepath.FromSlash("internal/ui/layouts/storefront.templ"): true,
 	}
 
 	// Match a banned class only when it appears as a complete token — bounded
@@ -163,7 +243,10 @@ func CheckAdminUI() error {
 
 	var violations []string
 
-	err := filepath.Walk("internal/ui/admin", func(path string, info os.FileInfo, err error) error {
+	// Both roots, like the dead-token half. layouts/ holds the admin shell —
+	// sixty-odd rr-* usages framing every page — alongside storefront.templ,
+	// which uses the banned classes legitimately and is excluded below.
+	blockWalk := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -181,7 +264,10 @@ func CheckAdminUI() error {
 		if err != nil {
 			return err
 		}
-		for lineNum, line := range strings.Split(string(data), "\n") {
+		// <style> blocks are blanked, not scanned: the admin shell names these
+		// tokens in order to override them, which is a definition rather than a
+		// class somebody reached for.
+		for lineNum, line := range strings.Split(blankStyleBlocks(string(data)), "\n") {
 			matches := re.FindAllStringSubmatch(line, -1)
 			for _, m := range matches {
 				violations = append(violations, fmt.Sprintf(
@@ -191,10 +277,19 @@ func CheckAdminUI() error {
 			}
 		}
 		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("walk admin templ files: %w", err)
 	}
+
+	for _, root := range adminUIRoots() {
+		if err := filepath.Walk(root, blockWalk); err != nil {
+			return fmt.Errorf("walk %s: %w", root, err)
+		}
+	}
+
+	dead, err := deadTokenClasses(excluded)
+	if err != nil {
+		return err
+	}
+	violations = append(violations, dead...)
 
 	if len(violations) > 0 {
 		for _, v := range violations {
@@ -203,6 +298,157 @@ func CheckAdminUI() error {
 		return fmt.Errorf("%d admin UI lint violation(s) — see docs/admin-ui.md", len(violations))
 	}
 	return nil
+}
+
+// styleOpenAt reports where a real <style> tag starts on a line, or -1.
+//
+// A line that merely mentions "<style" in a comment does not open a block, and
+// treating it as one was worse than useless: the scan started at the comment,
+// ran to the next genuine </style>, and blanked every line in between — so the
+// code the lint exists to read went unread. packing_slip.templ and
+// layouts/admin.templ both have such a comment today.
+func styleOpenAt(line string) int {
+	idx := strings.Index(line, "<style")
+	if idx < 0 {
+		return -1
+	}
+	before := line[:idx]
+	if strings.Contains(before, "//") || strings.Contains(before, "<!--") {
+		return -1
+	}
+	return idx
+}
+
+// blankStyleBlocks replaces the contents of <style> blocks with empty lines.
+//
+// Inside one, a token name is a definition rather than a class somebody reached
+// for — the admin shell names the tokens in order to override them. Blanking
+// rather than skipping keeps the line numbering honest, and unlike a running
+// in-a-style-block flag it cannot swallow the rest of a file that mentions
+// "<style" without ever closing it.
+func blankStyleBlocks(src string) string {
+	lines := strings.Split(src, "\n")
+	for i := 0; i < len(lines); i++ {
+		if styleOpenAt(lines[i]) < 0 {
+			continue
+		}
+		// Only a block that actually closes is blanked. An unmatched "<style"
+		// — the literal in a comment, say — is left alone, because swallowing
+		// the rest of the file from there is the failure this replaced.
+		end := -1
+		for j := i; j < len(lines); j++ {
+			if strings.Contains(lines[j], "</style>") {
+				end = j
+				break
+			}
+		}
+		if end == -1 {
+			return strings.Join(lines, "\n")
+		}
+		for j := i; j <= end; j++ {
+			lines[j] = ""
+		}
+		i = end
+	}
+	return strings.Join(lines, "\n")
+}
+
+// emitsCSS reports whether Tailwind produced a rule for a utility.
+//
+// Substring rather than ".class", because a variant is emitted escaped —
+// `hover:text-rr-red-lt` becomes `.hover\:text-rr-red-lt:hover` — and matching
+// on the leading dot would call every variant dead. The trailing guard stops
+// `bg-rr-red` matching inside `bg-rr-red-lt`.
+func emitsCSS(compiled, class string) bool {
+	return regexp.MustCompile(regexp.QuoteMeta(class) + `([^a-z0-9-]|$)`).MatchString(compiled)
+}
+
+// adminUIRoots are the trees both halves of the lint read. The admin shell is
+// admin UI too: scanning only internal/ui/admin would leave the frame around
+// every page unchecked.
+func adminUIRoots() []string {
+	return []string{"internal/ui/admin", "internal/ui/layouts"}
+}
+
+// deadTokenClasses finds rr-* utilities the admin uses that Tailwind never
+// emitted a rule for.
+//
+// The blocklist above catches a class that is wrong. This catches one that does
+// not exist: Tailwind v4 drops an unknown utility silently, so `bg-rr-paper-warm`
+// — the token is `--color-paper-warm`, un-prefixed and storefront-only —
+// compiled, passed this lint, passed the render tests, and produced no CSS at
+// all. Today simply was not marked on the maintenance calendar, and nothing but
+// a browser could have said so.
+//
+// Read against the committed output.css rather than a fresh build. Having
+// `mage check` rebuild first made a lint depend on Node and a network, and
+// rewrote a tracked file as a side effect of checking it.
+//
+// That leaves one sharp edge: a token added without running `mage css` reads as
+// dead. It is not a false failure — the stylesheet genuinely does not carry the
+// class yet — so the message says so and names the fix rather than the check
+// standing down and letting a real dead token through.
+func deadTokenClasses(excluded map[string]bool) ([]string, error) {
+	roots := adminUIRoots()
+
+	const cssPath = "internal/ui/assets/css/output.css"
+
+	css, err := os.ReadFile(cssPath)
+	if os.IsNotExist(err) {
+		fmt.Fprintln(os.Stderr, "checkAdminUI: output.css not built — skipping the dead-token half; run `mage css`")
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read output.css: %w", err)
+	}
+	compiled := string(css)
+
+	// Utilities only, so a token name inside a CSS variable or a comment is not
+	// mistaken for one. Opacity suffixes (bg-rr-raised/60) compile from the
+	// base utility, so they are checked as the base.
+	use := regexp.MustCompile(`\b((?:bg|text|border|border-[trblxy]|ring|ring-offset|divide|from|via|to|fill|stroke|decoration|outline|accent|shadow|placeholder|caret)-rr-[a-z0-9-]+)`)
+
+	var dead []string
+	seen := map[string]bool{}
+
+	walk := func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || !strings.HasSuffix(path, ".templ") {
+			return nil
+		}
+		if excluded[path] {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		// Same rule as the blocklist half.
+		for lineNum, line := range strings.Split(blankStyleBlocks(string(data)), "\n") {
+			for _, m := range use.FindAllStringSubmatch(line, -1) {
+				class := strings.TrimRight(m[1], "-")
+				key := path + class
+				if seen[key] || emitsCSS(compiled, class) {
+					continue
+				}
+				seen[key] = true
+				dead = append(dead, fmt.Sprintf(
+					"%s:%d: %q emits no CSS — check the spelling, or run `mage css` if you just added the token — %s",
+					path, lineNum+1, class, strings.TrimSpace(line),
+				))
+			}
+		}
+		return nil
+	}
+
+	for _, root := range roots {
+		if err := filepath.Walk(root, walk); err != nil {
+			return nil, fmt.Errorf("walk %s: %w", root, err)
+		}
+	}
+	return dead, nil
 }
 
 // CheckScoping verifies customer-facing handlers don't call staff-only

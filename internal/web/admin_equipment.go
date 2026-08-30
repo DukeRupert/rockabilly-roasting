@@ -308,6 +308,9 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 	var customerName, siteLabel string
 	var activity []domain.AuditEntry
 	var tickets []admin.ServiceTicketRow
+	var maintenance admin.EquipmentMaintenanceProps
+	var cost []domain.ServiceCostWindow
+	var laborRates domain.ServiceLaborRates
 
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -349,7 +352,21 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 			return txErr
 		}
 		tickets = admin.ServiceTicketRowsFrom(history, nil, nil, nil, staleCutoff())
-		return nil
+
+		maintenance, txErr = d.equipmentMaintenanceProps(ctx, tx, equipment, d.merchantToday())
+		if txErr != nil {
+			return txErr
+		}
+
+		// What the machine has taken in parts and hours. Every entry counts,
+		// billable or not — this is what the machine cost the shop, which is
+		// the number the replace-it argument rests on.
+		cost, txErr = d.ServiceTicketService.CostForEquipment(ctx, tx, equipment.ID, d.merchantToday())
+		if txErr != nil {
+			return txErr
+		}
+		laborRates, txErr = d.ServiceTicketService.LaborRates(ctx, tx)
+		return txErr
 	}); err != nil {
 		Error(w, r, err)
 		return
@@ -362,6 +379,9 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 		SiteLabel:    siteLabel,
 		Activity:     activity,
 		Tickets:      tickets,
+		Maintenance:  maintenance,
+		Cost:         cost,
+		LaborRates:   laborRates,
 		MerchantTZ:   d.MerchantTZ,
 		StaffName:    staffName,
 		StaffRole:    staffRole,

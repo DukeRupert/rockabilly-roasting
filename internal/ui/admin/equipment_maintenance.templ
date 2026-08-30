@@ -1,0 +1,330 @@
+package admin
+
+import (
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+)
+
+// The maintenance card on a machine's page: which plans it is on, what is
+// coming up, and the form for putting it on another one.
+//
+// Main column, not rail: "what is this machine's schedule" is part of what the
+// machine IS, alongside its repair history — see docs/admin-detail-pages.md.
+//
+// Part of the equipment service module; see docs/equipment-service-module.md.
+
+// EquipmentMaintenanceProps is the card's state, carried on EquipmentShowProps.
+type EquipmentMaintenanceProps struct {
+	// Assignments are the plans on this machine, live ones first.
+	Assignments []domain.EquipmentServicePlan
+	// Upcoming is every pending occurrence across those plans, soonest first.
+	Upcoming []domain.MaintenanceDueRow
+	// AvailablePlans are the active plans this machine could go on: written for
+	// its category or for any machine, and not already assigned to it. A
+	// filter, not a sort — a grinder plan is not offered for an espresso
+	// machine at all.
+	AvailablePlans []domain.ServicePlan
+	// OtherCategoryPlans counts the active plans excluded by that filter, so
+	// the empty state can say "none for this kind of machine" rather than
+	// "none at all" and send somebody off to write a duplicate.
+	OtherCategoryPlans int
+	// Today is what "overdue" is measured against.
+	Today time.Time
+}
+
+// Any reports whether the machine has a schedule at all.
+func (p EquipmentMaintenanceProps) Any() bool { return len(p.Assignments) > 0 }
+
+// assignmentCoverageBadge marks who pays. An assignment with no contract is
+// the one staff act on, so it gets the louder colour.
+func assignmentCoverageBadge(a domain.EquipmentServicePlan, today time.Time) string {
+	if a.Covered(today) {
+		return "badge badge-teal"
+	}
+	return "badge badge-amber"
+}
+
+func assignmentCoverageLabel(a domain.EquipmentServicePlan, today time.Time) string {
+	switch {
+	case a.Covered(today):
+		return "On contract"
+	case a.UnderContract:
+		return "Contract lapsed"
+	}
+	return "No contract"
+}
+
+func assignmentEndConfirm(a domain.EquipmentServicePlan) ActionConfirm {
+	return ActionConfirm{
+		Title: "Take this machine off " + a.PlanName + "?",
+		Lead:  "It stops generating scheduled maintenance.",
+		Points: []string{
+			"Anything currently waiting on this plan disappears from the due list.",
+			"What was already done stays on the machine's record.",
+		},
+		Confirm: "Take it off",
+		Danger:  true,
+	}
+}
+
+// equipmentMaintenanceCard is the whole card.
+templ equipmentMaintenanceCard(props EquipmentShowProps) {
+	<div class="mt-4 border border-rr-border bg-rr-surface">
+		<div class="px-4 py-4">
+			<div class="flex items-center justify-between">
+				<h2 class="text-sm font-semibold text-rr-heading">Maintenance</h2>
+				<a href="/admin/service/maintenance" class="text-sm text-rr-muted underline">The whole due list</a>
+			</div>
+			if !props.Maintenance.Any() && props.Equipment.Status == domain.EquipmentStatusRetired {
+				<p class="mt-2 text-sm text-rr-muted">
+					Retired machines are not put on plans — there is no work left to schedule for one.
+				</p>
+			} else if !props.Maintenance.Any() {
+				<p class="mt-2 text-sm text-rr-muted">
+					This machine is not on a maintenance plan. Put it on one and its preventive work shows up here and on the due list.
+				</p>
+			} else {
+				@equipmentMaintenancePlans(props)
+				@equipmentMaintenanceUpcoming(props)
+			}
+			if props.CanWrite && props.Equipment.Status != domain.EquipmentStatusRetired {
+				@equipmentAssignPlanForm(props)
+			}
+		</div>
+	</div>
+}
+
+// equipmentMaintenancePlans lists the plans the machine is on.
+templ equipmentMaintenancePlans(props EquipmentShowProps) {
+	<ul role="list" class="mt-3 divide-y divide-rr-border">
+		for _, a := range props.Maintenance.Assignments {
+			<li class="flex flex-wrap items-start justify-between gap-2 py-2 first:pt-0">
+				<div class="min-w-0">
+					<div class="flex flex-wrap items-center gap-2">
+						<a href={ templ.SafeURL("/admin/service/plans/" + a.PlanID.String()) } class="text-sm font-medium text-rr-heading underline">
+							{ a.PlanName }
+						</a>
+						<!-- Live by construction: ListAssignments is called with
+						     includeEnded=false, so an ended arrangement never
+						     reaches this list. -->
+						<span class={ assignmentCoverageBadge(a, props.Maintenance.Today) }>
+							{ assignmentCoverageLabel(a, props.Maintenance.Today) }
+						</span>
+					</div>
+					<div class="mt-0.5 text-xs text-rr-muted">
+						Schedule anchored to { dayLabel(&a.StartsOn) }
+						if a.ContractEndsOn != nil {
+							· contract to { dayLabel(a.ContractEndsOn) }
+						}
+					</div>
+					if a.Notes != "" {
+						<p class="mt-1 text-sm text-rr-body">{ a.Notes }</p>
+					}
+				</div>
+				if props.CanWrite && a.Live() {
+					<form method="post" action={ templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/plans/" + a.ID.String() + "/end") }>
+						<button type="submit" class="text-sm text-rr-muted underline" { ConfirmAttrs(assignmentEndConfirm(a))... }>
+							Take it off
+						</button>
+					</form>
+				}
+				if props.CanWrite && a.Live() {
+					@assignmentEditForm(props, a)
+				}
+			</li>
+		}
+	</ul>
+}
+
+// assignmentEditForm changes the terms a machine is on a plan under.
+//
+// The one that matters is the contract flag: a cafe that signs up for
+// maintenance halfway through should not have to be taken off the plan and put
+// back on, which would throw away the schedule. The anchor is here too, for the
+// case where it was typed wrong — it seeds occurrences that have not been
+// generated yet and leaves the dates already produced alone.
+templ assignmentEditForm(props EquipmentShowProps, a domain.EquipmentServicePlan) {
+	<details class="mt-1 w-full">
+		<summary class="cursor-pointer text-xs text-rr-muted underline">Change the terms</summary>
+		<form method="post" action={ templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/plans/" + a.ID.String()) } class="mt-2 border-l border-rr-border pl-3">
+			<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+				<div>
+					<label for={ "assign-starts-" + a.ID.String() } class="label-font block text-rr-muted">Schedule anchored to</label>
+					<input
+						type="date"
+						id={ "assign-starts-" + a.ID.String() }
+						name="starts_on"
+						value={ a.StartsOn.UTC().Format("2006-01-02") }
+						required
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					/>
+				</div>
+				<div>
+					<label for={ "assign-ends-" + a.ID.String() } class="label-font block text-rr-muted">Contract runs to</label>
+					<input
+						type="date"
+						id={ "assign-ends-" + a.ID.String() }
+						name="contract_ends_on"
+						value={ assignmentContractEndInput(a) }
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					/>
+				</div>
+				<div class="sm:col-span-2">
+					<label class="flex items-center gap-2 text-sm text-rr-body">
+						<input type="checkbox" name="under_contract" value="1" checked?={ a.UnderContract } class="rounded-sm border-rr-border"/>
+						They pay for this maintenance
+					</label>
+				</div>
+				<div class="sm:col-span-2">
+					<label for={ "assign-notes-" + a.ID.String() } class="label-font block text-rr-muted">Notes</label>
+					<input
+						type="text"
+						id={ "assign-notes-" + a.ID.String() }
+						name="notes"
+						value={ a.Notes }
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					/>
+				</div>
+			</div>
+			<div class="mt-3">
+				<button type="submit" class="btn-secondary">Save the terms</button>
+			</div>
+		</form>
+	</details>
+}
+
+// assignmentContractEndInput renders the contract end for a date input, blank
+// for an open-ended arrangement.
+func assignmentContractEndInput(a domain.EquipmentServicePlan) string {
+	if a.ContractEndsOn == nil {
+		return ""
+	}
+	return a.ContractEndsOn.UTC().Format("2006-01-02")
+}
+
+// equipmentMaintenanceUpcoming is the machine's own schedule, soonest first.
+templ equipmentMaintenanceUpcoming(props EquipmentShowProps) {
+	if len(props.Maintenance.Upcoming) > 0 {
+		<div class="mt-4 border-t border-rr-border pt-3">
+			<h3 class="label-font text-rr-muted">Coming up</h3>
+			<ul role="list" class="mt-2 space-y-1.5">
+				for _, row := range props.Maintenance.Upcoming {
+					<li class="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+						<span class="text-rr-body">{ row.TaskName }</span>
+						<span class="flex items-center gap-2">
+							<span class="text-xs text-rr-muted">{ dayLabel(&row.DueOn) }</span>
+							<span class={ maintenanceUrgencyBadge(row.Urgency(props.Maintenance.Today)) }>
+								{ maintenanceTiming(row, props.Maintenance.Today) }
+							</span>
+						</span>
+					</li>
+				}
+			</ul>
+		</div>
+	}
+}
+
+// equipmentAssignPlanForm puts the machine on a plan.
+//
+// The anchor date is the field that matters and the one people get wrong: it is
+// "when was this last fully serviced", not "today". Getting it right is what
+// puts a five-year-old machine on a believable schedule instead of making
+// everything on it due at once.
+templ equipmentAssignPlanForm(props EquipmentShowProps) {
+	<div class="mt-4 border-t border-rr-border pt-4">
+		if len(props.Maintenance.AvailablePlans) == 0 {
+			if props.Maintenance.Any() && props.Maintenance.OtherCategoryPlans == 0 {
+				<p class="text-sm text-rr-muted">This machine is on every plan that suits it.</p>
+			} else if props.Maintenance.Any() {
+				<p class="text-sm text-rr-muted">
+					This machine is on every plan that suits it — your others are written for different kinds of machine.
+				</p>
+			} else if props.Maintenance.OtherCategoryPlans > 0 {
+				<p class="text-sm text-rr-muted">
+					None of your plans suit this machine — they are written for other kinds.
+					<a href="/admin/service/plans" class="underline">Write one</a> and it shows up here.
+				</p>
+			} else {
+				<p class="text-sm text-rr-muted">
+					No maintenance plans exist yet.
+					<a href="/admin/service/plans" class="underline">Write one</a> and you can put this machine on it.
+				</p>
+			}
+		} else {
+			<!-- Left closed on a rejected assignment: the failure arrives as a
+			     flash at the top of the page, which is where the eye goes after
+			     a redirect. Opening the panel as well would be two answers to
+			     the same question. -->
+			<details>
+				<summary class="cursor-pointer text-sm font-semibold text-rr-heading">Put it on a plan</summary>
+				<form method="post" action={ templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/plans") } class="mt-3">
+					<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+						<div>
+							<label for="assign-plan" class="label-font block text-rr-muted">Plan</label>
+							<select id="assign-plan" name="plan_id" required class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+								for _, plan := range props.Maintenance.AvailablePlans {
+									<option value={ plan.ID.String() }>{ plan.Name }</option>
+								}
+							</select>
+						</div>
+						<div>
+							<label for="assign-starts" class="label-font block text-rr-muted">Last fully serviced</label>
+							<input
+								type="date"
+								id="assign-starts"
+								name="starts_on"
+								value={ equipmentAnchorDefault(props) }
+								required
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+							<p class="mt-1 text-xs text-rr-muted">Every due date counts forward from this day.</p>
+						</div>
+						<div>
+							<label class="flex items-center gap-2 text-sm text-rr-body">
+								<input type="checkbox" name="under_contract" value="1" class="rounded-sm border-rr-border"/>
+								They pay for this maintenance
+							</label>
+							<p class="mt-1 text-xs text-rr-muted">
+								On contract, work due opens itself a ticket. Otherwise it goes on the call list for somebody to ring about.
+							</p>
+						</div>
+						<div>
+							<label for="assign-contract-ends" class="label-font block text-rr-muted">Contract runs to</label>
+							<input
+								type="date"
+								id="assign-contract-ends"
+								name="contract_ends_on"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+							<p class="mt-1 text-xs text-rr-muted">Leave blank for open-ended.</p>
+						</div>
+						<div class="sm:col-span-2">
+							<label for="assign-notes" class="label-font block text-rr-muted">Notes</label>
+							<input
+								type="text"
+								id="assign-notes"
+								name="notes"
+								class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+						</div>
+					</div>
+					<div class="mt-4">
+						<button type="submit" class="btn-secondary">Put it on the plan</button>
+					</div>
+				</form>
+			</details>
+		}
+	</div>
+}
+
+// equipmentAnchorDefault prefills the anchor with the machine's install date
+// where one is known — for a machine that has never been serviced that is
+// exactly right, and for one that has, it is at least a date somebody will
+// notice is wrong.
+func equipmentAnchorDefault(props EquipmentShowProps) string {
+	if props.Equipment.InstalledOn != nil {
+		return props.Equipment.InstalledOn.UTC().Format("2006-01-02")
+	}
+	return props.Maintenance.Today.Format("2006-01-02")
+}

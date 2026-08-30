@@ -99,12 +99,7 @@ func Clean() error {
 
 // Check runs lint, scoping check, admin UI lint, and tests together (CI-style gate).
 func Check() {
-	// CSS first, and not in the parallel group: CheckAdminUI's dead-token half
-	// reads output.css, so against a stale one it would call a freshly added
-	// token dead — a false failure in the check written to prevent false
-	// passes.
-	mg.SerialDeps(CSS, CheckAdminUI)
-	mg.Deps(Lint, CheckScoping, Test)
+	mg.Deps(Lint, CheckScoping, CheckAdminUI, Test)
 }
 
 // CheckAdminUI fails if any admin .templ file reaches for storefront/marketing
@@ -236,12 +231,25 @@ func emitsCSS(compiled, class string) bool {
 // all. Today simply was not marked on the maintenance calendar, and nothing but
 // a browser could have said so.
 //
-// Skipped when output.css has not been built. `mage check` now builds it first
-// (SerialDeps above), so this only bites somebody running the target bare on a
-// clean checkout, where failing would be a confusing way to learn it.
+// Read against the committed output.css rather than a fresh build. Having
+// `mage check` rebuild first made a lint depend on Node and a network, and
+// rewrote a tracked file as a side effect of checking it.
+//
+// That leaves one sharp edge: a token added without running `mage css` reads as
+// dead. It is not a false failure — the stylesheet genuinely does not carry the
+// class yet — so the message says so and names the fix rather than the check
+// standing down and letting a real dead token through.
 func deadTokenClasses(excluded map[string]bool) ([]string, error) {
-	css, err := os.ReadFile("internal/ui/assets/css/output.css")
+	// The admin shell is admin UI too — sixty-odd rr-* usages live in the
+	// layout, and scanning only internal/ui/admin would leave the frame around
+	// every page unchecked.
+	roots := []string{"internal/ui/admin", "internal/ui/layouts"}
+
+	const cssPath = "internal/ui/assets/css/output.css"
+
+	css, err := os.ReadFile(cssPath)
 	if os.IsNotExist(err) {
+		fmt.Fprintln(os.Stderr, "checkAdminUI: output.css not built — skipping the dead-token half; run `mage css`")
 		return nil, nil
 	}
 	if err != nil {
@@ -256,11 +264,6 @@ func deadTokenClasses(excluded map[string]bool) ([]string, error) {
 
 	var dead []string
 	seen := map[string]bool{}
-
-	// The admin shell is admin UI too — sixty-odd rr-* usages live in the
-	// layout, and scanning only internal/ui/admin would leave the frame around
-	// every page unchecked.
-	roots := []string{"internal/ui/admin", "internal/ui/layouts"}
 
 	walk := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -285,7 +288,7 @@ func deadTokenClasses(excluded map[string]bool) ([]string, error) {
 				}
 				seen[key] = true
 				dead = append(dead, fmt.Sprintf(
-					"%s:%d: %q emits no CSS — is the token spelled right? — %s",
+					"%s:%d: %q emits no CSS — check the spelling, or run `mage css` if you just added the token — %s",
 					path, lineNum+1, class, strings.TrimSpace(line),
 				))
 			}

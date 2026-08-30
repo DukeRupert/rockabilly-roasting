@@ -86,7 +86,7 @@ Use 1px hairlines on cards (`border border-rr-border`) and `shadow-sm` if you ne
 
 ## Don't use these in admin
 
-These classes exist for the storefront/marketing surfaces. Reaching for them in admin breaks the warm-professional treatment — and the lint will fail your build.
+These classes exist for the storefront/marketing surfaces. Reaching for them in admin breaks the warm-professional treatment — and `mage check` will refuse it.
 
 ### Banned colors (direct paper-and-ink utilities)
 
@@ -140,7 +140,7 @@ If you're building something genuinely new (e.g., an admin onboarding splash), o
 
 ## The lint has two halves
 
-`mage checkAdminUI` (wired into `mage check`) fails the build on two things:
+`mage checkAdminUI` (wired into `mage check`) fails on two things:
 
 1. **A banned class** — the storefront paper-and-ink utilities, brand fonts,
    stamp shadows and heavy borders listed above. A class that is *wrong*.
@@ -160,3 +160,10 @@ maintenance calendar, and nothing short of opening a browser could have said so.
 
 If you add a token, add it to `input.css`; if the lint calls a class dead, the
 name is wrong rather than the check.
+
+**It is a local gate, not a CI one.** Nothing in `.github/workflows` runs `mage
+check` — the deploy workflows build and ship. So the lint only catches what
+somebody runs it against before pushing, which is how `bg-rr-paper-warm` reached
+`main`'s doorstep in the first place. Wiring `mage check` into CI is the obvious
+follow-up and is deliberately not done here, because it belongs to the repo's
+build setup rather than to a feature branch.

@@ -687,14 +687,15 @@ cadence whatever that something was.
 Two rules on top of the shift, both about not letting an interval edit rewrite
 what is owed now:
 
-- **Overdue work does not move at all.** It is outstanding today, and
-  lengthening an interval must not clear it — a task one day late going from
-  weekly to yearly would jump a year out, taking a warranty-critical job off the
-  list nobody would then think to look for. The new interval governs the *next*
-  occurrence, measured from whenever this one is finally done.
-- **Everything else is shifted**, then stepped forward whole intervals if that
-  lands it in the past, for the booking reason above. "Everything else" includes
-  work due *today*: it is not late, so it moves with the future bucket.
+- **Work already owed does not move at all** — overdue, *or due today*. The
+  test is "is this owed now", not "is this late": due-today is `DueSoon` and
+  `BookableOn` is true for it, so the sweep would book it tonight. Lengthening
+  an interval must not clear it — a task due today going from weekly to yearly
+  would jump a year out, taking a warranty-critical job off the list nobody
+  would then think to look for. The new interval governs the *next* occurrence,
+  measured from whenever this one is finally done.
+- **Future work is shifted**, then stepped forward whole intervals if that lands
+  it in the past, for the booking reason above.
 
 
 

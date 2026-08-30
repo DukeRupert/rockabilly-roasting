@@ -267,23 +267,27 @@ func TestEquipmentServicePlanLive(t *testing.T) {
 func TestRescheduledDue(t *testing.T) {
 	today := day(2026, time.September, 1)
 
-	t.Run("overdue work does not move", func(t *testing.T) {
+	t.Run("owed work does not move", func(t *testing.T) {
 		// The regression: lengthening the interval shifted these forward and
 		// took them off the overdue list, warranty-critical ones included.
 		tests := []struct {
-			name             string
-			due              time.Time
-			oldInt, newInt   int
+			name           string
+			due            time.Time
+			oldInt, newInt int
 		}{
 			{"a day late, weekly to yearly", day(2026, time.August, 31), 7, 365},
 			{"nine days late, monthly to quarterly", day(2026, time.August, 23), 30, 90},
 			{"badly late", day(2025, time.March, 1), 90, 180},
+			// The boundary the docs and the guard disagreed about. Due-today is
+			// BookableOn, so the sweep would book it tonight — an interval edit
+			// that deferred it would clear live work.
+			{"due today, weekly to yearly", today, 7, 365},
 		}
 		for _, tc := range tests {
 			t.Run(tc.name, func(t *testing.T) {
 				got := domain.RescheduledDue(tc.due, tc.oldInt, tc.newInt, today)
 				assert.Equal(t, tc.due, got, "work owed today stays owed today")
-				assert.True(t, got.Before(today), "and stays visible as overdue")
+				assert.False(t, got.After(today), "and stays visible as owed")
 			})
 		}
 	})

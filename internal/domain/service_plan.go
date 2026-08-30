@@ -403,8 +403,10 @@ func NextDueAfterSkip(dueOn, on time.Time, intervalDays int) time.Time {
 //
 // Two rules, both about not letting an interval edit rewrite what is owed now:
 //
-//   - Work already overdue does not move at all. It is outstanding today, and
-//     lengthening an interval must not clear it — shifting a task one day late
+//   - Work already owed does not move at all — overdue *or due today*. The test
+//     is "is this owed now", not "is this late": due-today is MaintenanceDueSoon
+//     and BookableOn returns true for it, so the sweep would book it tonight.
+//     Lengthening an interval must not clear it — shifting a task due today
 //     from weekly to yearly would push it a year out and take a
 //     warranty-critical job off the list nobody would then think to look for.
 //     The new interval governs the *next* occurrence, which is measured from
@@ -417,8 +419,9 @@ func RescheduledDue(currentDue time.Time, oldInterval, newInterval int, on time.
 	due := calendarDay(currentDue)
 	today := calendarDay(on)
 
-	// Already late: leave it precisely where it is.
-	if due.Before(today) {
+	// Already owed: leave it precisely where it is. Due-today counts — it is
+	// work the sweep would book tonight, so an interval edit must not defer it.
+	if !due.After(today) {
 		return due
 	}
 

@@ -48,7 +48,10 @@ func NewServiceMaintenanceSweepWorker(plans *app.ServicePlanService, pool *pgxpo
 // The day is collapsed to a UTC midnight once resolved in the merchant's zone,
 // the same shape the web handlers use, so it compares cleanly against the date
 // columns pgx hands back.
-func (w *ServiceMaintenanceSweepWorker) Work(ctx context.Context, _ *river.Job[ServiceMaintenanceSweepArgs]) error {
+func (w *ServiceMaintenanceSweepWorker) Work(ctx context.Context, job *river.Job[ServiceMaintenanceSweepArgs]) error {
 	y, m, d := time.Now().In(w.loc).Date()
-	return w.plans.SweepMaintenance(ctx, w.pool, time.Date(y, m, d, 0, 0, 0, 0, time.UTC))
+	// The job id rides along into the audit metadata. This is the one path that
+	// opens customer tickets with no human behind it, and "which run did this"
+	// is the first question anybody asks about one.
+	return w.plans.SweepMaintenance(ctx, w.pool, time.Date(y, m, d, 0, 0, 0, 0, time.UTC), job.ID)
 }

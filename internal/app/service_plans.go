@@ -715,13 +715,23 @@ func (s *ServicePlanService) closeDue(ctx context.Context, tx pgx.Tx, id uuid.UU
 		if status == domain.MaintenanceStatusSkipped {
 			next = domain.NextDueAfterSkip(before.DueOn, on, task.IntervalDays)
 		}
-		if _, err := s.plans.CreateDue(ctx, tx, store.CreateMaintenanceDueParams{
+		successor, err := s.plans.CreateDue(ctx, tx, store.CreateMaintenanceDueParams{
 			AssignmentID: before.AssignmentID,
 			TaskID:       before.TaskID,
 			EquipmentID:  before.EquipmentID,
 			DueOn:        next,
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, err
+		}
+		// CreateDue returns nil when the pending unique index already held a
+		// row. Reaching that here would mean this occurrence was closed without
+		// its predecessor's successor ever being written — the one way the
+		// close-writes-the-successor invariant can fail silently. It cannot
+		// happen while CloseDue runs first, and asserting it is how we find out
+		// if that ever stops being true.
+		if successor == nil {
+			return nil, fmt.Errorf("close maintenance %s: successor already existed", id)
 		}
 	}
 

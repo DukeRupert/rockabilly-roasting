@@ -447,7 +447,7 @@ var (
 	// ErrLaborRateInvalid guards the hourly rate. The cap exists because
 	// somebody typing cents into a dollars field would put a six-figure number
 	// against every account in the cost report.
-	ErrLaborRateInvalid = errors.New("give an hourly rate between $0 and $10,000")
+	ErrLaborRateInvalid = errors.New("give an hourly rate no higher than $10,000")
 	// ErrLaborRateZero keeps "unset" to one spelling. A saved 0.00 reads as
 	// unset to ServiceLaborRates.Set(), so it would stamp every hour uncosted
 	// while the settings page showed a figure somebody had typed.

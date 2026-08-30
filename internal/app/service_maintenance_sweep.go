@@ -60,7 +60,7 @@ const bookingLimit = 25
 // occurrences with no ticket yet and attaches the ticket in the same
 // transaction, so a retry after a partial run neither doubles the schedule nor
 // double-books a visit.
-func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool.Pool, now time.Time) error {
+func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool.Pool, now time.Time, riverJobID int64) error {
 	if s.modules == nil || !s.modules.Enabled(domain.ModuleEquipmentService) {
 		return nil
 	}
@@ -70,7 +70,7 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 		return err
 	}
 
-	booked, err := s.bookCoveredMaintenance(ctx, pool, now)
+	booked, err := s.bookCoveredMaintenance(ctx, pool, now, riverJobID)
 	if err != nil {
 		return err
 	}
@@ -90,12 +90,13 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 			Action:       audit.AuditMaintenanceSwept,
 			ResourceType: "equipment",
 			Metadata: map[string]any{
-				"backfilled": filled,
-				"booked":     booked,
-				"overdue":    counts[domain.MaintenanceOverdue],
-				"due_soon":   counts[domain.MaintenanceDueSoon],
-				"uncovered":  counts[maintenanceUncoveredKey],
-				"warranty":   counts[maintenanceWarrantyKey],
+				"river_job_id": riverJobID,
+				"backfilled":   filled,
+				"booked":       booked,
+				"overdue":      counts[domain.MaintenanceOverdue],
+				"due_soon":     counts[domain.MaintenanceDueSoon],
+				"uncovered":    counts[maintenanceUncoveredKey],
+				"warranty":     counts[maintenanceWarrantyKey],
 			},
 		})
 	}); err != nil {
@@ -153,7 +154,7 @@ func (s *ServicePlanService) backfillMissing(ctx context.Context, pool *pgxpool.
 // customer deleted mid-sweep, a constraint nobody predicted — must not roll
 // back the twenty that succeeded, and the failure is worth logging rather than
 // aborting the run for.
-func (s *ServicePlanService) bookCoveredMaintenance(ctx context.Context, pool *pgxpool.Pool, now time.Time) (int, error) {
+func (s *ServicePlanService) bookCoveredMaintenance(ctx context.Context, pool *pgxpool.Pool, now time.Time, riverJobID int64) (int, error) {
 	if s.tickets == nil {
 		return 0, nil
 	}
@@ -181,7 +182,7 @@ func (s *ServicePlanService) bookCoveredMaintenance(ctx context.Context, pool *p
 		if !row.BookableOn(now) {
 			continue
 		}
-		if err := s.bookOne(ctx, pool, row); err != nil {
+		if err := s.bookOne(ctx, pool, row, riverJobID); err != nil {
 			slog.ErrorContext(ctx, "maintenance sweep: could not book visit",
 				"due_id", row.ID.String(), "customer_id", row.CustomerID.String(),
 				"task", row.TaskName, "error", err.Error())
@@ -198,7 +199,7 @@ func (s *ServicePlanService) bookCoveredMaintenance(ctx context.Context, pool *p
 // bookOne opens the ticket for one due item and attaches it, in one
 // transaction. The pairing matters: a ticket opened without the attachment
 // would be booked again tomorrow, and every day after.
-func (s *ServicePlanService) bookOne(ctx context.Context, pool *pgxpool.Pool, row domain.MaintenanceDueRow) error {
+func (s *ServicePlanService) bookOne(ctx context.Context, pool *pgxpool.Pool, row domain.MaintenanceDueRow, riverJobID int64) error {
 	return store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		equipmentID := row.EquipmentID
 		dueOn := row.DueOn
@@ -240,6 +241,7 @@ func (s *ServicePlanService) bookOne(ctx context.Context, pool *pgxpool.Pool, ro
 			ResourceType: "service_ticket",
 			ResourceID:   ticket.ID,
 			Metadata: map[string]any{
+				"river_job_id":   riverJobID,
 				"number":         ticket.Number,
 				"customer_id":    row.CustomerID.String(),
 				"equipment_id":   row.EquipmentID.String(),

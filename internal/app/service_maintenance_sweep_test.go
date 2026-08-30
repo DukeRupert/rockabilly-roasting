@@ -79,11 +79,16 @@ func commitPlan(t *testing.T, ctx context.Context, intervalDays, leadDays int) (
 
 // commitAssignment puts a machine on a plan from an anchor date.
 func commitAssignment(t *testing.T, ctx context.Context, equipmentID, planID uuid.UUID, startsOn time.Time, underContract bool) uuid.UUID {
+	return commitAssignmentUntil(t, ctx, equipmentID, planID, startsOn, underContract, nil)
+}
+
+// commitAssignmentUntil is the same with a contract end date.
+func commitAssignmentUntil(t *testing.T, ctx context.Context, equipmentID, planID uuid.UUID, startsOn time.Time, underContract bool, endsOn *time.Time) uuid.UUID {
 	t.Helper()
 	id := uuid.New()
 	_, err := testPool.Exec(ctx,
-		`INSERT INTO equipment_service_plans (id, equipment_id, plan_id, starts_on, under_contract)
-		 VALUES ($1, $2, $3, $4, $5)`, id, equipmentID, planID, startsOn, underContract)
+		`INSERT INTO equipment_service_plans (id, equipment_id, plan_id, starts_on, under_contract, contract_ends_on)
+		 VALUES ($1, $2, $3, $4, $5, $6)`, id, equipmentID, planID, startsOn, underContract, endsOn)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		//nolint:errcheck // teardown
@@ -130,7 +135,7 @@ func TestSweepBooksCoveredMaintenance(t *testing.T) {
 	plan, _ := commitPlan(t, ctx, 365, 30)
 	commitAssignment(t, ctx, machine, plan, time.Now().AddDate(-1, 0, -30), true)
 
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now()))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
 
 	assert.Equal(t, 1, sweptTickets(t, ctx, customer),
 		"the backfill wrote the occurrence and the booking opened a ticket for it")
@@ -165,7 +170,7 @@ func TestSweepNeverBooksUncoveredMaintenance(t *testing.T) {
 	plan, _ := commitPlan(t, ctx, 365, 30)
 	commitAssignment(t, ctx, machine, plan, time.Now().AddDate(-1, 0, -30), false)
 
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now()))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
 
 	assert.Equal(t, 0, sweptTickets(t, ctx, customer))
 
@@ -185,7 +190,7 @@ func TestSweepLeavesWorkOutsideItsWindow(t *testing.T) {
 	plan, _ := commitPlan(t, ctx, 365, 30)
 	commitAssignment(t, ctx, machine, plan, time.Now(), true)
 
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now()))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
 
 	assert.Equal(t, 0, sweptTickets(t, ctx, customer))
 }
@@ -201,9 +206,9 @@ func TestSweepIsIdempotent(t *testing.T) {
 	commitAssignment(t, ctx, machine, plan, time.Now().AddDate(-1, 0, -30), true)
 
 	now := time.Now()
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, now))
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, now))
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, now))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, now, 0))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, now, 0))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, now, 0))
 
 	assert.Equal(t, 1, sweptTickets(t, ctx, customer),
 		"three runs, one visit — the attachment is what stops the second one")
@@ -223,7 +228,7 @@ func TestSweepBackfillsTasksAddedLater(t *testing.T) {
 
 	plan, _ := commitPlan(t, ctx, 365, 30)
 	commitAssignment(t, ctx, machine, plan, time.Now().AddDate(0, -1, 0), false)
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now()))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
 
 	// A second task joins the plan after the machine is already on it.
 	_, err := testPool.Exec(ctx,
@@ -231,7 +236,7 @@ func TestSweepBackfillsTasksAddedLater(t *testing.T) {
 		 VALUES ($1, 'Change water filter', 180, 14)`, plan)
 	require.NoError(t, err)
 
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now()))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
 
 	var due int
 	require.NoError(t, testPool.QueryRow(ctx,
@@ -255,7 +260,7 @@ func TestSweepIgnoresRetiredMachines(t *testing.T) {
 	_, err := testPool.Exec(ctx, `UPDATE equipment SET status = 'retired' WHERE id = $1`, machine)
 	require.NoError(t, err)
 
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now()))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
 
 	assert.Equal(t, 0, sweptTickets(t, ctx, customer))
 	_, _, found := pendingDue(t, ctx, machine)
@@ -282,7 +287,7 @@ func TestSweepDoesNothingWithTheModuleOff(t *testing.T) {
 	plan, _ := commitPlan(t, ctx, 365, 30)
 	commitAssignment(t, ctx, machine, plan, time.Now().AddDate(-1, 0, -30), true)
 
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now()),
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0),
 		"the module being off is not a fault — an error would make River retry forever")
 
 	assert.Equal(t, 0, sweptTickets(t, ctx, customer))
@@ -301,7 +306,7 @@ func TestSweepAuditsWhatItBooked(t *testing.T) {
 	plan, _ := commitPlan(t, ctx, 365, 30)
 	commitAssignment(t, ctx, machine, plan, time.Now().AddDate(-1, 0, -30), true)
 
-	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now()))
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
 	sweptTickets(t, ctx, customer) // registers teardown
 
 	var booked, swept int
@@ -319,4 +324,47 @@ func TestSweepAuditsWhatItBooked(t *testing.T) {
 		testPool.Exec(context.Background(),
 			`DELETE FROM audit_log WHERE action IN ('equipment.maintenance_booked', 'equipment.maintenance_swept')`)
 	})
+}
+
+// A contract that has run out is not a contract.
+//
+// This is the branch most likely to silently book an unpaid visit: the flag
+// still says under_contract, and only the end date says otherwise. Every other
+// "never books uncovered work" test leaves under_contract false, so the lapsed
+// case was the one path through Covered() that nothing exercised.
+func TestSweepNeverBooksAgainstALapsedContract(t *testing.T) {
+	ctx := t.Context()
+	svc := sweepService(t, ctx)
+	customer := commitCustomer(t, ctx)
+	machine := commitMachine(t, ctx, customer)
+
+	lapsed := time.Now().AddDate(0, -2, 0)
+	plan, _ := commitPlan(t, ctx, 365, 30)
+	commitAssignmentUntil(t, ctx, machine, plan, time.Now().AddDate(-1, 0, -30), true, &lapsed)
+
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
+
+	assert.Equal(t, 0, sweptTickets(t, ctx, customer),
+		"the term ran out two months ago — the shop must not book itself a visit on it")
+
+	_, ticketed, found := pendingDue(t, ctx, machine)
+	require.True(t, found, "still due, and now on the call list")
+	assert.False(t, ticketed)
+}
+
+// The mirror: a contract still running does book, so the test above is proving
+// the end date matters rather than that booking is broken.
+func TestSweepBooksAgainstALiveTermContract(t *testing.T) {
+	ctx := t.Context()
+	svc := sweepService(t, ctx)
+	customer := commitCustomer(t, ctx)
+	machine := commitMachine(t, ctx, customer)
+
+	running := time.Now().AddDate(1, 0, 0)
+	plan, _ := commitPlan(t, ctx, 365, 30)
+	commitAssignmentUntil(t, ctx, machine, plan, time.Now().AddDate(-1, 0, -30), true, &running)
+
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
+
+	assert.Equal(t, 1, sweptTickets(t, ctx, customer))
 }

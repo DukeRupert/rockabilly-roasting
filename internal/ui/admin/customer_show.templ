@@ -790,12 +790,18 @@ templ customerSettingsCard(props CustomerShowProps) {
 					<dt class="text-xs font-medium uppercase tracking-wide text-rr-muted">Billing method</dt>
 					<dd class="mt-1">
 						<form method="post" action={ templ.SafeURL(fmt.Sprintf("/admin/customers/%s/billing-method", props.Customer.ID)) }>
-							@customerSelect("billing_method") {
+							@customerBillingMethodSelect(props.Customer) {
 								<option value="manual" selected?={ props.Customer.BillingMethod == domain.BillingMethodManual }>Manual</option>
 								<option value="ach" selected?={ props.Customer.BillingMethod == domain.BillingMethodACH }>ACH</option>
 								<option value="credit_card" selected?={ props.Customer.BillingMethod == domain.BillingMethodCreditCard }>Credit Card</option>
 							}
 						</form>
+						if !props.Customer.BillingMethod.AutoInvoiced() {
+							<p class="mt-1 text-xs text-rr-muted">
+								Not invoiced automatically. Switching to ACH or Credit Card starts billing
+								them from their next order.
+							</p>
+						}
 					</dd>
 				</div>
 				<div class="px-4 py-3">
@@ -841,6 +847,85 @@ templ customerSettingsCard(props CustomerShowProps) {
 			</div>
 		</dl>
 	</div>
+}
+
+// customerBillingMethodSelect is customerSelect with a gate on the one
+// direction that costs money.
+//
+// Billing method decides whether QuickBooks invoices this account without
+// anybody asking, so moving it to ACH or Credit Card is the same class of act
+// as Go live — and until now it was a single click on a menu that submitted
+// itself, with no confirmation and nothing recorded but the click. The system
+// has no way to know an agreement exists; the most it can do is make the
+// person say they are sure, and say it against the customer's own name.
+//
+// Only that direction. Moving back to Manual stops billing, which is the safe
+// side and needs no ceremony — the same asymmetry the billing-mode toggle uses.
+//
+// The dialog's cancel path restores the previous option: without it a declined
+// change leaves the menu showing a value that was never saved, which is worse
+// than no gate at all.
+templ customerBillingMethodSelect(customer *domain.Customer) {
+	<div
+		class="grid grid-cols-1"
+		x-data={ "{ previous: '" + string(customer.BillingMethod) + "' }" }
+	>
+		<select
+			name="billing_method"
+			@change="
+				if ($el.value === 'manual') { $el.form.submit(); return }
+				$dispatch('admin-confirm', {
+					form: $el.form,
+					cancelled: () => { $el.value = previous },
+					copy: previous === 'manual' ? {
+						title: 'Start invoicing ' + $el.dataset.customer + ' automatically?',
+						lead: 'From their next order, QuickBooks will raise the invoice and email it to them.',
+						points: [
+							'Only do this once they have agreed to be invoiced and to pay this way — nothing here checks that.',
+							'Their invoices will carry a ' + $el.options[$el.selectedIndex].text + ' pay button.',
+							'Orders already placed are not billed retrospectively.',
+							'Moving them back to Manual stops it again.'
+						],
+						confirm: 'Switch to ' + $el.options[$el.selectedIndex].text,
+						danger: true
+					} : {
+						title: 'Change how ' + $el.dataset.customer + ' pays?',
+						lead: 'This account is already invoiced automatically. Only the payment button on its invoices changes.',
+						points: [
+							'Their invoices will carry a ' + $el.options[$el.selectedIndex].text + ' pay button from the next one onwards.',
+							'Invoices already sent are not changed.',
+							'Only do this if they have agreed to pay this way.'
+						],
+						confirm: 'Switch to ' + $el.options[$el.selectedIndex].text,
+						danger: true
+					}
+				})
+			"
+			data-customer={ customerBillingName(customer) }
+			class="col-start-1 row-start-1 w-full appearance-none rounded-sm bg-rr-surface py-1.5 pl-3 pr-8 text-sm text-rr-heading outline-1 -outline-offset-1 outline-rr-border focus:outline-2 focus:-outline-offset-2 focus:outline-rr-red"
+		>
+			{ children... }
+		</select>
+		<svg class="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end text-rr-muted sm:size-4" viewBox="0 0 16 16" fill="currentColor">
+			<path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+		</svg>
+	</div>
+}
+
+// customerBillingName is what the confirmation calls this account. The company
+// name if there is one, because that is what a wholesale account is known as.
+func customerBillingName(customer *domain.Customer) string {
+	// Trimmed, not merely non-empty: a company name of spaces would otherwise
+	// title the dialog "Start invoicing  automatically?", which names nobody
+	// at the moment the operator most needs to know who they are billing.
+	if customer.CompanyName != nil && strings.TrimSpace(*customer.CompanyName) != "" {
+		return strings.TrimSpace(*customer.CompanyName)
+	}
+	name := strings.TrimSpace(customer.FirstName + " " + customer.LastName)
+	if name != "" {
+		return name
+	}
+	return customer.Email
 }
 
 // customerSelect is the auto-submitting select these settings all share: change

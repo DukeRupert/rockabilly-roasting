@@ -69,6 +69,11 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 		// Zeroed, not left alone. A module switched off mid-life would
 		// otherwise pin four series at their last non-zero values forever,
 		// which reads as a shop with permanent overdue maintenance.
+		//
+		// No audit row: "one a day, whatever happened" is a promise about a
+		// shop that runs this module. On one that does not, a daily row saying
+		// nothing happened is noise in a log somebody else has to read. The
+		// zeroed gauges are the signal that the job ran.
 		s.publishMaintenanceGauges(nil)
 		return nil
 	}
@@ -89,6 +94,23 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 			"error", countErr.Error())
 	}
 
+	// The counts go in only when they were actually read. Defaulting a failed
+	// read to zero would write "overdue: 0" on a day nobody counted anything,
+	// which is a worse lie than the gap it fills.
+	metadata := map[string]any{
+		"river_job_id": riverJobID,
+		"backfilled":   filled,
+		"booked":       booked,
+	}
+	if countErr == nil {
+		metadata["overdue"] = counts[domain.MaintenanceOverdue]
+		metadata["due_soon"] = counts[domain.MaintenanceDueSoon]
+		metadata["uncovered"] = counts[maintenanceUncoveredKey]
+		metadata["warranty"] = counts[maintenanceWarrantyKey]
+	} else {
+		metadata["counts_unavailable"] = countErr.Error()
+	}
+
 	// One audit row a day, whatever happened — and so, like the gauges, ahead of
 	// any error return. A quiet due list and a job that stopped running look
 	// identical from the outside otherwise, and the days worth explaining are
@@ -99,15 +121,7 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 			ActorName:    "service_maintenance_sweep",
 			Action:       audit.AuditMaintenanceSwept,
 			ResourceType: "equipment",
-			Metadata: map[string]any{
-				"river_job_id": riverJobID,
-				"backfilled":   filled,
-				"booked":       booked,
-				"overdue":      counts[domain.MaintenanceOverdue],
-				"due_soon":     counts[domain.MaintenanceDueSoon],
-				"uncovered":    counts[maintenanceUncoveredKey],
-				"warranty":     counts[maintenanceWarrantyKey],
-			},
+			Metadata:     metadata,
 		})
 	}); err != nil {
 		// Best effort: the work is done and committed. Failing here would make

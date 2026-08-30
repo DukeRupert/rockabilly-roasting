@@ -36,11 +36,10 @@ WHERE s.id = true
   AND s.service_labor_rate_cents IS NOT NULL;
 -- +goose StatementEnd
 
--- NOTE: this index was dropped again in 084 — it serves no query. Every
--- rate_cents IS NULL read is an aggregate FILTER inside a SUM, which a partial
--- index on ticket_id cannot serve. Left here so the history reads straight.
-CREATE INDEX service_time_entries_uncosted_idx
-    ON service_time_entries (ticket_id) WHERE rate_cents IS NULL;
+-- No index on rate_cents. Every read of it is an aggregate FILTER inside a SUM
+-- over one ticket's or one scope's entries, which a partial index cannot serve,
+-- and the one existence check (AnyCostedTime) tests the complement. An index
+-- here would cost a write on every logged hour and never be read.
 
 -- +goose Down
 

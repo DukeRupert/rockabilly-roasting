@@ -147,8 +147,9 @@ CREATE INDEX service_maintenance_due_calendar_idx
 -- The machine's own maintenance history, newest first.
 CREATE INDEX service_maintenance_due_equipment_idx
     ON service_maintenance_due (equipment_id, due_on DESC);
-CREATE INDEX service_maintenance_due_ticket_idx
-    ON service_maintenance_due (ticket_id) WHERE ticket_id IS NOT NULL;
+-- No index on ticket_id: nothing looks an occurrence up by its ticket. The
+-- scopes filter on `ticket_id IS NULL`, which is the complement and is served
+-- by the calendar index's own predicate.
 
 -- +goose Down
 

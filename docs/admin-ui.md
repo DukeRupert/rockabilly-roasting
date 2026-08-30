@@ -118,7 +118,16 @@ These classes exist for the storefront/marketing surfaces. Reaching for them in 
 
 ## Lint enforcement
 
-`mage checkAdminUI` (and `mage check` which calls it) greps `internal/ui/admin/**/*.templ` for the deny-list above and fails the build if any matches are found. `staff_login.templ` is excluded.
+`mage checkAdminUI` (and `mage check` which calls it) greps
+`internal/ui/admin/**/*.templ` **and `internal/ui/layouts/**/*.templ`** — the
+admin shell is admin UI too — for the deny-list above, and fails if any matches
+are found. `staff_login.templ`, `staff_setup.templ` and `layouts/storefront.templ`
+are excluded; the last of those is *meant* to use the paper-and-ink classes.
+`<style>` blocks are skipped, because a token named inside the shell's own
+override stylesheet is a definition rather than a class somebody reached for.
+
+That is one half of the check. The other is described under *The lint has two
+halves* below.
 
 To add a new admin-allowed token or update the deny-list, edit the lint target in `magefiles/mage.go`.
 
@@ -148,9 +157,10 @@ If you're building something genuinely new (e.g., an admin onboarding splash), o
    rule for. A class that does not *exist*.
 
    Scope is `internal/ui/admin` plus `internal/ui/layouts` (the admin shell),
-   and it matches `rr-*` utilities written literally in the templates. A class
-   assembled by string concatenation, or a *non*-`rr` typo like `bg-surface`,
-   still slips through — this closes the hole that shipped, not every hole.
+   and it matches `rr-*` utilities written literally in the templates. Known
+   gaps, deliberately: a class assembled by string concatenation, a *non*-`rr`
+   typo like `bg-surface`, and `rr-*` classes written in Go or JS rather than a
+   `.templ`. This closes the hole that shipped, not every hole.
 
 The second half was added after `bg-rr-paper-warm` shipped. The token is
 `--color-paper-warm`: un-prefixed, and storefront-only. Tailwind v4 drops an

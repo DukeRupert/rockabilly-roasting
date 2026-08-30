@@ -794,6 +794,13 @@ func (d *Deps) handleAdminEquipmentPlanAssign(w http.ResponseWriter, r *http.Req
 			redirectFlashError(w, r, back, "That contract end date is not a date.")
 			return
 		}
+		// Bounded like the others. A slipped year here decides whether covered
+		// work books itself for the next decade, which is a quieter mistake
+		// than a wrong anchor and a more expensive one.
+		if err := checkMaintenanceDay(end, d.merchantToday()); err != nil {
+			redirectFlashError(w, r, back, err.Error())
+			return
+		}
 		contractEnds = &end
 	}
 
@@ -1104,6 +1111,13 @@ func (d *Deps) handleAdminEquipmentPlanUpdate(w http.ResponseWriter, r *http.Req
 		end, parseErr := time.Parse("2006-01-02", raw)
 		if parseErr != nil {
 			redirectFlashError(w, r, back, "That contract end date is not a date.")
+			return
+		}
+		// Bounded like the others. A slipped year here decides whether covered
+		// work books itself for the next decade, which is a quieter mistake
+		// than a wrong anchor and a more expensive one.
+		if err := checkMaintenanceDay(end, d.merchantToday()); err != nil {
+			redirectFlashError(w, r, back, err.Error())
 			return
 		}
 		contractEnds = &end

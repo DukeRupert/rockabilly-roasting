@@ -528,7 +528,8 @@ Three new tabs in the Service section — `Maintenance`, `Plans` and `Costs`.
 `service_maintenance_sweep` (River, daily, no `RunOnStart` — the booking half
 opens real tickets, and a deploy is not a reason for a machine to acquire a
 visit). It backfills missing occurrences from `ListMissingDue`, books the
-covered work, and publishes `service_maintenance_due_total{scope}`.
+covered work, and publishes `service_maintenance_due_total{scope}` and increments
+`service_maintenance_booked_total` once per visit it opens.
 
 Backfill is the fan-out path for *existing* machines: `AddTask` deliberately
 does not reach the forty already on a plan, because one job that finds every gap is easier
@@ -777,18 +778,22 @@ what is owed now:
     shop's rate no longer re-costs the past. Details in *Labour rates → The
     snapshot*.
 13. **Done.** Eleven rounds of independent review, every one of which failed
-    the branch. The defects clustered: an interval edit that could book a visit the
-    customer had declined; `AttachTicket` silently no-opping and crossing
-    accounts; seventeen validation sentinels answering 500; `bg-rr-paper-warm`,
-    which is not a token, leaving today unmarked on the calendar; Skip rejecting
-    every attempt because the handler demanded a date its form never sent; and a
-    helper rewritten by a careless regex into a call to itself, fatal to the
-    process.
+    the branch.
 
-    Five of those were behaviours an earlier commit message *claimed* to have
-    fixed and had not — including one where the "fix" rewrote a doc to ratify
-    the bug, and one where a regex rewrote a helper into a call to itself. That is the failure mode worth carrying forward from this
-    build: none of the six was visible to the compiler, the linter, or the test
-    suite, so a green `mage check` was never evidence against them. What caught
-    them was opening the pages, posting what the forms actually post, and
-    grepping each claimed fix back out of the tree before writing it down.
+    The defects that mattered: an interval edit that could book a visit the
+    customer had declined; `AttachTicket` silently no-opping and crossing
+    accounts; nineteen validation sentinels answering 500 instead of 400;
+    `bg-rr-paper-warm`, which is not a token, leaving today unmarked on the
+    calendar; Skip rejecting every attempt because the handler demanded a date
+    its form never sent; and a helper a careless regex rewrote into a call to
+    itself, fatal to the process.
+
+    Separately from those, **five fixes were asserted in a commit message and
+    were not in the tree** — including one where the "fix" rewrote a doc to
+    ratify the bug it was meant to correct.
+
+    That is the failure mode worth carrying forward. None of it was visible to
+    the compiler, the linter, or the test suite, so a green `mage check` was
+    never evidence against any of it. What caught it was opening the pages,
+    posting what the forms actually post, and grepping each claimed fix back out
+    of the tree before writing it down.

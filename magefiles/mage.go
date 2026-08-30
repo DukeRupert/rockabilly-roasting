@@ -288,7 +288,7 @@ func deadTokenClasses(excluded map[string]bool) ([]string, error) {
 	// Utilities only, so a token name inside a CSS variable or a comment is not
 	// mistaken for one. Opacity suffixes (bg-rr-raised/60) compile from the
 	// base utility, so they are checked as the base.
-	use := regexp.MustCompile(`\b((?:bg|text|border|ring|divide|from|via|to|fill|stroke|decoration|outline|accent|shadow)-rr-[a-z0-9-]+)`)
+	use := regexp.MustCompile(`\b((?:bg|text|border|border-[trblxy]|ring|ring-offset|divide|from|via|to|fill|stroke|decoration|outline|accent|shadow|placeholder|caret)-rr-[a-z0-9-]+)`)
 
 	var dead []string
 	seen := map[string]bool{}

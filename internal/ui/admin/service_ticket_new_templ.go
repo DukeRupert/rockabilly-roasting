@@ -27,6 +27,10 @@ type ServiceTicketFormValues struct {
 	Severity    string
 	AssignedTo  string
 	Billable    string
+	// MaintenanceID rides through the form when the ticket was started from a
+	// due maintenance row. On submit the ticket is attached to that occurrence,
+	// so the due list stops asking about work that is now booked.
+	MaintenanceID string
 }
 
 // ServiceTicketNewProps is the state of the open-a-ticket form.
@@ -93,7 +97,7 @@ func ServiceTicketNewContent(props ServiceTicketNewProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 63, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 67, Col: 59}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -104,53 +108,76 @@ func ServiceTicketNewContent(props ServiceTicketNewProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"post\" action=\"/admin/service/tickets\" class=\"mt-6 border border-rr-border bg-rr-surface p-6\"><div class=\"grid grid-cols-1 gap-4 sm:grid-cols-6\"><div class=\"sm:col-span-3\"><label for=\"customer_id\" class=\"block text-sm font-medium text-rr-heading\">Customer</label> <select id=\"customer_id\" name=\"customer_id\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\" hx-get=\"/admin/service/tickets/machines\" hx-target=\"#equipment-picker\" hx-swap=\"outerHTML\" hx-trigger=\"change\"><option value=\"\">Choose a customer</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<form method=\"post\" action=\"/admin/service/tickets\" class=\"mt-6 border border-rr-border bg-rr-surface p-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		for _, c := range props.Customers {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<option value=\"")
+		if props.Values.MaintenanceID != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<input type=\"hidden\" name=\"maintenance_id\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
-			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID.String())
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.MaintenanceID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 82, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 72, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if props.Values.CustomerID == c.ID.String() {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, " selected")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, ">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 82, Col: 102}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</select></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"grid grid-cols-1 gap-4 sm:grid-cols-6\"><div class=\"sm:col-span-3\"><label for=\"customer_id\" class=\"block text-sm font-medium text-rr-heading\">Customer</label> <select id=\"customer_id\" name=\"customer_id\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\" hx-get=\"/admin/service/tickets/machines\" hx-target=\"#equipment-picker\" hx-swap=\"outerHTML\" hx-trigger=\"change\"><option value=\"\">Choose a customer</option> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, c := range props.Customers {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<option value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var4 string
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(c.ID.String())
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 89, Col: 35}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if props.Values.CustomerID == c.ID.String() {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var5 string
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 89, Col: 102}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</select></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -158,135 +185,135 @@ func ServiceTicketNewContent(props ServiceTicketNewProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"sm:col-span-6\"><label for=\"title\" class=\"block text-sm font-medium text-rr-heading\">What is wrong?</label> <input type=\"text\" id=\"title\" name=\"title\" required value=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.Title)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 94, Col: 31}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" placeholder=\"Group head leaking between shots\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><p class=\"mt-1 text-xs text-rr-muted\">One line. This is the whole ticket as far as the queue is concerned.</p></div><div class=\"sm:col-span-6\"><label for=\"description\" class=\"block text-sm font-medium text-rr-heading\">What did they say?</label> <textarea id=\"description\" name=\"description\" rows=\"3\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"sm:col-span-6\"><label for=\"title\" class=\"block text-sm font-medium text-rr-heading\">What is wrong?</label> <input type=\"text\" id=\"title\" name=\"title\" required value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.Values.Description)
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.Title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 107, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 101, Col: 31}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</textarea></div><div class=\"sm:col-span-2\"><label for=\"severity\" class=\"block text-sm font-medium text-rr-heading\">How bad is it?</label> <select id=\"severity\" name=\"severity\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" placeholder=\"Group head leaking between shots\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><p class=\"mt-1 text-xs text-rr-muted\">One line. This is the whole ticket as far as the queue is concerned.</p></div><div class=\"sm:col-span-6\"><label for=\"description\" class=\"block text-sm font-medium text-rr-heading\">What did they say?</label> <textarea id=\"description\" name=\"description\" rows=\"3\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var7 string
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(props.Values.Description)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 114, Col: 31}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</textarea></div><div class=\"sm:col-span-2\"><label for=\"severity\" class=\"block text-sm font-medium text-rr-heading\">How bad is it?</label> <select id=\"severity\" name=\"severity\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, sv := range domain.ServiceSeverities() {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<option value=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var7 string
-			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(sv))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 113, Col: 32}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if props.Values.severityOrDefault() == string(sv) {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, " selected")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, ">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<option value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var8 string
-			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(sv.Label())
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(sv))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 113, Col: 108}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 120, Col: 32}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</option>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</select></div><div class=\"sm:col-span-2\"><label for=\"assigned_staff_id\" class=\"block text-sm font-medium text-rr-heading\">Assign to</label> <select id=\"assigned_staff_id\" name=\"assigned_staff_id\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><option value=\"\">Nobody yet</option> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		for _, st := range props.Staff {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<option value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var9 string
-			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.ResolveAttributeValue(st.ID.String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 122, Col: 36}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if props.Values.AssignedTo == st.ID.String() {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, " selected")
+			if props.Values.severityOrDefault() == string(sv) {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, " selected")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, ">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var9 string
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(sv.Label())
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 120, Col: 108}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</option>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</select></div><div class=\"sm:col-span-2\"><label for=\"assigned_staff_id\" class=\"block text-sm font-medium text-rr-heading\">Assign to</label> <select id=\"assigned_staff_id\" name=\"assigned_staff_id\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><option value=\"\">Nobody yet</option> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		for _, st := range props.Staff {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<option value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
-			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(st.Name)
+			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(st.ID.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 122, Col: 104}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 129, Col: 36}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if props.Values.AssignedTo == st.ID.String() {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var11 string
+			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(st.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 129, Col: 104}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</select></div><div class=\"sm:col-span-2 flex items-end\"><label class=\"flex items-center gap-2 text-sm text-rr-body\"><input type=\"checkbox\" name=\"billable\" value=\"1\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</select></div><div class=\"sm:col-span-2 flex items-end\"><label class=\"flex items-center gap-2 text-sm text-rr-body\"><input type=\"checkbox\" name=\"billable\" value=\"1\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if props.Values.billableChecked() {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, " checked")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, " checked")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, " class=\"rounded-sm border-rr-border\"> Billable</label></div></div><div class=\"mt-6 flex items-center gap-3\"><button type=\"submit\" class=\"btn-confirm\">Open ticket</button> <a href=\"/admin/service\" class=\"text-sm text-rr-muted underline\">Cancel</a></div></form>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, " class=\"rounded-sm border-rr-border\"> Billable</label></div></div><div class=\"mt-6 flex items-center gap-3\"><button type=\"submit\" class=\"btn-confirm\">Open ticket</button> <a href=\"/admin/service\" class=\"text-sm text-rr-muted underline\">Cancel</a></div></form>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -313,68 +340,68 @@ func ServiceTicketMachinePicker(machines []EquipmentOption, selected string) tem
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var11 == nil {
-			templ_7745c5c3_Var11 = templ.NopComponent
+		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var12 == nil {
+			templ_7745c5c3_Var12 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"sm:col-span-3\" id=\"equipment-picker\"><label for=\"equipment_id\" class=\"block text-sm font-medium text-rr-heading\">Which machine?</label> <select id=\"equipment_id\" name=\"equipment_id\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><option value=\"\">Not about a specific machine</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<div class=\"sm:col-span-3\" id=\"equipment-picker\"><label for=\"equipment_id\" class=\"block text-sm font-medium text-rr-heading\">Which machine?</label> <select id=\"equipment_id\" name=\"equipment_id\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><option value=\"\">Not about a specific machine</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for _, m := range machines {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<option value=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var12 string
-			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID.String())
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 149, Col: 33}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			if selected == m.ID.String() {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, " selected")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, ">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<option value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var13 string
-			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(m.Label)
+			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.ResolveAttributeValue(m.ID.String())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 149, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 156, Col: 33}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var13)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</option>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if selected == m.ID.String() {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, " selected")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, ">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var14 string
+			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(m.Label)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_ticket_new.templ`, Line: 156, Col: 85}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "</option>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</select> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</select> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(machines) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<p class=\"mt-1 text-xs text-rr-muted\">No machines on the register for this customer yet.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<p class=\"mt-1 text-xs text-rr-muted\">No machines on the register for this customer yet.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -416,12 +443,12 @@ func ServiceTicketNew(props ServiceTicketNewProps) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var14 == nil {
-			templ_7745c5c3_Var14 = templ.NopComponent
+		templ_7745c5c3_Var15 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var15 == nil {
+			templ_7745c5c3_Var15 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var15 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var16 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -444,7 +471,7 @@ func ServiceTicketNew(props ServiceTicketNewProps) templ.Component {
 			ActivePath: "/admin/service",
 			StaffName:  props.StaffName,
 			StaffRole:  props.StaffRole,
-		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var15), templ_7745c5c3_Buffer)
+		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var16), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

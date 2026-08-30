@@ -321,6 +321,10 @@ var (
 	// ErrEquipmentSiteIncomplete guards a half-typed new site. A street with no
 	// town is not somewhere a tech can be sent.
 	ErrEquipmentSiteIncomplete = errors.New("a new site needs a street, city, state and ZIP")
+	// ErrEquipmentRetired rejects scheduling work on a machine that is out of
+	// service for good. Maintenance nobody will ever do is exactly the noise a
+	// due list has to stay free of to be worth opening.
+	ErrEquipmentRetired = errors.New("that machine is retired")
 
 	// --- Service tickets ---
 
@@ -389,6 +393,56 @@ var (
 	// ErrJobRetryUnavailable means no River client is wired in this process,
 	// so there is nothing to hand the job back to.
 	ErrJobRetryUnavailable = errors.New("background job retry is unavailable")
+
+	// --- Preventive maintenance ---
+
+	ErrPlanNotFound = errors.New("maintenance plan not found")
+	// ErrPlanNameRequired guards the unnamed plan. The plan name is what staff
+	// pick from when assigning one to a machine; a blank one is unpickable.
+	ErrPlanNameRequired = errors.New("give the plan a name")
+	// ErrPlanNameTaken catches the near-duplicate. Two plans called "Linea PB
+	// warranty" is a data-entry accident nobody notices until the second one
+	// has machines on it.
+	ErrPlanNameTaken = errors.New("a plan with that name already exists")
+	// ErrPlanInUse blocks deleting a plan machines have been on. The
+	// maintenance history of every one of them hangs off it; deactivate the
+	// plan instead, which takes it out of the picker and leaves the record.
+	ErrPlanInUse = errors.New("machines have been on this plan — deactivate it instead of deleting it")
+	// ErrPlanInactive stops a retired plan being assigned to something new.
+	ErrPlanInactive = errors.New("that plan is no longer active")
+	// ErrPlanHasNoTasks rejects assigning an empty plan. It would generate no
+	// maintenance at all while looking on the machine's page exactly like one
+	// that does — the worst kind of wrong.
+	ErrPlanHasNoTasks       = errors.New("add at least one task to the plan before assigning it")
+	ErrPlanTaskNotFound     = errors.New("that task is not on this plan")
+	ErrPlanTaskNameRequired = errors.New("what gets done? name the task")
+	// ErrPlanIntervalInvalid guards the interval. Zero would come due forever;
+	// ten years is past the point where anything would ever surface it again,
+	// and is far likelier to be a typo than a schedule.
+	ErrPlanIntervalInvalid = errors.New("how often? give an interval between 1 and 3650 days")
+	// ErrPlanLeadInvalid rejects a warning window as long as the interval
+	// itself, which would leave the task permanently reading as due soon and
+	// the due list saying nothing at all.
+	ErrPlanLeadInvalid = errors.New("the notice period has to be shorter than the interval")
+	// ErrPlanStartRequired guards the anchor date. Every due date on the
+	// machine counts forward from it, so there is no sensible default.
+	ErrPlanStartRequired           = errors.New("when does the schedule start?")
+	ErrPlanContractEndsBeforeStart = errors.New("the contract cannot end before the schedule starts")
+	// ErrPlanAlreadyAssigned stops the same plan going on a machine twice,
+	// which would double every due item on it.
+	ErrPlanAlreadyAssigned    = errors.New("that machine is already on this plan")
+	ErrPlanAssignmentNotFound = errors.New("that plan is not on this machine")
+	ErrPlanAssignmentEnded    = errors.New("that plan has already been taken off this machine")
+
+	ErrMaintenanceNotFound = errors.New("scheduled maintenance not found")
+	// ErrMaintenanceAlreadyClosed makes the double submit safe: the second
+	// click finds the item already done and says so, rather than writing a
+	// second follow-on occurrence.
+	ErrMaintenanceAlreadyClosed = errors.New("that maintenance has already been closed out")
+	// ErrMaintenanceDateRequired guards the date the next occurrence is
+	// measured from. Defaulting it to today would silently re-anchor a
+	// fortnight-old visit to the day it was typed up.
+	ErrMaintenanceDateRequired = errors.New("when was it done?")
 )
 
 // MOQViolationError carries the per-line minimum/multiple violations so

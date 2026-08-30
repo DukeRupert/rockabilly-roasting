@@ -1,0 +1,189 @@
+package admin
+
+import (
+	"strconv"
+
+	"github.com/google/uuid"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// Maintenance plans — /admin/service/plans. The templates the schedule is built
+// from: a named series of tasks, written once, assigned to many machines.
+//
+// Part of the equipment service module; see docs/equipment-service-module.md.
+
+// ServicePlanListProps is the plan index's state.
+type ServicePlanListProps struct {
+	Plans []domain.ServicePlan
+	Nav   ServiceNav
+	// Machines is how many live assignments each plan has, so a row can say
+	// what editing it would touch.
+	Machines map[uuid.UUID]int
+	// Values echoes back a rejected create form so nothing is retyped.
+	Values ServicePlanFormValues
+	Error  string
+	// ShowForm opens the create panel — set when a submission bounced.
+	ShowForm  bool
+	StaffName string
+	StaffRole string
+	CanWrite  bool
+	Flash     Flash
+}
+
+// ServicePlanFormValues is the create/edit form as strings, echoed back on
+// error so a rejected submission does not lose what was typed.
+type ServicePlanFormValues struct {
+	Name        string
+	Description string
+	Category    string
+	Active      bool
+}
+
+// ServicePlanFormValuesFrom fills the form from a plan, or gives an empty one.
+func ServicePlanFormValuesFrom(p *domain.ServicePlan) ServicePlanFormValues {
+	if p == nil {
+		return ServicePlanFormValues{Active: true}
+	}
+	return ServicePlanFormValues{
+		Name:        p.Name,
+		Description: p.Description,
+		Category:    string(p.Category),
+		Active:      p.Active,
+	}
+}
+
+func planMachineLabel(n int) string {
+	switch n {
+	case 0:
+		return "No machines"
+	case 1:
+		return "1 machine"
+	}
+	return strconv.Itoa(n) + " machines"
+}
+
+func planCategoryLabel(p domain.ServicePlan) string {
+	if p.Category == "" {
+		return "Any machine"
+	}
+	return p.Category.Label()
+}
+
+templ ServicePlanListContent(props ServicePlanListProps) {
+	@serviceSection(props.Nav, serviceTabPlans)
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Maintenance plans</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				A plan is the series of jobs a machine needs to stay under warranty — backflush every month, gaskets every six, full service every year. Write it once, put it on as many machines as you like.
+			</p>
+		</div>
+	</div>
+	@adminFlash(props.Flash)
+	if props.CanWrite {
+		@servicePlanCreateForm(props)
+	}
+	<div class="mt-6 overflow-hidden border border-rr-border bg-rr-surface">
+		if len(props.Plans) == 0 {
+			<div class="px-4 py-12 text-center">
+				<p class="text-sm text-rr-muted">No plans yet. Write the first one above.</p>
+			</div>
+		} else {
+			<table class="min-w-full divide-y divide-rr-border">
+				<thead>
+					<tr>
+						<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Plan</th>
+						<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Suits</th>
+						<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Tasks</th>
+						<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">In use</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-rr-border">
+					for _, plan := range props.Plans {
+						<tr class="row-link">
+							<td class="px-4 py-3 text-sm">
+								<a href={ templ.SafeURL("/admin/service/plans/" + plan.ID.String()) } class="row-link-target font-medium text-rr-heading">
+									{ plan.Name }
+								</a>
+								if !plan.Active {
+									<span class="badge badge-grey">Retired</span>
+								}
+								if plan.Description != "" {
+									<div class="text-rr-muted">{ plan.Description }</div>
+								}
+							</td>
+							<td class="px-4 py-3 text-sm text-rr-body">{ planCategoryLabel(plan) }</td>
+							<td class="px-4 py-3 text-sm text-rr-body">{ strconv.Itoa(plan.TaskCount()) }</td>
+							<td class="px-4 py-3 text-sm text-rr-muted">{ planMachineLabel(props.Machines[plan.ID]) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	</div>
+}
+
+// servicePlanCreateForm is open on the page rather than behind its own route.
+// Writing a plan is two fields and the thing you do next is add tasks to it, so
+// a round trip to a form page and back would be most of the interaction.
+templ servicePlanCreateForm(props ServicePlanListProps) {
+	<details class="mt-6 border border-rr-border bg-rr-surface" open?={ props.ShowForm }>
+		<summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-rr-heading">Write a new plan</summary>
+		<form method="post" action="/admin/service/plans" class="border-t border-rr-border px-4 py-4">
+			if props.Error != "" {
+				<p class="mb-3 text-sm text-rr-red">{ props.Error }</p>
+			}
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+				<div>
+					<label for="plan-name" class="label-font block text-rr-muted">Name</label>
+					<input
+						type="text"
+						id="plan-name"
+						name="name"
+						value={ props.Values.Name }
+						required
+						placeholder="Linea PB — warranty schedule"
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					/>
+				</div>
+				<div>
+					<label for="plan-category" class="label-font block text-rr-muted">Suits</label>
+					<select id="plan-category" name="category" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+						<option value="" selected?={ props.Values.Category == "" }>Any machine</option>
+						for _, c := range domain.EquipmentCategories() {
+							<option value={ string(c) } selected?={ props.Values.Category == string(c) }>{ c.Label() }</option>
+						}
+					</select>
+					<p class="mt-1 text-xs text-rr-muted">Only sorts the picker — you can still put it on anything.</p>
+				</div>
+			</div>
+			<div class="mt-4">
+				<label for="plan-description" class="label-font block text-rr-muted">What it is for</label>
+				<textarea
+					id="plan-description"
+					name="description"
+					rows="2"
+					class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+				>{ props.Values.Description }</textarea>
+			</div>
+			<div class="mt-4">
+				<button type="submit" class="inline-flex items-center bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90">
+					Create the plan
+				</button>
+			</div>
+		</form>
+	</details>
+}
+
+templ ServicePlanList(props ServicePlanListProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Maintenance plans",
+		ActivePath: "/admin/service",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@ServicePlanListContent(props)
+	}
+}

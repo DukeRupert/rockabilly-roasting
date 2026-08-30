@@ -67,6 +67,7 @@ type Deps struct {
 	ModuleService          *app.ModuleService
 	EquipmentService       *app.EquipmentService
 	ServiceTicketService   *app.ServiceTicketService
+	ServicePlanService     *app.ServicePlanService
 	AuditWriter            *audit.AuditWriter // for cross-boundary audit events (OAuth connect/disconnect); prefer recording through a service
 	PaymentProvider        payments.Provider
 	RiverClient            *river.Client[pgx.Tx]
@@ -760,6 +761,31 @@ func NewRouter(deps *Deps) http.Handler {
 	serviceWrite("GET /admin/service/equipment/{id}/edit", deps.handleAdminEquipmentEdit)
 	serviceWrite("POST /admin/service/equipment/{id}", deps.handleAdminEquipmentUpdate)
 	serviceWrite("POST /admin/service/equipment/{id}/status", deps.handleAdminEquipmentStatus)
+
+	// Preventive maintenance. The plan pages are shop-wide templates; the
+	// assignment routes hang off a machine, which is where staff actually put
+	// one on.
+	serviceRead("GET /admin/service/maintenance", deps.handleAdminMaintenanceList)
+	serviceRead("GET /admin/service/maintenance/calendar", deps.handleAdminMaintenanceCalendar)
+	serviceWrite("POST /admin/service/maintenance/{id}/complete", deps.handleAdminMaintenanceComplete)
+	serviceWrite("POST /admin/service/maintenance/{id}/skip", deps.handleAdminMaintenanceSkip)
+
+	serviceRead("GET /admin/service/plans", deps.handleAdminServicePlanList)
+	serviceWrite("POST /admin/service/plans", deps.handleAdminServicePlanCreate)
+	serviceRead("GET /admin/service/plans/{id}", deps.handleAdminServicePlanShow)
+	serviceWrite("POST /admin/service/plans/{id}", deps.handleAdminServicePlanUpdate)
+	serviceWrite("POST /admin/service/plans/{id}/retire", deps.handleAdminServicePlanRetire)
+	serviceWrite("POST /admin/service/plans/{id}/reactivate", deps.handleAdminServicePlanReactivate)
+	serviceWrite("POST /admin/service/plans/{id}/delete", deps.handleAdminServicePlanDelete)
+	serviceWrite("POST /admin/service/plans/{id}/tasks", deps.handleAdminServicePlanTaskAdd)
+	serviceWrite("POST /admin/service/plans/{id}/tasks/{childID}/delete", deps.handleAdminServicePlanTaskDelete)
+
+	serviceWrite("POST /admin/service/equipment/{id}/plans", deps.handleAdminEquipmentPlanAssign)
+	serviceWrite("POST /admin/service/equipment/{id}/plans/{childID}/end", deps.handleAdminEquipmentPlanEnd)
+
+	// The cross-account cost report. Read-only, so finance — which holds
+	// service:view and nothing else — can open the numbers it is meant to read.
+	serviceRead("GET /admin/service/costs", deps.handleAdminServiceCosts)
 
 	// Admin audit log
 	// Background job health. Admin-only: retrying a job re-runs real work,

@@ -250,6 +250,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	// service machines pays nothing for a card it will never see.
 	serviceEnabled := d.ModuleService.Enabled(domain.ModuleEquipmentService)
 	var equipment []domain.Equipment
+	var serviceCost []domain.ServiceCostWindow
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -314,6 +315,13 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			if txErr != nil {
 				return txErr
 			}
+			// Scoped to the customer rather than to their machines, so the
+			// call-outs that never named one still count — those hours went
+			// into the account just the same.
+			serviceCost, txErr = d.ServiceTicketService.CostForCustomer(ctx, tx, id, time.Now())
+			if txErr != nil {
+				return txErr
+			}
 		}
 
 		// Who approved the wholesale application. A staff record that has since
@@ -358,6 +366,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		StaffRole:            role,
 		CanEditEmail:         staffCan(r, auth.PermEditCustomers),
 		Equipment:            equipment,
+		ServiceCost:          serviceCost,
 		ServiceEnabled:       serviceEnabled,
 		CanWriteService:      staffCan(r, auth.PermWriteService),
 		ApprovedByName:       approvedByName,

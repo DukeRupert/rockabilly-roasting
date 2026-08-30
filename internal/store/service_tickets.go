@@ -657,3 +657,207 @@ func (s *ServiceTicketStore) LastServiceByEquipment(ctx context.Context, tx pgx.
 	}
 	return out, nil
 }
+
+// ServiceCostFilter scopes a cost roll-up: one machine, or one account, over an
+// optional window. Exactly one of the two ids is expected to be set.
+type ServiceCostFilter struct {
+	// EquipmentID scopes to one machine — "what has this cost us".
+	EquipmentID *uuid.UUID
+	// CustomerID scopes to a whole account, including the call-outs that were
+	// never tied to a particular machine. Those are real hours spent on the
+	// customer, and dropping them would understate exactly the account the
+	// merchant is trying to judge.
+	CustomerID *uuid.UUID
+	// Since bounds the window. Zero means all time.
+	Since time.Time
+}
+
+// The date a part counts against.
+//
+// Parts have no single "we spent this" date. installed_on is the truest one,
+// but a part sitting at 'needed' or 'ordered' has cost committed and no install
+// date yet, and dropping it out of the window would make a repair in progress
+// look free. Falling back through received → ordered → the day the line was
+// written keeps every part in exactly one window.
+const servicePartCostDate = `COALESCE(p.installed_on, p.received_on, p.ordered_on, p.created_at::date)`
+
+// CostSummary rolls up parts spend and hours for a machine or an account.
+//
+// Every part on a scoped ticket counts, whatever its status and whoever ends up
+// paying — the same rule Totals follows for one ticket, and the reason this is
+// a widening of that query rather than a second opinion about what a repair
+// cost. Billable minutes come back alongside the total rather than instead of
+// it: what the work cost and what was charged for it are different questions,
+// and this answers the first.
+//
+// One round trip. A machine page draws three of these windows and an account
+// page three more; nine queries to render two cards would be silly.
+func (s *ServiceTicketStore) CostSummary(ctx context.Context, tx pgx.Tx, f ServiceCostFilter) (domain.ServiceCostSummary, error) {
+	var where []string
+	var args []any
+
+	add := func(clause string, arg any) {
+		args = append(args, arg)
+		where = append(where, fmt.Sprintf(clause, len(args)))
+	}
+	if f.EquipmentID != nil {
+		add("equipment_id = $%d", *f.EquipmentID)
+	}
+	if f.CustomerID != nil {
+		add("customer_id = $%d", *f.CustomerID)
+	}
+	// No scope means every ticket in the shop, which is never what a caller
+	// meant to ask for. Refuse rather than quietly return the whole business.
+	if len(where) == 0 {
+		return domain.ServiceCostSummary{}, fmt.Errorf("service cost summary: no scope given")
+	}
+
+	// The window is applied per sub-record, against the day the work actually
+	// happened, not against the ticket. A ticket opened in January and worked
+	// in April belongs to April's numbers.
+	partWindow, entryWindow := "", ""
+	if !f.Since.IsZero() {
+		args = append(args, f.Since)
+		partWindow = fmt.Sprintf(" AND %s >= $%d::date", servicePartCostDate, len(args))
+		entryWindow = fmt.Sprintf(" AND e.performed_on >= $%d::date", len(args))
+	}
+
+	query := `
+	WITH scoped AS (
+	    SELECT id FROM service_tickets WHERE ` + strings.Join(where, " AND ") + `
+	), parts AS (
+	    SELECT p.ticket_id, p.unit_cost_cents * p.quantity AS cents
+	    FROM service_parts p JOIN scoped s ON s.id = p.ticket_id
+	    WHERE true` + partWindow + `
+	), entries AS (
+	    SELECT e.ticket_id, e.minutes, e.kind, e.billable
+	    FROM service_time_entries e JOIN scoped s ON s.id = e.ticket_id
+	    WHERE true` + entryWindow + `
+	)
+	SELECT
+	    (SELECT COALESCE(SUM(cents), 0) FROM parts),
+	    (SELECT count(*) FROM parts),
+	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE kind = 'labor'), 0) FROM entries),
+	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE kind = 'travel'), 0) FROM entries),
+	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE billable), 0) FROM entries),
+	    (SELECT count(DISTINCT ticket_id) FROM (
+	        SELECT ticket_id FROM parts UNION ALL SELECT ticket_id FROM entries
+	     ) touched)`
+
+	var out domain.ServiceCostSummary
+	if err := tx.QueryRow(ctx, query, args...).Scan(
+		&out.PartsCostCents, &out.PartCount,
+		&out.LaborMinutes, &out.TravelMinutes, &out.BillableMinutes,
+		&out.Visits,
+	); err != nil {
+		return domain.ServiceCostSummary{}, fmt.Errorf("service cost summary: %w", err)
+	}
+	return out, nil
+}
+
+// ServiceAccountCostFilter scopes the cross-account table.
+type ServiceAccountCostFilter struct {
+	// Since bounds the window. Zero means all time.
+	Since time.Time
+	Sort  domain.ServiceAccountCostSort
+	Limit int
+}
+
+// CostByCustomer ranks every account by what servicing it has taken.
+//
+// Driven by work recorded, not by the customer list: an account nobody has
+// touched in the window has no row, because a table padded with zeros buries
+// the handful of rows worth reading. That also means the result is naturally
+// small — it is bounded by "customers we did service work for this quarter".
+//
+// Parts and time entries are normalised into one shape and aggregated together
+// rather than joined as two per-customer aggregates. A FULL OUTER JOIN between
+// them would be the obvious way, and it is the way that quietly drops the
+// customer who had parts but no hours logged, or the reverse.
+func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f ServiceAccountCostFilter) ([]domain.ServiceAccountCost, error) {
+	var args []any
+
+	partWindow, entryWindow := "", ""
+	if !f.Since.IsZero() {
+		args = append(args, f.Since)
+		partWindow = fmt.Sprintf(" AND %s >= $%d::date", servicePartCostDate, len(args))
+		entryWindow = fmt.Sprintf(" AND e.performed_on >= $%d::date", len(args))
+	}
+
+	orderBy := "total_minutes DESC, parts_cents DESC"
+	switch f.Sort {
+	case domain.ServiceAccountCostByParts:
+		orderBy = "parts_cents DESC, total_minutes DESC"
+	case domain.ServiceAccountCostByVisits:
+		orderBy = "visits DESC, total_minutes DESC"
+	}
+
+	limit := ""
+	if f.Limit > 0 {
+		args = append(args, f.Limit)
+		limit = fmt.Sprintf(" LIMIT $%d", len(args))
+	}
+
+	query := `
+	WITH combined AS (
+	    SELECT t.customer_id, p.ticket_id, p.unit_cost_cents * p.quantity AS cents,
+	           0 AS minutes, NULL::text AS kind, false AS billable, true AS is_part,
+	           ` + servicePartCostDate + ` AS on_day
+	    FROM service_parts p
+	    JOIN service_tickets t ON t.id = p.ticket_id
+	    WHERE true` + partWindow + `
+	    UNION ALL
+	    SELECT t.customer_id, e.ticket_id, 0, e.minutes, e.kind, e.billable, false, e.performed_on
+	    FROM service_time_entries e
+	    JOIN service_tickets t ON t.id = e.ticket_id
+	    WHERE true` + entryWindow + `
+	), agg AS (
+	    SELECT customer_id,
+	           COALESCE(SUM(cents), 0)                                  AS parts_cents,
+	           count(*) FILTER (WHERE is_part)                          AS part_count,
+	           COALESCE(SUM(minutes) FILTER (WHERE kind = 'labor'), 0)  AS labor_minutes,
+	           COALESCE(SUM(minutes) FILTER (WHERE kind = 'travel'), 0) AS travel_minutes,
+	           COALESCE(SUM(minutes) FILTER (WHERE billable), 0)        AS billable_minutes,
+	           COALESCE(SUM(minutes), 0)                                AS total_minutes,
+	           count(DISTINCT ticket_id)                                AS visits,
+	           max(on_day)                                              AS last_work_on
+	    FROM combined
+	    GROUP BY customer_id
+	)
+	SELECT a.customer_id,
+	       COALESCE(NULLIF(c.company_name, ''), TRIM(c.first_name || ' ' || c.last_name), c.email),
+	       COALESCE(m.machines, 0),
+	       a.parts_cents, a.part_count, a.labor_minutes, a.travel_minutes,
+	       a.billable_minutes, a.visits, a.last_work_on
+	FROM agg a
+	JOIN customers c ON c.id = a.customer_id
+	LEFT JOIN (
+	    SELECT customer_id, count(*) AS machines FROM equipment
+	    WHERE status <> 'retired' GROUP BY customer_id
+	) m ON m.customer_id = a.customer_id
+	ORDER BY ` + orderBy + `, c.company_name, c.last_name` + limit
+
+	rows, err := tx.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("service cost by customer: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.ServiceAccountCost
+	for rows.Next() {
+		var r domain.ServiceAccountCost
+		if err := rows.Scan(
+			&r.CustomerID, &r.CustomerName, &r.MachineCount,
+			&r.Summary.PartsCostCents, &r.Summary.PartCount,
+			&r.Summary.LaborMinutes, &r.Summary.TravelMinutes,
+			&r.Summary.BillableMinutes, &r.Summary.Visits, &r.LastWorkOn,
+		); err != nil {
+			return nil, fmt.Errorf("scan service cost by customer: %w", err)
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("service cost by customer: %w", err)
+	}
+	return out, nil
+}

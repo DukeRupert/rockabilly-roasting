@@ -1,0 +1,228 @@
+package admin
+
+import (
+	"strconv"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// The cross-account service report — /admin/service/costs.
+//
+// The machine card answers "is this machine getting worse" and the customer
+// rail answers "what has this account taken". This is the one that names an
+// account nobody suspected: every customer the shop did service work for in a
+// period, ranked, with the machines they have beside the hours they took.
+//
+// The row worth finding is large hours over few machines. A nine-machine chain
+// costing more than a single-site cafe is not a finding, which is why the
+// machine count sits in the table rather than being left to memory.
+//
+// Part of the equipment service module; see docs/equipment-service-module.md.
+
+// ServiceCostsProps is the report's state.
+type ServiceCostsProps struct {
+	Report domain.ServiceAccountReport
+	Nav    ServiceNav
+	// Days is the window in force — 90, 365, or 0 for all time — echoed back so
+	// the period control shows what is applied.
+	Days      int
+	StaffName string
+	StaffRole string
+	Flash     Flash
+}
+
+// servicePeriods are the windows the report offers, in the order they appear.
+func servicePeriods() []struct {
+	Label string
+	Days  int
+} {
+	return []struct {
+		Label string
+		Days  int
+	}{
+		{"90 days", 90},
+		{"12 months", 365},
+		{"All time", 0},
+	}
+}
+
+// serviceSorts are the rankings. Both numbers are always in the table; this
+// only decides which one the rows are ordered by.
+func serviceSorts() []struct {
+	Label string
+	Value string
+} {
+	return []struct {
+		Label string
+		Value string
+	}{
+		{"Hours", ""},
+		{"Parts spend", "parts"},
+		{"Visits", "visits"},
+	}
+}
+
+// serviceCostsHref builds a link that changes one control and keeps the other.
+func serviceCostsHref(days int, sort string) string {
+	q := "/admin/service/costs?days=" + strconv.Itoa(days)
+	if sort != "" {
+		q += "&sort=" + sort
+	}
+	return q
+}
+
+// serviceCostsPeriodLabel says what the numbers cover, in a sentence.
+func serviceCostsPeriodLabel(days int) string {
+	switch days {
+	case 90:
+		return "the last 90 days"
+	case 365:
+		return "the last 12 months"
+	}
+	return "all time"
+}
+
+// serviceToggleClass stamps the selected option in the period and rank
+// controls. Same treatment as the dashboard's period toggles: filled ink for
+// what is applied, outlined for what is not.
+func serviceToggleClass(selected bool) string {
+	base := "rounded-sm px-2 py-1 text-xs font-semibold uppercase tracking-wide"
+	if selected {
+		return base + " bg-rr-heading text-rr-bg"
+	}
+	return base + " border border-rr-border bg-rr-surface text-rr-muted hover:text-rr-heading"
+}
+
+// serviceCostMachines renders the machine count with its noun.
+func serviceCostMachines(n int) string {
+	if n == 1 {
+		return "1 machine"
+	}
+	return strconv.Itoa(n) + " machines"
+}
+
+templ ServiceCostsContent(props ServiceCostsProps) {
+	@serviceSection(props.Nav, serviceTabCosts)
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">What service costs</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				Every account the crew did service work for, ranked. Hours and parts both count whether or not anyone was billed for them — this is what the work cost the shop, not what it earned.
+			</p>
+		</div>
+	</div>
+	@adminFlash(props.Flash)
+	<div class="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 border border-rr-border bg-rr-surface px-4 py-3">
+		<div class="flex items-center gap-2">
+			<span class="label-font text-rr-muted">Period</span>
+			for _, p := range servicePeriods() {
+				<a
+					href={ templ.SafeURL(serviceCostsHref(p.Days, string(props.Report.Sort))) }
+					class={ serviceToggleClass(p.Days == props.Days) }
+				>{ p.Label }</a>
+			}
+		</div>
+		<div class="flex items-center gap-2">
+			<span class="label-font text-rr-muted">Rank by</span>
+			for _, s := range serviceSorts() {
+				<a
+					href={ templ.SafeURL(serviceCostsHref(props.Days, s.Value)) }
+					class={ serviceToggleClass(s.Value == string(props.Report.Sort)) }
+				>{ s.Label }</a>
+			}
+		</div>
+	</div>
+	<div class="mt-4 overflow-hidden border border-rr-border bg-rr-surface">
+		if len(props.Report.Rows) == 0 {
+			<div class="px-4 py-12 text-center">
+				<p class="text-sm text-rr-muted">
+					No parts or hours were recorded against any account in { serviceCostsPeriodLabel(props.Days) }.
+				</p>
+			</div>
+		} else {
+			<div class="overflow-x-auto">
+				<table class="min-w-full divide-y divide-rr-border">
+					<thead>
+						<tr>
+							<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Account</th>
+							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Hours</th>
+							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Parts</th>
+							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Visits</th>
+							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Last worked</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-rr-border">
+						for _, row := range props.Report.Rows {
+							<tr class="row-link">
+								<td class="px-4 py-3 text-sm">
+									<a href={ templ.SafeURL("/admin/customers/" + row.CustomerID.String()) } class="row-link-target font-medium text-rr-heading">
+										{ row.CustomerName }
+									</a>
+									<div class="text-rr-muted">{ serviceCostMachines(row.MachineCount) }</div>
+								</td>
+								<td class="px-4 py-3 text-right text-sm tabular-nums text-rr-heading">
+									{ formatMinutes(row.Summary.TotalMinutes()) }
+									if row.Summary.TravelMinutes > 0 {
+										<div class="text-xs text-rr-muted">{ formatMinutes(row.Summary.TravelMinutes) } travel</div>
+									}
+								</td>
+								<td class="px-4 py-3 text-right text-sm tabular-nums text-rr-heading">
+									{ formatCents(row.Summary.PartsCostCents) }
+									if row.Summary.PartCount > 0 {
+										<div class="text-xs text-rr-muted">{ serviceCostParts(row.Summary.PartCount) }</div>
+									}
+								</td>
+								<td class="px-4 py-3 text-right text-sm tabular-nums text-rr-heading">
+									{ strconv.Itoa(row.Summary.Visits) }
+									if row.Summary.Visits > 0 {
+										<div class="text-xs text-rr-muted">{ formatMinutes(row.Summary.MinutesPerVisit()) } each</div>
+									}
+								</td>
+								<td class="px-4 py-3 text-right text-sm text-rr-muted">{ dayLabel(row.LastWorkOn) }</td>
+							</tr>
+						}
+					</tbody>
+					<tfoot class="border-t border-rr-border bg-rr-raised">
+						<tr>
+							<th scope="row" class="px-4 py-3 text-left text-sm font-semibold text-rr-heading">
+								Everything shown
+							</th>
+							<td class="px-4 py-3 text-right text-sm font-semibold tabular-nums text-rr-heading">
+								{ formatMinutes(props.Report.Total.TotalMinutes()) }
+							</td>
+							<td class="px-4 py-3 text-right text-sm font-semibold tabular-nums text-rr-heading">
+								{ formatCents(props.Report.Total.PartsCostCents) }
+							</td>
+							<td class="px-4 py-3 text-right text-sm font-semibold tabular-nums text-rr-heading">
+								{ strconv.Itoa(props.Report.Total.Visits) }
+							</td>
+							<td class="px-4 py-3"></td>
+						</tr>
+					</tfoot>
+				</table>
+			</div>
+		}
+	</div>
+	if props.Report.Truncated {
+		<p class="mt-3 text-sm text-rr-red">
+			Only the top 200 accounts are shown, so the total above is not the whole period. Narrow the window to see a complete picture.
+		</p>
+	}
+	if props.Report.Total.BillableMinutes > 0 {
+		<p class="mt-3 text-xs text-rr-muted">
+			{ formatMinutes(props.Report.Total.BillableMinutes) } of those hours were marked billable.
+		</p>
+	}
+}
+
+templ ServiceCosts(props ServiceCostsProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "What service costs",
+		ActivePath: "/admin/service",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@ServiceCostsContent(props)
+	}
+}

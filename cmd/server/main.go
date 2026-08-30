@@ -377,6 +377,7 @@ func run() error {
 	moduleStore := store.NewModuleStore()
 	equipmentStore := store.NewEquipmentStore()
 	serviceTicketStore := store.NewServiceTicketStore()
+	servicePlanStore := store.NewServicePlanStore()
 	customerUserInviteTokenStore := store.NewCustomerUserInviteTokenStore()
 	geocodeStore := store.NewGeocodeStore(metricsReg)
 	routeStore := store.NewRouteStore(metricsReg)
@@ -445,6 +446,8 @@ func run() error {
 	equipmentSvc := app.NewEquipmentService(equipmentStore, auditWriter)
 	serviceTicketSvc := app.NewServiceTicketService(serviceTicketStore, equipmentStore, auditWriter).
 		WithNotifications(emailEnv, customerStore, moduleSvc, metricsReg)
+	servicePlanSvc := app.NewServicePlanService(servicePlanStore, equipmentStore, auditWriter).
+		WithScheduling(serviceTicketSvc, moduleSvc, metricsReg)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, attributeStore, customerStore, auditWriter, metricsReg).
 		WithEmail(emailEnv, authSvc)
 	attributeSvc := app.NewAttributeService(attributeStore, auditWriter, metricsReg)
@@ -511,6 +514,7 @@ func run() error {
 	river.AddWorker(workers, jobs.NewAnnouncementDispatchWorker(announcementSvc, pool))
 	river.AddWorker(workers, jobs.NewAnnouncementSendWorker(announcementSvc, pool))
 	river.AddWorker(workers, jobs.NewServiceStaleSweepWorker(serviceTicketSvc, pool))
+	river.AddWorker(workers, jobs.NewServiceMaintenanceSweepWorker(servicePlanSvc, pool))
 	river.AddWorker(workers, jobs.NewServiceTicketOpenedWorker(serviceTicketSvc, pool))
 
 	// QB workers are registered after the river client is created (they need it for job chaining)
@@ -559,6 +563,22 @@ func run() error {
 			river.PeriodicInterval(24*time.Hour),
 			func() (river.JobArgs, *river.InsertOpts) {
 				return jobs.ServiceStaleSweepArgs{}, &river.InsertOpts{
+					UniqueOpts: river.UniqueOpts{
+						ByPeriod: 24 * time.Hour,
+					},
+				}
+			},
+			&river.PeriodicJobOpts{RunOnStart: false},
+		),
+
+		// Sweep the preventive maintenance schedule: backfill occurrences, book
+		// the covered work that has come due, publish the gauges. Daily and no
+		// RunOnStart — the booking half opens real tickets, and a deploy is not
+		// a reason for a customer's machine to acquire a scheduled visit.
+		river.NewPeriodicJob(
+			river.PeriodicInterval(24*time.Hour),
+			func() (river.JobArgs, *river.InsertOpts) {
+				return jobs.ServiceMaintenanceSweepArgs{}, &river.InsertOpts{
 					UniqueOpts: river.UniqueOpts{
 						ByPeriod: 24 * time.Hour,
 					},
@@ -773,6 +793,7 @@ func run() error {
 		ModuleService:          moduleSvc,
 		EquipmentService:       equipmentSvc,
 		ServiceTicketService:   serviceTicketSvc,
+		ServicePlanService:     servicePlanSvc,
 		Enqueuer:               enqueuer,
 		R2Client:               r2Client,
 		MediaConfig:            mediaConfig,

@@ -168,6 +168,20 @@ func (d *Deps) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 			return txErr
 		}
 
+		// Overdue preventive maintenance, on the instances that service
+		// machines. Asked only when the module is on: everywhere else the
+		// tables are empty and the query would be a daily reminder that a
+		// feature nobody uses is still being paid for.
+		if d.ModuleService.Enabled(domain.ModuleEquipmentService) {
+			props.OverdueMaintenance, txErr = d.ServicePlanService.CountDue(ctx, tx, store.MaintenanceFilter{
+				Scope: store.MaintenanceScopeOverdue,
+				Now:   d.merchantToday(),
+			})
+			if txErr != nil {
+				return txErr
+			}
+		}
+
 		// White-label submissions awaiting review
 		props.PendingWhiteLabel, txErr = d.countPendingWhiteLabel(ctx, tx)
 		if txErr != nil {

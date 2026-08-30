@@ -375,3 +375,128 @@ type ServiceTotals struct {
 
 // TotalMinutes is every minute recorded against the ticket, billable or not.
 func (t ServiceTotals) TotalMinutes() int { return t.LaborMinutes + t.TravelMinutes }
+
+// ServiceCostSummary is what a machine or an account has cost over a window:
+// the same roll-up as a single ticket, widened.
+//
+// It embeds ServiceTotals rather than restating its fields so the two can never
+// disagree. A machine page reporting $40 while the ticket beside it says $58
+// would read as a bug in the money, which is the worst kind to have.
+type ServiceCostSummary struct {
+	ServiceTotals
+	// PartCount is how many part lines went into the cost, so "$340" can be
+	// read as "$340 across twelve parts" rather than left as a bare number.
+	PartCount int
+	// Visits is the number of distinct tickets that carried any of this work.
+	// Not the number of tickets raised: a ticket that was only ever a phone
+	// call is not a visit, and counting it would flatter the hours-per-visit
+	// figure this exists to expose.
+	Visits int
+}
+
+// Any reports whether anything at all was recorded in the window. Used to tell
+// "nothing has been spent on this" from "we have not started tracking yet",
+// which are the same zero and different sentences.
+func (s ServiceCostSummary) Any() bool {
+	return s.PartsCostCents > 0 || s.TotalMinutes() > 0 || s.Visits > 0
+}
+
+// MinutesPerVisit is the average length of a visit, in minutes, or zero when
+// there have been none. The number that says whether a machine is a quick
+// call-out or an afternoon every time.
+func (s ServiceCostSummary) MinutesPerVisit() int {
+	if s.Visits == 0 {
+		return 0
+	}
+	return s.TotalMinutes() / s.Visits
+}
+
+// ServiceCostWindow is one period of a cost roll-up, ready to render.
+type ServiceCostWindow struct {
+	// Label is the period in the words the card prints — "Last 90 days".
+	Label string
+	// Since is the start of the window, zero for all time. Carried so a caller
+	// can say what was measured without re-deriving it.
+	Since   time.Time
+	Summary ServiceCostSummary
+}
+
+// ServiceAccountCost is one row of the cross-account table: what servicing one
+// customer has taken over a period.
+//
+// The row the whole report exists for is the one where the hours are large and
+// the machines are few — an account absorbing a tech's week for two grinders is
+// unprofitable in a way no single ticket ever looks.
+type ServiceAccountCost struct {
+	CustomerID   uuid.UUID
+	CustomerName string
+	// MachineCount is how many machines the account has on the register, so a
+	// big number can be read against how much there is to look after. A chain
+	// with nine machines costing more than a single-site cafe is not a finding.
+	MachineCount int
+	// LastWorkOn is the most recent day anything was recorded — the difference
+	// between an account that is expensive and one that was expensive.
+	LastWorkOn *time.Time
+	Summary    ServiceCostSummary
+}
+
+// ServiceAccountCostSort is how the cross-account table is ranked.
+//
+// There is no single money figure to sort by, because the shop has no labour
+// rate recorded — parts are in cents and work is in minutes, and inventing a
+// rate to blend them would put a made-up number at the top of a report meant to
+// settle arguments. So the reader picks which of the two scarce things to rank
+// by, and both are always shown.
+type ServiceAccountCostSort string
+
+const (
+	// ServiceAccountCostByHours ranks by time spent. The default: for a crew of
+	// two, hours are the thing there is least of.
+	ServiceAccountCostByHours ServiceAccountCostSort = ""
+	// ServiceAccountCostByParts ranks by parts spend — the money that actually
+	// left the building.
+	ServiceAccountCostByParts ServiceAccountCostSort = "parts"
+	// ServiceAccountCostByVisits ranks by how often somebody had to go out,
+	// which catches the account that is death by a thousand twenty-minute
+	// call-outs.
+	ServiceAccountCostByVisits ServiceAccountCostSort = "visits"
+)
+
+// Valid reports whether s is a known sort. A hand-edited query string falls
+// back to the default rather than erroring.
+func (s ServiceAccountCostSort) Valid() bool {
+	switch s {
+	case ServiceAccountCostByHours, ServiceAccountCostByParts, ServiceAccountCostByVisits:
+		return true
+	}
+	return false
+}
+
+// ServiceAccountReport is the cross-account view: every account that took
+// service work in a period, ranked, with the shop's own total beside it.
+type ServiceAccountReport struct {
+	Rows []ServiceAccountCost
+	// Total is the sum of the rows shown. Summed over the returned rows rather
+	// than asked for separately, so the footer can never disagree with the
+	// column above it.
+	Total ServiceCostSummary
+	// Truncated says the limit bit and the table is not the whole picture. A
+	// bounded list that does not say it is bounded reads as complete.
+	Truncated bool
+	// Since is the start of the window, zero for all time.
+	Since time.Time
+	Sort  ServiceAccountCostSort
+}
+
+// AnyServiceCost reports whether any window in a roll-up holds anything, which
+// is how a card tells "nothing has been spent here" from "there is nothing to
+// show". Reading that off the widest window is a thing a caller could get
+// wrong, so it is done once here.
+func AnyServiceCost(windows []ServiceCostWindow) bool {
+	for _, w := range windows {
+		if w.Summary.Any() {
+			return true
+		}
+	}
+	return false
+}

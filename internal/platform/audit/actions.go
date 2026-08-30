@@ -48,6 +48,31 @@ const (
 	// when a cafe is angry about a machine that stayed broken.
 	AuditServiceTicketNotified = "service_ticket.staff_notified"
 
+	// Preventive maintenance. Plans are shop-wide templates, so plan and task
+	// edits are recorded against the plan; everything that happens to a
+	// particular machine is recorded against the equipment, which is where
+	// somebody looking into "why was this serviced late" will actually be.
+	AuditServicePlanCreated     = "service_plan.created"
+	AuditServicePlanUpdated     = "service_plan.updated"
+	AuditServicePlanDeleted     = "service_plan.deleted"
+	AuditServicePlanTaskAdded   = "service_plan.task_added"
+	AuditServicePlanTaskUpdated = "service_plan.task_updated"
+	AuditServicePlanTaskRemoved = "service_plan.task_removed"
+
+	AuditServicePlanAssigned          = "equipment.plan_assigned"
+	AuditServicePlanAssignmentUpdated = "equipment.plan_assignment_updated"
+	AuditServicePlanUnassigned        = "equipment.plan_unassigned"
+	AuditMaintenanceCompleted         = "equipment.maintenance_completed"
+	AuditMaintenanceSkipped           = "equipment.maintenance_skipped"
+	// AuditMaintenanceBooked records the sweep opening a routine ticket for a
+	// contract customer's due maintenance. Recorded because a ticket appearing
+	// with no human behind it is otherwise unexplainable from the ticket page.
+	AuditMaintenanceBooked = "equipment.maintenance_booked"
+	// AuditMaintenanceSwept records that the daily sweep ran and what it did.
+	// Not a per-machine event: one row a day, so a quiet due list can be told
+	// apart from a job that stopped running.
+	AuditMaintenanceSwept = "equipment.maintenance_swept"
+
 	// Optional feature modules — turning a whole section of the app on or off.
 	// Worth an audit entry because enabling one can start sending customer mail
 	// nobody was expecting, and "who did this" is the first question asked.

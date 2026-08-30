@@ -196,11 +196,15 @@ func TestFormatMinutesReadsLikeATechWouldSayIt(t *testing.T) {
 
 // A "0" in a tab badge reads as a number to check rather than nothing to do.
 func TestServiceNavBadgeHidesAtZero(t *testing.T) {
-	tabs := ServiceNav{StaleCount: 0}.tabs()
-	require.Len(t, tabs, 2)
-	assert.Equal(t, 0, tabs[0].Count)
+	tabs := ServiceNav{}.tabs()
+	require.Len(t, tabs, 5)
+	for _, tab := range tabs {
+		assert.Equal(t, 0, tab.Count, "%s", tab.Label)
+	}
 
-	withWork := ServiceNav{StaleCount: 3}.tabs()
+	withWork := ServiceNav{StaleCount: 3, OverdueMaintenance: 5}.tabs()
 	assert.Equal(t, 3, withWork[0].Count, "the count rides on the tab that owns the fix")
 	assert.Equal(t, serviceTabTickets, withWork[0].Href)
+	assert.Equal(t, 5, withWork[2].Count, "overdue maintenance rides on the Maintenance tab")
+	assert.Equal(t, serviceTabMaintenance, withWork[2].Href)
 }

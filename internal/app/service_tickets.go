@@ -379,3 +379,102 @@ func generateTicketNumber() string {
 	}
 	return "SVC-" + strings.ToUpper(hex.EncodeToString(b))
 }
+
+// serviceCostWindows are the three periods every roll-up reports.
+//
+// Three at once rather than a period selector. The question is never "what did
+// the last quarter cost" on its own — it is whether this machine is getting
+// worse, and that is a comparison. A toggle would make somebody click three
+// times and hold the numbers in their head to answer it.
+//
+// 90 days is the quarter the merchant actually asks about, 12 months absorbs
+// the seasonality of a cafe, and all-time is the argument for replacing a
+// machine.
+var serviceCostWindows = []struct {
+	label string
+	days  int
+}{
+	{"Last 90 days", 90},
+	{"Last 12 months", 365},
+	{"All time", 0},
+}
+
+// CostForEquipment rolls up what one machine has cost, over each window.
+func (s *ServiceTicketService) CostForEquipment(ctx context.Context, tx pgx.Tx, equipmentID uuid.UUID, now time.Time) ([]domain.ServiceCostWindow, error) {
+	return s.costWindows(ctx, tx, store.ServiceCostFilter{EquipmentID: &equipmentID}, now)
+}
+
+// CostForCustomer rolls up what one account has cost, over each window. It
+// includes work on tickets that never named a machine — those hours went into
+// the account just the same.
+func (s *ServiceTicketService) CostForCustomer(ctx context.Context, tx pgx.Tx, customerID uuid.UUID, now time.Time) ([]domain.ServiceCostWindow, error) {
+	return s.costWindows(ctx, tx, store.ServiceCostFilter{CustomerID: &customerID}, now)
+}
+
+// costWindows runs the roll-up once per window.
+//
+// The windows are measured from a calendar day rather than an instant, so the
+// numbers on a card do not shift between two refreshes of the same page — and
+// so a test can ask what the card said on a given morning.
+func (s *ServiceTicketService) costWindows(ctx context.Context, tx pgx.Tx, f store.ServiceCostFilter, now time.Time) ([]domain.ServiceCostWindow, error) {
+	today := now.UTC().Truncate(24 * time.Hour)
+
+	out := make([]domain.ServiceCostWindow, 0, len(serviceCostWindows))
+	for _, w := range serviceCostWindows {
+		scoped := f
+		if w.days > 0 {
+			scoped.Since = today.AddDate(0, 0, -w.days)
+		}
+		summary, err := s.tickets.CostSummary(ctx, tx, scoped)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, domain.ServiceCostWindow{Label: w.label, Since: scoped.Since, Summary: summary})
+	}
+	return out, nil
+}
+
+// accountCostLimit caps the cross-account table. Rows only exist for accounts
+// that had work in the window, so this is far above any real result — it is a
+// guard against a page rendering ten thousand rows, not a business rule. When
+// it bites, the caller is told rather than shown a silently short table.
+const accountCostLimit = 200
+
+// CostByAccount ranks accounts by what servicing them has taken over a window.
+//
+// sinceDays of zero means all time. The window is measured from a calendar day
+// so the table does not shift between two refreshes of the same page.
+func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sinceDays int, sort domain.ServiceAccountCostSort, now time.Time) (domain.ServiceAccountReport, error) {
+	report := domain.ServiceAccountReport{Sort: sort}
+	if sinceDays > 0 {
+		report.Since = now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -sinceDays)
+	}
+
+	rows, err := s.tickets.CostByCustomer(ctx, tx, store.ServiceAccountCostFilter{
+		Since: report.Since,
+		Sort:  sort,
+		// One over the cap, so a full page can be told from an overflowing one
+		// without a second counting query.
+		Limit: accountCostLimit + 1,
+	})
+	if err != nil {
+		return domain.ServiceAccountReport{}, err
+	}
+
+	if len(rows) > accountCostLimit {
+		rows = rows[:accountCostLimit]
+		report.Truncated = true
+	}
+	report.Rows = rows
+
+	for _, r := range rows {
+		report.Total.PartsCostCents += r.Summary.PartsCostCents
+		report.Total.PartCount += r.Summary.PartCount
+		report.Total.LaborMinutes += r.Summary.LaborMinutes
+		report.Total.TravelMinutes += r.Summary.TravelMinutes
+		report.Total.BillableMinutes += r.Summary.BillableMinutes
+		report.Total.Visits += r.Summary.Visits
+	}
+
+	return report, nil
+}

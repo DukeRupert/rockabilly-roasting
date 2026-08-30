@@ -26,6 +26,13 @@ type EquipmentShowProps struct {
 	// This is the argument the page exists to let staff make: "we have replaced
 	// this pump twice in a year, the machine is the problem."
 	Tickets []ServiceTicketRow
+	// Maintenance is the machine's preventive schedule: the plans it is on,
+	// what is coming up, and what it could be put on.
+	Maintenance EquipmentMaintenanceProps
+	// Cost is what the machine has taken in parts and hours, per window. The
+	// quantified form of the repair history below it, and the other half of the
+	// argument this page exists to let staff make.
+	Cost []domain.ServiceCostWindow
 	MerchantTZ   *time.Location
 	StaffName    string
 	StaffRole    string
@@ -131,6 +138,8 @@ templ EquipmentShowContent(props EquipmentShowProps) {
 					</div>
 				</div>
 			</div>
+			@equipmentMaintenanceCard(props)
+			@ServiceCostCard(props.Cost, "Nothing has been spent on this one — no parts and no hours recorded.")
 			@equipmentRepairHistory(props)
 			@EquipmentActivity(props.Activity, props.MerchantTZ)
 		</div>

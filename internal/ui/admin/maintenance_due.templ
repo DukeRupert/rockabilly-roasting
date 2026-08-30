@@ -1,0 +1,299 @@
+package admin
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// The maintenance due list — /admin/service/maintenance. Every piece of
+// preventive maintenance the shop owes somebody, across all customers.
+//
+// Part of the equipment service module; see docs/equipment-service-module.md.
+//
+// The page splits on one question: is the customer paying for this? Contract
+// work books itself a ticket overnight and appears here only as a progress
+// check. Uncovered work is a phone call somebody has to make, and the copy on
+// those rows is written to be read out loud.
+
+// MaintenanceDueProps is the due list's state.
+type MaintenanceDueProps struct {
+	Rows []domain.MaintenanceDueRow
+	Nav  ServiceNav
+	// Scope is the tab in force, echoed back so the strip shows what is applied.
+	Scope string
+	// Counts per scope, for the tab badges. A scope that is empty still renders
+	// its tab — a missing tab reads as a missing feature.
+	Counts MaintenanceCounts
+	// Today is the day everything is measured against, in merchant time. Passed
+	// in rather than taken from the clock in the template so a render test can
+	// pin it.
+	Today      time.Time
+	MerchantTZ *time.Location
+	StaffName  string
+	StaffRole  string
+	CanWrite   bool
+	Flash      Flash
+}
+
+// MaintenanceCounts is the size of each scope.
+type MaintenanceCounts struct {
+	Overdue   int
+	DueSoon   int
+	Warranty  int
+	Uncovered int
+}
+
+// Scope values, matching the query-string values the handler parses.
+const (
+	maintenanceScopeDue       = ""
+	maintenanceScopeOverdue   = "overdue"
+	maintenanceScopeWarranty  = "warranty"
+	maintenanceScopeUncovered = "uncovered"
+	maintenanceScopeHistory   = "history"
+)
+
+func maintenanceScopeTabs(p MaintenanceDueProps) []sectionTab {
+	return []sectionTab{
+		{Label: "Everything due", Href: "/admin/service/maintenance"},
+		{Label: "Overdue", Href: "/admin/service/maintenance?scope=overdue", Count: p.Counts.Overdue},
+		{Label: "Warranty at risk", Href: "/admin/service/maintenance?scope=warranty", Count: p.Counts.Warranty},
+		{Label: "Call list", Href: "/admin/service/maintenance?scope=uncovered", Count: p.Counts.Uncovered},
+		{Label: "Done and skipped", Href: "/admin/service/maintenance?scope=history"},
+	}
+}
+
+func maintenanceScopeHref(scope string) string {
+	if scope == "" {
+		return "/admin/service/maintenance"
+	}
+	return "/admin/service/maintenance?scope=" + scope
+}
+
+// maintenanceUrgencyBadge colours a row by how late it is. Warranty risk is
+// handled separately and louder — it is not a degree of lateness, it is a
+// different kind of consequence.
+func maintenanceUrgencyBadge(u domain.MaintenanceUrgency) string {
+	switch u {
+	case domain.MaintenanceOverdue:
+		return "badge badge-red"
+	case domain.MaintenanceDueSoon:
+		return "badge badge-amber"
+	}
+	return "badge badge-slate"
+}
+
+func maintenanceStatusBadge(s domain.MaintenanceStatus) string {
+	switch s {
+	case domain.MaintenanceStatusCompleted:
+		return "badge badge-green"
+	case domain.MaintenanceStatusSkipped:
+		return "badge badge-grey"
+	}
+	return "badge badge-slate"
+}
+
+// maintenanceTiming is the row's date in the words somebody would say it —
+// "11 days late" carries the urgency that "due 18 Aug" makes you compute.
+func maintenanceTiming(row domain.MaintenanceDueRow, today time.Time) string {
+	days := row.DaysUntil(today)
+	switch {
+	case days < -1:
+		return strconv.Itoa(-days) + " days late"
+	case days == -1:
+		return "1 day late"
+	case days == 0:
+		return "Due today"
+	case days == 1:
+		return "Due tomorrow"
+	}
+	return "In " + strconv.Itoa(days) + " days"
+}
+
+// maintenanceCoverage is what the row says about who pays. Uncovered work is
+// the row a staffer acts on, so it is the one that gets the badge.
+func maintenanceCoverageBadge(row domain.MaintenanceDueRow, today time.Time) string {
+	if row.Covered(today) {
+		return "badge badge-teal"
+	}
+	return "badge badge-amber"
+}
+
+func maintenanceCoverageLabel(row domain.MaintenanceDueRow, today time.Time) string {
+	if row.Covered(today) {
+		return "On contract"
+	}
+	return "No contract"
+}
+
+// maintenanceEmptyLine explains an empty list per scope. "Nothing here" reads
+// as a broken page; "nothing is overdue" reads as good news.
+func maintenanceEmptyLine(scope string) string {
+	switch scope {
+	case maintenanceScopeOverdue:
+		return "Nothing is overdue. Every machine on a plan is inside its window."
+	case maintenanceScopeWarranty:
+		return "No warranties are at risk."
+	case maintenanceScopeUncovered:
+		return "Nobody needs ringing — every machine with work coming up is on a contract."
+	case maintenanceScopeHistory:
+		return "No maintenance has been logged yet."
+	}
+	return "Nothing is due. Put a machine on a plan and its schedule shows up here."
+}
+
+templ MaintenanceDueContent(props MaintenanceDueProps) {
+	@ConfirmDialogHost()
+	@serviceSection(props.Nav, serviceTabMaintenance)
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Maintenance</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				Preventive work the shop owes, machine by machine. Contract customers get a ticket opened for them overnight; everyone else needs a phone call.
+			</p>
+		</div>
+		<div class="mt-4 flex gap-2 sm:mt-0 sm:ml-16 sm:flex-none">
+			<a href="/admin/service/maintenance/calendar" class="btn-secondary">Calendar</a>
+			<a href="/admin/service/plans" class="btn-secondary">Plans</a>
+		</div>
+	</div>
+	@adminFlash(props.Flash)
+	@adminSectionTabs(maintenanceScopeTabs(props), maintenanceScopeHref(props.Scope))
+	<div class="mt-4 overflow-hidden border border-rr-border bg-rr-surface">
+		if len(props.Rows) == 0 {
+			<div class="px-4 py-12 text-center">
+				<p class="text-sm text-rr-muted">{ maintenanceEmptyLine(props.Scope) }</p>
+			</div>
+		} else {
+			<ul role="list" class="divide-y divide-rr-border">
+				for _, row := range props.Rows {
+					@maintenanceRow(row, props)
+				}
+			</ul>
+		}
+	</div>
+}
+
+// maintenanceRow is one piece of scheduled work, with everything needed to act
+// on it without opening another page.
+//
+// A list, not a table: the action a row needs is a small form with a date in
+// it, and cramming that into a table cell makes both the form and the table
+// worse.
+templ maintenanceRow(row domain.MaintenanceDueRow, props MaintenanceDueProps) {
+	<li class="px-4 py-4">
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div class="min-w-0">
+				<div class="flex flex-wrap items-center gap-2">
+					<span class="text-sm font-medium text-rr-heading">{ row.TaskName }</span>
+					if row.Status == domain.MaintenanceStatusPending {
+						<span class={ maintenanceUrgencyBadge(row.Urgency(props.Today)) }>
+							{ maintenanceTiming(row, props.Today) }
+						</span>
+						<span class={ maintenanceCoverageBadge(row, props.Today) }>
+							{ maintenanceCoverageLabel(row, props.Today) }
+						</span>
+						if row.WarrantyAtRisk(props.Today) {
+							<span class="badge badge-red">Warranty at risk</span>
+						}
+					} else {
+						<span class={ maintenanceStatusBadge(row.Status) }>{ row.Status.Label() }</span>
+						<span class="text-xs text-rr-muted">{ dayLabel(row.CompletedOn) }</span>
+					}
+				</div>
+				<div class="mt-1 text-sm text-rr-body">
+					<a href={ templ.SafeURL("/admin/service/equipment/" + row.EquipmentID.String()) } class="font-medium text-rr-heading underline">
+						{ row.MachineDescription() }
+					</a>
+					<span class="text-rr-muted"> · </span>
+					<a href={ templ.SafeURL("/admin/customers/" + row.CustomerID.String()) } class="underline">
+						{ row.CustomerName }
+					</a>
+				</div>
+				<div class="mt-0.5 text-xs text-rr-muted">
+					{ row.PlanName } · { row.IntervalLabel() } · due { dayLabel(&row.DueOn) }
+					if row.EquipmentSerial != "" {
+						· serial { row.EquipmentSerial }
+					}
+				</div>
+				if row.WarrantyAtRisk(props.Today) {
+					<p class="mt-2 text-sm text-rr-red">
+						This one keeps the manufacturer's warranty alive, and it is past due. Worth a call today.
+					</p>
+				}
+				if row.TicketID != nil {
+					<a href={ templ.SafeURL("/admin/service/tickets/" + row.TicketID.String()) } class="mt-2 inline-block text-sm text-rr-heading underline">
+						Booked on a ticket &rarr;
+					</a>
+				}
+			</div>
+			if props.CanWrite && row.Status == domain.MaintenanceStatusPending {
+				@maintenanceRowActions(row, props)
+			}
+		</div>
+	</li>
+}
+
+// maintenanceRowActions is the log-it form.
+//
+// The date defaults to today but is editable, because the common case is a tech
+// writing up Tuesday's visit on Thursday — and the next occurrence counts
+// forward from the day the work happened, so a wrong date here quietly moves
+// the whole schedule.
+templ maintenanceRowActions(row domain.MaintenanceDueRow, props MaintenanceDueProps) {
+	<div class="flex shrink-0 flex-wrap items-end gap-2">
+		<form method="post" action={ templ.SafeURL("/admin/service/maintenance/" + row.ID.String() + "/complete") } class="flex items-end gap-2">
+			<input type="hidden" name="scope" value={ props.Scope }/>
+			<div>
+				<label for={ "done-on-" + row.ID.String() } class="label-font block text-rr-muted">Done on</label>
+				<input
+					type="date"
+					id={ "done-on-" + row.ID.String() }
+					name="on"
+					value={ props.Today.Format("2006-01-02") }
+					class="mt-1 rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm"
+				/>
+			</div>
+			<button type="submit" class="btn-secondary">Mark done</button>
+		</form>
+		<form method="post" action={ templ.SafeURL("/admin/service/maintenance/" + row.ID.String() + "/skip") }>
+			<input type="hidden" name="scope" value={ props.Scope }/>
+			<button
+				type="submit"
+				class="btn-secondary"
+				{ ConfirmAttrs(maintenanceSkipConfirm(row))... }
+			>Skip</button>
+		</form>
+		if row.TicketID == nil {
+			<a
+				href={ templ.SafeURL("/admin/service/tickets/new?customer_id=" + row.CustomerID.String() + "&equipment_id=" + row.EquipmentID.String() + "&maintenance_id=" + row.ID.String()) }
+				class="btn-secondary"
+			>Book a visit</a>
+		}
+	</div>
+}
+
+func maintenanceSkipConfirm(row domain.MaintenanceDueRow) ActionConfirm {
+	return ActionConfirm{
+		Title: "Skip " + row.TaskName + " this time?",
+		Lead:  "It is recorded as deliberately not done, and the next one stays on the original schedule.",
+		Points: []string{
+			"The machine's history will show it was skipped, not forgotten.",
+			"Nothing is sent to the customer.",
+		},
+		Confirm: "Skip it",
+	}
+}
+
+templ MaintenanceDue(props MaintenanceDueProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Maintenance",
+		ActivePath: "/admin/service",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@MaintenanceDueContent(props)
+	}
+}

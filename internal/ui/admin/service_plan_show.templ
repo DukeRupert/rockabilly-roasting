@@ -1,0 +1,353 @@
+package admin
+
+import (
+	"strconv"
+
+	"github.com/dukerupert/hiri/internal/domain"
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// One maintenance plan and the series inside it — /admin/service/plans/{id}.
+//
+// Structure follows docs/admin-detail-pages.md: main column for what the plan
+// IS (the series, in order), rail for what you can do to it. The rail carries
+// the warning that matters — editing a task's interval moves the next due date
+// on every machine already on the plan, which is the point, and is worth saying
+// out loud before somebody discovers it.
+//
+// Part of the equipment service module; see docs/equipment-service-module.md.
+
+// ServicePlanShowProps is the plan page's state.
+type ServicePlanShowProps struct {
+	Plan domain.ServicePlan
+	Nav  ServiceNav
+	// LiveMachines is how many machines are on the plan right now — the blast
+	// radius of any edit made here.
+	LiveMachines int
+	// TotalMachines includes the ended assignments. A plan with history cannot
+	// be deleted, only retired.
+	TotalMachines int
+	// Values and Error echo back a rejected task form.
+	Values    PlanTaskFormValues
+	Error     string
+	StaffName string
+	StaffRole string
+	CanWrite  bool
+	Flash     Flash
+}
+
+// PlanTaskFormValues is the add-task form as strings.
+type PlanTaskFormValues struct {
+	Name             string
+	Instructions     string
+	IntervalDays     string
+	LeadDays         string
+	WarrantyRequired bool
+}
+
+// NewPlanTaskFormValues gives the add-task form its defaults: quarterly, with
+// two weeks' notice. Both are the commonest answers rather than neutral ones —
+// a blank interval field is a question nobody wants to be asked.
+func NewPlanTaskFormValues() PlanTaskFormValues {
+	return PlanTaskFormValues{IntervalDays: "90", LeadDays: "14"}
+}
+
+func (p ServicePlanShowProps) deleteReason() string {
+	if p.TotalMachines > 0 {
+		return "Machines have been on this plan, so it cannot be deleted — their maintenance history hangs off it. Retire it instead and it disappears from the picker."
+	}
+	return ""
+}
+
+func planLeadLabel(t domain.ServicePlanTask) string {
+	if t.LeadDays == 0 {
+		return "No notice"
+	}
+	if t.LeadDays == 1 {
+		return "1 day's notice"
+	}
+	return strconv.Itoa(t.LeadDays) + " days' notice"
+}
+
+func planRetireConfirm(p domain.ServicePlan) ActionConfirm {
+	return ActionConfirm{
+		Title: "Retire " + p.Name + "?",
+		Lead:  "It stops appearing when somebody assigns a plan to a machine.",
+		Points: []string{
+			"Machines already on it keep their schedule and carry on as normal.",
+			"You can bring it back at any time.",
+		},
+		Confirm: "Retire the plan",
+	}
+}
+
+func planTaskRemoveConfirm(t domain.ServicePlanTask, machines int) ActionConfirm {
+	c := ActionConfirm{
+		Title:   "Remove " + t.Name + " from the plan?",
+		Lead:    "It stops being part of the series.",
+		Confirm: "Remove it",
+		Danger:  true,
+	}
+	if machines > 0 {
+		c.Points = []string{
+			"It comes off the schedule of every machine on this plan.",
+			"The record of times it was already done goes with it.",
+		}
+	} else {
+		c.Points = []string{"No machines are on this plan, so nothing else changes."}
+	}
+	return c
+}
+
+templ ServicePlanShowContent(props ServicePlanShowProps) {
+	@ConfirmDialogHost()
+	<div class="sm:flex sm:items-start sm:justify-between">
+		<div class="min-w-0">
+			<a href="/admin/service/plans" class="text-sm text-rr-muted underline">&larr; Plans</a>
+			<h1 class="admin-page-title mt-1">{ props.Plan.Name }</h1>
+			<div class="mt-2 flex flex-wrap items-center gap-2">
+				if props.Plan.Active {
+					<span class="badge badge-green">Active</span>
+				} else {
+					<span class="badge badge-grey">Retired</span>
+				}
+				<span class="badge badge-neutral">{ planCategoryLabel(props.Plan) }</span>
+				<span class="text-sm text-rr-muted">{ planMachineLabel(props.LiveMachines) } on it now</span>
+			</div>
+			if props.Plan.Description != "" {
+				<p class="mt-2 max-w-2xl text-sm text-rr-body">{ props.Plan.Description }</p>
+			}
+		</div>
+	</div>
+	@adminFlash(props.Flash)
+	<div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+		<!-- Main column: the series -->
+		<div class="min-w-0">
+			<div class="border border-rr-border bg-rr-surface">
+				<div class="px-4 py-4">
+					<h2 class="text-sm font-semibold text-rr-heading">The series</h2>
+					if len(props.Plan.Tasks) == 0 {
+						<p class="mt-2 text-sm text-rr-muted">
+							No tasks yet. A plan with nothing in it cannot be put on a machine — add the first job below.
+						</p>
+					} else {
+						<ul role="list" class="mt-3 divide-y divide-rr-border">
+							for _, task := range props.Plan.Tasks {
+								<li class="py-3 first:pt-0">
+									<div class="flex flex-wrap items-start justify-between gap-2">
+										<div class="min-w-0">
+											<div class="flex flex-wrap items-center gap-2">
+												<span class="text-sm font-medium text-rr-heading">{ task.Name }</span>
+												<span class="badge badge-slate">{ task.IntervalLabel() }</span>
+												if task.WarrantyRequired {
+													<span class="badge badge-teal">Warranty</span>
+												}
+											</div>
+											<div class="mt-0.5 text-xs text-rr-muted">{ planLeadLabel(task) }</div>
+											if task.Instructions != "" {
+												<p class="mt-1 text-sm whitespace-pre-line text-rr-body">{ task.Instructions }</p>
+											}
+										</div>
+										if props.CanWrite {
+											<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/tasks/" + task.ID.String() + "/delete") }>
+												<button
+													type="submit"
+													class="text-sm text-rr-muted underline"
+													{ ConfirmAttrs(planTaskRemoveConfirm(task, props.LiveMachines))... }
+												>Remove</button>
+											</form>
+										}
+									</div>
+								</li>
+							}
+						</ul>
+					}
+				</div>
+			</div>
+			if props.CanWrite {
+				@planTaskForm(props)
+			}
+		</div>
+		<!-- Rail -->
+		<div class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+			if props.CanWrite {
+				@planEditForm(props)
+				<div class="border border-rr-border bg-rr-surface">
+					<div class="px-4 py-4">
+						<h2 class="text-sm font-semibold text-rr-heading">Taking it out of use</h2>
+						if reason := props.deleteReason(); reason != "" {
+							<p class="mt-1 text-sm text-rr-muted">{ reason }</p>
+						} else {
+							<p class="mt-1 text-sm text-rr-muted">Nothing has ever been on this plan, so it can be deleted outright.</p>
+						}
+						<div class="mt-3 space-y-2">
+							if props.Plan.Active {
+								<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/retire") }>
+									<button type="submit" class="btn-secondary w-full" { ConfirmAttrs(planRetireConfirm(props.Plan))... }>
+										Retire the plan
+									</button>
+								</form>
+							} else {
+								<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/reactivate") }>
+									<button type="submit" class="btn-secondary w-full">Put it back in use</button>
+								</form>
+							}
+							if props.TotalMachines == 0 {
+								<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/delete") }>
+									<button
+										type="submit"
+										class="btn-danger w-full"
+										{ ConfirmAttrs(ActionConfirm{
+											Title:   "Delete " + props.Plan.Name + "?",
+											Lead:    "It has never been used, so nothing depends on it.",
+											Confirm: "Delete it",
+											Danger:  true,
+										})... }
+									>Delete the plan</button>
+								</form>
+							}
+						</div>
+					</div>
+				</div>
+			} else {
+				<div class="border border-rr-border bg-rr-surface">
+					<div class="px-4 py-4">
+						<p class="text-sm text-rr-muted">You have read-only access to service records.</p>
+					</div>
+				</div>
+			}
+		</div>
+	</div>
+}
+
+// planTaskForm adds a job to the series.
+templ planTaskForm(props ServicePlanShowProps) {
+	<div class="mt-4 border border-rr-border bg-rr-surface">
+		<div class="px-4 py-4">
+			<h2 class="text-sm font-semibold text-rr-heading">Add a job to the series</h2>
+			if props.LiveMachines > 0 {
+				<p class="mt-1 text-sm text-rr-muted">
+					{ planMachineLabel(props.LiveMachines) } on this plan will pick it up overnight, counted from when each of them last had a full service.
+				</p>
+			}
+			<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/tasks") } class="mt-3">
+				if props.Error != "" {
+					<p class="mb-3 text-sm text-rr-red">{ props.Error }</p>
+				}
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+					<div class="sm:col-span-3">
+						<label for="task-name" class="label-font block text-rr-muted">What gets done</label>
+						<input
+							type="text"
+							id="task-name"
+							name="name"
+							value={ props.Values.Name }
+							required
+							placeholder="Backflush and change group screens"
+							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+						/>
+					</div>
+					<div>
+						<label for="task-interval" class="label-font block text-rr-muted">Every (days)</label>
+						<input
+							type="number"
+							id="task-interval"
+							name="interval_days"
+							value={ props.Values.IntervalDays }
+							min="1"
+							max="3650"
+							required
+							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+						/>
+					</div>
+					<div>
+						<label for="task-lead" class="label-font block text-rr-muted">Notice (days)</label>
+						<input
+							type="number"
+							id="task-lead"
+							name="lead_days"
+							value={ props.Values.LeadDays }
+							min="0"
+							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+						/>
+						<p class="mt-1 text-xs text-rr-muted">How far ahead it starts asking.</p>
+					</div>
+					<div class="flex items-end">
+						<label class="flex items-center gap-2 pb-2 text-sm text-rr-body">
+							<input type="checkbox" name="warranty_required" value="1" checked?={ props.Values.WarrantyRequired } class="rounded-sm border-rr-border"/>
+							Keeps the warranty
+						</label>
+					</div>
+					<div class="sm:col-span-3">
+						<label for="task-instructions" class="label-font block text-rr-muted">How it is done</label>
+						<textarea
+							id="task-instructions"
+							name="instructions"
+							rows="3"
+							placeholder="Goes on the ticket, so whoever is standing at the machine has the procedure."
+							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+						>{ props.Values.Instructions }</textarea>
+					</div>
+				</div>
+				<div class="mt-4">
+					<button type="submit" class="inline-flex items-center bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90">
+						Add it to the series
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
+
+// planEditForm rewrites the plan's own details. Small enough to live in the
+// rail rather than on its own page.
+templ planEditForm(props ServicePlanShowProps) {
+	<div class="border border-rr-border bg-rr-surface">
+		<div class="px-4 py-4">
+			<h2 class="text-sm font-semibold text-rr-heading">Plan details</h2>
+			<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String()) } class="mt-3 space-y-3">
+				<div>
+					<label for="edit-plan-name" class="label-font block text-rr-muted">Name</label>
+					<input
+						type="text"
+						id="edit-plan-name"
+						name="name"
+						value={ props.Plan.Name }
+						required
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					/>
+				</div>
+				<div>
+					<label for="edit-plan-category" class="label-font block text-rr-muted">Suits</label>
+					<select id="edit-plan-category" name="category" class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm">
+						<option value="" selected?={ props.Plan.Category == "" }>Any machine</option>
+						for _, c := range domain.EquipmentCategories() {
+							<option value={ string(c) } selected?={ props.Plan.Category == c }>{ c.Label() }</option>
+						}
+					</select>
+				</div>
+				<div>
+					<label for="edit-plan-description" class="label-font block text-rr-muted">What it is for</label>
+					<textarea
+						id="edit-plan-description"
+						name="description"
+						rows="2"
+						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+					>{ props.Plan.Description }</textarea>
+				</div>
+				<button type="submit" class="btn-secondary w-full">Save the details</button>
+			</form>
+		</div>
+	</div>
+}
+
+templ ServicePlanShow(props ServicePlanShowProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      props.Plan.Name,
+		ActivePath: "/admin/service",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@ServicePlanShowContent(props)
+	}
+}

@@ -185,6 +185,11 @@ type DashboardProps struct {
 	// this the only notice staff get is the submission email — miss it and the
 	// request is invisible.
 	PendingWhiteLabel int
+	// OverdueMaintenance is preventive maintenance past its due date, across
+	// every machine the shop looks after. Zero on any instance without the
+	// equipment service module, which is how it stays off a coffee-only
+	// dashboard without the template having to know about modules.
+	OverdueMaintenance int
 
 	// Urgent action queues, each split by sales channel — see UrgentOrderGroup.
 	OnHold         []UrgentOrderGroup
@@ -271,7 +276,8 @@ func (p DashboardProps) wholesaleCount() int {
 }
 
 func (p DashboardProps) hasAnyAction() bool {
-	return p.urgentCount() > 0 || p.reviewCount() > 0 || p.retailCount() > 0 || p.wholesaleCount() > 0
+	return p.urgentCount() > 0 || p.reviewCount() > 0 || p.retailCount() > 0 ||
+		p.wholesaleCount() > 0 || p.OverdueMaintenance > 0
 }
 
 // ageLabel returns a compact "Nm / Nh / Nd ago" string for a timestamp.
@@ -460,6 +466,8 @@ templ commandBar(props DashboardProps) {
 				@actionChip("Review", props.reviewCount(), "#band-review", false)
 				@actionChip("Retail", props.retailCount(), "#band-retail", false)
 				@actionChip("Wholesale", props.wholesaleCount(), "#band-wholesale", false)
+				<!-- Links out of the dashboard rather than to a band: the work is a visit to book, not an order to push. -->
+				@actionChip("Maintenance", props.OverdueMaintenance, "/admin/service/maintenance?scope=overdue", false)
 			</div>
 		}
 	</div>

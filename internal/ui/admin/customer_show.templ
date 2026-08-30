@@ -46,6 +46,9 @@ type CustomerShowProps struct {
 	// does not render at all otherwise, so a shop that does not service
 	// machines never sees the word.
 	Equipment       []domain.Equipment
+	// ServiceCost is what this account has taken in parts and hours, including
+	// the call-outs that never named a machine.
+	ServiceCost []domain.ServiceCostWindow
 	ServiceEnabled  bool
 	CanWriteService bool
 	// CanEditEmail gates the inline email editor. The route is gated
@@ -192,6 +195,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 			@customerAddressesCard(props)
 			if props.ServiceEnabled {
 				@customerEquipmentCard(props)
+				@serviceCostRailCard(props.ServiceCost)
 			}
 			if len(props.TeamMembers) > 0 {
 				@customerTeamCard(props)

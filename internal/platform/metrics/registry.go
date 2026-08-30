@@ -56,6 +56,11 @@ type Registry struct {
 	ServiceTicketsOpen   *prometheus.GaugeVec
 	ServiceTicketsStale  prometheus.Gauge
 	ServiceTicketsOpened *prometheus.CounterVec
+	// MaintenanceDue is the state of the preventive maintenance schedule, set
+	// by the daily sweep. Labelled by scope rather than split into four gauges
+	// so a dashboard can graph the whole picture from one series.
+	MaintenanceDue    *prometheus.GaugeVec
+	MaintenanceBooked prometheus.Counter
 
 	// Stripe webhooks
 	StripeWebhooksReceived  *prometheus.CounterVec
@@ -234,6 +239,22 @@ func NewRegistry() *Registry {
 			Help: "Total service tickets opened, by who raised them and how bad it was.",
 		}, []string{"source", "severity"}),
 
+		// Scopes: overdue, due_soon, uncovered, warranty. "warranty" is the one
+		// worth alerting on — it is maintenance whose absence costs the
+		// customer their manufacturer's cover, which is a phone call the shop
+		// would much rather make early.
+		MaintenanceDue: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Name: "service_maintenance_due_total",
+			Help: "Current count of pending preventive maintenance, by scope.",
+		}, []string{"scope"}),
+
+		// How much work the sweep books without a human. A sudden jump is
+		// usually a plan edit that reached more machines than expected.
+		MaintenanceBooked: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "service_maintenance_booked_total",
+			Help: "Total service tickets opened automatically for scheduled maintenance.",
+		}),
+
 		// --- Subscription health ---
 
 		SubscriptionsActive: prometheus.NewGauge(prometheus.GaugeOpts{
@@ -348,6 +369,8 @@ func NewRegistry() *Registry {
 		m.ServiceTicketsOpen,
 		m.ServiceTicketsStale,
 		m.ServiceTicketsOpened,
+		m.MaintenanceDue,
+		m.MaintenanceBooked,
 		// Subscriptions
 		m.SubscriptionsActive,
 		m.SubscriptionsRenewalBlocked,

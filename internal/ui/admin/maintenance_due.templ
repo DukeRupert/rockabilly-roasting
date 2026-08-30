@@ -119,14 +119,14 @@ func maintenanceTiming(row domain.MaintenanceDueRow, today time.Time) string {
 // maintenanceCoverage is what the row says about who pays. Uncovered work is
 // the row a staffer acts on, so it is the one that gets the badge.
 func maintenanceCoverageBadge(row domain.MaintenanceDueRow, today time.Time) string {
-	if row.Covered(today) {
+	if row.Covered() {
 		return "badge badge-teal"
 	}
 	return "badge badge-amber"
 }
 
 func maintenanceCoverageLabel(row domain.MaintenanceDueRow, today time.Time) string {
-	if row.Covered(today) {
+	if row.Covered() {
 		return "On contract"
 	}
 	return "No contract"

@@ -129,6 +129,42 @@ func TestMaintenanceScopes(t *testing.T) {
 		"covered work inside its window — the far-out one is not booked yet")
 }
 
+// Bookable and Uncovered are complements, and both must decide coverage on the
+// day the visit happens rather than the day somebody asks.
+//
+// A fixed-term contract crosses this seam once, on its way out: cover ends
+// Sep 4, the visit is due Sep 11, and with fourteen days of lead the sweep is
+// already looking at the row on Sep 1. Keyed to now(), Bookable said yes —
+// opening a ticket for work landing a week after the contract was gone — and
+// Uncovered, being the exact complement, said no, so the row was on neither
+// list and nobody rang the cafe.
+func TestCoverageIsDecidedOnTheDueDateNotToday(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	today := planTestDay(2026, time.September, 1)
+
+	f := newPlanFixture(t, tx, 90, 14, true)
+	lapses := planTestDay(2026, time.September, 4)
+	_, err := tx.Exec(ctx,
+		`UPDATE equipment_service_plans SET contract_ends_on = $1 WHERE id = $2`,
+		lapses, f.assignment.ID)
+	require.NoError(t, err)
+	f.due(t, tx, planTestDay(2026, time.September, 11))
+
+	count := func(scope store.MaintenanceScope) int {
+		n, err := f.plans.CountDue(ctx, tx, store.MaintenanceFilter{
+			Scope: scope, Now: today, EquipmentID: &f.equipment.ID,
+		})
+		require.NoError(t, err)
+		return n
+	}
+
+	assert.Equal(t, 0, count(store.MaintenanceScopeBookable),
+		"the contract is gone by the due date — booking this sells the shop a visit nobody bought")
+	assert.Equal(t, 1, count(store.MaintenanceScopeUncovered),
+		"and it has to land on the call list, or the row is on neither")
+}
+
 // A retired machine drops off every list. Nagging about a machine in a skip is
 // how staff learn to ignore the whole page.
 func TestRetiredMachineLeavesTheDueList(t *testing.T) {

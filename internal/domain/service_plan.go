@@ -328,14 +328,26 @@ func (r MaintenanceDueRow) WarrantyAtRisk(on time.Time) bool {
 
 // Covered reports whether the customer pays for this occurrence, on the same
 // terms as EquipmentServicePlan.Covered.
-func (r MaintenanceDueRow) Covered(on time.Time) bool {
+//
+// Deliberately takes no day: coverage for an occurrence is coverage on the day
+// the visit happens, which is DueOn, and never the day somebody happens to be
+// asking. A fixed-term contract passes through its lead window on the way out
+// — cover ending Sep 4 with a visit due Sep 11 and fourteen days of lead — and
+// answering "covered?" as of the sweep day says yes to work that lands a week
+// after the contract is gone. That booked a ticket the shop had not sold and,
+// because the uncovered scope is the exact complement, took the row off the
+// call list where somebody would have sold it. Both halves failed on one row.
+//
+// The parameter is gone rather than corrected because a correct call and an
+// incorrect one looked identical at every call site.
+func (r MaintenanceDueRow) Covered() bool {
 	if !r.UnderContract {
 		return false
 	}
 	if r.ContractEndsOn == nil {
 		return true
 	}
-	return !calendarDay(on).After(calendarDay(*r.ContractEndsOn))
+	return !calendarDay(r.DueOn).After(calendarDay(*r.ContractEndsOn))
 }
 
 // BookableOn reports whether the sweep should open a routine ticket for this
@@ -351,7 +363,7 @@ func (r MaintenanceDueRow) BookableOn(on time.Time) bool {
 	if r.EquipmentStatus == EquipmentStatusRetired {
 		return false
 	}
-	if !r.Covered(on) {
+	if !r.Covered() {
 		return false
 	}
 	return r.Urgency(on) != MaintenanceUpcoming

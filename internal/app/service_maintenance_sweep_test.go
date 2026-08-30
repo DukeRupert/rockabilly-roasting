@@ -352,6 +352,36 @@ func TestSweepNeverBooksAgainstALapsedContract(t *testing.T) {
 	assert.False(t, ticketed)
 }
 
+// The seam between those two: a contract that is live today but gone by the day
+// the visit lands.
+//
+// Interval 365, lead 30, anchored so the occurrence falls seven days out; cover
+// runs three more days. On the sweep day the contract is unambiguously live, so
+// asking "covered?" as of today says yes and books a ticket for work happening
+// four days after the term ends. Nothing above catches it — one fixture lapsed
+// two months ago, the other runs a year out, and on both of those the sweep day
+// and the due date agree.
+func TestSweepNeverBooksAContractThatLapsesBeforeTheVisit(t *testing.T) {
+	ctx := t.Context()
+	svc := sweepService(t, ctx)
+	customer := commitCustomer(t, ctx)
+	machine := commitMachine(t, ctx, customer)
+
+	lapsesBeforeTheVisit := time.Now().AddDate(0, 0, 3)
+	plan, _ := commitPlan(t, ctx, 365, 30)
+	commitAssignmentUntil(t, ctx, machine, plan,
+		time.Now().AddDate(0, 0, 7-365), true, &lapsesBeforeTheVisit)
+
+	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
+
+	assert.Equal(t, 0, sweptTickets(t, ctx, customer),
+		"cover has four days left and the visit is seven days out — the shop must not book itself that visit")
+
+	_, ticketed, found := pendingDue(t, ctx, machine)
+	require.True(t, found, "still due, and it belongs on the call list so somebody can sell it")
+	assert.False(t, ticketed)
+}
+
 // The mirror: a contract still running does book, so the test above is proving
 // the end date matters rather than that booking is broken.
 func TestSweepBooksAgainstALiveTermContract(t *testing.T) {

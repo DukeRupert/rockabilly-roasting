@@ -789,10 +789,16 @@ func maintenanceWhere(f MaintenanceFilter) (string, []any) {
 			"e.warranty_expires_on IS NOT NULL",
 			"e.warranty_expires_on >= "+nowArg())
 	case MaintenanceScopeBookable:
+		// Coverage is tested against d.due_on, not now(): the visit happens on
+		// the due date, so a contract ending inside the lead window does not
+		// cover it. Keyed to now() this booked work the shop had not sold, and
+		// the Uncovered complement below hid the same row from the call list.
+		// Mirrors MaintenanceDueRow.Covered, which takes no day for the same
+		// reason — move one of these and you must move the other.
 		where = append(where, "d.status = 'pending'", "d.ticket_id IS NULL",
 			"d.due_on <= "+nowArg()+" + (t.lead_days * INTERVAL '1 day')",
 			"a.under_contract",
-			"(a.contract_ends_on IS NULL OR a.contract_ends_on >= "+nowArg()+")")
+			"(a.contract_ends_on IS NULL OR a.contract_ends_on >= d.due_on)")
 	case MaintenanceScopeUncovered:
 		// ticket_id IS NULL, exactly as Bookable carries it. This is the call
 		// list: once somebody has rung the cafe and booked the visit, the row
@@ -800,7 +806,7 @@ func maintenanceWhere(f MaintenanceFilter) (string, []any) {
 		// and inflates the uncovered gauge with work already in hand.
 		where = append(where, "d.status = 'pending'", "d.ticket_id IS NULL",
 			"d.due_on <= "+nowArg()+" + (t.lead_days * INTERVAL '1 day')",
-			"(NOT a.under_contract OR (a.contract_ends_on IS NOT NULL AND a.contract_ends_on < "+nowArg()+"))")
+			"(NOT a.under_contract OR (a.contract_ends_on IS NOT NULL AND a.contract_ends_on < d.due_on))")
 	default:
 		where = append(where, "d.status = 'pending'")
 	}

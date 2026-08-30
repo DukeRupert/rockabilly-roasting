@@ -120,27 +120,27 @@ func TestMaintenanceCoverage(t *testing.T) {
 	nextYear := day(2027, time.September, 1)
 
 	t.Run("no contract", func(t *testing.T) {
-		assert.False(t, dueRow(today).Covered(today))
+		assert.False(t, dueRow(today).Covered())
 	})
 
 	t.Run("open-ended contract", func(t *testing.T) {
 		r := dueRow(today)
 		r.UnderContract = true
-		assert.True(t, r.Covered(today))
+		assert.True(t, r.Covered())
 	})
 
 	t.Run("contract still running", func(t *testing.T) {
 		r := dueRow(today)
 		r.UnderContract = true
 		r.ContractEndsOn = &nextYear
-		assert.True(t, r.Covered(today))
+		assert.True(t, r.Covered())
 	})
 
 	t.Run("contract has lapsed", func(t *testing.T) {
 		r := dueRow(today)
 		r.UnderContract = true
 		r.ContractEndsOn = &lastMonth
-		assert.False(t, r.Covered(today), "a contract that has run out is not a contract")
+		assert.False(t, r.Covered(), "a contract that has run out is not a contract")
 	})
 
 	t.Run("the last day of the contract is covered", func(t *testing.T) {
@@ -148,7 +148,32 @@ func TestMaintenanceCoverage(t *testing.T) {
 		r.UnderContract = true
 		end := today
 		r.ContractEndsOn = &end
-		assert.True(t, r.Covered(today))
+		assert.True(t, r.Covered())
+	})
+
+	// The seam every fixed-term contract crosses on its way out, and the one
+	// nothing here used to exercise: the fixtures above run a year out or
+	// lapsed a month ago, so both sides agreed and the bug was invisible.
+	//
+	// Cover ends Sep 4. The visit is due Sep 11. Lead is fourteen days, so on
+	// Sep 1 the occurrence is already inside its window and the sweep is
+	// looking at it. Coverage as of Sep 1 says yes; the visit lands seven days
+	// after the contract is gone.
+	t.Run("a contract lapsing inside the lead window does not cover the visit", func(t *testing.T) {
+		r := dueRow(day(2026, time.September, 11))
+		r.UnderContract = true
+		end := day(2026, time.September, 4)
+		r.ContractEndsOn = &end
+
+		assert.False(t, r.Covered(),
+			"the visit happens on the due date, and cover has run out by then")
+		assert.False(t, r.BookableOn(today),
+			"booking this opens a ticket for work the shop never sold")
+
+		// The other half of the split has to pick it up, or the row is on
+		// neither list and nobody ever rings the cafe.
+		assert.True(t, r.Urgency(today) != domain.MaintenanceUpcoming,
+			"it is inside its lead window — the uncovered scope must see it")
 	})
 }
 

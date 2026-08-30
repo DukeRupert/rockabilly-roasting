@@ -122,7 +122,7 @@ func calendarChipState(row domain.MaintenanceDueRow, today time.Time) string {
 		return "warranty at risk"
 	case row.Urgency(today) == domain.MaintenanceOverdue:
 		return "overdue"
-	case !row.Covered(today):
+	case !row.Covered():
 		return "no contract"
 	}
 	return "on contract"
@@ -158,7 +158,7 @@ func calendarChipClass(row domain.MaintenanceDueRow, today time.Time) string {
 		return base + " bg-rr-red/10 text-rr-red"
 	case row.Urgency(today) == domain.MaintenanceOverdue:
 		return base + " bg-rr-amber/20 text-rr-heading"
-	case !row.Covered(today):
+	case !row.Covered():
 		return base + " bg-rr-raised text-rr-heading"
 	}
 	return base + " bg-rr-raised/60 text-rr-body"

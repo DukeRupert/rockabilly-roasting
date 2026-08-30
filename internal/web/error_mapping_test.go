@@ -1,15 +1,20 @@
 package web
 
 import (
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"net/http"
 	"os"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dukerupert/hiri/internal/app"
 )
 
 // Every app sentinel should have an HTTP mapping, and this is the ratchet that
@@ -23,10 +28,10 @@ import (
 // rendering as 500s until a review caught them.
 //
 // Freezing the existing gap rather than demanding it be closed is deliberate.
-// Sixty-seven sentinels predate this test; fixing them is real work with real
+// Fifty-two sentinels predate this test; fixing them is real work with real
 // judgement in it (each needs a status code and a customer-readable string) and
-// does not belong to whatever change happens to add the sixty-eighth. What this
-// test buys is that there is never a sixty-eighth by accident.
+// does not belong to whatever change happens to add the fifty-third. What this
+// test buys is that there is never a fifty-third by accident.
 //
 // To fix a failure: add the sentinel to the right case in mapError. Do not add
 // it to the list below — that list only ever shrinks.
@@ -138,10 +143,7 @@ func referencedSentinels(t *testing.T, path string) map[string]bool {
 // the test above fails if a name on it acquires a mapping and is not removed,
 // and fails if a sentinel not on it is added without one.
 var knownUnmappedSentinels = []string{
-	"ErrAddressNotFound",
 	"ErrAddressNotGeocodable",
-	"ErrAttributeKeyNotFound",
-	"ErrAttributeSetNotFound",
 	"ErrBoxPresetDimensionsInvalid",
 	"ErrBoxPresetMaxWeightInvalid",
 	"ErrBoxPresetNameRequired",
@@ -156,19 +158,15 @@ var knownUnmappedSentinels = []string{
 	"ErrEquipmentSiteIncomplete",
 	"ErrEquipmentSiteNotOnAccount",
 	"ErrFulfillmentUnavailable",
-	"ErrInvalidOrderStatus",
 	"ErrInvalidStaffRole",
 	"ErrInvalidTaxConfig",
 	"ErrInvalidTierQuantity",
 	"ErrJobNotDead",
-	"ErrJobRetryUnavailable",
 	"ErrLastActiveAdmin",
 	"ErrMagicLinkExpired",
 	"ErrNoBoxPreset",
 	"ErrNotWholesaleAccount",
-	"ErrOrderHasActiveLabel",
 	"ErrOrderNotSwitchable",
-	"ErrOrderQBManaged",
 	"ErrPasswordTooShort",
 	"ErrPaymentAmountMismatch",
 	"ErrPickupUnavailable",
@@ -180,10 +178,8 @@ var knownUnmappedSentinels = []string{
 	"ErrPostponeStrandsMovedRun",
 	"ErrPostponeTargetRunMoved",
 	"ErrPostponeTooFar",
-	"ErrPriceListNotFound",
 	"ErrRenewalPaymentDeclined",
 	"ErrRestoreRunPassed",
-	"ErrRouteStopNotFound",
 	"ErrRunRouteActive",
 	"ErrSetupTokenExpired",
 	"ErrShipmentNoPhysicalItems",
@@ -194,15 +190,68 @@ var knownUnmappedSentinels = []string{
 	"ErrStaffEmailRequired",
 	"ErrStaffInviteInvalid",
 	"ErrStaffNameRequired",
-	"ErrStopAlreadyDelivered",
-	"ErrSubscriptionNotCancellable",
-	"ErrSubscriptionNotEditable",
-	"ErrSubscriptionNotResumable",
-	"ErrSubscriptionPlanInactive",
-	"ErrSubscriptionPlanNotFound",
 	"ErrTaxCalculationFailed",
 	"ErrWhiteLabelInviteInvalid",
 	"ErrWhiteLabelLabelRequired",
 	"ErrWhiteLabelNameRequired",
 	"ErrWholesalePricesStale",
+}
+
+// These sentinels used to fall through mapError's default case, which meant an
+// operator who tried an unavailable move got "internal server error" and Sentry
+// got paged for the application working exactly as designed. The sentinel text
+// was never shown. Nothing failed a build over it — an unmapped sentinel is
+// only visible at runtime, on the one path nobody exercised.
+func TestPreviouslyUnmappedSentinels(t *testing.T) {
+	cases := []struct {
+		err    error
+		status int
+	}{
+		// The ID came off a URL the caller typed or followed. Missing means
+		// missing.
+		{app.ErrSubscriptionPlanNotFound, http.StatusNotFound},
+		{app.ErrPriceListNotFound, http.StatusNotFound},
+		{app.ErrAttributeSetNotFound, http.StatusNotFound},
+		{app.ErrAttributeKeyNotFound, http.StatusNotFound},
+		{app.ErrAddressNotFound, http.StatusNotFound},
+		{app.ErrRouteStopNotFound, http.StatusNotFound},
+
+		// The record exists and the operator may touch it; the move is just not
+		// available from where it stands.
+		{app.ErrSubscriptionNotCancellable, http.StatusUnprocessableEntity},
+		{app.ErrSubscriptionNotResumable, http.StatusUnprocessableEntity},
+		{app.ErrSubscriptionNotEditable, http.StatusUnprocessableEntity},
+		{app.ErrSubscriptionPlanInactive, http.StatusUnprocessableEntity},
+		{app.ErrInvalidOrderStatus, http.StatusConflict},
+		{app.ErrOrderHasActiveLabel, http.StatusConflict},
+		{app.ErrOrderQBManaged, http.StatusConflict},
+		{app.ErrStopAlreadyDelivered, http.StatusConflict},
+
+		// Nothing the operator did — this process has no River client.
+		{app.ErrJobRetryUnavailable, http.StatusServiceUnavailable},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.err.Error(), func(t *testing.T) {
+			status, msg := mapError(tc.err)
+			assert.Equal(t, tc.status, status)
+			assert.NotEqual(t, "internal server error", msg,
+				"the sentinel's own words are what the operator needs")
+
+			// Wrapped is the shape handlers actually produce, and errors.Is
+			// has to carry the mapping through it.
+			wrapped, _ := mapError(fmt.Errorf("load: %w", tc.err))
+			assert.Equal(t, tc.status, wrapped, "mapping must survive wrapping")
+		})
+	}
+}
+
+// A missing address or plan reached through an ID stored on an order or
+// subscription is broken data, not a bad request. The 404 mappings above must
+// not quietly absorb it — the handlers wrap those misses so they stay 500s, and
+// this pins the wrapping's one load-bearing property: it breaks errors.Is.
+func TestBrokenReferenceStaysInternal(t *testing.T) {
+	// fmt.Errorf without %w is deliberate at those call sites.
+	status, _ := mapError(fmt.Errorf("order X references missing address Y"))
+	assert.Equal(t, http.StatusInternalServerError, status)
 }

@@ -196,7 +196,7 @@ func CheckAdminUI() error {
 		return fmt.Errorf("walk admin templ files: %w", err)
 	}
 
-	dead, err := deadTokenClasses()
+	dead, err := deadTokenClasses(excluded)
 	if err != nil {
 		return err
 	}
@@ -233,7 +233,7 @@ func emitsCSS(compiled, class string) bool {
 //
 // Skipped when output.css has not been built; `mage check` runs css first, and
 // failing here on a clean checkout would be a confusing way to learn that.
-func deadTokenClasses() ([]string, error) {
+func deadTokenClasses(excluded map[string]bool) ([]string, error) {
 	css, err := os.ReadFile("internal/ui/assets/css/output.css")
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -251,11 +251,19 @@ func deadTokenClasses() ([]string, error) {
 	var dead []string
 	seen := map[string]bool{}
 
-	err = filepath.Walk("internal/ui/admin", func(path string, info os.FileInfo, err error) error {
+	// The admin shell is admin UI too — sixty-odd rr-* usages live in the
+	// layout, and scanning only internal/ui/admin would leave the frame around
+	// every page unchecked.
+	roots := []string{"internal/ui/admin", "internal/ui/layouts"}
+
+	walk := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if info.IsDir() || !strings.HasSuffix(path, ".templ") {
+			return nil
+		}
+		if excluded[path] {
 			return nil
 		}
 		data, err := os.ReadFile(path)
@@ -277,9 +285,12 @@ func deadTokenClasses() ([]string, error) {
 			}
 		}
 		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("walk admin templ files: %w", err)
+	}
+
+	for _, root := range roots {
+		if err := filepath.Walk(root, walk); err != nil {
+			return nil, fmt.Errorf("walk %s: %w", root, err)
+		}
 	}
 	return dead, nil
 }

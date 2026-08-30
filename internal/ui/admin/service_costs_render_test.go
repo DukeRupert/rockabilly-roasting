@@ -25,7 +25,8 @@ func TestServiceCostsHrefAlwaysNamesTheSort(t *testing.T) {
 		if sort != "" {
 			assert.Equal(t, sort, got)
 		} else {
-			assert.Equal(t, "hours", got, "an unset sort links to the ranking it actually shows")
+			assert.Equal(t, "hours", got,
+				"the strip's own Hours link must name hours — an omitted parameter asks for the default, which is cost")
 		}
 	}
 }

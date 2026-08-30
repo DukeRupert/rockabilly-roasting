@@ -659,91 +659,96 @@ func equipmentAssignPlanForm(props EquipmentShowProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if len(props.Maintenance.AvailablePlans) == 0 {
-			if props.Maintenance.Any() {
+			if props.Maintenance.Any() && props.Maintenance.OtherCategoryPlans == 0 {
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<p class=\"text-sm text-rr-muted\">This machine is on every plan that suits it.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
+			} else if props.Maintenance.Any() {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<p class=\"text-sm text-rr-muted\">This machine is on every plan that suits it — your others are written for different kinds of machine.</p>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
 			} else if props.Maintenance.OtherCategoryPlans > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<p class=\"text-sm text-rr-muted\">None of your plans suit this machine — they are written for other kinds. <a href=\"/admin/service/plans\" class=\"underline\">Write one</a> and it shows up here.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<p class=\"text-sm text-rr-muted\">None of your plans suit this machine — they are written for other kinds. <a href=\"/admin/service/plans\" class=\"underline\">Write one</a> and it shows up here.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<p class=\"text-sm text-rr-muted\">No maintenance plans exist yet. <a href=\"/admin/service/plans\" class=\"underline\">Write one</a> and you can put this machine on it.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<p class=\"text-sm text-rr-muted\">No maintenance plans exist yet. <a href=\"/admin/service/plans\" class=\"underline\">Write one</a> and you can put this machine on it.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<!-- Left closed on a rejected assignment: the failure arrives as a\n\t\t\t     flash at the top of the page, which is where the eye goes after\n\t\t\t     a redirect. Opening the panel as well would be two answers to\n\t\t\t     the same question. --> <details><summary class=\"cursor-pointer text-sm font-semibold text-rr-heading\">Put it on a plan</summary><form method=\"post\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<!-- Left closed on a rejected assignment: the failure arrives as a\n\t\t\t     flash at the top of the page, which is where the eye goes after\n\t\t\t     a redirect. Opening the panel as well would be two answers to\n\t\t\t     the same question. --> <details><summary class=\"cursor-pointer text-sm font-semibold text-rr-heading\">Put it on a plan</summary><form method=\"post\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var30 templ.SafeURL
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/equipment/" + props.Equipment.ID.String() + "/plans"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_maintenance.templ`, Line: 254, Col: 116}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_maintenance.templ`, Line: 258, Col: 116}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\" class=\"mt-3\"><div class=\"grid grid-cols-1 gap-4 sm:grid-cols-2\"><div><label for=\"assign-plan\" class=\"label-font block text-rr-muted\">Plan</label> <select id=\"assign-plan\" name=\"plan_id\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" class=\"mt-3\"><div class=\"grid grid-cols-1 gap-4 sm:grid-cols-2\"><div><label for=\"assign-plan\" class=\"label-font block text-rr-muted\">Plan</label> <select id=\"assign-plan\" name=\"plan_id\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, plan := range props.Maintenance.AvailablePlans {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<option value=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<option value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var31 string
 				templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.ResolveAttributeValue(plan.ID.String())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_maintenance.templ`, Line: 260, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_maintenance.templ`, Line: 264, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var31)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var32 string
 				templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(plan.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_maintenance.templ`, Line: 260, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_maintenance.templ`, Line: 264, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</option>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</option>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</select></div><div><label for=\"assign-starts\" class=\"label-font block text-rr-muted\">Last fully serviced</label> <input type=\"date\" id=\"assign-starts\" name=\"starts_on\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</select></div><div><label for=\"assign-starts\" class=\"label-font block text-rr-muted\">Last fully serviced</label> <input type=\"date\" id=\"assign-starts\" name=\"starts_on\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.ResolveAttributeValue(equipmentAnchorDefault(props))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_maintenance.templ`, Line: 270, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/equipment_maintenance.templ`, Line: 274, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var33)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><p class=\"mt-1 text-xs text-rr-muted\">Every due date counts forward from this day.</p></div><div><label class=\"flex items-center gap-2 text-sm text-rr-body\"><input type=\"checkbox\" name=\"under_contract\" value=\"1\" class=\"rounded-sm border-rr-border\"> They pay for this maintenance</label><p class=\"mt-1 text-xs text-rr-muted\">On contract, work due opens itself a ticket. Otherwise it goes on the call list for somebody to ring about.</p></div><div><label for=\"assign-contract-ends\" class=\"label-font block text-rr-muted\">Contract runs to</label> <input type=\"date\" id=\"assign-contract-ends\" name=\"contract_ends_on\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><p class=\"mt-1 text-xs text-rr-muted\">Leave blank for open-ended.</p></div><div class=\"sm:col-span-2\"><label for=\"assign-notes\" class=\"label-font block text-rr-muted\">Notes</label> <input type=\"text\" id=\"assign-notes\" name=\"notes\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div></div><div class=\"mt-4\"><button type=\"submit\" class=\"btn-secondary\">Put it on the plan</button></div></form></details>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "\" required class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><p class=\"mt-1 text-xs text-rr-muted\">Every due date counts forward from this day.</p></div><div><label class=\"flex items-center gap-2 text-sm text-rr-body\"><input type=\"checkbox\" name=\"under_contract\" value=\"1\" class=\"rounded-sm border-rr-border\"> They pay for this maintenance</label><p class=\"mt-1 text-xs text-rr-muted\">On contract, work due opens itself a ticket. Otherwise it goes on the call list for somebody to ring about.</p></div><div><label for=\"assign-contract-ends\" class=\"label-font block text-rr-muted\">Contract runs to</label> <input type=\"date\" id=\"assign-contract-ends\" name=\"contract_ends_on\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"><p class=\"mt-1 text-xs text-rr-muted\">Leave blank for open-ended.</p></div><div class=\"sm:col-span-2\"><label for=\"assign-notes\" class=\"label-font block text-rr-muted\">Notes</label> <input type=\"text\" id=\"assign-notes\" name=\"notes\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\"></div></div><div class=\"mt-4\"><button type=\"submit\" class=\"btn-secondary\">Put it on the plan</button></div></form></details>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

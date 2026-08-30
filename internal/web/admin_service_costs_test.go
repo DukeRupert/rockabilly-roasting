@@ -97,13 +97,21 @@ func TestServiceCostSort(t *testing.T) {
 	assert.True(t, explicit)
 	assert.Equal(t, domain.ServiceAccountCostByCost, sort)
 
-	// An empty sort= is not a ranking. Treating it as one is how the Hours tab
-	// came to return the cost ranking: its link omitted the parameter, the
-	// handler read that as "no preference", and applied the default.
-	_, explicit = serviceCostSort(url.Values{"sort": {""}})
-	assert.False(t, explicit)
-
-	sort, explicit = serviceCostSort(url.Values{"sort": {"bogus"}})
-	assert.False(t, explicit, "a mistyped URL falls back to the best default")
+	// A present-but-empty sort= is a value, not the absence of one — it lands
+	// on hours like any other unrecognised value. What means "no preference" is
+	// the parameter being missing entirely, which is what the Hours link used
+	// to do and why it came back ranked by cost.
+	sort, explicit = serviceCostSort(url.Values{"sort": {""}})
+	assert.True(t, explicit)
 	assert.Equal(t, domain.ServiceAccountCostByHours, sort)
+
+	_, explicit = serviceCostSort(url.Values{})
+	assert.False(t, explicit, "absent is the only thing that asks for the default")
+
+	// A mistyped sort is still a request for one. Treating it as absent would
+	// hand the reader the cost default and light a tab they did not click.
+	sort, explicit = serviceCostSort(url.Values{"sort": {"bogus"}})
+	assert.True(t, explicit)
+	assert.Equal(t, domain.ServiceAccountCostByHours, sort,
+		"hours is the safe ranking, and the strip highlights it")
 }

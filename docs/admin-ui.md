@@ -147,6 +147,11 @@ If you're building something genuinely new (e.g., an admin onboarding splash), o
 2. **A class that emits no CSS** — an `rr-*` utility Tailwind never produced a
    rule for. A class that does not *exist*.
 
+   Scope is `internal/ui/admin` plus `internal/ui/layouts` (the admin shell),
+   and it matches `rr-*` utilities written literally in the templates. A class
+   assembled by string concatenation, or a *non*-`rr` typo like `bg-surface`,
+   still slips through — this closes the hole that shipped, not every hole.
+
 The second half was added after `bg-rr-paper-warm` shipped. The token is
 `--color-paper-warm`: un-prefixed, and storefront-only. Tailwind v4 drops an
 unknown utility silently, so it compiled, passed the blocklist, passed the

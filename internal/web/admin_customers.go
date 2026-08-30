@@ -249,6 +249,12 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	// Only read when the equipment service module is on. A shop that does not
 	// service machines pays nothing for a card it will never see.
 	serviceEnabled := d.ModuleService.Enabled(domain.ModuleEquipmentService)
+	// The equipment list is configuration — what the cafe has on its counter —
+	// and anyone who can open the customer may see it. What servicing them cost
+	// is not: the same reasoning that keeps the dashboard chip behind
+	// service:view keeps this behind it too. /admin/customers/{id} carries no
+	// service permission of its own, so the card asks here.
+	canViewService := staffCan(r, auth.PermViewService)
 	var equipment []domain.Equipment
 	var serviceCost []domain.ServiceCostWindow
 	var serviceLaborRates domain.ServiceLaborRates
@@ -372,6 +378,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		CanEditEmail:         staffCan(r, auth.PermEditCustomers),
 		Equipment:            equipment,
 		ServiceCost:          serviceCost,
+		CanViewServiceCost:   canViewService,
 		ServiceLaborRates:    serviceLaborRates,
 		ServiceEnabled:       serviceEnabled,
 		CanWriteService:      staffCan(r, auth.PermWriteService),

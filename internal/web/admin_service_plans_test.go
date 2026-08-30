@@ -105,3 +105,25 @@ func TestParseMaintenanceDay(t *testing.T) {
 	_, err = parseMaintenanceDay("13/06/2026", fallback)
 	assert.Error(t, err)
 }
+
+// Skip carries no date field — you skip a job now, and there is no other day it
+// could mean. Requiring one made every Skip bounce with "when was it done?",
+// which is the regression this pins.
+func TestCloseMaintenanceDateRules(t *testing.T) {
+	today := gridDay(2026, time.September, 1)
+
+	t.Run("skipping defaults to today", func(t *testing.T) {
+		got, err := parseMaintenanceDay("", today)
+		require.NoError(t, err)
+		assert.Equal(t, today, got)
+	})
+
+	t.Run("completing insists on a date", func(t *testing.T) {
+		// The handler passes a zero fallback for a completion, because the day
+		// the work happened anchors the next occurrence and is routinely not
+		// today.
+		got, err := parseMaintenanceDay("", time.Time{})
+		require.NoError(t, err)
+		assert.True(t, got.IsZero(), "which the handler turns into ErrMaintenanceDateRequired")
+	})
+}

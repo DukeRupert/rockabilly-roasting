@@ -173,11 +173,21 @@ func (d *Deps) closeMaintenance(w http.ResponseWriter, r *http.Request, skip boo
 
 	back := maintenancePath(r.FormValue("scope"))
 
-	// No silent default. The form always ships today's date, so a blank one is
-	// somebody who cleared the field — and the day is what the next occurrence
-	// counts from, which is exactly what ErrMaintenanceDateRequired says must
-	// not be guessed.
-	on, err := parseMaintenanceDay(r.FormValue("on"), time.Time{})
+	// The two actions want different things from the date, so they get
+	// different rules.
+	//
+	// Completing: the day the work happened anchors the next occurrence, and it
+	// is routinely not today — a tech writes up Tuesday's visit on Thursday. A
+	// guess there quietly moves the whole schedule, which is what
+	// ErrMaintenanceDateRequired exists to refuse.
+	//
+	// Skipping: you skip it now. There is no other day it could mean, the form
+	// carries no date field, and requiring one made Skip reject every attempt.
+	fallback := time.Time{}
+	if skip {
+		fallback = d.merchantToday()
+	}
+	on, err := parseMaintenanceDay(r.FormValue("on"), fallback)
 	if err != nil {
 		redirectFlashError(w, r, back, "That is not a date the shop recognises.")
 		return
@@ -809,7 +819,8 @@ func (d *Deps) equipmentMaintenanceProps(ctx context.Context, tx pgx.Tx, equipme
 	}
 
 	// How many active plans the category filter left out, so an empty picker
-	// can tell "you have written none" from "none of yours suit this machine".
+	// can tell "you have written none" from "none of yours suit this machine" —
+	// which is worth saying whether or not the machine is already on something.
 	if len(props.AvailablePlans) == 0 {
 		all, allErr := d.ServicePlanService.ListPlans(ctx, tx, store.ServicePlanFilter{ActiveOnly: true})
 		if allErr != nil {
@@ -884,7 +895,10 @@ func serviceCostSort(q url.Values) (domain.ServiceAccountCostSort, bool) {
 	}
 	sort := domain.ServiceAccountCostSort(raw[0])
 	if !sort.Valid() {
-		return domain.ServiceAccountCostByHours, false
+		// A mistyped sort is still somebody asking for one. Treating it as
+		// absent would hand them the cost default and highlight a tab they did
+		// not click; hours is the safe ranking and the strip says so.
+		return domain.ServiceAccountCostByHours, true
 	}
 	return sort, true
 }

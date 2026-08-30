@@ -707,9 +707,14 @@ func maintenanceWhere(f MaintenanceFilter) (string, []any) {
 		add("d.due_on <= $%d", f.To)
 	}
 
-	// Retired machines never appear: their schedule is over, and a due list
-	// that nags about a machine in a skip is a list staff learn to ignore.
-	where = append(where, "e.status <> 'retired'")
+	// Retired machines drop off the *pending* scopes: their schedule is over,
+	// and a due list that nags about a machine in a skip is one staff learn to
+	// ignore. History is the opposite case — 077 keeps retired machines
+	// precisely so the record of what was done to them survives, and hiding it
+	// would delete the argument for having replaced the thing.
+	if f.Scope != MaintenanceScopeHistory {
+		where = append(where, "e.status <> 'retired'")
+	}
 
 	return " WHERE " + strings.Join(where, " AND "), args
 }

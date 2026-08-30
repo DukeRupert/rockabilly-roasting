@@ -589,6 +589,16 @@ ranking asked for by URL falls back to hours, because ordering by
 `parts_cents + 0` under a Cost heading would be the misleading label this report
 was built to avoid.
 
+`ServiceAccountCostByCost` ranks on `parts_cents + labor_cents` — the same
+figure the Cost column prints, ordered in SQL because it has to precede the
+LIMIT. `ServiceAccountReport.CanCost` decides both whether that ranking is
+offered and whether the column is drawn, from one signal so the two cannot
+disagree: true as soon as either an hour carries a rate or the shop has set one.
+
+Every link in the control strip names its ranking, including Hours. A link that
+omitted the parameter would read to the handler as "no preference", which is the
+request for the default — so the Hours tab would come back ranked by cost.
+
 Rows are driven by work recorded, not by the customer list: an account nobody
 touched in the window has no row, so the table stays as short as the finding is.
 The footer totals only what is shown, and a truncated table says so in red
@@ -682,15 +692,7 @@ what is owed now:
 - **Future work is stepped forward** whole intervals if the shift lands it in
   the past, for the booking reason above.
 
-`ServiceAccountCostByCost` ranks on `parts_cents + labor_cents` — the same
-figure the Cost column prints, ordered in SQL because it has to precede the
-LIMIT. `ServiceAccountReport.CanCost` decides both whether that ranking is
-offered and whether the column is drawn, from one signal so the two cannot
-disagree: true as soon as either an hour carries a rate or the shop has set one.
 
-Every link in the control strip names its ranking, including Hours. A link that
-omitted the parameter would read to the handler as "no preference", which is the
-request for the default — so the Hours tab would come back ranked by cost.
 
 ## Open decisions
 

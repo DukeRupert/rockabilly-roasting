@@ -50,9 +50,10 @@ func servicePeriods() []struct {
 // serviceSorts are the rankings. Every number is in the table whatever the
 // sort; this only decides the order.
 //
-// Cost is offered only once a labour rate is set. Without one there is no cost
-// figure, and a ranking labelled "Cost" that was really a ranking by parts
-// spend would be worse than not offering it.
+// Cost is offered only once there is money to rank on — a rate set for the next
+// hour, or an hour already carrying one. Without either, a ranking labelled
+// "Cost" would really be a ranking by parts spend, which is worse than not
+// offering it at all.
 func serviceSorts(rated bool) []struct {
 	Label string
 	Value string

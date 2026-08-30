@@ -227,3 +227,37 @@ func TestPlanNamesAreUniqueCaseInsensitively(t *testing.T) {
 	_, err = plans.Create(ctx, tx, store.CreateServicePlanParams{Name: "linea pb WARRANTY"})
 	assert.Error(t, err, "two plans differing only in case is a data-entry accident, not a choice")
 }
+
+// Retiring a machine ends its schedule but must not erase what was done to it.
+// Migration 077 keeps retired machines precisely so that record survives — it
+// is the argument for having replaced the thing.
+func TestRetiredMachineKeepsItsHistory(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newPlanFixture(t, tx, 90, 14, false)
+	d := f.due(t, tx, planTestDay(2026, time.April, 1))
+
+	_, err := f.plans.CloseDue(ctx, tx, d.ID, store.CloseDueParams{
+		Status:      domain.MaintenanceStatusCompleted,
+		CompletedOn: planTestDay(2026, time.April, 3),
+	})
+	require.NoError(t, err)
+
+	_, err = store.NewEquipmentStore().UpdateStatus(ctx, tx, f.equipment.ID, domain.EquipmentStatusRetired)
+	require.NoError(t, err)
+
+	history, err := f.plans.ListDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &f.equipment.ID,
+		Scope:       store.MaintenanceScopeHistory,
+		Now:         planTestDay(2026, time.September, 1),
+	})
+	require.NoError(t, err)
+	assert.Len(t, history, 1, "what was done to the machine outlives the machine")
+
+	pending, err := f.plans.CountDue(ctx, tx, store.MaintenanceFilter{
+		EquipmentID: &f.equipment.ID,
+		Now:         planTestDay(2026, time.September, 1),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 0, pending, "but nothing is still owed on it")
+}

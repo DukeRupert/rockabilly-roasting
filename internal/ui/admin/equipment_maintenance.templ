@@ -231,8 +231,12 @@ templ equipmentMaintenanceUpcoming(props EquipmentShowProps) {
 templ equipmentAssignPlanForm(props EquipmentShowProps) {
 	<div class="mt-4 border-t border-rr-border pt-4">
 		if len(props.Maintenance.AvailablePlans) == 0 {
-			if props.Maintenance.Any() {
+			if props.Maintenance.Any() && props.Maintenance.OtherCategoryPlans == 0 {
 				<p class="text-sm text-rr-muted">This machine is on every plan that suits it.</p>
+			} else if props.Maintenance.Any() {
+				<p class="text-sm text-rr-muted">
+					This machine is on every plan that suits it — your others are written for different kinds of machine.
+				</p>
 			} else if props.Maintenance.OtherCategoryPlans > 0 {
 				<p class="text-sm text-rr-muted">
 					None of your plans suit this machine — they are written for other kinds.

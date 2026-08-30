@@ -73,7 +73,10 @@ func calendarCellClass(day MaintenanceCalendarDay, today time.Time) string {
 	case !day.InMonth:
 		return base + " bg-rr-surface/50 text-rr-muted"
 	case sameDay(day.Date, today):
-		return base + " bg-rr-raised"
+		// Outlined, not filled. The raised fill already means "no contract" on
+		// the chips inside these cells, and one colour carrying two meanings is
+		// a legend nobody can trust.
+		return base + " bg-rr-surface ring-1 ring-inset ring-rr-heading"
 	case day.AtRisk(today):
 		return base + " bg-rr-surface ring-1 ring-inset ring-rr-red"
 	}
@@ -168,10 +171,13 @@ templ MaintenanceCalendarContent(props MaintenanceCalendarProps) {
 			</tbody>
 		</table>
 	</div>
+	<!-- Swatches carry the same values as the chips they explain. A legend that
+	     approximates its own key is a legend somebody has to second-guess. -->
 	<div class="mt-3 flex flex-wrap gap-4 text-xs text-rr-muted">
-		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-red/40"></span>Warranty at risk</span>
-		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-amber/40"></span>Overdue</span>
+		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-red/10 ring-1 ring-rr-red"></span>Warranty at risk</span>
+		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-amber/20"></span>Overdue</span>
 		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-raised"></span>No contract</span>
+		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-surface ring-1 ring-rr-heading"></span>Today</span>
 	</div>
 }
 

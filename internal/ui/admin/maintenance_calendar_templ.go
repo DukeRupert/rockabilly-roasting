@@ -81,7 +81,10 @@ func calendarCellClass(day MaintenanceCalendarDay, today time.Time) string {
 	case !day.InMonth:
 		return base + " bg-rr-surface/50 text-rr-muted"
 	case sameDay(day.Date, today):
-		return base + " bg-rr-raised"
+		// Outlined, not filled. The raised fill already means "no contract" on
+		// the chips inside these cells, and one colour carrying two meanings is
+		// a legend nobody can trust.
+		return base + " bg-rr-surface ring-1 ring-inset ring-rr-heading"
 	case day.AtRisk(today):
 		return base + " bg-rr-surface ring-1 ring-inset ring-rr-red"
 	}
@@ -164,7 +167,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 		var templ_7745c5c3_Var2 templ.SafeURL
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(calendarMonthHref(props.Month, -1)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 134, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 137, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -177,7 +180,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Month.AddDate(0, -1, 0).Format("Jan"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 134, Col: 138}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 137, Col: 138}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -190,7 +193,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(props.Month.Format("January 2006"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 135, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 138, Col: 88}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -203,7 +206,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 		var templ_7745c5c3_Var5 templ.SafeURL
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(calendarMonthHref(props.Month, 1)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 136, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 139, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -216,7 +219,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.Month.AddDate(0, 1, 0).Format("Jan"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 136, Col: 129}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 139, Col: 129}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -234,7 +237,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(d)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 143, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 146, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -280,7 +283,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(day.Date.Day()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 152, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 155, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -303,7 +306,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 					var templ_7745c5c3_Var12 templ.SafeURL
 					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/equipment/" + row.EquipmentID.String()))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 156, Col: 87}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 159, Col: 87}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
@@ -329,7 +332,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 					var templ_7745c5c3_Var14 string
 					templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.ResolveAttributeValue(row.CustomerName + " · " + row.MachineDescription() + " · " + row.TaskName)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 158, Col: 95}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 161, Col: 95}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var14)
 					if templ_7745c5c3_Err != nil {
@@ -342,7 +345,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 					var templ_7745c5c3_Var15 string
 					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(row.CustomerName)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 160, Col: 29}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 163, Col: 29}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 					if templ_7745c5c3_Err != nil {
@@ -355,7 +358,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(row.TaskName)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 160, Col: 50}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/maintenance_calendar.templ`, Line: 163, Col: 50}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 					if templ_7745c5c3_Err != nil {
@@ -376,7 +379,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</tbody></table></div><div class=\"mt-3 flex flex-wrap gap-4 text-xs text-rr-muted\"><span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-red/40\"></span>Warranty at risk</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-amber/40\"></span>Overdue</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-raised\"></span>No contract</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</tbody></table></div><!-- Swatches carry the same values as the chips they explain. A legend that\n\t     approximates its own key is a legend somebody has to second-guess. --><div class=\"mt-3 flex flex-wrap gap-4 text-xs text-rr-muted\"><span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-red/10 ring-1 ring-rr-red\"></span>Warranty at risk</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-amber/20\"></span>Overdue</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-raised\"></span>No contract</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-surface ring-1 ring-rr-heading\"></span>Today</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

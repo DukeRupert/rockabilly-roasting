@@ -51,6 +51,10 @@ type CustomerShowProps struct {
 	ServiceCost []domain.ServiceCostWindow
 	// ServiceLaborRates cost those hours; unset hides the money.
 	ServiceLaborRates domain.ServiceLaborRates
+	// CanViewServiceCost gates the money card. The machines are configuration
+	// and anyone who can open the customer sees them; what servicing them cost
+	// is service data, and follows service:view like the dashboard chip does.
+	CanViewServiceCost bool
 	ServiceEnabled  bool
 	CanWriteService bool
 	// CanEditEmail gates the inline email editor. The route is gated
@@ -197,7 +201,9 @@ templ CustomerShowContent(props CustomerShowProps) {
 			@customerAddressesCard(props)
 			if props.ServiceEnabled {
 				@customerEquipmentCard(props)
-				@serviceCostRailCard(props.ServiceCost, props.showServiceCost())
+				if props.CanViewServiceCost {
+					@serviceCostRailCard(props.ServiceCost, props.showServiceCost())
+				}
 			}
 			if len(props.TeamMembers) > 0 {
 				@customerTeamCard(props)

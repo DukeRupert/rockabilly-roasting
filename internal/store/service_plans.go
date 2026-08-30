@@ -296,13 +296,18 @@ func (s *ServicePlanStore) UpdateTask(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return scanServicePlanTask(row)
 }
 
-// CountBookedForTask is how many of a task's pending occurrences already carry
-// a ticket. Deleting the task would cascade those away and orphan the tickets.
+// CountBookedForTask is how many of a task's occurrences carry a ticket, in any
+// status. Deleting the task cascades them all away.
+//
+// Not just the pending ones. A completed occurrence with a ticket on it is the
+// record of a visit that happened — cascading it away loses the link between
+// the ticket and the work it was raised for, which is the same orphaning in the
+// past tense.
 func (s *ServicePlanStore) CountBookedForTask(ctx context.Context, tx pgx.Tx, taskID uuid.UUID) (int, error) {
 	var n int
 	if err := tx.QueryRow(ctx,
 		`SELECT count(*) FROM service_maintenance_due
-		  WHERE task_id = $1 AND status = 'pending' AND ticket_id IS NOT NULL`,
+		  WHERE task_id = $1 AND ticket_id IS NOT NULL`,
 		taskID).Scan(&n); err != nil {
 		return 0, fmt.Errorf("count booked for task: %w", err)
 	}

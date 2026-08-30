@@ -3,10 +3,12 @@
 package main
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/magefile/mage/mg"
@@ -99,7 +101,73 @@ func Clean() error {
 
 // Check runs lint, scoping check, admin UI lint, and tests together (CI-style gate).
 func Check() {
-	mg.Deps(Lint, CheckScoping, CheckAdminUI, Test)
+	mg.Deps(Lint, CheckScoping, CheckAdminUI, CheckTemplSync, Test)
+}
+
+// CheckTemplSync fails if any *_templ.go on disk differs from what templ
+// generates for its source.
+//
+// This has shipped twice. Both times the cause was the same: `templ generate`
+// failed or was never re-run, and nothing downstream noticed — `go build`,
+// `go vet`, the tests and the admin-UI lint all read the stale artifact quite
+// happily, so a green check said nothing about it. The second time, an
+// accessibility fix lived in the source and not in the file the repo ships.
+//
+// Compared by content across a regeneration rather than against git, so it says
+// "this artifact does not match its source" and not "you have uncommitted
+// work" — the latter would fire through every ordinary edit. Regenerating
+// leaves the corrected files in place, which is the state you wanted anyway.
+func CheckTemplSync() error {
+	before, err := templArtifactHashes()
+	if err != nil {
+		return err
+	}
+	if err := Templ(); err != nil {
+		return err
+	}
+	after, err := templArtifactHashes()
+	if err != nil {
+		return err
+	}
+
+	var stale []string
+	for path, sum := range after {
+		if before[path] != sum {
+			stale = append(stale, path)
+		}
+	}
+	if len(stale) > 0 {
+		sort.Strings(stale)
+		fmt.Fprintln(os.Stderr, "generated templ files did not match their source:")
+		for _, path := range stale {
+			fmt.Fprintln(os.Stderr, "  "+path)
+		}
+		return fmt.Errorf("regenerated %d file(s) — commit the result", len(stale))
+	}
+	return nil
+}
+
+// templArtifactHashes fingerprints every generated templ file.
+func templArtifactHashes() (map[string]string, error) {
+	sums := map[string]string{}
+	err := filepath.Walk("internal/ui", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || !strings.HasSuffix(path, "_templ.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		sums[path] = fmt.Sprintf("%x", sha256.Sum256(data))
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("hash templ artifacts: %w", err)
+	}
+	return sums, nil
 }
 
 // CheckAdminUI fails if any admin .templ file reaches for storefront/marketing
@@ -232,17 +300,27 @@ func CheckAdminUI() error {
 // "<style" without ever closing it.
 func blankStyleBlocks(src string) string {
 	lines := strings.Split(src, "\n")
-	depth := 0
-	for i, line := range lines {
-		opens := strings.Count(line, "<style")
-		closes := strings.Count(line, "</style>")
-		if depth > 0 || opens > 0 {
-			lines[i] = ""
+	for i := 0; i < len(lines); i++ {
+		if !strings.Contains(lines[i], "<style") {
+			continue
 		}
-		depth += opens - closes
-		if depth < 0 {
-			depth = 0
+		// Only a block that actually closes is blanked. An unmatched "<style"
+		// — the literal in a comment, say — is left alone, because swallowing
+		// the rest of the file from there is the failure this replaced.
+		end := -1
+		for j := i; j < len(lines); j++ {
+			if strings.Contains(lines[j], "</style>") {
+				end = j
+				break
+			}
 		}
+		if end == -1 {
+			return strings.Join(lines, "\n")
+		}
+		for j := i; j <= end; j++ {
+			lines[j] = ""
+		}
+		i = end
 	}
 	return strings.Join(lines, "\n")
 }

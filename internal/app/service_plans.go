@@ -390,6 +390,10 @@ func (s *ServicePlanService) rescheduleTask(ctx context.Context, tx pgx.Tx, task
 // RemoveTask takes an item out of a plan's series. Its occurrences go with it —
 // pending and historical alike, by the cascade — because a completed record of
 // a task that is no longer in the plan describes work nobody can now interpret.
+//
+// Refused while any of those occurrences carries a ticket. The cascade would
+// take an open customer visit, or the record of one that happened, with it and
+// leave the ticket pointing at nothing.
 func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, planID, id uuid.UUID, actor Actor) error {
 	task, err := s.plans.GetTask(ctx, tx, id)
 	if err != nil {
@@ -862,7 +866,8 @@ func (s *ServicePlanService) CountDue(ctx context.Context, tx pgx.Tx, f store.Ma
 // list can stop asking about work that is already booked.
 //
 // Fails rather than shrugging when nothing matched — a tampered or stale
-// occurrence id, one already booked, or one belonging to another customer. The
+// occurrence id, one already booked, one belonging to another customer, or one
+// on a different machine of the same customer than the ticket names. The
 // caller is inside the transaction that opened the ticket, so refusing here
 // rolls that back too, which is the right outcome: a ticket claiming to cover
 // maintenance it is not attached to is worse than no ticket.

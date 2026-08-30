@@ -90,10 +90,10 @@ func (s *ServiceTicketService) LaborRates(ctx context.Context, tx pgx.Tx) (domai
 
 // SetLaborRates records what the crew's time costs.
 //
-// The outgoing rates go into the audit metadata: every cost figure the reports
-// have ever shown was computed from whatever was set at the time, so "why did
-// this account's cost jump in March" is a question only the change history can
-// answer.
+// The outgoing rates go into the audit metadata. Since migration 083 stamped
+// the rate onto each entry this no longer explains a moved cost figure —
+// nothing moves — it explains the opposite: why two hours logged a week apart
+// cost different amounts, and who decided the new number.
 func (s *ServiceTicketService) SetLaborRates(ctx context.Context, tx pgx.Tx, rates domain.ServiceLaborRates, actor Actor) error {
 	if s.settings == nil {
 		return fmt.Errorf("service labor rates: settings store not wired")

@@ -484,9 +484,12 @@ original cadence, and a pure function of the anchor could express neither.
 
 ### The rules
 
-- **Closing writes the successor, in the same transaction.** A completion that
-  produced no next occurrence is a machine that silently falls off the schedule
-  at the moment it was last serviced. `ServicePlanService.closeDue` is the only
+- **Closing writes the successor, in the same transaction** — for a live
+  assignment. A completion that produced no next occurrence is a machine that
+  silently falls off the schedule at the moment it was last serviced. Ending an
+  assignment clears its pending row, and closing one out afterwards from a stale
+  page must not resurrect the schedule, so that case deliberately writes no
+  successor. `ServicePlanService.closeDue` is the only
   path, and `CloseDue` is scoped to `status = 'pending'` so a double submit
   closes it once.
 - **Completion re-anchors; a skip does not.** `NextDueAfterCompletion` counts
@@ -502,7 +505,7 @@ original cadence, and a pure function of the anchor could express neither.
 
 ### Admin UI
 
-Two new tabs in the Service section, `Maintenance` and `Plans`.
+Three new tabs in the Service section — `Maintenance`, `Plans` and `Costs`.
 
 - `/admin/service/maintenance` — the due list, scoped: everything due, overdue,
   **warranty at risk**, the **call list**, and history. Each pending row carries
@@ -525,8 +528,8 @@ opens real tickets, and a deploy is not a reason for a machine to acquire a
 visit). It backfills missing occurrences from `ListMissingDue`, books the
 covered work, and publishes `service_maintenance_due_total{scope}`.
 
-Backfill is the *only* fan-out path: `AddTask` deliberately does not reach the
-forty machines already on a plan, because one job that finds every gap is easier
+Backfill is the fan-out path for *existing* machines: `AddTask` deliberately
+does not reach the forty already on a plan, because one job that finds every gap is easier
 to trust than several paths that each find some. Booking is capped at
 `bookingLimit` a day.
 
@@ -689,8 +692,9 @@ what is owed now:
   weekly to yearly would jump a year out, taking a warranty-critical job off the
   list nobody would then think to look for. The new interval governs the *next*
   occurrence, measured from whenever this one is finally done.
-- **Future work is stepped forward** whole intervals if the shift lands it in
-  the past, for the booking reason above.
+- **Everything else is shifted**, then stepped forward whole intervals if that
+  lands it in the past, for the booking reason above. "Everything else" includes
+  work due *today*: it is not late, so it moves with the future bucket.
 
 
 
@@ -761,12 +765,18 @@ what is owed now:
     the rate then in force, plus the per-entry repricing form. Changing the
     shop's rate no longer re-costs the past. Details in *Labour rates → The
     snapshot*.
-13. **Done.** Two rounds of independent review. The second found that an
-    interval edit could book a declined visit (see *Rescheduling on an interval
-    change*), that `AttachTicket` could silently no-op and could cross accounts,
-    that seventeen validation sentinels were unmapped, and that
-    `bg-rr-paper-warm` was not a real token — so four styles, including today's
-    highlight on the calendar, rendered as nothing. All fixed. The last of those
-    is the one to remember: Tailwind v4 drops unknown utilities silently, so the
-    compiler, `mage checkAdminUI` and the render tests were all green while the
-    calendar had no today marker.
+13. **Done.** Six rounds of independent review, every one of which failed the
+    branch. The defects clustered: an interval edit that could book a visit the
+    customer had declined; `AttachTicket` silently no-opping and crossing
+    accounts; seventeen validation sentinels answering 500; `bg-rr-paper-warm`,
+    which is not a token, leaving today unmarked on the calendar; Skip rejecting
+    every attempt because the handler demanded a date its form never sent; and a
+    helper rewritten by a careless regex into a call to itself, fatal to the
+    process.
+
+    Three of those were behaviours an earlier commit message *claimed* to have
+    fixed and had not. That is the failure mode worth carrying forward from this
+    build: none of the six was visible to the compiler, the linter, or the test
+    suite, so a green `mage check` was never evidence against them. What caught
+    them was opening the pages, posting what the forms actually post, and
+    grepping each claimed fix back out of the tree before writing it down.

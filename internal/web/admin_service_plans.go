@@ -718,7 +718,7 @@ func planPath(id uuid.UUID) string { return "/admin/service/plans/" + id.String(
 // panel, and nobody is paged.
 func (d *Deps) redirectOrFail(w http.ResponseWriter, r *http.Request, back string, err error) {
 	if expectedFailure(err) {
-		d.redirectOrFail(w, r, back, err)
+		redirectFlashError(w, r, back, err.Error())
 		return
 	}
 	Error(w, r, err)

@@ -1,11 +1,16 @@
 package admin
 
 import (
+	"bytes"
+	"context"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/dukerupert/hiri/internal/domain"
 )
 
 // Every link in the control strip has to name its ranking.
@@ -45,4 +50,54 @@ func TestServiceSortsOffersCostOnlyWhenCostable(t *testing.T) {
 		rated = append(rated, s.Value)
 	}
 	assert.Equal(t, "cost", rated[0], "cost leads once it means something")
+}
+
+// The accessibility work on the new pages was asserted by reading the rendered
+// HTML once. That is exactly the kind of thing that regresses silently, so it
+// gets a test: CLAUDE.md commits the project to WCAG 2.1 AA and the calendar is
+// a new primary surface.
+func TestNewTablesCarryAccessibleNames(t *testing.T) {
+	ctx := context.Background()
+	today := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
+
+	t.Run("the month grid names itself and its days", func(t *testing.T) {
+		var buf bytes.Buffer
+		props := MaintenanceCalendarProps{
+			Month: today,
+			Days: []MaintenanceCalendarDay{
+				{Date: today, InMonth: true, Rows: []domain.MaintenanceDueRow{{
+					MaintenanceDue: domain.MaintenanceDue{DueOn: today},
+					CustomerName:   "Blue Bottle",
+					TaskName:       "Backflush",
+				}}},
+			},
+			Today: today,
+		}
+		require.NoError(t, MaintenanceCalendarContent(props).Render(ctx, &buf))
+		html := buf.String()
+
+		assert.Contains(t, html, "<caption", "a data table needs an accessible name")
+		assert.Contains(t, html, "Preventive maintenance due in September 2026")
+		assert.Contains(t, html, "Tuesday 1 September",
+			"a chip read aloud with no date attached tells a screen-reader user nothing")
+	})
+
+	t.Run("the cross-account table names itself", func(t *testing.T) {
+		var buf bytes.Buffer
+		props := ServiceCostsProps{Days: 90, Report: domain.ServiceAccountReport{
+			Rows: []domain.ServiceAccountCost{{CustomerName: "Blue Bottle"}},
+		}}
+		require.NoError(t, ServiceCostsContent(props).Render(ctx, &buf))
+		assert.Contains(t, buf.String(), "What servicing each account has taken")
+	})
+
+	t.Run("the machine cost card names itself", func(t *testing.T) {
+		var buf bytes.Buffer
+		windows := []domain.ServiceCostWindow{{
+			Label:   "All time",
+			Summary: domain.ServiceCostSummary{ServiceTotals: domain.ServiceTotals{PartsCostCents: 100}},
+		}}
+		require.NoError(t, ServiceCostCard(windows, false, "nothing yet").Render(ctx, &buf))
+		assert.Contains(t, buf.String(), "Parts and hours by period")
+	})
 }

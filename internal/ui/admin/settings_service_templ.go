@@ -48,8 +48,8 @@ type ServiceRateValues struct {
 // not a rate. Disagreeing would offer "see what it says" against a report that
 // says no rate is set.
 func (v ServiceRateValues) rateSet() bool {
-	cents, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimPrefix(v.LaborRate, "$")), 64)
-	return err == nil && cents > 0
+	dollars, err := strconv.ParseFloat(strings.TrimSpace(strings.TrimPrefix(v.LaborRate, "$")), 64)
+	return err == nil && dollars > 0
 }
 
 func SettingsServiceContent(props SettingsServiceProps) templ.Component {

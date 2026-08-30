@@ -3,6 +3,8 @@ package web
 import (
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 
@@ -147,5 +149,36 @@ func TestExpectedFailure(t *testing.T) {
 		assert.False(t, expectedFailure(fmt.Errorf("audit plan assigned: %w",
 			errors.New("write tcp: broken pipe"))),
 			"a wrapped infrastructure error must not pass as validation text")
+	})
+}
+
+// redirectOrFail must actually return on both branches.
+//
+// The regression: a regex that swapped the unconditional flashes for this
+// helper also rewrote the helper's own body into a call to itself, so every
+// *expected* failure — deleting a plan that has machines on it, say — recursed
+// until the stack gave out and took the process with it. Nothing in the build
+// or the type system objects to a function calling itself.
+func TestRedirectOrFailTerminates(t *testing.T) {
+	d := &Deps{}
+
+	t.Run("a named failure redirects with its own text", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/admin/service/plans/x/delete", nil)
+
+		d.redirectOrFail(w, r, "/admin/service/plans", app.ErrPlanInUse)
+
+		assert.Equal(t, http.StatusSeeOther, w.Code)
+		assert.Contains(t, w.Header().Get("Location"), "flash_error=")
+	})
+
+	t.Run("an unexpected failure is ours to answer for", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/admin/service/plans/x/delete", nil)
+
+		d.redirectOrFail(w, r, "/admin/service/plans", errors.New("connection reset by peer"))
+
+		assert.Equal(t, http.StatusInternalServerError, w.Code,
+			"logged and reported, not dressed up as something the operator typed wrong")
 	})
 }

@@ -38,6 +38,11 @@ type ServiceTicketService struct {
 	customers *store.CustomerStore
 	modules   *ModuleService
 	metrics   *metrics.Registry
+
+	// Set by WithSettings. Holds the labour rates the cost reports cost hours
+	// at; nil-safe, and a service without it reports hours and parts with no
+	// money column — which is also what happens when the rate is simply unset.
+	settings *store.SettingsStore
 }
 
 // NewServiceTicketService creates a new ServiceTicketService.
@@ -59,6 +64,98 @@ func (s *ServiceTicketService) WithNotifications(env EmailEnv, customers *store.
 	s.modules = modules
 	s.metrics = m
 	return s
+}
+
+// WithSettings attaches the store-wide settings the cost reports read their
+// labour rates from.
+//
+// Separate from WithNotifications because the two have nothing to do with each
+// other: one is what the background jobs need, this is what a report needs, and
+// a caller wiring only one should not have to supply the other's collaborators.
+func (s *ServiceTicketService) WithSettings(settings *store.SettingsStore) *ServiceTicketService {
+	s.settings = settings
+	return s
+}
+
+// LaborRates is what an hour of the crew's time costs the shop.
+//
+// Unset rates are not an error — they are the ordinary state of a shop that has
+// not decided, and every surface that would show money hides it instead.
+func (s *ServiceTicketService) LaborRates(ctx context.Context, tx pgx.Tx) (domain.ServiceLaborRates, error) {
+	if s.settings == nil {
+		return domain.ServiceLaborRates{}, nil
+	}
+	return s.settings.GetServiceLaborRates(ctx, tx)
+}
+
+// SetLaborRates records what the crew's time costs.
+//
+// The outgoing rates go into the audit metadata: every cost figure the reports
+// have ever shown was computed from whatever was set at the time, so "why did
+// this account's cost jump in March" is a question only the change history can
+// answer.
+func (s *ServiceTicketService) SetLaborRates(ctx context.Context, tx pgx.Tx, rates domain.ServiceLaborRates, actor Actor) error {
+	if s.settings == nil {
+		return fmt.Errorf("service labor rates: settings store not wired")
+	}
+	if err := validateLaborRates(rates); err != nil {
+		return err
+	}
+
+	previous, err := s.settings.GetServiceLaborRates(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if err := s.settings.UpdateServiceLaborRates(ctx, tx, rates); err != nil {
+		return err
+	}
+
+	return s.audit.Record(ctx, tx, audit.AuditEntry{
+		ActorType:    actor.Type,
+		ActorID:      actor.ID,
+		ActorName:    actor.Name,
+		Action:       audit.AuditServiceLaborRatesUpdated,
+		ResourceType: "store_settings",
+		Metadata: map[string]any{
+			"labor_rate_cents":      rateForAudit(rates.LaborCentsPerHour),
+			"travel_rate_cents":     rateForAudit(rates.TravelCentsPerHour),
+			"was_labor_rate_cents":  rateForAudit(previous.LaborCentsPerHour),
+			"was_travel_rate_cents": rateForAudit(previous.TravelCentsPerHour),
+		},
+	})
+}
+
+// maxLaborRateCents caps an hourly rate at $10,000. Not a business rule — a
+// guard against somebody typing cents into a dollars field and putting a
+// six-figure number on every account in the report.
+const maxLaborRateCents = 1_000_000
+
+// validateLaborRates guards the two fields.
+func validateLaborRates(rates domain.ServiceLaborRates) error {
+	for _, r := range []*int{rates.LaborCentsPerHour, rates.TravelCentsPerHour} {
+		if r == nil {
+			continue
+		}
+		if *r < 0 || *r > maxLaborRateCents {
+			return ErrLaborRateInvalid
+		}
+	}
+	// A travel rate on its own costs nothing: travel falls back to the labour
+	// rate, and with no labour rate there is no money column for it to appear
+	// in. Saying so beats silently accepting a setting that does nothing.
+	if rates.LaborCentsPerHour == nil && rates.TravelCentsPerHour != nil {
+		return ErrTravelRateWithoutLabor
+	}
+	return nil
+}
+
+// rateForAudit renders a nullable rate for an audit record, where "unset" and
+// "zero" have to stay distinguishable.
+func rateForAudit(cents *int) any {
+	if cents == nil {
+		return nil
+	}
+	return *cents
 }
 
 // OpenTicketParams is the input for raising a ticket.
@@ -445,7 +542,18 @@ const accountCostLimit = 200
 // sinceDays of zero means all time. The window is measured from a calendar day
 // so the table does not shift between two refreshes of the same page.
 func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sinceDays int, sort domain.ServiceAccountCostSort, now time.Time) (domain.ServiceAccountReport, error) {
-	report := domain.ServiceAccountReport{Sort: sort}
+	rates, err := s.LaborRates(ctx, tx)
+	if err != nil {
+		return domain.ServiceAccountReport{}, err
+	}
+	// A cost ranking with no rate behind it would be a ranking by parts spend
+	// wearing a misleading label. Fall back, and let the page notice the sort
+	// it echoes back is not the one it asked for.
+	if sort == domain.ServiceAccountCostByCost && !rates.Set() {
+		sort = domain.ServiceAccountCostByHours
+	}
+
+	report := domain.ServiceAccountReport{Sort: sort, Rates: rates}
 	if sinceDays > 0 {
 		report.Since = now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -sinceDays)
 	}
@@ -453,6 +561,7 @@ func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sin
 	rows, err := s.tickets.CostByCustomer(ctx, tx, store.ServiceAccountCostFilter{
 		Since: report.Since,
 		Sort:  sort,
+		Rates: rates,
 		// One over the cap, so a full page can be told from an overflowing one
 		// without a second counting query.
 		Limit: accountCostLimit + 1,

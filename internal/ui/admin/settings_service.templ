@@ -1,0 +1,121 @@
+package admin
+
+import (
+	"github.com/dukerupert/hiri/internal/ui/layouts"
+)
+
+// Settings → Service. What an hour of the crew's time costs the shop.
+//
+// Only exists where the equipment service module is on. One setting today, and
+// it earns a tab of its own rather than a corner of Modules: Modules is the
+// page a shop touches once at setup, and a rate is a number that gets revised.
+//
+// Part of the equipment service module; see docs/equipment-service-module.md.
+
+// SettingsServiceProps is the tab's state.
+type SettingsServiceProps struct {
+	Nav SettingsNav
+	// Values are the rates as typed — dollars-and-cents strings, empty when
+	// unset. Echoed back on a rejected save so nothing is retyped.
+	Values    ServiceRateValues
+	Error     string
+	StaffName string
+	StaffRole string
+	Flash     Flash
+}
+
+// ServiceRateValues is the rate form. Strings rather than numbers because
+// "unset" and "zero" are different states here and an int cannot hold both.
+type ServiceRateValues struct {
+	LaborRate  string
+	TravelRate string
+}
+
+// rateSet reports whether a labour rate has been entered, which decides whether
+// the page explains what the number does or what its absence does.
+func (v ServiceRateValues) rateSet() bool { return v.LaborRate != "" }
+
+templ SettingsServiceContent(props SettingsServiceProps) {
+	@settingsSection(props.Nav, settingsTabService)
+	<div class="sm:flex sm:items-center">
+		<div class="sm:flex-auto">
+			<h1 class="admin-page-title">Service</h1>
+			<p class="mt-1 text-sm text-rr-muted">
+				What an hour of the crew's time costs the shop. Set it and the service cost reports can put parts and hours into one figure.
+			</p>
+		</div>
+	</div>
+	@settingsAttention(props.Nav.Issues)
+	@adminFlash(props.Flash)
+	<div class="mt-6 max-w-2xl border border-rr-border bg-rr-surface">
+		<div class="px-4 py-4">
+			<h2 class="text-sm font-semibold text-rr-heading">Hourly cost</h2>
+			<p class="mt-1 text-sm text-rr-muted">
+				This is what an hour <em>costs you</em> — wages, vehicle, the lot — not what you charge for it. The reports it feeds measure what servicing an account took out of the business, so a charge-out rate here would turn a cost report into a revenue one.
+			</p>
+			<form method="post" action="/admin/settings/service" class="mt-4">
+				if props.Error != "" {
+					<p class="mb-3 text-sm text-rr-red">{ props.Error }</p>
+				}
+				<div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+					<div>
+						<label for="labor-rate" class="label-font block text-rr-muted">Labour, per hour</label>
+						<div class="mt-1 flex items-center gap-2">
+							<span class="text-sm text-rr-muted">$</span>
+							<input
+								type="text"
+								id="labor-rate"
+								name="labor_rate"
+								value={ props.Values.LaborRate }
+								inputmode="decimal"
+								placeholder="65.00"
+								class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+						</div>
+						<p class="mt-1 text-xs text-rr-muted">Leave blank and the reports show hours and parts separately, with no money column.</p>
+					</div>
+					<div>
+						<label for="travel-rate" class="label-font block text-rr-muted">Travel, per hour</label>
+						<div class="mt-1 flex items-center gap-2">
+							<span class="text-sm text-rr-muted">$</span>
+							<input
+								type="text"
+								id="travel-rate"
+								name="travel_rate"
+								value={ props.Values.TravelRate }
+								inputmode="decimal"
+								placeholder="40.00"
+								class="w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
+							/>
+						</div>
+						<p class="mt-1 text-xs text-rr-muted">Blank means travel is costed at the labour rate. Set it to 0.00 if you absorb the drive.</p>
+					</div>
+				</div>
+				<div class="mt-4 flex items-center gap-3">
+					<button type="submit" class="inline-flex items-center bg-rr-red px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90">
+						Save the rates
+					</button>
+					if props.Values.rateSet() {
+						<a href="/admin/service/costs?sort=cost" class="text-sm text-rr-muted underline">See what it says</a>
+					}
+				</div>
+			</form>
+		</div>
+		<div class="border-t border-rr-border bg-rr-raised px-4 py-3">
+			<p class="text-xs text-rr-muted">
+				Changing a rate re-costs every past visit — the reports compute from the rate as it stands now, not the rate that was set on the day. The change is recorded in the audit log so a jump in a cost figure can be traced back to it.
+			</p>
+		</div>
+	</div>
+}
+
+templ SettingsService(props SettingsServiceProps) {
+	@layouts.Admin(layouts.AdminProps{
+		Title:      "Service settings",
+		ActivePath: "/admin/settings",
+		StaffName:  props.StaffName,
+		StaffRole:  props.StaffRole,
+	}) {
+		@SettingsServiceContent(props)
+	}
+}

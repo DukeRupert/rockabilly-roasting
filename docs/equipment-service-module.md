@@ -3,7 +3,7 @@
 Status: v1 built — module registry, schema, store layer, the equipment register,
 the ticket queue with its merged timeline, parts and hours, the daily stale
 sweep, and the wholesale portal. Preventive maintenance and the cost roll-ups
-(the first two thirds of v2) built 2026-08-29 — see *Preventive maintenance* and
+(the first two thirds of v2) plus labour rates built 2026-08-29 — see *Preventive maintenance* and
 *Cost roll-ups* below. What is left is the rest of the v2 list at the end.
 Written 2026-08-24, last updated 2026-08-29.
 
@@ -579,18 +579,58 @@ them together. A FULL OUTER JOIN between two per-customer aggregates is the
 obvious implementation, and it is the one that quietly drops the account with
 parts but no hours logged — there is a test for exactly that.
 
-**There is no single money figure, and one is not invented.** The shop has no
-labour rate recorded, so parts are in cents and work is in minutes. Blending
-them would need a made-up rate at the top of a report meant to settle arguments.
-Instead the reader picks the ranking — hours (default, because for a crew of two
-hours are the scarcest thing), parts spend, or visits — and both numbers are
-always in the table. Adding a labour rate is the change that would make one
-figure possible, and it is a business input, not a technical one.
+**The money figure exists only once the shop supplies a rate.** Parts are in
+cents and work is in minutes; blending them needs an hourly cost, and inventing
+one would put a made-up number at the top of a report meant to settle arguments.
+Set a rate in Settings → Service and a Cost column appears on all three
+surfaces, and Cost becomes the default ranking. Leave it unset — the shipped
+state — and the reader picks between hours (default), parts spend, or visits,
+with both numbers always in the table.
 
 Rows are driven by work recorded, not by the customer list: an account nobody
 touched in the window has no row, so the table stays as short as the finding is.
 The footer totals only what is shown, and a truncated table says so in red
 rather than looking complete.
+
+## Labour rates
+
+Migration `082_service_labor_rates.sql` adds two nullable columns to
+`store_settings`, edited on **Settings → Service** (module-gated, so the tab
+does not exist on a shop that only sells coffee).
+
+**These are cost rates, not prices.** The reports they feed say plainly that
+they measure what work cost the shop rather than what it earned, and a
+charge-out rate dropped into that column would quietly turn a cost report into a
+revenue one. Billing a ticket out — still unbuilt — will want its own charge
+rate when it lands; it is deliberately not this column.
+
+- **Nullable, not defaulted to zero.** There is no rate a shop can be assumed to
+  have, and a zero would render as "$0.00 of labour" — a number that looks
+  measured. Unset is the shipped state and every money surface hides itself.
+  `Set()` is false for a nil *or* zero labour rate, so the two cannot diverge.
+- **Travel has its own rate, falling back to labour.** `service_time_entries`
+  splits travel from labour because it bills differently or not at all; a second
+  rate honours that split. Nil means "cost it as labour", and an explicit `0.00`
+  means the shop absorbs the drive — which is why the form takes strings and
+  blank is not zero.
+- **A travel rate with no labour rate is refused.** It would do nothing: travel
+  falls back to labour, and with no labour rate there is no money column for it
+  to appear in.
+- **Costing rounds to the nearest cent**, not truncated. These figures are
+  summed across hundreds of entries; a fraction lost on each would drift away
+  from the same numbers computed any other way.
+- **Rates are not historised.** Changing one re-costs every past visit, because
+  the reports compute from the rate as it stands. The page says so, and the
+  change is audited (`service.labor_rates_updated`, carrying the old values) so
+  a jump in a cost figure can be traced to it. Snapshotting a rate per time
+  entry is the honest fix if that ever matters; it did not seem worth the column
+  before anyone had used the feature once.
+
+With a rate set, `ServiceAccountCostByCost` becomes available and becomes the
+default ranking. The ordering happens in SQL because it has to precede the
+LIMIT; a cost sort requested with no rate set falls back to hours rather than
+silently ranking by parts spend under a misleading label, and the control strip
+highlights the sort that actually ran.
 
 ## Open decisions
 
@@ -651,3 +691,6 @@ rather than looking complete.
 10. **Done.** The cross-account cost table at `/admin/service/costs`, ranked by
     hours, parts spend, or visits over 90 days / 12 months / all time. Read-only,
     so finance can open it. Details in *Cost roll-ups → The cross-account table*.
+11. **Done.** Labour rates (migration `082_service_labor_rates.sql`) on a
+    module-gated Settings → Service tab, and the Cost column and cost ranking
+    they unlock across the three cost surfaces. Details in *Labour rates* above.

@@ -73,6 +73,13 @@ const (
 	// apart from a job that stopped running.
 	AuditMaintenanceSwept = "equipment.maintenance_swept"
 
+	// AuditServiceLaborRatesUpdated records a change to what an hour of the
+	// crew's time costs. Worth its own action because every cost figure the
+	// service reports have ever shown was computed from whatever was set at the
+	// time — "why did this account's cost jump in March" is a question only the
+	// change history can answer.
+	AuditServiceLaborRatesUpdated = "service.labor_rates_updated"
+
 	// Optional feature modules — turning a whole section of the app on or off.
 	// Worth an audit entry because enabling one can start sending customer mail
 	// nobody was expecting, and "who did this" is the first question asked.

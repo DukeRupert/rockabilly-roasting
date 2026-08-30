@@ -445,7 +445,8 @@ func run() error {
 	}
 	equipmentSvc := app.NewEquipmentService(equipmentStore, auditWriter)
 	serviceTicketSvc := app.NewServiceTicketService(serviceTicketStore, equipmentStore, auditWriter).
-		WithNotifications(emailEnv, customerStore, moduleSvc, metricsReg)
+		WithNotifications(emailEnv, customerStore, moduleSvc, metricsReg).
+		WithSettings(settingsStore)
 	servicePlanSvc := app.NewServicePlanService(servicePlanStore, equipmentStore, auditWriter).
 		WithScheduling(serviceTicketSvc, moduleSvc, metricsReg)
 	whiteLabelSvc := app.NewWhiteLabelService(catalogSvc, pricingSvc, catalogStore, attributeStore, customerStore, auditWriter, metricsReg).

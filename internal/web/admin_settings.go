@@ -46,13 +46,18 @@ type settingsSection struct {
 	// reading it twice would let the "No box presets" warning render above a
 	// table that has one.
 	BoxPresets []domain.BoxPreset
+	// ServiceEnabled draws the Service tab. Read here rather than per-page so
+	// every tab in the section agrees about whether the strip has six entries
+	// or five.
+	ServiceEnabled bool
 }
 
 // nav derives the tab strip + attention list for a staffer.
 func (s settingsSection) nav(role string) admin.SettingsNav {
 	return admin.SettingsNav{
-		StaffRole: role,
-		Issues:    admin.SettingsIssuesFor(s.Shipping, s.QB, s.QBEnabled, len(s.BoxPresets)),
+		StaffRole:      role,
+		Issues:         admin.SettingsIssuesFor(s.Shipping, s.QB, s.QBEnabled, len(s.BoxPresets)),
+		ServiceEnabled: s.ServiceEnabled,
 	}
 }
 
@@ -64,7 +69,10 @@ func (s settingsSection) nav(role string) admin.SettingsNav {
 // on its own so a failure there stays a failure there. See the comment at that
 // read.
 func (d *Deps) loadSettingsSection(ctx context.Context) (settingsSection, error) {
-	out := settingsSection{QBEnabled: d.QBOAuthManager != nil}
+	out := settingsSection{
+		QBEnabled:      d.QBOAuthManager != nil,
+		ServiceEnabled: d.ModuleService.Enabled(domain.ModuleEquipmentService),
+	}
 
 	// The QuickBooks status gets its own transaction, deliberately. A failed
 	// status read must not take the settings page down — the shipping form

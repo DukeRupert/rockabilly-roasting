@@ -310,6 +310,7 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 	var tickets []admin.ServiceTicketRow
 	var maintenance admin.EquipmentMaintenanceProps
 	var cost []domain.ServiceCostWindow
+	var laborRates domain.ServiceLaborRates
 
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -361,6 +362,10 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 		// billable or not — this is what the machine cost the shop, which is
 		// the number the replace-it argument rests on.
 		cost, txErr = d.ServiceTicketService.CostForEquipment(ctx, tx, equipment.ID, time.Now())
+		if txErr != nil {
+			return txErr
+		}
+		laborRates, txErr = d.ServiceTicketService.LaborRates(ctx, tx)
 		return txErr
 	}); err != nil {
 		Error(w, r, err)
@@ -376,6 +381,7 @@ func (d *Deps) handleAdminEquipmentShow(w http.ResponseWriter, r *http.Request) 
 		Tickets:      tickets,
 		Maintenance:  maintenance,
 		Cost:         cost,
+		LaborRates:   laborRates,
 		MerchantTZ:   d.MerchantTZ,
 		StaffName:    staffName,
 		StaffRole:    staffRole,

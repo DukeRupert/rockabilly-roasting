@@ -411,6 +411,84 @@ func (s ServiceCostSummary) MinutesPerVisit() int {
 	return s.TotalMinutes() / s.Visits
 }
 
+// ServiceLaborRates is what an hour of the crew's time costs the shop.
+//
+// Cost, not price. These feed reports that say they measure what work cost
+// rather than what it earned; a charge-out rate here would quietly turn a cost
+// report into a revenue one. Billing a ticket out will want its own charge rate
+// when it is built.
+//
+// Both are nil until somebody sets them, and nil is a real state the reports
+// respect — there is no rate a shop can be assumed to have, and a zero would
+// render as "$0.00 of labour", which looks measured.
+type ServiceLaborRates struct {
+	// LaborCentsPerHour is the loaded cost of a technician's hour.
+	LaborCentsPerHour *int
+	// TravelCentsPerHour is the cost of an hour on the road. Nil falls back to
+	// the labour rate: travel counted at the tech's rate overstates nothing
+	// that was not genuinely somebody's hour.
+	TravelCentsPerHour *int
+}
+
+// Set reports whether a labour rate has been configured. Without one there is
+// no money figure to compute, and every surface that would show one hides it
+// instead of printing a zero.
+func (r ServiceLaborRates) Set() bool {
+	return r.LaborCentsPerHour != nil && *r.LaborCentsPerHour > 0
+}
+
+// TravelRate is the rate to cost travel at, falling back to labour.
+func (r ServiceLaborRates) TravelRate() int {
+	if r.TravelCentsPerHour != nil {
+		return *r.TravelCentsPerHour
+	}
+	if r.LaborCentsPerHour != nil {
+		return *r.LaborCentsPerHour
+	}
+	return 0
+}
+
+// LaborRate is the rate to cost labour at.
+func (r ServiceLaborRates) LaborRate() int {
+	if r.LaborCentsPerHour != nil {
+		return *r.LaborCentsPerHour
+	}
+	return 0
+}
+
+// costMinutes converts minutes at an hourly rate into cents, rounded to the
+// nearest cent.
+//
+// Rounded rather than truncated because these figures are summed: a report over
+// two hundred time entries that lost a fraction of a cent on each would drift
+// visibly away from the same numbers computed any other way, and the first
+// person to notice would be checking the arithmetic by hand.
+func costMinutes(minutes, centsPerHour int) int {
+	if minutes <= 0 || centsPerHour <= 0 {
+		return 0
+	}
+	return (minutes*centsPerHour + 30) / 60
+}
+
+// LaborCostCents is what the hours on this summary cost, labour and travel at
+// their own rates. Zero when no rate is set.
+func (s ServiceCostSummary) LaborCostCents(rates ServiceLaborRates) int {
+	if !rates.Set() {
+		return 0
+	}
+	return costMinutes(s.LaborMinutes, rates.LaborRate()) +
+		costMinutes(s.TravelMinutes, rates.TravelRate())
+}
+
+// TotalCostCents is the whole cost of the work — parts plus hours.
+//
+// With no rate set this is the parts figure alone, which is the honest answer:
+// the hours were spent, they are shown beside it, and the shop has not said
+// what they were worth.
+func (s ServiceCostSummary) TotalCostCents(rates ServiceLaborRates) int {
+	return s.PartsCostCents + s.LaborCostCents(rates)
+}
+
 // ServiceCostWindow is one period of a cost roll-up, ready to render.
 type ServiceCostWindow struct {
 	// Label is the period in the words the card prints — "Last 90 days".
@@ -460,13 +538,20 @@ const (
 	// which catches the account that is death by a thousand twenty-minute
 	// call-outs.
 	ServiceAccountCostByVisits ServiceAccountCostSort = "visits"
+	// ServiceAccountCostByCost ranks by parts plus costed hours — the single
+	// figure the other three exist to approximate. Only available once a labour
+	// rate is set; without one it falls back to hours, because a ranking by a
+	// number nobody supplied would be a ranking by parts spend wearing a
+	// misleading label.
+	ServiceAccountCostByCost ServiceAccountCostSort = "cost"
 )
 
 // Valid reports whether s is a known sort. A hand-edited query string falls
 // back to the default rather than erroring.
 func (s ServiceAccountCostSort) Valid() bool {
 	switch s {
-	case ServiceAccountCostByHours, ServiceAccountCostByParts, ServiceAccountCostByVisits:
+	case ServiceAccountCostByHours, ServiceAccountCostByParts,
+		ServiceAccountCostByVisits, ServiceAccountCostByCost:
 		return true
 	}
 	return false
@@ -486,6 +571,10 @@ type ServiceAccountReport struct {
 	// Since is the start of the window, zero for all time.
 	Since time.Time
 	Sort  ServiceAccountCostSort
+	// Rates are what the hours were costed at, carried so the table can render
+	// the money column without a second lookup — and so it can leave the column
+	// out entirely when no rate is set.
+	Rates ServiceLaborRates
 }
 
 // AnyServiceCost reports whether any window in a roll-up holds anything, which

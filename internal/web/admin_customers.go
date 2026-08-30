@@ -251,6 +251,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 	serviceEnabled := d.ModuleService.Enabled(domain.ModuleEquipmentService)
 	var equipment []domain.Equipment
 	var serviceCost []domain.ServiceCostWindow
+	var serviceLaborRates domain.ServiceLaborRates
 
 	err = store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -322,6 +323,10 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 			if txErr != nil {
 				return txErr
 			}
+			serviceLaborRates, txErr = d.ServiceTicketService.LaborRates(ctx, tx)
+			if txErr != nil {
+				return txErr
+			}
 		}
 
 		// Who approved the wholesale application. A staff record that has since
@@ -367,6 +372,7 @@ func (d *Deps) handleAdminCustomerShow(w http.ResponseWriter, r *http.Request) {
 		CanEditEmail:         staffCan(r, auth.PermEditCustomers),
 		Equipment:            equipment,
 		ServiceCost:          serviceCost,
+		ServiceLaborRates:    serviceLaborRates,
 		ServiceEnabled:       serviceEnabled,
 		CanWriteService:      staffCan(r, auth.PermWriteService),
 		ApprovedByName:       approvedByName,

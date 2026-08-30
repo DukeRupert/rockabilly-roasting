@@ -37,6 +37,7 @@ const (
 	settingsTabWholesale    = "/admin/settings/wholesale"
 	settingsTabIntegrations = "/admin/settings/integrations"
 	settingsTabModules      = "/admin/settings/modules"
+	settingsTabService      = "/admin/settings/service"
 	settingsTabTeam         = "/admin/staff"
 )
 
@@ -94,6 +95,11 @@ func (i SettingsIssue) badgeLabel() string {
 type SettingsNav struct {
 	StaffRole string
 	Issues    []SettingsIssue
+	// ServiceEnabled draws the Service tab. It holds settings that only mean
+	// anything where the equipment service module is on, so on a shop that just
+	// sells coffee the tab is not there at all — the same rule the Service
+	// sidebar row follows.
+	ServiceEnabled bool
 }
 
 // tabs builds the strip, hanging each issue count off the tab that owns it.
@@ -107,6 +113,9 @@ func (n SettingsNav) tabs() []sectionTab {
 		// then never again — unlike the four before it, which hold settings
 		// that get revised.
 		{Label: "Modules", Href: settingsTabModules},
+	}
+	if n.ServiceEnabled {
+		tabs = append(tabs, sectionTab{Label: "Service", Href: settingsTabService})
 	}
 	// The team roster lives at /admin/staff and was reachable only from the
 	// user menu. It is settings — it belongs in the strip, for the staff who
@@ -320,7 +329,7 @@ func settingsAttention(issues []SettingsIssue) templ.Component {
 				var templ_7745c5c3_Var5 templ.SafeURL
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(issue.href()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 252, Col: 43}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 261, Col: 43}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -355,7 +364,7 @@ func settingsAttention(issues []SettingsIssue) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(issue.badgeLabel())
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 253, Col: 62}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 262, Col: 62}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -368,7 +377,7 @@ func settingsAttention(issues []SettingsIssue) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(issue.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 255, Col: 79}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 264, Col: 79}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -381,7 +390,7 @@ func settingsAttention(issues []SettingsIssue) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(issue.Detail)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 256, Col: 64}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_nav.templ`, Line: 265, Col: 64}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {

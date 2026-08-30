@@ -760,6 +760,10 @@ type ServiceAccountCostFilter struct {
 	// Since bounds the window. Zero means all time.
 	Since time.Time
 	Sort  domain.ServiceAccountCostSort
+	// Rates cost the hours for a cost ranking. Ignored by every other sort,
+	// and a cost sort with no rate set falls back to hours rather than
+	// silently ranking by parts spend alone.
+	Rates domain.ServiceLaborRates
 	Limit int
 }
 
@@ -790,6 +794,20 @@ func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f Se
 		orderBy = "parts_cents DESC, total_minutes DESC"
 	case domain.ServiceAccountCostByVisits:
 		orderBy = "visits DESC, total_minutes DESC"
+	case domain.ServiceAccountCostByCost:
+		if f.Rates.Set() {
+			// The same arithmetic as ServiceCostSummary.TotalCostCents, in SQL
+			// because the ranking has to happen before the LIMIT. Rounding is
+			// left out here — it can only move a row past a neighbour it is
+			// within half a cent of, and the figure the reader compares is the
+			// rounded one Go computes for the cell.
+			args = append(args, f.Rates.LaborRate())
+			labour := fmt.Sprintf("$%d", len(args))
+			args = append(args, f.Rates.TravelRate())
+			travel := fmt.Sprintf("$%d", len(args))
+			orderBy = "(parts_cents + labor_minutes * " + labour + " / 60.0" +
+				" + travel_minutes * " + travel + " / 60.0) DESC, total_minutes DESC"
+		}
 	}
 
 	limit := ""

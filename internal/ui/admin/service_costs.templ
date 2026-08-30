@@ -47,20 +47,34 @@ func servicePeriods() []struct {
 	}
 }
 
-// serviceSorts are the rankings. Both numbers are always in the table; this
-// only decides which one the rows are ordered by.
-func serviceSorts() []struct {
+// serviceSorts are the rankings. Every number is in the table whatever the
+// sort; this only decides the order.
+//
+// Cost is offered only once a labour rate is set. Without one there is no cost
+// figure, and a ranking labelled "Cost" that was really a ranking by parts
+// spend would be worse than not offering it.
+func serviceSorts(rated bool) []struct {
 	Label string
 	Value string
 } {
-	return []struct {
+	sorts := []struct {
+		Label string
+		Value string
+	}{}
+	if rated {
+		sorts = append(sorts, struct {
+			Label string
+			Value string
+		}{"Cost", "cost"})
+	}
+	return append(sorts, []struct {
 		Label string
 		Value string
 	}{
 		{"Hours", ""},
 		{"Parts spend", "parts"},
 		{"Visits", "visits"},
-	}
+	}...)
 }
 
 // serviceCostsHref builds a link that changes one control and keeps the other.
@@ -125,7 +139,7 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 		</div>
 		<div class="flex items-center gap-2">
 			<span class="label-font text-rr-muted">Rank by</span>
-			for _, s := range serviceSorts() {
+			for _, s := range serviceSorts(props.Report.Rates.Set()) {
 				<a
 					href={ templ.SafeURL(serviceCostsHref(props.Days, s.Value)) }
 					class={ serviceToggleClass(s.Value == string(props.Report.Sort)) }
@@ -149,6 +163,9 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Hours</th>
 							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Parts</th>
 							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Visits</th>
+							if props.Report.Rates.Set() {
+								<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Cost</th>
+							}
 							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Last worked</th>
 						</tr>
 					</thead>
@@ -179,6 +196,14 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 										<div class="text-xs text-rr-muted">{ formatMinutes(row.Summary.MinutesPerVisit()) } each</div>
 									}
 								</td>
+								if props.Report.Rates.Set() {
+									<td class="px-4 py-3 text-right text-sm font-semibold tabular-nums text-rr-heading">
+										{ formatCents(row.Summary.TotalCostCents(props.Report.Rates)) }
+										<div class="text-xs font-normal text-rr-muted">
+											{ formatCents(row.Summary.LaborCostCents(props.Report.Rates)) } of it hours
+										</div>
+									</td>
+								}
 								<td class="px-4 py-3 text-right text-sm text-rr-muted">{ dayLabel(row.LastWorkOn) }</td>
 							</tr>
 						}
@@ -197,6 +222,11 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 							<td class="px-4 py-3 text-right text-sm font-semibold tabular-nums text-rr-heading">
 								{ strconv.Itoa(props.Report.Total.Visits) }
 							</td>
+							if props.Report.Rates.Set() {
+								<td class="px-4 py-3 text-right text-sm font-semibold tabular-nums text-rr-heading">
+									{ formatCents(props.Report.Total.TotalCostCents(props.Report.Rates)) }
+								</td>
+							}
 							<td class="px-4 py-3"></td>
 						</tr>
 					</tfoot>
@@ -207,6 +237,15 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 	if props.Report.Truncated {
 		<p class="mt-3 text-sm text-rr-red">
 			Only the top 200 accounts are shown, so the total above is not the whole period. Narrow the window to see a complete picture.
+		</p>
+	}
+	if props.Report.Rates.Set() {
+		<p class="mt-3 text-xs text-rr-muted">
+			Hours are costed at { formatCents(props.Report.Rates.LaborRate()) } an hour, travel at { formatCents(props.Report.Rates.TravelRate()) }. Change them in <a href="/admin/settings/service" class="underline">Settings &rarr; Service</a>.
+		</p>
+	} else {
+		<p class="mt-3 text-xs text-rr-muted">
+			Hours and parts are shown separately because no hourly cost is set. <a href="/admin/settings/service" class="underline">Set one</a> and this table can rank accounts by what they actually cost.
 		</p>
 	}
 	if props.Report.Total.BillableMinutes > 0 {

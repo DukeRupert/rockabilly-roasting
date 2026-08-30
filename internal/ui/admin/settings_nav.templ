@@ -29,6 +29,7 @@ const (
 	settingsTabWholesale    = "/admin/settings/wholesale"
 	settingsTabIntegrations = "/admin/settings/integrations"
 	settingsTabModules      = "/admin/settings/modules"
+	settingsTabService      = "/admin/settings/service"
 	settingsTabTeam         = "/admin/staff"
 )
 
@@ -86,6 +87,11 @@ func (i SettingsIssue) badgeLabel() string {
 type SettingsNav struct {
 	StaffRole string
 	Issues    []SettingsIssue
+	// ServiceEnabled draws the Service tab. It holds settings that only mean
+	// anything where the equipment service module is on, so on a shop that just
+	// sells coffee the tab is not there at all — the same rule the Service
+	// sidebar row follows.
+	ServiceEnabled bool
 }
 
 // tabs builds the strip, hanging each issue count off the tab that owns it.
@@ -99,6 +105,9 @@ func (n SettingsNav) tabs() []sectionTab {
 		// then never again — unlike the four before it, which hold settings
 		// that get revised.
 		{Label: "Modules", Href: settingsTabModules},
+	}
+	if n.ServiceEnabled {
+		tabs = append(tabs, sectionTab{Label: "Service", Href: settingsTabService})
 	}
 	// The team roster lives at /admin/staff and was reachable only from the
 	// user menu. It is settings — it belongs in the strip, for the staff who

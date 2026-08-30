@@ -162,3 +162,34 @@ func (s *SettingsStore) UpdateQBItemConfig(ctx context.Context, tx pgx.Tx, cfg Q
 	}
 	return nil
 }
+
+// GetServiceLaborRates returns what an hour of the crew's time costs the shop.
+// Nil fields mean unset, which the cost reports treat as "say nothing" rather
+// than as zero.
+func (s *SettingsStore) GetServiceLaborRates(ctx context.Context, tx pgx.Tx) (domain.ServiceLaborRates, error) {
+	var rates domain.ServiceLaborRates
+	err := tx.QueryRow(ctx,
+		`SELECT service_labor_rate_cents, service_travel_rate_cents FROM store_settings LIMIT 1`,
+	).Scan(&rates.LaborCentsPerHour, &rates.TravelCentsPerHour)
+	if err != nil {
+		return domain.ServiceLaborRates{}, fmt.Errorf("get service labor rates: %w", err)
+	}
+	return rates, nil
+}
+
+// UpdateServiceLaborRates sets the rates. Nil clears one, which is how a shop
+// says "we do not cost travel separately" or takes the money column off the
+// reports entirely.
+func (s *SettingsStore) UpdateServiceLaborRates(ctx context.Context, tx pgx.Tx, rates domain.ServiceLaborRates) error {
+	if _, err := tx.Exec(ctx,
+		`UPDATE store_settings
+		    SET service_labor_rate_cents  = $1,
+		        service_travel_rate_cents = $2,
+		        updated_at                = now()
+		  WHERE id = true`,
+		rates.LaborCentsPerHour, rates.TravelCentsPerHour,
+	); err != nil {
+		return fmt.Errorf("update service labor rates: %w", err)
+	}
+	return nil
+}

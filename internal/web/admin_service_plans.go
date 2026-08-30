@@ -752,17 +752,19 @@ func (d *Deps) handleAdminServiceCosts(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 
 	days := serviceCostDays(q.Get("days"))
-	sort := domain.ServiceAccountCostSort(q.Get("sort"))
-	// A hand-edited sort ranks by the default rather than erroring: a mistyped
-	// URL should still show the report.
-	if !sort.Valid() {
-		sort = domain.ServiceAccountCostByHours
-	}
+	sort, explicit := serviceCostSort(q)
 
 	var report domain.ServiceAccountReport
 	var nav admin.ServiceNav
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
+		// With a rate set, cost is the ranking the report exists to produce, so
+		// it leads unless the reader asked for another. CostByAccount falls the
+		// choice back to hours when no rate is set, and the strip highlights
+		// whatever came back rather than what was asked for.
+		if !explicit {
+			sort = domain.ServiceAccountCostByCost
+		}
 		report, txErr = d.ServiceTicketService.CostByAccount(ctx, tx, days, sort, time.Now())
 		if txErr != nil {
 			return txErr
@@ -789,6 +791,25 @@ func (d *Deps) handleAdminServiceCosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	admin.ServiceCosts(props).Render(ctx, w) //nolint:errcheck
+}
+
+// serviceCostSort reads the ranking off the query string, and says whether the
+// reader picked one at all.
+//
+// The distinction matters: an absent sort means "give me the best default",
+// which depends on whether a labour rate exists, and that is not known here. A
+// hand-edited one falls back rather than erroring — a mistyped URL should still
+// show the report.
+func serviceCostSort(q url.Values) (domain.ServiceAccountCostSort, bool) {
+	raw, ok := q["sort"]
+	if !ok || len(raw) == 0 {
+		return domain.ServiceAccountCostByHours, false
+	}
+	sort := domain.ServiceAccountCostSort(raw[0])
+	if !sort.Valid() {
+		return domain.ServiceAccountCostByHours, false
+	}
+	return sort, true
 }
 
 // serviceCostDays reads the window off the query string. Only the three the

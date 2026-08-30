@@ -696,6 +696,16 @@ func NewRouter(deps *Deps) http.Handler {
 	settingsRoute("POST /admin/settings/default-price-list", deps.handleAdminDefaultPriceListUpdate)
 	settingsRoute("GET /admin/settings/modules", deps.handleAdminSettingsModules)
 	settingsRoute("POST /admin/settings/modules", deps.handleAdminModuleToggle)
+
+	// Service settings — the crew's hourly cost. Module-gated as well as
+	// permission-gated: on a shop that does not service machines the rate means
+	// nothing, and the tab is not drawn either.
+	settingsServiceRoute := func(pattern string, h http.HandlerFunc) {
+		adminMux.Handle(pattern, deps.requireModule(domain.ModuleEquipmentService,
+			deps.requirePermission(auth.PermManageSystem, h)))
+	}
+	settingsServiceRoute("GET /admin/settings/service", deps.handleAdminSettingsService)
+	settingsServiceRoute("POST /admin/settings/service", deps.handleAdminServiceLaborRatesUpdate)
 	settingsRoute("GET /admin/settings/box-presets", deps.handleAdminBoxPresets)
 	settingsRoute("POST /admin/settings/box-presets", deps.handleAdminBoxPresetCreate)
 	settingsRoute("POST /admin/settings/box-presets/{id}", deps.handleAdminBoxPresetUpdate)

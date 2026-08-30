@@ -443,6 +443,16 @@ var (
 	// measured from. Defaulting it to today would silently re-anchor a
 	// fortnight-old visit to the day it was typed up.
 	ErrMaintenanceDateRequired = errors.New("when was it done?")
+
+	// ErrLaborRateInvalid guards the hourly rate. The cap exists because
+	// somebody typing cents into a dollars field would put a six-figure number
+	// against every account in the cost report.
+	ErrLaborRateInvalid = errors.New("give an hourly rate between $0 and $10,000")
+	// ErrTravelRateWithoutLabor rejects a travel rate with no labour rate
+	// behind it. Travel falls back to the labour rate, and with none set there
+	// is no money column for it to appear in — the setting would do nothing,
+	// silently.
+	ErrTravelRateWithoutLabor = errors.New("set the labour rate first — a travel rate on its own has nothing to appear in")
 )
 
 // MOQViolationError carries the per-line minimum/multiple violations so

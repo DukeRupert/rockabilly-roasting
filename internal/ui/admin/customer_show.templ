@@ -49,6 +49,8 @@ type CustomerShowProps struct {
 	// ServiceCost is what this account has taken in parts and hours, including
 	// the call-outs that never named a machine.
 	ServiceCost []domain.ServiceCostWindow
+	// ServiceLaborRates cost those hours; unset hides the money.
+	ServiceLaborRates domain.ServiceLaborRates
 	ServiceEnabled  bool
 	CanWriteService bool
 	// CanEditEmail gates the inline email editor. The route is gated
@@ -195,7 +197,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 			@customerAddressesCard(props)
 			if props.ServiceEnabled {
 				@customerEquipmentCard(props)
-				@serviceCostRailCard(props.ServiceCost)
+				@serviceCostRailCard(props.ServiceCost, props.ServiceLaborRates)
 			}
 			if len(props.TeamMembers) > 0 {
 				@customerTeamCard(props)

@@ -707,9 +707,13 @@ func (s *ServicePlanService) closeDue(ctx context.Context, tx pgx.Tx, id uuid.UU
 		return nil, err
 	}
 
-	// Only a live assignment gets a successor. Ending an assignment clears its
-	// pending row, and closing the last one out of the ticket page afterwards
-	// must not resurrect the schedule.
+	// Only a live assignment gets a successor.
+	//
+	// Belt and braces: ending an assignment deletes its unbooked pending rows,
+	// so GetDue above already fails for those and this is unreachable through
+	// that path. It is reachable for an occurrence that was booked — those
+	// survive EndAssignment so the ticket is not orphaned — and there, closing
+	// the work out must not restart a schedule nobody is on.
 	if assignment.Live() {
 		next := domain.NextDueAfterCompletion(on, task.IntervalDays)
 		if status == domain.MaintenanceStatusSkipped {

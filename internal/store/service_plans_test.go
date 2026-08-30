@@ -261,3 +261,47 @@ func TestRetiredMachineKeepsItsHistory(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 0, pending, "but nothing is still owed on it")
 }
+
+// Taking a machine off a plan must not orphan a visit that is already booked.
+//
+// The sweep opens a real customer ticket and attaches it while leaving the
+// occurrence pending. Deleting those on EndAssignment left a tech instructed to
+// do maintenance for an arrangement that no longer existed, with nothing linking
+// the ticket back to anything.
+func TestEndAssignmentKeepsBookedOccurrences(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newPlanFixture(t, tx, 90, 14, true)
+
+	booked := f.due(t, tx, planTestDay(2026, time.April, 1))
+
+	ticket, err := store.NewServiceTicketStore().Create(ctx, tx, store.CreateServiceTicketParams{
+		Number:     "SVC-END-" + uuid.NewString()[:8],
+		CustomerID: f.equipment.CustomerID,
+		Title:      "Scheduled visit",
+		Severity:   domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+	require.NoError(t, f.plans.AttachTicket(ctx, tx, booked.ID, ticket.ID))
+
+	require.NoError(t, f.plans.EndAssignment(ctx, tx, f.assignment.ID, time.Now()))
+
+	kept, err := f.plans.GetDue(ctx, tx, booked.ID)
+	require.NoError(t, err, "an occurrence with a ticket on it survives the assignment ending")
+	require.NotNil(t, kept.TicketID)
+	assert.Equal(t, ticket.ID, *kept.TicketID)
+}
+
+// The unbooked ones still go: nothing has been promised to anybody about them.
+func TestEndAssignmentClearsUnbookedOccurrences(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newPlanFixture(t, tx, 90, 14, false)
+
+	unbooked := f.due(t, tx, planTestDay(2026, time.April, 1))
+
+	require.NoError(t, f.plans.EndAssignment(ctx, tx, f.assignment.ID, time.Now()))
+
+	_, err := f.plans.GetDue(ctx, tx, unbooked.ID)
+	assert.ErrorIs(t, err, pgx.ErrNoRows)
+}

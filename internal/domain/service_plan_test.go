@@ -152,7 +152,10 @@ func TestMaintenanceCoverage(t *testing.T) {
 	})
 }
 
-// The whole contract split: covered work books itself, uncovered work gets sold.
+// The contract split, on the half the domain owns. Whether uncovered work lands
+// on the call list is decided in SQL (MaintenanceScopeUncovered) and covered by
+// TestMaintenanceScopes, so there is one implementation of that rule rather
+// than a Go copy that can drift from it.
 func TestBookableAndSellable(t *testing.T) {
 	today := day(2026, time.September, 1)
 
@@ -164,7 +167,6 @@ func TestBookableAndSellable(t *testing.T) {
 
 	t.Run("covered work inside the window is bookable", func(t *testing.T) {
 		assert.True(t, covered().BookableOn(today))
-		assert.False(t, covered().NeedsSelling(today), "nobody needs ringing about work they already pay for")
 	})
 
 	t.Run("uncovered work is never booked automatically", func(t *testing.T) {
@@ -172,7 +174,6 @@ func TestBookableAndSellable(t *testing.T) {
 		r.UnderContract = false
 		assert.False(t, r.BookableOn(today),
 			"opening a ticket would commit the shop to a visit nobody agreed to pay for")
-		assert.True(t, r.NeedsSelling(today))
 	})
 
 	t.Run("already booked", func(t *testing.T) {
@@ -186,7 +187,6 @@ func TestBookableAndSellable(t *testing.T) {
 		r := covered()
 		r.DueOn = day(2026, time.December, 1)
 		assert.False(t, r.BookableOn(today))
-		assert.False(t, r.NeedsSelling(today), "the call list is work that is actually near")
 	})
 
 	t.Run("retired machine", func(t *testing.T) {

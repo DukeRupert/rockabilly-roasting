@@ -974,6 +974,10 @@ func (d *Deps) handleAdminServicePlanTaskUpdate(w http.ResponseWriter, r *http.R
 	}
 
 	values := admin.PlanTaskFormValues{
+		// Stamped so the page echoes these back into *this* task's edit form.
+		// Without it they land in the add form, and submitting that creates a
+		// duplicate task instead of editing the original.
+		TaskID:           taskID.String(),
 		Name:             r.FormValue("name"),
 		Instructions:     r.FormValue("instructions"),
 		IntervalDays:     strings.TrimSpace(r.FormValue("interval_days")),

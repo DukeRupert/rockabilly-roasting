@@ -36,8 +36,16 @@ type ServicePlanShowProps struct {
 	Flash     Flash
 }
 
-// PlanTaskFormValues is the add-task form as strings.
+// PlanTaskFormValues is a task form as strings.
+//
+// TaskID says which form the values belong to, and it is load-bearing rather
+// than decorative: the page draws one add form plus an edit form per task, and
+// without it a rejected *edit* echoed into the *add* card — so the operator saw
+// their typed changes over a create form, and submitting it made a duplicate
+// task instead of editing the original.
 type PlanTaskFormValues struct {
+	// TaskID is empty for the add form, and the task's id for an edit.
+	TaskID           string
 	Name             string
 	Instructions     string
 	IntervalDays     string
@@ -45,11 +53,42 @@ type PlanTaskFormValues struct {
 	WarrantyRequired bool
 }
 
+// forAdd reports whether these values belong to the add-a-job form.
+func (v PlanTaskFormValues) forAdd() bool { return v.TaskID == "" }
+
+// forTask reports whether these values belong to one task's edit form.
+func (v PlanTaskFormValues) forTask(id string) bool { return v.TaskID == id }
+
 // NewPlanTaskFormValues gives the add-task form its defaults: quarterly, with
 // two weeks' notice. Both are the commonest answers rather than neutral ones —
 // a blank interval field is a question nobody wants to be asked.
 func NewPlanTaskFormValues() PlanTaskFormValues {
 	return PlanTaskFormValues{IntervalDays: "90", LeadDays: "14"}
+}
+
+// addValues are the add form's values: what was typed if the add form is what
+// bounced, and empty defaults otherwise.
+func (p ServicePlanShowProps) addValues() PlanTaskFormValues {
+	if p.Values.forAdd() {
+		return p.Values
+	}
+	return NewPlanTaskFormValues()
+}
+
+// editValues are one task's edit form: what was typed if that form is what
+// bounced, and the stored row otherwise.
+func (p ServicePlanShowProps) editValues(task domain.ServicePlanTask) PlanTaskFormValues {
+	if p.Values.forTask(task.ID.String()) {
+		return p.Values
+	}
+	return PlanTaskFormValues{
+		TaskID:           task.ID.String(),
+		Name:             task.Name,
+		Instructions:     task.Instructions,
+		IntervalDays:     strconv.Itoa(task.IntervalDays),
+		LeadDays:         strconv.Itoa(task.LeadDays),
+		WarrantyRequired: task.WarrantyRequired,
+	}
 }
 
 func (p ServicePlanShowProps) deleteReason() string {
@@ -232,9 +271,15 @@ templ ServicePlanShowContent(props ServicePlanShowProps) {
 // That is the point of a template, and it is worth saying before somebody
 // discovers it from the due list.
 templ planTaskEditForm(props ServicePlanShowProps, task domain.ServicePlanTask) {
-	<details class="mt-2">
+	{{ vals := props.editValues(task) }}
+	<!-- Open when this form is the one that just bounced: leaving the failure
+	     folded away behind a summary would show an error with no visible form. -->
+	<details class="mt-2" open?={ props.Values.forTask(task.ID.String()) }>
 		<summary class="cursor-pointer text-xs text-rr-muted underline">Edit this job</summary>
 		<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/tasks/" + task.ID.String()) } class="mt-2 border-l border-rr-border pl-3">
+			if props.Error != "" && props.Values.forTask(task.ID.String()) {
+				<p class="mb-3 text-sm text-rr-red">{ props.Error }</p>
+			}
 			<div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
 				<div class="sm:col-span-4">
 					<label for={ "edit-task-name-" + task.ID.String() } class="label-font block text-rr-muted">What gets done</label>
@@ -242,7 +287,7 @@ templ planTaskEditForm(props ServicePlanShowProps, task domain.ServicePlanTask) 
 						type="text"
 						id={ "edit-task-name-" + task.ID.String() }
 						name="name"
-						value={ task.Name }
+						value={ vals.Name }
 						required
 						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 					/>
@@ -253,7 +298,7 @@ templ planTaskEditForm(props ServicePlanShowProps, task domain.ServicePlanTask) 
 						type="number"
 						id={ "edit-task-interval-" + task.ID.String() }
 						name="interval_days"
-						value={ strconv.Itoa(task.IntervalDays) }
+						value={ vals.IntervalDays }
 						min="1"
 						max="3650"
 						required
@@ -266,14 +311,14 @@ templ planTaskEditForm(props ServicePlanShowProps, task domain.ServicePlanTask) 
 						type="number"
 						id={ "edit-task-lead-" + task.ID.String() }
 						name="lead_days"
-						value={ strconv.Itoa(task.LeadDays) }
+						value={ vals.LeadDays }
 						min="0"
 						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 					/>
 				</div>
 				<div class="flex items-end sm:col-span-2">
 					<label class="flex items-center gap-2 pb-2 text-sm text-rr-body">
-						<input type="checkbox" name="warranty_required" value="1" checked?={ task.WarrantyRequired } class="rounded-sm border-rr-border"/>
+						<input type="checkbox" name="warranty_required" value="1" checked?={ vals.WarrantyRequired } class="rounded-sm border-rr-border"/>
 						Keeps the warranty
 					</label>
 				</div>
@@ -284,7 +329,7 @@ templ planTaskEditForm(props ServicePlanShowProps, task domain.ServicePlanTask) 
 						name="instructions"
 						rows="2"
 						class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-					>{ task.Instructions }</textarea>
+					>{ vals.Instructions }</textarea>
 				</div>
 			</div>
 			if props.LiveMachines > 0 {
@@ -310,7 +355,7 @@ templ planTaskForm(props ServicePlanShowProps) {
 				</p>
 			}
 			<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/tasks") } class="mt-3">
-				if props.Error != "" {
+				if props.Error != "" && props.Values.forAdd() {
 					<p class="mb-3 text-sm text-rr-red">{ props.Error }</p>
 				}
 				<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -320,7 +365,7 @@ templ planTaskForm(props ServicePlanShowProps) {
 							type="text"
 							id="task-name"
 							name="name"
-							value={ props.Values.Name }
+							value={ props.addValues().Name }
 							required
 							placeholder="Backflush and change group screens"
 							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
@@ -332,7 +377,7 @@ templ planTaskForm(props ServicePlanShowProps) {
 							type="number"
 							id="task-interval"
 							name="interval_days"
-							value={ props.Values.IntervalDays }
+							value={ props.addValues().IntervalDays }
 							min="1"
 							max="3650"
 							required
@@ -345,7 +390,7 @@ templ planTaskForm(props ServicePlanShowProps) {
 							type="number"
 							id="task-lead"
 							name="lead_days"
-							value={ props.Values.LeadDays }
+							value={ props.addValues().LeadDays }
 							min="0"
 							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
 						/>
@@ -353,7 +398,7 @@ templ planTaskForm(props ServicePlanShowProps) {
 					</div>
 					<div class="flex items-end">
 						<label class="flex items-center gap-2 pb-2 text-sm text-rr-body">
-							<input type="checkbox" name="warranty_required" value="1" checked?={ props.Values.WarrantyRequired } class="rounded-sm border-rr-border"/>
+							<input type="checkbox" name="warranty_required" value="1" checked?={ props.addValues().WarrantyRequired } class="rounded-sm border-rr-border"/>
 							Keeps the warranty
 						</label>
 					</div>
@@ -365,7 +410,7 @@ templ planTaskForm(props ServicePlanShowProps) {
 							rows="3"
 							placeholder="Goes on the ticket, so whoever is standing at the machine has the procedure."
 							class="mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm"
-						>{ props.Values.Instructions }</textarea>
+						>{ props.addValues().Instructions }</textarea>
 					</div>
 				</div>
 				<div class="mt-4">

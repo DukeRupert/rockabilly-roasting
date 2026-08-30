@@ -78,10 +78,12 @@ const (
 	AuditMaintenanceSwept = "equipment.maintenance_swept"
 
 	// AuditServiceLaborRatesUpdated records a change to what an hour of the
-	// crew's time costs. Worth its own action because every cost figure the
-	// service reports have ever shown was computed from whatever was set at the
-	// time — "why did this account's cost jump in March" is a question only the
-	// change history can answer.
+	// crew's time costs.
+	//
+	// Since migration 083 the rate is snapshotted onto each time entry, so this
+	// no longer explains a moved cost figure — nothing moves. It explains the
+	// opposite: why two hours logged a week apart cost different amounts, and
+	// who decided the new number.
 	AuditServiceLaborRatesUpdated = "service.labor_rates_updated"
 
 	// Optional feature modules — turning a whole section of the app on or off.

@@ -334,17 +334,6 @@ func (r MaintenanceDueRow) Covered(on time.Time) bool {
 	return !calendarDay(on).After(calendarDay(*r.ContractEndsOn))
 }
 
-// NeedsSelling is the other half of the split: work that is due or overdue on a
-// machine nobody is paying maintenance for. These are the rows staff ring the
-// customer about — "this is due, and it is what keeps your warranty; call us to
-// get it booked."
-func (r MaintenanceDueRow) NeedsSelling(on time.Time) bool {
-	if r.Status != MaintenanceStatusPending || r.Covered(on) {
-		return false
-	}
-	return r.Urgency(on) != MaintenanceUpcoming
-}
-
 // BookableOn reports whether the sweep should open a routine ticket for this
 // occurrence today: covered work, inside its lead window, not already booked.
 //

@@ -154,6 +154,9 @@ func CheckAdminUI() error {
 	excluded := map[string]bool{
 		filepath.FromSlash("internal/ui/admin/staff_login.templ"): true,
 		filepath.FromSlash("internal/ui/admin/staff_setup.templ"): true,
+		// The storefront layout is *meant* to use paper-and-ink directly; it
+		// only shares a directory with the admin shell.
+		filepath.FromSlash("internal/ui/layouts/storefront.templ"): true,
 	}
 
 	// Match a banned class only when it appears as a complete token — bounded
@@ -163,7 +166,10 @@ func CheckAdminUI() error {
 
 	var violations []string
 
-	err := filepath.Walk("internal/ui/admin", func(path string, info os.FileInfo, err error) error {
+	// Both roots, like the dead-token half. layouts/ holds the admin shell —
+	// sixty-odd rr-* usages framing every page — alongside storefront.templ,
+	// which uses the banned classes legitimately and is excluded below.
+	blockWalk := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -181,7 +187,22 @@ func CheckAdminUI() error {
 		if err != nil {
 			return err
 		}
+		inStyle := false
 		for lineNum, line := range strings.Split(string(data), "\n") {
+			// The admin shell carries an inline stylesheet that *redefines*
+			// these tokens — it names `font-oswald` in order to redirect it.
+			// Inside a <style> block a banned name is a definition, not a class
+			// somebody reached for, and flagging it would make the shell
+			// unlintable for the usages that do matter.
+			if strings.Contains(line, "<style") {
+				inStyle = true
+			}
+			if inStyle {
+				if strings.Contains(line, "</style>") {
+					inStyle = false
+				}
+				continue
+			}
 			matches := re.FindAllStringSubmatch(line, -1)
 			for _, m := range matches {
 				violations = append(violations, fmt.Sprintf(
@@ -191,9 +212,12 @@ func CheckAdminUI() error {
 			}
 		}
 		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("walk admin templ files: %w", err)
+	}
+
+	for _, root := range adminUIRoots() {
+		if err := filepath.Walk(root, blockWalk); err != nil {
+			return fmt.Errorf("walk %s: %w", root, err)
+		}
 	}
 
 	dead, err := deadTokenClasses(excluded)
@@ -239,11 +263,15 @@ func emitsCSS(compiled, class string) bool {
 // dead. It is not a false failure — the stylesheet genuinely does not carry the
 // class yet — so the message says so and names the fix rather than the check
 // standing down and letting a real dead token through.
+// adminUIRoots are the trees both halves of the lint read. The admin shell is
+// admin UI too: scanning only internal/ui/admin would leave the frame around
+// every page unchecked.
+func adminUIRoots() []string {
+	return []string{"internal/ui/admin", "internal/ui/layouts"}
+}
+
 func deadTokenClasses(excluded map[string]bool) ([]string, error) {
-	// The admin shell is admin UI too — sixty-odd rr-* usages live in the
-	// layout, and scanning only internal/ui/admin would leave the frame around
-	// every page unchecked.
-	roots := []string{"internal/ui/admin", "internal/ui/layouts"}
+	roots := adminUIRoots()
 
 	const cssPath = "internal/ui/assets/css/output.css"
 

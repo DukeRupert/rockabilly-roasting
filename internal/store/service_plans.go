@@ -459,9 +459,17 @@ func (s *ServicePlanStore) UpdateAssignment(ctx context.Context, tx pgx.Tx, id u
 	return scanAssignment(row)
 }
 
-// EndAssignment stops an assignment generating maintenance and clears whatever
-// it still had pending. The completed history stays: it is the record of what
-// was done to the machine, and it outlives the arrangement that produced it.
+// EndAssignment stops an assignment generating maintenance and clears what it
+// had pending. The completed history stays: it is the record of what was done
+// to the machine, and it outlives the arrangement that produced it.
+//
+// Occurrences that already carry a ticket are kept. The sweep books covered
+// work by opening a real ticket and attaching it while leaving the occurrence
+// pending, so deleting those would orphan an open ticket — a tech still
+// instructed to do maintenance for an arrangement that no longer exists, with
+// nothing left linking the two. Taking a machine off a plan is not a reason to
+// silently un-book a visit somebody may already have driven out for; cancel the
+// ticket if that is the intent.
 func (s *ServicePlanStore) EndAssignment(ctx context.Context, tx pgx.Tx, id uuid.UUID, at time.Time) error {
 	if _, err := tx.Exec(ctx,
 		`UPDATE equipment_service_plans SET ended_at = $2, updated_at = now()
@@ -469,7 +477,8 @@ func (s *ServicePlanStore) EndAssignment(ctx context.Context, tx pgx.Tx, id uuid
 		return fmt.Errorf("end plan assignment: %w", err)
 	}
 	if _, err := tx.Exec(ctx,
-		`DELETE FROM service_maintenance_due WHERE assignment_id = $1 AND status = 'pending'`,
+		`DELETE FROM service_maintenance_due
+		  WHERE assignment_id = $1 AND status = 'pending' AND ticket_id IS NULL`,
 		id); err != nil {
 		return fmt.Errorf("clear pending maintenance: %w", err)
 	}

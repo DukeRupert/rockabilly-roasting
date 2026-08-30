@@ -552,11 +552,12 @@ type ServiceAccountCost struct {
 
 // ServiceAccountCostSort is how the cross-account table is ranked.
 //
-// There is no single money figure to sort by, because the shop has no labour
-// rate recorded — parts are in cents and work is in minutes, and inventing a
-// rate to blend them would put a made-up number at the top of a report meant to
-// settle arguments. So the reader picks which of the two scarce things to rank
-// by, and both are always shown.
+// Parts are in cents and work is in minutes, so blending them needs an hourly
+// cost. Until a shop records one there is no single money figure to sort by,
+// and inventing a rate would put a made-up number at the top of a report meant
+// to settle arguments — so the reader picks which of the two scarce things to
+// rank by. Once hours carry a rate, ServiceAccountCostByCost blends them and
+// leads; both numbers stay in the table either way.
 type ServiceAccountCostSort string
 
 const (

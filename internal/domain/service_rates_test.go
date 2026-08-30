@@ -123,9 +123,16 @@ func TestServiceAccountReportShowCost(t *testing.T) {
 }
 
 func TestServiceAccountCostSortValid(t *testing.T) {
-	assert.True(t, domain.ServiceAccountCostByHours.Valid(), "the empty default is a valid sort")
+	assert.True(t, domain.ServiceAccountCostByHours.Valid())
 	assert.True(t, domain.ServiceAccountCostByCost.Valid())
 	assert.True(t, domain.ServiceAccountCostByParts.Valid())
 	assert.True(t, domain.ServiceAccountCostByVisits.Valid())
 	assert.False(t, domain.ServiceAccountCostSort("bogus").Valid())
+
+	// The regression that made the Hours tab return the cost ranking: Hours
+	// carried the empty string, so its own link omitted ?sort= and the handler
+	// read that as "no preference". Empty is not a sort.
+	assert.False(t, domain.ServiceAccountCostSort("").Valid(),
+		"an absent parameter asks for the default; it is not a ranking")
+	assert.NotEqual(t, domain.ServiceAccountCostSort(""), domain.ServiceAccountCostByHours)
 }

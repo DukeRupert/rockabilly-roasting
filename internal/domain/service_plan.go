@@ -196,8 +196,9 @@ type MaintenanceDue struct {
 	// the row was closed by a job.
 	CompletedByStaffID *uuid.UUID
 	// TicketID is the ticket the work was done on, where there was one. Set
-	// both by the sweep that books contract work and by a staffer closing an
-	// item against a ticket they already had open.
+	// when the visit is booked — by the sweep for contract work, or by the
+	// ticket form when a staffer raises one from the due list — never when the
+	// occurrence is closed out.
 	TicketID  *uuid.UUID
 	Notes     string
 	CreatedAt time.Time
@@ -371,8 +372,12 @@ func NextDueAfterCompletion(completedOn time.Time, intervalDays int) time.Time {
 func NextDueAfterSkip(dueOn, on time.Time, intervalDays int) time.Time {
 	next := calendarDay(dueOn).AddDate(0, 0, intervalDays)
 	today := calendarDay(on)
-	// Bounded by construction: intervalDays is CHECKed > 0 in the database and
-	// validated in the service, so each step moves at least a day forward.
+	// Guarded here rather than trusting the CHECK and the service validation to
+	// both hold forever — a zero or negative interval reaching this loop would
+	// hang the request, and RescheduledDue makes the same check in code.
+	if intervalDays < 1 {
+		return next
+	}
 	for !next.After(today) {
 		next = next.AddDate(0, 0, intervalDays)
 	}

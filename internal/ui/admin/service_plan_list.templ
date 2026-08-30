@@ -148,7 +148,7 @@ templ servicePlanCreateForm(props ServicePlanListProps) {
 							<option value={ string(c) } selected?={ props.Values.Category == string(c) }>{ c.Label() }</option>
 						}
 					</select>
-					<p class="mt-1 text-xs text-rr-muted">Only sorts the picker — you can still put it on anything.</p>
+					<p class="mt-1 text-xs text-rr-muted">A filter: the plan is only offered for machines of this kind. Leave it on <em>Any machine</em> to offer it for all of them.</p>
 				</div>
 			</div>
 			<div class="mt-4">

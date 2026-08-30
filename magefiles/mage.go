@@ -245,6 +245,13 @@ func emitsCSS(compiled, class string) bool {
 	return regexp.MustCompile(regexp.QuoteMeta(class) + `([^a-z0-9-]|$)`).MatchString(compiled)
 }
 
+// adminUIRoots are the trees both halves of the lint read. The admin shell is
+// admin UI too: scanning only internal/ui/admin would leave the frame around
+// every page unchecked.
+func adminUIRoots() []string {
+	return []string{"internal/ui/admin", "internal/ui/layouts"}
+}
+
 // deadTokenClasses finds rr-* utilities the admin uses that Tailwind never
 // emitted a rule for.
 //
@@ -263,13 +270,6 @@ func emitsCSS(compiled, class string) bool {
 // dead. It is not a false failure — the stylesheet genuinely does not carry the
 // class yet — so the message says so and names the fix rather than the check
 // standing down and letting a real dead token through.
-// adminUIRoots are the trees both halves of the lint read. The admin shell is
-// admin UI too: scanning only internal/ui/admin would leave the frame around
-// every page unchecked.
-func adminUIRoots() []string {
-	return []string{"internal/ui/admin", "internal/ui/layouts"}
-}
-
 func deadTokenClasses(excluded map[string]bool) ([]string, error) {
 	roots := adminUIRoots()
 

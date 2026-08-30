@@ -58,7 +58,9 @@ func (d *Deps) handleAdminMaintenanceList(w http.ResponseWriter, r *http.Request
 	filter := store.MaintenanceFilter{
 		Scope: maintenanceScope(scope),
 		Now:   today,
-		Limit: maintenanceListLimit,
+		// One over the cap, so a full page can be told from an overflowing one
+		// without a second counting query — the same trick the cost report uses.
+		Limit: maintenanceListLimit + 1,
 	}
 	// A hand-edited scope shows everything rather than 500. Echo back the
 	// normalised value so the tab strip does not highlight a tab that is not
@@ -68,6 +70,7 @@ func (d *Deps) handleAdminMaintenanceList(w http.ResponseWriter, r *http.Request
 	}
 
 	var rows []domain.MaintenanceDueRow
+	var truncated bool
 	var counts admin.MaintenanceCounts
 	var nav admin.ServiceNav
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
@@ -75,6 +78,10 @@ func (d *Deps) handleAdminMaintenanceList(w http.ResponseWriter, r *http.Request
 		rows, txErr = d.ServicePlanService.ListDue(ctx, tx, filter)
 		if txErr != nil {
 			return txErr
+		}
+		truncated = len(rows) > maintenanceListLimit
+		if truncated {
+			rows = rows[:maintenanceListLimit]
 		}
 		counts, txErr = d.maintenanceCounts(ctx, tx, today)
 		if txErr != nil {
@@ -94,6 +101,8 @@ func (d *Deps) handleAdminMaintenanceList(w http.ResponseWriter, r *http.Request
 		Scope:     scope,
 		Counts:    counts,
 		Today:     today,
+		Truncated: truncated,
+		Limit:     maintenanceListLimit,
 		StaffName: staffName,
 		StaffRole: staffRole,
 		CanWrite:  staffCan(r, auth.PermWriteService),

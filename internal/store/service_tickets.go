@@ -565,12 +565,6 @@ func (s *ServiceTicketStore) CreateTimeEntry(ctx context.Context, tx pgx.Tx, p C
 	return e, nil
 }
 
-// GetTimeEntry returns one logged stint.
-func (s *ServiceTicketStore) GetTimeEntry(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.ServiceTimeEntry, error) {
-	row := tx.QueryRow(ctx, `SELECT `+serviceTimeColumns+` FROM service_time_entries WHERE id = $1`, id)
-	return scanServiceTimeEntry(row)
-}
-
 // UpdateTimeEntryRate sets what one recorded hour cost. Nil returns it to
 // uncosted, which takes it back out of the money figures without touching the
 // hours themselves.

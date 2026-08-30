@@ -362,7 +362,7 @@ func servicePlanCreateForm(props ServicePlanListProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</select><p class=\"mt-1 text-xs text-rr-muted\">Only sorts the picker — you can still put it on anything.</p></div></div><div class=\"mt-4\"><label for=\"plan-description\" class=\"label-font block text-rr-muted\">What it is for</label> <textarea id=\"plan-description\" name=\"description\" rows=\"2\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</select><p class=\"mt-1 text-xs text-rr-muted\">A filter: the plan is only offered for machines of this kind. Leave it on <em>Any machine</em> to offer it for all of them.</p></div></div><div class=\"mt-4\"><label for=\"plan-description\" class=\"label-font block text-rr-muted\">What it is for</label> <textarea id=\"plan-description\" name=\"description\" rows=\"2\" class=\"mt-1 w-full rounded-sm border border-rr-border bg-rr-surface px-3 py-2 text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

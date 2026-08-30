@@ -30,7 +30,12 @@ type MaintenanceDueProps struct {
 	// Today is the day everything is measured against, in merchant time. Passed
 	// in rather than taken from the clock in the template so a render test can
 	// pin it.
-	Today     time.Time
+	Today time.Time
+	// Truncated says the list hit its cap. The tab badges above it are counted
+	// without one, so a silent cut would leave them disagreeing with the rows
+	// for no visible reason.
+	Truncated bool
+	Limit     int
 	StaffName string
 	StaffRole string
 	CanWrite  bool
@@ -173,6 +178,11 @@ templ MaintenanceDueContent(props MaintenanceDueProps) {
 			</ul>
 		}
 	</div>
+	if props.Truncated {
+		<p class="mt-3 text-sm text-rr-red">
+			Showing the first { strconv.Itoa(props.Limit) } — the counts on the tabs above are the real totals. Narrow it with a scope to see the rest.
+		</p>
+	}
 }
 
 // maintenanceRow is one piece of scheduled work, with everything needed to act

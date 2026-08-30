@@ -305,3 +305,77 @@ func TestEndAssignmentClearsUnbookedOccurrences(t *testing.T) {
 	_, err := f.plans.GetDue(ctx, tx, unbooked.ID)
 	assert.ErrorIs(t, err, pgx.ErrNoRows)
 }
+
+// The call list is work to sell. Once somebody has rung the cafe and booked the
+// visit, the row has been sold and comes off it — the same ticket_id filter
+// Bookable carries. Without it the row sat there forever and inflated the
+// uncovered gauge with work already in hand.
+func TestUncoveredScopeDropsBookedWork(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	today := planTestDay(2026, time.September, 1)
+
+	f := newPlanFixture(t, tx, 90, 14, false)
+	due := f.due(t, tx, planTestDay(2026, time.August, 20))
+
+	count := func() int {
+		n, err := f.plans.CountDue(ctx, tx, store.MaintenanceFilter{
+			Scope: store.MaintenanceScopeUncovered, Now: today,
+		})
+		require.NoError(t, err)
+		return n
+	}
+	require.Equal(t, 1, count(), "uncovered work near its date needs selling")
+
+	ticket, err := store.NewServiceTicketStore().Create(ctx, tx, store.CreateServiceTicketParams{
+		Number:     "SVC-SOLD-" + uuid.NewString()[:8],
+		CustomerID: f.equipment.CustomerID,
+		Title:      "Booked after a phone call",
+		Severity:   domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+	require.NoError(t, f.plans.AttachTicket(ctx, tx, due.ID, ticket.ID))
+
+	assert.Equal(t, 0, count(), "sold — it is somebody's job now, not the call list's")
+}
+
+// The backfill anchor follows the machine, not the arrangement.
+//
+// A machine taken off a plan and put back on gets a new assignment id.
+// Anchoring on that forgot every service it had ever had and regenerated years
+// of overdue occurrences for work that was genuinely done.
+func TestMissingDueAnchorSurvivesReassignment(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newPlanFixture(t, tx, 90, 14, false)
+
+	// Serviced once under the original arrangement.
+	done := f.due(t, tx, planTestDay(2026, time.June, 1))
+	_, err := f.plans.CloseDue(ctx, tx, done.ID, store.CloseDueParams{
+		Status:      domain.MaintenanceStatusCompleted,
+		CompletedOn: planTestDay(2026, time.June, 1),
+	})
+	require.NoError(t, err)
+
+	// Off the plan, then back on it — a new assignment over the same machine.
+	require.NoError(t, f.plans.EndAssignment(ctx, tx, f.assignment.ID, time.Now()))
+	again, err := f.plans.Assign(ctx, tx, store.AssignPlanParams{
+		EquipmentID: f.equipment.ID,
+		PlanID:      f.plan.ID,
+		StartsOn:    planTestDay(2024, time.January, 1),
+	})
+	require.NoError(t, err)
+
+	missing, err := f.plans.ListMissingDue(ctx, tx)
+	require.NoError(t, err)
+
+	var found *store.MissingDueRow
+	for i := range missing {
+		if missing[i].AssignmentID == again.ID {
+			found = &missing[i]
+		}
+	}
+	require.NotNil(t, found)
+	assert.Equal(t, planTestDay(2026, time.June, 1).UTC(), found.Anchor.UTC(),
+		"the June service still counts — the machine was serviced, whatever the paperwork said")
+}

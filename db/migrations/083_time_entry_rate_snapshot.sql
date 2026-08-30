@@ -36,10 +36,9 @@ WHERE s.id = true
   AND s.service_labor_rate_cents IS NOT NULL;
 -- +goose StatementEnd
 
--- The cost reports sum minutes * rate over entries, filtered to a window and
--- grouped by ticket. The existing ticket index covers the grouping; this one
--- keeps the "which of these are uncosted" question cheap, since it is asked on
--- every report render to decide whether to print the warning.
+-- NOTE: this index was dropped again in 084 — it serves no query. Every
+-- rate_cents IS NULL read is an aggregate FILTER inside a SUM, which a partial
+-- index on ticket_id cannot serve. Left here so the history reads straight.
 CREATE INDEX service_time_entries_uncosted_idx
     ON service_time_entries (ticket_id) WHERE rate_cents IS NULL;
 

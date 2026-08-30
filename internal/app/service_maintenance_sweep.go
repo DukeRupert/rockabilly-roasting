@@ -65,21 +65,29 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 		return nil
 	}
 
-	filled, err := s.backfillMissing(ctx, pool)
-	if err != nil {
-		return err
+	// Both halves run before anything returns, and the gauges are published
+	// whatever they did. "Always" has to mean always: bailing early left the
+	// four series holding yesterday's numbers, which reads healthier than the
+	// blank series the promise exists to prevent. SweepStaleTickets publishes
+	// ahead of anything fallible for the same reason.
+	filled, backfillErr := s.backfillMissing(ctx, pool)
+	booked, bookErr := s.bookCoveredMaintenance(ctx, pool, now, riverJobID)
+
+	counts, countErr := s.sweepCounts(ctx, pool, now)
+	if countErr == nil {
+		s.publishMaintenanceGauges(counts)
+	} else {
+		slog.ErrorContext(ctx, "maintenance sweep: could not read counts, gauges left unpublished",
+			"error", countErr.Error())
 	}
 
-	booked, err := s.bookCoveredMaintenance(ctx, pool, now, riverJobID)
-	if err != nil {
-		return err
+	// Reported after the gauges, and the first failure wins — River retries the
+	// whole sweep, and every write it makes is conditional.
+	for _, err := range []error{backfillErr, bookErr, countErr} {
+		if err != nil {
+			return err
+		}
 	}
-
-	counts, err := s.sweepCounts(ctx, pool, now)
-	if err != nil {
-		return err
-	}
-	s.publishMaintenanceGauges(counts)
 
 	// One audit row a day, whatever happened. A quiet due list and a job that
 	// stopped running look identical from the outside otherwise.

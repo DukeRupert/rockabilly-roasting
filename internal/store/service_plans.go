@@ -178,8 +178,9 @@ func (s *ServicePlanStore) CountAssignments(ctx context.Context, tx pgx.Tx, plan
 	return live, total, nil
 }
 
-// CountAssignmentsByPlan is the same count for every plan at once, so the plan
-// list does not run a query per row.
+// CountAssignmentsByPlan is the live count for every plan at once, so the plan
+// list does not run a query per row. Only live: the list says what an edit
+// would touch, and an ended assignment is not touched by one.
 func (s *ServicePlanStore) CountAssignmentsByPlan(ctx context.Context, tx pgx.Tx) (map[uuid.UUID]int, error) {
 	rows, err := tx.Query(ctx,
 		`SELECT plan_id, count(*) FROM equipment_service_plans
@@ -693,7 +694,11 @@ func maintenanceWhere(f MaintenanceFilter) (string, []any) {
 			"a.under_contract",
 			"(a.contract_ends_on IS NULL OR a.contract_ends_on >= "+nowArg()+")")
 	case MaintenanceScopeUncovered:
-		where = append(where, "d.status = 'pending'",
+		// ticket_id IS NULL, exactly as Bookable carries it. This is the call
+		// list: once somebody has rung the cafe and booked the visit, the row
+		// has been sold and must come off it — otherwise it sits there forever
+		// and inflates the uncovered gauge with work already in hand.
+		where = append(where, "d.status = 'pending'", "d.ticket_id IS NULL",
 			"d.due_on <= "+nowArg()+" + (t.lead_days * INTERVAL '1 day')",
 			"(NOT a.under_contract OR (a.contract_ends_on IS NOT NULL AND a.contract_ends_on < "+nowArg()+"))")
 	default:
@@ -823,6 +828,11 @@ type MissingDueRow struct {
 	// Anchor is the day to count the interval forward from: the last completion
 	// of this task on this machine, or the assignment's start date where there
 	// has not been one.
+	//
+	// Scoped to the machine rather than to the assignment on purpose. A machine
+	// taken off a plan and put back on gets a new assignment id, and anchoring
+	// on that would forget every service it has ever had — regenerating years
+	// of overdue occurrences for work that was actually done.
 	Anchor time.Time
 }
 
@@ -834,7 +844,7 @@ func (s *ServicePlanStore) ListMissingDue(ctx context.Context, tx pgx.Tx) ([]Mis
 		`SELECT a.id, t.id, a.equipment_id, t.interval_days,
 		        COALESCE(
 		            (SELECT max(prev.completed_on) FROM service_maintenance_due prev
-		             WHERE prev.assignment_id = a.id AND prev.task_id = t.id
+		             WHERE prev.equipment_id = a.equipment_id AND prev.task_id = t.id
 		               AND prev.status = 'completed'),
 		            a.starts_on
 		        )

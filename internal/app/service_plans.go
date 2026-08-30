@@ -629,14 +629,17 @@ func (s *ServicePlanService) ListAssignments(ctx context.Context, tx pgx.Tx, equ
 // --- Occurrences ---
 
 // CompleteDueParams records that a scheduled piece of maintenance was done.
+//
+// No ticket field: an occurrence worked on a ticket is already attached to it,
+// by the sweep when it books one or by the ticket form when a staffer opens one
+// from the due list. A second way to set it would be a second way to get it
+// wrong.
 type CompleteDueParams struct {
 	// CompletedOn is when the work actually happened, which is routinely not
 	// today: a tech logs Tuesday's visit on Thursday, and the next occurrence
 	// has to count from Tuesday.
 	CompletedOn time.Time
-	// TicketID links the work to the ticket it was done on, where there was one.
-	TicketID *uuid.UUID
-	Notes    string
+	Notes       string
 }
 
 // CompleteDue marks an occurrence done and writes the next one, in the same
@@ -648,7 +651,7 @@ func (s *ServicePlanService) CompleteDue(ctx context.Context, tx pgx.Tx, id uuid
 		return nil, ErrMaintenanceDateRequired
 	}
 
-	return s.closeDue(ctx, tx, id, domain.MaintenanceStatusCompleted, p.CompletedOn, p.TicketID,
+	return s.closeDue(ctx, tx, id, domain.MaintenanceStatusCompleted, p.CompletedOn,
 		strings.TrimSpace(p.Notes), actor)
 }
 
@@ -658,12 +661,12 @@ func (s *ServicePlanService) SkipDue(ctx context.Context, tx pgx.Tx, id uuid.UUI
 	if on.IsZero() {
 		return nil, ErrMaintenanceDateRequired
 	}
-	return s.closeDue(ctx, tx, id, domain.MaintenanceStatusSkipped, on, nil, strings.TrimSpace(notes), actor)
+	return s.closeDue(ctx, tx, id, domain.MaintenanceStatusSkipped, on, strings.TrimSpace(notes), actor)
 }
 
 // closeDue is the shared body of CompleteDue and SkipDue: close this
 // occurrence, work out when the task comes round again, write that.
-func (s *ServicePlanService) closeDue(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.MaintenanceStatus, on time.Time, ticketID *uuid.UUID, notes string, actor Actor) (*domain.MaintenanceDue, error) {
+func (s *ServicePlanService) closeDue(ctx context.Context, tx pgx.Tx, id uuid.UUID, status domain.MaintenanceStatus, on time.Time, notes string, actor Actor) (*domain.MaintenanceDue, error) {
 	before, err := s.plans.GetDue(ctx, tx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -693,7 +696,6 @@ func (s *ServicePlanService) closeDue(ctx context.Context, tx pgx.Tx, id uuid.UU
 		Status:      status,
 		CompletedOn: on,
 		StaffID:     staffID,
-		TicketID:    ticketID,
 		Notes:       notes,
 	})
 	if err != nil {
@@ -750,8 +752,8 @@ func (s *ServicePlanService) closeDue(ctx context.Context, tx pgx.Tx, id uuid.UU
 		"due_on":        before.DueOn.Format(time.DateOnly),
 		"on":            on.Format(time.DateOnly),
 	}
-	if ticketID != nil {
-		metadata["ticket_id"] = ticketID.String()
+	if before.TicketID != nil {
+		metadata["ticket_id"] = before.TicketID.String()
 	}
 	if err := s.audit.Record(ctx, tx, audit.AuditEntry{
 		ActorType:    actor.Type,
@@ -777,18 +779,6 @@ func (s *ServicePlanService) ListDue(ctx context.Context, tx pgx.Tx, f store.Mai
 // section tab badge.
 func (s *ServicePlanService) CountDue(ctx context.Context, tx pgx.Tx, f store.MaintenanceFilter) (int, error) {
 	return s.plans.CountDue(ctx, tx, f)
-}
-
-// GetDue returns one occurrence.
-func (s *ServicePlanService) GetDue(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.MaintenanceDue, error) {
-	d, err := s.plans.GetDue(ctx, tx, id)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrMaintenanceNotFound
-		}
-		return nil, err
-	}
-	return d, nil
 }
 
 // AttachTicket records the ticket a due item is being handled on, so the due

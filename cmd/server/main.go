@@ -573,11 +573,22 @@ func run() error {
 		),
 
 		// Sweep the preventive maintenance schedule: backfill occurrences, book
-		// the covered work that has come due, publish the gauges. Daily and no
-		// RunOnStart — the booking half opens real tickets, and a deploy is not
-		// a reason for a customer's machine to acquire a scheduled visit.
+		// the covered work that has come due, publish the gauges. No RunOnStart
+		// — the booking half opens real tickets, and a deploy is not a reason
+		// for a customer's machine to acquire a scheduled visit.
+		//
+		// 03:00 merchant time, on a wall-clock schedule rather than a 24h
+		// interval. The docs promise covered work books itself overnight, and
+		// PeriodicInterval anchors to process start — it would have made
+		// "overnight" mean "whenever we last deployed", which for a job that
+		// opens customer tickets is a promise the wiring could not keep.
+		//
+		// 03:00 rather than the more obvious 02:00 because 02:00 is the hour US
+		// DST deletes each spring: it does not exist on the changeover day, and
+		// asking for it yields whatever the library normalises a non-existent
+		// local time to. 03:00 occurs exactly once on both changeover days.
 		river.NewPeriodicJob(
-			river.PeriodicInterval(24*time.Hour),
+			jobs.NewDailySchedule(3, 0, merchantTZ),
 			func() (river.JobArgs, *river.InsertOpts) {
 				return jobs.ServiceMaintenanceSweepArgs{}, &river.InsertOpts{
 					UniqueOpts: river.UniqueOpts{

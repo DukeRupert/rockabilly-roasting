@@ -309,6 +309,21 @@ func TestRescheduledDue(t *testing.T) {
 			"stepped forward a whole interval, so it stays on the new cadence")
 	})
 
+	t.Run("a shortened interval never lands on today either", func(t *testing.T) {
+		// The off-by-one: shifting puts this exactly on today, and a step that
+		// stops at today leaves it bookable tonight. Future work must not be
+		// made owed-today by an interval edit — that is the sweep opening a
+		// ticket for a visit the customer had just declined.
+		due := day(2026, time.September, 16)
+		got := domain.RescheduledDue(due, 90, 75, today)
+
+		assert.True(t, got.After(today), "got %s, wanted strictly after today", got.Format("2006-01-02"))
+		assert.Equal(t, day(2026, time.November, 15), got, "stepped a whole new interval clear of today")
+		row := dueRow(got)
+		row.UnderContract = true
+		assert.False(t, row.BookableOn(today), "and so the sweep leaves it alone tonight")
+	})
+
 	t.Run("an unchanged interval is a no-op", func(t *testing.T) {
 		due := day(2026, time.October, 1)
 		assert.Equal(t, due, domain.RescheduledDue(due, 90, 90, today))

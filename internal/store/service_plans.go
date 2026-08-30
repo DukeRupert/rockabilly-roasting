@@ -296,27 +296,91 @@ func (s *ServicePlanStore) UpdateTask(ctx context.Context, tx pgx.Tx, id uuid.UU
 	return scanServicePlanTask(row)
 }
 
-// CountBookedForTask is how many of a task's occurrences carry a ticket, in any
-// status. Deleting the task cascades them all away.
+// CountTaskHistory is how many of a task's occurrences record something that
+// happened: a visit booked onto a ticket, or work marked done or deliberately
+// skipped. Deleting the task cascades every one of them away.
 //
-// Not just the pending ones. A completed occurrence with a ticket on it is the
-// record of a visit that happened — cascading it away loses the link between
-// the ticket and the work it was raised for, which is the same orphaning in the
-// past tense.
-func (s *ServicePlanStore) CountBookedForTask(ctx context.Context, tx pgx.Tx, taskID uuid.UUID) (int, error) {
+// Two kinds of row, one rule. A ticketed occurrence carries the link between a
+// ticket and the work it was raised for. A completed one with *no* ticket is
+// the ordinary call-list case — maintenance sold over the phone and ticked off
+// by hand — and is just as much the record of what was done to a machine. The
+// earlier version of this counted only the ticketed rows, which meant the
+// commonest history on an uncovered account was the one kind that vanished
+// silently.
+//
+// Pending rows are not counted. They describe work that has not happened yet,
+// and dropping them is the point of removing a task from a plan.
+func (s *ServicePlanStore) CountTaskHistory(ctx context.Context, tx pgx.Tx, taskID uuid.UUID) (int, error) {
 	var n int
 	if err := tx.QueryRow(ctx,
 		`SELECT count(*) FROM service_maintenance_due
-		  WHERE task_id = $1 AND ticket_id IS NOT NULL`,
+		  WHERE task_id = $1 AND (ticket_id IS NOT NULL OR status <> 'pending')`,
 		taskID).Scan(&n); err != nil {
-		return 0, fmt.Errorf("count booked for task: %w", err)
+		return 0, fmt.Errorf("count task history: %w", err)
 	}
 	return n, nil
 }
 
-// DeleteTask removes a task from a plan. The occurrences cascade with it: an
-// item that is no longer part of the schedule should not still be due, and the
-// completed ones described work under a task that no longer exists.
+// NextTaskSortOrder is where a new task goes: after every task already on the
+// plan. Returns 0 for a plan with none.
+//
+// MAX rather than COUNT so a plan whose tasks have been reordered, or one that
+// has had a task removed, still appends rather than colliding with an existing
+// position.
+func (s *ServicePlanStore) NextTaskSortOrder(ctx context.Context, tx pgx.Tx, planID uuid.UUID) (int, error) {
+	var next int
+	if err := tx.QueryRow(ctx,
+		`SELECT COALESCE(MAX(sort_order), -1) + 1 FROM service_plan_tasks WHERE plan_id = $1`,
+		planID).Scan(&next); err != nil {
+		return 0, fmt.Errorf("next task sort order: %w", err)
+	}
+	return next, nil
+}
+
+// CountHistoryByTask is CountTaskHistory for every task on a plan at once,
+// keyed by task id. Tasks with no history are absent from the map rather than
+// present as zero, so a caller reading it with the zero value gets the right
+// answer either way.
+//
+// The plan page needs this per task to decide whether to offer a remove
+// control at all — offering one that RemoveTask will always refuse is a worse
+// experience than not offering it. One query rather than one per task, because
+// a full manufacturer schedule runs to a dozen of them.
+func (s *ServicePlanStore) CountHistoryByTask(ctx context.Context, tx pgx.Tx, planID uuid.UUID) (map[uuid.UUID]int, error) {
+	rows, err := tx.Query(ctx,
+		`SELECT d.task_id, count(*)
+		   FROM service_maintenance_due d
+		   JOIN service_plan_tasks t ON t.id = d.task_id
+		  WHERE t.plan_id = $1
+		    AND (d.ticket_id IS NOT NULL OR d.status <> 'pending')
+		  GROUP BY d.task_id`, planID)
+	if err != nil {
+		return nil, fmt.Errorf("count history by task: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[uuid.UUID]int)
+	for rows.Next() {
+		var id uuid.UUID
+		var n int
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, fmt.Errorf("scan task history count: %w", err)
+		}
+		counts[id] = n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("count history by task: %w", err)
+	}
+	return counts, nil
+}
+
+// DeleteTask removes a task from a plan. Its occurrences cascade with it: an
+// item that is no longer part of the schedule should not still be due.
+//
+// Only ever called once CountTaskHistory returns zero, so the cascade reaches
+// pending rows alone. It is not a soft delete and cannot be — task_id is NOT
+// NULL, so there is nowhere for a surviving occurrence to point. That is
+// precisely why the guard lives above it rather than here.
 func (s *ServicePlanStore) DeleteTask(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	if _, err := tx.Exec(ctx, `DELETE FROM service_plan_tasks WHERE id = $1`, id); err != nil {
 		return fmt.Errorf("delete plan task: %w", err)

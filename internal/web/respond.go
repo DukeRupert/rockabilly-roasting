@@ -48,17 +48,23 @@ func Error(w http.ResponseWriter, r *http.Request, err error) {
 }
 
 // expectedFailure reports whether an error is one the application named on
-// purpose — a validation rule, a not-found, a state machine refusing a move —
-// as opposed to something that went wrong.
+// purpose *and* that a redirect can sensibly carry — a validation rule, a state
+// machine refusing a move — as opposed to something that went wrong.
 //
 // The distinction is what separates "tell the operator, in the words the
 // sentinel carries" from "log it, alert on it, and say nothing useful". A
 // redirect-with-flash path that skips the question turns a dead database into a
 // cheerful 303 and a sentence about maintenance schedules, and Sentry never
 // hears about it.
+//
+// Not-found is excluded, though it is every bit as deliberate as the rest. The
+// callers are redirect-back helpers, and the thing they redirect back *to* is
+// usually the resource that was not found: flashing "no such plan" onto a 303
+// aimed at that plan's page just produces a 404 with the message lost on the
+// way. A missing resource wants the 404 rendered directly.
 func expectedFailure(err error) bool {
 	status, _ := mapError(err)
-	return status < http.StatusInternalServerError
+	return status < http.StatusInternalServerError && status != http.StatusNotFound
 }
 
 // mapError converts sentinel errors to HTTP status codes and messages.
@@ -158,7 +164,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrPlanInactive),
 		errors.Is(err, app.ErrPlanHasNoTasks),
 		errors.Is(err, app.ErrPlanTaskNameRequired),
-		errors.Is(err, app.ErrPlanTaskBooked),
+		errors.Is(err, app.ErrPlanTaskHasHistory),
 		errors.Is(err, app.ErrPlanIntervalInvalid),
 		errors.Is(err, app.ErrPlanLeadInvalid),
 		errors.Is(err, app.ErrPlanStartRequired),

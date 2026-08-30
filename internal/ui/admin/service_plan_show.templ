@@ -3,6 +3,8 @@ package admin
 import (
 	"strconv"
 
+	"github.com/google/uuid"
+
 	"github.com/dukerupert/hiri/internal/domain"
 	"github.com/dukerupert/hiri/internal/ui/layouts"
 )
@@ -10,7 +12,16 @@ import (
 // One maintenance plan and the series inside it — /admin/service/plans/{id}.
 //
 // Structure follows docs/admin-detail-pages.md: main column for what the plan
-// IS (the series, in order), rail for what you can do to it. The rail carries
+// IS (the series, in order), rail for what you can do to it.
+//
+// One deliberate departure, declared rather than left for a reader to notice:
+// there is no activity timeline (rule 5). A plan is a template, and the events
+// worth reading are not things that happened *to* it but things that happened
+// because of it — occurrences completed and skipped, on machines. Those live on
+// each machine's maintenance history, where the reader also has the machine in
+// front of them. A timeline here would show plan edits and nothing else, which
+// is the least interesting history the module keeps; the audit log already has
+// it for the rare occasion somebody wants it. The rail carries
 // the warning that matters — editing a task's interval moves the next due date
 // on every machine already on the plan, which is the point, and is worth saying
 // out loud before somebody discovers it.
@@ -27,6 +38,12 @@ type ServicePlanShowProps struct {
 	// TotalMachines includes the ended assignments. A plan with history cannot
 	// be deleted, only retired.
 	TotalMachines int
+	// TaskHistory is how many recorded occurrences each task has — done,
+	// skipped, or booked onto a ticket. Any at all means RemoveTask will refuse
+	// the delete, because the occurrences cascade and that history is the
+	// record of what a machine actually received. Tasks with none are absent
+	// from the map, so reading it for a missing key gives the right answer.
+	TaskHistory map[uuid.UUID]int
 	// Values and Error echo back a rejected task form.
 	Values    PlanTaskFormValues
 	Error     string
@@ -120,6 +137,14 @@ func planRetireConfirm(p domain.ServicePlan) ActionConfirm {
 	}
 }
 
+// planTaskRemoveConfirm describes what removing a task actually costs.
+//
+// Keyed off the task's own history, not the plan's live machine count. Those
+// are different questions, and answering the first with the second is how this
+// dialog came to tell a plan with years of completed work and no machines
+// currently on it that "nothing else changes" — immediately before deleting all
+// of it. A task with any history is not offered a remove control at all now, so
+// this only ever describes a task that has genuinely never been done.
 func planTaskRemoveConfirm(t domain.ServicePlanTask, machines int) ActionConfirm {
 	c := ActionConfirm{
 		Title:   "Remove " + t.Name + " from the plan?",
@@ -130,12 +155,26 @@ func planTaskRemoveConfirm(t domain.ServicePlanTask, machines int) ActionConfirm
 	if machines > 0 {
 		c.Points = []string{
 			"It comes off the schedule of every machine on this plan.",
-			"The record of times it was already done goes with it.",
+			"Nothing recorded is lost — this job has never been done.",
 		}
 	} else {
 		c.Points = []string{"No machines are on this plan, so nothing else changes."}
 	}
 	return c
+}
+
+// planTaskRemovable reports whether a task can still be taken off the plan.
+func planTaskRemovable(props ServicePlanShowProps, t domain.ServicePlanTask) bool {
+	return props.TaskHistory[t.ID] == 0
+}
+
+// planTaskKeptLabel explains, in place of the control, why it is not offered.
+func planTaskKeptLabel(props ServicePlanShowProps, t domain.ServicePlanTask) string {
+	n := props.TaskHistory[t.ID]
+	if n == 1 {
+		return "Done once — kept for the record"
+	}
+	return "Done " + strconv.Itoa(n) + " times — kept for the record"
 }
 
 templ ServicePlanShowContent(props ServicePlanShowProps) {
@@ -188,7 +227,7 @@ templ ServicePlanShowContent(props ServicePlanShowProps) {
 												<p class="mt-1 text-sm whitespace-pre-line text-rr-body">{ task.Instructions }</p>
 											}
 										</div>
-										if props.CanWrite {
+										if props.CanWrite && planTaskRemovable(props, task) {
 											<form method="post" action={ templ.SafeURL("/admin/service/plans/" + props.Plan.ID.String() + "/tasks/" + task.ID.String() + "/delete") }>
 												<button
 													type="submit"
@@ -196,6 +235,8 @@ templ ServicePlanShowContent(props ServicePlanShowProps) {
 													{ ConfirmAttrs(planTaskRemoveConfirm(task, props.LiveMachines))... }
 												>Remove</button>
 											</form>
+										} else if props.CanWrite {
+											<span class="text-xs text-rr-muted">{ planTaskKeptLabel(props, task) }</span>
 										}
 									</div>
 									if props.CanWrite {

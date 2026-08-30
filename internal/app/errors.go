@@ -415,10 +415,15 @@ var (
 	// that does — the worst kind of wrong.
 	ErrPlanHasNoTasks   = errors.New("add at least one task to the plan before assigning it")
 	ErrPlanTaskNotFound = errors.New("that task is not on this plan")
-	// ErrPlanTaskBooked blocks deleting a job somebody has already been sent
-	// out for. Its occurrences cascade with it, so the delete would leave an
-	// open customer ticket pointing at nothing.
-	ErrPlanTaskBooked       = errors.New("a visit is already booked for this job — close or cancel that ticket first")
+	// ErrPlanTaskHasHistory blocks deleting a job that has already been done,
+	// skipped, or booked onto a ticket. Its occurrences cascade with it, so the
+	// delete would erase the record of maintenance a machine actually received
+	// — and, where a ticket is involved, leave that ticket pointing at nothing.
+	//
+	// A used task therefore cannot be removed from a plan at all. That is the
+	// deliberate trade: history is worth more than a tidy plan, and the plan
+	// itself can be retired if it is genuinely wrong.
+	ErrPlanTaskHasHistory   = errors.New("this job has already been done on at least one machine — its history would go with it, so it cannot be removed from the plan")
 	ErrPlanTaskNameRequired = errors.New("what gets done? name the task")
 	// ErrPlanIntervalInvalid guards the interval. Zero would come due forever;
 	// ten years is past the point where anything would ever surface it again,

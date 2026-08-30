@@ -229,7 +229,7 @@ func (d *Deps) closeMaintenance(w http.ResponseWriter, r *http.Request, skip boo
 			redirectFlash(w, r, back, "That one was already logged.")
 			return
 		}
-		Error(w, r, err)
+		d.redirectOrFail(w, r, back, err)
 		return
 	}
 
@@ -503,6 +503,7 @@ func (d *Deps) renderPlanShow(w http.ResponseWriter, r *http.Request, id uuid.UU
 
 	var plan *domain.ServicePlan
 	var live, total int
+	var history map[uuid.UUID]int
 	var nav admin.ServiceNav
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		var txErr error
@@ -511,6 +512,10 @@ func (d *Deps) renderPlanShow(w http.ResponseWriter, r *http.Request, id uuid.UU
 			return txErr
 		}
 		live, total, txErr = d.ServicePlanService.CountAssignments(ctx, tx, id)
+		if txErr != nil {
+			return txErr
+		}
+		history, txErr = d.ServicePlanService.TaskHistoryCounts(ctx, tx, id)
 		if txErr != nil {
 			return txErr
 		}
@@ -527,6 +532,7 @@ func (d *Deps) renderPlanShow(w http.ResponseWriter, r *http.Request, id uuid.UU
 		Nav:           nav,
 		LiveMachines:  live,
 		TotalMachines: total,
+		TaskHistory:   history,
 		Values:        values,
 		Error:         msg,
 		StaffName:     staffName,
@@ -662,20 +668,15 @@ func (d *Deps) handleAdminServicePlanTaskAdd(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
-		// New tasks go on the end of the series, which is the order somebody
-		// writing a plan types them in.
-		plan, txErr := d.ServicePlanService.GetPlanWithTasks(ctx, tx, planID)
-		if txErr != nil {
-			return txErr
-		}
-		_, txErr = d.ServicePlanService.AddTask(ctx, tx, app.AddPlanTaskParams{
+		// Where the task lands in the series is AddTask's business, not this
+		// handler's.
+		_, txErr := d.ServicePlanService.AddTask(ctx, tx, app.AddPlanTaskParams{
 			PlanID:           planID,
 			Name:             values.Name,
 			Instructions:     values.Instructions,
 			IntervalDays:     interval,
 			LeadDays:         lead,
 			WarrantyRequired: values.WarrantyRequired,
-			SortOrder:        len(plan.Tasks),
 		}, staffActor(r))
 		return txErr
 	}); err != nil {

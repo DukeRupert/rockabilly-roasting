@@ -84,7 +84,7 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 	// blank series the promise exists to prevent. SweepStaleTickets publishes
 	// ahead of anything fallible for the same reason.
 	filled, backfillErr := s.backfillMissing(ctx, pool)
-	booked, bookErr := s.bookCoveredMaintenance(ctx, pool, now, riverJobID)
+	booked, bookFailed, bookErr := s.bookCoveredMaintenance(ctx, pool, now, riverJobID)
 
 	counts, countErr := s.sweepCounts(ctx, pool, now)
 	if countErr == nil {
@@ -101,6 +101,11 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 		"river_job_id": riverJobID,
 		"backfilled":   filled,
 		"booked":       booked,
+	}
+	// Only when there were any, so a normal day's row stays free of noise —
+	// but present and non-zero on every day that is worth explaining.
+	if bookFailed > 0 {
+		metadata["booking_failures"] = bookFailed
 	}
 	if countErr == nil {
 		metadata["overdue"] = counts[domain.MaintenanceOverdue]
@@ -128,7 +133,8 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 		// River re-run a sweep whose effects have already landed, to write a
 		// row nobody reads on a normal day.
 		slog.ErrorContext(ctx, "maintenance sweep: audit failed",
-			"backfilled", filled, "booked", booked, "error", err.Error())
+			"backfilled", filled, "booked", booked, "booking_failures", bookFailed,
+			"error", err.Error())
 	}
 
 	// Reported last, after the gauges and the audit row, so a failed run still
@@ -187,9 +193,16 @@ func (s *ServicePlanService) backfillMissing(ctx context.Context, pool *pgxpool.
 // customer deleted mid-sweep, a constraint nobody predicted — must not roll
 // back the twenty that succeeded, and the failure is worth logging rather than
 // aborting the run for.
-func (s *ServicePlanService) bookCoveredMaintenance(ctx context.Context, pool *pgxpool.Pool, now time.Time, riverJobID int64) (int, error) {
+//
+// It returns how many failed as well as how many were booked. Swallowing the
+// per-item errors entirely made a run where every booking failed write
+// `booked: 0` and report success — indistinguishable in the audit log from a
+// day with no maintenance due, which is precisely the day nobody needs to hear
+// about. The count goes in the audit row, and a run that booked nothing but
+// failed at something returns an error so River retries it.
+func (s *ServicePlanService) bookCoveredMaintenance(ctx context.Context, pool *pgxpool.Pool, now time.Time, riverJobID int64) (booked, failed int, err error) {
 	if s.tickets == nil {
-		return 0, nil
+		return 0, 0, nil
 	}
 
 	var due []domain.MaintenanceDueRow
@@ -202,10 +215,10 @@ func (s *ServicePlanService) bookCoveredMaintenance(ctx context.Context, pool *p
 		})
 		return err
 	}); err != nil {
-		return 0, fmt.Errorf("list bookable maintenance: %w", err)
+		return 0, 0, fmt.Errorf("list bookable maintenance: %w", err)
 	}
 
-	var booked int
+	var lastErr error
 	for _, row := range due {
 		// The store scope and this check answer the same question from two
 		// sides. The predicate is the authority on what is bookable; the query
@@ -219,6 +232,8 @@ func (s *ServicePlanService) bookCoveredMaintenance(ctx context.Context, pool *p
 			slog.ErrorContext(ctx, "maintenance sweep: could not book visit",
 				"due_id", row.ID.String(), "customer_id", row.CustomerID.String(),
 				"task", row.TaskName, "error", err.Error())
+			failed++
+			lastErr = err
 			continue
 		}
 		booked++
@@ -226,7 +241,15 @@ func (s *ServicePlanService) bookCoveredMaintenance(ctx context.Context, pool *p
 			s.metrics.MaintenanceBooked.Inc()
 		}
 	}
-	return booked, nil
+
+	// Partial success stays a success: the bookings that landed are committed,
+	// and retrying the whole sweep to chase one bad row would re-examine every
+	// good one. A run that booked *nothing* while failing is the other case —
+	// nothing was accomplished, so let River try again.
+	if booked == 0 && failed > 0 {
+		return 0, failed, fmt.Errorf("booked none of %d due visits: %w", failed, lastErr)
+	}
+	return booked, failed, nil
 }
 
 // bookOne opens the ticket for one due item and attaches it, in one

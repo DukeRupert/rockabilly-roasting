@@ -279,7 +279,9 @@ func (d *Deps) handleAdminServiceTimeReprice(w http.ResponseWriter, r *http.Requ
 		entry, txErr = d.ServiceTicketService.RepriceTimeEntry(ctx, tx, ticketID, entryID, rate, staffActor(r))
 		return txErr
 	}); err != nil {
-		Error(w, r, err)
+		// A rate out of range is a typo, not a crash: say so on the ticket the
+		// operator is standing on rather than replacing it with an error page.
+		d.redirectOrFail(w, r, ticketPath(ticketID), err)
 		return
 	}
 

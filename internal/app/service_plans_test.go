@@ -476,11 +476,22 @@ func TestEditTaskIntervalNeverBooksASkippedVisit(t *testing.T) {
 		moved.DueOn.UTC().Format("2006-01-02"))
 	assert.NotEqual(t, domain.MaintenanceOverdue, moved.Urgency(today),
 		"editing an interval must not retrospectively make work late")
-	assert.Equal(t, planDay(2026, time.May, 1).UTC(), moved.DueOn.UTC(),
-		"clamped forward a whole interval at a time, so it stays on the new cadence")
 
-	// Due today on a fifteen-day cadence is legitimately due — the plan now
-	// says so. What must not happen is it arriving already late.
+	// Clear of today, not merely level with it.
+	//
+	// This assertion used to read 1 May — today — on the reasoning that a
+	// fifteen-day cadence makes work due today legitimately due. That reasoning
+	// is fine for an occurrence that was already owed, and wrong here: this one
+	// was in the future until an interval edit moved it, the customer declined
+	// the visit two weeks ago, and BookableOn returns true for a due-today row.
+	// Landing on today is the sweep booking it tonight — precisely what this
+	// test is named after.
+	assert.True(t, moved.DueOn.UTC().After(today.UTC()),
+		"got %s, wanted strictly after today", moved.DueOn.UTC().Format("2006-01-02"))
+	assert.Equal(t, planDay(2026, time.May, 16).UTC(), moved.DueOn.UTC(),
+		"clamped forward a whole interval at a time, so it stays on the new cadence")
+	assert.False(t, moved.BookableOn(today),
+		"and the sweep leaves it alone tonight, which is the whole point")
 }
 
 // An occurrence that was already late stays late — it genuinely is, and hiding
@@ -574,4 +585,37 @@ func TestBothCloseRoutesBoundTheirDates(t *testing.T) {
 		_, err = svc.SkipDue(ctx, tx, id, now.AddDate(-11, 0, 0), now, "", staffActorFor(t, tx))
 		assert.ErrorIs(t, err, app.ErrMaintenanceDateOutOfRange)
 	})
+}
+
+// The append rule belongs to AddTask, so it holds however the caller reaches it
+// — including a second caller that would not have known to count first.
+func TestAddTaskAppendsToTheSeries(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	svc := newServicePlanService()
+
+	plan, err := svc.CreatePlan(ctx, tx, app.CreateServicePlanParams{Name: "Order " + uuid.NewString()[:8]}, testutil.TestActor())
+	require.NoError(t, err)
+
+	var orders []int
+	for _, name := range []string{"Backflush", "Gaskets", "Full service"} {
+		task, err := svc.AddTask(ctx, tx, app.AddPlanTaskParams{
+			PlanID: plan.ID, Name: name, IntervalDays: 30, LeadDays: 7,
+		}, testutil.TestActor())
+		require.NoError(t, err)
+		orders = append(orders, task.SortOrder)
+	}
+	assert.Equal(t, []int{0, 1, 2}, orders, "each one lands after the last")
+
+	// And a gap does not make the next one collide. Removing the middle task
+	// leaves 0 and 2 behind; counting would put the next at 2.
+	full, err := svc.GetPlanWithTasks(ctx, tx, plan.ID)
+	require.NoError(t, err)
+	require.NoError(t, svc.RemoveTask(ctx, tx, plan.ID, full.Tasks[1].ID, testutil.TestActor()))
+
+	task, err := svc.AddTask(ctx, tx, app.AddPlanTaskParams{
+		PlanID: plan.ID, Name: "Water filter", IntervalDays: 180, LeadDays: 14,
+	}, testutil.TestActor())
+	require.NoError(t, err)
+	assert.Equal(t, 3, task.SortOrder, "still after everything, not on top of the last one")
 }

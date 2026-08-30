@@ -380,20 +380,21 @@ func TestMissingDueAnchorSurvivesReassignment(t *testing.T) {
 		"the June service still counts — the machine was serviced, whatever the paperwork said")
 }
 
-// Deleting a plan task must not orphan a visit somebody has been sent out for.
+// Deleting a plan task must not destroy what a machine has already had done.
 //
-// service_maintenance_due.task_id cascades, so the delete takes the occurrence
-// with it — ticket and all. EndAssignment was rewritten to stop exactly this;
-// two write paths reaching the same rows should not hold opposite policies.
-func TestCountBookedForTaskSeesTheTicket(t *testing.T) {
+// service_maintenance_due.task_id cascades, so the delete takes every
+// occurrence with it — ticket and all, completion and all. EndAssignment keeps
+// all of that; two write paths reaching the same rows should not hold opposite
+// policies.
+func TestCountTaskHistorySeesTheTicket(t *testing.T) {
 	tx := testutil.NewTestTx(t, testPool)
 	ctx := t.Context()
 	f := newPlanFixture(t, tx, 90, 14, true)
 	due := f.due(t, tx, planTestDay(2026, time.April, 1))
 
-	n, err := f.plans.CountBookedForTask(ctx, tx, f.task.ID)
+	n, err := f.plans.CountTaskHistory(ctx, tx, f.task.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 0, n, "nothing booked yet")
+	assert.Equal(t, 0, n, "a pending occurrence is not history — it has not happened")
 
 	ticket, err := store.NewServiceTicketStore().Create(ctx, tx, store.CreateServiceTicketParams{
 		Number:     "SVC-DEL-" + uuid.NewString()[:8],
@@ -404,9 +405,59 @@ func TestCountBookedForTaskSeesTheTicket(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, f.plans.AttachTicket(ctx, tx, due.ID, ticket.ID))
 
-	n, err = f.plans.CountBookedForTask(ctx, tx, f.task.ID)
+	n, err = f.plans.CountTaskHistory(ctx, tx, f.task.ID)
 	require.NoError(t, err)
 	assert.Equal(t, 1, n, "and now the delete has something to refuse")
+}
+
+// The regression: work done off a ticket is still work done.
+//
+// Uncovered maintenance is the call-list case — sold on the phone, ticked off
+// by hand, never auto-booked — so its history is completed occurrences with a
+// NULL ticket_id. Counting only the ticketed rows meant the commonest history
+// on a no-contract account was the one kind that cascaded away in silence,
+// while the confirm dialog said nothing else would change.
+func TestCountTaskHistorySeesHandTickedWork(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newPlanFixture(t, tx, 90, 14, false)
+	due := f.due(t, tx, planTestDay(2026, time.April, 1))
+
+	_, err := f.plans.CloseDue(ctx, tx, due.ID, store.CloseDueParams{
+		Status:      domain.MaintenanceStatusCompleted,
+		CompletedOn: planTestDay(2026, time.April, 3),
+		Notes:       "backflushed, screens changed",
+	})
+	require.NoError(t, err)
+
+	n, err := f.plans.CountTaskHistory(ctx, tx, f.task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n, "no ticket, but the machine still had the work done")
+
+	counts, err := f.plans.CountHistoryByTask(ctx, tx, f.plan.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, counts[f.task.ID], "and the page sees it, so it stops offering Remove")
+}
+
+// A skip is a deliberate decision about a machine, recorded on purpose. It is
+// as much a fact about the past as a completion, and cascading it away loses
+// the reason the next occurrence sits where it does.
+func TestCountTaskHistorySeesASkip(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newPlanFixture(t, tx, 90, 14, false)
+	due := f.due(t, tx, planTestDay(2026, time.April, 1))
+
+	_, err := f.plans.CloseDue(ctx, tx, due.ID, store.CloseDueParams{
+		Status:      domain.MaintenanceStatusSkipped,
+		CompletedOn: planTestDay(2026, time.April, 3),
+		Notes:       "customer declined",
+	})
+	require.NoError(t, err)
+
+	n, err := f.plans.CountTaskHistory(ctx, tx, f.task.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 1, n)
 }
 
 // Same account is not the same machine. A chain is one customer, so the account

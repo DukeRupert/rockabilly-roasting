@@ -137,10 +137,27 @@ func TestExpectedFailure(t *testing.T) {
 			app.ErrLaborRateZero,
 			app.ErrTravelRateWithoutLabor,
 			app.ErrEquipmentRetired,
-			app.ErrPlanNotFound,
-			app.ErrMaintenanceNotFound,
 		} {
 			assert.True(t, expectedFailure(err), "%v", err)
+		}
+	})
+
+	t.Run("a missing resource is not something to flash", func(t *testing.T) {
+		// Deliberate, and the odd one out: not-found is as named as anything
+		// above it, but the callers are redirect-*back* helpers and the place
+		// they redirect back to is the resource that is missing. Flashing "no
+		// such plan" onto a 303 aimed at that plan's own page just produces a
+		// 404 with the message lost on the way there. Error renders the 404.
+		for _, err := range []error{
+			app.ErrPlanNotFound,
+			app.ErrMaintenanceNotFound,
+			app.ErrPlanTaskNotFound,
+			app.ErrPlanAssignmentNotFound,
+		} {
+			assert.False(t, expectedFailure(err), "%v", err)
+			status, _ := mapError(err)
+			assert.Equal(t, http.StatusNotFound, status,
+				"%v is excluded for being a 404, so it had better be one", err)
 		}
 	})
 

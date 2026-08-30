@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -569,8 +570,23 @@ func parseDollarsCents(raw string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	// ParseFloat accepts "Inf", "+Inf" and "NaN" as valid float64s. Neither is
+	// caught by the negative check below — NaN compares false against
+	// everything, and +Inf is cheerfully positive — and converting either to an
+	// int is undefined behaviour that lands on a large negative number in
+	// practice. A settings field that turns "NaN" into a negative rate is worse
+	// than one that refuses it.
+	if math.IsNaN(dollars) || math.IsInf(dollars, 0) {
+		return 0, fmt.Errorf("not an amount")
+	}
 	if dollars < 0 {
 		return 0, fmt.Errorf("negative amount")
+	}
+	// Bounded so the conversion cannot overflow. The ceiling is far above any
+	// figure a shop setting holds — the point is that it exists, not where it
+	// sits.
+	if cents := dollars*100 + 0.5; cents > math.MaxInt32 {
+		return 0, fmt.Errorf("amount too large")
 	}
 	return int(dollars*100 + 0.5), nil
 }

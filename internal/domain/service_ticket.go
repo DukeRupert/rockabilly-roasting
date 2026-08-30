@@ -461,11 +461,29 @@ type ServiceLaborRates struct {
 // Set reports whether a labour rate has been configured. Without one there is
 // no money figure to compute, and every surface that would show one hides it
 // instead of printing a zero.
+//
+// Zero counts as unset here, and *does not* on the travel field. The asymmetry
+// is deliberate and worth stating on the type, because reading only one of
+// these two methods gives the wrong impression of the other:
+//
+//   - A zero labour rate is meaningless. Nobody's hour costs nothing, so the
+//     only thing it can be is a half-finished edit, and treating it as a real
+//     rate would stamp every entry at zero and print "$0.00 of labour" — which
+//     reads as a measurement rather than an absence.
+//   - A zero travel rate means something specific: the shop absorbs the drive.
+//     That is a real policy a shop can hold, so TravelRate returns the zero
+//     rather than falling back to labour, and travel is costed at nothing on
+//     purpose.
+//
+// app.validateLaborRates is what stops the meaningless one being saved
+// (ErrLaborRateZero); this comment is what stops the next reader assuming the
+// two fields are spelled the same way.
 func (r ServiceLaborRates) Set() bool {
 	return r.LaborCentsPerHour != nil && *r.LaborCentsPerHour > 0
 }
 
-// TravelRate is the rate to cost travel at, falling back to labour.
+// TravelRate is the rate to cost travel at, falling back to labour when unset.
+// A present zero is honoured, not treated as absent — see Set.
 func (r ServiceLaborRates) TravelRate() int {
 	if r.TravelCentsPerHour != nil {
 		return *r.TravelCentsPerHour

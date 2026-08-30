@@ -86,6 +86,21 @@ func calendarCellClass(day MaintenanceCalendarDay, today time.Time) string {
 	return base + " bg-rr-surface"
 }
 
+// calendarCellAttrs marks today's cell for anything that is not looking at the
+// ring around it.
+//
+// aria-current="date" is the one attribute that means "this is today" in a
+// grid of dates, and without it the marker was colour alone — the same WCAG
+// 1.4.1 failure calendarChipState exists to fix, left standing on the cell
+// while the chips inside it were corrected. The visible ring stays; this is
+// what the ring means, said out loud.
+func calendarCellAttrs(day MaintenanceCalendarDay, today time.Time) templ.Attributes {
+	if !sameDay(day.Date, today) {
+		return templ.Attributes{}
+	}
+	return templ.Attributes{"aria-current": "date"}
+}
+
 // calendarChipState is the word a chip's colour stands for.
 //
 // WCAG 2.1 AA, 1.4.1: the grid distinguished overdue from at-risk from
@@ -174,11 +189,20 @@ templ MaintenanceCalendarContent(props MaintenanceCalendarProps) {
 				for week := 0; week*7 < len(props.Days); week++ {
 					<tr>
 						for _, day := range props.Days[week*7 : min(week*7+7, len(props.Days))] {
-							<td class={ calendarCellClass(day, props.Today) }>
+							<td class={ calendarCellClass(day, props.Today) } { calendarCellAttrs(day, props.Today)... }>
 								<!-- The day number is the cell's own heading, not decoration:
 								     without it a screen reader reads a chip with no date on it. -->
 								<div class="text-xs font-medium">
-									<span class="sr-only">{ day.Date.Format("Monday 2 January") }</span>
+									<!-- The year is here because a maintenance calendar is routinely
+									     read months either side of now, and a spoken date with no year
+									     in it is ambiguous exactly when somebody is checking a warranty
+									     deadline. -->
+									<span class="sr-only">
+										{ day.Date.Format("Monday 2 January 2006") }
+										if sameDay(day.Date, props.Today) {
+											, today
+										}
+									</span>
 									<span aria-hidden="true">{ strconv.Itoa(day.Date.Day()) }</span>
 								</div>
 								<div class="mt-1 space-y-0.5">
@@ -188,7 +212,7 @@ templ MaintenanceCalendarContent(props MaintenanceCalendarProps) {
 											class={ calendarChipClass(row, props.Today) }
 											title={ row.CustomerName + " · " + row.MachineDescription() + " · " + row.TaskName }
 										>
-											<span class="sr-only">{ day.Date.Format("2 January") }, { calendarChipState(row, props.Today) }: </span>
+											<span class="sr-only">{ day.Date.Format("2 January 2006") }, { calendarChipState(row, props.Today) }: </span>
 											{ row.CustomerName } — { row.TaskName }
 										</a>
 									}

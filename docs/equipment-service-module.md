@@ -500,7 +500,9 @@ original cadence, and a pure function of the anchor could express neither.
 - **The first occurrence is never pushed forward.** Assigning a plan with an
   anchor two years back is how a shop *discovers* a machine is overdue.
 - **The contract decides what "due" does.** Covered work inside its lead window
-  opens itself a `routine` ticket overnight and attaches it. Uncovered work is
+  opens itself a `routine` ticket overnight — 03:00 merchant time, on a
+  wall-clock schedule (`jobs.DailySchedule`) so "overnight" does not drift to
+  whenever the last deploy happened — and attaches it. Uncovered work is
   never booked — that would commit the shop to a visit nobody agreed to pay for
   — and lands on the **call list** instead, which is a human's job.
 

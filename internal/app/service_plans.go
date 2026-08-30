@@ -233,12 +233,25 @@ func (s *ServicePlanService) CountAssignmentsByPlan(ctx context.Context, tx pgx.
 	return s.plans.CountAssignmentsByPlan(ctx, tx)
 }
 
+// TaskHistoryCounts is how many recorded occurrences each task on a plan has —
+// done, skipped, or booked onto a ticket. A task with any is one RemoveTask
+// will refuse, so the page uses this to stop offering the control.
+func (s *ServicePlanService) TaskHistoryCounts(ctx context.Context, tx pgx.Tx, planID uuid.UUID) (map[uuid.UUID]int, error) {
+	return s.plans.CountHistoryByTask(ctx, tx, planID)
+}
+
 // --- Tasks ---
 
 // AddPlanTaskParams is the input for adding an item to a plan's series.
 type AddPlanTaskParams = store.CreateServicePlanTaskParams
 
-// AddTask adds an item to a plan's series.
+// AddTask adds an item to a plan's series, at the end of it.
+//
+// The position is decided here rather than by the caller. "A new task goes on
+// the end" is a rule about what a plan is — the order somebody writes the jobs
+// down in — and the handler that used to own it had to load the plan and all
+// its tasks to count them, which made a read-modify-write out of an append and
+// put a business rule somewhere no service-level caller would inherit it.
 //
 // It does not backfill occurrences onto the machines already on the plan. The
 // daily sweep does that, from ListMissingDue — one path that finds every gap
@@ -253,6 +266,11 @@ func (s *ServicePlanService) AddTask(ctx context.Context, tx pgx.Tx, p AddPlanTa
 	}
 
 	plan, err := s.GetPlan(ctx, tx, p.PlanID)
+	if err != nil {
+		return nil, err
+	}
+
+	p.SortOrder, err = s.plans.NextTaskSortOrder(ctx, tx, p.PlanID)
 	if err != nil {
 		return nil, err
 	}
@@ -410,17 +428,24 @@ func (s *ServicePlanService) RemoveTask(ctx context.Context, tx pgx.Tx, planID, 
 	}
 
 	// service_maintenance_due.task_id cascades, so deleting the task would take
-	// its occurrences with it — including ones the sweep has already opened a
-	// customer ticket for. EndAssignment was rewritten to stop exactly that;
-	// two write paths reaching the same rows should not hold opposite policies.
-	// There is no way to keep the row (task_id is NOT NULL), so the delete is
-	// refused until somebody deals with the ticket.
-	booked, err := s.plans.CountBookedForTask(ctx, tx, id)
+	// every occurrence of it with it — the pending ones, which is the intent,
+	// but also everything that already happened, which is not.
+	//
+	// EndAssignment keeps all completed history and every booked row; two write
+	// paths reaching the same rows must not hold opposite policies. This guard
+	// used to count only the ticketed occurrences, which honoured that for
+	// contract accounts and broke it for everyone else: uncovered maintenance
+	// is sold on the phone and ticked off by hand, so its history is completed
+	// rows with no ticket — exactly the kind that fell through.
+	//
+	// There is nowhere to put a surviving occurrence (task_id is NOT NULL), so
+	// the delete is refused rather than made lossy.
+	history, err := s.plans.CountTaskHistory(ctx, tx, id)
 	if err != nil {
 		return err
 	}
-	if booked > 0 {
-		return ErrPlanTaskBooked
+	if history > 0 {
+		return ErrPlanTaskHasHistory
 	}
 
 	if err := s.plans.DeleteTask(ctx, tx, id); err != nil {
@@ -588,6 +613,15 @@ func (s *ServicePlanService) EditAssignment(ctx context.Context, tx pgx.Tx, id u
 	before, err := s.GetAssignment(ctx, tx, id)
 	if err != nil {
 		return nil, err
+	}
+	// An ended arrangement is history, and history is not edited. EndAssignment
+	// refuses the same way; the two are the only writes that reach an
+	// assignment and they should agree on what a stopped one is. Nothing here
+	// would generate work — the pending scopes all filter ended_at IS NULL —
+	// but changing the anchor date of an arrangement that is over silently
+	// rewrites the record of what a machine was on and when.
+	if !before.Live() {
+		return nil, ErrPlanAssignmentEnded
 	}
 
 	assignment, err := s.plans.UpdateAssignment(ctx, tx, id, p)

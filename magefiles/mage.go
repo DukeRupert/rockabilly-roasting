@@ -100,8 +100,17 @@ func Clean() error {
 }
 
 // Check runs lint, scoping check, admin UI lint, and tests together (CI-style gate).
+//
+// CheckTemplSync goes first and alone. It is the one target here that *writes*
+// — it runs `templ generate` and compares the result — while Lint and Test both
+// compile the files it is rewriting. Under mg.Deps they run concurrently, so a
+// tree with real drift would have had the generator racing the compiler: the
+// failure mode arms itself in exactly the case the target exists to catch, and
+// stays invisible the rest of the time because a clean tree rewrites every file
+// with identical bytes.
 func Check() {
-	mg.Deps(Lint, CheckScoping, CheckAdminUI, CheckTemplSync, Test)
+	mg.SerialDeps(CheckTemplSync)
+	mg.Deps(Lint, CheckScoping, CheckAdminUI, Test)
 }
 
 // CheckTemplSync fails if any *_templ.go on disk differs from what templ

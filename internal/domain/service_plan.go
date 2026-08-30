@@ -409,9 +409,12 @@ func NextDueAfterSkip(dueOn, on time.Time, intervalDays int) time.Time {
 //     The new interval governs the *next* occurrence, which is measured from
 //     whenever this one is finally done.
 //   - Work still in the future is shifted, then stepped forward whole intervals
-//     if that lands it in the past. Past-due covered work is inside the sweep's
-//     booking window, so without this a shortened interval would open a real
-//     customer ticket for a visit somebody had just declined.
+//     until it clears today. Past-due *and due-today* covered work is inside the
+//     sweep's booking window, so without this a shortened interval would open a
+//     real customer ticket for a visit somebody had just declined. Note the
+//     asymmetry with the rule above and that it is deliberate: an occurrence
+//     already owed stays owed, but an interval edit may not newly *make* one
+//     owed today out of work that was in the future a moment ago.
 func RescheduledDue(currentDue time.Time, oldInterval, newInterval int, on time.Time) time.Time {
 	due := calendarDay(currentDue)
 	today := calendarDay(on)
@@ -427,7 +430,12 @@ func RescheduledDue(currentDue time.Time, oldInterval, newInterval int, on time.
 		return shifted
 	}
 	// Bounded: newInterval is at least one day, so each step moves forward.
-	for shifted.Before(today) {
+	//
+	// Strict, matching NextDueAfterSkip: the step has to clear today, not merely
+	// reach it. Landing exactly on today is landing *inside* the booking window
+	// — BookableOn returns true for a due-today occurrence — so stopping there
+	// would open the very ticket this guard exists to prevent.
+	for !shifted.After(today) {
 		shifted = shifted.AddDate(0, 0, newInterval)
 	}
 	return shifted

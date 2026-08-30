@@ -144,7 +144,7 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 			for _, p := range servicePeriods() {
 				<a
 					href={ templ.SafeURL(serviceCostsHref(p.Days, string(props.Report.Sort))) }
-					aria-current={ ariaCurrent(p.Days == props.Days) }
+					aria-current={ ariaCurrentOption(p.Days == props.Days) }
 					class={ serviceToggleClass(p.Days == props.Days) }
 				>{ p.Label }</a>
 			}
@@ -154,7 +154,7 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 			for _, s := range serviceSorts(props.Report.ShowCost()) {
 				<a
 					href={ templ.SafeURL(serviceCostsHref(props.Days, s.Value)) }
-					aria-current={ ariaCurrent(s.Value == string(props.Report.Sort)) }
+					aria-current={ ariaCurrentOption(s.Value == string(props.Report.Sort)) }
 					class={ serviceToggleClass(s.Value == string(props.Report.Sort)) }
 				>{ s.Label }</a>
 			}

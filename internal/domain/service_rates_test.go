@@ -33,55 +33,98 @@ func TestServiceLaborRatesTravelFallback(t *testing.T) {
 	assert.Equal(t, 0, absorbed.TravelRate(), "zero is a decision: the shop absorbs the drive")
 }
 
+// Cost is a sum of what each hour was booked at, not a calculation against the
+// current rate. The summary carries the figure; nothing recomputes it.
 func TestServiceCostSummaryCosting(t *testing.T) {
 	summary := domain.ServiceCostSummary{
 		ServiceTotals: domain.ServiceTotals{
 			PartsCostCents: 12690,
 			LaborMinutes:   150,
 			TravelMinutes:  60,
+			LaborCostCents: 18000,
 		},
 	}
 
-	t.Run("no rate set", func(t *testing.T) {
-		assert.Equal(t, 0, summary.LaborCostCents(domain.ServiceLaborRates{}))
-		assert.Equal(t, 12690, summary.TotalCostCents(domain.ServiceLaborRates{}),
-			"parts alone — the hours were spent, and the shop has not said what they were worth")
-	})
-
-	t.Run("labour rate only", func(t *testing.T) {
-		rates := domain.ServiceLaborRates{LaborCentsPerHour: rate(6000)}
-		// 150m at $60/h = $150, 60m of travel at the same = $60.
-		assert.Equal(t, 21000, summary.LaborCostCents(rates))
-		assert.Equal(t, 33690, summary.TotalCostCents(rates))
-	})
-
-	t.Run("split rates", func(t *testing.T) {
-		rates := domain.ServiceLaborRates{LaborCentsPerHour: rate(6000), TravelCentsPerHour: rate(3000)}
-		// 150m at $60/h = $150, 60m at $30/h = $30.
-		assert.Equal(t, 18000, summary.LaborCostCents(rates))
-	})
-
-	t.Run("travel absorbed", func(t *testing.T) {
-		rates := domain.ServiceLaborRates{LaborCentsPerHour: rate(6000), TravelCentsPerHour: rate(0)}
-		assert.Equal(t, 15000, summary.LaborCostCents(rates))
-	})
+	assert.Equal(t, 30690, summary.TotalCostCents(), "parts plus the hours as they were booked")
+	assert.True(t, summary.AnyCost())
+	assert.True(t, summary.FullyCosted())
 }
 
-// Costing rounds to the nearest cent rather than truncating. These figures are
-// summed across hundreds of entries, and a fraction lost on each would drift
-// away from the same numbers computed any other way.
-func TestServiceCostRounding(t *testing.T) {
-	// 7 minutes at $65/hour is 758.33 cents.
+// A shop that never set a rate has hours and no money against them, and the
+// difference between "free" and "never priced" has to survive to the surface.
+func TestServiceCostSummaryUncosted(t *testing.T) {
 	summary := domain.ServiceCostSummary{
-		ServiceTotals: domain.ServiceTotals{LaborMinutes: 7},
+		ServiceTotals: domain.ServiceTotals{
+			PartsCostCents:  12690,
+			LaborMinutes:    150,
+			UncostedMinutes: 150,
+		},
 	}
-	rates := domain.ServiceLaborRates{LaborCentsPerHour: rate(6500)}
 
-	assert.Equal(t, 758, summary.LaborCostCents(rates))
+	assert.Equal(t, 12690, summary.TotalCostCents(), "parts alone — nobody said what the hours were worth")
+	assert.False(t, summary.AnyCost())
+	assert.False(t, summary.FullyCosted(),
+		"the money figure is a floor while any hour is unpriced, and the page says so")
+}
 
-	// 5 minutes at $65/hour is 541.67 — rounds up, where truncation would say 541.
-	summary.LaborMinutes = 5
-	assert.Equal(t, 542, summary.LaborCostCents(rates))
+// A partly-priced summary is the awkward middle: real money, and a total that
+// is not the whole story.
+func TestServiceCostSummaryPartlyCosted(t *testing.T) {
+	summary := domain.ServiceCostSummary{
+		ServiceTotals: domain.ServiceTotals{
+			LaborMinutes:    300,
+			LaborCostCents:  16250,
+			UncostedMinutes: 150,
+		},
+	}
+
+	assert.True(t, summary.AnyCost())
+	assert.False(t, summary.FullyCosted())
+}
+
+// One entry's own cost, rounded to the nearest cent.
+func TestServiceTimeEntryCost(t *testing.T) {
+	priced := domain.ServiceTimeEntry{Minutes: 150, RateCents: rate(6500)}
+	assert.True(t, priced.Costed())
+	assert.Equal(t, 16250, priced.CostCents(), "2.5h at $65")
+
+	// 7 minutes at $65/hour is 758.33 cents. Rounded, not truncated: these are
+	// summed across hundreds of entries and a fraction lost on each would drift.
+	odd := domain.ServiceTimeEntry{Minutes: 7, RateCents: rate(6500)}
+	assert.Equal(t, 758, odd.CostCents())
+
+	rounding := domain.ServiceTimeEntry{Minutes: 5, RateCents: rate(6500)}
+	assert.Equal(t, 542, rounding.CostCents(), "541.67 rounds up, where truncation would say 541")
+
+	unpriced := domain.ServiceTimeEntry{Minutes: 150}
+	assert.False(t, unpriced.Costed())
+	assert.Equal(t, 0, unpriced.CostCents(), "zero, and the surfaces say \"not priced\" rather than $0.00")
+
+	// An explicit zero is a decision — the shop absorbs the hour — and is not
+	// the same as never having priced it.
+	absorbed := domain.ServiceTimeEntry{Minutes: 150, RateCents: rate(0)}
+	assert.True(t, absorbed.Costed())
+	assert.Equal(t, 0, absorbed.CostCents())
+}
+
+// The money column appears as soon as either an hour is priced or a rate is
+// set — a shop setting its first rate should not have to log an hour to see
+// that the setting did anything.
+func TestServiceAccountReportShowCost(t *testing.T) {
+	assert.False(t, domain.ServiceAccountReport{}.ShowCost())
+
+	rated := domain.ServiceAccountReport{
+		Rates: domain.ServiceLaborRates{LaborCentsPerHour: rate(6500)},
+	}
+	assert.True(t, rated.ShowCost(), "a rate with no hours behind it yet still shows the column")
+
+	historic := domain.ServiceAccountReport{
+		Total: domain.ServiceCostSummary{
+			ServiceTotals: domain.ServiceTotals{LaborCostCents: 16250},
+		},
+	}
+	assert.True(t, historic.ShowCost(),
+		"priced hours keep the column even after the shop clears its rate")
 }
 
 func TestServiceAccountCostSortValid(t *testing.T) {

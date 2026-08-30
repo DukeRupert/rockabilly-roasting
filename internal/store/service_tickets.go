@@ -513,14 +513,14 @@ func (s *ServiceTicketStore) ListParts(ctx context.Context, tx pgx.Tx, ticketID 
 // --- Time entries ---
 
 const serviceTimeColumns = `id, ticket_id, staff_id, kind, minutes, performed_on, billable,
-	                    note, created_at`
+	                    note, created_at, rate_cents`
 
 func scanServiceTimeEntry(row rowScanner) (*domain.ServiceTimeEntry, error) {
 	var e domain.ServiceTimeEntry
 	var kind string
 	if err := row.Scan(
 		&e.ID, &e.TicketID, &e.StaffID, &kind, &e.Minutes, &e.PerformedOn, &e.Billable,
-		&e.Note, &e.CreatedAt,
+		&e.Note, &e.CreatedAt, &e.RateCents,
 	); err != nil {
 		return nil, err
 	}
@@ -538,6 +538,11 @@ type CreateTimeEntryParams struct {
 	PerformedOn time.Time
 	Billable    bool
 	Note        string
+	// RateCents is the hourly cost to stamp on the entry. Nil leaves it
+	// uncosted, which is what a shop with no rate set gets. The caller resolves
+	// which rate applies — labour or travel — because that is a policy question
+	// and this layer does not answer those.
+	RateCents *int
 }
 
 // CreateTimeEntry logs minutes against a ticket.
@@ -548,16 +553,32 @@ func (s *ServiceTicketStore) CreateTimeEntry(ctx context.Context, tx pgx.Tx, p C
 	}
 	row := tx.QueryRow(ctx,
 		`INSERT INTO service_time_entries (ticket_id, staff_id, kind, minutes, performed_on,
-		                                   billable, note)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		                                   billable, note, rate_cents)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		 RETURNING `+serviceTimeColumns,
-		p.TicketID, p.StaffID, string(p.Kind), p.Minutes, on, p.Billable, p.Note)
+		p.TicketID, p.StaffID, string(p.Kind), p.Minutes, on, p.Billable, p.Note, p.RateCents)
 
 	e, err := scanServiceTimeEntry(row)
 	if err != nil {
 		return nil, fmt.Errorf("create service time entry: %w", err)
 	}
 	return e, nil
+}
+
+// GetTimeEntry returns one logged stint.
+func (s *ServiceTicketStore) GetTimeEntry(ctx context.Context, tx pgx.Tx, id uuid.UUID) (*domain.ServiceTimeEntry, error) {
+	row := tx.QueryRow(ctx, `SELECT `+serviceTimeColumns+` FROM service_time_entries WHERE id = $1`, id)
+	return scanServiceTimeEntry(row)
+}
+
+// UpdateTimeEntryRate sets what one recorded hour cost. Nil returns it to
+// uncosted, which takes it back out of the money figures without touching the
+// hours themselves.
+func (s *ServiceTicketStore) UpdateTimeEntryRate(ctx context.Context, tx pgx.Tx, id uuid.UUID, rateCents *int) (*domain.ServiceTimeEntry, error) {
+	row := tx.QueryRow(ctx,
+		`UPDATE service_time_entries SET rate_cents = $2 WHERE id = $1
+		 RETURNING `+serviceTimeColumns, id, rateCents)
+	return scanServiceTimeEntry(row)
 }
 
 // DeleteTimeEntry removes a logged stint. For correcting a fat-fingered entry;
@@ -612,9 +633,13 @@ func (s *ServiceTicketStore) Totals(ctx context.Context, tx pgx.Tx, ticketID uui
 	if err := tx.QueryRow(ctx,
 		`SELECT COALESCE(SUM(minutes) FILTER (WHERE kind = 'labor'), 0),
 		        COALESCE(SUM(minutes) FILTER (WHERE kind = 'travel'), 0),
-		        COALESCE(SUM(minutes) FILTER (WHERE billable), 0)
+		        COALESCE(SUM(minutes) FILTER (WHERE billable), 0),
+		        COALESCE(SUM(round(minutes * rate_cents / 60.0))
+		                 FILTER (WHERE rate_cents IS NOT NULL), 0),
+		        COALESCE(SUM(minutes) FILTER (WHERE rate_cents IS NULL), 0)
 		 FROM service_time_entries WHERE ticket_id = $1`,
-		ticketID).Scan(&t.LaborMinutes, &t.TravelMinutes, &t.BillableMinutes); err != nil {
+		ticketID).Scan(&t.LaborMinutes, &t.TravelMinutes, &t.BillableMinutes,
+		&t.LaborCostCents, &t.UncostedMinutes); err != nil {
 		return domain.ServiceTotals{}, fmt.Errorf("sum service time for ticket %s: %w", ticketID, err)
 	}
 
@@ -730,7 +755,7 @@ func (s *ServiceTicketStore) CostSummary(ctx context.Context, tx pgx.Tx, f Servi
 	    FROM service_parts p JOIN scoped s ON s.id = p.ticket_id
 	    WHERE true` + partWindow + `
 	), entries AS (
-	    SELECT e.ticket_id, e.minutes, e.kind, e.billable
+	    SELECT e.ticket_id, e.minutes, e.kind, e.billable, e.rate_cents
 	    FROM service_time_entries e JOIN scoped s ON s.id = e.ticket_id
 	    WHERE true` + entryWindow + `
 	)
@@ -740,6 +765,11 @@ func (s *ServiceTicketStore) CostSummary(ctx context.Context, tx pgx.Tx, f Servi
 	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE kind = 'labor'), 0) FROM entries),
 	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE kind = 'travel'), 0) FROM entries),
 	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE billable), 0) FROM entries),
+	    -- Each hour at the rate it was booked at, rounded per entry so the
+	    -- figure matches the per-entry ones a staffer can read off the ticket.
+	    (SELECT COALESCE(SUM(round(minutes * rate_cents / 60.0)), 0) FROM entries
+	      WHERE rate_cents IS NOT NULL),
+	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE rate_cents IS NULL), 0) FROM entries),
 	    (SELECT count(DISTINCT ticket_id) FROM (
 	        SELECT ticket_id FROM parts UNION ALL SELECT ticket_id FROM entries
 	     ) touched)`
@@ -748,6 +778,7 @@ func (s *ServiceTicketStore) CostSummary(ctx context.Context, tx pgx.Tx, f Servi
 	if err := tx.QueryRow(ctx, query, args...).Scan(
 		&out.PartsCostCents, &out.PartCount,
 		&out.LaborMinutes, &out.TravelMinutes, &out.BillableMinutes,
+		&out.LaborCostCents, &out.UncostedMinutes,
 		&out.Visits,
 	); err != nil {
 		return domain.ServiceCostSummary{}, fmt.Errorf("service cost summary: %w", err)
@@ -760,10 +791,6 @@ type ServiceAccountCostFilter struct {
 	// Since bounds the window. Zero means all time.
 	Since time.Time
 	Sort  domain.ServiceAccountCostSort
-	// Rates cost the hours for a cost ranking. Ignored by every other sort,
-	// and a cost sort with no rate set falls back to hours rather than
-	// silently ranking by parts spend alone.
-	Rates domain.ServiceLaborRates
 	Limit int
 }
 
@@ -795,19 +822,11 @@ func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f Se
 	case domain.ServiceAccountCostByVisits:
 		orderBy = "visits DESC, total_minutes DESC"
 	case domain.ServiceAccountCostByCost:
-		if f.Rates.Set() {
-			// The same arithmetic as ServiceCostSummary.TotalCostCents, in SQL
-			// because the ranking has to happen before the LIMIT. Rounding is
-			// left out here — it can only move a row past a neighbour it is
-			// within half a cent of, and the figure the reader compares is the
-			// rounded one Go computes for the cell.
-			args = append(args, f.Rates.LaborRate())
-			labour := fmt.Sprintf("$%d", len(args))
-			args = append(args, f.Rates.TravelRate())
-			travel := fmt.Sprintf("$%d", len(args))
-			orderBy = "(parts_cents + labor_minutes * " + labour + " / 60.0" +
-				" + travel_minutes * " + travel + " / 60.0) DESC, total_minutes DESC"
-		}
+		// Ranked on the costs the entries actually carry, which is the same
+		// number the Cost column prints. Nothing is passed in: since the rate
+		// moved onto the entry there is no "current rate" for a report to
+		// apply, which is the whole point of the snapshot.
+		orderBy = "(parts_cents + labor_cents) DESC, total_minutes DESC"
 	}
 
 	limit := ""
@@ -820,12 +839,14 @@ func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f Se
 	WITH combined AS (
 	    SELECT t.customer_id, p.ticket_id, p.unit_cost_cents * p.quantity AS cents,
 	           0 AS minutes, NULL::text AS kind, false AS billable, true AS is_part,
+	           NULL::integer AS rate_cents,
 	           ` + servicePartCostDate + ` AS on_day
 	    FROM service_parts p
 	    JOIN service_tickets t ON t.id = p.ticket_id
 	    WHERE true` + partWindow + `
 	    UNION ALL
-	    SELECT t.customer_id, e.ticket_id, 0, e.minutes, e.kind, e.billable, false, e.performed_on
+	    SELECT t.customer_id, e.ticket_id, 0, e.minutes, e.kind, e.billable, false,
+	           e.rate_cents, e.performed_on
 	    FROM service_time_entries e
 	    JOIN service_tickets t ON t.id = e.ticket_id
 	    WHERE true` + entryWindow + `
@@ -837,6 +858,15 @@ func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f Se
 	           COALESCE(SUM(minutes) FILTER (WHERE kind = 'travel'), 0) AS travel_minutes,
 	           COALESCE(SUM(minutes) FILTER (WHERE billable), 0)        AS billable_minutes,
 	           COALESCE(SUM(minutes), 0)                                AS total_minutes,
+	           -- Hours at the rate each was booked at. is_part rows carry a
+	           -- NULL rate and are excluded by the same filter that excludes a
+	           -- genuinely uncosted hour, which is why the parts side had to be
+	           -- given the column at all.
+	           COALESCE(SUM(round(minutes * rate_cents / 60.0))
+	                    FILTER (WHERE NOT is_part AND rate_cents IS NOT NULL), 0)
+	                                                                    AS labor_cents,
+	           COALESCE(SUM(minutes) FILTER (WHERE NOT is_part AND rate_cents IS NULL), 0)
+	                                                                    AS uncosted_minutes,
 	           count(DISTINCT ticket_id)                                AS visits,
 	           max(on_day)                                              AS last_work_on
 	    FROM combined
@@ -846,7 +876,7 @@ func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f Se
 	       COALESCE(NULLIF(c.company_name, ''), TRIM(c.first_name || ' ' || c.last_name), c.email),
 	       COALESCE(m.machines, 0),
 	       a.parts_cents, a.part_count, a.labor_minutes, a.travel_minutes,
-	       a.billable_minutes, a.visits, a.last_work_on
+	       a.billable_minutes, a.labor_cents, a.uncosted_minutes, a.visits, a.last_work_on
 	FROM agg a
 	JOIN customers c ON c.id = a.customer_id
 	LEFT JOIN (
@@ -868,7 +898,8 @@ func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f Se
 			&r.CustomerID, &r.CustomerName, &r.MachineCount,
 			&r.Summary.PartsCostCents, &r.Summary.PartCount,
 			&r.Summary.LaborMinutes, &r.Summary.TravelMinutes,
-			&r.Summary.BillableMinutes, &r.Summary.Visits, &r.LastWorkOn,
+			&r.Summary.BillableMinutes, &r.Summary.LaborCostCents,
+			&r.Summary.UncostedMinutes, &r.Summary.Visits, &r.LastWorkOn,
 		); err != nil {
 			return nil, fmt.Errorf("scan service cost by customer: %w", err)
 		}

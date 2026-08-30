@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -240,4 +241,57 @@ func formatTimeFlash(e *domain.ServiceTimeEntry) string {
 		return strconv.Itoa(e.Minutes) + " billable " + unit + " logged."
 	}
 	return strconv.Itoa(e.Minutes) + " " + unit + " logged."
+}
+
+// handleAdminServiceTimeReprice sets what one recorded hour cost.
+//
+// The deliberate counterpart to the rate snapshot: a settings change no longer
+// re-prices past work, so an hour logged before the shop had a rate — or at one
+// since decided wrong — is corrected here, one row at a time and audited.
+func (d *Deps) handleAdminServiceTimeReprice(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	ticketID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		Error(w, r, app.ErrServiceTicketNotFound)
+		return
+	}
+	entryID, err := uuid.Parse(r.PathValue("childID"))
+	if err != nil {
+		Error(w, r, app.ErrServiceTimeEntryNotFound)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	// Blank returns the hour to unpriced, which is how a wrongly-costed one is
+	// taken back out of the money figures without deleting the hours.
+	rate, err := parseOptionalRate(r.FormValue("rate"))
+	if err != nil {
+		redirectFlashError(w, r, ticketPath(ticketID), "That is not an hourly rate.")
+		return
+	}
+
+	var entry *domain.ServiceTimeEntry
+	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
+		var txErr error
+		entry, txErr = d.ServiceTicketService.RepriceTimeEntry(ctx, tx, entryID, rate, staffActor(r))
+		return txErr
+	}); err != nil {
+		Error(w, r, err)
+		return
+	}
+
+	if !entry.Costed() {
+		redirectFlash(w, r, ticketPath(ticketID), "Hour left unpriced — its minutes still count, its cost does not.")
+		return
+	}
+	redirectFlash(w, r, ticketPath(ticketID),
+		fmt.Sprintf("Priced at %s an hour — %s.", formatCentsPlain(*entry.RateCents), formatCentsPlain(entry.CostCents())))
+}
+
+// formatCentsPlain renders cents as dollars for a flash message.
+func formatCentsPlain(cents int) string {
+	return fmt.Sprintf("$%d.%02d", cents/100, cents%100)
 }

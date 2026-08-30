@@ -53,6 +53,9 @@ templ SettingsServiceContent(props SettingsServiceProps) {
 			<p class="mt-1 text-sm text-rr-muted">
 				This is what an hour <em>costs you</em> — wages, vehicle, the lot — not what you charge for it. The reports it feeds measure what servicing an account took out of the business, so a charge-out rate here would turn a cost report into a revenue one.
 			</p>
+			<p class="mt-2 text-sm text-rr-muted">
+				Hours logged from now on are stamped with this rate and keep it. Hours already logged keep whatever they were stamped with — including nothing, if you had not set a rate yet.
+			</p>
 			<form method="post" action="/admin/settings/service" class="mt-4">
 				if props.Error != "" {
 					<p class="mb-3 text-sm text-rr-red">{ props.Error }</p>
@@ -103,7 +106,7 @@ templ SettingsServiceContent(props SettingsServiceProps) {
 		</div>
 		<div class="border-t border-rr-border bg-rr-raised px-4 py-3">
 			<p class="text-xs text-rr-muted">
-				Changing a rate re-costs every past visit — the reports compute from the rate as it stands now, not the rate that was set on the day. The change is recorded in the audit log so a jump in a cost figure can be traced back to it.
+				Each hour is stamped with the rate in force when it was logged, so changing these prices the next hour and leaves every past one alone. To correct an hour that was priced wrong — or logged before you set a rate at all — reprice it on its own ticket.
 			</p>
 		</div>
 	</div>

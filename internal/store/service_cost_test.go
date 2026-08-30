@@ -400,3 +400,122 @@ func TestCostByCustomerHonoursTheWindow(t *testing.T) {
 	}
 	t.Fatal("the account with recent work should be in the table")
 }
+
+// --- Rate snapshots ---
+
+// logTimeAt logs a stint already stamped with a rate, the way the service does.
+func (f costFixture) logTimeAt(t *testing.T, tx pgx.Tx, ticketID uuid.UUID, minutes int, kind domain.ServiceTimeKind, on time.Time, rateCents *int) {
+	t.Helper()
+	_, err := f.tickets.CreateTimeEntry(t.Context(), tx, store.CreateTimeEntryParams{
+		TicketID:    ticketID,
+		StaffID:     f.staffID,
+		Kind:        kind,
+		Minutes:     minutes,
+		PerformedOn: on,
+		RateCents:   rateCents,
+	})
+	require.NoError(t, err)
+}
+
+func ratePtr(cents int) *int { return &cents }
+
+// Two hours booked at two different rates cost the sum of what each was booked
+// at — not either rate applied to both.
+func TestCostSummarySumsEachHourAtItsOwnRate(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newCostFixture(t, tx)
+	on := costDay(2026, time.August, 10)
+
+	f.logTimeAt(t, tx, f.onMachine.ID, 60, domain.ServiceTimeKindLabor, on, ratePtr(6000))
+	f.logTimeAt(t, tx, f.onMachine.ID, 60, domain.ServiceTimeKindLabor, on, ratePtr(9000))
+
+	got, err := f.tickets.CostSummary(ctx, tx, store.ServiceCostFilter{EquipmentID: &f.equipment.ID})
+	require.NoError(t, err)
+
+	assert.Equal(t, 15000, got.LaborCostCents, "$60 then $90 — not two hours at either")
+	assert.Equal(t, 120, got.LaborMinutes)
+	assert.True(t, got.FullyCosted())
+}
+
+// Unpriced hours contribute minutes and no money, and are counted separately so
+// a report can say the total is a floor.
+func TestCostSummarySeparatesUncostedHours(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newCostFixture(t, tx)
+	on := costDay(2026, time.August, 10)
+
+	f.logTimeAt(t, tx, f.onMachine.ID, 60, domain.ServiceTimeKindLabor, on, ratePtr(6000))
+	f.logTimeAt(t, tx, f.onMachine.ID, 90, domain.ServiceTimeKindLabor, on, nil)
+
+	got, err := f.tickets.CostSummary(ctx, tx, store.ServiceCostFilter{EquipmentID: &f.equipment.ID})
+	require.NoError(t, err)
+
+	assert.Equal(t, 6000, got.LaborCostCents)
+	assert.Equal(t, 150, got.LaborMinutes, "every minute counts as time")
+	assert.Equal(t, 90, got.UncostedMinutes)
+	assert.False(t, got.FullyCosted())
+}
+
+// An explicit zero rate is a decision — the shop absorbs the hour — and is not
+// the same as never having priced it.
+func TestCostSummaryZeroRateIsNotUncosted(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newCostFixture(t, tx)
+
+	f.logTimeAt(t, tx, f.onMachine.ID, 60, domain.ServiceTimeKindTravel, costDay(2026, time.August, 10), ratePtr(0))
+
+	got, err := f.tickets.CostSummary(ctx, tx, store.ServiceCostFilter{EquipmentID: &f.equipment.ID})
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, got.LaborCostCents)
+	assert.Equal(t, 0, got.UncostedMinutes, "priced at nothing is still priced")
+	assert.True(t, got.FullyCosted())
+}
+
+// The per-ticket roll-up and the widened one have to agree about cost too.
+func TestTotalsAndCostSummaryAgreeOnCost(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	f := newCostFixture(t, tx)
+	on := costDay(2026, time.August, 10)
+
+	f.logTimeAt(t, tx, f.onMachine.ID, 150, domain.ServiceTimeKindLabor, on, ratePtr(6500))
+	f.logTimeAt(t, tx, f.onMachine.ID, 45, domain.ServiceTimeKindTravel, on, nil)
+	f.addPart(t, tx, f.onMachine.ID, 2, 425)
+
+	perTicket, err := f.tickets.Totals(ctx, tx, f.onMachine.ID)
+	require.NoError(t, err)
+	widened, err := f.tickets.CostSummary(ctx, tx, store.ServiceCostFilter{EquipmentID: &f.equipment.ID})
+	require.NoError(t, err)
+
+	assert.Equal(t, perTicket, widened.ServiceTotals)
+	assert.Equal(t, 16250, perTicket.LaborCostCents)
+	assert.Equal(t, 45, perTicket.UncostedMinutes)
+}
+
+// The cross-account table costs each account's hours the same way, and ranks on
+// the result rather than on a rate passed in.
+func TestCostByCustomerCostsFromStampedRates(t *testing.T) {
+	tx := testutil.NewTestTx(t, testPool)
+	ctx := t.Context()
+	on := costDay(2026, time.August, 10)
+
+	cheapHours := newCostFixture(t, tx)
+	cheapHours.logTimeAt(t, tx, cheapHours.onMachine.ID, 600, domain.ServiceTimeKindLabor, on, ratePtr(2000))
+
+	dearHours := newCostFixture(t, tx)
+	dearHours.logTimeAt(t, tx, dearHours.onMachine.ID, 300, domain.ServiceTimeKindLabor, on, ratePtr(9000))
+
+	rows, err := store.NewServiceTicketStore().CostByCustomer(ctx, tx, store.ServiceAccountCostFilter{
+		Sort: domain.ServiceAccountCostByCost,
+	})
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(rows), 2)
+
+	assert.Equal(t, dearHours.customerID, rows[0].CustomerID,
+		"5h at $90 outranks 10h at $20 — which ranking by hours alone would get backwards")
+	assert.Equal(t, 45000, rows[0].Summary.LaborCostCents)
+}

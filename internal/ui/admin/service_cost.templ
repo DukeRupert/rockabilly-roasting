@@ -61,7 +61,7 @@ func allTimeSummary(windows []domain.ServiceCostWindow) domain.ServiceCostWindow
 
 // ServiceCostCard is the full roll-up: a row per window, for the main column of
 // a machine's page.
-templ ServiceCostCard(windows []domain.ServiceCostWindow, rates domain.ServiceLaborRates, emptyLine string) {
+templ ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLine string) {
 	<div class="mt-4 border border-rr-border bg-rr-surface">
 		<div class="px-4 py-4">
 			<h2 class="text-sm font-semibold text-rr-heading">What it has cost</h2>
@@ -76,7 +76,7 @@ templ ServiceCostCard(windows []domain.ServiceCostWindow, rates domain.ServiceLa
 								<th scope="col" class="label-font py-2 pr-4 text-right text-rr-muted">Parts</th>
 								<th scope="col" class="label-font py-2 pr-4 text-right text-rr-muted">Hours</th>
 								<th scope="col" class="label-font py-2 pr-4 text-right text-rr-muted">Visits</th>
-								if rates.Set() {
+								if showCost {
 									<th scope="col" class="label-font py-2 text-right text-rr-muted">Cost</th>
 								}
 							</tr>
@@ -103,9 +103,12 @@ templ ServiceCostCard(windows []domain.ServiceCostWindow, rates domain.ServiceLa
 											<span class="block text-xs text-rr-muted">{ formatMinutes(w.Summary.MinutesPerVisit()) } each</span>
 										}
 									</td>
-									if rates.Set() {
+									if showCost {
 										<td class="py-2 text-right text-sm font-semibold tabular-nums text-rr-heading">
-											{ formatCents(w.Summary.TotalCostCents(rates)) }
+											{ formatCents(w.Summary.TotalCostCents()) }
+											if !w.Summary.FullyCosted() {
+												<span class="block text-xs font-normal text-rr-red">{ formatMinutes(w.Summary.UncostedMinutes) } unpriced</span>
+											}
 										</td>
 									}
 								</tr>
@@ -127,7 +130,7 @@ templ ServiceCostCard(windows []domain.ServiceCostWindow, rates domain.ServiceLa
 // The rail is narrow and this is not the page's argument — it is a fact about
 // the account, sitting beside the machines it was spent on. Somebody who wants
 // the breakdown opens a machine.
-templ serviceCostRailCard(windows []domain.ServiceCostWindow, rates domain.ServiceLaborRates) {
+templ serviceCostRailCard(windows []domain.ServiceCostWindow, showCost bool) {
 	<div class="border border-rr-border bg-rr-surface">
 		<div class="px-4 py-4">
 			<h2 class="text-sm font-semibold text-rr-heading">Service cost</h2>
@@ -145,8 +148,8 @@ templ serviceCostRailCard(windows []domain.ServiceCostWindow, rates domain.Servi
 									<span class="text-rr-muted"> · </span>
 									<span class="tabular-nums">{ formatMinutes(w.Summary.TotalMinutes()) }</span>
 									<span class="text-rr-muted"> · { serviceCostVisits(w.Summary.Visits) }</span>
-									if rates.Set() {
-										<span class="block font-semibold text-rr-heading">{ formatCents(w.Summary.TotalCostCents(rates)) } all in</span>
+									if showCost {
+										<span class="block font-semibold text-rr-heading">{ formatCents(w.Summary.TotalCostCents()) } all in</span>
 									}
 								} else {
 									<span class="text-rr-muted">Nothing</span>

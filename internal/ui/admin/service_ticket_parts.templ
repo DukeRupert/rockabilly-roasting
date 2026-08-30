@@ -252,6 +252,54 @@ type TimeEntryRow struct {
 	StaffName string
 }
 
+// timeEntryCostLine says what the hour was booked at, and what it therefore
+// cost. An unpriced hour says so plainly rather than showing $0.00, which would
+// read as free rather than as undecided.
+func timeEntryCostLine(e domain.ServiceTimeEntry) string {
+	if !e.Costed() {
+		return "not priced"
+	}
+	return formatCents(*e.RateCents) + "/h · " + formatCents(e.CostCents())
+}
+
+// timeEntryRepriceForm is the deliberate counterpart to the rate snapshot.
+//
+// Rates no longer cascade backwards, so an hour logged before the shop had a
+// rate — or at one since decided wrong — needs a way to be corrected. One row
+// at a time, by hand, and audited: that is the difference between a correction
+// and a settings change quietly rewriting history. Blank returns it to
+// unpriced, which takes it out of the money without touching the hours.
+templ timeEntryRepriceForm(props ServiceTicketShowProps, e domain.ServiceTimeEntry) {
+	<form method="post" action={ templ.SafeURL("/admin/service/tickets/" + props.Ticket.ID.String() + "/time/" + e.ID.String() + "/rate") } class="flex items-end gap-1.5">
+		<div>
+			<label for={ "rate-" + e.ID.String() } class="label-font block text-rr-muted">Rate/h</label>
+			<div class="mt-1 flex items-center gap-1">
+				<span class="text-sm text-rr-muted">$</span>
+				<input
+					type="text"
+					id={ "rate-" + e.ID.String() }
+					name="rate"
+					value={ timeEntryRateInput(e) }
+					inputmode="decimal"
+					placeholder="65.00"
+					class="w-20 rounded-sm border border-rr-border bg-rr-surface px-2 py-1.5 text-sm"
+				/>
+			</div>
+		</div>
+		<button type="submit" class="btn-secondary">Price it</button>
+	</form>
+}
+
+// timeEntryRateInput renders the stored rate for the form, blank when unpriced.
+// Blank and "0.00" stay distinct: one is undecided, the other is a decision to
+// charge nothing for the hour.
+func timeEntryRateInput(e domain.ServiceTimeEntry) string {
+	if !e.Costed() {
+		return ""
+	}
+	return fmt.Sprintf("%d.%02d", *e.RateCents/100, *e.RateCents%100)
+}
+
 templ serviceTicketTime(props ServiceTicketShowProps) {
 	<div class="mt-4 border border-rr-border bg-rr-surface">
 		<div class="px-4 py-4">
@@ -276,16 +324,19 @@ templ serviceTicketTime(props ServiceTicketShowProps) {
 									}
 								</div>
 								<div class="text-xs text-rr-muted">
-									{ row.StaffName } · { dayLabel(&row.Entry.PerformedOn) }
+									{ row.StaffName } · { dayLabel(&row.Entry.PerformedOn) } · { timeEntryCostLine(row.Entry) }
 								</div>
 								if row.Entry.Note != "" {
 									<p class="mt-0.5 text-sm text-rr-body">{ row.Entry.Note }</p>
 								}
 							</div>
 							if props.CanWrite {
-								<form method="post" action={ templ.SafeURL("/admin/service/tickets/" + props.Ticket.ID.String() + "/time/" + row.Entry.ID.String() + "/delete") } class="shrink-0">
-									<button type="submit" class="btn-danger" { ConfirmAttrs(timeEntryRemoveConfirm(row.Entry))... }>Remove</button>
-								</form>
+								<div class="flex shrink-0 flex-wrap items-end gap-2">
+									@timeEntryRepriceForm(props, row.Entry)
+									<form method="post" action={ templ.SafeURL("/admin/service/tickets/" + props.Ticket.ID.String() + "/time/" + row.Entry.ID.String() + "/delete") }>
+										<button type="submit" class="btn-danger" { ConfirmAttrs(timeEntryRemoveConfirm(row.Entry))... }>Remove</button>
+									</form>
+								</div>
 							}
 						</li>
 					}

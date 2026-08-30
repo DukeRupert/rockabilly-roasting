@@ -546,12 +546,6 @@ func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sin
 	if err != nil {
 		return domain.ServiceAccountReport{}, err
 	}
-	// A cost ranking with no rate behind it would be a ranking by parts spend
-	// wearing a misleading label. Fall back, and let the page notice the sort
-	// it echoes back is not the one it asked for.
-	if sort == domain.ServiceAccountCostByCost && !rates.Set() {
-		sort = domain.ServiceAccountCostByHours
-	}
 
 	report := domain.ServiceAccountReport{Sort: sort, Rates: rates}
 	if sinceDays > 0 {
@@ -561,7 +555,6 @@ func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sin
 	rows, err := s.tickets.CostByCustomer(ctx, tx, store.ServiceAccountCostFilter{
 		Since: report.Since,
 		Sort:  sort,
-		Rates: rates,
 		// One over the cap, so a full page can be told from an overflowing one
 		// without a second counting query.
 		Limit: accountCostLimit + 1,
@@ -582,6 +575,8 @@ func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sin
 		report.Total.LaborMinutes += r.Summary.LaborMinutes
 		report.Total.TravelMinutes += r.Summary.TravelMinutes
 		report.Total.BillableMinutes += r.Summary.BillableMinutes
+		report.Total.LaborCostCents += r.Summary.LaborCostCents
+		report.Total.UncostedMinutes += r.Summary.UncostedMinutes
 		report.Total.Visits += r.Summary.Visits
 	}
 

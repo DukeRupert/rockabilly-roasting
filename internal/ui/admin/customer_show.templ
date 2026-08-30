@@ -197,7 +197,7 @@ templ CustomerShowContent(props CustomerShowProps) {
 			@customerAddressesCard(props)
 			if props.ServiceEnabled {
 				@customerEquipmentCard(props)
-				@serviceCostRailCard(props.ServiceCost, props.ServiceLaborRates)
+				@serviceCostRailCard(props.ServiceCost, props.showServiceCost())
 			}
 			if len(props.TeamMembers) > 0 {
 				@customerTeamCard(props)
@@ -1001,6 +1001,20 @@ templ CustomerShow(props CustomerShowProps) {
 	}) {
 		@CustomerShowContent(props)
 	}
+}
+
+// showServiceCost decides whether the rail card carries a money figure: as soon
+// as either an hour has been priced or the shop has set a rate.
+func (p CustomerShowProps) showServiceCost() bool {
+	if p.ServiceLaborRates.Set() {
+		return true
+	}
+	for _, w := range p.ServiceCost {
+		if w.Summary.AnyCost() {
+			return true
+		}
+	}
+	return false
 }
 
 // customerEquipmentCard lists the machines this cafe has on the register.

@@ -80,7 +80,7 @@ func SettingsServiceContent(props SettingsServiceProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"mt-6 max-w-2xl border border-rr-border bg-rr-surface\"><div class=\"px-4 py-4\"><h2 class=\"text-sm font-semibold text-rr-heading\">Hourly cost</h2><p class=\"mt-1 text-sm text-rr-muted\">This is what an hour <em>costs you</em> — wages, vehicle, the lot — not what you charge for it. The reports it feeds measure what servicing an account took out of the business, so a charge-out rate here would turn a cost report into a revenue one.</p><form method=\"post\" action=\"/admin/settings/service\" class=\"mt-4\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"mt-6 max-w-2xl border border-rr-border bg-rr-surface\"><div class=\"px-4 py-4\"><h2 class=\"text-sm font-semibold text-rr-heading\">Hourly cost</h2><p class=\"mt-1 text-sm text-rr-muted\">This is what an hour <em>costs you</em> — wages, vehicle, the lot — not what you charge for it. The reports it feeds measure what servicing an account took out of the business, so a charge-out rate here would turn a cost report into a revenue one.</p><p class=\"mt-2 text-sm text-rr-muted\">Hours logged from now on are stamped with this rate and keep it. Hours already logged keep whatever they were stamped with — including nothing, if you had not set a rate yet.</p><form method=\"post\" action=\"/admin/settings/service\" class=\"mt-4\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -92,7 +92,7 @@ func SettingsServiceContent(props SettingsServiceProps) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 58, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 61, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -110,7 +110,7 @@ func SettingsServiceContent(props SettingsServiceProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.LaborRate)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 69, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 72, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
 		if templ_7745c5c3_Err != nil {
@@ -123,7 +123,7 @@ func SettingsServiceContent(props SettingsServiceProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.TravelRate)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 85, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/settings_service.templ`, Line: 88, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 		if templ_7745c5c3_Err != nil {
@@ -139,7 +139,7 @@ func SettingsServiceContent(props SettingsServiceProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></form></div><div class=\"border-t border-rr-border bg-rr-raised px-4 py-3\"><p class=\"text-xs text-rr-muted\">Changing a rate re-costs every past visit — the reports compute from the rate as it stands now, not the rate that was set on the day. The change is recorded in the audit log so a jump in a cost figure can be traced back to it.</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div></form></div><div class=\"border-t border-rr-border bg-rr-raised px-4 py-3\"><p class=\"text-xs text-rr-muted\">Each hour is stamped with the rate in force when it was logged, so changing these prices the next hour and leaves every past one alone. To correct an hour that was priced wrong — or logged before you set a rate at all — reprice it on its own ticket.</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

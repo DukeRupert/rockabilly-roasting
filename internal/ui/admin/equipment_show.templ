@@ -33,14 +33,29 @@ type EquipmentShowProps struct {
 	// quantified form of the repair history below it, and the other half of the
 	// argument this page exists to let staff make.
 	Cost []domain.ServiceCostWindow
-	// LaborRates cost the hours on that card. Unset leaves the money column
-	// off entirely rather than printing a zero.
+	// LaborRates are what the next hour will cost. They no longer price
+	// anything on this page — each hour carries its own — but a shop that has
+	// set one should see the money column before it has logged an hour at it.
 	LaborRates domain.ServiceLaborRates
 	MerchantTZ   *time.Location
 	StaffName    string
 	StaffRole    string
 	CanWrite     bool
 	Flash        Flash
+}
+
+// ShowCost decides whether the cost card carries a money column: as soon as
+// either an hour has been priced or the shop has set a rate.
+func (p EquipmentShowProps) ShowCost() bool {
+	if p.LaborRates.Set() {
+		return true
+	}
+	for _, w := range p.Cost {
+		if w.Summary.AnyCost() {
+			return true
+		}
+	}
+	return false
 }
 
 func (p EquipmentShowProps) siteLine() string {
@@ -142,7 +157,7 @@ templ EquipmentShowContent(props EquipmentShowProps) {
 				</div>
 			</div>
 			@equipmentMaintenanceCard(props)
-			@ServiceCostCard(props.Cost, props.LaborRates, "Nothing has been spent on this one — no parts and no hours recorded.")
+			@ServiceCostCard(props.Cost, props.ShowCost(), "Nothing has been spent on this one — no parts and no hours recorded.")
 			@equipmentRepairHistory(props)
 			@EquipmentActivity(props.Activity, props.MerchantTZ)
 		</div>

@@ -38,6 +38,10 @@ const (
 	AuditServicePartRemoved = "service_ticket.part_removed"
 	AuditServiceTimeLogged  = "service_ticket.time_logged"
 	AuditServiceTimeRemoved = "service_ticket.time_removed"
+	// AuditServiceTimeRepriced records one hour being priced by hand. Rates are
+	// snapshotted onto the entry, so this is the only way a past hour's cost
+	// changes — and the record of who decided it.
+	AuditServiceTimeRepriced = "service_ticket.time_repriced"
 	// AuditServiceStaleSwept records that the daily sweep sent a digest. Not a
 	// per-ticket event — it names how many were quiet, so an unanswered ticket
 	// can later be shown to have been reported and ignored rather than missed.

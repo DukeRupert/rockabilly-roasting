@@ -619,18 +619,43 @@ rate when it lands; it is deliberately not this column.
 - **Costing rounds to the nearest cent**, not truncated. These figures are
   summed across hundreds of entries; a fraction lost on each would drift away
   from the same numbers computed any other way.
-- **Rates are not historised.** Changing one re-costs every past visit, because
-  the reports compute from the rate as it stands. The page says so, and the
-  change is audited (`service.labor_rates_updated`, carrying the old values) so
-  a jump in a cost figure can be traced to it. Snapshotting a rate per time
-  entry is the honest fix if that ever matters; it did not seem worth the column
-  before anyone had used the feature once.
+- **Rates are snapshotted per time entry** (migration `083`). See below.
 
-With a rate set, `ServiceAccountCostByCost` becomes available and becomes the
-default ranking. The ordering happens in SQL because it has to precede the
-LIMIT; a cost sort requested with no rate set falls back to hours rather than
-silently ranking by parts spend under a misleading label, and the control strip
-highlights the sort that actually ran.
+### The snapshot
+
+`service_time_entries.rate_cents` holds what the hour was booked at, stamped
+when the entry is written and never touched by a settings change. The reports
+sum `minutes × rate_cents` per entry; there is no "current rate" for them to
+apply, which is the point.
+
+Before this, raising the rate in March silently made last August more expensive.
+That is the opposite of what a cost record is for: the hour was bought at the
+rate of the day, and that is a fact about the past.
+
+- **The travel fallback resolves at stamp time.** A travel entry logged while
+  only a labour rate existed records the labour rate, so a shop that later adds
+  a travel rate does not retrospectively re-price drives it already made.
+- **Migration 083 backfills at the rate the reports were already using**, so it
+  changes no number anybody can see. A shop with no rate set gets NULL, which is
+  what its reports already showed.
+- **NULL means uncosted, not free.** `UncostedMinutes` rides alongside the cost
+  on every summary, and each surface says how many hours are unpriced rather
+  than letting a total read as complete. `FullyCosted()` is the check.
+- **An explicit `0.00` is a decision** — the shop absorbs the hour — and stays
+  distinguishable from never having priced it. That is why the forms take
+  strings: blank is not zero.
+- **Repricing is by hand, one row at a time**, on the ticket the hour was logged
+  on (`POST /admin/service/tickets/{id}/time/{childID}/rate`, audited as
+  `service_ticket.time_repriced`). Blank returns an hour to unpriced without
+  touching the minutes. This is the deliberate counterpart to the snapshot: a
+  correction is a decision somebody makes and signs for, not a side effect of a
+  settings save.
+
+`ServiceAccountCostByCost` ranks on `parts_cents + labor_cents` — the same
+figure the Cost column prints, ordered in SQL because it has to precede the
+LIMIT. The money column appears as soon as either an hour carries a rate or the
+shop has set one, so a first rate visibly does something before any hour is
+logged at it.
 
 ## Open decisions
 
@@ -694,3 +719,8 @@ highlights the sort that actually ran.
 11. **Done.** Labour rates (migration `082_service_labor_rates.sql`) on a
     module-gated Settings → Service tab, and the Cost column and cost ranking
     they unlock across the three cost surfaces. Details in *Labour rates* above.
+12. **Done.** Rate snapshots (migration `083_time_entry_rate_snapshot.sql`):
+    `service_time_entries.rate_cents`, stamped at write time and backfilled at
+    the rate then in force, plus the per-entry repricing form. Changing the
+    shop's rate no longer re-costs the past. Details in *Labour rates → The
+    snapshot*.

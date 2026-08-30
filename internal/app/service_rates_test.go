@@ -109,6 +109,179 @@ func TestSetLaborRatesIsAudited(t *testing.T) {
 	assert.Equal(t, "service.labor_rates_updated", action)
 }
 
+// The behaviour the snapshot exists for: a rate change prices the next hour and
+// leaves every past one alone.
+func TestRateChangeDoesNotRepriceThePast(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newRatedTicketService()
+	tickets := store.NewServiceTicketStore()
+	customer := testutil.CreateCustomer(t, tx)
+	staffID := testutil.CreateStaff(t, tx)
+
+	ticket, err := tickets.Create(ctx, tx, store.CreateServiceTicketParams{
+		Number: "SVC-SNAP-1", CustomerID: customer.ID, Title: "long job",
+		Severity: domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour: cents(6000),
+	}, testutil.TestActor()))
+
+	// An hour logged at $60.
+	_, err = svc.LogTime(ctx, tx, app.LogTimeParams{
+		TicketID: ticket.ID, StaffID: staffID, Kind: domain.ServiceTimeKindLabor, Minutes: 60,
+	}, testutil.TestActor())
+	require.NoError(t, err)
+
+	totals, err := svc.Totals(ctx, tx, ticket.ID)
+	require.NoError(t, err)
+	require.Equal(t, 6000, totals.LaborCostCents)
+
+	// The shop puts its rate up.
+	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour: cents(9000),
+	}, testutil.TestActor()))
+
+	totals, err = svc.Totals(ctx, tx, ticket.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 6000, totals.LaborCostCents,
+		"the hour was bought at $60 and stays bought at $60")
+
+	// The next hour goes on at the new rate, and the two live side by side.
+	_, err = svc.LogTime(ctx, tx, app.LogTimeParams{
+		TicketID: ticket.ID, StaffID: staffID, Kind: domain.ServiceTimeKindLabor, Minutes: 60,
+	}, testutil.TestActor())
+	require.NoError(t, err)
+
+	totals, err = svc.Totals(ctx, tx, ticket.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 15000, totals.LaborCostCents, "$60 then $90 — not two hours at either")
+}
+
+// Travel resolves its fallback at stamp time, so a shop that later sets a
+// travel rate does not retrospectively re-price drives already made.
+func TestTravelRateStampedAtWriteTime(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newRatedTicketService()
+	tickets := store.NewServiceTicketStore()
+	customer := testutil.CreateCustomer(t, tx)
+	staffID := testutil.CreateStaff(t, tx)
+
+	ticket, err := tickets.Create(ctx, tx, store.CreateServiceTicketParams{
+		Number: "SVC-SNAP-2", CustomerID: customer.ID, Title: "drive",
+		Severity: domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+
+	// No travel rate yet, so the drive is costed as labour.
+	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour: cents(6000),
+	}, testutil.TestActor()))
+	drive, err := svc.LogTime(ctx, tx, app.LogTimeParams{
+		TicketID: ticket.ID, StaffID: staffID, Kind: domain.ServiceTimeKindTravel, Minutes: 60,
+	}, testutil.TestActor())
+	require.NoError(t, err)
+	require.NotNil(t, drive.RateCents)
+	assert.Equal(t, 6000, *drive.RateCents, "with no travel rate the drive is an hour of labour")
+
+	// A travel rate arrives. The drive already made keeps what it was booked at.
+	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour: cents(6000), TravelCentsPerHour: cents(3000),
+	}, testutil.TestActor()))
+
+	totals, err := svc.Totals(ctx, tx, ticket.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 6000, totals.LaborCostCents)
+}
+
+// Hours logged before any rate existed stay unpriced, and say so.
+func TestHoursLoggedBeforeARateAreUnpriced(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newRatedTicketService()
+	tickets := store.NewServiceTicketStore()
+	customer := testutil.CreateCustomer(t, tx)
+	staffID := testutil.CreateStaff(t, tx)
+
+	ticket, err := tickets.Create(ctx, tx, store.CreateServiceTicketParams{
+		Number: "SVC-SNAP-3", CustomerID: customer.ID, Title: "early work",
+		Severity: domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+
+	entry, err := svc.LogTime(ctx, tx, app.LogTimeParams{
+		TicketID: ticket.ID, StaffID: staffID, Kind: domain.ServiceTimeKindLabor, Minutes: 120,
+	}, testutil.TestActor())
+	require.NoError(t, err)
+	assert.False(t, entry.Costed())
+
+	// Setting a rate now does NOT reach backwards — that is the whole point.
+	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour: cents(6500),
+	}, testutil.TestActor()))
+
+	totals, err := svc.Totals(ctx, tx, ticket.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, totals.LaborCostCents)
+	assert.Equal(t, 120, totals.UncostedMinutes)
+	assert.False(t, totals.FullyCosted(), "the page has to be able to say the total is a floor")
+}
+
+// The escape hatch: an unpriced hour can be priced by hand, one row at a time.
+func TestRepriceTimeEntry(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newRatedTicketService()
+	tickets := store.NewServiceTicketStore()
+	customer := testutil.CreateCustomer(t, tx)
+	staffID := testutil.CreateStaff(t, tx)
+
+	ticket, err := tickets.Create(ctx, tx, store.CreateServiceTicketParams{
+		Number: "SVC-SNAP-4", CustomerID: customer.ID, Title: "fixable",
+		Severity: domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+
+	entry, err := svc.LogTime(ctx, tx, app.LogTimeParams{
+		TicketID: ticket.ID, StaffID: staffID, Kind: domain.ServiceTimeKindLabor, Minutes: 120,
+	}, testutil.TestActor())
+	require.NoError(t, err)
+	require.False(t, entry.Costed())
+
+	priced, err := svc.RepriceTimeEntry(ctx, tx, entry.ID, cents(6500), testutil.TestActor())
+	require.NoError(t, err)
+	require.NotNil(t, priced.RateCents)
+	assert.Equal(t, 6500, *priced.RateCents)
+	assert.Equal(t, 13000, priced.CostCents(), "2h at $65")
+
+	totals, err := svc.Totals(ctx, tx, ticket.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 13000, totals.LaborCostCents)
+	assert.True(t, totals.FullyCosted())
+
+	// And back out again, without touching the hours.
+	cleared, err := svc.RepriceTimeEntry(ctx, tx, entry.ID, nil, testutil.TestActor())
+	require.NoError(t, err)
+	assert.False(t, cleared.Costed())
+
+	totals, err = svc.Totals(ctx, tx, ticket.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, totals.LaborCostCents)
+	assert.Equal(t, 120, totals.LaborMinutes, "the hours are still there")
+
+	var action string
+	require.NoError(t, tx.QueryRow(ctx,
+		`SELECT action FROM audit_log WHERE resource_type = 'service_ticket'
+		   AND action = 'service_ticket.time_repriced' ORDER BY created_at DESC LIMIT 1`,
+	).Scan(&action))
+	assert.Equal(t, "service_ticket.time_repriced", action,
+		"a hand-priced hour is a decision, and decisions are recorded")
+}
+
+// The point of the whole feature: with a rate set, accounts can be ranked by
 // The point of the whole feature: with a rate set, accounts can be ranked by
 // what they actually cost — which is a different order from hours alone.
 func TestCostByAccountRanksByCostOnceRated(t *testing.T) {
@@ -133,40 +306,35 @@ func TestCostByAccountRanksByCostOnceRated(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	// The rate has to exist before the hours are logged: it is stamped on each
+	// entry as it is written, and setting it afterwards would not reach back.
+	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour: cents(6500),
+	}, testutil.TestActor()))
+
 	// 10 hours of labour: at $65/h that is $650.
-	_, err = tickets.CreateTimeEntry(ctx, tx, store.CreateTimeEntryParams{
+	_, err = svc.LogTime(ctx, tx, app.LogTimeParams{
 		TicketID: t1.ID, StaffID: staffID, Kind: domain.ServiceTimeKindLabor,
 		Minutes: 600, PerformedOn: now.AddDate(0, 0, -5),
-	})
+	}, testutil.TestActor())
 	require.NoError(t, err)
 	// 30 minutes and a $500 part: $32.50 + $500 = $532.50.
-	_, err = tickets.CreateTimeEntry(ctx, tx, store.CreateTimeEntryParams{
+	_, err = svc.LogTime(ctx, tx, app.LogTimeParams{
 		TicketID: t2.ID, StaffID: staffID, Kind: domain.ServiceTimeKindLabor,
 		Minutes: 30, PerformedOn: now.AddDate(0, 0, -5),
-	})
+	}, testutil.TestActor())
 	require.NoError(t, err)
 	_, err = tickets.CreatePart(ctx, tx, store.CreatePartParams{
 		TicketID: t2.ID, Name: "Burr set", Quantity: 1, UnitCostCents: 50000,
 	})
 	require.NoError(t, err)
 
-	// Before a rate exists, a cost ranking is impossible and falls back.
 	report, err := svc.CostByAccount(ctx, tx, 90, domain.ServiceAccountCostByCost, now)
 	require.NoError(t, err)
-	assert.Equal(t, domain.ServiceAccountCostByHours, report.Sort,
-		"a cost ranking with no rate behind it falls back rather than misleading")
-
-	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
-		LaborCentsPerHour: cents(6500),
-	}, testutil.TestActor()))
-
-	report, err = svc.CostByAccount(ctx, tx, 90, domain.ServiceAccountCostByCost, now)
-	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(report.Rows), 2)
-	assert.True(t, report.Rates.Set())
 	assert.Equal(t, hoursHeavy.ID, report.Rows[0].CustomerID,
-		"$650 of hours outranks a $532.50 part — the ranking hours alone would also give, but for the right reason")
-	assert.Equal(t, 65000, report.Rows[0].Summary.TotalCostCents(report.Rates))
+		"$650 of hours outranks a $532.50 part")
+	assert.Equal(t, 65000, report.Rows[0].Summary.TotalCostCents())
 
 	// By parts spend the order inverts, which is the comparison the rate makes
 	// meaningful rather than redundant.

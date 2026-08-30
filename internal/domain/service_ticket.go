@@ -360,7 +360,26 @@ type ServiceTimeEntry struct {
 	Billable    bool
 	Note        string
 	CreatedAt   time.Time
+	// RateCents is the hourly cost this entry was booked at, captured when it
+	// was written. Nil means uncosted: the hour was logged before the shop had
+	// a rate, and the reports count its minutes and none of its money.
+	//
+	// A settings change never touches this. The hour was bought at the rate of
+	// the day, and that is a fact about the past — see migration 083.
+	RateCents *int
 }
+
+// CostCents is what this entry cost, rounded to the nearest cent. Zero for an
+// uncosted entry, which is honest: nobody has said what that hour was worth.
+func (e ServiceTimeEntry) CostCents() int {
+	if e.RateCents == nil {
+		return 0
+	}
+	return costMinutes(e.Minutes, *e.RateCents)
+}
+
+// Costed reports whether this entry carries a rate.
+func (e ServiceTimeEntry) Costed() bool { return e.RateCents != nil }
 
 // ServiceTotals is the roll-up a ticket page and an account report both need:
 // what the parts cost and where the hours went.
@@ -371,6 +390,15 @@ type ServiceTotals struct {
 	// BillableMinutes counts both kinds, since a shop that bills travel bills
 	// it by the minute like anything else.
 	BillableMinutes int
+	// LaborCostCents is what the hours cost, summed from the rate stamped on
+	// each entry rather than computed from whatever the shop charges today.
+	// That is the point of the snapshot: this number does not move when
+	// somebody edits the rate in Settings.
+	LaborCostCents int
+	// UncostedMinutes are minutes on entries carrying no rate — logged before
+	// the shop set one. Carried so a surface can say "and 4h we never priced"
+	// instead of quietly counting those hours as free.
+	UncostedMinutes int
 }
 
 // TotalMinutes is every minute recorded against the ticket, billable or not.
@@ -470,23 +498,27 @@ func costMinutes(minutes, centsPerHour int) int {
 	return (minutes*centsPerHour + 30) / 60
 }
 
-// LaborCostCents is what the hours on this summary cost, labour and travel at
-// their own rates. Zero when no rate is set.
-func (s ServiceCostSummary) LaborCostCents(rates ServiceLaborRates) int {
-	if !rates.Set() {
-		return 0
-	}
-	return costMinutes(s.LaborMinutes, rates.LaborRate()) +
-		costMinutes(s.TravelMinutes, rates.TravelRate())
+// TotalCostCents is the whole cost of the work — parts plus the hours as they
+// were booked.
+//
+// No rate argument: every hour carries the rate it was bought at, so this is a
+// sum of recorded facts rather than a calculation against today's settings.
+func (s ServiceTotals) TotalCostCents() int {
+	return s.PartsCostCents + s.LaborCostCents
 }
 
-// TotalCostCents is the whole cost of the work — parts plus hours.
-//
-// With no rate set this is the parts figure alone, which is the honest answer:
-// the hours were spent, they are shown beside it, and the shop has not said
-// what they were worth.
-func (s ServiceCostSummary) TotalCostCents(rates ServiceLaborRates) int {
-	return s.PartsCostCents + s.LaborCostCents(rates)
+// AnyCost reports whether there is a money figure worth showing. False on a
+// shop that has never set a rate, where every hour is uncosted and the parts
+// column already says everything the money column would.
+func (s ServiceTotals) AnyCost() bool {
+	return s.LaborCostCents > 0
+}
+
+// FullyCosted reports whether every hour in this summary carries a rate. When
+// false the money figure is a floor, not a total, and the surfaces showing it
+// say so rather than letting it read as complete.
+func (s ServiceTotals) FullyCosted() bool {
+	return s.UncostedMinutes == 0
 }
 
 // ServiceCostWindow is one period of a cost roll-up, ready to render.
@@ -571,10 +603,22 @@ type ServiceAccountReport struct {
 	// Since is the start of the window, zero for all time.
 	Since time.Time
 	Sort  ServiceAccountCostSort
-	// Rates are what the hours were costed at, carried so the table can render
-	// the money column without a second lookup — and so it can leave the column
-	// out entirely when no rate is set.
+	// Rates are what the *next* hour will cost. Since the snapshot moved the
+	// rate onto each entry these no longer price anything in this report; they
+	// are carried so the page can name the current rate in its footnote, and so
+	// a shop that has just set one sees the money column appear before any hour
+	// has been logged at it.
 	Rates ServiceLaborRates
+}
+
+// ShowCost reports whether the money column belongs on the table.
+//
+// True as soon as either an hour carries a rate or the shop has set one. The
+// second half matters: a shop that sets its first rate should see the column
+// arrive immediately, not once somebody logs an hour — otherwise the setting
+// looks like it did nothing.
+func (r ServiceAccountReport) ShowCost() bool {
+	return r.Rates.Set() || r.Total.AnyCost()
 }
 
 // AnyServiceCost reports whether any window in a roll-up holds anything, which

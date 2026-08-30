@@ -139,7 +139,7 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 		</div>
 		<div class="flex items-center gap-2">
 			<span class="label-font text-rr-muted">Rank by</span>
-			for _, s := range serviceSorts(props.Report.Rates.Set()) {
+			for _, s := range serviceSorts(props.Report.ShowCost()) {
 				<a
 					href={ templ.SafeURL(serviceCostsHref(props.Days, s.Value)) }
 					class={ serviceToggleClass(s.Value == string(props.Report.Sort)) }
@@ -163,7 +163,7 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Hours</th>
 							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Parts</th>
 							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Visits</th>
-							if props.Report.Rates.Set() {
+							if props.Report.ShowCost() {
 								<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Cost</th>
 							}
 							<th scope="col" class="label-font px-4 py-3 text-right text-rr-muted">Last worked</th>
@@ -196,11 +196,16 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 										<div class="text-xs text-rr-muted">{ formatMinutes(row.Summary.MinutesPerVisit()) } each</div>
 									}
 								</td>
-								if props.Report.Rates.Set() {
+								if props.Report.ShowCost() {
 									<td class="px-4 py-3 text-right text-sm font-semibold tabular-nums text-rr-heading">
-										{ formatCents(row.Summary.TotalCostCents(props.Report.Rates)) }
+										{ formatCents(row.Summary.TotalCostCents()) }
 										<div class="text-xs font-normal text-rr-muted">
-											{ formatCents(row.Summary.LaborCostCents(props.Report.Rates)) } of it hours
+											if row.Summary.LaborCostCents > 0 {
+												{ formatCents(row.Summary.LaborCostCents) } of it hours
+											}
+											if !row.Summary.FullyCosted() {
+												<span class="text-rr-red">{ formatMinutes(row.Summary.UncostedMinutes) } unpriced</span>
+											}
 										</div>
 									</td>
 								}
@@ -222,9 +227,9 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 							<td class="px-4 py-3 text-right text-sm font-semibold tabular-nums text-rr-heading">
 								{ strconv.Itoa(props.Report.Total.Visits) }
 							</td>
-							if props.Report.Rates.Set() {
+							if props.Report.ShowCost() {
 								<td class="px-4 py-3 text-right text-sm font-semibold tabular-nums text-rr-heading">
-									{ formatCents(props.Report.Total.TotalCostCents(props.Report.Rates)) }
+									{ formatCents(props.Report.Total.TotalCostCents()) }
 								</td>
 							}
 							<td class="px-4 py-3"></td>
@@ -239,9 +244,14 @@ templ ServiceCostsContent(props ServiceCostsProps) {
 			Only the top 200 accounts are shown, so the total above is not the whole period. Narrow the window to see a complete picture.
 		</p>
 	}
+	if !props.Report.Total.FullyCosted() {
+		<p class="mt-3 text-sm text-rr-red">
+			{ formatMinutes(props.Report.Total.UncostedMinutes) } of these hours were logged before the shop had a rate, so no cost is counted against them. Price them on the ticket they were logged on — the totals above are a floor until you do.
+		</p>
+	}
 	if props.Report.Rates.Set() {
 		<p class="mt-3 text-xs text-rr-muted">
-			Hours are costed at { formatCents(props.Report.Rates.LaborRate()) } an hour, travel at { formatCents(props.Report.Rates.TravelRate()) }. Change them in <a href="/admin/settings/service" class="underline">Settings &rarr; Service</a>.
+			Each hour is costed at the rate it was booked at, so changing the rate never re-prices past work. New hours go on at { formatCents(props.Report.Rates.LaborRate()) }, travel at { formatCents(props.Report.Rates.TravelRate()) } — change them in <a href="/admin/settings/service" class="underline">Settings &rarr; Service</a>.
 		</p>
 	} else {
 		<p class="mt-3 text-xs text-rr-muted">

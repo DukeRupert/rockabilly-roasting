@@ -169,12 +169,18 @@ func planTaskRemovable(props ServicePlanShowProps, t domain.ServicePlanTask) boo
 }
 
 // planTaskKeptLabel explains, in place of the control, why it is not offered.
+//
+// "Used", not "done": CountHistoryByTask counts every occurrence that has left
+// the pending-and-unbooked state, which is completed ones, skipped ones, and
+// ones with a ticket open right now. Saying "done" would report work as
+// finished that a tech has not been to yet, or that somebody deliberately
+// skipped — and this label's only job is to explain why the task is staying.
 func planTaskKeptLabel(props ServicePlanShowProps, t domain.ServicePlanTask) string {
 	n := props.TaskHistory[t.ID]
 	if n == 1 {
-		return "Done once — kept for the record"
+		return "Used once — kept for the record"
 	}
-	return "Done " + strconv.Itoa(n) + " times — kept for the record"
+	return "Used " + strconv.Itoa(n) + " times — kept for the record"
 }
 
 templ ServicePlanShowContent(props ServicePlanShowProps) {

@@ -295,8 +295,10 @@ func TestSweepDoesNothingWithTheModuleOff(t *testing.T) {
 	assert.False(t, found, "not even the backfill runs")
 }
 
-// A booked visit leaves a record saying why it exists: the ticket has no human
-// behind it and is otherwise unexplainable from its own page.
+// A booked visit leaves a record saying why it exists, on the machine's own
+// timeline — which is where somebody wondering about an unattended ticket
+// actually looks, and where every other thing that happened to that machine is
+// already listed.
 func TestSweepAuditsWhatItBooked(t *testing.T) {
 	ctx := t.Context()
 	svc := sweepService(t, ctx)
@@ -309,11 +311,24 @@ func TestSweepAuditsWhatItBooked(t *testing.T) {
 	require.NoError(t, svc.SweepMaintenance(ctx, testPool, time.Now(), 0))
 	sweptTickets(t, ctx, customer) // registers teardown
 
+	// Matched on resource_type/resource_id rather than on metadata, because
+	// that pair is what ListByResource("equipment", id) reads — asserting the
+	// row exists somewhere would not have caught it sitting on the ticket,
+	// invisible from the machine.
 	var booked, swept int
 	require.NoError(t, testPool.QueryRow(ctx,
-		`SELECT count(*) FROM audit_log WHERE action = 'equipment.maintenance_booked'
-		   AND metadata->>'equipment_id' = $1`, machine.String()).Scan(&booked))
-	assert.Equal(t, 1, booked, "a ticket nobody opened has to be explainable")
+		`SELECT count(*) FROM audit_log
+		  WHERE action = 'equipment.maintenance_booked'
+		    AND resource_type = 'equipment' AND resource_id = $1`,
+		machine).Scan(&booked))
+	assert.Equal(t, 1, booked, "a ticket nobody opened has to be explainable from the machine")
+
+	var ticketID string
+	require.NoError(t, testPool.QueryRow(ctx,
+		`SELECT metadata->>'ticket_id' FROM audit_log
+		  WHERE action = 'equipment.maintenance_booked' AND resource_id = $1`,
+		machine).Scan(&ticketID))
+	assert.NotEmpty(t, ticketID, "and the ticket it opened has to be reachable from that row")
 
 	require.NoError(t, testPool.QueryRow(ctx,
 		`SELECT count(*) FROM audit_log WHERE action = 'equipment.maintenance_swept'`).Scan(&swept))

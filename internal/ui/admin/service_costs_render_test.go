@@ -79,7 +79,11 @@ func TestNewTablesCarryAccessibleNames(t *testing.T) {
 
 		assert.Contains(t, html, "<caption", "a data table needs an accessible name")
 		assert.Contains(t, html, "Preventive maintenance due in September 2026")
-		assert.Contains(t, html, "Tuesday 1 September",
+		// The chip's own prefix, not the cell heading's "Tuesday 1 September
+		// 2026". The heading is on every cell whether or not anything is due,
+		// so asserting on it passed with no chip on the page at all — which is
+		// the state this test exists to rule out.
+		assert.Contains(t, html, "1 September 2026, no contract: ",
 			"a chip read aloud with no date attached tells a screen-reader user nothing")
 	})
 
@@ -128,9 +132,12 @@ func TestCalendarAccessibleAffordances(t *testing.T) {
 
 	// WCAG 1.4.1: the chips differ by background colour, so the urgency has to
 	// exist as text a screen reader can reach.
-	assert.Contains(t, html, "overdue",
-		"a chip's colour must not be the only thing carrying its state")
-	assert.Contains(t, html, "20 August", "and the date must travel with it")
+	//
+	// One assertion on the chip's whole spoken prefix rather than two loose
+	// substrings: "20 August" alone also matches the cell heading, which every
+	// cell carries, so it held with zero chips rendered.
+	assert.Contains(t, html, "20 August 2026, overdue: ",
+		"a chip's colour must not be the only thing carrying its state, and the date must travel with it")
 }
 
 // Two landmarks called "Section" on one page are two a screen-reader user

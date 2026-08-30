@@ -70,7 +70,9 @@ const (
 	AuditMaintenanceSkipped           = "equipment.maintenance_skipped"
 	// AuditMaintenanceBooked records the sweep opening a routine ticket for a
 	// contract customer's due maintenance. Recorded because a ticket appearing
-	// with no human behind it is otherwise unexplainable from the ticket page.
+	// with no human behind it needs something, somewhere, saying why — and it
+	// goes on the machine, with the rest of that machine's story, rather than
+	// on the ticket it created.
 	AuditMaintenanceBooked = "equipment.maintenance_booked"
 	// AuditMaintenanceSwept records that the daily sweep ran and what it did.
 	// Not a per-machine event: one row a day, so a quiet due list can be told

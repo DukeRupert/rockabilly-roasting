@@ -287,20 +287,27 @@ func (s *ServicePlanService) bookOne(ctx context.Context, pool *pgxpool.Pool, ro
 			return err
 		}
 
-		// A ticket appearing with no human behind it is otherwise
-		// unexplainable from the ticket page: the opened-by fields are empty
-		// and nothing says why today. This is the row that answers it.
+		// Recorded against the machine, like maintenance_completed and
+		// maintenance_skipped, and like the equipment.* namespace this action
+		// sits in. It was on the ticket, which put the one row explaining an
+		// unattended ticket on the only timeline nobody investigating would
+		// think to open — the machine's page shows every other thing that ever
+		// happened to it, and this was the gap in that story.
+		//
+		// The ticket page loses nothing it needs: maintenanceTicketBody
+		// already says which plan and task raised it, so the ticket explains
+		// itself in prose, and ticket_id below keeps the link machine-side.
 		return s.audit.Record(ctx, tx, audit.AuditEntry{
 			ActorType:    domain.AuditActorTypeSystem,
 			ActorName:    "service_maintenance_sweep",
 			Action:       audit.AuditMaintenanceBooked,
-			ResourceType: "service_ticket",
-			ResourceID:   ticket.ID,
+			ResourceType: "equipment",
+			ResourceID:   row.EquipmentID,
 			Metadata: map[string]any{
 				"river_job_id":   riverJobID,
+				"ticket_id":      ticket.ID.String(),
 				"number":         ticket.Number,
 				"customer_id":    row.CustomerID.String(),
-				"equipment_id":   row.EquipmentID.String(),
 				"plan":           row.PlanName,
 				"task":           row.TaskName,
 				"due_on":         row.DueOn.Format(time.DateOnly),

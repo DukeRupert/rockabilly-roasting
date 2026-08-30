@@ -561,7 +561,15 @@ func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sin
 	// the shop has set one for the next. Both halves matter: the first keeps
 	// the column after a rate is cleared, the second makes a shop's first rate
 	// visibly do something before anybody has logged an hour at it.
-	costed, err := s.tickets.AnyCostedTime(ctx, tx)
+	report := domain.ServiceAccountReport{Rates: rates, Limit: accountCostLimit}
+	if sinceDays > 0 {
+		report.Since = now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -sinceDays)
+	}
+
+	// The window has to be known first: asked globally this said yes on the
+	// strength of an hour costed last year, and kept the Cost column over a
+	// quarter with nothing costed in it.
+	costed, err := s.tickets.AnyCostedTime(ctx, tx, report.Since)
 	if err != nil {
 		return domain.ServiceAccountReport{}, err
 	}
@@ -574,13 +582,8 @@ func (s *ServiceTicketService) CostByAccount(ctx context.Context, tx pgx.Tx, sin
 	if sort == domain.ServiceAccountCostByCost && !canCost {
 		sort = domain.ServiceAccountCostByHours
 	}
-
-	report := domain.ServiceAccountReport{
-		Sort: sort, Rates: rates, CanCost: canCost, Limit: accountCostLimit,
-	}
-	if sinceDays > 0 {
-		report.Since = now.UTC().Truncate(24*time.Hour).AddDate(0, 0, -sinceDays)
-	}
+	report.Sort = sort
+	report.CanCost = canCost
 
 	rows, err := s.tickets.CostByCustomer(ctx, tx, store.ServiceAccountCostFilter{
 		Since: report.Since,

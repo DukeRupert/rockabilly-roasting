@@ -300,6 +300,25 @@ func CheckAdminUI() error {
 	return nil
 }
 
+// styleOpenAt reports where a real <style> tag starts on a line, or -1.
+//
+// A line that merely mentions "<style" in a comment does not open a block, and
+// treating it as one was worse than useless: the scan started at the comment,
+// ran to the next genuine </style>, and blanked every line in between — so the
+// code the lint exists to read went unread. packing_slip.templ and
+// layouts/admin.templ both have such a comment today.
+func styleOpenAt(line string) int {
+	idx := strings.Index(line, "<style")
+	if idx < 0 {
+		return -1
+	}
+	before := line[:idx]
+	if strings.Contains(before, "//") || strings.Contains(before, "<!--") {
+		return -1
+	}
+	return idx
+}
+
 // blankStyleBlocks replaces the contents of <style> blocks with empty lines.
 //
 // Inside one, a token name is a definition rather than a class somebody reached
@@ -310,7 +329,7 @@ func CheckAdminUI() error {
 func blankStyleBlocks(src string) string {
 	lines := strings.Split(src, "\n")
 	for i := 0; i < len(lines); i++ {
-		if !strings.Contains(lines[i], "<style") {
+		if styleOpenAt(lines[i]) < 0 {
 			continue
 		}
 		// Only a block that actually closes is blanked. An unmatched "<style"

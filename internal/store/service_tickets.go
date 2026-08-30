@@ -698,7 +698,14 @@ type ServiceCostFilter struct {
 // date yet, and dropping it out of the window would make a repair in progress
 // look free. Falling back through received → ordered → the day the line was
 // written keeps every part in exactly one window.
-const servicePartCostDate = `COALESCE(p.installed_on, p.received_on, p.ordered_on, p.created_at::date)`
+//
+// The created_at fallback is pinned to UTC rather than cast bare. The other
+// three terms are date columns and carry no zone; a bare created_at::date
+// resolves against the session TimeZone, so the same part could fall either
+// side of a window boundary depending on how the connection was configured.
+// The windows themselves are UTC calendar days (see CostByAccount), so UTC is
+// the one that makes the comparison mean something.
+const servicePartCostDate = `COALESCE(p.installed_on, p.received_on, p.ordered_on, (p.created_at AT TIME ZONE 'UTC')::date)`
 
 // CostSummary rolls up parts spend and hours for a machine or an account.
 //
@@ -788,15 +795,28 @@ type ServiceAccountCostFilter struct {
 	Limit int
 }
 
-// AnyCostedTime reports whether a single logged hour anywhere carries a rate.
+// AnyCostedTime reports whether a logged hour inside the window carries a rate.
 //
 // Asked before a cost ranking, because with no costed hour the cost ordering
 // degenerates into ordering by parts spend — the same rows in the same order,
 // under a column heading that claims to mean something else.
-func (s *ServiceTicketStore) AnyCostedTime(ctx context.Context, tx pgx.Tx) (bool, error) {
+//
+// Windowed on the same performed_on the ranking itself uses, and a zero since
+// means all time, exactly as in ServiceAccountCostFilter. Asked globally it
+// answered a different question from the one the caller has: a rate set and
+// used last year would keep the Cost column alive over a quarter whose every
+// hour is uncosted, which is the degenerate ranking this guard exists to catch.
+func (s *ServiceTicketStore) AnyCostedTime(ctx context.Context, tx pgx.Tx, since time.Time) (bool, error) {
+	var args []any
+	window := ""
+	if !since.IsZero() {
+		args = append(args, since)
+		window = fmt.Sprintf(" AND performed_on >= $%d::date", len(args))
+	}
 	var exists bool
 	if err := tx.QueryRow(ctx,
-		`SELECT EXISTS (SELECT 1 FROM service_time_entries WHERE rate_cents IS NOT NULL)`,
+		`SELECT EXISTS (SELECT 1 FROM service_time_entries WHERE rate_cents IS NOT NULL`+window+`)`,
+		args...,
 	).Scan(&exists); err != nil {
 		return false, fmt.Errorf("any costed time: %w", err)
 	}

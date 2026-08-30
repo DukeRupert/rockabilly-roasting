@@ -21,7 +21,10 @@ type ServicePlan struct {
 	Name        string
 	Description string
 	// Category is the kind of machine the plan is written for, or "" for any.
-	// Advisory: it sorts the assignment picker, it does not forbid the odd case.
+	//
+	// A filter, not a hint: ListPlans offers a plan only for machines of its
+	// category (plus the any-machine plans), so a grinder plan is not offered
+	// for an espresso machine at all.
 	Category EquipmentCategory
 	// Active false hides the plan from the picker without disturbing the
 	// machines already on it.

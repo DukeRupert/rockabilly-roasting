@@ -200,10 +200,12 @@ templ MaintenanceCalendarContent(props MaintenanceCalendarProps) {
 			</tbody>
 		</table>
 	</div>
-	<!-- Swatches carry the same values as the chips they explain. A legend that
-	     approximates its own key is a legend somebody has to second-guess. -->
+	<!-- The first three swatches carry the chips' own values; the last carries
+	     today's cell outline. A day holding warranty risk is outlined in red as
+	     well, but the chip is what this names — a legend that approximates its
+	     own key is one somebody has to second-guess. -->
 	<div class="mt-3 flex flex-wrap gap-4 text-xs text-rr-muted">
-		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-red/10 ring-1 ring-rr-red"></span>Warranty at risk</span>
+		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-red/10"></span>Warranty at risk</span>
 		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-amber/20"></span>Overdue</span>
 		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-raised"></span>No contract</span>
 		<span><span class="mr-1 inline-block h-2 w-2 bg-rr-surface ring-1 ring-rr-heading"></span>Today</span>

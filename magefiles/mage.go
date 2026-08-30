@@ -307,7 +307,20 @@ func deadTokenClasses(excluded map[string]bool) ([]string, error) {
 		if err != nil {
 			return err
 		}
+		inStyle := false
 		for lineNum, line := range strings.Split(string(data), "\n") {
+			// Same rule as the blocklist half: inside a <style> block a token
+			// name is a definition, not a class somebody reached for. Without
+			// this the shell's own override stylesheet reads as usage.
+			if strings.Contains(line, "<style") {
+				inStyle = true
+			}
+			if inStyle {
+				if strings.Contains(line, "</style>") {
+					inStyle = false
+				}
+				continue
+			}
 			for _, m := range use.FindAllStringSubmatch(line, -1) {
 				class := strings.TrimRight(m[1], "-")
 				key := path + class

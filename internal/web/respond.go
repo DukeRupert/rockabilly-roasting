@@ -166,6 +166,7 @@ func mapError(err error) (int, string) {
 		errors.Is(err, app.ErrPlanAssignmentEnded),
 		errors.Is(err, app.ErrMaintenanceAlreadyClosed),
 		errors.Is(err, app.ErrMaintenanceDateRequired),
+		errors.Is(err, app.ErrMaintenanceDateOutOfRange),
 		errors.Is(err, app.ErrEquipmentRetired):
 		return http.StatusBadRequest, err.Error()
 

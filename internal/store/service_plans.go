@@ -721,13 +721,19 @@ func maintenanceWhere(f MaintenanceFilter) (string, []any) {
 		add("d.due_on <= $%d", f.To)
 	}
 
-	// Retired machines drop off the *pending* scopes: their schedule is over,
-	// and a due list that nags about a machine in a skip is one staff learn to
-	// ignore. History is the opposite case — 077 keeps retired machines
+	// Retired machines and ended arrangements drop off the *pending* scopes.
+	//
+	// A due list that nags about a machine in a skip is one staff learn to
+	// ignore, and the same goes for work owed under a plan the customer is no
+	// longer on: EndAssignment keeps a booked occurrence so its ticket is not
+	// orphaned, but the row should not go on demanding attention — the ticket
+	// carries the work from there.
+	//
+	// History is the opposite case both times. 077 keeps retired machines
 	// precisely so the record of what was done to them survives, and hiding it
 	// would delete the argument for having replaced the thing.
 	if f.Scope != MaintenanceScopeHistory {
-		where = append(where, "e.status <> 'retired'")
+		where = append(where, "e.status <> 'retired'", "a.ended_at IS NULL")
 	}
 
 	return " WHERE " + strings.Join(where, " AND "), args

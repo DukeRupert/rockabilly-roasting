@@ -628,7 +628,7 @@ func (s *ServiceTicketStore) Totals(ctx context.Context, tx pgx.Tx, ticketID uui
 		`SELECT COALESCE(SUM(minutes) FILTER (WHERE kind = 'labor'), 0),
 		        COALESCE(SUM(minutes) FILTER (WHERE kind = 'travel'), 0),
 		        COALESCE(SUM(minutes) FILTER (WHERE billable), 0),
-		        COALESCE(SUM(round(minutes * rate_cents / 60.0))
+		        COALESCE(SUM(round(minutes::bigint * rate_cents / 60.0))
 		                 FILTER (WHERE rate_cents IS NOT NULL), 0),
 		        COALESCE(SUM(minutes) FILTER (WHERE rate_cents IS NULL), 0)
 		 FROM service_time_entries WHERE ticket_id = $1`,
@@ -761,7 +761,7 @@ func (s *ServiceTicketStore) CostSummary(ctx context.Context, tx pgx.Tx, f Servi
 	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE billable), 0) FROM entries),
 	    -- Each hour at the rate it was booked at, rounded per entry so the
 	    -- figure matches the per-entry ones a staffer can read off the ticket.
-	    (SELECT COALESCE(SUM(round(minutes * rate_cents / 60.0)), 0) FROM entries
+	    (SELECT COALESCE(SUM(round(minutes::bigint * rate_cents / 60.0)), 0) FROM entries
 	      WHERE rate_cents IS NOT NULL),
 	    (SELECT COALESCE(SUM(minutes) FILTER (WHERE rate_cents IS NULL), 0) FROM entries),
 	    (SELECT count(DISTINCT ticket_id) FROM (
@@ -811,9 +811,10 @@ func (s *ServiceTicketStore) AnyCostedTime(ctx context.Context, tx pgx.Tx) (bool
 // small — it is bounded by "customers we did service work for this quarter".
 //
 // Parts and time entries are normalised into one shape and aggregated together
-// rather than joined as two per-customer aggregates. A FULL OUTER JOIN between
-// them would be the obvious way, and it is the way that quietly drops the
-// customer who had parts but no hours logged, or the reverse.
+// rather than joined as two per-customer aggregates. Joining is the obvious
+// way, and an *inner* join is the one that quietly drops the customer who had
+// parts but no hours logged, or the reverse — the UNION keeps both sides
+// without anybody having to remember which join type does that.
 func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f ServiceAccountCostFilter) ([]domain.ServiceAccountCost, error) {
 	var args []any
 
@@ -871,7 +872,10 @@ func (s *ServiceTicketStore) CostByCustomer(ctx context.Context, tx pgx.Tx, f Se
 	           -- NULL rate and are excluded by the same filter that excludes a
 	           -- genuinely uncosted hour, which is why the parts side had to be
 	           -- given the column at all.
-	           COALESCE(SUM(round(minutes * rate_cents / 60.0))
+	           -- bigint: minutes * cents overflows int32 near 358k minutes, and
+	           -- this sum spans every account — one long-lived machine would
+	           -- take the whole report down rather than just its own row.
+	           COALESCE(SUM(round(minutes::bigint * rate_cents / 60.0))
 	                    FILTER (WHERE NOT is_part AND rate_cents IS NOT NULL), 0)
 	                                                                    AS labor_cents,
 	           COALESCE(SUM(minutes) FILTER (WHERE NOT is_part AND rate_cents IS NULL), 0)

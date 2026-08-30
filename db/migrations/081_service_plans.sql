@@ -18,9 +18,12 @@ CREATE TABLE service_plans (
     id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     name        text NOT NULL,
     description text NOT NULL DEFAULT '',
-    -- Which kind of machine the plan is written for. Advisory only: it sorts
-    -- the picker so assigning a grinder plan to a grinder is the path of least
-    -- resistance, but it does not forbid the odd case. Nullable = any machine.
+    -- Which kind of machine the plan is written for. Nullable = any machine.
+    --
+    -- NOTE: written as "advisory only — it sorts the picker"; the application
+    -- has always filtered on it (ListPlans: category IS NULL OR category = $1),
+    -- so a plan is offered only for machines of its kind. Corrected here rather
+    -- than in a new migration because the column and its CHECK are unchanged.
     category    text
                 CHECK (category IN ('espresso_machine', 'grinder', 'brewer', 'water', 'other')),
     -- Retiring a plan hides it from the assignment picker without disturbing

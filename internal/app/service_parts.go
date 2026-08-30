@@ -366,6 +366,13 @@ func (s *ServiceTicketService) rateFor(ctx context.Context, tx pgx.Tx, kind doma
 //
 // A nil rate returns the entry to uncosted, which is how a wrongly-priced hour
 // is taken back out of the money figures without deleting the hours themselves.
+//
+// Zero is accepted, and is a different thing from nil. At settings level a zero
+// *labour* rate is refused, because Set() reads it as unset — but per entry,
+// zero means the shop absorbed that hour, which is exactly what the settings
+// page offers for travel ("set it to 0.00 if you absorb the drive") and what
+// rateFor already stamps. Refusing it here would leave the manual path unable
+// to express a state the automatic one creates every day.
 func (s *ServiceTicketService) RepriceTimeEntry(ctx context.Context, tx pgx.Tx, ticketID, entryID uuid.UUID, rateCents *int, actor Actor) (*domain.ServiceTimeEntry, error) {
 	if rateCents != nil && (*rateCents < 0 || *rateCents > maxLaborRateCents) {
 		return nil, ErrLaborRateInvalid

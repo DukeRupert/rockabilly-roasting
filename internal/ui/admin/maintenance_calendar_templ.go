@@ -453,7 +453,7 @@ func MaintenanceCalendarContent(props MaintenanceCalendarProps) templ.Component 
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</tbody></table></div><!-- Swatches carry the same values as the chips they explain. A legend that\n\t     approximates its own key is a legend somebody has to second-guess. --><div class=\"mt-3 flex flex-wrap gap-4 text-xs text-rr-muted\"><span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-red/10 ring-1 ring-rr-red\"></span>Warranty at risk</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-amber/20\"></span>Overdue</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-raised\"></span>No contract</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-surface ring-1 ring-rr-heading\"></span>Today</span></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</tbody></table></div><!-- The first three swatches carry the chips' own values; the last carries\n\t     today's cell outline. A day holding warranty risk is outlined in red as\n\t     well, but the chip is what this names — a legend that approximates its\n\t     own key is one somebody has to second-guess. --><div class=\"mt-3 flex flex-wrap gap-4 text-xs text-rr-muted\"><span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-red/10\"></span>Warranty at risk</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-amber/20\"></span>Overdue</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-raised\"></span>No contract</span> <span><span class=\"mr-1 inline-block h-2 w-2 bg-rr-surface ring-1 ring-rr-heading\"></span>Today</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

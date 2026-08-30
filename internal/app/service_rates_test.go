@@ -425,3 +425,60 @@ func TestLaborRateZeroIsRefused(t *testing.T) {
 		TravelCentsPerHour: cents(0),
 	}, testutil.TestActor()))
 }
+
+// Zero and unset are different things on an entry, and both are reachable.
+//
+// At settings level a zero labour rate is refused — Set() reads it as unset.
+// Per entry, zero means the shop absorbed the hour: the settings page offers
+// exactly that for travel, and rateFor stamps it. So an hour can be priced at
+// nothing, which is not the same as never having been priced, and only the
+// second belongs in the unpriced-hours warning.
+func TestZeroRateOnAnEntryMeansAbsorbedNotUnpriced(t *testing.T) {
+	ctx := t.Context()
+	tx := testutil.NewTestTx(t, testPool)
+	svc := newRatedTicketService()
+	tickets := store.NewServiceTicketStore()
+	customer := testutil.CreateCustomer(t, tx)
+	staffID := testutil.CreateStaff(t, tx)
+
+	ticket, err := tickets.Create(ctx, tx, store.CreateServiceTicketParams{
+		Number: "SVC-ABSORB-1", CustomerID: customer.ID, Title: "drive",
+		Severity: domain.ServiceSeverityRoutine,
+	})
+	require.NoError(t, err)
+
+	// Labour priced, travel absorbed — the configuration the settings page
+	// describes in so many words.
+	require.NoError(t, svc.SetLaborRates(ctx, tx, domain.ServiceLaborRates{
+		LaborCentsPerHour:  cents(6000),
+		TravelCentsPerHour: cents(0),
+	}, testutil.TestActor()))
+
+	drive, err := svc.LogTime(ctx, tx, app.LogTimeParams{
+		TicketID: ticket.ID, StaffID: staffID, Kind: domain.ServiceTimeKindTravel, Minutes: 90,
+	}, testutil.TestActor())
+	require.NoError(t, err)
+	require.True(t, drive.Costed(), "priced at nothing is still priced")
+	assert.Equal(t, 0, drive.CostCents())
+
+	totals, err := svc.Totals(ctx, tx, ticket.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, totals.UncostedMinutes,
+		"an absorbed drive must not show up as hours nobody has priced")
+	assert.True(t, totals.FullyCosted())
+
+	// And the manual path can express the same state the stamp just created.
+	repriced, err := svc.RepriceTimeEntry(ctx, tx, ticket.ID, drive.ID, cents(0), testutil.TestActor())
+	require.NoError(t, err)
+	assert.True(t, repriced.Costed())
+
+	// Nil is the other thing: back to genuinely unpriced.
+	cleared, err := svc.RepriceTimeEntry(ctx, tx, ticket.ID, drive.ID, nil, testutil.TestActor())
+	require.NoError(t, err)
+	assert.False(t, cleared.Costed())
+
+	totals, err = svc.Totals(ctx, tx, ticket.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 90, totals.UncostedMinutes)
+	assert.False(t, totals.FullyCosted())
+}

@@ -443,6 +443,10 @@ var (
 	// measured from. Defaulting it to today would silently re-anchor a
 	// fortnight-old visit to the day it was typed up.
 	ErrMaintenanceDateRequired = errors.New("when was it done?")
+	// ErrMaintenanceDateOutOfRange catches the slipped year. The day a
+	// completion is logged on anchors the next occurrence, so a date a decade
+	// out takes the machine off the due list for a decade, silently.
+	ErrMaintenanceDateOutOfRange = errors.New("that date is more than ten years away — check the year")
 
 	// ErrLaborRateInvalid guards the hourly rate. The cap exists because
 	// somebody typing cents into a dollars field would put a six-figure number

@@ -49,8 +49,12 @@ const bookingLimit = 25
 //     commits the shop to a visit nobody agreed to pay for. Those rows go on
 //     the call list instead, which is a human's job to work through.
 //
-//  3. Publishes the gauges, always — a series that goes blank on a quiet day is
-//     indistinguishable from a broken exporter.
+//  3. Publishes the gauges and writes one audit row, on every run that gets far
+//     enough to read the counts. A series that goes blank on a quiet day is
+//     indistinguishable from a broken exporter, so neither is behind an early
+//     return — only a failure to read the counts at all can skip them, and that
+//     is logged. With the module off the gauges are zeroed rather than left
+//     holding whatever the shop last had.
 //
 // Returns nil (not an error) when the module is off: that is not a fault, and
 // an error would make River retry a job that can never succeed here.
@@ -62,6 +66,10 @@ const bookingLimit = 25
 // double-books a visit.
 func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool.Pool, now time.Time, riverJobID int64) error {
 	if s.modules == nil || !s.modules.Enabled(domain.ModuleEquipmentService) {
+		// Zeroed, not left alone. A module switched off mid-life would
+		// otherwise pin four series at their last non-zero values forever,
+		// which reads as a shop with permanent overdue maintenance.
+		s.publishMaintenanceGauges(nil)
 		return nil
 	}
 
@@ -81,16 +89,10 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 			"error", countErr.Error())
 	}
 
-	// Reported after the gauges, and the first failure wins — River retries the
-	// whole sweep, and every write it makes is conditional.
-	for _, err := range []error{backfillErr, bookErr, countErr} {
-		if err != nil {
-			return err
-		}
-	}
-
-	// One audit row a day, whatever happened. A quiet due list and a job that
-	// stopped running look identical from the outside otherwise.
+	// One audit row a day, whatever happened — and so, like the gauges, ahead of
+	// any error return. A quiet due list and a job that stopped running look
+	// identical from the outside otherwise, and the days worth explaining are
+	// exactly the ones where something failed.
 	if err := store.Tx(ctx, pool, func(tx pgx.Tx) error {
 		return s.audit.Record(ctx, tx, audit.AuditEntry{
 			ActorType:    domain.AuditActorTypeSystem,
@@ -113,6 +115,15 @@ func (s *ServicePlanService) SweepMaintenance(ctx context.Context, pool *pgxpool
 		// row nobody reads on a normal day.
 		slog.ErrorContext(ctx, "maintenance sweep: audit failed",
 			"backfilled", filled, "booked", booked, "error", err.Error())
+	}
+
+	// Reported last, after the gauges and the audit row, so a failed run still
+	// leaves the trace that explains it. The first failure wins — River retries
+	// the whole sweep, and every write it makes is conditional.
+	for _, err := range []error{backfillErr, bookErr, countErr} {
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

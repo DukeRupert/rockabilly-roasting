@@ -790,20 +790,20 @@ func planTaskEditForm(props ServicePlanShowProps, task domain.ServicePlanTask) t
 			return templ_7745c5c3_Err
 		}
 		if props.LiveMachines > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<p class=\"mt-2 text-xs text-rr-muted\">Changing the interval moves the next due date on ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<p class=\"mt-2 text-xs text-rr-muted\">Changing the interval shifts the next due date on ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(planMachineLabel(props.LiveMachines))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_show.templ`, Line: 337, Col: 92}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_show.templ`, Line: 337, Col: 93}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, " — measured from when each was last done, not from today.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, " by the difference. Anything already owed — overdue, or due today — stays exactly where it is.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

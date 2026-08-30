@@ -334,7 +334,7 @@ templ planTaskEditForm(props ServicePlanShowProps, task domain.ServicePlanTask) 
 			</div>
 			if props.LiveMachines > 0 {
 				<p class="mt-2 text-xs text-rr-muted">
-					Changing the interval moves the next due date on { planMachineLabel(props.LiveMachines) } — measured from when each was last done, not from today.
+					Changing the interval shifts the next due date on { planMachineLabel(props.LiveMachines) } by the difference. Anything already owed — overdue, or due today — stays exactly where it is.
 				</p>
 			}
 			<div class="mt-3">

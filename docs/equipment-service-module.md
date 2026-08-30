@@ -487,9 +487,10 @@ original cadence, and a pure function of the anchor could express neither.
 - **Closing writes the successor, in the same transaction** — for a live
   assignment. A completion that produced no next occurrence is a machine that
   silently falls off the schedule at the moment it was last serviced. Ending an
-  assignment clears its pending row, and closing one out afterwards from a stale
-  page must not resurrect the schedule, so that case deliberately writes no
-  successor. `ServicePlanService.closeDue` is the only
+  assignment clears the pending rows nothing has been booked against — ones
+  already carrying a ticket survive, so the ticket is not orphaned — and closing
+  one out afterwards from a stale page must not resurrect the schedule, so that
+  case deliberately writes no successor. `ServicePlanService.closeDue` is the only
   path, and `CloseDue` is scoped to `status = 'pending'` so a double submit
   closes it once.
 - **Completion re-anchors; a skip does not.** `NextDueAfterCompletion` counts
@@ -514,8 +515,9 @@ Three new tabs in the Service section — `Maintenance`, `Plans` and `Costs`.
   finished ticket attaches to the occurrence.
 - `/admin/service/maintenance/calendar` — a six-week month grid, Monday-first.
 - `/admin/service/plans` and `/admin/service/plans/{id}` — write a plan, add
-  jobs to the series. Editing a task's interval reschedules every pending
-  occurrence of it, which is the point of a plan being a template.
+  jobs to the series. Editing a task's interval shifts every pending occurrence
+  that is not yet owed — overdue and due-today work stays put — which is the
+  point of a plan being a template.
 - The machine's page grows a **Maintenance** card: which plans it is on, what is
   coming up, and the form for putting it on another.
 - The dashboard command bar gets an overdue-maintenance chip, asked for only
@@ -578,9 +580,10 @@ worth finding is large hours over few machines, which is why the machine count
 is in the table rather than left to memory.
 
 `CostByCustomer` normalises parts and time entries into one shape and aggregates
-them together. A FULL OUTER JOIN between two per-customer aggregates is the
-obvious implementation, and it is the one that quietly drops the account with
-parts but no hours logged — there is a test for exactly that.
+them together. Joining two per-customer aggregates is the obvious
+implementation, and an *inner* join is the one that quietly drops the account
+with parts but no hours logged — the UNION keeps both sides without anybody
+having to remember which join type does that. There is a test for exactly that.
 
 **The money figure exists only once the shop supplies a rate.** Parts are in
 cents and work is in minutes; blending them needs an hourly cost, and inventing
@@ -654,7 +657,14 @@ rate of the day, and that is a fact about the past.
   a travel rate does not retrospectively re-price drives it already made.
 - **Migration 083 backfills at the rate the reports were already using**, so it
   changes no number anybody can see. A shop with no rate set gets NULL, which is
-  what its reports already showed.
+  what its reports already showed. On a fresh deploy that is *every* shop: 082
+  adds the rate columns as NULL in the same release, so the backfill finds
+  nothing. It earns its place only for an instance that ran 082 long enough for
+  somebody to set a rate.
+- **Migration 084 drops an index 083 added.** It served no query — every
+  `rate_cents IS NULL` read is an aggregate `FILTER` inside a `SUM`, and the one
+  per-render check tests the complement — so it cost a write on every logged
+  hour and was never read.
 - **NULL means uncosted, not free.** `UncostedMinutes` rides alongside the cost
   on every summary, and each surface says how many hours are unpriced rather
   than letting a total read as complete. `FullyCosted()` is the check.
@@ -766,8 +776,8 @@ what is owed now:
     the rate then in force, plus the per-entry repricing form. Changing the
     shop's rate no longer re-costs the past. Details in *Labour rates → The
     snapshot*.
-13. **Done.** Six rounds of independent review, every one of which failed the
-    branch. The defects clustered: an interval edit that could book a visit the
+13. **Done.** Eleven rounds of independent review, every one of which failed
+    the branch. The defects clustered: an interval edit that could book a visit the
     customer had declined; `AttachTicket` silently no-opping and crossing
     accounts; seventeen validation sentinels answering 500; `bg-rr-paper-warm`,
     which is not a token, leaving today unmarked on the calendar; Skip rejecting
@@ -775,8 +785,9 @@ what is owed now:
     helper rewritten by a careless regex into a call to itself, fatal to the
     process.
 
-    Three of those were behaviours an earlier commit message *claimed* to have
-    fixed and had not. That is the failure mode worth carrying forward from this
+    Five of those were behaviours an earlier commit message *claimed* to have
+    fixed and had not — including one where the "fix" rewrote a doc to ratify
+    the bug, and one where a regex rewrote a helper into a call to itself. That is the failure mode worth carrying forward from this
     build: none of the six was visible to the compiler, the linter, or the test
     suite, so a green `mage check` was never evidence against them. What caught
     them was opening the pages, posting what the forms actually post, and

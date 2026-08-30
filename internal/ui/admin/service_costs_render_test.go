@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -100,4 +101,48 @@ func TestNewTablesCarryAccessibleNames(t *testing.T) {
 		require.NoError(t, ServiceCostCard(windows, false, "nothing yet").Render(ctx, &buf))
 		assert.Contains(t, buf.String(), "Parts and hours by period")
 	})
+}
+
+// Pinning the accessibility work that a018eb1 added, which until now lived only
+// in source and could regress in silence.
+func TestCalendarAccessibleAffordances(t *testing.T) {
+	ctx := context.Background()
+	today := time.Date(2026, time.September, 1, 0, 0, 0, 0, time.UTC)
+	overdue := time.Date(2026, time.August, 20, 0, 0, 0, 0, time.UTC)
+
+	var buf bytes.Buffer
+	props := MaintenanceCalendarProps{
+		Month: today,
+		Days: []MaintenanceCalendarDay{
+			{Date: overdue, InMonth: true, Rows: []domain.MaintenanceDueRow{{
+				MaintenanceDue: domain.MaintenanceDue{DueOn: overdue, Status: domain.MaintenanceStatusPending},
+				CustomerName:   "Blue Bottle",
+				TaskName:       "Backflush",
+				LeadDays:       5,
+			}}},
+		},
+		Today: today,
+	}
+	require.NoError(t, MaintenanceCalendarContent(props).Render(ctx, &buf))
+	html := buf.String()
+
+	// WCAG 1.4.1: the chips differ by background colour, so the urgency has to
+	// exist as text a screen reader can reach.
+	assert.Contains(t, html, "overdue",
+		"a chip's colour must not be the only thing carrying its state")
+	assert.Contains(t, html, "20 August", "and the date must travel with it")
+}
+
+// Two landmarks called "Section" on one page are two a screen-reader user
+// cannot tell apart. The due list draws the Service strip and its own scope
+// strip, so the second carries a name of its own.
+func TestDueListLandmarksAreDistinct(t *testing.T) {
+	var buf bytes.Buffer
+	props := MaintenanceDueProps{Today: time.Now()}
+	require.NoError(t, MaintenanceDueContent(props).Render(context.Background(), &buf))
+	html := buf.String()
+
+	assert.Contains(t, html, `aria-label="Maintenance scope"`)
+	assert.Equal(t, 1, strings.Count(html, `aria-label="Section"`),
+		"exactly one landmark may be called Section")
 }

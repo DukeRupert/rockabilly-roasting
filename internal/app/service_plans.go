@@ -370,13 +370,21 @@ func (s *ServicePlanService) rescheduleTask(ctx context.Context, tx pgx.Tx, task
 	if err != nil {
 		return 0, err
 	}
+	// Counting moves, not examinations. Work already owed stays where it is, so
+	// forty overdue machines used to audit "rescheduled: 40" having moved none
+	// — a number somebody would later read as evidence that dates changed.
+	moved := 0
 	for _, d := range pending {
-		moved := domain.RescheduledDue(d.DueOn, oldInterval, newInterval, now)
-		if err := s.plans.UpdateDueOn(ctx, tx, d.ID, moved); err != nil {
+		next := domain.RescheduledDue(d.DueOn, oldInterval, newInterval, now)
+		if next.Equal(d.DueOn.UTC().Truncate(24 * time.Hour)) {
+			continue
+		}
+		if err := s.plans.UpdateDueOn(ctx, tx, d.ID, next); err != nil {
 			return 0, err
 		}
+		moved++
 	}
-	return len(pending), nil
+	return moved, nil
 }
 
 // RemoveTask takes an item out of a plan's series. Its occurrences go with it —

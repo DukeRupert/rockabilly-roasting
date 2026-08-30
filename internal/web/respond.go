@@ -47,6 +47,20 @@ func Error(w http.ResponseWriter, r *http.Request, err error) {
 	JSON(w, status, map[string]string{"error": msg})
 }
 
+// expectedFailure reports whether an error is one the application named on
+// purpose — a validation rule, a not-found, a state machine refusing a move —
+// as opposed to something that went wrong.
+//
+// The distinction is what separates "tell the operator, in the words the
+// sentinel carries" from "log it, alert on it, and say nothing useful". A
+// redirect-with-flash path that skips the question turns a dead database into a
+// cheerful 303 and a sentence about maintenance schedules, and Sentry never
+// hears about it.
+func expectedFailure(err error) bool {
+	status, _ := mapError(err)
+	return status < http.StatusInternalServerError
+}
+
 // mapError converts sentinel errors to HTTP status codes and messages.
 func mapError(err error) (int, string) {
 	switch {

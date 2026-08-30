@@ -140,6 +140,7 @@ templ MaintenanceCalendarContent(props MaintenanceCalendarProps) {
 	</div>
 	<div class="mt-4 overflow-x-auto border-t border-l border-rr-border">
 		<table class="w-full min-w-3xl table-fixed">
+			<caption class="sr-only">Preventive maintenance due in { props.Month.Format("January 2006") }, by day</caption>
 			<thead>
 				<tr>
 					for _, d := range calendarWeekdays() {
@@ -152,7 +153,12 @@ templ MaintenanceCalendarContent(props MaintenanceCalendarProps) {
 					<tr>
 						for _, day := range props.Days[week*7 : min(week*7+7, len(props.Days))] {
 							<td class={ calendarCellClass(day, props.Today) }>
-								<div class="text-xs font-medium">{ strconv.Itoa(day.Date.Day()) }</div>
+								<!-- The day number is the cell's own heading, not decoration:
+								     without it a screen reader reads a chip with no date on it. -->
+								<div class="text-xs font-medium">
+									<span class="sr-only">{ day.Date.Format("Monday 2 January") }</span>
+									<span aria-hidden="true">{ strconv.Itoa(day.Date.Day()) }</span>
+								</div>
 								<div class="mt-1 space-y-0.5">
 									for _, row := range day.Rows {
 										<a
@@ -160,6 +166,7 @@ templ MaintenanceCalendarContent(props MaintenanceCalendarProps) {
 											class={ calendarChipClass(row, props.Today) }
 											title={ row.CustomerName + " · " + row.MachineDescription() + " · " + row.TaskName }
 										>
+											<span class="sr-only">{ day.Date.Format("2 January") }: </span>
 											{ row.CustomerName } — { row.TaskName }
 										</a>
 									}

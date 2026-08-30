@@ -49,12 +49,14 @@ func serviceCostParts(n int) string {
 // nothing was marked billable, because "0m billable" on a shop that never bills
 // service is a column of zeros telling nobody anything.
 func serviceCostBillableNote(windows []domain.ServiceCostWindow) string {
-	for _, w := range windows {
-		if w.Summary.BillableMinutes > 0 {
-			return "Of all time, " + formatMinutes(allTimeSummary(windows).Summary.BillableMinutes) + " was marked billable."
-		}
+	// The widest window only. Looping to decide and then printing all-time was
+	// right by accident — all-time is last and a superset of the others — and
+	// would have started lying the moment somebody reordered them.
+	allTime := allTimeSummary(windows).Summary
+	if allTime.BillableMinutes == 0 {
+		return ""
 	}
-	return ""
+	return "Of all time, " + formatMinutes(allTime.BillableMinutes) + " was marked billable."
 }
 
 // allTimeSummary picks the widest window. It is the last one by construction;
@@ -102,7 +104,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(emptyLine)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 69, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 71, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -113,7 +115,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"mt-3 overflow-x-auto\"><table class=\"min-w-full\"><thead><tr><th scope=\"col\" class=\"label-font py-2 pr-4 text-left text-rr-muted\">Period</th><th scope=\"col\" class=\"label-font py-2 pr-4 text-right text-rr-muted\">Parts</th><th scope=\"col\" class=\"label-font py-2 pr-4 text-right text-rr-muted\">Hours</th><th scope=\"col\" class=\"label-font py-2 pr-4 text-right text-rr-muted\">Visits</th>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"mt-3 overflow-x-auto\"><table class=\"min-w-full\"><caption class=\"sr-only\">Parts and hours by period</caption> <thead><tr><th scope=\"col\" class=\"label-font py-2 pr-4 text-left text-rr-muted\">Period</th><th scope=\"col\" class=\"label-font py-2 pr-4 text-right text-rr-muted\">Parts</th><th scope=\"col\" class=\"label-font py-2 pr-4 text-right text-rr-muted\">Hours</th><th scope=\"col\" class=\"label-font py-2 pr-4 text-right text-rr-muted\">Visits</th>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -135,7 +137,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(w.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 87, Col: 61}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 90, Col: 61}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -148,7 +150,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(w.Summary.PartsCostCents))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 89, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 92, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -166,7 +168,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(serviceCostParts(w.Summary.PartCount))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 91, Col: 92}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 94, Col: 92}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -184,7 +186,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(w.Summary.TotalMinutes()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 95, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 98, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -202,7 +204,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(w.Summary.TravelMinutes))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 97, Col: 93}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 100, Col: 93}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
@@ -220,7 +222,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(w.Summary.Visits))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 101, Col: 42}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 104, Col: 42}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -238,7 +240,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(w.Summary.MinutesPerVisit()))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 103, Col: 97}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 106, Col: 97}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -261,7 +263,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(w.Summary.TotalCostCents()))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 108, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 111, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -279,7 +281,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 						var templ_7745c5c3_Var11 string
 						templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(w.Summary.UncostedMinutes))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 110, Col: 106}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 113, Col: 106}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 						if templ_7745c5c3_Err != nil {
@@ -312,7 +314,7 @@ func ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLin
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(note)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 120, Col: 80}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 123, Col: 80}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -381,7 +383,7 @@ func serviceCostRailCard(windows []domain.ServiceCostWindow, showCost bool) temp
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(w.Label)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 144, Col: 53}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 147, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -399,7 +401,7 @@ func serviceCostRailCard(windows []domain.ServiceCostWindow, showCost bool) temp
 					var templ_7745c5c3_Var15 string
 					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(w.Summary.PartsCostCents))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 147, Col: 91}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 150, Col: 91}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 					if templ_7745c5c3_Err != nil {
@@ -412,7 +414,7 @@ func serviceCostRailCard(windows []domain.ServiceCostWindow, showCost bool) temp
 					var templ_7745c5c3_Var16 string
 					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(w.Summary.TotalMinutes()))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 149, Col: 77}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 152, Col: 77}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 					if templ_7745c5c3_Err != nil {
@@ -425,7 +427,7 @@ func serviceCostRailCard(windows []domain.ServiceCostWindow, showCost bool) temp
 					var templ_7745c5c3_Var17 string
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(serviceCostVisits(w.Summary.Visits))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 150, Col: 78}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 153, Col: 78}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -443,7 +445,7 @@ func serviceCostRailCard(windows []domain.ServiceCostWindow, showCost bool) temp
 						var templ_7745c5c3_Var18 string
 						templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(formatCents(w.Summary.TotalCostCents()))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 153, Col: 52}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 156, Col: 52}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 						if templ_7745c5c3_Err != nil {
@@ -476,7 +478,7 @@ func serviceCostRailCard(windows []domain.ServiceCostWindow, showCost bool) temp
 							var templ_7745c5c3_Var19 string
 							templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(formatMinutes(w.Summary.UncostedMinutes))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 161, Col: 105}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_cost.templ`, Line: 164, Col: 105}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 							if templ_7745c5c3_Err != nil {

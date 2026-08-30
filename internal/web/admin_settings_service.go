@@ -82,6 +82,10 @@ func (d *Deps) handleAdminServiceLaborRatesUpdate(w http.ResponseWriter, r *http
 			TravelCentsPerHour: travel,
 		}, staffActor(r))
 	}); err != nil {
+		if !expectedFailure(err) {
+			Error(w, r, err)
+			return
+		}
 		d.rejectServiceSettings(w, r, values, err.Error())
 		return
 	}

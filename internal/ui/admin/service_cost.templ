@@ -41,12 +41,14 @@ func serviceCostParts(n int) string {
 // nothing was marked billable, because "0m billable" on a shop that never bills
 // service is a column of zeros telling nobody anything.
 func serviceCostBillableNote(windows []domain.ServiceCostWindow) string {
-	for _, w := range windows {
-		if w.Summary.BillableMinutes > 0 {
-			return "Of all time, " + formatMinutes(allTimeSummary(windows).Summary.BillableMinutes) + " was marked billable."
-		}
+	// The widest window only. Looping to decide and then printing all-time was
+	// right by accident — all-time is last and a superset of the others — and
+	// would have started lying the moment somebody reordered them.
+	allTime := allTimeSummary(windows).Summary
+	if allTime.BillableMinutes == 0 {
+		return ""
 	}
-	return ""
+	return "Of all time, " + formatMinutes(allTime.BillableMinutes) + " was marked billable."
 }
 
 // allTimeSummary picks the widest window. It is the last one by construction;
@@ -70,6 +72,7 @@ templ ServiceCostCard(windows []domain.ServiceCostWindow, showCost bool, emptyLi
 			} else {
 				<div class="mt-3 overflow-x-auto">
 					<table class="min-w-full">
+						<caption class="sr-only">Parts and hours by period</caption>
 						<thead>
 							<tr>
 								<th scope="col" class="label-font py-2 pr-4 text-left text-rr-muted">Period</th>

@@ -32,27 +32,18 @@ type ServicePlanListProps struct {
 	Flash     Flash
 }
 
-// ServicePlanFormValues is the create/edit form as strings, echoed back on
-// error so a rejected submission does not lose what was typed.
+// ServicePlanFormValues is the create form as strings, echoed back on error so
+// a rejected submission does not lose what was typed. The create form only: A plan's active flag is not on it — a plan is written
+// because it is about to be used, and retiring one is a rail action on its own
+// page.
 type ServicePlanFormValues struct {
 	Name        string
 	Description string
 	Category    string
-	Active      bool
 }
 
-// ServicePlanFormValuesFrom fills the form from a plan, or gives an empty one.
-func ServicePlanFormValuesFrom(p *domain.ServicePlan) ServicePlanFormValues {
-	if p == nil {
-		return ServicePlanFormValues{Active: true}
-	}
-	return ServicePlanFormValues{
-		Name:        p.Name,
-		Description: p.Description,
-		Category:    string(p.Category),
-		Active:      p.Active,
-	}
-}
+// NewServicePlanFormValues gives the create form its empty state.
+func NewServicePlanFormValues() ServicePlanFormValues { return ServicePlanFormValues{} }
 
 func planMachineLabel(n int) string {
 	switch n {
@@ -92,6 +83,7 @@ templ ServicePlanListContent(props ServicePlanListProps) {
 			</div>
 		} else {
 			<table class="min-w-full divide-y divide-rr-border">
+				<caption class="sr-only">Maintenance plans and how many machines are on each</caption>
 				<thead>
 					<tr>
 						<th scope="col" class="label-font px-4 py-3 text-left text-rr-muted">Plan</th>

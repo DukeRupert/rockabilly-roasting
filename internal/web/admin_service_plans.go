@@ -109,12 +109,14 @@ func (d *Deps) handleAdminMaintenanceList(w http.ResponseWriter, r *http.Request
 
 // maintenanceScope maps a query-string scope onto a store scope, dropping
 // anything it does not recognise.
+//
+// Only the scopes the tab strip offers. due_soon is a real store scope the
+// sweep and the counters use, but it has no tab and no empty-state sentence, so
+// accepting it by URL would render a list nothing on the page explained.
 func maintenanceScope(raw string) store.MaintenanceScope {
 	switch store.MaintenanceScope(raw) {
 	case store.MaintenanceScopeOverdue:
 		return store.MaintenanceScopeOverdue
-	case store.MaintenanceScopeDueSoon:
-		return store.MaintenanceScopeDueSoon
 	case store.MaintenanceScopeWarranty:
 		return store.MaintenanceScopeWarranty
 	case store.MaintenanceScopeUncovered:
@@ -236,8 +238,10 @@ func maintenancePath(scope string) string {
 	return "/admin/service/maintenance?scope=" + url.QueryEscape(scope)
 }
 
-// parseMaintenanceDay reads a date input, falling back to today when the field
-// was left empty. A `date` is parsed in UTC to match how the column comes back.
+// parseMaintenanceDay reads a date input, returning the caller's fallback when
+// the field was left empty — today for a skip, the zero time for a completion,
+// which the caller turns into ErrMaintenanceDateRequired. A `date` is parsed in
+// UTC to match how the column comes back.
 func parseMaintenanceDay(raw string, fallback time.Time) (time.Time, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -401,7 +405,7 @@ func (d *Deps) planListProps(r *http.Request) (admin.ServicePlanListProps, error
 		Plans:     plans,
 		Nav:       nav,
 		Machines:  machines,
-		Values:    admin.ServicePlanFormValuesFrom(nil),
+		Values:    admin.NewServicePlanFormValues(),
 		StaffName: staffName,
 		StaffRole: staffRole,
 		CanWrite:  staffCan(r, auth.PermWriteService),
@@ -421,7 +425,6 @@ func (d *Deps) handleAdminServicePlanCreate(w http.ResponseWriter, r *http.Reque
 		Name:        r.FormValue("name"),
 		Description: r.FormValue("description"),
 		Category:    r.FormValue("category"),
-		Active:      true,
 	}
 
 	var plan *domain.ServicePlan
@@ -437,6 +440,14 @@ func (d *Deps) handleAdminServicePlanCreate(w http.ResponseWriter, r *http.Reque
 		// Re-render in place rather than redirecting. The commonest rejection
 		// is a duplicate name, and bouncing back to an empty form would throw
 		// away a description somebody had just written.
+		//
+		// Only for failures the application named, though: rendering an
+		// unexpected one as form-validation text would answer a dead database
+		// with HTTP 200 and a tidy little message.
+		if !expectedFailure(err) {
+			Error(w, r, err)
+			return
+		}
 		d.renderPlanList(w, r, values, err.Error())
 		return
 	}
@@ -576,7 +587,7 @@ func (d *Deps) updatePlan(w http.ResponseWriter, r *http.Request, apply func(*ap
 		_, txErr = d.ServicePlanService.EditPlan(ctx, tx, id, params, staffActor(r))
 		return txErr
 	}); err != nil {
-		redirectFlashError(w, r, planPath(id), err.Error())
+		d.redirectOrFail(w, r, planPath(id), err)
 		return
 	}
 
@@ -595,7 +606,7 @@ func (d *Deps) handleAdminServicePlanDelete(w http.ResponseWriter, r *http.Reque
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		return d.ServicePlanService.DeletePlan(ctx, tx, id, staffActor(r))
 	}); err != nil {
-		redirectFlashError(w, r, planPath(id), err.Error())
+		d.redirectOrFail(w, r, planPath(id), err)
 		return
 	}
 
@@ -659,7 +670,11 @@ func (d *Deps) handleAdminServicePlanTaskAdd(w http.ResponseWriter, r *http.Requ
 	}); err != nil {
 		// Instructions can be several lines of procedure. Losing them to a
 		// mistyped interval would be a good way to teach somebody not to write
-		// them in the first place.
+		// them in the first place. Unexpected failures still go up as 500s.
+		if !expectedFailure(err) {
+			Error(w, r, err)
+			return
+		}
 		d.renderPlanShow(w, r, planID, values, err.Error())
 		return
 	}
@@ -684,7 +699,7 @@ func (d *Deps) handleAdminServicePlanTaskDelete(w http.ResponseWriter, r *http.R
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		return d.ServicePlanService.RemoveTask(ctx, tx, planID, taskID, staffActor(r))
 	}); err != nil {
-		redirectFlashError(w, r, planPath(planID), err.Error())
+		d.redirectOrFail(w, r, planPath(planID), err)
 		return
 	}
 
@@ -692,6 +707,22 @@ func (d *Deps) handleAdminServicePlanTaskDelete(w http.ResponseWriter, r *http.R
 }
 
 func planPath(id uuid.UUID) string { return "/admin/service/plans/" + id.String() }
+
+// redirectOrFail sends the operator back with the message a sentinel carries,
+// or — when the failure was not one the application named — hands it to Error
+// so it is logged, reported, and answered with a 500.
+//
+// Every write path in this file used to flash err.Error() unconditionally. That
+// reads fine for "a plan with that name already exists" and very badly for a
+// connection reset: the operator gets a 303 and a sentence in a green-ish
+// panel, and nobody is paged.
+func (d *Deps) redirectOrFail(w http.ResponseWriter, r *http.Request, back string, err error) {
+	if expectedFailure(err) {
+		d.redirectOrFail(w, r, back, err)
+		return
+	}
+	Error(w, r, err)
+}
 
 // --- Assignments, from the machine's page ---
 
@@ -740,7 +771,7 @@ func (d *Deps) handleAdminEquipmentPlanAssign(w http.ResponseWriter, r *http.Req
 		}, staffActor(r))
 		return txErr
 	}); err != nil {
-		redirectFlashError(w, r, back, err.Error())
+		d.redirectOrFail(w, r, back, err)
 		return
 	}
 
@@ -765,7 +796,7 @@ func (d *Deps) handleAdminEquipmentPlanEnd(w http.ResponseWriter, r *http.Reques
 	if err := store.Tx(ctx, d.Pool, func(tx pgx.Tx) error {
 		return d.ServicePlanService.EndAssignment(ctx, tx, equipmentID, assignmentID, time.Now(), staffActor(r))
 	}); err != nil {
-		redirectFlashError(w, r, back, err.Error())
+		d.redirectOrFail(w, r, back, err)
 		return
 	}
 
@@ -973,7 +1004,7 @@ func (d *Deps) handleAdminServicePlanTaskUpdate(w http.ResponseWriter, r *http.R
 		}, d.merchantToday(), staffActor(r))
 		return txErr
 	}); err != nil {
-		redirectFlashError(w, r, planPath(planID), err.Error())
+		d.redirectOrFail(w, r, planPath(planID), err)
 		return
 	}
 
@@ -1035,7 +1066,7 @@ func (d *Deps) handleAdminEquipmentPlanUpdate(w http.ResponseWriter, r *http.Req
 		}, staffActor(r))
 		return txErr
 	}); err != nil {
-		redirectFlashError(w, r, back, err.Error())
+		d.redirectOrFail(w, r, back, err)
 		return
 	}
 

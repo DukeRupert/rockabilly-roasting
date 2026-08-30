@@ -40,27 +40,18 @@ type ServicePlanListProps struct {
 	Flash     Flash
 }
 
-// ServicePlanFormValues is the create/edit form as strings, echoed back on
-// error so a rejected submission does not lose what was typed.
+// ServicePlanFormValues is the create form as strings, echoed back on error so
+// a rejected submission does not lose what was typed. The create form only: A plan's active flag is not on it — a plan is written
+// because it is about to be used, and retiring one is a rail action on its own
+// page.
 type ServicePlanFormValues struct {
 	Name        string
 	Description string
 	Category    string
-	Active      bool
 }
 
-// ServicePlanFormValuesFrom fills the form from a plan, or gives an empty one.
-func ServicePlanFormValuesFrom(p *domain.ServicePlan) ServicePlanFormValues {
-	if p == nil {
-		return ServicePlanFormValues{Active: true}
-	}
-	return ServicePlanFormValues{
-		Name:        p.Name,
-		Description: p.Description,
-		Category:    string(p.Category),
-		Active:      p.Active,
-	}
-}
+// NewServicePlanFormValues gives the create form its empty state.
+func NewServicePlanFormValues() ServicePlanFormValues { return ServicePlanFormValues{} }
 
 func planMachineLabel(n int) string {
 	switch n {
@@ -128,7 +119,7 @@ func ServicePlanListContent(props ServicePlanListProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<table class=\"min-w-full divide-y divide-rr-border\"><thead><tr><th scope=\"col\" class=\"label-font px-4 py-3 text-left text-rr-muted\">Plan</th><th scope=\"col\" class=\"label-font px-4 py-3 text-left text-rr-muted\">Suits</th><th scope=\"col\" class=\"label-font px-4 py-3 text-left text-rr-muted\">Tasks</th><th scope=\"col\" class=\"label-font px-4 py-3 text-left text-rr-muted\">In use</th></tr></thead> <tbody class=\"divide-y divide-rr-border\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<table class=\"min-w-full divide-y divide-rr-border\"><caption class=\"sr-only\">Maintenance plans and how many machines are on each</caption> <thead><tr><th scope=\"col\" class=\"label-font px-4 py-3 text-left text-rr-muted\">Plan</th><th scope=\"col\" class=\"label-font px-4 py-3 text-left text-rr-muted\">Suits</th><th scope=\"col\" class=\"label-font px-4 py-3 text-left text-rr-muted\">Tasks</th><th scope=\"col\" class=\"label-font px-4 py-3 text-left text-rr-muted\">In use</th></tr></thead> <tbody class=\"divide-y divide-rr-border\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -140,7 +131,7 @@ func ServicePlanListContent(props ServicePlanListProps) templ.Component {
 				var templ_7745c5c3_Var2 templ.SafeURL
 				templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/admin/service/plans/" + plan.ID.String()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 107, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 99, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 				if templ_7745c5c3_Err != nil {
@@ -153,7 +144,7 @@ func ServicePlanListContent(props ServicePlanListProps) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(plan.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 108, Col: 20}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 100, Col: 20}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -177,7 +168,7 @@ func ServicePlanListContent(props ServicePlanListProps) templ.Component {
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(plan.Description)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 114, Col: 54}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 106, Col: 54}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 					if templ_7745c5c3_Err != nil {
@@ -195,7 +186,7 @@ func ServicePlanListContent(props ServicePlanListProps) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(planCategoryLabel(plan))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 117, Col: 75}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 109, Col: 75}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -208,7 +199,7 @@ func ServicePlanListContent(props ServicePlanListProps) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.Itoa(plan.TaskCount()))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 118, Col: 82}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 110, Col: 82}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -221,7 +212,7 @@ func ServicePlanListContent(props ServicePlanListProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(planMachineLabel(props.Machines[plan.ID]))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 119, Col: 94}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 111, Col: 94}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -291,7 +282,7 @@ func servicePlanCreateForm(props ServicePlanListProps) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 136, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 128, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -309,7 +300,7 @@ func servicePlanCreateForm(props ServicePlanListProps) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.ResolveAttributeValue(props.Values.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 145, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 137, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 		if templ_7745c5c3_Err != nil {
@@ -337,7 +328,7 @@ func servicePlanCreateForm(props ServicePlanListProps) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.ResolveAttributeValue(string(c))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 156, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 148, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 			if templ_7745c5c3_Err != nil {
@@ -360,7 +351,7 @@ func servicePlanCreateForm(props ServicePlanListProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(c.Label())
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 156, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 148, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -378,7 +369,7 @@ func servicePlanCreateForm(props ServicePlanListProps) templ.Component {
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(props.Values.Description)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 169, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/admin/service_plan_list.templ`, Line: 161, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {

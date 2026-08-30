@@ -99,7 +99,12 @@ func Clean() error {
 
 // Check runs lint, scoping check, admin UI lint, and tests together (CI-style gate).
 func Check() {
-	mg.Deps(Lint, CheckScoping, CheckAdminUI, Test)
+	// CSS first, and not in the parallel group: CheckAdminUI's dead-token half
+	// reads output.css, so against a stale one it would call a freshly added
+	// token dead — a false failure in the check written to prevent false
+	// passes.
+	mg.SerialDeps(CSS, CheckAdminUI)
+	mg.Deps(Lint, CheckScoping, Test)
 }
 
 // CheckAdminUI fails if any admin .templ file reaches for storefront/marketing
@@ -231,8 +236,9 @@ func emitsCSS(compiled, class string) bool {
 // all. Today simply was not marked on the maintenance calendar, and nothing but
 // a browser could have said so.
 //
-// Skipped when output.css has not been built; `mage check` runs css first, and
-// failing here on a clean checkout would be a confusing way to learn that.
+// Skipped when output.css has not been built. `mage check` now builds it first
+// (SerialDeps above), so this only bites somebody running the target bare on a
+// clean checkout, where failing would be a confusing way to learn it.
 func deadTokenClasses(excluded map[string]bool) ([]string, error) {
 	css, err := os.ReadFile("internal/ui/assets/css/output.css")
 	if os.IsNotExist(err) {

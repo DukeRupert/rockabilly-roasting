@@ -1,11 +1,14 @@
 package web
 
 import (
+	"errors"
+	"fmt"
 	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dukerupert/hiri/internal/app"
 	"github.com/dukerupert/hiri/internal/domain"
 )
 
@@ -114,4 +117,35 @@ func TestServiceCostSort(t *testing.T) {
 	assert.True(t, explicit)
 	assert.Equal(t, domain.ServiceAccountCostByHours, sort,
 		"hours is the safe ranking, and the strip highlights it")
+}
+
+// The line between "tell the operator" and "page somebody".
+//
+// Every maintenance write path used to flash err.Error() whatever it was, so a
+// dead database arrived as a 303 and a tidy sentence — and Sentry never heard
+// about it. One of them rendered the same thing at HTTP 200.
+func TestExpectedFailure(t *testing.T) {
+	t.Run("named failures are the operator's to fix", func(t *testing.T) {
+		for _, err := range []error{
+			app.ErrPlanNameTaken,
+			app.ErrPlanHasNoTasks,
+			app.ErrPlanIntervalInvalid,
+			app.ErrMaintenanceDateRequired,
+			app.ErrMaintenanceAlreadyClosed,
+			app.ErrLaborRateZero,
+			app.ErrTravelRateWithoutLabor,
+			app.ErrEquipmentRetired,
+			app.ErrPlanNotFound,
+			app.ErrMaintenanceNotFound,
+		} {
+			assert.True(t, expectedFailure(err), "%v", err)
+		}
+	})
+
+	t.Run("anything else is ours", func(t *testing.T) {
+		assert.False(t, expectedFailure(errors.New("connection reset by peer")))
+		assert.False(t, expectedFailure(fmt.Errorf("audit plan assigned: %w",
+			errors.New("write tcp: broken pipe"))),
+			"a wrapped infrastructure error must not pass as validation text")
+	})
 }
